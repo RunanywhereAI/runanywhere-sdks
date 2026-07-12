@@ -11,11 +11,11 @@
  * return RAC_ERROR_NOT_SUPPORTED).
  */
 
+#include "qhexrt_session.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#include "qhexrt_session.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -30,7 +30,9 @@ using qhexrt_engine::Session;
 using qhexrt_engine::session_close;
 using qhexrt_engine::session_open;
 
-Session* as_session(void* impl) { return static_cast<Session*>(impl); }
+Session* as_session(void* impl) {
+    return static_cast<Session*>(impl);
+}
 
 // Converts the raw STT audio buffer (mono int16 PCM, the RAC contract) into the
 // mono float32 [-1,1] buffer the QHexRT runtime expects. The converted samples
@@ -92,6 +94,7 @@ int stream_trampoline(void* user, const char* utf8, int len, int /*token_id*/, i
 
 struct StopCtx {
     Session* session;
+    bool cancelled = false;
 };
 
 int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_id*/,
@@ -99,6 +102,7 @@ int stop_trampoline(void* user, const char* /*utf8*/, int /*len*/, int /*token_i
     auto* c = static_cast<StopCtx*>(user);
     if (c != nullptr && c->session != nullptr &&
         c->session->cancel.load(std::memory_order_relaxed)) {
+        c->cancelled = true;
         return 0;
     }
     return 1;
@@ -132,15 +136,21 @@ rac_result_t qhexrt_stt_create(const char* model_id, const char* /*config_json*/
     return RAC_SUCCESS;
 }
 
-rac_result_t qhexrt_stt_initialize(void* /*impl*/, const char* /*model_path*/) { return RAC_SUCCESS; }
+rac_result_t qhexrt_stt_initialize(void* /*impl*/, const char* /*model_path*/) {
+    return RAC_SUCCESS;
+}
 
 rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t audio_size,
                                    const rac_stt_options_t* options, rac_stt_result_t* out_result) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr || out_result == nullptr) {
+    if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK transcribe calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
@@ -153,10 +163,10 @@ rac_result_t qhexrt_stt_transcribe(void* impl, const void* audio_data, size_t au
         StopCtx stop_ctx{c};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stop_trampoline, &stop_ctx, &out);
+        if (stop_ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stt) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -171,10 +181,14 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
                                           const rac_stt_options_t* options,
                                           rac_stt_stream_callback_t callback, void* user_data) {
     auto* c = as_session(impl);
-    if (c == nullptr || c->sess == nullptr) {
+    if (c == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
     try {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        if (c->sess == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
         qhx_session_reset(c->sess);  // public SDK stream calls are independent requests
         c->cancel.store(false, std::memory_order_relaxed);
         qhx_inputs in;
@@ -187,10 +201,10 @@ rac_result_t qhexrt_stt_transcribe_stream(void* impl, const void* audio_data, si
         StreamCtx ctx{callback, user_data, c, false, std::string()};
         qhx_output out{};
         qhx_status st = qhx_generate(c->sess, &in, &cfg, stream_trampoline, &ctx, &out);
+        if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
+            return RAC_ERROR_CANCELLED;
+        }
         if (st != 0) {
-            if (ctx.cancelled || c->cancel.load(std::memory_order_relaxed)) {
-                return RAC_ERROR_CANCELLED;
-            }
             RAC_LOG_ERROR(LOG_CAT, "qhx_generate(stt stream) failed: %s", qhx_status_str(st));
             return RAC_ERROR_GENERATION_FAILED;
         }
@@ -205,7 +219,12 @@ rac_result_t qhexrt_stt_get_info(void* impl, rac_stt_info_t* out_info) {
         return RAC_ERROR_NULL_POINTER;
     }
     auto* c = as_session(impl);
-    out_info->is_ready = (c != nullptr && c->sess != nullptr) ? RAC_TRUE : RAC_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    if (c != nullptr) {
+        std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+        is_ready = c->sess != nullptr ? RAC_TRUE : RAC_FALSE;
+    }
+    out_info->is_ready = is_ready;
     out_info->current_model = nullptr;
     out_info->supports_streaming = RAC_TRUE;
     return RAC_SUCCESS;
@@ -213,13 +232,19 @@ rac_result_t qhexrt_stt_get_info(void* impl, rac_stt_info_t* out_info) {
 
 rac_result_t qhexrt_stt_cleanup(void* impl) {
     auto* c = as_session(impl);
-    if (c != nullptr && c->sess != nullptr) {
+    if (c == nullptr) {
+        return RAC_SUCCESS;
+    }
+    std::lock_guard<std::mutex> operation_lock(c->operation_mutex);
+    if (c->sess != nullptr) {
         qhx_session_reset(c->sess);
     }
     return RAC_SUCCESS;
 }
 
-void qhexrt_stt_destroy(void* impl) { session_close(as_session(impl)); }
+void qhexrt_stt_destroy(void* impl) {
+    session_close(as_session(impl));
+}
 
 }  // namespace
 

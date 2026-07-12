@@ -44,7 +44,7 @@ namespace margelo::nitro::runanywhere::onnx {
 
     public:
       // Properties
-
+      
 
     public:
       // Methods

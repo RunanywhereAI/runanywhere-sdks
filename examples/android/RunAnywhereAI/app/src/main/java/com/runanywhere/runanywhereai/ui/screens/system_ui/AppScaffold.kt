@@ -24,14 +24,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.RunAnywhereApplication
-import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.navigation.AppNavHost
 import com.runanywhere.runanywhereai.ui.navigation.Chat
 import com.runanywhere.runanywhereai.ui.navigation.More
+import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.navigation.isConsumerTopLevel
+import com.runanywhere.runanywhereai.ui.navigation.isSelected
 import com.runanywhere.runanywhereai.ui.navigation.navigateTopLevel
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatDetailsSheet
 import com.runanywhere.runanywhereai.ui.screens.chat.ConversationHistorySheet
@@ -69,16 +70,12 @@ fun AppScaffold() {
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
-    val recentConversations = ConversationRepository.summaries
+    val previousDestination = navController.previousBackStackEntry?.destination
     val canNavigateBack = destination != null &&
-        !destination.isConsumerTopLevel() &&
-        navController.previousBackStackEntry != null
+        previousDestination != null &&
+        (!destination.isConsumerTopLevel() || !previousDestination.isSelected(Chat))
     val startNewChat = {
         chatViewModel.clearChat()
-        navController.navigateTopLevel(Chat)
-    }
-    val openConversation = { id: String ->
-        chatViewModel.loadConversation(id)
         navController.navigateTopLevel(Chat)
     }
 
@@ -111,7 +108,15 @@ fun AppScaffold() {
                 AppNavHost(
                     navController = navController,
                     chatViewModel = chatViewModel,
-                    onOpenVision = { navController.navigateTopLevel(Vision) },
+                    onOpenModels = { showModelSheet = true },
+                    // This is an explicit request for live mode. Do not restore a
+                    // previously saved photo-mode Vision destination over its argument.
+                    onOpenVision = {
+                        navController.navigateTopLevel(
+                            Vision(openLiveCamera = true),
+                            restoreState = false,
+                        )
+                    },
                     onOpenVoice = { navController.navigateTopLevel(Voice) },
                     onOpenAdvanced = { navController.navigateTopLevel(More) },
                     modifier = Modifier
@@ -126,14 +131,10 @@ fun AppScaffold() {
                 PermanentNavigationDrawer(
                     drawerContent = {
                         AppNavigationDrawer(
-                            navController = navController,
                             destination = destination,
-                            recentConversations = recentConversations,
                             onNewChat = startNewChat,
-                            onOpenConversation = openConversation,
                             onHistory = { showHistorySheet = true },
-                            onModels = { showModelSheet = true },
-                            onAdapters = { showLoraSheet = true },
+                            onNavigate = { navController.navigateTopLevel(it) },
                             permanent = true,
                         )
                     },
@@ -147,14 +148,10 @@ fun AppScaffold() {
                     gesturesEnabled = showNav,
                     drawerContent = {
                         AppNavigationDrawer(
-                            navController = navController,
                             destination = destination,
-                            recentConversations = recentConversations,
                             onNewChat = startNewChat,
-                            onOpenConversation = openConversation,
                             onHistory = { showHistorySheet = true },
-                            onModels = { showModelSheet = true },
-                            onAdapters = { showLoraSheet = true },
+                            onNavigate = { navController.navigateTopLevel(it) },
                             onDismiss = { afterClose ->
                                 scope.launch {
                                     drawerState.close()

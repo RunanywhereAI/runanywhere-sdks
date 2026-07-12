@@ -15,6 +15,7 @@ import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdown
 import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdownSuspending
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEnvironment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
@@ -23,22 +24,61 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
-import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import com.runanywhere.sdk.infrastructure.logging.SentryDestination
-import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+
+/** Collects sanitized teardown failures while allowing later cleanup to run. */
+internal class ShutdownFailureCollector {
+    private var firstFailure: IllegalStateException? = null
+
+    val hasFailure: Boolean
+        get() = firstFailure != null
+
+    fun record(message: String) {
+        val failure = IllegalStateException(message)
+        val first = firstFailure
+        if (first == null) {
+            firstFailure = failure
+        } else {
+            first.addSuppressed(failure)
+        }
+    }
+
+    fun capture(
+        message: String,
+        action: () -> Unit,
+    ): Boolean =
+        try {
+            action()
+            true
+        } catch (_: Throwable) {
+            record(message)
+            false
+        }
+
+    fun captureNativeShutdown(action: () -> Int): Boolean {
+        val succeeded =
+            try {
+                action() == RunAnywhereBridge.RAC_SUCCESS
+            } catch (_: Throwable) {
+                false
+            }
+        if (!succeeded) {
+            record("Native SDK shutdown failed")
+        }
+        return succeeded
+    }
+
+    fun throwIfAny() {
+        firstFailure?.let { throw it }
+    }
+}
 
 /**
  * CppBridge is the central coordinator for all C++ interop via JNI.
@@ -61,8 +101,11 @@ object CppBridge {
 
     private val lock = Any()
 
-    /** Coroutine scope for async SDK operations, cancelled on shutdown */
-    private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile
+    private var shutdownInProgress: Boolean = false
+
+    @Volatile
+    private var shutdownRetryRequired: Boolean = false
 
     /**
      * Current SDK environment.
@@ -126,6 +169,8 @@ object CppBridge {
      */
     fun initialize(environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         synchronized(lock) {
+            check(!shutdownInProgress) { "CppBridge shutdown is in progress" }
+            check(!shutdownRetryRequired) { "CppBridge reset is required before initialization" }
             if (CppBridgeState.isInitialized) {
                 return
             }
@@ -152,11 +197,14 @@ object CppBridge {
                 RunAnywhereBridge.racConfigureLogging(environment.cEnvironment)
             }
 
-            setupSentryHooks(environment)
-
             // CRITICAL: Set environment early so CppBridgeDevice.isDeviceRegisteredCallback()
             // can determine correct behavior for production/staging modes
             CppBridgeTelemetry.setEnvironment(environment)
+
+            // Resolve the durable identity and register device callbacks before
+            // telemetry can consume it. Any KeyStore/persistence error aborts
+            // initialization with the exact commons rac_result_t.
+            CppBridgeDevice.register()
 
             initializeTelemetryManager(environment)
 
@@ -168,8 +216,6 @@ object CppBridge {
             } else {
                 logger.warn("Telemetry handle not available, analytics events will not be tracked")
             }
-
-            CppBridgeDevice.register()
 
             CppBridgeState.isInitialized = true
 
@@ -187,6 +233,10 @@ object CppBridge {
      */
     private fun initializeTelemetryManager(environment: SDKEnvironment) {
         try {
+            if (!CppBridgeEnvironment.shouldSendTelemetry(environment)) {
+                logger.debug("Telemetry disabled for $environment")
+                return
+            }
             // getDeviceIdCallback() may lazily initialize the persistent UUID
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
@@ -278,6 +328,16 @@ object CppBridge {
         OkHttpHttpTransport.unregister()
     }
 
+    /** Shut down native core state while the platform adapter is still valid. */
+    private fun shutdownNativeCore(failures: ShutdownFailureCollector): Boolean {
+        if (!CppBridgeState.nativeLibraryLoaded) return true
+        val succeeded = failures.captureNativeShutdown(RunAnywhereBridge::racShutdown)
+        if (!succeeded) {
+            logger.warn("Native SDK shutdown failed")
+        }
+        return succeeded
+    }
+
     /**
      * Try to load the native commons library.
      * This is optional - the SDK works without it for non-inference features.
@@ -312,6 +372,8 @@ object CppBridge {
     suspend fun initializeServices() {
         // Guard: check and set initializing flag under lock, then release lock for I/O
         synchronized(lock) {
+            check(!shutdownInProgress) { "CppBridge shutdown is in progress" }
+            check(!shutdownRetryRequired) { "CppBridge reset is required before services initialization" }
             if (!CppBridgeState.isInitialized) {
                 throw IllegalStateException("CppBridge.initialize() must be called before initializeServices()")
             }
@@ -371,13 +433,12 @@ object CppBridge {
      * Shutdown the SDK and release all resources.
      *
      * Mirrors Swift `CppBridge.shutdown()` which is async because AI component
-     * destroy() methods are actor-isolated. The Kotlin entry point remains
-     * non-suspend to preserve the existing `fun shutdownPlatformBridge()`
-     * actual signature; the suspend body is awaited via `runBlocking`. Callers
-     * that already live in a coroutine context should prefer [shutdownSuspending].
+     * destroy() methods are actor-isolated. The compatibility entry point is
+     * non-suspending and awaits the same teardown via `runBlocking`; coroutine
+     * callers should prefer [shutdownSuspending].
      *
      * Order (matching Swift CppBridge.shutdown() exactly):
-     * 1. Destroy AI component bridges (LLM → STT → TTS → VAD → VoiceAgent → VLM)
+     * 1. Destroy stateful AI component bridges (LLM → STT → TTS → VAD → VoiceAgent)
      * 2. Unregister Phase 2 services, Phase 1 core extensions in reverse order.
      *
      * Each component destroy is wrapped in try/catch so a failure in one
@@ -385,6 +446,39 @@ object CppBridge {
      */
     fun shutdown() {
         runBlocking { shutdownSuspending() }
+    }
+
+    /** Tear down Phase 1 state after an initialization failure. */
+    internal fun rollbackInitialization(afterNativeShutdown: () -> Unit = {}) {
+        val failures = ShutdownFailureCollector()
+        synchronized(lock) {
+            if (shutdownInProgress) return
+            shutdownInProgress = true
+            try {
+                CppBridgeDevice.unregister()
+                shutdownNativeCore(failures)
+                if (!runPostNativeShutdownHook(afterNativeShutdown)) {
+                    failures.record("Post-native shutdown hook failed")
+                }
+                failures.capture("SDK event teardown failed") { CppBridgeSDKEvents.unregister() }
+                failures.capture("Telemetry teardown failed") { CppBridgeTelemetry.unregister() }
+                failures.capture("System TTS teardown failed") { SystemTTSModule.unregister() }
+                failures.capture("HTTP transport teardown failed") { unregisterOkHttpTransport() }
+                failures.capture("HTTP configuration teardown failed") { HTTPClientAdapter.reset() }
+                failures.capture("Platform adapter teardown failed") { CppBridgePlatformAdapter.unregister() }
+
+                // A failed partial rollback remains retryable through the
+                // public reset path. Do not clear the bridge/native-loaded
+                // gates until every cleanup step succeeds.
+                if (!failures.hasFailure) {
+                    failures.capture("Bridge state teardown failed") { CppBridgeState.shutdown() }
+                }
+                shutdownRetryRequired = failures.hasFailure
+            } finally {
+                shutdownInProgress = false
+            }
+        }
+        failures.throwIfAny()
     }
 
     /**
@@ -395,84 +489,130 @@ object CppBridge {
      * callers to avoid the `runBlocking` bridge in [shutdown].
      */
     suspend fun shutdownSuspending() {
-        // Snapshot initialization state under the lock without holding it
-        // across the suspend destroy calls below.
-        val wasInitialized =
-            synchronized(lock) {
-                if (!CppBridgeState.isInitialized) {
-                    return
-                }
-                true
-            }
-        if (!wasInitialized) return
+        shutdownSuspending(afterNativeShutdown = {})
+    }
+
+    /**
+     * Platform-facade shutdown hook placed after the terminal native event and
+     * before event and telemetry dependencies are detached.
+     */
+    internal suspend fun shutdownSuspending(afterNativeShutdown: () -> Unit) {
+        // Claim teardown under the synchronous lifecycle lock, then release it
+        // before awaiting component and telemetry work.
+        synchronized(lock) {
+            if ((!CppBridgeState.isInitialized && !shutdownRetryRequired) || shutdownInProgress) return
+            shutdownInProgress = true
+        }
+
+        val failures = ShutdownFailureCollector()
 
         // Destroy AI components sequentially before tearing down Telemetry/Events.
         // Each call is best-effort: a failure in one bridge must not block the rest.
         // Matches Swift CppBridge.shutdown() ordering exactly:
-        //   LLM → STT → TTS → VAD → VoiceAgent → VLM
+        //   LLM → STT → TTS → VAD → VoiceAgent
         try {
             CppBridgeLLM.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeLLM.destroy() failed during shutdown: ${t.message}")
+        } catch (_: Throwable) {
+            logger.warn("LLM bridge teardown failed")
+            failures.record("LLM bridge teardown failed")
         }
         try {
             CppBridgeSTT.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeSTT.destroy() failed during shutdown: ${t.message}")
+        } catch (_: Throwable) {
+            logger.warn("STT bridge teardown failed")
+            failures.record("STT bridge teardown failed")
         }
         try {
             CppBridgeTTS.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeTTS.destroy() failed during shutdown: ${t.message}")
+        } catch (_: Throwable) {
+            logger.warn("TTS bridge teardown failed")
+            failures.record("TTS bridge teardown failed")
         }
         try {
             CppBridgeVAD.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeVAD.destroy() failed during shutdown: ${t.message}")
+        } catch (_: Throwable) {
+            logger.warn("VAD bridge teardown failed")
+            failures.record("VAD bridge teardown failed")
         }
         try {
             CppBridgeVoiceAgent.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeVoiceAgent.destroy() failed during shutdown: ${t.message}")
-        }
-        try {
-            CppBridgeVLM.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeVLM.destroy() failed during shutdown: ${t.message}")
+        } catch (_: Throwable) {
+            logger.warn("Voice-agent bridge teardown failed")
+            failures.record("Voice-agent bridge teardown failed")
         }
 
-        synchronized(lock) {
-            // Re-check in case a concurrent shutdown already tore things down
-            if (!CppBridgeState.isInitialized) {
-                return
+        try {
+            synchronized(lock) {
+                // Stop native device callbacks before canonical shutdown begins.
+                CppBridgeDevice.unregister()
+
+                // Canonical native shutdown publishes its terminal lifecycle event
+                // while EventBus, telemetry, HTTP, logging, and platform services
+                // are still available.
+                shutdownNativeCore(failures)
+                if (!runPostNativeShutdownHook(afterNativeShutdown)) {
+                    failures.record("Post-native shutdown hook failed")
+                }
+
+                if (!failures.capture("SDK event teardown failed") { CppBridgeSDKEvents.unregister() }) {
+                    logger.warn("SDK event teardown failed")
+                }
             }
 
-            // Cancel any pending async operations
-            sdkScope.cancel()
+            // Native flush callbacks run on this lifetime's replaceable scope.
+            // Drain it before HTTP credentials or transport are released.
+            try {
+                CppBridgeTelemetry.unregisterSuspending()
+            } catch (_: Throwable) {
+                logger.warn("Telemetry callback drain failed during shutdown")
+                failures.record("Telemetry callback drain failed during shutdown")
+            }
 
-            // Unregister Phase 1 core extensions (reverse order)
-            CppBridgeDevice.unregister()
-            CppBridgeTelemetry.unregister()
-            CppBridgeSDKEvents.unregister()
-            SystemTTSModule.unregister()
+            synchronized(lock) {
+                if (!failures.capture("System TTS teardown failed") { SystemTTSModule.unregister() }) {
+                    logger.warn("System TTS teardown failed")
+                }
 
-            // Release the OkHttp transport before the
-            // platform adapter, so any final rac_http_request_* inside shutdown
-            // (e.g. telemetry flush) still has a working HTTP path.
-            unregisterOkHttpTransport()
+                // Telemetry flush/destroy above may use HTTP, so release the
+                // transport and copied credentials only after telemetry is gone.
+                if (!failures.capture("HTTP transport teardown failed") { unregisterOkHttpTransport() }) {
+                    logger.warn("HTTP transport teardown failed")
+                }
+                if (!failures.capture("HTTP configuration teardown failed") { HTTPClientAdapter.reset() }) {
+                    logger.warn("HTTP configuration teardown failed")
+                }
 
-            CppBridgePlatformAdapter.unregister()
+                if (!failures.capture("Platform adapter teardown failed") { CppBridgePlatformAdapter.unregister() }) {
+                    logger.warn("Platform adapter teardown failed")
+                }
 
-            // Teardown Sentry logging
-            teardownSentryLogging()
-
-            // Clear Sentry hooks
-            Logging.sentrySetupHook = null
-            Logging.sentryTeardownHook = null
-
-            CppBridgeState.reset()
+                // Keep the Kotlin/native-loaded gates intact after any failure
+                // so a fail-closed RunAnywhere.reset() retry re-enters this
+                // canonical teardown. Clear them only after every step succeeds.
+                if (!failures.hasFailure &&
+                    !failures.capture("Bridge state teardown failed") { CppBridgeState.shutdown() }
+                ) {
+                    logger.warn("Bridge state teardown failed")
+                }
+                shutdownRetryRequired = failures.hasFailure
+            }
+        } finally {
+            synchronized(lock) {
+                shutdownInProgress = false
+            }
         }
+
+        failures.throwIfAny()
     }
+
+    private fun runPostNativeShutdownHook(hook: () -> Unit): Boolean =
+        try {
+            hook()
+            true
+        } catch (_: Throwable) {
+            logger.warn("Post-native shutdown hook failed")
+            false
+        }
 
     /**
      * Check if the C++ core is initialized.
@@ -482,60 +622,5 @@ object CppBridge {
     fun isNativeInitialized(): Boolean {
         if (!CppBridgeState.isInitialized || !isNativeLibraryLoaded) return false
         return RunAnywhereBridge.racIsInitialized()
-    }
-
-    /**
-     * Setup Sentry hooks so Logging can trigger Sentry setup/teardown dynamically.
-     *
-     * This allows runtime enabling/disabling of Sentry logging via Logging.setSentryLoggingEnabled()
-     */
-    private fun setupSentryHooks(environment: SDKEnvironment) {
-        Logging.sentrySetupHook = {
-            setupSentryLogging(environment)
-        }
-
-        Logging.sentryTeardownHook = {
-            teardownSentryLogging()
-        }
-    }
-
-    /**
-     * Initialize Sentry logging for error tracking.
-     *
-     * Matches iOS SDK's setupSentryLogging() in Logging class.
-     *
-     * @param environment SDK environment for tagging Sentry events
-     */
-    private fun setupSentryLogging(environment: SDKEnvironment) {
-        try {
-            SentryManager.initialize(environment = environment)
-
-            if (SentryManager.isInitialized) {
-                Logging.addDestinationSync(SentryDestination())
-                logger.info("Sentry logging initialized")
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to setup Sentry logging: ${e.message}")
-        }
-    }
-
-    /**
-     * Teardown Sentry logging.
-     */
-    private fun teardownSentryLogging() {
-        try {
-            val sentryDestination =
-                Logging.destinations.find {
-                    it.identifier == SentryDestination.DESTINATION_ID
-                }
-            if (sentryDestination != null) {
-                Logging.removeDestinationSync(sentryDestination)
-            }
-
-            SentryManager.close()
-            logger.info("Sentry logging disabled")
-        } catch (e: Exception) {
-            logger.error("Failed to teardown Sentry logging: ${e.message}")
-        }
     }
 }

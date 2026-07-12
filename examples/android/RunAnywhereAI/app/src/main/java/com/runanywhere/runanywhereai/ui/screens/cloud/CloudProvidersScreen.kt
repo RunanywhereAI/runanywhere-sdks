@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,13 +36,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.cloud.CloudPreset
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderConfig
+import com.runanywhere.runanywhereai.ui.HybridBetaCopy
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import java.net.URI
 
 @Composable
 fun CloudProvidersScreen() {
@@ -58,22 +62,35 @@ fun CloudProvidersScreen() {
             verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
             Text(
-                "Register any cloud STT provider — its key, endpoint and format. " +
-                    "Registered providers can back the online side of Hybrid transcription.",
+                HybridBetaCopy.CLOUD_PROVIDERS_EXPLANATION,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            vm.errorMessage?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             vm.providers.forEach { config ->
                 ProviderCard(
                     config = config,
-                    onEdit = { editing = EditTarget(config) },
+                    onEdit = {
+                        vm.clearError()
+                        editing = EditTarget(config)
+                    },
                     onDelete = { vm.delete(config.id) },
                 )
             }
 
             OutlinedButton(
-                onClick = { editing = EditTarget(null) },
+                onClick = {
+                    vm.clearError()
+                    editing = EditTarget(null)
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(RACIcons.Outline.Plus, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
@@ -85,10 +102,15 @@ fun CloudProvidersScreen() {
     editing?.let { target ->
         ProviderSheet(
             initial = target.config,
-            onDismiss = { editing = null },
-            onSave = { label, preset, model, apiKey, baseUrl ->
-                vm.save(target.config?.id, label, preset, model, apiKey, baseUrl)
+            errorMessage = vm.errorMessage,
+            onDismiss = {
+                vm.clearError()
                 editing = null
+            },
+            onSave = { label, preset, model, apiKey, baseUrl ->
+                if (vm.save(target.config?.id, label, preset, model, apiKey, baseUrl)) {
+                    editing = null
+                }
             },
         )
     }
@@ -143,6 +165,7 @@ private fun ProviderCard(config: CloudProviderConfig, onEdit: () -> Unit, onDele
 @Composable
 private fun ProviderSheet(
     initial: CloudProviderConfig?,
+    errorMessage: String?,
     onDismiss: () -> Unit,
     onSave: (label: String, preset: CloudPreset, model: String, apiKey: String, baseUrl: String) -> Unit,
 ) {
@@ -163,7 +186,10 @@ private fun ProviderSheet(
         preset = value
     }
 
-    val canSave = apiKey.isNotBlank()
+    val parsedBaseUrl = runCatching { URI(baseUrl.trim()) }.getOrNull()
+    val validBaseUrl = parsedBaseUrl?.scheme.equals("https", ignoreCase = true) &&
+        !parsedBaseUrl?.host.isNullOrBlank() && parsedBaseUrl.userInfo == null
+    val canSave = apiKey.isNotBlank() && validBaseUrl
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -209,14 +235,27 @@ private fun ProviderSheet(
                 value = apiKey, onValueChange = { apiKey = it },
                 label = { Text("API key") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = baseUrl, onValueChange = { baseUrl = it },
                 label = { Text("Base URL") }, singleLine = true,
                 placeholder = { Text(preset.defaultBaseUrl.ifBlank { "https://…" }) },
+                isError = baseUrl.isNotBlank() && !validBaseUrl,
+                supportingText = if (baseUrl.isNotBlank() && !validBaseUrl) {
+                    { Text("Enter a valid HTTPS URL without embedded credentials") }
+                } else null,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            errorMessage?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
                 TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }

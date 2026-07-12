@@ -107,16 +107,16 @@ typedef struct rac_telemetry_payload {
 
     // VLM-specific fields (VLM also carries the LLM token fields above)
     int32_t image_count;
-    int32_t vision_tokens;          // image/vision tokens (via properties carrier)
-    double vision_encode_time_ms;   // vision encode time (via properties carrier)
-    const char* image_resolution;   // "WxH" (via properties carrier; string → dup'd/freed)
+    int32_t vision_tokens;         // image/vision tokens (via properties carrier)
+    double vision_encode_time_ms;  // vision encode time (via properties carrier)
+    const char* image_resolution;  // "WxH" (via properties carrier; string → dup'd/freed)
 
     // RAG-specific fields
     int32_t retrieved_docs_count;
 
     // Embeddings-specific fields (embedding_model is read from model_id)
-    int32_t input_count;        // texts embedded in the op
-    int32_t vectors_produced;   // vectors returned
+    int32_t input_count;          // texts embedded in the op
+    int32_t vectors_produced;     // vectors returned
     int32_t embedding_dimension;  // vector dimension (via properties carrier)
 
     // RAG-specific extras (via properties carrier; retrieved_docs_count above)
@@ -126,7 +126,7 @@ typedef struct rac_telemetry_payload {
 
     // LoRA-specific fields. Strings → must be dup'd/freed in track + payload_free.
     const char* adapter_id;
-    const char* operation;  // attach/detach/failed (derived from capability kind)
+    const char* operation;       // attach/detach/failed (derived from capability kind)
     int64_t adapter_size_bytes;  // adapter file size in bytes (via properties carrier)
 
     // ImageGen / diffusion fields (all via properties carrier). Strings (scheduler,

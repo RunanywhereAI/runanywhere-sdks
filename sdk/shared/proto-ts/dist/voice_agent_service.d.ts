@@ -196,20 +196,6 @@ export interface VoiceAgentComposeConfig {
     vadEnergyThreshold: number;
     /**
      * -------------------------------------------------------------------
-     * Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-     * rac_wakeword_config_t).
-     * -------------------------------------------------------------------
-     */
-    wakewordEnabled: boolean;
-    wakewordModelPath?: string | undefined;
-    wakewordModelId?: string | undefined;
-    wakewordPhrase?: string | undefined;
-    /** default 0.5 */
-    wakewordThreshold: number;
-    wakewordEmbeddingModelPath?: string | undefined;
-    wakewordVadModelPath?: string | undefined;
-    /**
-     * -------------------------------------------------------------------
      * Session-behavior sub-config. Optional so the C ABI can be invoked
      * without runtime-behavior overrides (engine defaults applied).
      * -------------------------------------------------------------------

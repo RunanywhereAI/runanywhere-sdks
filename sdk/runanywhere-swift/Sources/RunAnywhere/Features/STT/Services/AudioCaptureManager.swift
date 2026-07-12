@@ -9,6 +9,7 @@
 @preconcurrency import AVFoundation
 import CRACommons
 import Foundation
+import os
 
 #if os(macOS)
 import AudioToolbox
@@ -59,24 +60,10 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     /// Request microphone permission
     public func requestPermission() async -> Bool {
         #if os(iOS)
-        // Use modern AVAudioApplication API for iOS 17+
-        if #available(iOS 17.0, *) {
-            return await AVAudioApplication.requestRecordPermission()
-        } else {
-            // Fallback to deprecated API for older iOS versions
-            return await withCheckedContinuation { continuation in
-                AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
-        }
+        return await AVAudioApplication.requestRecordPermission()
         #elseif os(tvOS)
-        // tvOS doesn't have AVAudioApplication, use legacy API
-        return await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                continuation.resume(returning: granted)
-            }
-        }
+        // tvOS is not an advertised SDK platform.
+        return false
         #elseif os(macOS)
         // On macOS, use AVCaptureDevice for permission request
         return await withCheckedContinuation { continuation in
@@ -294,13 +281,17 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
         }
 
         var error: NSError?
-        var hasProvidedData = false
+        let hasProvidedData = OSAllocatedUnfairLock(initialState: false)
         let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
-            if hasProvidedData {
+            let shouldProvide = hasProvidedData.withLock { provided in
+                guard !provided else { return false }
+                provided = true
+                return true
+            }
+            if !shouldProvide {
                 outStatus.pointee = .noDataNow
                 return nil
             }
-            hasProvidedData = true
             outStatus.pointee = .haveData
             return buffer
         }

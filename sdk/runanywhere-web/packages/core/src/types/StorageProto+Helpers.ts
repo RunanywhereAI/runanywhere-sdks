@@ -18,7 +18,6 @@ import {
   ModelStorageMetrics,
   StorageAvailability,
   StorageInfo,
-  StoredModel,
 } from '@runanywhere/proto-ts/storage_types';
 
 // MARK: - DeviceStorageInfo
@@ -138,21 +137,6 @@ export function storageInfoModelCount(info: StorageInfo): number {
   return info.models.length;
 }
 
-/**
- * Project per-model metrics rows into the `StoredModel` shape.
- * Swift parity: `RAStorageInfo.storedModels` (StorageProto+Helpers.swift:83-91):
- * `name` mirrors `modelId` because metrics rows carry no display name.
- */
-export function storageInfoStoredModels(info: StorageInfo): StoredModel[] {
-  return info.models.map((metrics) =>
-    StoredModel.fromPartial({
-      modelId: metrics.modelId,
-      name: metrics.modelId,
-      sizeBytes: metrics.sizeOnDiskBytes,
-    }),
-  );
-}
-
 // MARK: - ModelStorageMetrics
 
 /**
@@ -170,27 +154,6 @@ export function makeModelStorageMetrics(
     sizeOnDiskBytes,
     lastUsedMs,
   });
-}
-
-// MARK: - StoredModel
-
-/**
- * On-disk path of the stored model, with the Swift `/unknown` fallback.
- * Swift parity: `RAStoredModel.path` (StorageProto+Helpers.swift:119) —
- * Swift wraps the path in a file `URL`; Web has no file-URL type, so the
- * raw path string is returned.
- */
-export function storedModelPath(model: StoredModel): string {
-  return model.localPath.length === 0 ? '/unknown' : model.localPath;
-}
-
-/**
- * Download-completion timestamp as a `Date` (epoch when absent).
- * Swift parity: `RAStoredModel.createdDate` (StorageProto+Helpers.swift:121-124).
- */
-export function storedModelCreatedDate(model: StoredModel): Date {
-  if (model.downloadedAtMs === undefined) return new Date(0);
-  return new Date(model.downloadedAtMs);
 }
 
 // MARK: - StorageAvailability

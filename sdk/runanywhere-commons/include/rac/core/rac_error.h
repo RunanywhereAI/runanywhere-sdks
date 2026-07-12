@@ -87,7 +87,7 @@ extern "C" {
 #define RAC_ERROR_INVALID_MODEL_FORMAT ((rac_result_t) - 114)
 /** Model storage is corrupted */
 #define RAC_ERROR_MODEL_STORAGE_CORRUPTED ((rac_result_t) - 115)
-/** Model not loaded (alias for backward compatibility) */
+/** Required model is not currently loaded */
 #define RAC_ERROR_MODEL_NOT_LOADED ((rac_result_t) - 116)
 
 // =============================================================================

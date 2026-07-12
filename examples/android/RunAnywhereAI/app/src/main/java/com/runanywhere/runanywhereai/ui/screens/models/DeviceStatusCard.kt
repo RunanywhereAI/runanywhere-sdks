@@ -19,10 +19,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 
 @Composable
 fun DeviceStatusCard(info: DeviceInfo, modifier: Modifier = Modifier) {
@@ -33,17 +36,59 @@ fun DeviceStatusCard(info: DeviceInfo, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.surface,
     ) {
         Column(modifier = Modifier.padding(horizontal = dimens.spacingLg)) {
+            TierHeader(info)
+            Line()
             DeviceRow(RACIcons.Outline.DeviceMobile, "Model", info.model)
             Line()
             DeviceRow(RACIcons.Outline.Cpu, "Chip", info.chip)
             Line()
             DeviceRow(RACIcons.Outline.Database, "Memory", if (info.memoryMb > 0) "${info.memoryMb} MB" else "—")
+            Line()
+            DeviceRow(
+                RACIcons.Filled.Bolt,
+                "NPU",
+                info.npuName ?: "Not detected",
+                valueColor = if (info.hasNpu) primaryGreen else null,
+            )
         }
     }
 }
 
 @Composable
-private fun DeviceRow(icon: ImageVector, label: String, value: String) {
+private fun TierHeader(info: DeviceInfo) {
+    val dimens = LocalDimens.current
+    val accent = if (info.hasNpu) primaryGreen else MaterialTheme.colorScheme.primary
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = dimens.spacingMd),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(dimens.radiusMd))
+                .background(accent.copy(alpha = 0.14f)),
+        ) {
+            Icon(RACIcons.Outline.Cpu, contentDescription = null, tint = accent, modifier = Modifier.size(dimens.iconMd))
+        }
+        Spacer(Modifier.width(dimens.spacingMd))
+        Column {
+            Text(
+                info.tierSummary,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Recommendations tuned to this device",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeviceRow(icon: ImageVector, label: String, value: String, valueColor: Color? = null) {
     val dimens = LocalDimens.current
     val accent = MaterialTheme.colorScheme.primary
     Row(
@@ -62,7 +107,12 @@ private fun DeviceRow(icon: ImageVector, label: String, value: String) {
         Spacer(Modifier.width(dimens.spacingMd))
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (valueColor != null) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 

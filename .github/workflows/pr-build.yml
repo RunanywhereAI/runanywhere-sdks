@@ -15,8 +15,10 @@ name: PR build matrix
 on:
   pull_request:
     branches: [main, dev, "feat/v2-architecture"]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, dev, "feat/v2-architecture"]
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,11 +41,24 @@ jobs:
   centralization:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
       - name: TypeScript / Web / RN centralization (syncpack)
         run: bash scripts/validation/gates/check_typescript_centralization.sh
+      - name: WASM vendor provenance schema contract
+        run: bash scripts/validation/gates/check_wasm_provenance_contract.sh
+      - name: Release-train version coherence
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_RELEASE_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          if [ -n "${PR_BASE_SHA}" ]; then
+            git fetch --no-tags --depth=1 origin "${PR_BASE_SHA}"
+          fi
+          bash scripts/validation/gates/check_release_version_coherence.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only
@@ -53,21 +68,26 @@ jobs:
         run: bash scripts/validation/gates/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
         run: bash scripts/validation/gates/check_gradle_centralization.sh
+      - name: Android dependency and build contract tests
+        run: |
+          set -euo pipefail
+          python3 scripts/build/test_validate_qhexrt_prebuilt.py
+          python3 scripts/build/test_build_core_android_guards.py
+          python3 sdk/runanywhere-commons/scripts/android/test_download_sherpa_onnx.py
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
   # =============================================================================
 
   macos-debug:
-    # Pinned to macos-14 (Xcode 15.4) because macos-15 ships Xcode 16+ /
-    # Apple Clang 18 which now rejects llama.cpp's `void* → id<MTLDevice>`
-    # casts in ggml-metal-device.m. The CMake preset additionally disables
-    # GGML_METAL for the test build (CPU paths are sufficient for unit
-    # tests; Metal is only required by iOS/Swift runtime builds, which
-    # run in their own dedicated jobs).
-    runs-on: macos-14
+    # These CPU-only presets disable GGML_METAL, so validate the native core
+    # with the same exact Xcode/Clang pin used by the shipping Apple SDK.
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
       - name: Install ninja + protobuf
         run: brew install ninja protobuf
       - name: Configure
@@ -75,22 +95,17 @@ jobs:
       - name: Build
         run: cmake --build --preset macos-debug
       - name: Test
-        # solution_runner_tests has two subcases that assume the RAG
-        # operators are NOT registered (they were originally written
-        # against a build without RAG). Now that the proto-C ABI
-        # symbols (`rac_rag_query_proto` etc.) must always be linked
-        # into librac_commons for op_engine_backed.cpp to resolve, the
-        # real RAG embed/retrieve factories are pre-registered and the
-        # honest-failure assertions no longer hold. Filter the suite
-        # itself out — every other test in the matrix still runs.
-        run: ctest --preset macos-debug -E "solution_runner_tests"
+        run: ctest --preset macos-debug
 
   macos-release:
-    # Same reason as macos-debug: pin to macos-14 / Xcode 15.4 so the
-    # llama.cpp Metal compile units don't trip Xcode 16's strict ARC.
-    runs-on: macos-14
+    # Keep the release compile on the canonical Apple toolchain too. Metal is
+    # disabled in this preset; the dedicated rcli lane covers Metal separately.
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
       - run: brew install ninja protobuf
       - run: cmake --preset macos-release
       - run: cmake --build --preset macos-release
@@ -105,52 +120,49 @@ jobs:
     # the apt install forces the vendored FetchContent path cleanly.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset linux-debug
       - run: cmake --build --preset linux-debug
-      # solution_runner_tests has two RAG-honest-failure subcases that
-      # don't hold now that RAG operators are always linked into
-      # librac_commons (see commit 0e3b8ae42 + f690aa8a6). Same filter
-      # as macos-debug.
-      - run: ctest --preset linux-debug -E "solution_runner_tests"
+      - run: ctest --preset linux-debug
 
   linux-asan:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset linux-asan
       - run: cmake --build --preset linux-asan
-      # solution_runner_tests has two RAG-honest-failure subcases that
-      # no longer hold (same as linux-debug + macos-debug above).
-      - run: ctest --preset linux-asan -E "solution_runner_tests"
+      - run: ctest --preset linux-asan
 
   rcli-macos:
     # rcli desktop CLI — full-backend release build + modelless smoke.
-    # macos-14 pin for the same llama.cpp Metal / Xcode 16 reason as
-    # macos-debug (the rcli preset enables GGML_METAL=ON).
+    # This is the one macOS lane that enables GGML_METAL, so it retains the
+    # older compatible runner while CPU-only native and SDK lanes use Xcode 26.
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: brew install ninja protobuf
       - run: cmake --preset rcli-macos-release
       - run: cmake --build --preset rcli-macos-release
       - name: Smoke (modelless)
         run: |
+          set -euo pipefail
           RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
           "$RCLI" version
           "$RCLI" backends
           "$RCLI" list --all
           "$RCLI" info --json
+      - name: Package smoke
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
 
   rcli-linux:
     # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
       - name: Sherpa-ONNX prebuilts
         run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
       - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
@@ -159,37 +171,34 @@ jobs:
         run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
       - name: Smoke (modelless)
         run: |
+          set -euo pipefail
           RCLI=build/rcli-linux-release/sdk/runanywhere-cli/rcli
           "$RCLI" version
           "$RCLI" backends
           "$RCLI" list --all
           "$RCLI" info --json
+      - name: Package smoke
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
 
   wasm:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Emscripten
-        run: |
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
-          /tmp/emsdk/emsdk install latest
-          /tmp/emsdk/emsdk activate latest
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: web
       - name: Configure (WASM)
-        run: |
-          source /tmp/emsdk/emsdk_env.sh
-          cmake --preset wasm
+        run: cmake --preset wasm
       - name: Build (WASM)
-        run: |
-          source /tmp/emsdk/emsdk_env.sh
-          cmake --build --preset wasm
+        run: cmake --build --preset wasm
 
   ios-device:
     # MLX audio is linked through mlx-audio-swift, which requires Swift 6.2+.
-    # Use the macOS 26 runner line for Xcode 26 while keeping the macOS C++
-    # desktop/rcli lanes on their existing macos-14 pins.
+    # Use the macOS 26 runner line for Xcode 26; only the Metal rcli lane keeps
+    # its explicit older-runner compatibility exception.
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -203,18 +212,11 @@ jobs:
 
   android-arm64:
     runs-on: ubuntu-22.04
-    env:
-      # Stage the NDK outside the workspace so the unzip + extraction directory
-      # do NOT collide with the destination path (which previously caused
-      # `mv ... into a subdirectory of itself`).
-      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Android NDK
-        run: |
-          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q /tmp/ndk.zip -d /tmp
-          test -d "${ANDROID_NDK_HOME}"
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
@@ -229,9 +231,8 @@ jobs:
     # Builds the Apple MLX Swift runtime, including mlx-audio-swift. This
     # needs Swift 6.2+, so use the macOS 26/Xcode 26 runner line.
     runs-on: macos-26
-    needs: [ios-device]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
@@ -240,97 +241,93 @@ jobs:
         run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
         run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+      - name: Build pinned Sherpa/ONNX static inventory (macOS arm64)
+        run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
       - name: Build XCFramework
         run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
-      - name: swift build
-        run: swift build --target MLXRuntime --jobs 2
-      # Per-SDK lint lane — fail PRs that introduce SwiftLint
-      # violations or unused declarations. Soft (continue-on-error) until the
-      # baseline is clean; flip to required gate once the backlog clears.
-      - name: SwiftLint (lint lane)
-        continue-on-error: true
+      - name: Build all Swift products and run tests
+        env:
+          RUNANYWHERE_USE_LOCAL_NATIVES: "1"
         run: |
-          if command -v swiftlint >/dev/null 2>&1; then
-            swiftlint --strict --quiet || swiftlint --quiet
-          else
-            brew install swiftlint && swiftlint --quiet
-          fi
-      - name: Periphery unused-code scan (lint lane)
-        continue-on-error: true
+          set -euo pipefail
+          swift build --build-tests --jobs 2
+          swift test --skip-build --jobs 2
+      - name: SwiftLint (SDK, strict)
+        working-directory: sdk/runanywhere-swift
         run: |
+          set -euo pipefail
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          swiftlint lint --strict --quiet
+      # Periphery remains advisory until the runner image ships it and the
+      # repository has a checked-in, reproducible scan configuration.
+      - name: Periphery unused-code scan (advisory)
+        continue-on-error: true
+        working-directory: sdk/runanywhere-swift
+        run: |
+          set -euo pipefail
           if command -v periphery >/dev/null 2>&1; then
-            periphery scan --quiet || true
+            periphery scan --quiet
           else
-            echo "periphery not installed on runner; skipping"
+            echo "::notice::periphery is not installed on this runner; advisory scan skipped"
           fi
 
   kotlin-android:
     runs-on: ubuntu-22.04
-    needs: [android-arm64]
-    env:
-      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 17 (Android Gradle Plugin 8.x requires Java 17+)
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
         with:
-          distribution: temurin
-          java-version: '17'
-      - name: Install Android NDK
-        run: |
-          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q /tmp/ndk.zip -d /tmp
-          test -d "${ANDROID_NDK_HOME}"
+          platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - name: Build Android JNI libs
         run: ./scripts/build/build-core-android.sh
-      - name: gradle assembleDebug
+      - name: Kotlin SDK unit tests + debug assembly
         working-directory: sdk/runanywhere-kotlin
-        run: ./gradlew assembleDebug
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon --max-workers=2
+      - name: Stage debug SDK AARs for the Android example
+        working-directory: examples/android/RunAnywhereAI
+        run: ./scripts/stage-sdk-aars.sh debug
+      - name: Android example unit tests + debug assembly
+        working-directory: examples/android/RunAnywhereAI
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2
       - name: ktlintCheck + detekt (lint lane)
-        continue-on-error: true
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew ktlintCheck detekt --no-daemon
 
   flutter-pubget:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # FLUTTER_VERSION is sourced from sdk/runanywhere-commons/VERSIONS (single
       # source of truth) by the setup-toolchain action. Bump the value in
       # VERSIONS to roll the Flutter pin across pr-build, release, and FVM.
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: flutter
-      - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
-      # Per-SDK lint lane — run melos analyze across the full
-      # Flutter workspace (not just the single `runanywhere` package). Soft
-      # gate (continue-on-error) until baseline is clean.
-      - name: melos bootstrap + analyze (workspace lint lane)
-        continue-on-error: true
+      - name: Analyze and test the complete Flutter workspace
         working-directory: sdk/runanywhere-flutter
         run: |
-          if command -v melos >/dev/null 2>&1; then
-            melos bootstrap && melos run analyze
-          else
-            dart pub global activate melos
-            export PATH="$PATH:$HOME/.pub-cache/bin"
-            melos bootstrap && melos run analyze
-          fi
+          set -euo pipefail
+          flutter pub get
+          dart run melos bootstrap
+          dart run melos run analyze
+          dart run melos run test
 
   rn-typecheck:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
       # Repo root and sdk/runanywhere-react-native pin `packageManager: yarn@3.6.1`
       # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
       - name: Enable Corepack (yarn@3.6.1)
         run: |
+          set -euo pipefail
           corepack enable
           corepack prepare yarn@3.6.1 --activate
       # Root lockfile gate: the RN example app is a root-workspace member, so
@@ -338,6 +335,8 @@ jobs:
       # commands below run inside the standalone RN workspace.
       - name: Yarn install (repo root lockfile gate)
         run: yarn install --immutable
+      - name: Jest unit tests (React Native example)
+        run: yarn workspace runanywhere-ai-example test --runInBand --config jest.config.js
       # sdk/runanywhere-react-native is ALSO a standalone Yarn project with its
       # own pinned yarn.lock (fb060a368) and workspaces declaration.
       # `yarn workspace <name> run <script>` re-detects the project from the
@@ -349,72 +348,73 @@ jobs:
       - name: Yarn install (RN standalone workspace)
         working-directory: sdk/runanywhere-react-native
         run: yarn install --immutable
-      - name: Typecheck @runanywhere/core
+      - name: Typecheck React Native workspace
         working-directory: sdk/runanywhere-react-native
-        run: yarn workspace @runanywhere/core typecheck
-      # Per-SDK lint lane — run eslint via the package's lint
-      # script when an eslint config is present. Soft (continue-on-error) until
-      # the lint config is committed and baseline is clean.
-      - name: ESLint (@runanywhere/core lint lane)
-        continue-on-error: true
+        run: yarn typecheck
+      - name: ESLint (React Native workspace)
         working-directory: sdk/runanywhere-react-native
-        run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
-      # Per-SDK unit-test lane. Smoke tests
-      # cover Foundation/Errors and services/Proto* utilities; the runner
-      # (ts-jest) is wired in `packages/core/jest.config.js`. Soft
-      # (continue-on-error) until the in-tree jest devDependencies are
-      # installed in the workspace lock — flip to required once the lane
-      # exits 0 cleanly.
+        run: yarn lint
       - name: Jest unit tests (@runanywhere/core)
-        continue-on-error: true
         working-directory: sdk/runanywhere-react-native
-        run: yarn workspace @runanywhere/core run test || echo "jest devDeps not yet installed in workspace lock"
+        run: yarn workspace @runanywhere/core run test --runInBand
 
   web-typecheck:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
       # Install + typecheck from the workspace root so the in-tree
       # @runanywhere/proto-ts package (sdk/shared/proto-ts) is resolved as a
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
-      # llamacpp, and onnx — exactly the surface this PR touches.
+      # llamacpp, mlx, and onnx — exactly the surface this PR touches.
       # proto-ts is a workspace member of BOTH the repo-root Yarn workspace AND
       # the sdk/runanywhere-web npm workspace. When we cd into proto-ts and run
       # `npm install`, npm walks up, finds the root Yarn package.json with
       # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
       # `--workspaces=false` keeps npm from inheriting the root workspace
       # context and resolves the long/protobufjs deps in-tree directly.
-      - name: Install proto-ts dependencies (standalone install)
-        working-directory: sdk/shared/proto-ts
-        run: npm install --no-audit --no-fund --workspaces=false
       - name: Install workspace dependencies
         working-directory: sdk/runanywhere-web
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+      # npm may clean the external workspace's own node_modules while laying
+      # out the Web workspace. Install proto-ts last so TypeScript resolution
+      # from its real path always sees its direct @bufbuild/protobuf dependency.
+      - name: Install proto-ts dependencies (standalone install)
+        working-directory: sdk/shared/proto-ts
+        run: npm ci --no-audit --no-fund --workspaces=false
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: sdk/runanywhere-web
         run: npm run typecheck
-      # Per-SDK lint lane — run eslint across the web workspace.
-      # Soft (continue-on-error) until baseline is clean.
-      - name: ESLint (web workspace lint lane)
-        continue-on-error: true
+      - name: ESLint (Web workspace)
         working-directory: sdk/runanywhere-web
-        run: npm run lint || echo "eslint not yet wired"
+        run: npm run lint
+      - name: Web unit tests
+        working-directory: sdk/runanywhere-web
+        run: npm test
 
-  # Dedicated validation lane — runs the source-of-truth
-  # validation scripts so deprecated-surface drift and RAC_API export drift
-  # are caught in CI rather than landing silently. Soft (continue-on-error)
-  # while we baseline; flip to required gate once both scripts exit 0 cleanly
-  # on every supported commit.
+  # Dedicated validation lane — runs the source-of-truth validation scripts
+  # so deprecated-surface drift and RAC_API export drift cannot land silently.
   validation:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Deprecated surface check
-        continue-on-error: true
+      - uses: actions/checkout@v7
+      - name: Deprecated surface check (strict)
         run: bash scripts/validation/gates/check_deprecated_surfaces.sh
       - name: RAC_API export drift check (strict)
-        continue-on-error: true
         run: bash scripts/validation/commons/check_rac_api_exports.sh --strict
+      - name: Kotlin release-boundary validator tests
+        run: python3 sdk/runanywhere-kotlin/scripts/test_validate_public_artifacts.py
+      - name: React Native release-boundary validator tests
+        run: python3 sdk/runanywhere-react-native/scripts/test_validate_public_packages.py
+      - name: Web release-boundary validator tests
+        run: python3 sdk/runanywhere-web/scripts/test_validate_public_packages.py
+      - name: HF-auth public API packaging parity
+        run: |
+          set -euo pipefail
+          declaration='RAC_API rac_bool_t rac_http_hf_token_is_configured(void);'
+          grep -Fq "$declaration" sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
+          grep -Fxq '_rac_http_hf_token_is_configured' sdk/runanywhere-commons/exports/RACommons.exports
+          grep -Fq "$declaration" sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons/include/rac_http_client.h

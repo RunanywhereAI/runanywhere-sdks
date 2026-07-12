@@ -10,6 +10,10 @@ val Primary70 = Color(0xFFFF6D1F)
 val Primary80 = Color(0xFFFFB693)
 val Primary90 = Color(0xFFFFDBCA)
 
+// Canonical brand accent shared with the iOS and web examples (#FF5500).
+// Used as the dark-scheme primary so brand moments match across platforms.
+val BrandOrange = Color(0xFFFF5500)
+
 // Secondary tonal — Warm Neutral
 val Secondary10 = Color(0xFF1F1A17)
 val Secondary20 = Color(0xFF352F2B)

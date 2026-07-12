@@ -3,6 +3,7 @@
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -38,19 +39,8 @@ class DartBridgeState {
     required SDKEnvironment environment,
     String? baseURL,
   }) async {
-    try {
-      await DartBridgeAuth.initialize(
-        environment: environment,
-        baseURL: baseURL,
-      );
-
-      _logger.debug('Auth secure storage initialized');
-    } catch (e, stack) {
-      _logger.debug(
-        'Auth secure storage init error: $e',
-        metadata: {'stack': stack.toString()},
-      );
-    }
+    await DartBridgeAuth.initialize(environment: environment, baseURL: baseURL);
+    _logger.debug('Auth secure storage initialized');
   }
 
   /// Check if state is initialized
@@ -83,31 +73,26 @@ class DartBridgeState {
       } catch (_) {
         // rac_auth_reset may not be linked yet; ignore.
       }
-    } catch (e) {
-      _logger.debug('rac_state_reset not available: $e');
+    } catch (_) {
+      _logger.debug('rac_state_reset not available');
     }
   }
 
   /// Shutdown state manager
-  void shutdown() {
+  bool shutdown({required bool requireNative}) {
+    final DynamicLibrary lib;
     try {
-      final lib = PlatformLoader.loadCommons();
-      final shutdownState = lib
-          .lookupFunction<Void Function(), void Function()>(
-            'rac_state_shutdown',
-          );
-      shutdownState();
-      try {
-        final resetAuth = lib.lookupFunction<Void Function(), void Function()>(
-          'rac_auth_reset',
-        );
-        resetAuth();
-      } catch (_) {
-        // rac_auth_reset may not be linked yet; ignore.
-      }
-    } catch (e) {
-      _logger.debug('rac_state_shutdown not available: $e');
+      lib = PlatformLoader.loadCommons();
+    } catch (_) {
+      _logger.debug('Commons library unavailable during state shutdown');
+      if (requireNative) rethrow;
+      return false;
     }
+    final teardown = lib.lookupFunction<Void Function(), void Function()>(
+      'rac_shutdown',
+    );
+    teardown();
+    return true;
   }
 
   // ============================================================================
@@ -270,17 +255,12 @@ class DartBridgeState {
   /// Delegates to `rac_auth_clear` which clears native auth state and the
   /// secure-storage vtable owned by `DartBridgeAuth`.
   Future<void> clearAuth() async {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final clearAuthFn = lib.lookupFunction<Void Function(), void Function()>(
-        'rac_auth_clear',
-      );
-      clearAuthFn();
-
-      _logger.debug('Auth state cleared');
-    } catch (e) {
-      _logger.debug('Failed to clear auth: $e');
-    }
+    final lib = PlatformLoader.loadCommons();
+    final clearAuthFn = lib.lookupFunction<Int32 Function(), int Function()>(
+      'rac_auth_clear',
+    );
+    SDKException.throwIfError(clearAuthFn());
+    _logger.debug('Auth state cleared');
   }
 
   // ============================================================================

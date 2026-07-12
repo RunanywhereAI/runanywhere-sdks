@@ -27,8 +27,8 @@ public extension RunAnywhere {
         }
 
         try await ensureServicesReady()
-        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-        _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)
+        _ = try await CppBridge.VoiceAgent.shared.getHandle()
+        _ = try await CppBridge.VoiceAgent.shared.initialize(config)
     }
 
     /// Default Silero VAD model id seeded by every example app's catalog.
@@ -160,8 +160,8 @@ public extension RunAnywhere {
             config.ttsVoiceID = voiceID
         }
 
-        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-        _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)
+        _ = try await CppBridge.VoiceAgent.shared.getHandle()
+        _ = try await CppBridge.VoiceAgent.shared.initialize(config)
     }
 
     /// Get the current voice-agent component states (per-component load status
@@ -180,8 +180,7 @@ public extension RunAnywhere {
         }
 
         try await ensureServicesReady()
-        let handle = try await CppBridge.VoiceAgent.shared.requireExistingHandle()
-        return try await CppBridge.VoiceAgent.shared.componentStatesProto(handle: handle)
+        return try await CppBridge.VoiceAgent.shared.componentStates()
     }
 
     /// Process a complete voice turn through the proto C++ ABI.
@@ -203,7 +202,7 @@ public extension RunAnywhere {
     /// voice agent.
     ///
     /// While the stream is consumed, a platform mic driver captures audio,
-    /// segments utterances, and submits them via `rac_voice_agent_process_turn_proto`.
+    /// forwards raw frames via `rac_voice_agent_feed_audio_proto`.
     /// Events fan out through the handle callback registered by
     /// `VoiceAgentStreamAdapter`.
     ///
@@ -235,7 +234,7 @@ public extension RunAnywhere {
 
                     defer { micTask.cancel() }
 
-                    let adapter = VoiceAgentStreamAdapter(handle: handle)
+                    let adapter = VoiceAgentStreamAdapter(handle: handle.rawValue)
                     for await event in adapter.stream() {
                         if Task.isCancelled { break }
                         continuation.yield(event)

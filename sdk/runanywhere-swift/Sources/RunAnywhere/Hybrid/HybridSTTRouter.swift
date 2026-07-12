@@ -62,8 +62,6 @@ import SwiftProtobuf
 /// itself is thread-safe for transcribe + the slot setters.
 public final class HybridSTTRouter: @unchecked Sendable {
 
-    private static let logger = SDKLogger(category: "Hybrid.STTRouter")
-
     /// One attached STT service: the heap-stable `rac_stt_service_t` the router
     /// holds a pointer to, the engine ops that created it (to call `destroy`),
     /// and the strdup'd model id the struct's `model_id` field points at.
@@ -77,18 +75,28 @@ public final class HybridSTTRouter: @unchecked Sendable {
         let modelIdCStr: UnsafeMutablePointer<CChar>
     }
 
+    private struct PreparedPair: @unchecked Sendable {
+        let offline: AttachedService
+        let online: AttachedService
+        let offlineDescriptor: [UInt8]
+        let onlineDescriptor: [UInt8]
+        let policyBytes: [UInt8]
+    }
+
     /// `@unchecked Sendable`: every field is mutated only under the `state`
     /// lock; the native handle + service pointers never escape it unguarded.
     private struct State: @unchecked Sendable {
         var handle: rac_handle_t?
         var offline: AttachedService?
         var online: AttachedService?
+        var isReconfiguring = false
         /// Names of custom-filter predicates registered for the current policy,
         /// so `close()` can unregister exactly those.
         var customFilterNames: [String] = []
     }
 
     private let state = OSAllocatedUnfairLock<State>(initialState: State())
+    private let activeOperations = DispatchGroup()
 
     /// Create the native router handle.
     public init() throws {
@@ -101,7 +109,7 @@ public final class HybridSTTRouter: @unchecked Sendable {
                 category: .component
             )
         }
-        state.withLock { $0.handle = handle }
+        state.withLockUnchecked { $0.handle = handle }
     }
 
     // MARK: - Pair + policy
@@ -113,12 +121,37 @@ public final class HybridSTTRouter: @unchecked Sendable {
         online: HybridModel,
         policy: HybridRoutingPolicy
     ) throws {
-        guard let handle = state.withLock({ $0.handle }) else {
+        guard state.withLock({ $0.handle != nil }) else {
             throw notOpen()
         }
 
-        // Build both services up-front so a failure on the online side doesn't
-        // leave a half-attached router.
+        let prepared = try preparePair(offline: offline, online: online, policy: policy)
+
+        let canReconfigure = state.withLock { current -> Bool in
+            guard current.handle != nil, !current.isReconfiguring else { return false }
+            current.isReconfiguring = true
+            return true
+        }
+        guard canReconfigure else {
+            destroy(prepared.offline)
+            destroy(prepared.online)
+            throw SDKException(
+                code: .serviceBusy,
+                message: "Hybrid STT router is closed or already being reconfigured",
+                category: .component
+            )
+        }
+        activeOperations.wait()
+        defer { state.withLock { $0.isReconfiguring = false } }
+
+        try installPair(prepared, policy: policy)
+    }
+
+    private func preparePair(
+        offline: HybridModel,
+        online: HybridModel,
+        policy: HybridRoutingPolicy
+    ) throws -> PreparedPair {
         let offlineService = try createService(for: offline)
         let onlineService: AttachedService
         do {
@@ -128,89 +161,95 @@ public final class HybridSTTRouter: @unchecked Sendable {
             throw error
         }
 
-        // Serialize all proto bytes (descriptors + policy) up-front via the
-        // generated SwiftProtobuf messages, before mutating any installed state.
-        // A serialization failure only destroys the freshly created services and
-        // leaves the previously installed pair / filters untouched. The router
-        // copies the bytes into its own storage, so each array only needs to
-        // outlive the corresponding call.
-        let offlineDescriptor: [UInt8]
-        let onlineDescriptor: [UInt8]
-        let policyBytes: [UInt8]
         do {
-            offlineDescriptor = try offline.descriptorBytes()
-            onlineDescriptor = try online.descriptorBytes()
-            policyBytes = try policy.serializedBytes()
+            return PreparedPair(
+                offline: offlineService,
+                online: onlineService,
+                offlineDescriptor: try offline.descriptorBytes(),
+                onlineDescriptor: try online.descriptorBytes(),
+                policyBytes: try policy.serializedBytes()
+            )
         } catch {
-            destroy(offlineService); destroy(onlineService)
+            destroy(offlineService)
+            destroy(onlineService)
             throw error
         }
+    }
 
-        // Detach + destroy any previously attached services before swapping in
-        // the new pair (clear router slots first — see header UAF note), and
-        // retire the previous policy's custom-filter predicates so re-pairing
-        // with a different policy doesn't leave stale named filters registered
-        // in commons.
-        clearAndDestroyServices(handle: handle)
-        retirePreviousCustomFilters()
+    private func installPair(
+        _ prepared: PreparedPair,
+        policy: HybridRoutingPolicy
+    ) throws {
+        try state.withLockUnchecked { current in
+            guard let handle = current.handle else {
+                destroy(prepared.offline)
+                destroy(prepared.online)
+                throw notOpen()
+            }
 
-        let rcOff = rac_stt_hybrid_router_set_offline_service_proto(
-            handle,
-            offlineService.servicePtr,
-            offlineDescriptor,
-            offlineDescriptor.count
-        )
-        guard rcOff == RAC_SUCCESS else {
-            destroy(offlineService); destroy(onlineService)
-            throw SDKException(
-                code: .serviceNotAvailable,
-                message: "set_offline_service_proto failed (rc=\(rcOff))",
-                category: .component
+            // Keep the lock for the full native swap. `close()` and
+            // `transcribe()` therefore cannot destroy or use a half-installed
+            // router/service pair.
+            clearAndDestroyServices(handle: handle, state: &current)
+            retirePreviousCustomFilters(state: &current)
+
+            let rcOff = rac_stt_hybrid_router_set_offline_service_proto(
+                handle,
+                prepared.offline.servicePtr,
+                prepared.offlineDescriptor,
+                prepared.offlineDescriptor.count
             )
-        }
-        let rcOn = rac_stt_hybrid_router_set_online_service_proto(
-            handle,
-            onlineService.servicePtr,
-            onlineDescriptor,
-            onlineDescriptor.count
-        )
-        guard rcOn == RAC_SUCCESS else {
-            _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
-            destroy(offlineService); destroy(onlineService)
-            throw SDKException(
-                code: .serviceNotAvailable,
-                message: "set_online_service_proto failed (rc=\(rcOn))",
-                category: .component
+            guard rcOff == RAC_SUCCESS else {
+                destroy(prepared.offline)
+                destroy(prepared.online)
+                throw SDKException(
+                    code: .serviceNotAvailable,
+                    message: "set_offline_service_proto failed (rc=\(rcOff))",
+                    category: .component
+                )
+            }
+            let rcOn = rac_stt_hybrid_router_set_online_service_proto(
+                handle,
+                prepared.online.servicePtr,
+                prepared.onlineDescriptor,
+                prepared.onlineDescriptor.count
             )
-        }
+            guard rcOn == RAC_SUCCESS else {
+                _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
+                destroy(prepared.offline)
+                destroy(prepared.online)
+                throw SDKException(
+                    code: .serviceNotAvailable,
+                    message: "set_online_service_proto failed (rc=\(rcOn))",
+                    category: .component
+                )
+            }
 
-        // Register custom-filter predicates with commons BEFORE installing the
-        // policy bytes, so the router can resolve each HybridFilter.custom name
-        // the first time it filters. The router owns the eval — Swift only
-        // supplies the named predicate.
-        let customNames = policy.customFilters.map(\.name)
-        for filter in policy.customFilters {
-            HybridCustomFilter.register(name: filter.name, check: filter.check)
-        }
+            // Register predicates before installing policy bytes so commons can
+            // resolve every named custom filter on its first evaluation.
+            let customNames = policy.customFilters.map(\.name)
+            for filter in policy.customFilters {
+                HybridCustomFilter.register(name: filter.name, check: filter.check)
+            }
 
-        let rcPolicy = rac_stt_hybrid_router_set_policy_proto(
-            handle, policyBytes, policyBytes.count
-        )
-        guard rcPolicy == RAC_SUCCESS else {
-            for name in customNames { HybridCustomFilter.unregister(name: name) }
-            _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
-            _ = rac_stt_hybrid_router_set_online_service_proto(handle, nil, nil, 0)
-            destroy(offlineService); destroy(onlineService)
-            throw SDKException(
-                code: .serviceNotAvailable,
-                message: "set_policy_proto failed (rc=\(rcPolicy))",
-                category: .component
+            let rcPolicy = rac_stt_hybrid_router_set_policy_proto(
+                handle, prepared.policyBytes, prepared.policyBytes.count
             )
-        }
+            guard rcPolicy == RAC_SUCCESS else {
+                for name in customNames { HybridCustomFilter.unregister(name: name) }
+                _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
+                _ = rac_stt_hybrid_router_set_online_service_proto(handle, nil, nil, 0)
+                destroy(prepared.offline)
+                destroy(prepared.online)
+                throw SDKException(
+                    code: .serviceNotAvailable,
+                    message: "set_policy_proto failed (rc=\(rcPolicy))",
+                    category: .component
+                )
+            }
 
-        state.withLock { current in
-            current.offline = offlineService
-            current.online = onlineService
+            current.offline = prepared.offline
+            current.online = prepared.online
             current.customFilterNames = customNames
         }
     }
@@ -234,17 +273,15 @@ public final class HybridSTTRouter: @unchecked Sendable {
         _ audio: Data,
         options: HybridTranscribeOptions = .init()
     ) throws -> HybridTranscribeResult {
-        guard let handle = state.withLock({ $0.handle }) else {
-            throw notOpen()
-        }
-
         let requestBytes = try encodeRequest(audio: audio, options: options)
+        let handle = try beginOperation()
+        defer { activeOperations.leave() }
 
         var outBytes: UnsafeMutablePointer<UInt8>?
         var outSize: Int = 0
         let rc = requestBytes.withUnsafeBufferPointer { buffer in
             rac_stt_hybrid_router_transcribe_proto(
-                handle, buffer.baseAddress, buffer.count, &outBytes, &outSize
+                handle.rawValue, buffer.baseAddress, buffer.count, &outBytes, &outSize
             )
         }
 
@@ -260,8 +297,7 @@ public final class HybridSTTRouter: @unchecked Sendable {
             )
         }
 
-        let responseData = Data(bytes: outBytes, count: outSize)
-        return try decodeResponse(responseData)
+        return try decodeResponse(Data(bytes: outBytes, count: outSize))
     }
 
     // MARK: - Request encode / response decode
@@ -309,8 +345,9 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// exposes a cancel op today, so commons treats this as a no-op until one
     /// does — see rac_stt_hybrid_router_cancel.)
     public func cancel() {
-        guard let handle = state.withLock({ $0.handle }) else { return }
-        _ = rac_stt_hybrid_router_cancel(handle)
+        guard let handle = try? beginOperation() else { return }
+        defer { activeOperations.leave() }
+        _ = rac_stt_hybrid_router_cancel(handle.rawValue)
     }
 
     // MARK: - Teardown
@@ -318,21 +355,26 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Detach + destroy both services, unregister custom filters, and destroy
     /// the router handle. Idempotent.
     public func close() {
-        let teardown: (handle: rac_handle_t?, names: [String]) = state.withLock { current in
-            let captured = (current.handle, current.customFilterNames)
-            return captured
-        }
-
-        if let handle = teardown.handle {
-            clearAndDestroyServices(handle: handle)
-            rac_stt_hybrid_router_destroy(handle)
-        }
-        for name in teardown.names {
-            HybridCustomFilter.unregister(name: name)
-        }
-        state.withLock { current in
+        let closingHandle = state.withLockUnchecked { current -> HybridRouterHandle? in
+            guard let handle = current.handle else { return nil }
             current.handle = nil
+            return HybridRouterHandle(rawValue: handle)
+        }
+        guard let closingHandle else { return }
+
+        // No new operation can start after the handle is cleared. Wait for any
+        // transcribe/cancel that already borrowed it before freeing services.
+        activeOperations.wait()
+
+        let names = state.withLockUnchecked { current -> [String] in
+            clearAndDestroyServices(handle: closingHandle.rawValue, state: &current)
+            rac_stt_hybrid_router_destroy(closingHandle.rawValue)
+            let names = current.customFilterNames
             current.customFilterNames = []
+            return names
+        }
+        for name in names {
+            HybridCustomFilter.unregister(name: name)
         }
     }
 
@@ -464,16 +506,12 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Clear both router slots, then destroy whatever services were attached.
     /// Slot-clearing must precede service destruction (router holds raw
     /// pointers — see rac_stt_hybrid_router.h UAF note).
-    private func clearAndDestroyServices(handle: rac_handle_t) {
+    private func clearAndDestroyServices(handle: rac_handle_t, state: inout State) {
         _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
         _ = rac_stt_hybrid_router_set_online_service_proto(handle, nil, nil, 0)
-        let services: (offline: AttachedService?, online: AttachedService?) =
-            state.withLock { current in
-                let captured = (current.offline, current.online)
-                current.offline = nil
-                current.online = nil
-                return captured
-            }
+        let services = (offline: state.offline, online: state.online)
+        state.offline = nil
+        state.online = nil
         if let offline = services.offline { destroy(offline) }
         if let online = services.online { destroy(online) }
     }
@@ -481,12 +519,9 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Retire the previous policy's custom-filter predicates so re-pairing
     /// with a different policy doesn't leave stale named filters registered
     /// in commons. Verbatim extraction from `setPair` (lint body-length).
-    private func retirePreviousCustomFilters() {
-        let previousFilterNames: [String] = state.withLock { current in
-            let old = current.customFilterNames
-            current.customFilterNames = []
-            return old
-        }
+    private func retirePreviousCustomFilters(state: inout State) {
+        let previousFilterNames = state.customFilterNames
+        state.customFilterNames = []
         for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
     }
 
@@ -499,6 +534,19 @@ public final class HybridSTTRouter: @unchecked Sendable {
         free(service.modelIdCStr)
     }
 
+    /// Borrow the router handle for one native operation. Entering the dispatch
+    /// group under the state lock closes the race with `close()` clearing the
+    /// handle; `close()` waits for every successful borrow before destroy.
+    private func beginOperation() throws -> HybridRouterHandle {
+        try state.withLockUnchecked { current in
+            guard let handle = current.handle, !current.isReconfiguring else {
+                throw notOpen()
+            }
+            activeOperations.enter()
+            return HybridRouterHandle(rawValue: handle)
+        }
+    }
+
     private func notOpen() -> SDKException {
         SDKException(
             code: .notInitialized,
@@ -506,4 +554,10 @@ public final class HybridSTTRouter: @unchecked Sendable {
             category: .component
         )
     }
+}
+
+/// Borrowed native router pointer whose lifetime is guarded by
+/// `HybridSTTRouter.activeOperations`.
+private struct HybridRouterHandle: @unchecked Sendable {
+    let rawValue: rac_handle_t
 }

@@ -127,9 +127,7 @@ export interface LLMGenerationOptions {
 }
 /**
  * ---------------------------------------------------------------------------
- * Result of a single text generation. Same fields as the Swift
- * LLMGenerationResult plus the fields RN/Web carry that Swift derives from
- * the rac_llm_stream_result_t C struct.
+ * Result of a single text generation shared by every SDK.
  * ---------------------------------------------------------------------------
  */
 export interface LLMGenerationResult {

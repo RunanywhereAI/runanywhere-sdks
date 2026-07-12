@@ -22,8 +22,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 export 'logging.pbenum.dart';
 
 /// ---------------------------------------------------------------------------
-/// SDK logging configuration. Union of the fields the per-SDK
-/// LoggingConfiguration structs carry today; per-environment presets
+/// SDK logging configuration. Per-environment presets
 /// (development/staging/production) stay in each SDK as factory helpers.
 /// ---------------------------------------------------------------------------
 class LoggingConfiguration extends $pb.GeneratedMessage {
@@ -33,7 +32,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
     $core.bool? includeSourceLocation,
     $core.bool? includeDeviceMetadata,
     $core.bool? enableRemoteLogging,
-    $core.bool? enableSentryLogging,
   }) {
     final result = create();
     if (enableLocalLogging != null)
@@ -45,8 +43,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
       result.includeDeviceMetadata = includeDeviceMetadata;
     if (enableRemoteLogging != null)
       result.enableRemoteLogging = enableRemoteLogging;
-    if (enableSentryLogging != null)
-      result.enableSentryLogging = enableSentryLogging;
     return result;
   }
 
@@ -69,7 +65,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'includeSourceLocation')
     ..aOB(4, _omitFieldNames ? '' : 'includeDeviceMetadata')
     ..aOB(5, _omitFieldNames ? '' : 'enableRemoteLogging')
-    ..aOB(6, _omitFieldNames ? '' : 'enableSentryLogging')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -140,16 +135,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   $core.bool hasEnableRemoteLogging() => $_has(4);
   @$pb.TagNumber(5)
   void clearEnableRemoteLogging() => $_clearField(5);
-
-  /// Forward error/fatal records to Sentry.
-  @$pb.TagNumber(6)
-  $core.bool get enableSentryLogging => $_getBF(5);
-  @$pb.TagNumber(6)
-  set enableSentryLogging($core.bool value) => $_setBool(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasEnableSentryLogging() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearEnableSentryLogging() => $_clearField(6);
 }
 
 /// ---------------------------------------------------------------------------

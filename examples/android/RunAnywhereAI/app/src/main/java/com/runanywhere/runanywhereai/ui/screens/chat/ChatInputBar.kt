@@ -11,12 +11,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -69,8 +67,10 @@ fun ChatInputBar(
     onSend: () -> Unit,
     canSend: Boolean,
     isGenerating: Boolean,
+    isStopping: Boolean,
     onStop: () -> Unit,
     toolsEnabled: Boolean,
+    toolsUnavailableMessage: String?,
     onToggleTools: () -> Unit,
     onAttachDocument: () -> Unit,
     onAttachImage: () -> Unit,
@@ -80,6 +80,7 @@ fun ChatInputBar(
     modifier: Modifier = Modifier,
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
+    compact: Boolean = false,
 ) {
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -97,15 +98,31 @@ fun ChatInputBar(
             thickness = 0.5.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         )
-        AnimatedVisibility(
-            visible = pendingAttachment != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            pendingAttachment?.let {
-                AttachmentStatusPill(
-                    attachment = it,
-                    onClear = onClearAttachment,
+        if (!compact) {
+            AnimatedVisibility(
+                visible = pendingAttachment != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                pendingAttachment?.let {
+                    AttachmentStatusPill(
+                        attachment = it,
+                        onClear = onClearAttachment,
+                        modifier = Modifier.padding(
+                            start = dimens.spacingMd,
+                            top = dimens.spacingSm,
+                            end = dimens.spacingMd,
+                        ),
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = toolsEnabled || toolsUnavailableMessage != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                ToolStatusPill(
+                    unavailableMessage = toolsUnavailableMessage,
                     modifier = Modifier.padding(
                         start = dimens.spacingMd,
                         top = dimens.spacingSm,
@@ -113,19 +130,6 @@ fun ChatInputBar(
                     ),
                 )
             }
-        }
-        AnimatedVisibility(
-            visible = toolsEnabled,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            ToolStatusPill(
-                modifier = Modifier.padding(
-                    start = dimens.spacingMd,
-                    top = dimens.spacingSm,
-                    end = dimens.spacingMd,
-                ),
-            )
         }
         Row(
             modifier = Modifier
@@ -195,7 +199,11 @@ fun ChatInputBar(
             ) {
                 Icon(
                     imageVector = RACIcons.Outline.Cloud,
-                    contentDescription = if (toolsEnabled) "Disable web and tools" else "Enable web and tools",
+                    contentDescription = when {
+                        toolsEnabled -> "Disable web and tools"
+                        toolsUnavailableMessage != null -> "Web and tools unavailable for current model"
+                        else -> "Enable web and tools"
+                    },
                     modifier = Modifier.size(dimens.iconMd),
                 )
             }
@@ -226,7 +234,7 @@ fun ChatInputBar(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    maxLines = 5,
+                    maxLines = if (compact) 2 else 5,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Default,
@@ -249,8 +257,12 @@ fun ChatInputBar(
                 )
             }
 
+            val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
             IconButton(
-                onClick = if (isGenerating) onStop else onSend,
+                onClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    if (isGenerating) onStop() else onSend()
+                },
                 enabled = isGenerating || canSend,
                 modifier = Modifier.size(dimens.inputBarMinHeight),
                 colors = IconButtonDefaults.iconButtonColors(
@@ -267,6 +279,38 @@ fun ChatInputBar(
                 )
             }
         }
+        if (!compact) {
+            AnimatedVisibility(
+                visible = isStopping,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                StoppingStatusPill(
+                    modifier = Modifier.padding(
+                        start = dimens.spacingMd,
+                        top = dimens.spacingSm,
+                        end = dimens.spacingMd,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StoppingStatusPill(modifier: Modifier = Modifier) {
+    val dimens = LocalDimens.current
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(dimens.radiusFull),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            text = "Stopping the previous response… You can keep typing.",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
+        )
     }
 }
 
@@ -318,31 +362,54 @@ private fun AttachmentStatusPill(
 }
 
 @Composable
-private fun ToolStatusPill(modifier: Modifier = Modifier) {
+private fun ToolStatusPill(
+    unavailableMessage: String?,
+    modifier: Modifier = Modifier,
+) {
     val dimens = LocalDimens.current
+    val unavailable = unavailableMessage != null
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(dimens.radiusFull),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-        contentColor = MaterialTheme.colorScheme.primary,
+        shape = RoundedCornerShape(if (unavailable) dimens.radiusLg else dimens.radiusFull),
+        color = if (unavailable) {
+            MaterialTheme.colorScheme.errorContainer
+        } else {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        },
+        contentColor = if (unavailable) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = dimens.spacingMd, vertical = dimens.spacingXs),
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(RACIcons.Outline.Cloud, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
-            Text(
-                text = "Web & tools on",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
+            Icon(
+                imageVector = if (unavailable) RACIcons.Outline.AlertTriangle else RACIcons.Outline.Cloud,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm),
             )
-            Spacer(Modifier.width(dimens.spacingXs))
-            Text(
-                text = "Trace appears in replies",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (unavailable) "Web & tools unavailable" else "Web & tools on",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = unavailableMessage ?: "Trace appears in replies",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (unavailable) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = if (unavailable) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -1,18 +1,28 @@
 /* =============================================================================
  * RunAnywhere AI - Design System
- * Matches iOS AppColors, Typography, and AppSpacing
- * Primary accent: #FF5500 (vibrant orange-red)
+ * Shared brand language with the iOS/Android example apps:
+ *   brand        #FF5500  (accent fills, dark-surface primary)
+ *   brandStrong  #E65500  (interactive tone on light surfaces, hover)
+ * Surfaces are warm neutrals (not slate) to match the Android example's
+ * Material palette and read as a consumer chat product.
+ * Theming: dark is the :root default; light applies via
+ *   - explicit choice:   :root[data-theme="light"]
+ *   - system preference: @media (prefers-color-scheme: light) when no explicit
+ *     dark choice was made (:root:not([data-theme="dark"])).
  * ============================================================================= */
 
 /* =============================================================================
  * CSS Custom Properties (Dark theme default)
  * ============================================================================= */
 :root {
+  color-scheme: dark;
+
   /* ---- Primary Accent Colors ---- */
   --color-primary: #FF5500;
-  --color-primary-hover: #E64500;
-  --color-primary-light: rgba(255, 85, 0, 0.1);
-  --color-primary-medium: rgba(255, 85, 0, 0.2);
+  --color-primary-strong: #E65500;
+  --color-primary-hover: #E65500;
+  --color-primary-light: rgba(255, 85, 0, 0.12);
+  --color-primary-medium: rgba(255, 85, 0, 0.22);
   --color-blue: #3B82F6;
   --color-green: #10B981;
   --color-red: #EF4444;
@@ -20,32 +30,32 @@
   --color-purple: #8B5CF6;
 
   /* ---- Text Colors (Dark) ---- */
-  --text-primary: #E4E4EF;
-  --text-secondary: #94A3B8;
-  --text-tertiary: #64748B;
+  --text-primary: #F0EEEB;
+  --text-secondary: #A8A29B;
+  --text-tertiary: #757069;
   --text-white: #FFFFFF;
   --text-on-primary: #FFFFFF;
 
-  /* ---- Background Colors (Dark) ---- */
-  --bg-primary: #0F172A;
-  --bg-secondary: #1A1F2E;
-  --bg-tertiary: #252B3A;
-  --bg-grouped: #0F172A;
-  --bg-gray5: #2A3142;
-  --bg-gray6: #353B4A;
-  --bg-elevated: #1E2538;
-  --bg-input: #1A1F2E;
+  /* ---- Background Colors (Dark, warm neutral) ---- */
+  --bg-primary: #191817;
+  --bg-secondary: #201F1D;
+  --bg-tertiary: #292725;
+  --bg-grouped: #191817;
+  --bg-gray5: #2E2B29;
+  --bg-gray6: #383431;
+  --bg-elevated: #242220;
+  --bg-input: #201F1D;
 
   /* ---- Message Bubble Colors ---- */
   --bubble-user-start: #FF5500;
   --bubble-user-end: #E64500;
-  --bubble-assistant-start: #2A3142;
-  --bubble-assistant-end: #353B4A;
+  --bubble-assistant-start: #292725;
+  --bubble-assistant-end: #2E2B29;
 
   /* ---- Thinking Mode Colors ---- */
-  --thinking-bg: rgba(255, 85, 0, 0.1);
-  --thinking-border: rgba(255, 85, 0, 0.2);
-  --thinking-content-bg: #353B4A;
+  --thinking-bg: rgba(255, 85, 0, 0.08);
+  --thinking-border: rgba(255, 85, 0, 0.18);
+  --thinking-content-bg: #292725;
 
   /* ---- Badge Colors ---- */
   --badge-primary: rgba(255, 85, 0, 0.2);
@@ -54,39 +64,45 @@
   --badge-purple: rgba(139, 92, 246, 0.2);
   --badge-red: rgba(239, 68, 68, 0.2);
   --badge-yellow: rgba(234, 179, 8, 0.2);
-  --badge-gray: rgba(148, 163, 184, 0.2);
+  --badge-gray: rgba(168, 162, 155, 0.2);
 
   /* ---- Status Colors ---- */
   --status-green: #10B981;
   --status-orange: #FF5500;
   --status-red: #EF4444;
-  --status-gray: #64748B;
+  --status-gray: #757069;
   --status-blue: #3B82F6;
 
   /* ---- Border Colors ---- */
-  --border-light: rgba(255, 255, 255, 0.1);
+  --border-light: rgba(255, 255, 255, 0.09);
   --border-medium: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --separator: #2A3142;
-  --divider: #2A3142;
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --separator: #2E2B29;
+  --divider: #2E2B29;
 
-  /* ---- Shadow Colors ---- */
-  --shadow-default: rgba(0, 0, 0, 0.2);
-  --shadow-medium: rgba(0, 0, 0, 0.3);
-  --shadow-accent: rgba(255, 85, 0, 0.2);
+  /* ---- Shadow Colors & Elevation ---- */
+  --shadow-default: rgba(0, 0, 0, 0.25);
+  --shadow-medium: rgba(0, 0, 0, 0.35);
+  --shadow-accent: rgba(255, 85, 0, 0.22);
+  --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
+  --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.24);
+  --elevation-lg: 0 12px 40px rgba(0, 0, 0, 0.34);
 
   /* ---- Overlay Colors ---- */
   --overlay-light: rgba(0, 0, 0, 0.3);
   --overlay-medium: rgba(0, 0, 0, 0.5);
   --overlay-dark: rgba(0, 0, 0, 0.7);
 
+  /* ---- Focus Ring ---- */
+  --focus-ring: 0 0 0 3px rgba(255, 85, 0, 0.35);
+
   /* ---- Typography ---- */
-  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
 
   --font-size-xs: 0.6875rem;    /* 11px */
   --font-size-sm: 0.75rem;      /* 12px */
-  --font-size-base: 0.875rem;   /* 14px */
+  --font-size-base: 0.9375rem;  /* 15px — chat products read best at 15-16 */
   --font-size-md: 1rem;         /* 16px */
   --font-size-lg: 1.125rem;     /* 18px */
   --font-size-xl: 1.5rem;       /* 24px */
@@ -126,13 +142,17 @@
   --radius-card: 16px;
   --radius-bubble: 18px;
   --radius-modal: 20px;
+  --radius-composer: 28px;
   --radius-full: 9999px;
 
-  /* ---- Animation Durations (matches iOS AppLayout) ---- */
+  /* ---- Motion ---- */
+  --duration-quick: 0.15s;
   --duration-fast: 0.25s;
   --duration-regular: 0.3s;
   --duration-slow: 0.5s;
   --duration-very-slow: 0.6s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
   /* ---- Component Sizes ---- */
   --icon-sm: 18px;
@@ -150,36 +170,83 @@
 }
 
 /* =============================================================================
- * Light Theme
+ * Light Theme (warm paper surfaces)
+ * Applied twice on purpose: once for the explicit toggle, once for system
+ * preference when the user has not explicitly chosen dark.
  * ============================================================================= */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --text-primary: #1D1B19;
+  --text-secondary: #57534D;
+  --text-tertiary: #8A857E;
+
+  --bg-primary: #FCFBFA;
+  --bg-secondary: #F6F4F1;
+  --bg-tertiary: #EFECE8;
+  --bg-grouped: #F6F4F1;
+  --bg-gray5: #E5E1DC;
+  --bg-gray6: #EFECE8;
+  --bg-elevated: #FFFFFF;
+  --bg-input: #F6F4F1;
+
+  --color-primary-hover: #CC4B00;
+  --bubble-assistant-start: #EFECE8;
+  --bubble-assistant-end: #F4F1ED;
+
+  --thinking-content-bg: #F4F1ED;
+
+  --badge-gray: rgba(87, 83, 77, 0.14);
+
+  --border-light: rgba(29, 27, 25, 0.08);
+  --border-medium: rgba(29, 27, 25, 0.05);
+  --border-strong: rgba(29, 27, 25, 0.14);
+  --separator: #E5E1DC;
+  --divider: #D6D1CA;
+
+  --shadow-default: rgba(29, 27, 25, 0.08);
+  --shadow-medium: rgba(29, 27, 25, 0.12);
+  --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
+  --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
+  --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
-    --text-primary: #0F172A;
-    --text-secondary: #475569;
-    --text-tertiary: #94A3B8;
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
 
-    --bg-primary: #FFFFFF;
-    --bg-secondary: #F8FAFC;
-    --bg-tertiary: #F1F5F9;
-    --bg-grouped: #F1F5F9;
-    --bg-gray5: #E2E8F0;
-    --bg-gray6: #F1F5F9;
+    --text-primary: #1D1B19;
+    --text-secondary: #57534D;
+    --text-tertiary: #8A857E;
+
+    --bg-primary: #FCFBFA;
+    --bg-secondary: #F6F4F1;
+    --bg-tertiary: #EFECE8;
+    --bg-grouped: #F6F4F1;
+    --bg-gray5: #E5E1DC;
+    --bg-gray6: #EFECE8;
     --bg-elevated: #FFFFFF;
-    --bg-input: #F8FAFC;
+    --bg-input: #F6F4F1;
 
-    --bubble-assistant-start: #E2E8F0;
-    --bubble-assistant-end: #F1F5F9;
+    --color-primary-hover: #CC4B00;
+    --bubble-assistant-start: #EFECE8;
+    --bubble-assistant-end: #F4F1ED;
 
-    --thinking-content-bg: #F1F5F9;
+    --thinking-content-bg: #F4F1ED;
 
-    --border-light: rgba(0, 0, 0, 0.06);
-    --border-medium: rgba(0, 0, 0, 0.04);
-    --border-strong: rgba(0, 0, 0, 0.1);
-    --separator: #E2E8F0;
-    --divider: #CBD5E1;
+    --badge-gray: rgba(87, 83, 77, 0.14);
 
-    --shadow-default: rgba(0, 0, 0, 0.08);
-    --shadow-medium: rgba(0, 0, 0, 0.12);
+    --border-light: rgba(29, 27, 25, 0.08);
+    --border-medium: rgba(29, 27, 25, 0.05);
+    --border-strong: rgba(29, 27, 25, 0.14);
+    --separator: #E5E1DC;
+    --divider: #D6D1CA;
+
+    --shadow-default: rgba(29, 27, 25, 0.08);
+    --shadow-medium: rgba(29, 27, 25, 0.12);
+    --elevation-sm: 0 1px 2px rgba(29, 27, 25, 0.06);
+    --elevation-md: 0 4px 16px rgba(29, 27, 25, 0.08);
+    --elevation-lg: 0 12px 40px rgba(29, 27, 25, 0.12);
   }
 }
 
@@ -206,6 +273,19 @@ body {
   background: var(--bg-primary);
   min-height: 100vh;
   overflow: hidden;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+/* =============================================================================
+ * Reduced Motion
+ * ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* =============================================================================
@@ -237,7 +317,7 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-light);
+  background: var(--border-strong);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {

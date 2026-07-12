@@ -12,6 +12,7 @@
 
 #include "qhexrt_session.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -28,6 +29,7 @@
 #endif
 
 #include "qhexrt_bundle_policy.h"
+
 #include "rac/core/rac_logger.h"
 
 namespace fs = std::filesystem;
@@ -42,34 +44,117 @@ qhx_runtime* g_rt = nullptr;
 std::size_t g_rt_refs = 0;
 
 #if defined(__ANDROID__)
+const char* kAdspLibraryPathEnv = "ADSP_LIBRARY_PATH";
+const char* kQhexrtSkelDirEnv = "RUNANYWHERE_QHEXRT_SKEL_DIR";
+
+bool contains_zip_separator(const std::string& path) {
+    return path.find("!/") != std::string::npos;
+}
+
+bool directory_contains_qnn_skel(const std::string& path) {
+    if (path.empty() || contains_zip_separator(path)) {
+        return false;
+    }
+    std::error_code ec;
+    if (!fs::is_directory(path, ec)) {
+        return false;
+    }
+    static const char* kSkels[] = {
+        "libQnnHtpV75Skel.so",
+        "libQnnHtpV79Skel.so",
+        "libQnnHtpV81Skel.so",
+    };
+    for (const char* skel : kSkels) {
+        if (fs::is_regular_file(fs::path(path) / skel, ec)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool append_path(std::vector<std::string>& paths, const std::string& path, bool require_skel) {
+    if (path.empty() || contains_zip_separator(path)) {
+        return false;
+    }
+    if (require_skel && !directory_contains_qnn_skel(path)) {
+        return false;
+    }
+    for (const std::string& existing : paths) {
+        if (existing == path) {
+            return true;
+        }
+    }
+    paths.push_back(path);
+    return true;
+}
+
+void append_existing_adsp_paths(std::vector<std::string>& paths, const char* existing) {
+    if (existing == nullptr || existing[0] == '\0') {
+        return;
+    }
+    std::string value(existing);
+    size_t start = 0;
+    while (start <= value.size()) {
+        const size_t end = value.find(';', start);
+        const std::string segment =
+            value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        append_path(paths, segment, false);
+        if (end == std::string::npos) {
+            break;
+        }
+        start = end + 1;
+    }
+}
+
 // QNN's HTP stub dlopens libcdsprpc.so and the per-arch DSP skel
 // (for example, libQnnHtpV75/V79/V81Skel.so) via ADSP_LIBRARY_PATH; this must be set before
-// the first qhx_runtime_create in every host (Kotlin/Flutter/RN) — engine-owned
-// so platform glue never re-implements it. The skels ship next to this engine
-// .so in the app's nativeLibraryDir, which dladdr on one of our own symbols
-// yields. Composition order mirrors the retired Kotlin example-app helper:
-// native lib dir first, then any existing value, then the two vendor fallbacks
-// (blank segments skipped).
+// the first qhx_runtime_create in every host (Kotlin/Flutter/RN). Modern Android
+// packaging can load JNI libraries from base.apk!/..., which is valid for the
+// app linker but not for FastRPC's DSP file loader. Prefer a real skel directory
+// supplied by the SDK and only fall back to dladdr() when it points at a real
+// extracted native library directory.
 void configure_adsp_library_path() {
+    std::vector<std::string> paths;
+    const char* skel_dir = std::getenv(kQhexrtSkelDirEnv);
+    if (skel_dir != nullptr && skel_dir[0] != '\0' && !append_path(paths, skel_dir, true)) {
+        RAC_LOG_WARNING(LOG_CAT, "Ignoring invalid QHexRT skel directory: %s", skel_dir);
+    }
+
     Dl_info info{};
-    if (dladdr(reinterpret_cast<void*>(&configure_adsp_library_path), &info) == 0 ||
-        info.dli_fname == nullptr) {
+    if (dladdr(reinterpret_cast<void*>(&configure_adsp_library_path), &info) != 0 &&
+        info.dli_fname != nullptr) {
+        std::string lib_path(info.dli_fname);
+        auto slash = lib_path.find_last_of('/');
+        if (slash != std::string::npos) {
+            append_path(paths, lib_path.substr(0, slash), true);
+        }
+    }
+
+    append_existing_adsp_paths(paths, std::getenv(kAdspLibraryPathEnv));
+    append_path(paths, "/vendor/dsp/cdsp", false);
+    append_path(paths, "/vendor/lib/rfsa/adsp", false);
+
+    std::string path;
+    for (const std::string& segment : paths) {
+        if (!path.empty()) {
+            path += ";";
+        }
+        path += segment;
+    }
+    if (path.empty()) {
         return;
     }
-    std::string lib_path(info.dli_fname);
-    auto slash = lib_path.find_last_of('/');
-    if (slash == std::string::npos) {
-        return;
-    }
-    std::string path = lib_path.substr(0, slash);
-    const char* existing = std::getenv("ADSP_LIBRARY_PATH");
-    if (existing != nullptr && existing[0] != '\0') {
-        path += ";";
-        path += existing;
-    }
-    path += ";/vendor/dsp/cdsp;/vendor/lib/rfsa/adsp";
     setenv("ADSP_LIBRARY_PATH", path.c_str(), 1);
     RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH set to %s", path.c_str());
+}
+
+extern "C" __attribute__((visibility("default"))) void
+rac_qhexrt_set_skel_directory(const char* path) {
+    if (path == nullptr || path[0] == '\0') {
+        unsetenv(kQhexrtSkelDirEnv);
+        return;
+    }
+    setenv(kQhexrtSkelDirEnv, path, 1);
 }
 #endif
 
@@ -111,7 +196,8 @@ bool ends_with_ci(const std::string& s, const char* suffix) {
     }
     for (size_t i = 0; i < n; ++i) {
         char a = s[s.size() - n + i];
-        if (a >= 'A' && a <= 'Z') a = static_cast<char>(a + ('a' - 'A'));
+        if (a >= 'A' && a <= 'Z')
+            a = static_cast<char>(a + ('a' - 'A'));
         if (a != suffix[i]) {
             return false;
         }
@@ -122,7 +208,9 @@ bool ends_with_ci(const std::string& s, const char* suffix) {
 // Aux JSON files that live next to a manifest but are not the manifest
 // itself. Single source of truth: qhexrt_bundle_policy.h, shared with the
 // commons-side bundle resolution so remote and on-disk selection agree.
-bool is_aux_json(const std::string& name) { return qhexrt_is_aux_json(name.c_str()) != 0; }
+bool is_aux_json(const std::string& name) {
+    return qhexrt_is_aux_json(name.c_str()) != 0;
+}
 
 // A QHexRT manifest carries a "plan"/"schema_version"/"dsp_arch" key. Sniff the
 // head of the file to disambiguate it from arbitrary JSON sidecars.
@@ -136,12 +224,11 @@ bool looks_like_manifest(const fs::path& file) {
     buf[in.gcount() > 0 ? static_cast<size_t>(in.gcount()) : 0] = '\0';
     std::string head(buf);
     return head.find("schema_version") != std::string::npos ||
-           head.find("\"plan\"") != std::string::npos ||
-           head.find("dsp_arch") != std::string::npos;
+           head.find("\"plan\"") != std::string::npos || head.find("dsp_arch") != std::string::npos;
 }
 
-// Returns the manifest .json inside `dir`, or empty. Prefers a file that sniffs
-// as a QHexRT manifest; otherwise the single non-aux .json.
+// Returns the manifest .json inside `dir`, or empty. Candidate order matches
+// the remote bundle policy: alphabetically first after excluding aux files.
 std::string find_manifest_in_dir(const fs::path& dir) {
     std::error_code ec;
     if (!fs::is_directory(dir, ec)) {
@@ -158,10 +245,13 @@ std::string find_manifest_in_dir(const fs::path& dir) {
         if (!ends_with_ci(name, ".json") || is_aux_json(name)) {
             continue;
         }
-        if (looks_like_manifest(p)) {
-            return p.generic_string();
-        }
         candidates.push_back(p);
+    }
+    std::sort(candidates.begin(), candidates.end());
+    for (const fs::path& candidate : candidates) {
+        if (looks_like_manifest(candidate)) {
+            return candidate.generic_string();
+        }
     }
     if (candidates.size() == 1) {
         return candidates.front().generic_string();
@@ -214,6 +304,8 @@ Session* session_open(const char* manifest_path) {
         runtime_release();
         return nullptr;
     }
+    s->model_ref = manifest_path;
+    s->scratch_dir = fs::path(manifest).parent_path().generic_string();
     // artifacts_dir = NULL -> manifest-relative paths resolve against its own dir.
     s->model = qhx_model_load(rt, manifest.c_str(), nullptr);
     if (s->model == nullptr) {
@@ -236,11 +328,19 @@ void session_close(Session* s) {
     if (s == nullptr) {
         return;
     }
-    if (s->sess != nullptr) {
-        qhx_session_free(s->sess);
-    }
-    if (s->model != nullptr) {
-        qhx_model_free(s->model);
+    {
+        // Wait for an in-flight generate/reset/copy operation before releasing
+        // session-owned buffers. Lifecycle ownership prevents new operations
+        // once destroy begins; this mutex closes the remaining execution race.
+        std::lock_guard<std::mutex> operation_lock(s->operation_mutex);
+        if (s->sess != nullptr) {
+            qhx_session_free(s->sess);
+            s->sess = nullptr;
+        }
+        if (s->model != nullptr) {
+            qhx_model_free(s->model);
+            s->model = nullptr;
+        }
     }
     delete s;
     runtime_release();

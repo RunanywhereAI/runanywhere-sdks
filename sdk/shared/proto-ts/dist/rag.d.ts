@@ -53,10 +53,12 @@ export interface RAGConfiguration {
      * score are discarded before being passed to the LLM as context.
      * Optional so callers can distinguish "unset" from explicit 0.0
      * (accept-everything) without losing the canonical default.
-     * Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-     * cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-     * so a 0.7 floor filters out every match and retrieval returns nothing
-     * (validated by generated SDK helpers and commons session creation).
+     * Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+     * produce cosine similarities that rarely exceed ~0.5 even for relevant
+     * chunks, and chunking a document lowers each chunk's similarity further, so
+     * any positive floor filters out real matches — a multi-chunk document then
+     * retrieves nothing and the answer model reports "no information". top_k
+     * bounds the result count instead of a similarity floor.
      */
     similarityThreshold?: number | undefined;
     /**
@@ -147,7 +149,12 @@ export interface RAGQueryOptions {
     topK: number;
     /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
     retrievalTopK: number;
-    similarityThreshold: number;
+    /**
+     * Per-query similarity floor. `optional` so an explicit 0.0 (accept
+     * everything) is distinguishable from "unset" and can override a positive
+     * session-level default; unset falls back to RAGConfiguration.
+     */
+    similarityThreshold?: number | undefined;
     stream: boolean;
     /**
      * When true, suppress the answer model's thinking phase (maps to
@@ -155,6 +162,20 @@ export interface RAGQueryOptions {
      * directive instead of the app injecting "/no_think"). Default false.
      */
     disableThinking: boolean;
+    /**
+     * Multi-query expansion: when true, the answer LLM rewrites the question
+     * into `multi_query_count` variants; retrieval runs for the original plus
+     * each variant and the rankings are RRF-fused before rerank. Falls back to
+     * a single query if expansion yields nothing.
+     */
+    enableMultiQuery: boolean;
+    multiQueryCount?: number | undefined;
+    /**
+     * Scoped retrieval: when set, only chunks whose document id begins with
+     * this prefix are eligible (e.g. a chat/collection namespace). Unset =
+     * search the whole index.
+     */
+    scopePrefix?: string | undefined;
 }
 export interface RAGQueryRequest {
     requestId: string;
@@ -186,8 +207,7 @@ export interface RAGSearchResult {
     sourceDocument?: string | undefined;
     /**
      * Free-form metadata associated with the chunk (e.g. page number, section,
-     * ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-     * canonicalized here as a typed map so consumers don't re-parse.
+     * ingestion timestamp).
      */
     metadata: {
         [key: string]: string;

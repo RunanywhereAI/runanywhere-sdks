@@ -37,6 +37,7 @@ const CAPTURE_DIMENSION = 384;
 const DOCUMENT_TOP_K = 3;
 const MAX_IMAGE_ATTACHMENT_BYTES = 12 * 1024 * 1024;
 const MAX_DOCUMENT_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+let activeDocumentCancellation: AbortController | null = null;
 
 export function validateChatAttachmentFile(kind: ChatAttachmentKind, file: File): string | null {
   const limit = kind === 'image' ? MAX_IMAGE_ATTACHMENT_BYTES : MAX_DOCUMENT_ATTACHMENT_BYTES;
@@ -64,6 +65,12 @@ export function canAnswerImageAttachment(): boolean {
 
 export function cancelActiveImageAttachmentAnswer(): void {
   void RunAnywhere.visionLanguage.cancelVLMGeneration();
+}
+
+export function cancelActiveDocumentAttachmentAnswer(): void {
+  activeDocumentCancellation?.abort();
+  RunAnywhere.cancelGeneration();
+  void RunAnywhere.ragDestroyPipeline().catch(() => undefined);
 }
 
 export async function answerImageAttachment(
@@ -125,47 +132,67 @@ export async function answerDocumentAttachment(
   settings: ChatAttachmentGenerationSettings,
   onProgress: (progress: ChatAttachmentProgress) => void,
 ): Promise<ChatAttachmentAnswer> {
-  assertChatAttachmentFileSize('document', file);
-  const models = resolveRAGModels();
-  if (!models.embedding || !models.llm) {
-    throw new Error('Document Q&A needs an embedding model and a chat model in the catalog.');
+  const cancellation = new AbortController();
+  activeDocumentCancellation?.abort();
+  activeDocumentCancellation = cancellation;
+  try {
+    assertChatAttachmentFileSize('document', file);
+    const models = resolveRAGModels();
+    if (!models.embedding || !models.llm) {
+      throw new Error('Document Q&A needs an embedding model and a chat model in the catalog.');
+    }
+
+    onProgress({ content: 'Indexing document...' });
+    const text = await file.text();
+    throwIfDocumentCancelled(cancellation.signal);
+    if (!text.trim()) {
+      throw new Error('The selected document does not contain readable text.');
+    }
+
+    await RunAnywhere.ragCreatePipeline(models.embedding.id, models.llm.id);
+    throwIfDocumentCancelled(cancellation.signal);
+    await RunAnywhere.ragIngest(text, JSON.stringify({
+      docId: createDocumentId(),
+      docName: file.name || 'Document',
+      sourceUri: `web-file:${file.name || 'document'}`,
+      mediaType: file.type || 'text/plain',
+      sizeBytes: String(file.size),
+    }));
+    throwIfDocumentCancelled(cancellation.signal);
+
+    onProgress({ content: 'Searching document...' });
+
+    const result = await RunAnywhere.ragQuery({
+      ...ragQueryOptionsWithQuestion(question),
+      retrievalTopK: DOCUMENT_TOP_K,
+      maxTokens: Math.min(settings.maxTokens, 1024),
+      temperature: settings.temperature,
+      disableThinking: models.llm.supportsThinking && !settings.thinkingModeEnabled,
+    });
+    throwIfDocumentCancelled(cancellation.signal);
+
+    if (result.errorCode !== 0) {
+      throw new Error(result.errorMessage || 'Document query failed');
+    }
+
+    const split = splitThinking(result.answer);
+    return {
+      content: split.content || result.answer || '(no answer)',
+      thinking: result.thinkingContent || split.thinking || undefined,
+      sources: result.retrievedChunks.map(sourceFromRAGResult),
+    };
+  } catch (error) {
+    if (cancellation.signal.aborted) {
+      throw new DOMException('Document answer cancelled', 'AbortError');
+    }
+    throw error;
+  } finally {
+    if (activeDocumentCancellation === cancellation) activeDocumentCancellation = null;
   }
+}
 
-  onProgress({ content: 'Indexing document...' });
-  const text = await file.text();
-  if (!text.trim()) {
-    throw new Error('The selected document does not contain readable text.');
-  }
-
-  await RunAnywhere.ragCreatePipeline(models.embedding.id, models.llm.id);
-  await RunAnywhere.ragIngest(text, JSON.stringify({
-    docId: createDocumentId(),
-    docName: file.name || 'Document',
-    sourceUri: `web-file:${file.name || 'document'}`,
-    mediaType: file.type || 'text/plain',
-    sizeBytes: String(file.size),
-  }));
-
-  onProgress({ content: 'Searching document...' });
-
-  const result = await RunAnywhere.ragQuery({
-    ...ragQueryOptionsWithQuestion(question),
-    retrievalTopK: DOCUMENT_TOP_K,
-    maxTokens: Math.min(settings.maxTokens, 1024),
-    temperature: settings.temperature,
-    disableThinking: models.llm.supportsThinking && !settings.thinkingModeEnabled,
-  });
-
-  if (result.errorCode !== 0) {
-    throw new Error(result.errorMessage || 'Document query failed');
-  }
-
-  const split = splitThinking(result.answer);
-  return {
-    content: split.content || result.answer || '(no answer)',
-    thinking: result.thinkingContent || split.thinking || undefined,
-    sources: result.retrievedChunks.map(sourceFromRAGResult),
-  };
+function throwIfDocumentCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw new DOMException('Document answer cancelled', 'AbortError');
 }
 
 function assertChatAttachmentFileSize(kind: ChatAttachmentKind, file: File): void {

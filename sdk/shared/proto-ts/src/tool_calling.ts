@@ -73,30 +73,14 @@ export function toolParameterTypeToJSON(object: ToolParameterType): string {
 
 /**
  * ---------------------------------------------------------------------------
- * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
- * to `ToolCallingOptions.format_hint` (which remains a free-form string for
- * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
- * 1:1 to this enum).
- *
- * Drift across SDKs:
- *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
- *     today only exposes `default` and `lfm2` constants on a string-typed
- *     field — it is not yet an enum.
- *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
- * This enum is the union of formats LLM families actually emit; SDK frontends
- * should map their existing strings onto these values when surfacing the
- * strongly-typed field. Keep `format_hint` (string) populated for legacy
- * consumers until all SDKs migrate.
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
  * ---------------------------------------------------------------------------
  */
 export enum ToolCallFormatName {
   TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
   TOOL_CALL_FORMAT_NAME_JSON = 1,
-  TOOL_CALL_FORMAT_NAME_XML = 2,
-  TOOL_CALL_FORMAT_NAME_NATIVE = 3,
-  TOOL_CALL_FORMAT_NAME_PYTHONIC = 4,
-  TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5,
-  TOOL_CALL_FORMAT_NAME_HERMES = 6,
+  TOOL_CALL_FORMAT_NAME_LFM2 = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -108,21 +92,9 @@ export function toolCallFormatNameFromJSON(object: any): ToolCallFormatName {
     case 1:
     case "TOOL_CALL_FORMAT_NAME_JSON":
       return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-    case 2:
-    case "TOOL_CALL_FORMAT_NAME_XML":
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML;
-    case 3:
-    case "TOOL_CALL_FORMAT_NAME_NATIVE":
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE;
-    case 4:
-    case "TOOL_CALL_FORMAT_NAME_PYTHONIC":
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
-    case 5:
-    case "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS":
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS;
-    case 6:
-    case "TOOL_CALL_FORMAT_NAME_HERMES":
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES;
+    case 7:
+    case "TOOL_CALL_FORMAT_NAME_LFM2":
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -136,16 +108,8 @@ export function toolCallFormatNameToJSON(object: ToolCallFormatName): string {
       return "TOOL_CALL_FORMAT_NAME_UNSPECIFIED";
     case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON:
       return "TOOL_CALL_FORMAT_NAME_JSON";
-    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML:
-      return "TOOL_CALL_FORMAT_NAME_XML";
-    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE:
-      return "TOOL_CALL_FORMAT_NAME_NATIVE";
-    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC:
-      return "TOOL_CALL_FORMAT_NAME_PYTHONIC";
-    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS:
-      return "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS";
-    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES:
-      return "TOOL_CALL_FORMAT_NAME_HERMES";
+    case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2:
+      return "TOOL_CALL_FORMAT_NAME_LFM2";
     case ToolCallFormatName.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -374,8 +338,6 @@ export interface ToolCall {
    * value at the moment). Empty = unset.
    */
   type: string;
-  /** Alias for id used by pre-proto SDK surfaces. */
-  callId?: string | undefined;
   createdAtMs: number;
   rawText?: string | undefined;
 }
@@ -406,8 +368,6 @@ export interface ToolResult {
    * consumers should fall back to result_json/error semantics.
    */
   success: boolean;
-  /** Alias for tool_call_id used by pre-proto SDK surfaces. */
-  callId?: string | undefined;
   startedAtMs: number;
   completedAtMs: number;
 }
@@ -423,11 +383,6 @@ export interface ToolCallingOptions {
    * its registered tools (per-SDK convention).
    */
   tools: ToolDefinition[];
-  /**
-   * Maximum tool-call iterations in one conversation turn. 0 = SDK default
-   * (typically 5).
-   */
-  maxIterations: number;
   /** Whether to auto-execute tools or hand them back to the caller. */
   autoExecute: boolean;
   /** Sampling temperature override (Swift: optional Float). */
@@ -452,36 +407,17 @@ export interface ToolCallingOptions {
    * tool calls in one generation.
    */
   keepToolsAvailable: boolean;
-  /**
-   * Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
-   * Empty = SDK default.
-   */
-  formatHint: string;
-  /**
-   * Strongly-typed tool-call format. Preferred over `format_hint` when set;
-   * `format_hint` remains for legacy callers and per-SDK custom strings
-   * that don't round-trip through this enum.
-   */
+  /** Typed tool-call format. Unset lets commons select the model default. */
   format?:
     | ToolCallFormatName
     | undefined;
   /**
-   * Caller-supplied system prompt that fully replaces the SDK-injected
-   * tool-calling system prompt (rather than being merged with it).
-   * Distinct from `system_prompt` (field 6), which is merged unless
-   * `replace_system_prompt` is true.
-   */
-  customSystemPrompt?:
-    | string
-    | undefined;
-  /**
-   * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
-   * SDK default.
+   * Maximum tool calls in one conversation turn. Unset/0 = SDK default
+   * (typically 5).
    */
   maxToolCalls?: number | undefined;
   toolChoice: ToolChoiceMode;
   forcedToolName?: string | undefined;
-  parallelToolCalls: boolean;
   requireJsonArguments: boolean;
   /**
    * When true, suppress the model's thinking/reasoning phase during
@@ -510,7 +446,7 @@ export interface ToolCallingResult {
   conversationId?:
     | string
     | undefined;
-  /** Number of tool-call iterations actually used. */
+  /** Number of LLM generation turns used, including the final synthesis turn. */
   iterationsUsed: number;
   errorMessage?: string | undefined;
   errorCode: number;
@@ -554,7 +490,6 @@ export interface ToolPromptFormatRequest {
 export interface ToolPromptFormatResult {
   formattedPrompt: string;
   format: ToolCallFormatName;
-  formatHint: string;
   errorMessage?: string | undefined;
   errorCode: number;
 }
@@ -605,14 +540,13 @@ export interface ToolCallingSessionCreateRequest {
   topP: number;
   systemPrompt: string;
   tools: ToolDefinition[];
-  formatHint: string;
-  maxIterations: number;
+  format: ToolCallFormatName;
+  maxToolCalls: number;
   keepToolsAvailable: boolean;
   /**
    * proto3 `optional` enables presence detection (has_validate_calls()).
-   * When unset, commons defaults to validate_calls=true (preserves the
-   * historical hard-coded behavior and the native run-loop / session
-   * contract that unknown tool calls short-circuit before host execution).
+   * When unset, commons defaults to validate_calls=true so unknown tool
+   * calls short-circuit before host execution.
    * Callers that delegate validation/authorization to their executor or
    * use dynamic tool registries must explicitly set validate_calls=false.
    */
@@ -637,6 +571,13 @@ export interface ToolCallingSessionCreateRequest {
    * contract as LLMGenerationOptions.disable_thinking). Default false.
    */
   disableThinking: boolean;
+  /**
+   * Default true when absent. False returns the parsed ToolCall without
+   * invoking the host executor.
+   */
+  autoExecute?: boolean | undefined;
+  replaceSystemPrompt: boolean;
+  requireJsonArguments: boolean;
 }
 
 export interface ToolCallingSessionCreateResult {
@@ -1548,7 +1489,7 @@ export const ToolDefinition_MetadataEntry: MessageFns<ToolDefinition_MetadataEnt
 };
 
 function createBaseToolCall(): ToolCall {
-  return { id: "", name: "", argumentsJson: "", type: "", callId: undefined, createdAtMs: 0, rawText: undefined };
+  return { id: "", name: "", argumentsJson: "", type: "", createdAtMs: 0, rawText: undefined };
 }
 
 export const ToolCall: MessageFns<ToolCall> = {
@@ -1564,9 +1505,6 @@ export const ToolCall: MessageFns<ToolCall> = {
     }
     if (message.type !== "") {
       writer.uint32(34).string(message.type);
-    }
-    if (message.callId !== undefined) {
-      writer.uint32(50).string(message.callId);
     }
     if (message.createdAtMs !== 0) {
       writer.uint32(56).int64(message.createdAtMs);
@@ -1616,14 +1554,6 @@ export const ToolCall: MessageFns<ToolCall> = {
           message.type = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.callId = reader.string();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
@@ -1659,11 +1589,6 @@ export const ToolCall: MessageFns<ToolCall> = {
         ? globalThis.String(object.arguments_json)
         : "",
       type: isSet(object.type) ? globalThis.String(object.type) : "",
-      callId: isSet(object.callId)
-        ? globalThis.String(object.callId)
-        : isSet(object.call_id)
-        ? globalThis.String(object.call_id)
-        : undefined,
       createdAtMs: isSet(object.createdAtMs)
         ? globalThis.Number(object.createdAtMs)
         : isSet(object.created_at_ms)
@@ -1691,9 +1616,6 @@ export const ToolCall: MessageFns<ToolCall> = {
     if (message.type !== "") {
       obj.type = message.type;
     }
-    if (message.callId !== undefined) {
-      obj.callId = message.callId;
-    }
     if (message.createdAtMs !== 0) {
       obj.createdAtMs = Math.round(message.createdAtMs);
     }
@@ -1712,7 +1634,6 @@ export const ToolCall: MessageFns<ToolCall> = {
     message.name = object.name ?? "";
     message.argumentsJson = object.argumentsJson ?? "";
     message.type = object.type ?? "";
-    message.callId = object.callId ?? undefined;
     message.createdAtMs = object.createdAtMs ?? 0;
     message.rawText = object.rawText ?? undefined;
     return message;
@@ -1726,7 +1647,6 @@ function createBaseToolResult(): ToolResult {
     resultJson: "",
     error: undefined,
     success: false,
-    callId: undefined,
     startedAtMs: 0,
     completedAtMs: 0,
   };
@@ -1748,9 +1668,6 @@ export const ToolResult: MessageFns<ToolResult> = {
     }
     if (message.success !== false) {
       writer.uint32(40).bool(message.success);
-    }
-    if (message.callId !== undefined) {
-      writer.uint32(58).string(message.callId);
     }
     if (message.startedAtMs !== 0) {
       writer.uint32(64).int64(message.startedAtMs);
@@ -1808,14 +1725,6 @@ export const ToolResult: MessageFns<ToolResult> = {
           message.success = reader.bool();
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.callId = reader.string();
-          continue;
-        }
         case 8: {
           if (tag !== 64) {
             break;
@@ -1856,11 +1765,6 @@ export const ToolResult: MessageFns<ToolResult> = {
         : "",
       error: isSet(object.error) ? globalThis.String(object.error) : undefined,
       success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
-      callId: isSet(object.callId)
-        ? globalThis.String(object.callId)
-        : isSet(object.call_id)
-        ? globalThis.String(object.call_id)
-        : undefined,
       startedAtMs: isSet(object.startedAtMs)
         ? globalThis.Number(object.startedAtMs)
         : isSet(object.started_at_ms)
@@ -1891,9 +1795,6 @@ export const ToolResult: MessageFns<ToolResult> = {
     if (message.success !== false) {
       obj.success = message.success;
     }
-    if (message.callId !== undefined) {
-      obj.callId = message.callId;
-    }
     if (message.startedAtMs !== 0) {
       obj.startedAtMs = Math.round(message.startedAtMs);
     }
@@ -1913,7 +1814,6 @@ export const ToolResult: MessageFns<ToolResult> = {
     message.resultJson = object.resultJson ?? "";
     message.error = object.error ?? undefined;
     message.success = object.success ?? false;
-    message.callId = object.callId ?? undefined;
     message.startedAtMs = object.startedAtMs ?? 0;
     message.completedAtMs = object.completedAtMs ?? 0;
     return message;
@@ -1923,20 +1823,16 @@ export const ToolResult: MessageFns<ToolResult> = {
 function createBaseToolCallingOptions(): ToolCallingOptions {
   return {
     tools: [],
-    maxIterations: 0,
     autoExecute: false,
     temperature: undefined,
     maxTokens: undefined,
     systemPrompt: undefined,
     replaceSystemPrompt: false,
     keepToolsAvailable: false,
-    formatHint: "",
     format: undefined,
-    customSystemPrompt: undefined,
     maxToolCalls: undefined,
     toolChoice: 0,
     forcedToolName: undefined,
-    parallelToolCalls: false,
     requireJsonArguments: false,
     disableThinking: undefined,
   };
@@ -1946,9 +1842,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
   encode(message: ToolCallingOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.tools) {
       ToolDefinition.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.maxIterations !== 0) {
-      writer.uint32(16).int32(message.maxIterations);
     }
     if (message.autoExecute !== false) {
       writer.uint32(24).bool(message.autoExecute);
@@ -1968,14 +1861,8 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.keepToolsAvailable !== false) {
       writer.uint32(64).bool(message.keepToolsAvailable);
     }
-    if (message.formatHint !== "") {
-      writer.uint32(74).string(message.formatHint);
-    }
     if (message.format !== undefined) {
       writer.uint32(80).int32(message.format);
-    }
-    if (message.customSystemPrompt !== undefined) {
-      writer.uint32(90).string(message.customSystemPrompt);
     }
     if (message.maxToolCalls !== undefined) {
       writer.uint32(96).int32(message.maxToolCalls);
@@ -1985,9 +1872,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.forcedToolName !== undefined) {
       writer.uint32(114).string(message.forcedToolName);
-    }
-    if (message.parallelToolCalls !== false) {
-      writer.uint32(120).bool(message.parallelToolCalls);
     }
     if (message.requireJsonArguments !== false) {
       writer.uint32(128).bool(message.requireJsonArguments);
@@ -2011,14 +1895,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           }
 
           message.tools.push(ToolDefinition.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.maxIterations = reader.int32();
           continue;
         }
         case 3: {
@@ -2069,28 +1945,12 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           message.keepToolsAvailable = reader.bool();
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.formatHint = reader.string();
-          continue;
-        }
         case 10: {
           if (tag !== 80) {
             break;
           }
 
           message.format = reader.int32() as any;
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.customSystemPrompt = reader.string();
           continue;
         }
         case 12: {
@@ -2115,14 +1975,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           }
 
           message.forcedToolName = reader.string();
-          continue;
-        }
-        case 15: {
-          if (tag !== 120) {
-            break;
-          }
-
-          message.parallelToolCalls = reader.bool();
           continue;
         }
         case 16: {
@@ -2153,11 +2005,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
   fromJSON(object: any): ToolCallingOptions {
     return {
       tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e: any) => ToolDefinition.fromJSON(e)) : [],
-      maxIterations: isSet(object.maxIterations)
-        ? globalThis.Number(object.maxIterations)
-        : isSet(object.max_iterations)
-        ? globalThis.Number(object.max_iterations)
-        : 0,
       autoExecute: isSet(object.autoExecute)
         ? globalThis.Boolean(object.autoExecute)
         : isSet(object.auto_execute)
@@ -2184,17 +2031,7 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         : isSet(object.keep_tools_available)
         ? globalThis.Boolean(object.keep_tools_available)
         : false,
-      formatHint: isSet(object.formatHint)
-        ? globalThis.String(object.formatHint)
-        : isSet(object.format_hint)
-        ? globalThis.String(object.format_hint)
-        : "",
       format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
-      customSystemPrompt: isSet(object.customSystemPrompt)
-        ? globalThis.String(object.customSystemPrompt)
-        : isSet(object.custom_system_prompt)
-        ? globalThis.String(object.custom_system_prompt)
-        : undefined,
       maxToolCalls: isSet(object.maxToolCalls)
         ? globalThis.Number(object.maxToolCalls)
         : isSet(object.max_tool_calls)
@@ -2210,11 +2047,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         : isSet(object.forced_tool_name)
         ? globalThis.String(object.forced_tool_name)
         : undefined,
-      parallelToolCalls: isSet(object.parallelToolCalls)
-        ? globalThis.Boolean(object.parallelToolCalls)
-        : isSet(object.parallel_tool_calls)
-        ? globalThis.Boolean(object.parallel_tool_calls)
-        : false,
       requireJsonArguments: isSet(object.requireJsonArguments)
         ? globalThis.Boolean(object.requireJsonArguments)
         : isSet(object.require_json_arguments)
@@ -2232,9 +2064,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     const obj: any = {};
     if (message.tools?.length) {
       obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
-    }
-    if (message.maxIterations !== 0) {
-      obj.maxIterations = Math.round(message.maxIterations);
     }
     if (message.autoExecute !== false) {
       obj.autoExecute = message.autoExecute;
@@ -2254,14 +2083,8 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.keepToolsAvailable !== false) {
       obj.keepToolsAvailable = message.keepToolsAvailable;
     }
-    if (message.formatHint !== "") {
-      obj.formatHint = message.formatHint;
-    }
     if (message.format !== undefined) {
       obj.format = toolCallFormatNameToJSON(message.format);
-    }
-    if (message.customSystemPrompt !== undefined) {
-      obj.customSystemPrompt = message.customSystemPrompt;
     }
     if (message.maxToolCalls !== undefined) {
       obj.maxToolCalls = Math.round(message.maxToolCalls);
@@ -2271,9 +2094,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.forcedToolName !== undefined) {
       obj.forcedToolName = message.forcedToolName;
-    }
-    if (message.parallelToolCalls !== false) {
-      obj.parallelToolCalls = message.parallelToolCalls;
     }
     if (message.requireJsonArguments !== false) {
       obj.requireJsonArguments = message.requireJsonArguments;
@@ -2290,20 +2110,16 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
   fromPartial<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(object: I): ToolCallingOptions {
     const message = createBaseToolCallingOptions();
     message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
-    message.maxIterations = object.maxIterations ?? 0;
     message.autoExecute = object.autoExecute ?? false;
     message.temperature = object.temperature ?? undefined;
     message.maxTokens = object.maxTokens ?? undefined;
     message.systemPrompt = object.systemPrompt ?? undefined;
     message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
-    message.formatHint = object.formatHint ?? "";
     message.format = object.format ?? undefined;
-    message.customSystemPrompt = object.customSystemPrompt ?? undefined;
     message.maxToolCalls = object.maxToolCalls ?? undefined;
     message.toolChoice = object.toolChoice ?? 0;
     message.forcedToolName = object.forcedToolName ?? undefined;
-    message.parallelToolCalls = object.parallelToolCalls ?? false;
     message.requireJsonArguments = object.requireJsonArguments ?? false;
     message.disableThinking = object.disableThinking ?? undefined;
     return message;
@@ -2906,7 +2722,7 @@ export const ToolPromptFormatRequest: MessageFns<ToolPromptFormatRequest> = {
 };
 
 function createBaseToolPromptFormatResult(): ToolPromptFormatResult {
-  return { formattedPrompt: "", format: 0, formatHint: "", errorMessage: undefined, errorCode: 0 };
+  return { formattedPrompt: "", format: 0, errorMessage: undefined, errorCode: 0 };
 }
 
 export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
@@ -2916,9 +2732,6 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     }
     if (message.format !== 0) {
       writer.uint32(16).int32(message.format);
-    }
-    if (message.formatHint !== "") {
-      writer.uint32(26).string(message.formatHint);
     }
     if (message.errorMessage !== undefined) {
       writer.uint32(34).string(message.errorMessage);
@@ -2950,14 +2763,6 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
           }
 
           message.format = reader.int32() as any;
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.formatHint = reader.string();
           continue;
         }
         case 4: {
@@ -2993,11 +2798,6 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
         ? globalThis.String(object.formatted_prompt)
         : "",
       format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
-      formatHint: isSet(object.formatHint)
-        ? globalThis.String(object.formatHint)
-        : isSet(object.format_hint)
-        ? globalThis.String(object.format_hint)
-        : "",
       errorMessage: isSet(object.errorMessage)
         ? globalThis.String(object.errorMessage)
         : isSet(object.error_message)
@@ -3019,9 +2819,6 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     if (message.format !== 0) {
       obj.format = toolCallFormatNameToJSON(message.format);
     }
-    if (message.formatHint !== "") {
-      obj.formatHint = message.formatHint;
-    }
     if (message.errorMessage !== undefined) {
       obj.errorMessage = message.errorMessage;
     }
@@ -3038,7 +2835,6 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     const message = createBaseToolPromptFormatResult();
     message.formattedPrompt = object.formattedPrompt ?? "";
     message.format = object.format ?? 0;
-    message.formatHint = object.formatHint ?? "";
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
     return message;
@@ -3635,13 +3431,16 @@ function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRe
     topP: 0,
     systemPrompt: "",
     tools: [],
-    formatHint: "",
-    maxIterations: 0,
+    format: 0,
+    maxToolCalls: 0,
     keepToolsAvailable: false,
     validateCalls: undefined,
     toolChoice: undefined,
     forcedToolName: undefined,
     disableThinking: false,
+    autoExecute: undefined,
+    replaceSystemPrompt: false,
+    requireJsonArguments: false,
   };
 }
 
@@ -3665,11 +3464,11 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     for (const v of message.tools) {
       ToolDefinition.encode(v!, writer.uint32(18).fork()).join();
     }
-    if (message.formatHint !== "") {
-      writer.uint32(26).string(message.formatHint);
+    if (message.format !== 0) {
+      writer.uint32(24).int32(message.format);
     }
-    if (message.maxIterations !== 0) {
-      writer.uint32(32).uint32(message.maxIterations);
+    if (message.maxToolCalls !== 0) {
+      writer.uint32(32).uint32(message.maxToolCalls);
     }
     if (message.keepToolsAvailable !== false) {
       writer.uint32(40).bool(message.keepToolsAvailable);
@@ -3685,6 +3484,15 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     }
     if (message.disableThinking !== false) {
       writer.uint32(120).bool(message.disableThinking);
+    }
+    if (message.autoExecute !== undefined) {
+      writer.uint32(128).bool(message.autoExecute);
+    }
+    if (message.replaceSystemPrompt !== false) {
+      writer.uint32(136).bool(message.replaceSystemPrompt);
+    }
+    if (message.requireJsonArguments !== false) {
+      writer.uint32(144).bool(message.requireJsonArguments);
     }
     return writer;
   },
@@ -3745,11 +3553,11 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
           continue;
         }
         case 3: {
-          if (tag !== 26) {
+          if (tag !== 24) {
             break;
           }
 
-          message.formatHint = reader.string();
+          message.format = reader.int32() as any;
           continue;
         }
         case 4: {
@@ -3757,7 +3565,7 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
             break;
           }
 
-          message.maxIterations = reader.uint32();
+          message.maxToolCalls = reader.uint32();
           continue;
         }
         case 5: {
@@ -3800,6 +3608,30 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
           message.disableThinking = reader.bool();
           continue;
         }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.autoExecute = reader.bool();
+          continue;
+        }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.replaceSystemPrompt = reader.bool();
+          continue;
+        }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.requireJsonArguments = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3831,15 +3663,11 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
       tools: globalThis.Array.isArray(object?.tools)
         ? object.tools.map((e: any) => ToolDefinition.fromJSON(e))
         : [],
-      formatHint: isSet(object.formatHint)
-        ? globalThis.String(object.formatHint)
-        : isSet(object.format_hint)
-        ? globalThis.String(object.format_hint)
-        : "",
-      maxIterations: isSet(object.maxIterations)
-        ? globalThis.Number(object.maxIterations)
-        : isSet(object.max_iterations)
-        ? globalThis.Number(object.max_iterations)
+      format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
+      maxToolCalls: isSet(object.maxToolCalls)
+        ? globalThis.Number(object.maxToolCalls)
+        : isSet(object.max_tool_calls)
+        ? globalThis.Number(object.max_tool_calls)
         : 0,
       keepToolsAvailable: isSet(object.keepToolsAvailable)
         ? globalThis.Boolean(object.keepToolsAvailable)
@@ -3866,6 +3694,21 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
         : isSet(object.disable_thinking)
         ? globalThis.Boolean(object.disable_thinking)
         : false,
+      autoExecute: isSet(object.autoExecute)
+        ? globalThis.Boolean(object.autoExecute)
+        : isSet(object.auto_execute)
+        ? globalThis.Boolean(object.auto_execute)
+        : undefined,
+      replaceSystemPrompt: isSet(object.replaceSystemPrompt)
+        ? globalThis.Boolean(object.replaceSystemPrompt)
+        : isSet(object.replace_system_prompt)
+        ? globalThis.Boolean(object.replace_system_prompt)
+        : false,
+      requireJsonArguments: isSet(object.requireJsonArguments)
+        ? globalThis.Boolean(object.requireJsonArguments)
+        : isSet(object.require_json_arguments)
+        ? globalThis.Boolean(object.require_json_arguments)
+        : false,
     };
   },
 
@@ -3889,11 +3732,11 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     if (message.tools?.length) {
       obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
     }
-    if (message.formatHint !== "") {
-      obj.formatHint = message.formatHint;
+    if (message.format !== 0) {
+      obj.format = toolCallFormatNameToJSON(message.format);
     }
-    if (message.maxIterations !== 0) {
-      obj.maxIterations = Math.round(message.maxIterations);
+    if (message.maxToolCalls !== 0) {
+      obj.maxToolCalls = Math.round(message.maxToolCalls);
     }
     if (message.keepToolsAvailable !== false) {
       obj.keepToolsAvailable = message.keepToolsAvailable;
@@ -3909,6 +3752,15 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     }
     if (message.disableThinking !== false) {
       obj.disableThinking = message.disableThinking;
+    }
+    if (message.autoExecute !== undefined) {
+      obj.autoExecute = message.autoExecute;
+    }
+    if (message.replaceSystemPrompt !== false) {
+      obj.replaceSystemPrompt = message.replaceSystemPrompt;
+    }
+    if (message.requireJsonArguments !== false) {
+      obj.requireJsonArguments = message.requireJsonArguments;
     }
     return obj;
   },
@@ -3926,13 +3778,16 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     message.topP = object.topP ?? 0;
     message.systemPrompt = object.systemPrompt ?? "";
     message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
-    message.formatHint = object.formatHint ?? "";
-    message.maxIterations = object.maxIterations ?? 0;
+    message.format = object.format ?? 0;
+    message.maxToolCalls = object.maxToolCalls ?? 0;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
     message.validateCalls = object.validateCalls ?? undefined;
     message.toolChoice = object.toolChoice ?? undefined;
     message.forcedToolName = object.forcedToolName ?? undefined;
     message.disableThinking = object.disableThinking ?? false;
+    message.autoExecute = object.autoExecute ?? undefined;
+    message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
+    message.requireJsonArguments = object.requireJsonArguments ?? false;
     return message;
   },
 };

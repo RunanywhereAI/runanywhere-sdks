@@ -1,10 +1,10 @@
 /**
  * @file test_runtime_registry.cpp
- * @brief Behavioural tests for the L1 runtime-plugin registry (task T4.1).
+ * @brief Behavioural tests for the L1 runtime-plugin registry.
  *
- * Mirrors the engine registry's test_engine_vtable / test_legacy_coexistence
- * style: pure C++ with no backend deps, links only `rac_commons`, runs on
- * every preset (macos, linux, ios, wasm).
+ * Mirrors the engine registry's test_engine_vtable /
+ * test_plugin_registry_isolation style: pure C++ with no backend deps, links
+ * only `rac_commons`, and runs on every preset (macos, linux, ios, wasm).
  *
  * Scenarios:
  *   1. register + get_by_id round-trip.
@@ -56,7 +56,7 @@ struct VtState {
 VtState g_states[8] = {};
 
 const rac_runtime_vtable_v2_t k_noop_v2 = {
-    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION,
     /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
     /* .run_session_v2 = */ nullptr,
     /* .alloc_buffer   = */ nullptr,
@@ -180,7 +180,7 @@ int main() {
               "(3) missing v2 extension → RAC_ERROR_INVALID_PARAMETER");
     }
 
-    /* --- (4) ABI version mismatch / v1 rejected ------------------------- */
+    /* --- (4) Any non-current ABI version is rejected ------------------- */
     {
         for (auto& s : g_states)
             s = {};
@@ -192,10 +192,10 @@ int main() {
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_VULKAN) == nullptr,
               "(4) rejected runtime absent from registry");
 
-        auto v1 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_v1", 0, init_0, destroy_0);
-        v1.metadata.abi_version = RAC_RUNTIME_ABI_VERSION_V1;
-        CHECK(rac_runtime_register(&v1) == RAC_ERROR_ABI_VERSION_MISMATCH,
-              "(4) ABI v1 runtime → RAC_ERROR_ABI_VERSION_MISMATCH");
+        auto old = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_old_abi", 0, init_0, destroy_0);
+        old.metadata.abi_version = RAC_RUNTIME_ABI_VERSION - 1u;
+        CHECK(rac_runtime_register(&old) == RAC_ERROR_ABI_VERSION_MISMATCH,
+              "(4) old ABI runtime → RAC_ERROR_ABI_VERSION_MISMATCH");
     }
 
     /* --- (5) init returning non-zero → silent reject -------------------- */

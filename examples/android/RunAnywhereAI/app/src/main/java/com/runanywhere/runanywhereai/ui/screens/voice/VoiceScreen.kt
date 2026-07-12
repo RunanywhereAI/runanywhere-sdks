@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,41 +19,45 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.DeviceInfo
+import com.runanywhere.runanywhereai.ui.screens.models.HardwareTier
+import com.runanywhere.runanywhereai.ui.screens.models.ModelRecommendation
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
+import com.runanywhere.runanywhereai.ui.permissions.PermissionRecoveryCard
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.runanywhereai.util.readableWidth
+import kotlinx.coroutines.launch
 
 @Composable
 fun VoiceScreen() {
     val dimens = LocalDimens.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val voiceVm: VoiceViewModel = viewModel()
     val llmVm: ModelSelectionViewModel =
         viewModel(key = "voice-llm", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.LLM))
@@ -65,18 +68,65 @@ fun VoiceScreen() {
     val vadVm: ModelSelectionViewModel =
         viewModel(key = "voice-vad", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VAD))
     var sheet by remember { mutableStateOf<ModelSelectionViewModel?>(null) }
+    var isPreparing by remember { mutableStateOf(false) }
+    var permissionDenied by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    val llmName = GlobalState.model.loaded?.name
-    val sttName = sttVm.state.models.firstOrNull { it.id == sttVm.state.currentModelId }?.name
-    val ttsVoice = ttsVm.state.models.firstOrNull { it.id == ttsVm.state.currentModelId }
-    val vadName = vadVm.state.models.firstOrNull { it.id == vadVm.state.currentModelId }?.name
-    // VAD is optional: the voice agent auto-ensures Silero VAD when none is picked.
-    val ready = llmName != null && sttName != null && ttsVoice != null
+    // Navigation retains this ViewModel in the saved back-stack entry, so
+    // onCleared is not a screen-exit signal. Stop Talk explicitly to cancel
+    // AudioRecord and its native feed loop before another speech screen runs.
+    DisposableEffect(voiceVm) {
+        onDispose { voiceVm.stop() }
+    }
+
+    val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
+
+    // Pure recommendation over the union of all voice modalities, so the whole trio
+    // (+ VAD) is pre-selected with zero hand-picking. Prefers HNPU where it fits.
+    val allVoiceModels = sttVm.state.models + llmVm.state.models + ttsVm.state.models + vadVm.state.models
+    val pipeline = remember(allVoiceModels, device) {
+        ModelRecommendation.recommendVoicePipeline(
+            tier = device?.tier ?: HardwareTier.MID_RANGE,
+            hasNpu = device?.hasNpu ?: false,
+            models = allVoiceModels,
+        )
+    }
+
+    val components = listOf(
+        VoiceComponent("Listen", RACIcons.Outline.Brain, sttVm, pipeline.stt),
+        VoiceComponent("Assistant", RACIcons.Outline.MessageCircle, llmVm, pipeline.llm),
+        VoiceComponent("Speak", RACIcons.Outline.Robot, ttsVm, pipeline.tts),
+        VoiceComponent("Turn-taking", RACIcons.Outline.Activity, vadVm, pipeline.vad, optional = true),
+    )
+
+    // Ready = the three core components are loaded (current). VAD is optional; the agent
+    // auto-ensures it. LLM readiness is reflected in GlobalState after loading.
+    val coreReady = listOf(sttVm, llmVm, ttsVm).all { it.state.currentModelId != null }
+    val ready = coreReady && GlobalState.model.isLoaded
+
+    fun prepareAll() {
+        if (isPreparing) return
+        scope.launch {
+            isPreparing = true
+            try {
+                // Sequential so per-component progress reads cleanly and memory stays bounded.
+                for (component in components) {
+                    val model = component.model ?: continue
+                    val ok = component.viewModel.prepare(model)
+                    if (!ok && !component.optional) break
+                }
+            } finally {
+                isPreparing = false
+            }
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) voiceVm.toggle() }
+    ) { granted ->
+        permissionDenied = !granted
+        if (granted) voiceVm.toggle()
+    }
 
     fun onMic() {
         // While STARTING (composing the agent) ignore taps so an impatient
@@ -89,7 +139,11 @@ fun VoiceScreen() {
         if (!ready) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) voiceVm.toggle() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) {
+            voiceVm.toggle()
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     LaunchedEffect(voiceVm.turns.size) {
@@ -106,37 +160,24 @@ fun VoiceScreen() {
         Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
             Text("Talk Mode", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Start a hands-free conversation once the assistant has listening and speaking models ready.",
+                "Hands-free conversation. We picked the best voice models for your device — tap once to set them up.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(dimens.radiusLg),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column {
-                SetupRow(RACIcons.Outline.MessageCircle, "Assistant", llmName, onClick = { sheet = llmVm })
-                Divider()
-                SetupRow(RACIcons.Outline.Brain, "Listen", sttName, onClick = { sheet = sttVm })
-                Divider()
-                SetupRow(RACIcons.Outline.Robot, "Speak", ttsVoice?.name, onClick = { sheet = ttsVm })
-                Divider()
-                SetupRow(
-                    RACIcons.Outline.Activity,
-                    "Turn-taking",
-                    vadName,
-                    onClick = { sheet = vadVm },
-                )
-            }
-        }
+        VoiceSetupCard(
+            components = components,
+            allReady = ready,
+            isPreparing = isPreparing,
+            onPrepareAll = ::prepareAll,
+            onChange = { sheet = it.viewModel },
+        )
 
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (voiceVm.turns.isEmpty()) {
                 Text(
-                    text = if (ready) "Tap the mic and start talking" else "Choose listening and speaking models to begin",
+                    text = if (ready) "Tap the mic and start talking" else "Set up Voice AI above to begin",
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -162,7 +203,12 @@ fun VoiceScreen() {
                 textAlign = TextAlign.Center,
             )
         }
-
+        if (permissionDenied) {
+            PermissionRecoveryCard(
+                message = "Microphone access was denied. Enable it in Android settings to use Talk.",
+                onOpenSettings = context::openRunAnywhereAppSettings,
+            )
+        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -198,55 +244,6 @@ private fun statusText(state: VoiceState, ready: Boolean): String = when (state)
     VoiceState.TRANSCRIBING -> "Transcribing…"
     VoiceState.THINKING -> "Thinking…"
     VoiceState.SPEAKING -> "Speaking…"
-}
-
-@Composable
-private fun Divider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-}
-
-@Composable
-private fun SetupRow(icon: ImageVector, label: String, value: String?, onClick: () -> Unit) {
-    val dimens = LocalDimens.current
-    val ready = value != null
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(dimens.iconMd),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                text = value ?: "Tap to select",
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (ready) {
-            Box(
-                modifier = Modifier
-                    .size(dimens.spacingSm)
-                    .clip(CircleShape)
-                    .background(primaryGreen),
-            )
-        }
-        Icon(
-            imageVector = RACIcons.Outline.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(dimens.iconSm),
-        )
-    }
 }
 
 @Composable

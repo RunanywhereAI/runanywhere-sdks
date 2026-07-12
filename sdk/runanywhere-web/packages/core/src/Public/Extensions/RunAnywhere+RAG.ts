@@ -6,9 +6,12 @@
  * generated proto request/result models.
  */
 
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { RAGProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import {
+  EmbeddingsProtoAdapter,
+  RAGProtoAdapter,
+} from '../../Adapters/ModalityProtoAdapter.js';
 import type {
   RAGConfiguration,
   RAGDocument,
@@ -17,13 +20,19 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
+import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
 import {
   rAGConfigurationDefaults,
   rAGQueryOptionsDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
+import {
+  Embeddings,
+  embeddingCosineSimilarity,
+} from './RunAnywhere+Embeddings.js';
+import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -45,7 +54,7 @@ export interface RAGProviderCapabilities {
 }
 
 export interface RAGProvider {
-  readonly providerKind?: 'custom' | 'wasm-session';
+  readonly providerKind?: 'custom' | 'cross-wasm' | 'wasm-session';
   ragCreatePipeline(config: RAGConfiguration): Promise<void>;
   ragDestroyPipeline(): Promise<void>;
   ragIngest(text: string, metadataJson?: string): Promise<void>;
@@ -65,6 +74,7 @@ export interface RAGProvider {
 
 export type RAGAvailabilitySource =
   | 'provider'
+  | 'cross-wasm'
   | 'wasm-session'
   | 'wasm-exports'
   | 'unavailable';
@@ -76,6 +86,17 @@ export interface RAGAvailability {
   missingExports: string[];
 }
 
+/**
+ * Identity of the facade-owned active RAG pipeline. The generation changes on
+ * every successful create, destroy, or provider replacement—even when the
+ * model ids are unchanged—so mounted Web views can detect global provider
+ * replacement without inspecting backend-private state.
+ */
+export interface RAGPipelineState {
+  generation: number;
+  configuration: RAGConfiguration | null;
+}
+
 export interface RAGNativeProviderOptions {
   adapter?: RAGProtoAdapter;
   session?: number;
@@ -83,9 +104,31 @@ export interface RAGNativeProviderOptions {
 }
 
 let _provider: RAGProvider | null = null;
+let _pipelineGeneration = 0;
+let _pipelineConfiguration: RAGConfiguration | null = null;
+
+function advancePipelineState(configuration: RAGConfiguration | null): void {
+  _pipelineGeneration += 1;
+  _pipelineConfiguration = configuration ? { ...configuration } : null;
+}
+
+export function getRAGPipelineState(): RAGPipelineState {
+  return {
+    generation: _pipelineGeneration,
+    configuration: _pipelineConfiguration ? { ..._pipelineConfiguration } : null,
+  };
+}
 
 export function setRAGProvider(provider: RAGProvider | null): void {
   _provider = provider;
+  advancePipelineState(null);
+}
+
+/** Core-lifecycle cleanup for shutdown paths where a provider destroy fails. */
+export function resetRAGFacadeState(): void {
+  const hadState = _provider !== null || _pipelineConfiguration !== null;
+  _provider = null;
+  if (hadState) advancePipelineState(null);
 }
 
 export function createRAGNativeProvider(
@@ -114,20 +157,54 @@ export function setRAGSessionHandle(
 ): void {
   assertNativeHandle(session, 'RAG.setSessionHandle');
   _provider = createRAGNativeProvider({ adapter, session });
+  advancePipelineState(null);
+}
+
+function evictUnavailableCrossWasmProvider(): void {
+  const provider = _provider;
+  if (provider?.providerKind !== 'cross-wasm' || supportsCrossWasmRAG()) return;
+
+  _provider = null;
+  advancePipelineState(null);
+  void provider.ragDestroyPipeline().catch((error: unknown) => {
+    logger.warning(
+      `Stale cross-WASM RAG cleanup failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  });
 }
 
 function activeProvider(): RAGProvider | null {
+  evictUnavailableCrossWasmProvider();
   return _provider;
 }
 
 export function getRAGAvailability(): RAGAvailability {
-  if (_provider) {
+  const provider = activeProvider();
+  if (provider) {
+    const source = provider.providerKind === 'wasm-session'
+      ? 'wasm-session'
+      : provider.providerKind === 'cross-wasm'
+        ? 'cross-wasm'
+        : 'provider';
     return {
       available: true,
-      source: _provider.providerKind === 'wasm-session' ? 'wasm-session' : 'provider',
-      reason: _provider.providerKind === 'wasm-session'
+      source,
+      reason: source === 'wasm-session'
         ? 'Native RAG session provider registered.'
+        : source === 'cross-wasm'
+          ? 'Web cross-WASM embeddings, retrieval, and LLM provider registered.'
         : 'RAG provider registered.',
+      missingExports: [],
+    };
+  }
+
+  if (supportsCrossWasmRAG()) {
+    return {
+      available: false,
+      source: 'wasm-exports',
+      reason: 'Web cross-WASM embeddings and LLM backends are registered, but no RAG pipeline has been created.',
       missingExports: [],
     };
   }
@@ -327,6 +404,454 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 }
 
+interface CrossWasmRAGChunk {
+  id: string;
+  documentId: string;
+  documentName: string;
+  text: string;
+  metadata: Record<string, string>;
+  vector: EmbeddingVector;
+  startOffset: number;
+  endOffset: number;
+  tokenCount: number;
+}
+
+interface CrossWasmRAGDocument {
+  id: string;
+  name: string;
+  chunkCount: number;
+}
+
+/**
+ * Browser provider for the split-WASM release architecture.
+ *
+ * The ONNX module owns MiniLM embeddings while the llama.cpp module owns text
+ * generation. A C++ RAG session is private to one Emscripten heap and cannot
+ * resolve service handles registered in its sibling module. Keep the public
+ * RAG contract intact by owning the in-memory vector index here and routing
+ * each primitive to its canonical backend facade.
+ */
+class CrossWasmRAGProvider implements RAGProvider {
+  readonly providerKind = 'cross-wasm' as const;
+
+  private config: RAGConfiguration = createDefaultRAGConfiguration();
+  private initialized = false;
+  private chunks: CrossWasmRAGChunk[] = [];
+  private documents = new Map<string, CrossWasmRAGDocument>();
+  private lastUpdatedMs = 0;
+  private lastQueryMs = 0;
+  private lifecycleVersion = 0;
+
+  async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    validateNativeRAGConfiguration(config, 'RAG.createPipeline');
+    if (!config.llmModelId.trim()) {
+      throw SDKException.backendNotAvailable(
+        'RAG.createPipeline',
+        'The cross-WASM Web RAG provider requires RAGConfiguration.llmModelId.',
+      );
+    }
+    if (!supportsCrossWasmRAG()) {
+      throw SDKException.backendNotAvailable(
+        'RAG.createPipeline',
+        'The cross-WASM Web RAG provider requires registered ONNX embeddings and llama.cpp text generation backends.',
+      );
+    }
+
+    // Direct configuration callers (including rag.ensureReady) receive the
+    // same lifecycle guarantees as the two-model-id convenience overload.
+    await loadRagArtifactModel(
+      config.embeddingModelId,
+      ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      'Embedding',
+    );
+    await loadRagArtifactModel(
+      config.llmModelId,
+      ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      'LLM',
+    );
+
+    this.lifecycleVersion += 1;
+    this.config = { ...createDefaultRAGConfiguration(), ...config };
+    this.chunks = [];
+    this.documents.clear();
+    this.lastUpdatedMs = Date.now();
+    this.lastQueryMs = 0;
+    this.initialized = true;
+  }
+
+  async ragDestroyPipeline(): Promise<void> {
+    this.lifecycleVersion += 1;
+    this.initialized = false;
+    this.chunks = [];
+    this.documents.clear();
+    this.lastUpdatedMs = Date.now();
+    this.lastQueryMs = 0;
+  }
+
+  async ragIngest(text: string, metadataJson?: string): Promise<void> {
+    await this.ragIngestDocument(makeRAGDocument(text, metadataJson));
+  }
+
+  async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
+    this.requireInitialized('RAG.ingest');
+    const version = this.lifecycleVersion;
+    const normalized = normalizeCrossWasmDocument(document);
+    const textChunks = splitRAGText(
+      normalized.text,
+      this.config.chunkSize ?? 512,
+      this.config.chunkOverlap ?? 64,
+    );
+    if (textChunks.length === 0) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'RAG document text is empty.',
+        'RAG.ingest',
+      );
+    }
+
+    const result = await Embeddings.embedBatch({
+      texts: textChunks.map((chunk) => chunk.text),
+      requestId: '',
+      modelId: this.config.embeddingModelId,
+      metadata: {},
+    }, this.config.embeddingModelId);
+    this.assertCurrent(version, 'RAG.ingest');
+    if (result.vectors.length !== textChunks.length) {
+      throw SDKException.backendNotAvailable(
+        'RAG.ingest',
+        `Embedding backend returned ${result.vectors.length} vectors for ${textChunks.length} chunks.`,
+      );
+    }
+
+    this.removeDocumentInternal(normalized.id);
+    const nextChunks = textChunks.map((chunk, index): CrossWasmRAGChunk => ({
+      id: `${normalized.id}:chunk-${index}`,
+      documentId: normalized.id,
+      documentName: normalized.name,
+      text: chunk.text,
+      metadata: {
+        ...normalized.metadata,
+        docId: normalized.id,
+        docName: normalized.name,
+      },
+      vector: result.vectors[index]!,
+      startOffset: chunk.startOffset,
+      endOffset: chunk.endOffset,
+      tokenCount: chunk.tokenCount,
+    }));
+    this.chunks.push(...nextChunks);
+    this.documents.set(normalized.id, {
+      id: normalized.id,
+      name: normalized.name,
+      chunkCount: nextChunks.length,
+    });
+    this.lastUpdatedMs = Date.now();
+    return this.statistics();
+  }
+
+  async ragAddDocumentsBatch(
+    documents: Array<{ text: string; metadataJson?: string }>,
+  ): Promise<void> {
+    for (const document of documents) {
+      await this.ragIngest(document.text, document.metadataJson);
+    }
+  }
+
+  async ragQuery(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): Promise<RAGResult> {
+    this.requireInitialized('RAG.query');
+    const version = this.lifecycleVersion;
+    const query = question.trim();
+    if (!query) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'RAG query question is empty.',
+        'RAG.query',
+      );
+    }
+
+    const totalStarted = nowMs();
+    const retrievalStarted = nowMs();
+    const queryEmbedding = await Embeddings.embed(
+      query,
+      this.config.embeddingModelId,
+    );
+    this.assertCurrent(version, 'RAG.query');
+    const queryVector = queryEmbedding.vectors[0];
+    if (!queryVector) {
+      throw SDKException.backendNotAvailable(
+        'RAG.query',
+        'Embedding backend returned no query vector.',
+      );
+    }
+
+    const queryOptions = makeRAGQuery(query, this.config, options);
+    const minimumSimilarity = queryOptions.similarityThreshold ?? 0;
+    const requestedTopK = queryOptions.retrievalTopK || this.config.topK || 5;
+    const ranked = this.chunks
+      .map((chunk) => ({
+        chunk,
+        score: embeddingCosineSimilarity(queryVector, chunk.vector),
+      }))
+      .filter(({ score }) => score >= minimumSimilarity)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(1, requestedTopK));
+    const retrievalTimeMs = nowMs() - retrievalStarted;
+
+    const retrievedChunks: RAGSearchResult[] = ranked.map(({ chunk, score }, index) => ({
+      chunkId: chunk.id,
+      text: chunk.text,
+      similarityScore: score,
+      sourceDocument: chunk.documentName,
+      metadata: { ...chunk.metadata },
+      rank: index + 1,
+      startOffset: chunk.startOffset,
+      endOffset: chunk.endOffset,
+      tokenCount: chunk.tokenCount,
+    }));
+    if (retrievedChunks.length === 0) {
+      const totalTimeMs = nowMs() - totalStarted;
+      this.lastQueryMs = Date.now();
+      return {
+        answer: '',
+        retrievedChunks: [],
+        contextUsed: '',
+        retrievalTimeMs,
+        generationTimeMs: 0,
+        totalTimeMs,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        errorCode: 0,
+        requestId: createId('rag-query'),
+      };
+    }
+
+    const context = boundedRAGContext(
+      retrievedChunks,
+      this.config.maxContextTokens ?? 4096,
+    );
+    const prompt = renderRAGPrompt(
+      this.config.promptTemplate,
+      context,
+      query,
+    );
+
+    // Acceleration changes replace the entire llama.cpp Emscripten module.
+    // The TypeScript-owned vector index remains valid, but its configured LLM
+    // no longer exists in the new module's lifecycle heap. Re-establish that
+    // dependency immediately before generation without recreating (and
+    // clearing) the RAG pipeline.
+    const currentLlm = WebModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      includeModelMetadata: false,
+    });
+    if (!currentLlm?.found || currentLlm.modelId !== this.config.llmModelId) {
+      await loadRagArtifactModel(
+        this.config.llmModelId,
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        'LLM',
+      );
+      this.assertCurrent(version, 'RAG.query');
+    }
+
+    const generationStarted = nowMs();
+    const generated = await TextGeneration.generate({
+      prompt,
+      systemPrompt: queryOptions.systemPrompt
+        ?? 'Answer the question using only the supplied context. If the context does not contain the answer, say so.',
+      maxTokens: queryOptions.maxTokens,
+      temperature: queryOptions.temperature,
+      topP: queryOptions.topP,
+      topK: queryOptions.topK,
+      disableThinking: queryOptions.disableThinking,
+      conversationId: 'web-cross-wasm-rag',
+    });
+    this.assertCurrent(version, 'RAG.query');
+    const generationTimeMs = nowMs() - generationStarted;
+    const totalTimeMs = nowMs() - totalStarted;
+    this.lastQueryMs = Date.now();
+    return {
+      answer: generated.text,
+      retrievedChunks,
+      contextUsed: context,
+      retrievalTimeMs,
+      generationTimeMs,
+      totalTimeMs,
+      promptTokens: generated.inputTokens,
+      completionTokens: generated.tokensGenerated,
+      totalTokens: generated.inputTokens + generated.tokensGenerated,
+      errorCode: 0,
+      requestId: createId('rag-query'),
+      thinkingContent: generated.thinkingContent,
+    };
+  }
+
+  async ragClearDocuments(): Promise<void> {
+    this.requireInitialized('RAG.clearDocuments');
+    this.chunks = [];
+    this.documents.clear();
+    this.lastUpdatedMs = Date.now();
+  }
+
+  async ragGetDocumentCount(): Promise<number> {
+    return this.documents.size;
+  }
+
+  async ragGetStatistics(): Promise<RAGStatistics> {
+    return this.statistics();
+  }
+
+  async ragListDocuments(): Promise<RAGDocumentSummary[]> {
+    return [...this.documents.values()].map((document) => ({ ...document }));
+  }
+
+  async ragRemoveDocument(id: string): Promise<void> {
+    this.requireInitialized('RAG.removeDocument');
+    this.removeDocumentInternal(id);
+    this.lastUpdatedMs = Date.now();
+  }
+
+  ragGetCapabilities(): RAGProviderCapabilities {
+    return {
+      native: false,
+      persistent: false,
+      documentListing: true,
+      documentRemoval: true,
+    };
+  }
+
+  private statistics(): RAGStatistics {
+    const totalTokensIndexed = this.chunks.reduce(
+      (sum, chunk) => sum + chunk.tokenCount,
+      0,
+    );
+    const vectorStoreSizeBytes = this.chunks.reduce(
+      (sum, chunk) => sum + chunk.vector.values.length * Float32Array.BYTES_PER_ELEMENT,
+      0,
+    );
+    return {
+      indexedDocuments: this.documents.size,
+      indexedChunks: this.chunks.length,
+      totalTokensIndexed,
+      lastUpdatedMs: this.lastUpdatedMs,
+      indexPath: undefined,
+      statsJson: JSON.stringify({ provider: 'cross-wasm', dimension: this.chunks[0]?.vector.dimension ?? 0 }),
+      vectorStoreSizeBytes,
+      isPersistent: false,
+      lastQueryMs: this.lastQueryMs,
+      errorMessage: undefined,
+      errorCode: 0,
+    };
+  }
+
+  private removeDocumentInternal(id: string): void {
+    this.documents.delete(id);
+    this.chunks = this.chunks.filter((chunk) => chunk.documentId !== id);
+  }
+
+  private requireInitialized(feature: string): void {
+    if (!this.initialized) {
+      throw SDKException.notInitialized(`${feature}: RAG pipeline is not ready`);
+    }
+  }
+
+  private assertCurrent(version: number, feature: string): void {
+    if (!this.initialized || version !== this.lifecycleVersion) {
+      throw SDKException.notInitialized(`${feature}: RAG pipeline stopped or restarted`);
+    }
+  }
+}
+
+function supportsCrossWasmRAG(): boolean {
+  const embeddings = EmbeddingsProtoAdapter.tryDefault();
+  return Boolean(embeddings?.supportsLifecycleProtoEmbeddings())
+    && TextGeneration.supportsProtoLLM();
+}
+
+interface NormalizedCrossWasmDocument {
+  id: string;
+  name: string;
+  text: string;
+  metadata: Record<string, string>;
+}
+
+function normalizeCrossWasmDocument(document: RAGDocument): NormalizedCrossWasmDocument {
+  const id = document.id.trim() || createId('rag-doc');
+  const name = document.metadata.docName
+    || document.metadata.name
+    || document.metadata.sourceDocument
+    || document.sourceUri
+    || 'Document';
+  return {
+    id,
+    name,
+    text: document.text.trim(),
+    metadata: { ...document.metadata },
+  };
+}
+
+interface SplitRAGChunk {
+  text: string;
+  startOffset: number;
+  endOffset: number;
+  tokenCount: number;
+}
+
+function splitRAGText(text: string, requestedSize: number, requestedOverlap: number): SplitRAGChunk[] {
+  const matches = [...text.matchAll(/\S+/g)];
+  if (matches.length === 0) return [];
+  const size = Math.max(1, Math.floor(requestedSize));
+  const overlap = Math.min(Math.max(0, Math.floor(requestedOverlap)), size - 1);
+  const stride = Math.max(1, size - overlap);
+  const chunks: SplitRAGChunk[] = [];
+  for (let start = 0; start < matches.length; start += stride) {
+    const end = Math.min(matches.length, start + size);
+    const startOffset = matches[start]!.index ?? 0;
+    const last = matches[end - 1]!;
+    const endOffset = (last.index ?? 0) + last[0].length;
+    chunks.push({
+      text: text.slice(startOffset, endOffset),
+      startOffset,
+      endOffset,
+      tokenCount: end - start,
+    });
+    if (end === matches.length) break;
+  }
+  return chunks;
+}
+
+function boundedRAGContext(chunks: RAGSearchResult[], requestedMaxTokens: number): string {
+  const maxTokens = Math.max(1, Math.floor(requestedMaxTokens));
+  const parts: string[] = [];
+  let used = 0;
+  for (const chunk of chunks) {
+    const available = maxTokens - used;
+    if (available <= 0) break;
+    const words = chunk.text.split(/\s+/).filter(Boolean);
+    const text = words.slice(0, available).join(' ');
+    if (!text) continue;
+    parts.push(`[Source ${chunk.rank}: ${chunk.sourceDocument ?? 'Document'}]\n${text}`);
+    used += Math.min(words.length, available);
+  }
+  return parts.join('\n\n');
+}
+
+function renderRAGPrompt(template: string | undefined, context: string, query: string): string {
+  const fallback = 'Use the context below to answer.\n\nContext:\n{context}\n\nQuestion: {query}';
+  return (template?.trim() || fallback)
+    .replaceAll('{{context}}', context)
+    .replaceAll('{{query}}', query)
+    .replaceAll('{context}', context)
+    .replaceAll('{query}', query);
+}
+
+function nowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
 function assertNativeHandle(handle: number, feature: string): number {
   if (!Number.isFinite(handle) || handle <= 0) {
     throw SDKException.backendNotAvailable(
@@ -396,6 +921,9 @@ function makeRAGQuery(
     stream: options.stream ?? false,
     // Structured flag — commons prepends the model's no-think directive.
     disableThinking: options.disableThinking ?? false,
+    enableMultiQuery: options.enableMultiQuery ?? defaults.enableMultiQuery,
+    multiQueryCount: options.multiQueryCount ?? defaults.multiQueryCount,
+    scopePrefix: options.scopePrefix ?? defaults.scopePrefix,
   };
 }
 
@@ -432,12 +960,15 @@ function parseMetadata(metadataJson?: string): ParsedMetadata {
   const metadata = parseMetadataJson(metadataJson);
   const docId = metadata.docId ?? metadata.id ?? createId('rag-doc');
   const docName = metadata.docName ?? metadata.name ?? metadata.sourceDocument ?? metadata.sourceUri ?? 'Document';
+  const parsedSizeBytes = Number(metadata.sizeBytes ?? 0);
   return {
     docId,
     docName,
     sourceUri: metadata.sourceUri,
     mediaType: metadata.mediaType,
-    sizeBytes: Number(metadata.sizeBytes ?? 0),
+    sizeBytes: Number.isFinite(parsedSizeBytes) && parsedSizeBytes >= 0
+      ? parsedSizeBytes
+      : 0,
     metadata: {
       ...metadata,
       docId,
@@ -449,7 +980,10 @@ function parseMetadata(metadataJson?: string): ParsedMetadata {
 function parseMetadataJson(metadataJson?: string): Record<string, string> {
   if (!metadataJson) return {};
   try {
-    const parsed = JSON.parse(metadataJson) as Record<string, unknown>;
+    const parsed: unknown = JSON.parse(metadataJson);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return { metadataJson };
+    }
     const metadata: Record<string, string> = {};
     for (const [key, value] of Object.entries(parsed)) {
       if (value != null) metadata[key] = String(value);
@@ -571,11 +1105,27 @@ export async function ragCreatePipeline(
       baseConfiguration,
     )
     : configOrEmbeddingModelId;
-  const provider = activeProvider();
+  let provider = activeProvider();
+  let installedCrossWasmProvider = false;
+  // The Web release deliberately keeps llama.cpp and ONNX in independent
+  // Emscripten modules. A native RAG session in either module can see only
+  // one half of the pipeline (LLM or embeddings), so compose those public
+  // primitives in TypeScript when both registered backends are available.
+  if (!provider && supportsCrossWasmRAG()) {
+    provider = new CrossWasmRAGProvider();
+    _provider = provider;
+    installedCrossWasmProvider = true;
+  }
   if (provider) {
-    await provider.ragCreatePipeline(config);
-    logger.info('RAG pipeline created');
-    return;
+    try {
+      await provider.ragCreatePipeline(config);
+      advancePipelineState(config);
+      logger.info('RAG pipeline created');
+      return;
+    } catch (error) {
+      if (installedCrossWasmProvider && _provider === provider) _provider = null;
+      throw error;
+    }
   }
 
   const adapter = RAGProtoAdapter.tryDefault();
@@ -587,6 +1137,7 @@ export async function ragCreatePipeline(
   const nativeProvider = new NativeRAGSessionProvider(adapter, { config });
   await nativeProvider.ragCreatePipeline(config);
   _provider = nativeProvider;
+  advancePipelineState(config);
   logger.info('RAG pipeline created');
 }
 
@@ -598,6 +1149,7 @@ export async function ragDestroyPipeline(): Promise<void> {
   if (!provider) return;
   await provider.ragDestroyPipeline();
   _provider = null;
+  advancePipelineState(null);
   logger.info('RAG pipeline destroyed');
 }
 
@@ -826,6 +1378,12 @@ export async function ragEnsureReady(
   return availability;
 }
 
+/** Internal constructor used by focused split-WASM provider contract tests. */
+export const __testing__ = {
+  createCrossWasmRAGProvider: (): RAGProvider => new CrossWasmRAGProvider(),
+  resetFacadeState: resetRAGFacadeState,
+};
+
 /**
  * Public `RunAnywhere.rag.*` namespace — Web-only extensions ONLY.
  *
@@ -849,6 +1407,8 @@ export const RAG = {
   setSessionHandle: setRAGSessionHandle,
   /** @webOnly Inspect provider/availability without throwing. */
   availability: getRAGAvailability,
+  /** @webOnly Identify the exact active pipeline across global provider replacement. */
+  pipelineState: getRAGPipelineState,
   /** @webOnly Convenience boolean for availability checks. */
   isAvailable: isRAGAvailable,
   /** @webOnly Inspect the active provider's declared capabilities (listing/removal/persistence). */

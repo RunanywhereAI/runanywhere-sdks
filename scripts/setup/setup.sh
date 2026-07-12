@@ -127,7 +127,7 @@ setup_ios() {
     fi
     if ! have swift; then err "swift not found (install Xcode)"; return 1; fi
     if [ -d "${REPO_ROOT}/sdk/runanywhere-swift" ]; then
-        (cd "${REPO_ROOT}/sdk/runanywhere-swift" && swift package resolve) && ok "swift package resolve"
+        (cd "${REPO_ROOT}/sdk/runanywhere-swift" && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve) && ok "swift package resolve"
     fi
     for ex in "${REPO_ROOT}"/examples/ios/*/; do
         if [ -f "${ex}/Podfile" ] && have pod; then

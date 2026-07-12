@@ -8,9 +8,6 @@
  * the registered platform transport (OkHttp on Android, URLSession on iOS).
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
-
-#include <cstring>
 
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 
@@ -43,60 +40,37 @@ std::shared_ptr<ArrayBuffer> emptyDownloadProtoBuffer() {
     return ArrayBuffer::allocate(0);
 }
 
-proto_compat::ProtoBufferCallFn downloadProtoSymbol(const char* symbolName) {
-    if (std::strcmp(symbolName, "rac_download_plan_proto") == 0) {
-        return &rac_download_plan_proto;
-    }
-    if (std::strcmp(symbolName, "rac_download_start_proto") == 0) {
-        return &rac_download_start_proto;
-    }
-    if (std::strcmp(symbolName, "rac_download_cancel_proto") == 0) {
-        return &rac_download_cancel_proto;
-    }
-    if (std::strcmp(symbolName, "rac_download_resume_proto") == 0) {
-        return &rac_download_resume_proto;
-    }
-    if (std::strcmp(symbolName, "rac_download_progress_poll_proto") == 0) {
-        return &rac_download_progress_poll_proto;
-    }
-    return proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
-}
+using DownloadProtoFn = decltype(&rac_download_plan_proto);
 
 std::shared_ptr<ArrayBuffer> copyDownloadProtoBuffer(rac_proto_buffer_t& protoBuffer) {
     if (protoBuffer.status != RAC_SUCCESS) {
         if (protoBuffer.error_message) {
             LOGE("download proto error: %s", protoBuffer.error_message);
         }
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyDownloadProtoBuffer();
     }
 
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyDownloadProtoBuffer();
     }
 
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
 std::shared_ptr<ArrayBuffer> callDownloadProto(const std::vector<uint8_t>& requestBytes,
-                                               const char* symbolName,
+                                               DownloadProtoFn fn,
                                                const char* operation) {
-    auto fn = downloadProtoSymbol(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        return emptyDownloadProtoBuffer();
-    }
-
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     const uint8_t* requestData = requestBytes.empty() ? nullptr : requestBytes.data();
     rac_result_t rc = fn(requestData, requestBytes.size(), &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         return emptyDownloadProtoBuffer();
     }
     return copyDownloadProtoBuffer(out);
@@ -140,7 +114,7 @@ HybridRunAnywhereCore::downloadPlanProto(const std::shared_ptr<ArrayBuffer>& req
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callDownloadProto(
             bytes,
-            "rac_download_plan_proto",
+            rac_download_plan_proto,
             "downloadPlanProto");
     });
 }
@@ -151,7 +125,7 @@ HybridRunAnywhereCore::downloadStartProto(const std::shared_ptr<ArrayBuffer>& re
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callDownloadProto(
             bytes,
-            "rac_download_start_proto",
+            rac_download_start_proto,
             "downloadStartProto");
     });
 }
@@ -162,7 +136,7 @@ HybridRunAnywhereCore::downloadCancelProto(const std::shared_ptr<ArrayBuffer>& r
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callDownloadProto(
             bytes,
-            "rac_download_cancel_proto",
+            rac_download_cancel_proto,
             "downloadCancelProto");
     });
 }
@@ -173,7 +147,7 @@ HybridRunAnywhereCore::downloadResumeProto(const std::shared_ptr<ArrayBuffer>& r
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callDownloadProto(
             bytes,
-            "rac_download_resume_proto",
+            rac_download_resume_proto,
             "downloadResumeProto");
     });
 }
@@ -184,7 +158,7 @@ HybridRunAnywhereCore::downloadProgressPollProto(const std::shared_ptr<ArrayBuff
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callDownloadProto(
             bytes,
-            "rac_download_progress_poll_proto",
+            rac_download_progress_poll_proto,
             "downloadProgressPollProto");
     });
 }
@@ -198,15 +172,7 @@ HybridRunAnywhereCore::setDownloadProgressCallbackProto(
             g_downloadProtoCallback = onProgressBytes;
         }
 
-        auto setCallback = &rac_download_set_progress_proto_callback;
-        if (!setCallback) {
-            std::lock_guard<std::mutex> lock(g_downloadProtoCallbackMutex);
-            g_downloadProtoCallback = nullptr;
-            LOGE("setDownloadProgressCallbackProto: rac_download_set_progress_proto_callback unavailable");
-            return false;
-        }
-
-        rac_result_t rc = setCallback(
+        rac_result_t rc = rac_download_set_progress_proto_callback(
             &downloadProtoProgressTrampoline,
             nullptr);
         if (rc != RAC_SUCCESS) {
@@ -228,13 +194,7 @@ HybridRunAnywhereCore::clearDownloadProgressCallbackProto() {
             g_downloadProtoCallback = nullptr;
         }
 
-        auto setCallback = &rac_download_set_progress_proto_callback;
-        if (!setCallback) {
-            LOGE("clearDownloadProgressCallbackProto: rac_download_set_progress_proto_callback unavailable");
-            return false;
-        }
-
-        rac_result_t rc = setCallback(nullptr, nullptr);
+        rac_result_t rc = rac_download_set_progress_proto_callback(nullptr, nullptr);
         if (rc != RAC_SUCCESS) {
             LOGE("clearDownloadProgressCallbackProto: rc=%d", rc);
             return false;

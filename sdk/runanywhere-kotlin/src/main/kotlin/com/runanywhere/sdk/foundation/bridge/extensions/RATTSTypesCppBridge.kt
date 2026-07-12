@@ -9,11 +9,10 @@
  * Mirrors Swift `Foundation/Bridge/Extensions/RATTSTypes+CppBridge.swift`.
  * Pure ergonomic accessors / aliases; no JNI.
  *
- * Companion sibling `RATTSConfigurationHelpers.kt` (in
- * `public.extensions.TTS`) already covers `TTSConfiguration.defaults()`,
- * `TTSOptions.defaults()`, `TTSPhonemeTimestamp.startTime/endTime`, etc.
- * This file adds the Swift-style read-only aliases that round out the
- * `RATTSOptions` / `RATTSOutput` public surface.
+ * Canonical defaults live in generated/convenience/RAConvenience.kt. The
+ * public TTS helpers provide timestamp accessors; this file adds the
+ * Swift-style read-only aliases that round out the `RATTSOptions` /
+ * `RATTSOutput` public surface.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions

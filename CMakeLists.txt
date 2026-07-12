@@ -79,6 +79,13 @@ option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
 option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
 
+# Protobuf is a private implementation detail of the serialized-byte C ABI.
+# Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime
+# may carry a different unshaded protobuf runtime in the same final app.
+option(RAC_ISOLATE_PROTOBUF_NAMESPACE
+       "Build the private protobuf runtime in a RunAnywhere-owned C++ namespace"
+       ON)
+
 # Plugin loading mode
 # RAC_STATIC_PLUGINS:
 #   ON  → engine TUs are linked into rac_commons; iOS/WASM force this.
@@ -102,6 +109,7 @@ if(EMSCRIPTEN)
     option(RAC_WASM_LLAMACPP    "Build the WebAssembly target with llama.cpp (LLM + VLM)" OFF)
     option(RAC_WASM_ONNX        "Build the WebAssembly target with ONNX/sherpa support" OFF)
     option(RAC_WASM_WEBGPU      "Enable WebGPU acceleration for the WebAssembly target" OFF)
+    option(RAC_WASM_WEBGPU_JSPI "Use experimental JSPI instead of Asyncify for WebGPU" OFF)
 
     set(RAC_BUILD_JNI OFF CACHE BOOL "" FORCE)
     set(RAC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -140,7 +148,7 @@ if(EMSCRIPTEN)
     if(RAC_WASM_LLAMACPP)
         if(RAC_WASM_WEBGPU)
             set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
-            set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
+            set(GGML_WEBGPU_JSPI ${RAC_WASM_WEBGPU_JSPI} CACHE BOOL "" FORCE)
         else()
             set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
             set(GGML_WEBGPU_JSPI OFF CACHE BOOL "" FORCE)
@@ -251,10 +259,64 @@ endif()
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
     enable_testing()
+    if(TARGET test_mlx_cancellation)
+        add_test(NAME mlx_cancellation_tests COMMAND test_mlx_cancellation)
+    endif()
+    # Pure request-latch regression: cancellation in the reset/setup window
+    # must reach the active request without poisoning its successor. This test
+    # deliberately has no dependency on QHexRT's private C ABI.
+    if(NOT TARGET test_qhexrt_request_cancellation)
+        find_package(Threads REQUIRED)
+        add_executable(test_qhexrt_request_cancellation
+            engines/qhexrt/tests/test_qhexrt_request_cancellation.cpp)
+        target_include_directories(test_qhexrt_request_cancellation PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt)
+        target_link_libraries(test_qhexrt_request_cancellation PRIVATE Threads::Threads)
+        target_compile_features(test_qhexrt_request_cancellation PRIVATE cxx_std_17)
+        add_test(NAME qhexrt_request_cancellation_tests
+                 COMMAND test_qhexrt_request_cancellation)
+    endif()
+    # QHexRT owns Qualcomm chip selection and the device-aware model catalog
+    # facade. The test lives with the engine and links after the engine target
+    # exists; commons tests intentionally remain backend-neutral.
+    if(RAC_BACKEND_QHEXRT AND TARGET rac_backend_qhexrt AND
+       NOT TARGET test_qhexrt_model_catalog)
+        add_executable(test_qhexrt_model_catalog
+            engines/qhexrt/tests/test_qhexrt_model_catalog.cpp)
+        target_include_directories(test_qhexrt_model_catalog PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_qhexrt_model_catalog PRIVATE
+            rac_backend_qhexrt
+            rac_commons
+        )
+        if(RAC_PROTOBUF_RUNTIME_ENABLED)
+            target_compile_definitions(test_qhexrt_model_catalog PRIVATE
+                RAC_QHEXRT_HAVE_PROTOBUF=1)
+            target_include_directories(test_qhexrt_model_catalog PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto)
+            if(TARGET protobuf::libprotobuf)
+                target_link_libraries(test_qhexrt_model_catalog PRIVATE protobuf::libprotobuf)
+            elseif(Protobuf_LIBRARIES)
+                target_include_directories(test_qhexrt_model_catalog PRIVATE
+                    ${Protobuf_INCLUDE_DIRS})
+                target_link_libraries(test_qhexrt_model_catalog PRIVATE ${Protobuf_LIBRARIES})
+            endif()
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_qhexrt_model_catalog)
+        endif()
+        target_compile_features(test_qhexrt_model_catalog PRIVATE cxx_std_17)
+        add_test(NAME qhexrt_model_catalog_tests COMMAND test_qhexrt_model_catalog)
+    endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
-    # rac_backend_sherpa is built by engines/
-    # which is configured after sdk/runanywhere-commons/, so the target does
-    # not exist when commons/tests/CMakeLists.txt runs.
+    # rac_backend_sherpa is built by engines/, which is configured after
+    # sdk/runanywhere-commons/. This is also an intentional final-link gate:
+    # rac_commons contributes RunAnywhere's private protobuf runtime while the
+    # static macOS ONNX Runtime inventory contributes its own protobuf. A
+    # namespace-isolation regression therefore fails this target at link time.
     if(RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa AND NOT TARGET test_plugin_entry_sherpa)
         add_executable(test_plugin_entry_sherpa
             sdk/runanywhere-commons/tests/test_plugin_entry_sherpa.cpp)
@@ -277,6 +339,8 @@ if(RAC_BUILD_TESTS)
         endif()
         target_compile_features(test_plugin_entry_sherpa PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
+        set_tests_properties(plugin_entry_sherpa_tests PROPERTIES
+            LABELS "native;protobuf-isolation;sherpa")
     endif()
 
     if(APPLE AND RAC_BACKEND_COREML

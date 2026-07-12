@@ -1,19 +1,18 @@
 // ignore_for_file: avoid_classes_with_only_static_members
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -134,7 +133,7 @@ class DartBridgeDevice {
           .lookupFunction<
             Int32 Function(Pointer<RacDeviceCallbacksStruct>),
             int Function(Pointer<RacDeviceCallbacksStruct>)
-          >('rac_device_set_callbacks');
+          >('rac_device_manager_set_callbacks');
 
       final result = setCallbacks(callbacks);
       if (result != RacResultCode.success) {
@@ -149,11 +148,11 @@ class DartBridgeDevice {
 
       _callbacksRegistered = true;
       _logger.debug('Device callbacks registered (sync)');
-    } catch (e) {
-      // librac_commons.so may not export rac_device_set_callbacks in some
+    } catch (_) {
+      // librac_commons.so may not export rac_device_manager_set_callbacks in some
       // configurations (B-FL-1-002). Log at warning so it's visible in
       // non-debug builds; SDK falls back to no device callbacks.
-      _logger.warning('registerCallbacks unavailable: $e');
+      _logger.warning('Device callbacks are unavailable');
     }
   }
 
@@ -189,10 +188,9 @@ class DartBridgeDevice {
     await _refreshDeviceInfoSnapshot();
 
     // Callbacks are already registered (Phase 1 or the guard above).
-    // Re-register with the canonical C++ symbol so the device manager
-    // has them too (Phase 1 uses rac_device_set_callbacks; Phase 2 uses
-    // rac_device_manager_set_callbacks). Reuse the existing _callbacksPtr
-    // to avoid leaking the first allocation.
+    // Refresh the callback snapshot after the asynchronous device metadata
+    // caches are ready. Reuse the existing pointer to avoid leaking the
+    // Phase-1 allocation.
     try {
       final lib = PlatformLoader.loadCommons();
 
@@ -220,11 +218,8 @@ class DartBridgeDevice {
 
       _isRegistered = true;
       _logger.debug('Device callbacks registered successfully');
-    } catch (e, stack) {
-      _logger.debug(
-        'Device registration not available: $e',
-        metadata: {'stack': stack.toString()},
-      );
+    } catch (_) {
+      _logger.debug('Device registration is unavailable');
       _isRegistered = true; // Mark as registered to avoid retry loops
     }
   }
@@ -239,6 +234,49 @@ class DartBridgeDevice {
   /// only drains the request because Dart FFI callbacks cannot await network I/O.
   static Future<void> flushPendingRegistrationPost() async {
     await _executePendingHttpPost();
+  }
+
+  /// Clear process-local device state after native callbacks are quiescent.
+  /// Durable identity and registration values remain in platform storage.
+  static void shutdown() {
+    if (_callbacksRegistered) {
+      try {
+        final clearCallbacks = PlatformLoader.loadCommons()
+            .lookupFunction<Void Function(), void Function()>(
+              'rac_device_manager_clear_callbacks',
+            );
+        clearCallbacks();
+      } catch (_) {
+        _logger.warning('Device callback teardown failed');
+        // Keep every callback-owned allocation alive until a later reset can
+        // prove native callback quiescence. DartBridge aggregates this failure
+        // and remains fail closed in the meantime.
+        rethrow;
+      }
+    }
+
+    final callbacks = _callbacksPtr;
+    if (callbacks != null) {
+      calloc.free(callbacks);
+      _callbacksPtr = null;
+    }
+    final cachedPointer = _cachedDeviceIdPtr;
+    if (cachedPointer != null) {
+      calloc.free(cachedPointer);
+      _cachedDeviceIdPtr = null;
+    }
+
+    _callbacksRegistered = false;
+    _isRegistered = false;
+    _cachedDeviceId = null;
+    _cachedRegistrationInfo = _DeviceRegistrationInfoSnapshot.defaults();
+    _prefs = null;
+    _environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+    _baseURL = null;
+    _accessToken = null;
+    _pendingEndpoint = null;
+    _pendingBody = null;
+    _pendingRequiresAuth = false;
   }
 
   /// Execute the HTTP POST that was captured by the C++ callback.
@@ -304,13 +342,16 @@ class DartBridgeDevice {
       }
     }
 
-    logger.debug('Device registration POST to: $fullUrl');
+    logger.debug('Device registration POST started');
 
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
 
     try {
       final request = await client.postUrl(Uri.parse(fullUrl));
+      // Registration carries a bearer/API credential and a JSON body. Never
+      // replay either to a redirect target.
+      request.followRedirects = false;
       headers.forEach((key, value) => request.headers.set(key, value));
       request.write(body);
 
@@ -325,16 +366,13 @@ class DartBridgeDevice {
       if (isSuccess) {
         logger.debug('Device registration successful (status=$statusCode)');
       } else {
-        // Read error body for logging
-        final responseBody = await response.transform(utf8.decoder).join();
-        logger.warning(
-          'Device registration failed (status=$statusCode): $responseBody',
-        );
+        await response.drain<void>();
+        logger.warning('Device registration failed (status=$statusCode)');
         // Roll back set_registered so it retries on next launch
         _rollBackRegistration(logger);
       }
-    } catch (e) {
-      logger.warning('Device registration HTTP error: $e');
+    } catch (_) {
+      logger.warning('Device registration HTTP request failed');
       // Roll back set_registered so it retries on next launch
       _rollBackRegistration(logger);
     } finally {
@@ -374,8 +412,8 @@ class DartBridgeDevice {
     PackageInfo? packageInfo;
     try {
       packageInfo = await PackageInfo.fromPlatform();
-    } catch (e) {
-      _logger.debug('PackageInfo unavailable: $e');
+    } catch (_) {
+      _logger.debug('PackageInfo unavailable');
     }
 
     final timezone = await _currentTimezoneIdentifier();
@@ -415,16 +453,16 @@ class DartBridgeDevice {
           calloc.free(ptr);
         }
       }
-    } catch (e) {
-      _logger.debug('rac_sdk_set_client_info unavailable: $e');
+    } catch (_) {
+      _logger.debug('SDK client-info bridge unavailable');
     }
   }
 
   static Future<void> _refreshDeviceInfoSnapshot() async {
     try {
       _cachedRegistrationInfo = await _collectDeviceInfoSnapshot();
-    } catch (e) {
-      _logger.debug('Device info snapshot failed: $e');
+    } catch (_) {
+      _logger.debug('Device info snapshot failed');
       _cachedRegistrationInfo = _DeviceRegistrationInfoSnapshot.defaults(
         deviceId: _cachedDeviceId,
       );
@@ -435,90 +473,54 @@ class DartBridgeDevice {
   // Internal Helpers
   // ============================================================================
 
-  /// Key for storing persistent device UUID in Keychain/EncryptedSharedPreferences
+  /// Key for storing the persistent device UUID in platform secure storage.
   /// Matches Swift KeychainManager.KeychainKey.deviceUUID and React Native SecureStorageKeys.deviceUUID
   static const _keyDeviceUUID = 'com.runanywhere.sdk.device.uuid';
 
-  /// Secure storage for device UUID persistence
-  /// - iOS: Keychain (survives app reinstalls)
-  /// - Android: EncryptedSharedPreferences (survives app reinstalls)
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-  );
-
   /// Get or create a persistent device UUID.
   /// Matches Swift's DeviceIdentity.persistentUUID behavior:
-  /// 1. Try to retrieve stored UUID from Keychain/EncryptedSharedPreferences (survives reinstalls)
+  /// 1. Try to retrieve the stored UUID from platform secure storage
   /// 2. If not found, try iOS vendor ID
   /// 3. If still not found, generate new UUID
   /// The UUID format is required by the backend for device registration.
   static Future<String> _getOrCreateDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
 
-    try {
-      // Strategy 1: Try to get stored UUID from secure storage (Keychain/EncryptedSharedPreferences)
-      // This persists across app reinstalls (matches Swift KeychainManager behavior)
-      final storedUUID = await _secureStorage.read(key: _keyDeviceUUID);
-      if (storedUUID != null && _isValidUUID(storedUUID)) {
-        _cachedDeviceId = storedUUID;
-        _logger.debug('Using stored device UUID from secure storage');
-        return _cachedDeviceId!;
+    final nativeStorage = DartBridgeSecureStorage.instance;
+
+    // Strategy 1: Read the synchronous platform store. A null value is the
+    // only clean miss; authentication/IO failures propagate and abort init.
+    final storedUUID = nativeStorage.retrieveIfExists(_keyDeviceUUID);
+    if (storedUUID != null) {
+      if (!_isValidUUID(storedUUID)) {
+        throw StateError('Persisted device identifier is not a valid UUID');
       }
+      _cachedDeviceId = storedUUID;
+      _logger.debug('Using stored device UUID from secure storage');
+      return storedUUID;
+    }
 
-      // Strategy 2: On iOS, try to use identifierForVendor (already a UUID)
-      // Matches Swift: DeviceIdentity.vendorUUID fallback
-      if (Platform.isIOS) {
-        try {
-          final deviceInfo = DeviceInfoPlugin();
-          final iosInfo = await deviceInfo.iosInfo;
-          final vendorId = iosInfo.identifierForVendor;
-          if (vendorId != null && _isValidUUID(vendorId)) {
-            _cachedDeviceId = vendorId;
-            await _secureStorage.write(key: _keyDeviceUUID, value: vendorId);
-            _logger.debug('Stored iOS vendor UUID in secure storage');
-            return _cachedDeviceId!;
-          }
-        } catch (e) {
-          _logger.debug('Failed to get iOS vendor ID: $e');
-        }
-      }
-
-      // Strategy 3: Generate a new UUID (matches Swift's UUID().uuidString)
-      final newUUID = _generateUUID();
-      _cachedDeviceId = newUUID;
-      await _secureStorage.write(key: _keyDeviceUUID, value: newUUID);
-      _logger.debug('Generated and stored new device UUID in secure storage');
-      return _cachedDeviceId!;
-    } catch (e) {
-      _logger.warning('Failed to get device ID from secure storage: $e');
-
-      // Fallback: try SharedPreferences (less secure, doesn't survive reinstalls)
+    // Strategy 2: On iOS, prefer identifierForVendor when available.
+    String? candidate;
+    if (Platform.isIOS) {
       try {
-        _prefs ??= await SharedPreferences.getInstance();
-        final prefsUUID = _prefs?.getString(_keyDeviceUUID);
-        if (prefsUUID != null && _isValidUUID(prefsUUID)) {
-          _cachedDeviceId = prefsUUID;
-          // Try to migrate to secure storage
-          try {
-            await _secureStorage.write(key: _keyDeviceUUID, value: prefsUUID);
-            _logger.debug('Migrated device UUID to secure storage');
-          } catch (_) {}
-          return _cachedDeviceId!;
+        final iosInfo = await DeviceInfoPlugin().iosInfo;
+        final vendorId = iosInfo.identifierForVendor;
+        if (vendorId != null && _isValidUUID(vendorId)) {
+          candidate = vendorId;
         }
-
-        final newUUID = _generateUUID();
-        _cachedDeviceId = newUUID;
-        await _prefs?.setString(_keyDeviceUUID, newUUID);
-        _logger.debug('Stored device UUID in SharedPreferences (fallback)');
-        return _cachedDeviceId!;
-      } catch (e2) {
-        _logger.warning('SharedPreferences fallback failed: $e2');
-        // Last resort: generate UUID without storing
-        _cachedDeviceId = _generateUUID();
-        return _cachedDeviceId!;
+      } catch (_) {
+        _logger.debug('iOS vendor ID unavailable');
       }
     }
+
+    // Strategy 3: Generate an RFC-4122 UUID, but never expose/cache it until
+    // the synchronous platform store has committed it durably.
+    candidate ??= _generateUUID();
+    nativeStorage.store(_keyDeviceUUID, candidate);
+    _cachedDeviceId = candidate;
+    _logger.debug('Stored new device UUID in secure storage');
+    return candidate;
   }
 
   /// Generate a proper UUID v4 string (matches backend expectations)
@@ -597,8 +599,8 @@ void _getDeviceInfoCallback(
     outInfo.ref.performanceCores = snapshot.performanceCores;
     outInfo.ref.efficiencyCores = snapshot.efficiencyCores;
     outInfo.ref.deviceFingerprint = cacheString(snapshot.deviceFingerprint);
-  } catch (e) {
-    SDKLogger('DartBridge.Device').error('Error in device info callback: $e');
+  } catch (_) {
+    SDKLogger('DartBridge.Device').error('Device info callback failed');
   }
 }
 
@@ -651,8 +653,8 @@ void _setRegisteredCallback(int registered, Pointer<Void> userData) {
         registered != 0,
       ),
     );
-  } catch (e) {
-    SDKLogger('DartBridge.Device').error('Error setting registration: $e');
+  } catch (_) {
+    SDKLogger('DartBridge.Device').error('Registration state callback failed');
   }
 }
 
@@ -692,8 +694,8 @@ int _httpPostCallback(
     outResponse.ref.errorMessage = nullptr;
 
     return RacResultCode.success;
-  } catch (e) {
-    SDKLogger('DartBridge.Device').error('HTTP POST callback error: $e');
+  } catch (_) {
+    SDKLogger('DartBridge.Device').error('HTTP POST callback failed');
     return RacResultCode.errorNetworkError;
   }
 }
@@ -1035,8 +1037,8 @@ String _joinDistinct(List<String?> parts) {
 Future<String?> _currentTimezoneIdentifier() async {
   try {
     return _nonEmpty((await FlutterTimezone.getLocalTimezone()).identifier);
-  } catch (e) {
-    DartBridgeDevice._logger.debug('Timezone identifier unavailable: $e');
+  } catch (_) {
+    DartBridgeDevice._logger.debug('Timezone identifier unavailable');
     return null;
   }
 }

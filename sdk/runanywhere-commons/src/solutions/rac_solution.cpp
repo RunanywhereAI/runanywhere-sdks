@@ -86,7 +86,7 @@ bool yaml_looks_like_pipeline_spec(const std::string& yaml) {
         if (key == "operators" || key == "edges" || key == "options") {
             return true;
         }
-        if (key == "voice_agent" || key == "rag" || key == "wake_word" || key == "agent_loop" ||
+        if (key == "voice_agent" || key == "rag" || key == "agent_loop" ||
             key == "time_series") {
             return false;
         }

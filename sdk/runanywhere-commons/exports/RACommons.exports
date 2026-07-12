@@ -56,7 +56,7 @@ _rac_get_current_time_ms
 # Error Handling — internal struct/error-helper surface; SDK-facing errors
 # cross as runanywhere.v1.SDKError bytes inside SDKEvent envelopes.
 
-# Analytics Events — internal in-process telemetry sink (Sentry/HTTP
+# Analytics Events — internal in-process telemetry sink (HTTP
 # exporter, used by SDK telemetry shims still pending the proto-bytes
 # migration). SDK-facing events go through
 # rac_sdk_event_* below.
@@ -82,9 +82,6 @@ _rac_platform_services_register_availability_callback
 # native transport adapters that already wrap it).
 _rac_http_download
 _rac_http_download_cancel
-
-# Device Manager — platform device-info adapter contract.
-_rac_device_set_callbacks
 
 # Events — internal lower-level publisher used by lifecycle manager,
 # storage analyzer, device manager, and engine plugins for telemetry
@@ -188,18 +185,16 @@ _rac_tool_calling_session_step_with_result_proto
 _rac_tool_calling_session_destroy_proto
 # Public quiesce for the tool-calling-session
 # event dispatcher (mirrors rac_llm_proto_quiesce / rac_vlm_proto_quiesce).
-_rac_tool_calling_session_proto_quiesce
 
 # Synchronous single-call tool-calling loop. Mirrors the session
 # machinery but exposes one C ABI call instead of an outer-driven event
 # stream — Swift's generateWithTools collapses to ~10 LOC.
-_rac_tool_calling_run_loop_proto
 
 # VLM / Diffusion components — non-proto APIs are internal helpers used
 # by JNI during migration. SDK-facing surface is the proto-byte ABI
 # (rac_vlm_*_proto / rac_diffusion_*_proto) below. Helper enums
-# (rac_vlm_get_builtin_template, rac_diffusion_model_registry_*,
-# rac_diffusion_tokenizer_*) are commons-internal — SDKs receive
+# (rac_diffusion_model_registry_*, rac_diffusion_tokenizer_*) are
+# commons-internal — SDKs receive
 # model/storage/download state via generated protos.
 
 # Diffusion lifecycle-owned proto-byte stream ABI
@@ -224,7 +219,6 @@ _rac_proto_buffer_init
 _rac_proto_buffer_copy
 _rac_proto_buffer_set_error
 _rac_proto_buffer_free
-_rac_proto_buffer_copy_to_raw
 _rac_proto_buffer_free_data
 
 # SDK event stream proto ABI
@@ -261,6 +255,7 @@ _rac_model_lifecycle_unload_proto
 _rac_model_lifecycle_current_model_proto
 _rac_component_lifecycle_snapshot_proto
 _rac_model_lifecycle_reset
+_rac_model_lifecycle_resolve_paths_proto
 
 # Canonical two-phase SDK init surface (Phase 1 / Phase 2 / retry HTTP).
 # Mirrors RunAnywhere.swift::initialize / completeServicesInitialization /
@@ -319,6 +314,7 @@ _rac_voice_agent_component_states_proto
 _rac_voice_agent_process_voice_turn_proto
 # Full-session voice-agent ABI + per-helper proto wrappers.
 _rac_voice_agent_process_turn_proto
+_rac_voice_agent_cancel_turn_proto
 _rac_voice_agent_feed_audio_proto
 _rac_voice_agent_transcribe_proto
 _rac_voice_agent_synthesize_speech_proto
@@ -326,10 +322,6 @@ _rac_voice_agent_component_create_proto
 _rac_voice_agent_component_destroy_proto
 
 # Advanced modality generated-proto ABI
-_rac_vlm_process_proto
-_rac_vlm_process_stream_proto
-_rac_vlm_cancel_proto
-_rac_vlm_component_load_resolved_artifacts_proto
 _rac_vlm_generate_proto
 _rac_vlm_stream_proto
 _rac_vlm_cancel_lifecycle_proto
@@ -337,6 +329,7 @@ _rac_embeddings_embed_batch_proto
 _rac_embeddings_embed_batch_lifecycle_proto
 _rac_embeddings_create_proto
 _rac_lora_register_proto
+_rac_lora_adapter_import_proto
 _rac_lora_catalog_list_proto
 _rac_lora_catalog_query_proto
 _rac_lora_catalog_get_proto
@@ -361,12 +354,25 @@ _rac_diffusion_cancel_proto
 # Exposed as RAC_API and actively called by Swift (Public/Extensions/RunAnywhere+PluginLoader.swift)
 # and other SDKs.
 _rac_plugin_api_version
+_rac_plugin_count
+_rac_plugin_find
 _rac_plugin_list
+_rac_plugin_register
+_rac_plugin_unregister
 _rac_registry_free_plugin_list
 _rac_registry_list_plugins
 _rac_registry_load_plugin
 _rac_registry_plugin_count
 _rac_registry_unload_plugin
+
+# Engine-owned model-bundle policy registration.
+_rac_bundle_policy_register
+_rac_bundle_policy_unregister
+
+# Desktop host bootstrap used by the standalone CLI.
+_rac_desktop_adapter_init
+_rac_desktop_default_base_dir
+_rac_desktop_http_transport_register
 
 # Runtime registry — L1 runtime plugin lifecycle (CPU, Metal, CoreML, ONNX,
 # CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.
@@ -424,6 +430,8 @@ _rac_http_client_create
 _rac_http_client_destroy
 _rac_http_default_headers
 _rac_http_download_execute
+_rac_http_hf_token_set
+_rac_http_hf_token_is_configured
 _rac_http_request_send
 _rac_http_request_set_upsert_mode
 _rac_http_request_stream
@@ -487,7 +495,7 @@ _rac_validate_base_url
 _rac_validate_config
 _rac_validation_error_message
 
-# Dev-only config (Sentry DSN, Supabase URL/key, build token) — reached
+# Dev-only config (Supabase URL/key, build token) — reached
 # through CppBridge+Environment.swift.
 _rac_dev_config_get_build_token
 _rac_dev_config_get_supabase_key
@@ -499,6 +507,7 @@ _rac_dev_config_is_usable_http_url
 
 # Device registration manager — the commons-side device id cache and
 # deferred registration trigger called by CppBridge+Device.swift.
+_rac_device_manager_clear_callbacks
 _rac_device_manager_clear_registration
 _rac_device_manager_get_device_id
 _rac_device_manager_is_registered
@@ -509,7 +518,6 @@ _rac_device_manager_set_callbacks
 # identifierForVendor -> generate UUID) collapsed from each platform SDK
 # into one C entry point.
 _rac_device_get_or_create_persistent_id
-_rac_device_identity_reset_cache_for_testing
 
 # Backend registration entry points — every backend (platform FM, RAG,
 # etc.) publishes a rac_backend_*_register()/_unregister()
@@ -607,38 +615,10 @@ _rac_vlm_initialize
 _rac_vlm_process
 _rac_vlm_process_stream
 
-# Diffusion component lifecycle + non-proto service ABI (Apple CoreML).
-_rac_diffusion_cancel
-_rac_diffusion_component_cancel
-_rac_diffusion_component_cleanup
-_rac_diffusion_component_configure
-_rac_diffusion_component_create
-_rac_diffusion_component_destroy
-_rac_diffusion_component_get_capabilities
-_rac_diffusion_component_is_loaded
-_rac_diffusion_component_load_model
-_rac_diffusion_create
-_rac_diffusion_create_with_config
-_rac_diffusion_destroy
-_rac_diffusion_generate
-_rac_diffusion_generate_with_progress
-_rac_diffusion_get_capabilities
-_rac_diffusion_initialize
-
-# Embeddings component lifecycle + non-proto service ABI.
-_rac_embeddings_create
-_rac_embeddings_create_with_config
-_rac_embeddings_destroy
-_rac_embeddings_embed
-_rac_embeddings_embed_batch
-_rac_embeddings_initialize
-
 # RAG pipeline non-proto ABI — still called by RN RAGBridge.cpp.
 
-# Voice agent orchestrator — legacy non-proto ABI kept live while platform
-# bridges migrate to the rac_voice_agent_*_proto surface.
+# Voice agent orchestrator.
 _rac_voice_agent_cleanup
-_rac_voice_agent_create
 _rac_voice_agent_create_standalone
 _rac_voice_agent_destroy
 _rac_voice_agent_generate_response
@@ -647,16 +627,6 @@ _rac_voice_agent_initialize_with_loaded_models
 _rac_voice_agent_is_ready
 
 # Tool calling — struct-based helpers still called from Swift CppBridge+ToolCalling.swift.
-_rac_tool_call_format_prompt
-_rac_tool_call_free
-_rac_tool_call_parse
-_rac_tool_call_validate
-
-# Structured output — struct-based helpers still called from Swift
-# CppBridge+StructuredOutput.swift.
-_rac_structured_output_parse
-_rac_structured_output_prepare_prompt
-_rac_structured_output_validate
 
 # Solutions API — L5 solution lifecycle called from Swift
 # Public/Extensions/Solutions/RunAnywhere+Solutions.swift.
@@ -669,13 +639,15 @@ _rac_solution_feed
 _rac_solution_start
 _rac_solution_stop
 
-# Telemetry manager — flush + HTTP callback bridge for Sentry/analytics.
+# Telemetry manager — flush + HTTP callback bridge for analytics.
 _rac_telemetry_manager_create
 _rac_telemetry_manager_destroy
 _rac_telemetry_manager_flush
 _rac_telemetry_manager_http_complete
+_rac_telemetry_manager_poll_http_request
 _rac_telemetry_manager_set_device_info
 _rac_telemetry_manager_set_http_callback
+_rac_telemetry_manager_set_http_wakeup
 _rac_telemetry_manager_track
 _rac_telemetry_manager_track_proto
 
@@ -746,6 +718,7 @@ _rac_model_assignment_set_callbacks
 
 # Model category / framework helpers (capability probes).
 _rac_framework_raw_value
+_rac_framework_supported_on_platform
 _rac_model_category_default_framework
 _rac_model_category_requires_context_length
 _rac_model_category_supports_thinking
@@ -865,15 +838,6 @@ _rac_detect_archive_type
 _rac_dev_config_has_supabase
 _rac_device_registration_endpoint
 _rac_device_registration_to_json
-_rac_diffusion_cleanup
-_rac_diffusion_component_generate
-_rac_diffusion_component_generate_with_callbacks
-_rac_diffusion_component_get_info
-_rac_diffusion_component_get_metrics
-_rac_diffusion_component_get_model_id
-_rac_diffusion_component_get_state
-_rac_diffusion_component_unload
-_rac_diffusion_get_info
 _rac_diffusion_model_registry_cleanup
 _rac_diffusion_model_registry_get
 _rac_diffusion_model_registry_get_current_platform
@@ -901,20 +865,6 @@ _rac_diffusion_tokenizer_get_file_url
 _rac_download_result_free
 _rac_download_strategy_get
 _rac_download_strategy_register
-_rac_embeddings_cleanup
-_rac_embeddings_component_cleanup
-_rac_embeddings_component_configure
-_rac_embeddings_component_create
-_rac_embeddings_component_destroy
-_rac_embeddings_component_embed
-_rac_embeddings_component_embed_batch
-_rac_embeddings_component_get_metrics
-_rac_embeddings_component_get_model_id
-_rac_embeddings_component_get_state
-_rac_embeddings_component_is_loaded
-_rac_embeddings_component_load_model
-_rac_embeddings_component_unload
-_rac_embeddings_get_info
 _rac_embeddings_result_free
 _rac_energy_vad_calculate_rms
 _rac_energy_vad_create
@@ -1112,10 +1062,6 @@ _rac_streaming_metrics_mark_start
 _rac_streaming_metrics_record_token
 _rac_streaming_metrics_set_token_counts
 _rac_streaming_result_free
-_rac_structured_output_find_matching_brace
-_rac_structured_output_find_matching_bracket
-_rac_structured_output_parse_result_free
-_rac_structured_output_validation_free
 _rac_stt_cleanup
 _rac_stt_component_detect_language
 _rac_stt_component_get_metrics
@@ -1137,15 +1083,6 @@ _rac_telemetry_manager_parse_response
 _rac_telemetry_manager_payload_to_json
 _rac_telemetry_payload_default
 _rac_telemetry_payload_free
-_rac_tool_call_detect_format
-_rac_tool_call_format_from_model_info_proto
-_rac_tool_call_format_from_name
-_rac_tool_call_format_hint_from_format_name
-_rac_tool_call_format_name
-_rac_tool_call_format_prompt_with_format
-_rac_tool_call_parse_with_format
-_rac_tool_call_validate_json
-_rac_tool_call_validation_free
 _rac_tool_calling_session_cancel_proto
 _rac_tts_cleanup
 _rac_tts_component_configure
@@ -1166,23 +1103,12 @@ _rac_vad_component_get_metrics
 _rac_vad_component_get_state
 _rac_vad_component_set_activity_callback
 _rac_vad_component_set_audio_callback
-_rac_vad_create
-_rac_vad_destroy
-_rac_vad_get_info
-_rac_vad_initialize
-_rac_vad_pause
-_rac_vad_process_samples
-_rac_vad_resume
-_rac_vad_set_activity_callback
-_rac_vad_set_audio_callback
-_rac_vad_set_energy_threshold
 _rac_vlm_component_configure
 _rac_vlm_component_get_metrics
 _rac_vlm_component_get_model_id
 _rac_vlm_component_load_model_by_id
 _rac_vlm_component_process
 _rac_vlm_component_process_stream
-_rac_vlm_get_builtin_template
 _rac_vlm_get_info
 _rac_vlm_proto_quiesce
 _rac_vlm_resolve_model_files
@@ -1198,6 +1124,5 @@ _rac_download_cleanup_terminal_tasks_proto
 _rac_env_default_http_timeout_ms
 _rac_register_multi_file_model_proto
 _rac_tool_calling_run_loop_cancel_proto
-_rac_tool_calling_run_loop_with_handle_and_cb_proto
-_rac_tool_calling_run_loop_with_handle_proto
+_rac_tool_calling_run_loop_proto
 _rac_uuid_v4

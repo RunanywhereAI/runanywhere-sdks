@@ -51,38 +51,27 @@ private fun checkRc(rc: Int, operation: String) {
     }
 }
 
-private fun RALLMGenerationOptions?.toGenerateRequest(
+internal fun RALLMGenerationOptions?.toGenerateRequest(
     prompt: String,
     streaming: Boolean,
 ): RALLMGenerateRequest {
-    val options = this ?: RALLMGenerationOptions()
+    val options = this ?: RALLMGenerationOptions.defaults()
     val requestOptions =
         options.copy(
             max_tokens = options.max_tokens.takeIf { it > 0 } ?: 100,
-            temperature = options.temperature.takeIf { it > 0.0f } ?: 0.8f,
+            // A canonical options message has presence at the request level, so
+            // temperature=0 is an explicit, documented request for greedy
+            // decoding. Apply 0.8 only when the entire options object is absent
+            // (via defaults() above); rewriting an explicit zero makes greedy
+            // generation impossible through this overload.
+            temperature = options.temperature.coerceIn(0.0f, 2.0f),
             top_p = options.top_p.takeIf { it > 0.0f } ?: 1.0f,
             repetition_penalty = options.repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
             streaming_enabled = streaming || options.streaming_enabled,
         )
-    val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = requestOptions.max_tokens,
-        temperature = requestOptions.temperature,
-        top_p = requestOptions.top_p,
-        top_k = requestOptions.top_k,
-        system_prompt = options.system_prompt.orEmpty(),
         emit_thoughts = options.thinking_pattern != null,
-        repetition_penalty = requestOptions.repetition_penalty,
-        stop_sequences = options.stop_sequences,
-        streaming_enabled = requestOptions.streaming_enabled,
-        preferred_framework = options.preferred_framework.name,
-        json_schema = schema,
-        // Constrained-decoding grammar. Prefer the structured_output grammar, fall back to the top-level
-        // field; without this the grammar set on the options was silently dropped on the public generate
-        // path (C++ options_from_request already forwards it to rac_llm_options_t.grammar).
-        grammar = options.structured_output?.grammar ?: options.grammar.orEmpty(),
-        execution_target = options.execution_target?.name.orEmpty(),
         options = requestOptions,
     )
 }

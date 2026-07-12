@@ -445,16 +445,9 @@ public nonisolated struct RADiffusionTokenizerSource: Sendable {
 ///   Web    — n/a (config is implicit in the llamacpp service ctor)
 ///   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
 ///
-/// Drift note: Swift/Kotlin/RN also carry `model_id`, `preferred_framework`,
-/// and `reduce_memory` fields. Those belong on the more general component
-/// configuration carried by ModelInfo / framework selection elsewhere in
-/// this IDL package; this message intentionally narrows to the four
-/// diffusion-specific knobs called out by the v1 spec.
-/// `max_memory_mb` here is the new generalization of pre-IDL `reduce_memory`
-/// (a bool) — backends interpret 0 as "no cap / engine default" and any
-/// positive value as a hard MB ceiling. SDKs translating pre-IDL
-/// `reduceMemory == true` should set this to the backend's documented
-/// reduced-memory threshold; `reduceMemory == false` ⇒ 0.
+/// `max_memory_mb` is the single portable working-set control; backends
+/// interpret 0 as "no cap / engine default" and a positive value as a hard
+/// MiB ceiling.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RADiffusionConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -481,8 +474,7 @@ public nonisolated struct RADiffusionConfiguration: Sendable {
   public var enableSafetyChecker: Bool = false
 
   /// Maximum working-set memory the diffusion runtime is allowed to use,
-  /// in MiB. 0 = no cap (engine default). Generalizes the pre-IDL
-  /// `reduceMemory` bool flag.
+  /// in MiB. 0 = no cap (engine default).
   public var maxMemoryMb: Int32 = 0
 
   /// C ABI / SDK component fields that identify and route the component.
@@ -503,10 +495,6 @@ public nonisolated struct RADiffusionConfiguration: Sendable {
   public var hasPreferredFramework: Bool {self._preferredFramework != nil}
   /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredFramework() {self._preferredFramework = nil}
-
-  /// Legacy low-memory boolean. Backends may translate true to an internal
-  /// memory cap when max_memory_mb is unset.
-  public var reduceMemory: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1167,7 +1155,7 @@ nonisolated extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_variant\0\u{3}tokenizer_source\0\u{3}enable_safety_checker\0\u{3}max_memory_mb\0\u{3}model_id\0\u{3}preferred_framework\0\u{3}reduce_memory\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_variant\0\u{3}tokenizer_source\0\u{3}enable_safety_checker\0\u{3}max_memory_mb\0\u{3}model_id\0\u{3}preferred_framework\0\u{c}\u{7}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1181,7 +1169,6 @@ nonisolated extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProt
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxMemoryMb) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
       case 6: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.reduceMemory) }()
       default: break
       }
     }
@@ -1210,9 +1197,6 @@ nonisolated extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProt
     try { if let v = self._preferredFramework {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
     } }()
-    if self.reduceMemory != false {
-      try visitor.visitSingularBoolField(value: self.reduceMemory, fieldNumber: 7)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1223,7 +1207,6 @@ nonisolated extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProt
     if lhs.maxMemoryMb != rhs.maxMemoryMb {return false}
     if lhs._modelID != rhs._modelID {return false}
     if lhs._preferredFramework != rhs._preferredFramework {return false}
-    if lhs.reduceMemory != rhs.reduceMemory {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

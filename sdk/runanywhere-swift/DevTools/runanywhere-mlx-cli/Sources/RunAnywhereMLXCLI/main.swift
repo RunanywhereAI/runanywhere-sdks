@@ -144,6 +144,10 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    // Keep the speech catalog aligned with the verified MLX bundles we can
+    // load through this CLI today. Do not add repo-style Kitten / legacy
+    // Whisper entries here until they are validated against the current
+    // MLXAudioSTT / MLXAudioTTS loaders.
     static let qwen3ASR = CatalogEntry(
         id: "mlx-qwen3-asr-0.6b-8bit",
         alias: "mlx-qwen3-asr",
@@ -213,6 +217,31 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    static let qwen3TTS4Bit = CatalogEntry(
+        id: "mlx-qwen3-tts-12hz-0.6b-base-4bit",
+        alias: "mlx-qwen3-tts-4bit",
+        name: "Qwen3-TTS 12Hz 0.6B Base 4-bit (MLX)",
+        category: .speechSynthesis,
+        framework: .mlx,
+        files: [
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/generation_config.json", "generation_config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/merges.txt", "merges.txt"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/model.safetensors", "model.safetensors"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/model.safetensors.index.json", "model.safetensors.index.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/preprocessor_config.json", "preprocessor_config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/speech_tokenizer/config.json", "speech_tokenizer/config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/speech_tokenizer/configuration.json", "speech_tokenizer/configuration.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/speech_tokenizer/model.safetensors", "speech_tokenizer/model.safetensors"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/speech_tokenizer/preprocessor_config.json", "speech_tokenizer/preprocessor_config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/tokenizer_config.json", "tokenizer_config.json"),
+            .init("https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit/resolve/main/vocab.json", "vocab.json"),
+        ],
+        memoryRequirement: 1_711_328_624,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
     static let sopranoTTS = CatalogEntry(
         id: "mlx-soprano-1.1-80m-5bit",
         alias: "mlx-soprano",
@@ -233,6 +262,65 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    static let kokoroTTS = CatalogEntry(
+        id: "mlx-kokoro-82m-6bit",
+        alias: "mlx-kokoro",
+        name: "Kokoro 82M 6-bit (MLX)",
+        category: .speechSynthesis,
+        framework: .mlx,
+        files: [
+            .init("https://huggingface.co/mlx-community/Kokoro-82M-6bit/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/mlx-community/Kokoro-82M-6bit/resolve/main/kokoro-v1_0.safetensors", "kokoro-v1_0.safetensors"),
+            .init("https://huggingface.co/mlx-community/Kokoro-82M-6bit/resolve/main/voices/af_heart.safetensors", "voices/af_heart.safetensors"),
+        ],
+        memoryRequirement: 309_640_166,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    static let pocketTTS = CatalogEntry(
+        id: "mlx-pocket-tts",
+        alias: "mlx-pocket",
+        name: "Pocket TTS (MLX)",
+        category: .speechSynthesis,
+        framework: .mlx,
+        files: [
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/model.safetensors", "model.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/special_tokens_map.json", "special_tokens_map.json"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer.json", "tokenizer.json"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer_config.json", "tokenizer_config.json"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/alba.safetensors", "embeddings/alba.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/azelma.safetensors", "embeddings/azelma.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/cosette.safetensors", "embeddings/cosette.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/eponine.safetensors", "embeddings/eponine.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/fantine.safetensors", "embeddings/fantine.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/javert.safetensors", "embeddings/javert.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/jean.safetensors", "embeddings/jean.safetensors"),
+            .init("https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/marius.safetensors", "embeddings/marius.safetensors"),
+        ],
+        memoryRequirement: 420_000_000,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    static let kittenTTS = CatalogEntry(
+        id: "mlx-kitten-tts-nano-0.8-5bit",
+        alias: "mlx-kitten",
+        name: "Kitten TTS Nano 0.8 5-bit (MLX)",
+        category: .speechSynthesis,
+        framework: .mlx,
+        files: [
+            .init("https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors", "model.safetensors"),
+            .init("https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors.index.json", "model.safetensors.index.json"),
+            .init("https://huggingface.co/mlx-community/kitten-tts-nano-0.8/resolve/1a06939883365626208c9cd832133f36fbc6fe82/voices.safetensors", "voices.safetensors"),
+        ],
+        memoryRequirement: 120_000_000,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
     static let entries = [
         qwen3LLM,
         llamaLLM,
@@ -242,7 +330,11 @@ private enum MLXCatalog {
         qwen3ASR,
         glmASR,
         qwen3TTS,
+        qwen3TTS4Bit,
         sopranoTTS,
+        kokoroTTS,
+        pocketTTS,
+        kittenTTS,
     ]
 
     static func resolve(_ ref: String) -> CatalogEntry? {
@@ -424,10 +516,10 @@ private func printUsage() {
           embed <model> <text>
           vlm <model> <image-path> [prompt]
           stt <model> <pcm16-or-wav-path>
-          tts <model> <text> [output.wav]
+          tts <model> <text> [--voice <voice-id>] [--output <output.wav>]
 
         Smallest real MLX smoke test:
-          RunAnywhereMLXCLI tts mlx-soprano "hello from mlx" /tmp/mlx-soprano.wav
+          RunAnywhereMLXCLI tts mlx-soprano "hello from mlx" --output /tmp/mlx-soprano.wav
         """
     )
 }
@@ -646,13 +738,50 @@ private func runSTT(_ args: [String]) async throws {
 }
 
 private func runTTS(_ args: [String]) async throws {
-    guard args.count >= 2 else { throw CLIError.usage("Usage: RunAnywhereMLXCLI tts <model> <text> [output.wav]") }
+    guard args.count >= 2 else {
+        throw CLIError.usage(
+            "Usage: RunAnywhereMLXCLI tts <model> <text> [--voice <voice-id>] [--output <output.wav>]"
+        )
+    }
     guard let entry = MLXCatalog.resolve(args[0]) else { throw CLIError.modelNotFound(args[0]) }
-    let outputPath = args.count >= 3 ? args.last! : "/tmp/\(entry.id).wav"
-    let textParts = args.dropFirst().dropLast(args.count >= 3 ? 1 : 0)
+
+    var textParts = [String]()
+    var outputPath = "/tmp/\(entry.id).wav"
+    var voiceID = ""
+    var index = 1
+    while index < args.count {
+        let token = args[index]
+        if token == "--voice" {
+            let valueIndex = index + 1
+            guard valueIndex < args.count else {
+                throw CLIError.usage("Missing value for --voice")
+            }
+            voiceID = args[valueIndex]
+            index += 2
+            continue
+        }
+        if token == "--output" {
+            let valueIndex = index + 1
+            guard valueIndex < args.count else {
+                throw CLIError.usage("Missing value for --output")
+            }
+            outputPath = args[valueIndex]
+            index += 2
+            continue
+        }
+        textParts.append(token)
+        index += 1
+    }
+    guard !textParts.isEmpty else {
+        throw CLIError.usage(
+            "Usage: RunAnywhereMLXCLI tts <model> <text> [--voice <voice-id>] [--output <output.wav>]"
+        )
+    }
+
     try await withReadyModel(entry) {
         var options = RATTSOptions.defaults()
         options.audioFormat = .pcm
+        options.voice = voiceID
         let result = try await RunAnywhere.synthesize(textParts.joined(separator: " "), options: options)
         let sampleRate = Int(result.sampleRate > 0 ? result.sampleRate : options.sampleRate)
         let wav = try pcmFloat32ToPCM16Wav(result.audioData, sampleRate: sampleRate)

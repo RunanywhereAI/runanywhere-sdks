@@ -28,6 +28,7 @@ import {
 import {
   onModelStateChange,
   openSheet as openModelSheet,
+  refreshModelSelectionState,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
@@ -35,6 +36,7 @@ import { formatError } from '../services/format-error';
 import {
   formatBytes,
   formatFramework,
+  modelDisplaySizeBytes,
   modalityEmoji,
 } from '../services/model-display';
 
@@ -54,12 +56,12 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       </div>
     </div>
     <div class="scroll-area" id="storage-scroll">
-      <div id="storage-info-header" style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e);"></div>
+      <div id="storage-info-header" style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--bg-secondary);"></div>
 
       <div
         class="storage-location"
         id="storage-location"
-        style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"
+        style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--bg-secondary); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"
       >
         <div style="flex: 1; min-width: 200px;">
           <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px;">Storage Location</div>
@@ -81,7 +83,8 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     </div>
   `;
 
-  container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', () => {
+    void (async () => {
     // iOS parity: StorageViewModel.swift:68-75 `clearCache()`.
     try {
       await RunAnywhere.clearCache();
@@ -89,10 +92,12 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(`Failed to clear cache: ${formatError(err)}`, 'warning');
     }
-    refreshStorageInfo();
+      refreshStorageInfo();
+    })();
   });
 
-  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', () => {
+    void (async () => {
     // iOS parity: StorageViewModel.swift:77-84 `cleanTempFiles()`.
     try {
       await RunAnywhere.cleanTempFiles();
@@ -100,13 +105,16 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(`Failed to clean temporary files: ${formatError(err)}`, 'warning');
     }
-    refreshStorageInfo();
+      refreshStorageInfo();
+    })();
   });
 
-  container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', async () => {
+  container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', () => {
+    void (async () => {
     try {
       const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
       if (ok) {
+        refreshModelSelectionState();
         showToast(`Using folder: ${RunAnywhere.storage.localStorageDirectoryName ?? 'selected'}`, 'success');
       } else {
         showToast('Folder selection cancelled or unsupported', 'info');
@@ -114,13 +122,17 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     } catch (err) {
       showToast(formatError(err), 'warning');
     }
-    updateStorageLocationUI();
+      updateStorageLocationUI();
+    })();
   });
 
-  container.querySelector('#storage-reauth-btn')!.addEventListener('click', async () => {
-    const ok = await RunAnywhere.storage.requestLocalStorageAccess();
-    showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
-    updateStorageLocationUI();
+  container.querySelector('#storage-reauth-btn')!.addEventListener('click', () => {
+    void (async () => {
+      const ok = await RunAnywhere.storage.requestLocalStorageAccess();
+      if (ok) refreshModelSelectionState();
+      showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
+      updateStorageLocationUI();
+    })();
   });
 
   container.querySelector('#storage-open-selection-btn')!.addEventListener('click', () => {
@@ -225,16 +237,25 @@ function updateStorageLocationUI(): void {
       + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   } else if (RunAnywhere.storage.hasLocalStorageHandle) {
     label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = '';
+  } else if (RunAnywhere.storage.backend === 'memory') {
+    label.innerHTML = '<strong>Persistent model storage unavailable</strong>'
+      + '<br><span style="font-size:0.75rem;opacity:0.5">Model downloads require OPFS or an approved local folder in the split-WASM SDK.</span>';
+    label.style.color = 'var(--color-warning, #ff9800)';
+    chooseDirBtn.style.display = RunAnywhere.storage.isLocalStorageSupported ? '' : 'none';
+    reauthBtn.style.display = 'none';
   } else {
     label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Sandboxed browser storage &mdash; not visible in Finder. Use "Choose Storage Folder" for a real path.</span>`;
     label.style.color = '';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   }
 }
@@ -261,17 +282,24 @@ function renderModelList(): void {
     // tolerate — adapter may not be installed
   }
 
-  let loadedId: string | null = null;
-  try {
-    loadedId = RunAnywhere.currentModel()?.modelId || null;
-  } catch {
-    loadedId = null;
+  const loadedIds = new Set<string>();
+  const categories = new Set(catalog.map((entry) => entry.category));
+  for (const category of categories) {
+    try {
+      const current = RunAnywhere.currentModel({
+        category,
+        includeModelMetadata: false,
+      });
+      if (current?.modelId) loadedIds.add(current.modelId);
+    } catch {
+      // A backend may not support every category; keep checking the others.
+    }
   }
 
   host.innerHTML = catalog.map((entry) => {
     const registryInfo = lookupModelInfo(entry.id);
     const isDownloaded = downloadedIds.has(entry.id) || Boolean(registryInfo?.isDownloaded);
-    const isLoaded = entry.id === loadedId;
+    const isLoaded = loadedIds.has(entry.id);
     const statusLabel = isLoaded
       ? '<span class="badge badge-green">Loaded</span>'
       : isDownloaded
@@ -284,7 +312,7 @@ function renderModelList(): void {
           <div class="model-name">${escapeHtml(entry.name)}</div>
           <div class="model-meta">
             <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
-            <span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>
+            <span class="model-size">${formatBytes(modelDisplaySizeBytes(entry))}</span>
             ${statusLabel}
           </div>
         </div>
@@ -306,11 +334,12 @@ function renderModelList(): void {
 /** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
 async function deleteModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.deleteModel(modelId);
+    const result = await RunAnywhere.deleteModel(modelId);
     if (!result.success) {
       showToast(result.errorMessage || 'Failed to delete model', 'warning');
       return;
     }
+    refreshModelSelectionState();
     showToast(`Deleted ${modelId}`, 'success');
   } catch (err) {
     showToast(`Failed to delete model: ${formatError(err)}`, 'warning');

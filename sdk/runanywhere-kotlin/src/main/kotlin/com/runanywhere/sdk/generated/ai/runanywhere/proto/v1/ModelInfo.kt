@@ -137,17 +137,10 @@ public class ModelInfo(
   )
   public val supports_lora: Boolean = false,
   @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 11,
-  )
-  public val description: String = "",
-  @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.ModelSource#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val source: ModelSource = ModelSource.MODEL_SOURCE_UNSPECIFIED,
   @field:WireField(
@@ -155,7 +148,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "createdAtUnixMs",
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
   public val created_at_unix_ms: Long = 0L,
   @field:WireField(
@@ -163,7 +156,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "updatedAtUnixMs",
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val updated_at_unix_ms: Long = 0L,
   /**
@@ -174,7 +167,7 @@ public class ModelInfo(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     jsonName = "memoryRequiredBytes",
-    schemaIndex = 15,
+    schemaIndex = 14,
   )
   public val memory_required_bytes: Long? = null,
   /**
@@ -185,7 +178,7 @@ public class ModelInfo(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "checksumSha256",
-    schemaIndex = 16,
+    schemaIndex = 15,
   )
   public val checksum_sha256: String? = null,
   /**
@@ -196,18 +189,16 @@ public class ModelInfo(
     tag = 18,
     adapter = "ai.runanywhere.proto.v1.ThinkingTagPattern#ADAPTER",
     jsonName = "thinkingPattern",
-    schemaIndex = 17,
+    schemaIndex = 16,
   )
   public val thinking_pattern: ThinkingTagPattern? = null,
   /**
-   * Structured public catalog metadata. `description` (field 12) is kept for
-   * backward compatibility and should mirror metadata.description when both
-   * are populated.
+   * Structured public catalog metadata, including the model description.
    */
   @field:WireField(
     tag = 19,
     adapter = "ai.runanywhere.proto.v1.ModelInfoMetadata#ADAPTER",
-    schemaIndex = 18,
+    schemaIndex = 17,
   )
   public val metadata: ModelInfoMetadata? = null,
   @field:WireField(
@@ -215,14 +206,14 @@ public class ModelInfo(
     adapter = "ai.runanywhere.proto.v1.SingleFileArtifact#ADAPTER",
     jsonName = "singleFile",
     oneofName = "artifact",
-    schemaIndex = 19,
+    schemaIndex = 18,
   )
   public val single_file: SingleFileArtifact? = null,
   @field:WireField(
     tag = 21,
     adapter = "ai.runanywhere.proto.v1.ArchiveArtifact#ADAPTER",
     oneofName = "artifact",
-    schemaIndex = 20,
+    schemaIndex = 19,
   )
   public val archive: ArchiveArtifact? = null,
   @field:WireField(
@@ -230,7 +221,7 @@ public class ModelInfo(
     adapter = "ai.runanywhere.proto.v1.MultiFileArtifact#ADAPTER",
     jsonName = "multiFile",
     oneofName = "artifact",
-    schemaIndex = 21,
+    schemaIndex = 20,
   )
   public val multi_file: MultiFileArtifact? = null,
   @field:WireField(
@@ -238,7 +229,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "customStrategyId",
     oneofName = "artifact",
-    schemaIndex = 22,
+    schemaIndex = 21,
   )
   public val custom_strategy_id: String? = null,
   @field:WireField(
@@ -246,7 +237,7 @@ public class ModelInfo(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "builtIn",
     oneofName = "artifact",
-    schemaIndex = 23,
+    schemaIndex = 22,
   )
   public val built_in: Boolean? = null,
   /**
@@ -258,7 +249,7 @@ public class ModelInfo(
     tag = 25,
     adapter = "ai.runanywhere.proto.v1.ModelArtifactType#ADAPTER",
     jsonName = "artifactType",
-    schemaIndex = 24,
+    schemaIndex = 23,
   )
   public val artifact_type: ModelArtifactType? = null,
   /**
@@ -268,7 +259,7 @@ public class ModelInfo(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
     jsonName = "expectedFiles",
-    schemaIndex = 25,
+    schemaIndex = 24,
   )
   public val expected_files: ExpectedModelFiles? = null,
   /**
@@ -278,7 +269,7 @@ public class ModelInfo(
     tag = 27,
     adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     jsonName = "accelerationPreference",
-    schemaIndex = 26,
+    schemaIndex = 25,
   )
   public val acceleration_preference: AccelerationPreference? = null,
   /**
@@ -288,7 +279,7 @@ public class ModelInfo(
     tag = 28,
     adapter = "ai.runanywhere.proto.v1.RoutingPolicy#ADAPTER",
     jsonName = "routingPolicy",
-    schemaIndex = 27,
+    schemaIndex = 26,
   )
   public val routing_policy: RoutingPolicy? = null,
   /**
@@ -298,14 +289,14 @@ public class ModelInfo(
   @field:WireField(
     tag = 29,
     adapter = "ai.runanywhere.proto.v1.ModelRuntimeCompatibility#ADAPTER",
-    schemaIndex = 28,
+    schemaIndex = 27,
   )
   public val compatibility: ModelRuntimeCompatibility? = null,
   @field:WireField(
     tag = 30,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     jsonName = "preferredFramework",
-    schemaIndex = 29,
+    schemaIndex = 28,
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
@@ -316,49 +307,49 @@ public class ModelInfo(
     tag = 31,
     adapter = "ai.runanywhere.proto.v1.ModelRegistryStatus#ADAPTER",
     jsonName = "registryStatus",
-    schemaIndex = 30,
+    schemaIndex = 29,
   )
   public val registry_status: ModelRegistryStatus? = null,
   @field:WireField(
     tag = 32,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "isDownloaded",
-    schemaIndex = 31,
+    schemaIndex = 30,
   )
   public val is_downloaded: Boolean? = null,
   @field:WireField(
     tag = 33,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "isAvailable",
-    schemaIndex = 32,
+    schemaIndex = 31,
   )
   public val is_available: Boolean? = null,
   @field:WireField(
     tag = 34,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     jsonName = "lastUsedAtUnixMs",
-    schemaIndex = 33,
+    schemaIndex = 32,
   )
   public val last_used_at_unix_ms: Long? = null,
   @field:WireField(
     tag = 35,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "usageCount",
-    schemaIndex = 34,
+    schemaIndex = 33,
   )
   public val usage_count: Int? = null,
   @field:WireField(
     tag = 36,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "syncPending",
-    schemaIndex = 35,
+    schemaIndex = 34,
   )
   public val sync_pending: Boolean? = null,
   @field:WireField(
     tag = 37,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "statusMessage",
-    schemaIndex = 36,
+    schemaIndex = 35,
   )
   public val status_message: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -390,7 +381,6 @@ public class ModelInfo(
     if (context_length != other.context_length) return false
     if (supports_thinking != other.supports_thinking) return false
     if (supports_lora != other.supports_lora) return false
-    if (description != other.description) return false
     if (source != other.source) return false
     if (created_at_unix_ms != other.created_at_unix_ms) return false
     if (updated_at_unix_ms != other.updated_at_unix_ms) return false
@@ -434,7 +424,6 @@ public class ModelInfo(
       result = result * 37 + context_length.hashCode()
       result = result * 37 + supports_thinking.hashCode()
       result = result * 37 + supports_lora.hashCode()
-      result = result * 37 + description.hashCode()
       result = result * 37 + source.hashCode()
       result = result * 37 + created_at_unix_ms.hashCode()
       result = result * 37 + updated_at_unix_ms.hashCode()
@@ -478,7 +467,6 @@ public class ModelInfo(
     result += """context_length=$context_length"""
     result += """supports_thinking=$supports_thinking"""
     result += """supports_lora=$supports_lora"""
-    result += """description=${sanitize(description)}"""
     result += """source=$source"""
     result += """created_at_unix_ms=$created_at_unix_ms"""
     result += """updated_at_unix_ms=$updated_at_unix_ms"""
@@ -519,7 +507,6 @@ public class ModelInfo(
     context_length: Int = this.context_length,
     supports_thinking: Boolean = this.supports_thinking,
     supports_lora: Boolean = this.supports_lora,
-    description: String = this.description,
     source: ModelSource = this.source,
     created_at_unix_ms: Long = this.created_at_unix_ms,
     updated_at_unix_ms: Long = this.updated_at_unix_ms,
@@ -546,7 +533,7 @@ public class ModelInfo(
     sync_pending: Boolean? = this.sync_pending,
     status_message: String? = this.status_message,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, description, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in, artifact_type, expected_files, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms, usage_count, sync_pending, status_message, unknownFields)
+  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in, artifact_type, expected_files, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms, usage_count, sync_pending, status_message, unknownFields)
 
   public companion object {
     @JvmField
@@ -592,9 +579,6 @@ public class ModelInfo(
         }
         if (value.supports_lora != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.supports_lora)
-        }
-        if (value.description != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.description)
         }
         if (value.source != ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_UNSPECIFIED) {
           size += ModelSource.ADAPTER.encodedSizeWithTag(13, value.source)
@@ -664,9 +648,6 @@ public class ModelInfo(
         if (value.supports_lora != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.supports_lora)
         }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.description)
-        }
         if (value.source != ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_UNSPECIFIED) {
           ModelSource.ADAPTER.encodeWithTag(writer, 13, value.source)
         }
@@ -734,9 +715,6 @@ public class ModelInfo(
         if (value.source != ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_UNSPECIFIED) {
           ModelSource.ADAPTER.encodeWithTag(writer, 13, value.source)
         }
-        if (value.description != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.description)
-        }
         if (value.supports_lora != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.supports_lora)
         }
@@ -784,7 +762,6 @@ public class ModelInfo(
         var context_length: Int = 0
         var supports_thinking: Boolean = false
         var supports_lora: Boolean = false
-        var description: String = ""
         var source: ModelSource = ModelSource.MODEL_SOURCE_UNSPECIFIED
         var created_at_unix_ms: Long = 0L
         var updated_at_unix_ms: Long = 0L
@@ -835,7 +812,6 @@ public class ModelInfo(
             9 -> context_length = ProtoAdapter.INT32.decode(reader)
             10 -> supports_thinking = ProtoAdapter.BOOL.decode(reader)
             11 -> supports_lora = ProtoAdapter.BOOL.decode(reader)
-            12 -> description = ProtoAdapter.STRING.decode(reader)
             13 -> try {
               source = ModelSource.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -900,7 +876,6 @@ public class ModelInfo(
           context_length = context_length,
           supports_thinking = supports_thinking,
           supports_lora = supports_lora,
-          description = description,
           source = source,
           created_at_unix_ms = created_at_unix_ms,
           updated_at_unix_ms = updated_at_unix_ms,

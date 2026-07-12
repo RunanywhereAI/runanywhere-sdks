@@ -1,6 +1,5 @@
 plugins {
     id "com.android.application"
-    id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -23,29 +22,21 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.runanywhere.runanywhere_ai"
-    compileSdkVersion 36
-    ndkVersion flutter.ndkVersion
+    namespace = "com.runanywhere.runanywhere_ai"
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
-
     defaultConfig {
-        applicationId "com.runanywhere.runanywhere_ai"
-        minSdkVersion flutter.minSdkVersion
-        targetSdkVersion 34
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
+        applicationId = "com.runanywhere.runanywhere_ai"
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
+        versionCode = flutterVersionCode.toInteger()
+        versionName = flutterVersionName
     }
 
     signingConfigs {
@@ -56,31 +47,30 @@ android {
             def releaseKeyPassword = System.getenv("KEY_PASSWORD")
 
             if (keystorePath && keystorePassword && releaseKeyAlias && releaseKeyPassword) {
-                storeFile file(keystorePath)
-                storePassword keystorePassword
-                keyAlias releaseKeyAlias
-                keyPassword releaseKeyPassword
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
+            signingConfig = signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug
             // Android shell shrinking. The Dart app is AOT-compiled (not touched
             // by R8); these rules just keep the Flutter embedding + the
             // runanywhere/QHexRT plugin JNI surface that R8 would otherwise strip.
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            minifyEnabled = true
+            shrinkResources = true
+            proguardFiles(getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro')
         }
     }
 
-    packagingOptions {
+    packaging {
         // libc++_shared.so ships from every Flutter plugin that consumes
         // runanywhere native .so files — AGP needs a tie-breaker.
-        pickFirst '**/libc++_shared.so'
-        pickFirst '**/libomp.so'
+        jniLibs.pickFirsts += ['**/libc++_shared.so', '**/libomp.so']
         // QHexRT (QNN) needs the Hexagon HTP skel .so files (libQnnHtpV*Skel.so)
         // to exist as real on-disk files: FastRPC fopen()s them to offload to the
         // cDSP. With useLegacyPackaging=false the skels are page-mapped from the
@@ -95,8 +85,14 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
 flutter {
-    source '../..'
+    source = '../..'
 }
 
 dependencies {}

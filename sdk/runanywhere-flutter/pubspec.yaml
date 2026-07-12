@@ -2,7 +2,7 @@ name: runanywhere_flutter_workspace
 publish_to: none
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
+  sdk: '>=3.12.0 <4.0.0'
 
 workspace:
   - packages/runanywhere
@@ -34,8 +34,8 @@ melos:
   # Current centralization model:
   #   - The `packages/runanywhere` package is the source of truth for every
   #     third-party constraint shared across the workspace.
-  #   - Backend sub-packages (`runanywhere_llamacpp`, `runanywhere_onnx`,
-  #     `runanywhere_qhexrt`) should use the same shared-dependency major
+  #   - Backend sub-packages (`runanywhere_llamacpp`, `runanywhere_mlx`,
+  #     `runanywhere_onnx`, `runanywhere_qhexrt`) should use the same shared-dependency major
   #     range as the root package, expressed as a bounded publishable range
   #     (for example `>=2.2.0 <3.0.0`) when pub.dev rejects `any`.
   #   - The linter still flags hardcoded `^x.y.z` literals in sub-packages.
@@ -44,17 +44,17 @@ melos:
 
   scripts:
     analyze:
-      run: melos exec -c 1 -- flutter analyze --no-pub .
+      run: dart run melos exec -c 1 -- flutter analyze --no-pub .
       description: Run flutter analyze in all packages
 
     format:
-      run: melos exec -- dart format .
+      run: dart run melos exec -- dart format .
       description: Run dart format in all packages
 
     test:
-      run: melos exec -- flutter test
+      run: dart run melos exec -c 1 --dir-exists=test -- flutter test --no-pub
       description: Run tests in all packages
 
     clean:
-      run: melos exec -- flutter clean
+      run: dart run melos exec -- flutter clean
       description: Run flutter clean in all packages

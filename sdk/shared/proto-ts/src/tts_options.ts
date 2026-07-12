@@ -237,8 +237,6 @@ export interface TTSOptions {
    * depending on model convention.
    */
   speakerId: number;
-  /** Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate. */
-  speed: number;
   /** Optional style/emotion hint for voices that support style transfer. */
   style?: string | undefined;
 }
@@ -731,7 +729,6 @@ function createBaseTTSOptions(): TTSOptions {
     audioFormat: 0,
     sampleRate: 0,
     speakerId: 0,
-    speed: 0,
     style: undefined,
   };
 }
@@ -764,9 +761,6 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     }
     if (message.speakerId !== 0) {
       writer.uint32(72).int32(message.speakerId);
-    }
-    if (message.speed !== 0) {
-      writer.uint32(85).float(message.speed);
     }
     if (message.style !== undefined) {
       writer.uint32(90).string(message.style);
@@ -853,14 +847,6 @@ export const TTSOptions: MessageFns<TTSOptions> = {
           message.speakerId = reader.int32();
           continue;
         }
-        case 10: {
-          if (tag !== 85) {
-            break;
-          }
-
-          message.speed = reader.float();
-          continue;
-        }
         case 11: {
           if (tag !== 90) {
             break;
@@ -913,7 +899,6 @@ export const TTSOptions: MessageFns<TTSOptions> = {
         : isSet(object.speaker_id)
         ? globalThis.Number(object.speaker_id)
         : 0,
-      speed: isSet(object.speed) ? globalThis.Number(object.speed) : 0,
       style: isSet(object.style) ? globalThis.String(object.style) : undefined,
     };
   },
@@ -947,9 +932,6 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     if (message.speakerId !== 0) {
       obj.speakerId = Math.round(message.speakerId);
     }
-    if (message.speed !== 0) {
-      obj.speed = message.speed;
-    }
     if (message.style !== undefined) {
       obj.style = message.style;
     }
@@ -970,7 +952,6 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     message.audioFormat = object.audioFormat ?? 0;
     message.sampleRate = object.sampleRate ?? 0;
     message.speakerId = object.speakerId ?? 0;
-    message.speed = object.speed ?? 0;
     message.style = object.style ?? undefined;
     return message;
   },

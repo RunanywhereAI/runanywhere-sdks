@@ -59,8 +59,8 @@ fi
 
 cd "$WEB_ROOT"
 
-echo ">> npm install"
-npm install
+echo ">> npm ci"
+npm ci
 
 echo ">> npm run build:ts"
 npm run build:ts
@@ -72,22 +72,127 @@ DIST_DIR="${WEB_ROOT}/dist/sdk-web"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-for pkg in ../shared/proto-ts packages/core packages/llamacpp packages/onnx; do
-    echo ">> npm pack $pkg"
-    (cd "$pkg" && npm pack --pack-destination "$DIST_DIR" >/dev/null)
+PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+[ -n "$PACKAGE_VERSION" ] || { echo "ERROR: Web package version is empty" >&2; exit 1; }
+
+# proto-ts is still emitted as a first-class Web release asset, but the Web
+# core and LlamaCPP entry tarballs also vendor this exact payload. Installing
+# either entry package from GitHub Releases therefore never asks npm for an
+# unpublished proto-ts version.
+echo ">> npm pack ../shared/proto-ts"
+(cd ../shared/proto-ts && npm pack --silent --pack-destination "$DIST_DIR" >/dev/null)
+PROTO_ARCHIVE="$DIST_DIR/runanywhere-proto-ts-$PACKAGE_VERSION.tgz"
+[ -f "$PROTO_ARCHIVE" ] || { echo "ERROR: npm pack did not produce $PROTO_ARCHIVE" >&2; exit 1; }
+python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \
+    --archive "$PROTO_ARCHIVE" \
+    --exact-version "$PACKAGE_VERSION"
+
+for pkg in core llamacpp onnx; do
+    pkg_dir="$WEB_ROOT/packages/$pkg"
+    echo ">> npm pack packages/$pkg"
+    (cd "$pkg_dir" && npm pack --silent --pack-destination "$DIST_DIR" >/dev/null)
+    case "$pkg" in
+        core) artifact="$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz" ;;
+        llamacpp) artifact="$DIST_DIR/runanywhere-web-llamacpp-$PACKAGE_VERSION.tgz" ;;
+        onnx) artifact="$DIST_DIR/runanywhere-web-onnx-$PACKAGE_VERSION.tgz" ;;
+    esac
+    [ -f "$artifact" ] || { echo "ERROR: npm pack did not produce $artifact" >&2; exit 1; }
+    rewrite_args=(
+        --archive "$artifact"
+        --exact-version "$PACKAGE_VERSION"
+    )
+    if [ "$pkg" != "onnx" ]; then
+        rewrite_args+=(--bundle "@runanywhere/proto-ts=$PROTO_ARCHIVE")
+    fi
+    python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" "${rewrite_args[@]}"
 done
+
+python3 "$SCRIPT_DIR/validate_public_packages.py" \
+    --dist "$DIST_DIR" \
+    --expected-version "$PACKAGE_VERSION"
 
 echo ""
 echo ">> Artifacts in $DIST_DIR:"
 for f in "$DIST_DIR"/*.tgz; do
     [ -f "$f" ] || continue
+    artifact_dir="$(dirname "$f")"
+    artifact_name="$(basename "$f")"
     if command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$f" > "$f.sha256"
+        (cd "$artifact_dir" && shasum -a 256 "$artifact_name" > "$artifact_name.sha256")
+        (cd "$artifact_dir" && shasum -a 256 --check "$artifact_name.sha256")
     else
-        sha256sum "$f" > "$f.sha256"
+        (cd "$artifact_dir" && sha256sum "$artifact_name" > "$artifact_name.sha256")
+        (cd "$artifact_dir" && sha256sum --check "$artifact_name.sha256")
     fi
     echo "  $(basename "$f")"
 done
+
+# Exercise the same entry-package transactions documented for users. The
+# standalone proto tarball is intentionally omitted: these installs succeed
+# only when the advertised entry package carries its own exact proto payload.
+INSTALL_SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-web-install.XXXXXX")"
+trap 'rm -rf "$INSTALL_SMOKE_ROOT"' EXIT
+verify_candidate_install() {
+    local label="$1"
+    local entry_package="$2"
+    local proto_owner="$3"
+    shift 3
+    local install_root="$INSTALL_SMOKE_ROOT/$label"
+    mkdir -p "$install_root"
+    (
+        cd "$install_root"
+        npm init --yes >/dev/null
+        npm install \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund \
+            --package-lock=false \
+            "$@" >/dev/null
+        ENTRY_PACKAGE="$entry_package" \
+        PROTO_OWNER="$proto_owner" \
+        EXPECTED_VERSION="$PACKAGE_VERSION" \
+        node - <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const { createRequire } = require('module');
+
+const packageRoot = (name) => path.join(process.cwd(), 'node_modules', ...name.split('/'));
+const entryManifest = JSON.parse(
+  fs.readFileSync(path.join(packageRoot(process.env.ENTRY_PACKAGE), 'package.json'), 'utf8')
+);
+if (entryManifest.version !== process.env.EXPECTED_VERSION) {
+  throw new Error(`${entryManifest.name} resolved ${entryManifest.version}`);
+}
+const ownerRoot = packageRoot(process.env.PROTO_OWNER);
+const ownerRequire = createRequire(path.join(ownerRoot, 'package.json'));
+const protoManifestPath = ownerRequire.resolve('@runanywhere/proto-ts/package.json');
+const protoManifest = JSON.parse(fs.readFileSync(protoManifestPath, 'utf8'));
+if (protoManifest.version !== process.env.EXPECTED_VERSION) {
+  throw new Error(`proto-ts resolved ${protoManifest.version}`);
+}
+ownerRequire.resolve('@bufbuild/protobuf/wire');
+console.log(`verified ${entryManifest.name}@${entryManifest.version} with bundled proto-ts@${protoManifest.version}`);
+NODE
+    )
+}
+
+verify_candidate_install \
+    core \
+    @runanywhere/web \
+    @runanywhere/web \
+    "$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz"
+verify_candidate_install \
+    llamacpp \
+    @runanywhere/web-llamacpp \
+    @runanywhere/web-llamacpp \
+    "$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz" \
+    "$DIST_DIR/runanywhere-web-llamacpp-$PACKAGE_VERSION.tgz"
+verify_candidate_install \
+    onnx \
+    @runanywhere/web-onnx \
+    @runanywhere/web \
+    "$DIST_DIR/runanywhere-web-$PACKAGE_VERSION.tgz" \
+    "$DIST_DIR/runanywhere-web-onnx-$PACKAGE_VERSION.tgz"
 
 if [ -x "${REPO_ROOT}/scripts/release/validate-artifact.sh" ]; then
     echo ""

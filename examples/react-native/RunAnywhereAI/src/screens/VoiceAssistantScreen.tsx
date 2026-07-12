@@ -27,9 +27,9 @@ import {
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
+import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
 
-const listModels = async (): Promise<SDKModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -90,7 +90,7 @@ export const VoiceAssistantScreen: React.FC = () => {
 
   const loadAvailableModels = async () => {
     try {
-      const models = await listModels();
+      const models = await listVisibleCatalogModels();
       setAvailableModels(models);
     } catch (error) {
       console.warn('[VoiceAssistant] Error loading models:', error);
@@ -107,10 +107,10 @@ export const VoiceAssistantScreen: React.FC = () => {
           ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         ).catch(() => null),
       ]);
-      if (loadedSTT) setSTTModel(loadedSTT);
-      if (loadedLLM) setLLMModel(loadedLLM);
-      if (loadedTTS) setTTSModel(loadedTTS);
-      if (loadedVAD) setVADModel(loadedVAD);
+      setSTTModel(visibleNativeNpuCatalogModelOrNull(loadedSTT));
+      setLLMModel(visibleNativeNpuCatalogModelOrNull(loadedLLM));
+      setTTSModel(visibleNativeNpuCatalogModelOrNull(loadedTTS));
+      setVADModel(visibleNativeNpuCatalogModelOrNull(loadedVAD));
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
     }
@@ -246,7 +246,9 @@ export const VoiceAssistantScreen: React.FC = () => {
               const loaded = await RunAnywhere.modelInfoForCategory(
                 ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
               ).catch(() => null);
-              setSTTModel(loaded ?? model);
+              setSTTModel(
+                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+              );
             } else {
               Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
@@ -265,7 +267,9 @@ export const VoiceAssistantScreen: React.FC = () => {
               const loaded = await RunAnywhere.modelInfoForCategory(
                 ModelCategory.MODEL_CATEGORY_LANGUAGE
               ).catch(() => null);
-              setLLMModel(loaded ?? model);
+              setLLMModel(
+                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+              );
             } else {
               Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
@@ -284,7 +288,9 @@ export const VoiceAssistantScreen: React.FC = () => {
               const loaded = await RunAnywhere.modelInfoForCategory(
                 ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
               ).catch(() => null);
-              setTTSModel(loaded ?? model);
+              setTTSModel(
+                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+              );
             } else {
               Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
@@ -303,7 +309,9 @@ export const VoiceAssistantScreen: React.FC = () => {
               const loaded = await RunAnywhere.modelInfoForCategory(
                 ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
               ).catch(() => null);
-              setVADModel(loaded ?? model);
+              setVADModel(
+                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
+              );
             } else {
               Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }

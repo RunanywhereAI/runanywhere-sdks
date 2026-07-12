@@ -7,8 +7,6 @@
 # Usage:
 #   include(LoadVersions)
 #   # Then use: ${RAC_ONNX_VERSION_IOS}, ${RAC_SHERPA_ONNX_VERSION_IOS}, etc.
-#
-# All variables are also set without the RAC_ prefix for backward compatibility.
 # =============================================================================
 
 # Find VERSIONS file relative to this cmake module
@@ -38,31 +36,9 @@ foreach(_LINE IN LISTS _VERSIONS_LINES)
         set(_KEY "${CMAKE_MATCH_1}")
         set(_VALUE "${CMAKE_MATCH_2}")
 
-        # Set as CMake variable with RAC_ prefix (preserves raw form, including
-        # the GIT_TAG-style 'v' prefix some entries carry).
+        # CMake consumes only namespaced variables. Preserve the raw value,
+        # including the GIT_TAG-style 'v' prefix some entries carry.
         set(RAC_${_KEY} "${_VALUE}" CACHE STRING "Version from VERSIONS file" FORCE)
-
-        # Also set without prefix for backward compatibility.
-        #
-        # ZLIB_VERSION is special — it shares its
-        # bare-name with CMake's FindZLIB VERSION_VAR. FindZLIB feeds whatever
-        # `ZLIB_VERSION` holds into the numeric `find_package(ZLIB X.Y.Z)`
-        # comparator, which rejects a leading 'v'. libarchive's bundled CMake
-        # runs `FIND_PACKAGE(ZLIB 1.2.1)` and falls back to
-        # `archive_read_support_filter_program("gzip -d")` when the version
-        # check fails — broken on iOS app sandbox + Emscripten OPFS (no
-        # fork+exec). Every other engine that re-`include(LoadVersions)` would
-        # otherwise restore the raw `v1.3.2` and undo the v-strip
-        # fix on a per-subdirectory basis. Strip the 'v' once at the source for
-        # ZLIB_VERSION specifically. Other VERSION keys (USEARCH/GOOGLETEST/
-        # CPPHTTPLIB) intentionally keep the 'v' because they feed
-        # GIT_TAG arguments where the tag literally starts with 'v'.
-        set(_RAC_BARE_VALUE "${_VALUE}")
-        if("${_KEY}" STREQUAL "ZLIB_VERSION" AND _RAC_BARE_VALUE MATCHES "^v[0-9]")
-            string(REGEX REPLACE "^v" "" _RAC_BARE_VALUE "${_RAC_BARE_VALUE}")
-        endif()
-        set(${_KEY} "${_RAC_BARE_VALUE}" CACHE STRING "Version from VERSIONS file" FORCE)
-        unset(_RAC_BARE_VALUE)
     endif()
 endforeach()
 
@@ -70,6 +46,7 @@ endforeach()
 message(STATUS "Loaded versions from ${_VERSIONS_FILE}:")
 message(STATUS "  Platform targets:")
 message(STATUS "    IOS_DEPLOYMENT_TARGET: ${RAC_IOS_DEPLOYMENT_TARGET}")
+message(STATUS "    MACOS_DEPLOYMENT_TARGET: ${RAC_MACOS_DEPLOYMENT_TARGET}")
 message(STATUS "    ANDROID_MIN_SDK: ${RAC_ANDROID_MIN_SDK}")
 message(STATUS "  ONNX Runtime:")
 message(STATUS "    ONNX_VERSION_IOS: ${RAC_ONNX_VERSION_IOS}")
@@ -88,6 +65,7 @@ message(STATUS "    LLAMACPP_VERSION:    ${RAC_LLAMACPP_VERSION}")
 message(STATUS "  Data / serialization:")
 message(STATUS "    NLOHMANN_JSON_VERSION: ${RAC_NLOHMANN_JSON_VERSION}")
 message(STATUS "    PROTOBUF_VERSION:      ${RAC_PROTOBUF_VERSION}")
+message(STATUS "    ABSEIL_VERSION:        ${RAC_ABSEIL_VERSION}")
 message(STATUS "  Retrieval / vector search:")
 message(STATUS "    USEARCH_VERSION:     ${RAC_USEARCH_VERSION}")
 message(STATUS "  Compression / archives:")
@@ -102,6 +80,5 @@ message(STATUS "    NDK_VERSION:         ${RAC_NDK_VERSION}")
 message(STATUS "    EMSCRIPTEN_VERSION:  ${RAC_EMSCRIPTEN_VERSION}")
 message(STATUS "    NODE_VERSION:        ${RAC_NODE_VERSION}")
 message(STATUS "    JAVA_VERSION:        ${RAC_JAVA_VERSION}")
-message(STATUS "    GRADLE_VERSION:      ${RAC_GRADLE_VERSION}")
 message(STATUS "    CMAKE_VERSION:       ${RAC_CMAKE_VERSION}")
 message(STATUS "    MIN_CMAKE_VERSION:   ${RAC_MIN_CMAKE_VERSION}")

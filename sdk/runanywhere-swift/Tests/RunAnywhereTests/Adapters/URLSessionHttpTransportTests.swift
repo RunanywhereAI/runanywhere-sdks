@@ -4,10 +4,9 @@
 //
 //  Coverage for `URLSessionHttpTransport` — the URLSession-backed adapter
 //  that replaces libcurl on Apple and services every `rac_http_request_*`
-//  C ABI call (model download, catalog fetch, analytics). The Web SDK's
-//  `FetchHttpTransport.test.ts` is the parity reference; this suite mirrors
-//  its contracts against the real C router so a vtable regression fails
-//  here instead of at first-run-download time:
+//  C ABI call (model download, catalog fetch, analytics). This suite verifies
+//  its contracts against the real C router so a vtable regression fails here
+//  instead of at first-run-download time:
 //
 //   1. `register()` is idempotent — the C router reports a transport after
 //      the first call and a second call leaves it installed (no re-register
@@ -22,9 +21,8 @@
 //      true`, a 200 (server ignored the range) sets it to `false`.
 //
 //  All requests are intercepted by `StubURLProtocol` so the suite never
-//  touches the network. The streaming / resume tests inject the stub via
-//  `register(streamingSession:)`; the send test relies on the global
-//  `URLProtocol.registerClass(_:)` hook the shared session inherits.
+//  touches the network. Buffered and streaming requests inject sessions
+//  whose configurations explicitly install the stub protocol.
 //
 
 import CRACommons
@@ -35,14 +33,25 @@ import XCTest
 
 final class URLSessionHttpTransportTests: XCTestCase {
 
-    override func setUp() {
-        super.setUp()
-        URLProtocol.registerClass(StubURLProtocol.self)
+    private var client: OpaquePointer?
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        var createdClient: OpaquePointer?
+        XCTAssertEqual(rac_http_client_create(&createdClient), RAC_SUCCESS)
+        client = try XCTUnwrap(createdClient)
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubURLProtocol.self]
+        URLSessionHttpTransport.registerBufferedSessionForTesting(
+            URLSession(configuration: config)
+        )
     }
 
     override func tearDown() {
+        rac_http_client_destroy(client)
+        client = nil
         StubURLProtocol.reset()
-        URLProtocol.unregisterClass(StubURLProtocol.self)
         URLSessionHttpTransport.unregister()
         super.tearDown()
     }
@@ -97,7 +106,7 @@ final class URLSessionHttpTransportTests: XCTestCase {
 
         var response = rac_http_response_t()
         let rc = withRequest(method: "GET", url: "https://example.test/ping") { reqPtr in
-            rac_http_request_send(nil, reqPtr, &response)
+            rac_http_request_send(client, reqPtr, &response)
         }
         defer { rac_http_response_free(&response) }
 
@@ -126,7 +135,7 @@ final class URLSessionHttpTransportTests: XCTestCase {
         let sink = ChunkSink(cancelAtCall: 1)
         var response = rac_http_response_t()
         let rc = withRequest(method: "GET", url: "https://example.test/model.gguf") { reqPtr in
-            rac_http_request_stream(nil, reqPtr, ChunkSink.cCallback, sink.userData, &response)
+            rac_http_request_stream(client, reqPtr, ChunkSink.cCallback, sink.userData, &response)
         }
         defer { rac_http_response_free(&response) }
 
@@ -150,7 +159,7 @@ final class URLSessionHttpTransportTests: XCTestCase {
         var response = rac_http_response_t()
         let rc = withRequest(method: "GET", url: "https://example.test/model.gguf") { reqPtr in
             rac_http_request_resume(
-                nil,
+                client,
                 reqPtr,
                 resumeFrom,
                 ChunkSink.cCallback,
@@ -183,7 +192,7 @@ final class URLSessionHttpTransportTests: XCTestCase {
         var honoredResponse = rac_http_response_t()
         _ = withRequest(method: "GET", url: "https://example.test/partial") { reqPtr in
             rac_http_request_resume(
-                nil,
+                client,
                 reqPtr,
                 resumeFrom,
                 ChunkSink.cCallback,
@@ -206,7 +215,7 @@ final class URLSessionHttpTransportTests: XCTestCase {
         var ignoredResponse = rac_http_response_t()
         _ = withRequest(method: "GET", url: "https://example.test/full") { reqPtr in
             rac_http_request_resume(
-                nil,
+                client,
                 reqPtr,
                 resumeFrom,
                 ChunkSink.cCallback,
@@ -316,8 +325,7 @@ private struct StubResponse {
 }
 
 /// In-process `URLProtocol` that answers every request from a configurable
-/// closure — no sockets, no network. Mirrors the role of the `XHRStub` in
-/// the Web SDK's `FetchHttpTransport.test.ts`.
+/// closure — no sockets, no network.
 private final class StubURLProtocol: URLProtocol {
 
     /// Builds the canned response for an intercepted request.

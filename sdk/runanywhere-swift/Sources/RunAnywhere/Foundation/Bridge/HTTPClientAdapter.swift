@@ -20,8 +20,21 @@ public actor HTTPClientAdapter {
 
     public static let shared = HTTPClientAdapter()
 
-    private var baseURL: URL?
-    private var apiKey: String?
+    enum RequestTrustBoundary: Sendable {
+        case controlPlane
+        case externalAsset
+
+        var followsRedirects: Bool { self == .externalAsset }
+    }
+
+    private struct Configuration: Sendable {
+        let baseURL: URL
+        let apiKey: String
+        let generation: UInt64
+    }
+
+    private var configuration: Configuration?
+    private var nextConfigurationGeneration: UInt64 = 0
     private let logger = SDKLogger(category: "HTTPClientAdapter")
 
     /// Concurrent queue used to run the blocking `rac_http_client_*`
@@ -42,31 +55,46 @@ public actor HTTPClientAdapter {
         let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString),
               CppBridge.DevConfig.isUsableCredential(trimmedAPIKey) else {
-            self.baseURL = nil
-            self.apiKey = nil
+            clearConfiguration()
             logger.info("HTTP adapter not configured: no usable external config")
             return
         }
-        self.baseURL = baseURL
-        self.apiKey = trimmedAPIKey
+        nextConfigurationGeneration &+= 1
+        configuration = Configuration(
+            baseURL: baseURL,
+            apiKey: trimmedAPIKey,
+            generation: nextConfigurationGeneration
+        )
         logger.info("HTTP adapter configured with base URL: \(baseURL.host ?? "unknown")")
     }
 
     public func configure(baseURL: String, apiKey: String) {
         guard let url = URL(string: baseURL) else {
-            self.baseURL = nil
-            self.apiKey = nil
+            clearConfiguration()
             logger.error("Invalid base URL: \(baseURL)")
             return
         }
         configure(baseURL: url, apiKey: apiKey)
     }
 
-    public var isConfigured: Bool { baseURL != nil }
+    public var isConfigured: Bool { configuration != nil }
     public var hasUsableConfiguration: Bool {
-        guard let baseURL else { return false }
-        return CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) &&
-            CppBridge.DevConfig.isUsableCredential(apiKey)
+        guard let configuration else { return false }
+        return CppBridge.DevConfig.isUsableHTTPURL(configuration.baseURL.absoluteString) &&
+            CppBridge.DevConfig.isUsableCredential(configuration.apiKey)
+    }
+
+    /// Clear lifetime-scoped credentials so a later SDK initialization must
+    /// install its own environment instead of inheriting the previous one.
+    func shutdown() {
+        clearConfiguration()
+        logger.debug("HTTP adapter configuration cleared")
+    }
+
+    var activeConfigurationGeneration: UInt64? { configuration?.generation }
+
+    func configurationIsCurrent(generation: UInt64) -> Bool {
+        configuration?.generation == generation
     }
 
     public func postRaw(_ path: String, _ payload: Data, requiresAuth: Bool) async throws -> Data {
@@ -98,6 +126,7 @@ public actor HTTPClientAdapter {
             authToken: nil,
             upsertField: nil,
             body: nil,
+            trustBoundary: .externalAsset,
             logger: SDKLogger(category: "HTTPClientAdapter.fetchURL")
         )
     }
@@ -110,27 +139,38 @@ public actor HTTPClientAdapter {
         body: Data?,
         requiresAuth: Bool
     ) async throws -> Data {
-        guard let baseURL = baseURL else {
+        guard let configuration else {
             throw SDKException(code: .serviceNotAvailable, message: "HTTP adapter not configured", category: .network)
         }
-        let urlString = Self.buildURL(base: baseURL, path: path).absoluteString
-        let token = try await resolveToken(requiresAuth: requiresAuth)
+        let urlString = Self.buildURL(base: configuration.baseURL, path: path).absoluteString
+        let token = try await resolveToken(
+            requiresAuth: requiresAuth,
+            fallbackAPIKey: configuration.apiKey
+        )
+        guard configurationIsCurrent(generation: configuration.generation) else {
+            throw SDKException(
+                code: .invalidState,
+                message: "HTTP adapter configuration changed before request dispatch",
+                category: .internal
+            )
+        }
         // Supabase device registration uses UPSERT semantics — defer the URL
         // / header rewrite to commons via `rac_http_request_set_upsert_mode`.
         let upsertField: String? = path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) ? "device_id" : nil
         return try await Self.dispatch(
             method: method,
             urlString: urlString,
-            apiKey: apiKey,
+            apiKey: configuration.apiKey,
             authToken: token.isEmpty ? nil : token,
             upsertField: upsertField,
             body: body,
+            trustBoundary: .controlPlane,
             logger: logger
         )
     }
 
-    private func resolveToken(requiresAuth: Bool) async throws -> String {
-        if !requiresAuth { return apiKey ?? "" }
+    private func resolveToken(requiresAuth: Bool, fallbackAPIKey: String) async throws -> String {
+        if !requiresAuth { return fallbackAPIKey }
         // `rac_auth_get_valid_token` encodes the "valid → return / expired
         // → signal refresh" handshake in one call.
         var tokenPtr: UnsafePointer<CChar>?
@@ -141,8 +181,13 @@ public actor HTTPClientAdapter {
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
         if status == 0, let ptr = tokenPtr { return String(cString: ptr) }
-        if let key = apiKey, !key.isEmpty { return key }
+        if !fallbackAPIKey.isEmpty { return fallbackAPIKey }
         throw SDKException(code: .authenticationFailed, message: "No valid authentication token", category: .auth)
+    }
+
+    private func clearConfiguration() {
+        nextConfigurationGeneration &+= 1
+        configuration = nil
     }
 
     /// Join `base` + `path`, preserving any query string on `path`. Returns
@@ -174,6 +219,7 @@ public actor HTTPClientAdapter {
         authToken: String?,
         upsertField: String?,
         body: Data?,
+        trustBoundary: RequestTrustBoundary,
         logger: SDKLogger
     ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
@@ -186,6 +232,7 @@ public actor HTTPClientAdapter {
                         authToken: authToken,
                         upsertField: upsertField,
                         body: body,
+                        trustBoundary: trustBoundary,
                         logger: logger
                     )
                 })
@@ -200,6 +247,7 @@ public actor HTTPClientAdapter {
         authToken: String?,
         upsertField: String?,
         body: Data?,
+        trustBoundary: RequestTrustBoundary,
         logger: SDKLogger
     ) throws -> Data {
         var clientHandle: OpaquePointer?
@@ -249,7 +297,8 @@ public actor HTTPClientAdapter {
                 urlC: urlC,
                 headerKVs: kvBuf,
                 body: body,
-                upsertField: upsertField
+                upsertField: upsertField,
+                trustBoundary: trustBoundary
             )
         }
 
@@ -271,7 +320,8 @@ public actor HTTPClientAdapter {
         urlC: UnsafeMutablePointer<CChar>,
         headerKVs: UnsafeBufferPointer<rac_http_header_kv_t>,
         body: Data?,
-        upsertField: String?
+        upsertField: String?,
+        trustBoundary: RequestTrustBoundary
     ) -> (rac_result_t, Int32, Data) {
         func dispatchWith(bodyBase: UnsafePointer<UInt8>?, bodyLen: Int) -> (rac_result_t, Int32, Data) {
             var request = rac_http_request_t(
@@ -282,7 +332,7 @@ public actor HTTPClientAdapter {
                 body_bytes: bodyBase,
                 body_len: bodyLen,
                 timeout_ms: defaultTimeoutMs,
-                follow_redirects: RAC_TRUE,
+                follow_redirects: trustBoundary.followsRedirects ? RAC_TRUE : RAC_FALSE,
                 expected_checksum_hex: nil
             )
             if let upsertField {

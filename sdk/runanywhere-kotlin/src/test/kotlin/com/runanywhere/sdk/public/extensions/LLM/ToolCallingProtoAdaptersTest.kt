@@ -1,11 +1,10 @@
 package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.ToolCall
 import ai.runanywhere.proto.v1.ToolCallFormatName
 import ai.runanywhere.proto.v1.ToolCallingOptions
-import ai.runanywhere.proto.v1.ToolCallingResult
-import ai.runanywhere.proto.v1.ToolResult
+import ai.runanywhere.proto.v1.ToolChoiceMode
+import ai.runanywhere.proto.v1.ToolDefinition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -21,12 +20,12 @@ class ToolCallingProtoAdaptersTest {
                 system_prompt = "Use tools when useful.",
             ).toToolCallingOptions()
 
-        assertEquals(DEFAULT_TOOL_CALL_MAX_ITERATIONS, options.max_iterations)
+        assertEquals(DEFAULT_MAX_TOOL_CALLS, options.max_tool_calls)
         assertTrue(options.auto_execute)
         assertEquals(128, options.max_tokens)
         assertEquals(0.4f, options.temperature)
         assertEquals("Use tools when useful.", options.system_prompt)
-        assertEquals("default", options.format_hint)
+        assertEquals(null, options.format)
     }
 
     @Test
@@ -41,35 +40,61 @@ class ToolCallingProtoAdaptersTest {
                         auto_execute = false,
                         max_tokens = 64,
                         temperature = 0.1f,
-                        format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS,
+                        format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2,
                     ),
             ).toToolCallingOptions()
 
-        assertEquals(2, options.max_iterations)
+        assertEquals(2, options.max_tool_calls)
         assertFalse(options.auto_execute)
         assertEquals(64, options.max_tokens)
         assertEquals(0.1f, options.temperature)
-        assertEquals("default", options.format_hint)
+        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, options.format)
     }
 
     @Test
-    fun `tool calling result maps into canonical LLM result fields`() {
-        val call = ToolCall(id = "call_1", name = "get_weather", arguments_json = """{"city":"Paris"}""")
-        val result = ToolResult(tool_call_id = "call_1", name = "get_weather", result_json = """{"temp":18}""")
+    fun `run loop request preserves greedy forced tool policy across Kotlin bridge`() {
+        val search = ToolDefinition(name = "search_web", description = "Search current information")
+        val request =
+            makeToolCallingRunLoopRequest(
+                prompt = "Use search_web for the current requirement.",
+                options =
+                    ToolCallingOptions(
+                        tools = listOf(search),
+                        max_tool_calls = 2,
+                        max_tokens = 96,
+                        temperature = 0f,
+                        format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2,
+                        auto_execute = false,
+                        replace_system_prompt = true,
+                        require_json_arguments = true,
+                        disable_thinking = true,
+                        tool_choice = ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC,
+                        forced_tool_name = "search_web",
+                    ),
+                llmOptions =
+                    LLMGenerationOptions(
+                        max_tokens = 512,
+                        temperature = 0.7f,
+                        top_p = 1f,
+                        disable_thinking = false,
+                    ),
+                tools = listOf(search),
+                validateCalls = null,
+            )
 
-        val llmResult =
-            ToolCallingResult(
-                text = "It is 18 C.",
-                tool_calls = listOf(call),
-                tool_results = listOf(result),
-                is_complete = false,
-            ).toLLMGenerationResult(modelUsed = "demo-model")
-
-        assertEquals("It is 18 C.", llmResult.text)
-        assertEquals("demo-model", llmResult.model_used)
-        assertEquals("tool_calls", llmResult.finish_reason)
-        assertEquals(listOf(call), llmResult.tool_calls)
-        assertEquals(listOf(result), llmResult.tool_results)
+        assertEquals(96, request.max_tokens)
+        assertEquals(0f, request.temperature)
+        assertEquals(1f, request.top_p)
+        assertEquals(2, request.max_tool_calls)
+        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, request.format)
+        assertEquals(false, request.auto_execute)
+        assertTrue(request.replace_system_prompt)
+        assertTrue(request.require_json_arguments)
+        assertTrue(request.disable_thinking)
+        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, request.tool_choice)
+        assertEquals("search_web", request.forced_tool_name)
+        assertEquals(listOf("search_web"), request.tools.map { it.name })
+        assertEquals(null, request.validate_calls)
     }
 
     @Test

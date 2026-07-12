@@ -4,8 +4,8 @@
  *
  * W4 component unification: merges the former vlm_component.cpp (handle-based
  * Vision Language Model component path) with the entire rac_vlm_proto_abi.cpp
- * (proto-byte C ABI: rac_vlm_process_proto / _stream / cancel / generate /
- * stream / cancel_lifecycle, plus the rac_vlm_proto_quiesce in-flight guard)
+ * (proto-byte C ABI: generate / stream / cancel_lifecycle, plus the
+ * rac_vlm_proto_quiesce in-flight guard)
  * into one TU.
  */
 
@@ -774,96 +774,8 @@ extern "C" rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
 }
 
 // =============================================================================
-// PROTO-BACKED LOAD FROM RESOLVED ARTIFACTS
-// =============================================================================
-
-extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result) {
-    if (!out_result)
-        return RAC_ERROR_NULL_POINTER;
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)request_proto_bytes;
-    (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-                                      "protobuf support is not available");
-#else
-    const bool bytes_ok =
-        (request_proto_size == 0 || request_proto_bytes != nullptr) &&
-        request_proto_size <= static_cast<size_t>(std::numeric_limits<int>::max());
-    if (!bytes_ok) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "VLMLoadResolvedArtifactsRequest bytes are invalid");
-    }
-
-    runanywhere::v1::VLMLoadResolvedArtifactsRequest request;
-    static const char kEmpty[] = "";
-    const void* parse_src = request_proto_size == 0 ? static_cast<const void*>(kEmpty)
-                                                    : static_cast<const void*>(request_proto_bytes);
-    if (!request.ParseFromArray(parse_src, static_cast<int>(request_proto_size))) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse VLMLoadResolvedArtifactsRequest");
-    }
-
-    auto emit_failure = [&](rac_result_t code, const char* message) -> rac_result_t {
-        runanywhere::v1::VLMLoadResolvedArtifactsResponse response;
-        response.set_handle(0);
-        response.set_result_code(code);
-        if (message && message[0])
-            response.set_error_message(message);
-        const size_t size = response.ByteSizeLong();
-        std::vector<uint8_t> bytes(size);
-        if (size > 0 && !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-            return rac_proto_buffer_set_error(
-                out_result, RAC_ERROR_ENCODING_ERROR,
-                "failed to serialize VLMLoadResolvedArtifactsResponse");
-        }
-        return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                     out_result);
-    };
-
-    const std::string& primary = request.primary_model_path();
-    if (primary.empty()) {
-        return emit_failure(RAC_ERROR_INVALID_ARGUMENT, "primary_model_path is required");
-    }
-
-    const std::string& model_id = request.model_id();
-    const std::string create_id = model_id.empty() ? primary : model_id;
-
-    rac_handle_t service_handle = nullptr;
-    rac_result_t rc = rac_vlm_create(create_id.c_str(), &service_handle);
-    if (rc != RAC_SUCCESS || !service_handle) {
-        return emit_failure(rc != RAC_SUCCESS ? rc : RAC_ERROR_INTERNAL, rac_error_message(rc));
-    }
-
-    const char* mmproj_arg = request.has_mmproj_path() && !request.mmproj_path().empty()
-                                 ? request.mmproj_path().c_str()
-                                 : nullptr;
-    rc = rac_vlm_initialize(service_handle, primary.c_str(), mmproj_arg);
-    if (rc != RAC_SUCCESS) {
-        rac_vlm_destroy(service_handle);
-        service_handle = nullptr;
-        return emit_failure(rc, rac_error_message(rc));
-    }
-
-    runanywhere::v1::VLMLoadResolvedArtifactsResponse response;
-    response.set_handle(reinterpret_cast<uint64_t>(service_handle));
-    response.set_result_code(RAC_SUCCESS);
-    const size_t size = response.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        rac_vlm_destroy(service_handle);
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize VLMLoadResolvedArtifactsResponse");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
-#endif
-}
-
-// =============================================================================
-// PROTO-BYTE C ABI (formerly rac_vlm_proto_abi.cpp)
+// PROTO-BYTE C ABI
 //
-// Proto-byte verbs for VLM service operations. rac_vlm_process_proto keeps both
-// the lifecycle-owned path and the legacy handle-as-service fallback. The
 // VlmInFlightGuard + rac_vlm_proto_quiesce in-flight quiesce (called from
 // rac_vlm_component_destroy above) close the UAF window where a destroy thread
 // races a still-in-flight stream dispatch.
@@ -989,13 +901,12 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error, double duration_ms = 0.0,
-                        const char* model_id = nullptr, int64_t input_tokens = 0,
-                        int64_t total_tokens = 0, double tokens_per_second = 0.0,
-                        double ttft_ms = 0.0, const char* framework = nullptr,
-                        double temperature = -1.0, int32_t max_tokens = 0,
-                        int64_t vision_tokens = 0, double vision_encode_ms = 0.0,
-                        const char* image_resolution = nullptr) {
+                        const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
+                        int64_t input_tokens = 0, int64_t total_tokens = 0,
+                        double tokens_per_second = 0.0, double ttft_ms = 0.0,
+                        const char* framework = nullptr, double temperature = -1.0,
+                        int32_t max_tokens = 0, int64_t vision_tokens = 0,
+                        double vision_encode_ms = 0.0, const char* image_resolution = nullptr) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -1072,42 +983,6 @@ void free_vlm_image(rac_vlm_image_t* image) {
     rac_free(const_cast<uint8_t*>(image->pixel_data));
     rac_free(const_cast<char*>(image->base64_data));
     std::memset(image, 0, sizeof(*image));
-}
-
-rac_result_t parse_vlm_request(const uint8_t* image_bytes, size_t image_size,
-                               const uint8_t* options_bytes, size_t options_size,
-                               rac_vlm_image_t* out_image, rac_vlm_options_t* out_options,
-                               const char** out_prompt, rac_proto_buffer_t* out_error) {
-    if (!valid_bytes(image_bytes, image_size) || !valid_bytes(options_bytes, options_size)) {
-        return parse_error(out_error, "VLM proto input bytes are invalid");
-    }
-
-    runanywhere::v1::VLMImage image_proto;
-    if (!image_proto.ParseFromArray(parse_data(image_bytes, image_size),
-                                    static_cast<int>(image_size))) {
-        return parse_error(out_error, "failed to parse VLMImage");
-    }
-
-    runanywhere::v1::VLMGenerationOptions options_proto;
-    if (!options_proto.ParseFromArray(parse_data(options_bytes, options_size),
-                                      static_cast<int>(options_size))) {
-        return parse_error(out_error, "failed to parse VLMGenerationOptions");
-    }
-
-    if (!rac::foundation::rac_vlm_image_from_proto(image_proto, out_image) ||
-        !rac::foundation::rac_vlm_options_from_proto(options_proto, out_options, out_prompt)) {
-        return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
-                                          "failed to convert VLM request");
-    }
-    if (!*out_prompt || (*out_prompt)[0] == '\0') {
-        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
-                                          "VLMGenerationOptions.prompt is required");
-    }
-    if (!out_image->file_path && !out_image->pixel_data && !out_image->base64_data) {
-        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
-                                          "VLMImage source is required");
-    }
-    return RAC_SUCCESS;
 }
 
 rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes, size_t request_size,
@@ -1277,8 +1152,8 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
         return RAC_TRUE;
     }
 
-    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN, display_token,
-                                     false, nullptr, nullptr, 0);
+    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN,
+                                     display_token, false, nullptr, nullptr, 0);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -1324,7 +1199,7 @@ extern "C" {
 // while preserving the TOCTOU-safe barrier+drain window (any dispatcher entry
 // that observed false→true was rejected or already drained before the clear).
 // Swift is unaffected: its VLM stream path never calls this quiesce per
-// stream (it cancels via rac_vlm_cancel_proto in onTermination). The destroy
+// stream (it cancels via rac_vlm_cancel_lifecycle_proto in onTermination). The destroy
 // paths (vlm_component.cpp:350, rac_vlm_service.cpp:274) remain safe because
 // they tear down the lifecycle immediately afterwards, so a post-clear
 // acquire_lifecycle_vlm returns RAC_ERROR_NOT_INITIALIZED rather than
@@ -1335,177 +1210,6 @@ void rac_vlm_proto_quiesce(void) {
         std::this_thread::yield();
     }
     vlm_proto_shutting_down().store(false, std::memory_order_release);
-}
-
-rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
-                                   size_t image_proto_size, const uint8_t* options_proto_bytes,
-                                   size_t options_proto_size, rac_proto_buffer_t* out_result) {
-    if (!out_result)
-        return RAC_ERROR_NULL_POINTER;
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle;
-    (void)image_proto_bytes;
-    (void)image_proto_size;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
-    return feature_unavailable(out_result);
-#else
-    VlmInFlightGuard in_flight_guard;
-    if (!in_flight_guard.admitted()) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
-                                          "VLM proto ABI is shutting down");
-    }
-    // Phase 6j fix: prefer the lifecycle-owned VLM service over the caller's
-    // handle. iOS SDK's `CppBridge.VLM` passes a `rac_vlm_component*` into this
-    // proto ABI (the only VLM handle it owns), not a `rac_vlm_service_t*`.
-    // Blindly casting to `rac_vlm_service_t*` previously misread the ops vtable
-    // pointer out of the component's `LifecycleManager::logger_category`
-    // std::string, producing `EXC_BAD_ACCESS` at `0x6566694c2e4d4c56` -- the
-    // little-endian encoding of "VLM.Life" -- on iPhone 17 Pro Max. Routing
-    // through `acquire_lifecycle_vlm` removes the handle-type dependency
-    // entirely; Swift, Kotlin, and JNI callers all populate the lifecycle via
-    // `rac_model_lifecycle_load_proto` before inference, so the lifecycle
-    // reference is always authoritative. The `handle` parameter is retained
-    // only for the legacy struct-API smoke tests that pass a mock
-    // `rac_vlm_service_t*` without going through the lifecycle.
-    rac::vlm::LifecycleVlmRef lifecycle_ref;
-    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
-    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
-
-    if (!have_lifecycle && !handle) {
-        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.process",
-                        "VLM lifecycle component is not loaded");
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
-                                          "VLM lifecycle component is not loaded");
-    }
-
-    rac_vlm_image_t image = {};
-    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
-    const char* prompt = nullptr;
-    rac_result_t rc = parse_vlm_request(image_proto_bytes, image_proto_size, options_proto_bytes,
-                                        options_proto_size, &image, &options, &prompt, out_result);
-    if (rc != RAC_SUCCESS) {
-        free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
-        rac::foundation::rac_vlm_options_free_owned(&options);
-        if (have_lifecycle)
-            rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-        publish_failure(rc, "vlm.process", out_result->error_message);
-        return rc;
-    }
-
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.process",
-                       0.0f, 1, 0, nullptr, 0.0,
-                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
-
-    rac_vlm_result_t result = {};
-    if (have_lifecycle) {
-        if (!lifecycle_ref.ops || !lifecycle_ref.ops->process) {
-            rc = RAC_ERROR_NOT_SUPPORTED;
-        } else {
-            rc = lifecycle_ref.ops->process(lifecycle_ref.impl, &image, prompt, &options, &result);
-        }
-    } else {
-        // Legacy struct-API path: caller provided a `rac_vlm_service_t*`.
-        rc = rac_vlm_process(handle, &image, prompt, &options, &result);
-    }
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "vlm.process", rac_error_message(rc));
-        free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
-        rac::foundation::rac_vlm_options_free_owned(&options);
-        if (have_lifecycle)
-            rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
-    }
-
-    runanywhere::v1::VLMResult proto;
-    if (!rac::foundation::rac_vlm_result_to_proto(&result, &proto)) {
-        rc = rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
-                                        "failed to encode VLMResult");
-    } else {
-        rc = copy_proto(proto, out_result);
-    }
-    const std::string vlm_res = (image.width > 0 && image.height > 0)
-                                    ? std::to_string(image.width) + "x" + std::to_string(image.height)
-                                    : std::string();
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.process", 1.0f, 1, proto.completion_tokens(), nullptr,
-                       static_cast<double>(proto.processing_time_ms()),
-                       have_lifecycle ? lifecycle_ref.model_id : nullptr, proto.prompt_tokens(),
-                       proto.total_tokens(), static_cast<double>(proto.tokens_per_second()),
-                       static_cast<double>(proto.time_to_first_token_ms()),
-                       have_lifecycle ? lifecycle_ref.framework_name : nullptr,
-                       static_cast<double>(options.temperature), options.max_tokens,
-                       proto.image_tokens(), static_cast<double>(proto.image_encode_time_ms()),
-                       vlm_res.empty() ? nullptr : vlm_res.c_str());
-    rac_vlm_result_free(&result);
-    free_vlm_image(&image);
-    rac_free(const_cast<char*>(prompt));
-    rac::foundation::rac_vlm_options_free_owned(&options);
-    if (have_lifecycle)
-        rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-    return rc;
-#endif
-}
-
-rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
-    VlmInFlightGuard in_flight_guard;
-    if (!in_flight_guard.admitted()) {
-        return RAC_ERROR_INVALID_STATE;
-    }
-    // Phase 6j fix: prefer the lifecycle-owned VLM to avoid the handle-type
-    // mismatch that crashed `rac_vlm_process_proto` on iOS. The `handle`
-    // parameter is kept only as a legacy fallback for struct-API smoke tests.
-    rac::vlm::LifecycleVlmRef lifecycle_ref;
-    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
-    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
-
-    if (!have_lifecycle && !handle) {
-        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.cancel",
-                        "VLM lifecycle component is not loaded");
-        return RAC_ERROR_COMPONENT_NOT_READY;
-    }
-    runanywhere::v1::SDKEvent requested;
-    populate_envelope(&requested, runanywhere::v1::ERROR_SEVERITY_INFO);
-    auto* cancel = requested.mutable_cancellation();
-    cancel->set_kind(runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED);
-    cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
-    cancel->set_operation_id("vlm.cancel");
-    cancel->set_reason("requested by caller");
-    cancel->set_user_initiated(true);
-    publish_event(requested);
-
-    rac_result_t rc;
-    if (have_lifecycle) {
-        if (lifecycle_ref.ops && lifecycle_ref.ops->cancel) {
-            rc = lifecycle_ref.ops->cancel(lifecycle_ref.impl);
-        } else {
-            rc = RAC_SUCCESS;  // No-op if backend doesn't implement cancel
-        }
-    } else {
-        rc = rac_vlm_cancel(handle);
-    }
-    runanywhere::v1::SDKEvent completed;
-    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
-                                                    : runanywhere::v1::ERROR_SEVERITY_ERROR);
-    auto* completed_cancel = completed.mutable_cancellation();
-    completed_cancel->set_kind(rc == RAC_SUCCESS
-                                   ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED
-                                   : runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED);
-    completed_cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
-    completed_cancel->set_operation_id("vlm.cancel");
-    completed_cancel->set_reason(rc == RAC_SUCCESS ? "cancelled" : rac_error_message(rc));
-    completed_cancel->set_user_initiated(true);
-    publish_event(completed);
-    if (have_lifecycle)
-        rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-    return rc;
-#endif
 }
 
 rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
@@ -1693,7 +1397,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                            result.total_tokens(), static_cast<double>(result.tokens_per_second()),
                            static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                            static_cast<double>(options.temperature), options.max_tokens,
-                           result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
+                           result.image_tokens(),
+                           static_cast<double>(result.image_encode_time_ms()),
                            vlm_stream_res.empty() ? nullptr : vlm_stream_res.c_str());
     }
 

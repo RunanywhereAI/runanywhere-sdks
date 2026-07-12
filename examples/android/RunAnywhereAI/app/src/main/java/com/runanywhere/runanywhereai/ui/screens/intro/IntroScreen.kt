@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,11 +23,13 @@ import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 fun IntroScreen() {
     val dimens = LocalDimens.current
     Column(
-        Modifier.fillMaxSize(),
+        Modifier
+            .fillMaxSize()
+            .systemBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("RunAnywhere AI", style = MaterialTheme.typography.displaySmall)
+        Text("RunAnywhere", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(dimens.spacingMd))
         LinearProgressIndicator()
     }
@@ -36,19 +41,19 @@ fun InitErrorScreen(message: String, onRetry: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(dimens.spacingXl),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
         Text("Initialization Failed", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(dimens.spacingMd))
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(dimens.spacingXl))
         Button(onClick = onRetry) {
             Text("Retry")
         }

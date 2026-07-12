@@ -29,6 +29,7 @@ import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoMakeRequest
+import ai.runanywhere.proto.v1.ModelInfoMetadata
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
@@ -219,22 +220,7 @@ val RAModelInfo.requiresDownload: Boolean
 
 /** Underlying [ArchiveArtifact] or null if the entry isn't an archive. */
 val RAModelInfo.archiveArtifact: ArchiveArtifact?
-    get() {
-        archive?.let { return it }
-        return when (artifact_type) {
-            ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
-            ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE,
-            ->
-                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_ZIP)
-            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE ->
-                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_GZ)
-            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE ->
-                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_BZ2)
-            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE ->
-                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_XZ)
-            else -> null
-        }
-    }
+    get() = archive
 
 /** Multi-file descriptors declared on the entry, or empty. */
 val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
@@ -459,7 +445,10 @@ fun ModelInfo.Companion.make(
             download_size_bytes = downloadSizeBytes ?: 0L,
             context_length = contextLength ?: nativeModel?.context_length ?: 0,
             supports_thinking = supportsThinkingForCategory,
-            description = description.orEmpty(),
+            metadata =
+                (nativeModel?.metadata ?: ModelInfoMetadata()).copy(
+                    description = description.orEmpty(),
+                ),
             created_at_unix_ms = createdAtUnixMs,
             updated_at_unix_ms = updatedAtUnixMs,
             thinking_pattern =

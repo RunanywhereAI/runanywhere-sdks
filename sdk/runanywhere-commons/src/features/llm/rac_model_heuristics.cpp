@@ -2,11 +2,9 @@
  * @file rac_model_heuristics.cpp
  * @brief commons-owned heuristics derived from RAModelInfo.
  *
- * Background: every example app was duplicating the same model→tool-call-format
- * mapping (`name.contains("lfm2") && name.contains("tool")` →
- * `RAC_TOOL_FORMAT_LFM2`) and the same small-model regex (`0.3b`, `0.5b`,
- * `0.6b`, `350m`, `360m`, `500m`). The reviewer flagged this as four examples
- * encoding SDK-internal knowledge across the Flutter, iOS, and Android apps.
+ * Background: every example app was duplicating the same small-model regex
+ * (`0.3b`, `0.5b`, `0.6b`, `350m`, `360m`, `500m`). The reviewer flagged this
+ * as four examples encoding SDK-internal knowledge across platforms.
  *
  * Resolution: this TU centralizes the heuristics behind a proto-byte ABI so
  * SDKs derive every value from a serialized `runanywhere.v1.ModelInfo`. The
@@ -24,7 +22,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -43,25 +40,20 @@ std::string to_lower(const std::string& in) {
     return out;
 }
 
-bool contains(const std::string& haystack, const char* needle) {
-    if (!needle || *needle == '\0') {
-        return false;
-    }
-    return haystack.find(needle) != std::string::npos;
-}
-
 #if defined(RAC_HAVE_PROTOBUF)
 // Concatenate the human-readable fields that examples were inspecting (`name`,
 // `id`, `description`) into one lowercase haystack so the heuristic matches
 // regardless of which field carries the model identity.
 std::string build_haystack(const runanywhere::v1::ModelInfo& model) {
     std::string combined;
-    combined.reserve(model.name().size() + model.id().size() + model.description().size() + 4);
+    const std::string description =
+        model.has_metadata() ? model.metadata().description() : std::string();
+    combined.reserve(model.name().size() + model.id().size() + description.size() + 4);
     combined += model.name();
     combined.push_back(' ');
     combined += model.id();
     combined.push_back(' ');
-    combined += model.description();
+    combined += description;
     return to_lower(combined);
 }
 #endif  // RAC_HAVE_PROTOBUF
@@ -149,39 +141,6 @@ float scan_param_count_b(const std::string& lowered) {
 constexpr float kSmallModelThresholdB = 1.0f;
 
 }  // namespace
-
-extern "C" rac_result_t
-rac_tool_call_format_from_model_info_proto(const uint8_t* model_info_proto_bytes, size_t size,
-                                           rac_tool_call_format_t* out_format) {
-    if (!out_format) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-    *out_format = RAC_TOOL_FORMAT_DEFAULT;
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)model_info_proto_bytes;
-    (void)size;
-    return RAC_SUCCESS;
-#else
-    if (size == 0) {
-        return RAC_SUCCESS;
-    }
-    if (rac_proto_bytes_validate(model_info_proto_bytes, size) != RAC_SUCCESS) {
-        return RAC_ERROR_DECODING_ERROR;
-    }
-    runanywhere::v1::ModelInfo model;
-    if (!model.ParseFromArray(rac_proto_bytes_data_or_empty(model_info_proto_bytes, size),
-                              static_cast<int>(size))) {
-        return RAC_ERROR_DECODING_ERROR;
-    }
-    const std::string haystack = build_haystack(model);
-    if (contains(haystack, "lfm2") && contains(haystack, "tool")) {
-        *out_format = RAC_TOOL_FORMAT_LFM2;
-    } else {
-        *out_format = RAC_TOOL_FORMAT_DEFAULT;
-    }
-    return RAC_SUCCESS;
-#endif
-}
 
 extern "C" rac_result_t
 rac_model_info_parameter_count_b_proto(const uint8_t* model_info_proto_bytes, size_t size,

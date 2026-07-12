@@ -7,5 +7,6 @@ data class AppSettings(
     val streaming: Boolean = true,
     val disableThinking: Boolean = false,
     val toolCallingEnabled: Boolean = false,
+    val webSearchConsentScope: String = "",
     val hfToken: String = "",
 )

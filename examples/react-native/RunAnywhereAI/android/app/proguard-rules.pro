@@ -2,31 +2,24 @@
 #
 # React Native + Hermes: JS is shrunk by Metro/Hermes, not R8. R8 only touches
 # the Java/Kotlin native side here. React Native's own libraries ship consumer
-# rules; the app-specific keeps below cover the RunAnywhere SDK + Nitro + the
-# QHexRT JNI/native bridges, which are resolved by name across the JNI boundary
-# and must NOT be renamed or stripped.
+# rules, and each RunAnywhere package owns its exact JNI contracts. The broad
+# app-level rules retained below cover only contracts that do not yet have a
+# provably complete package-owned rule.
 
 # Readable release crash traces.
 -keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
 -keep class kotlin.Metadata { *; }
 
-# RunAnywhere SDK (core + qhexrt/llamacpp/onnx engines) + Wire protos: JNI,
-# dynamic backend registration, reflective lookups.
--keep class com.runanywhere.** { *; }
--keep interface com.runanywhere.** { *; }
+# Wire-generated protocol messages are created and adapted across package
+# boundaries. Keep this until the generated reflection/adapter contract is
+# represented by package-owned consumer rules.
 -keep class ai.runanywhere.** { *; }
--keepnames class com.runanywhere.** { *; }
 
-# Nitro Modules — HybridObjects (incl. RunAnywhereQHexRT) are registered and
-# resolved by class name from C++ via JNI.
--keep class com.margelo.nitro.** { *; }
--keep class com.facebook.jni.** { *; }
--keep @com.facebook.proguard.annotations.DoNotStrip class * { *; }
--keepclassmembers class * {
-    @com.facebook.proguard.annotations.DoNotStrip *;
-}
+# React Android ships the fbjni and DoNotStrip consumer rules. RunAnywhere
+# packages own their exact literal JNI contracts in their consumer rules.
 
-# App-local native package (DocumentService) registered in MainApplication.
+# App-local classes include React packages/services registered from the
+# manifest and MainApplication; keep until those entry points have exact rules.
 -keep class com.runanywhereaI.** { *; }
 
 # JNI: native methods and the classes that declare them.

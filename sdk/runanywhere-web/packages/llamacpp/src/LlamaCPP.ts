@@ -4,14 +4,13 @@
  * V2 canonical: this package is a SHELL. It only loads the WASM module,
  * registers the platform adapter, calls `rac_init`, registers the unified
  * llama.cpp backend (LLM + VLM in a single call), then installs the module
- * on every core proto-byte adapter via `setRunanywhereModule(...)`.
+ * only in its capability-scoped adapter slots via `registerWasmModule(...)`.
  *
  * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
- * tool calling, structured output,
- * embeddings, and diffusion all flow through `@runanywhere/web` core's
- * proto-byte adapters (`LLMProtoAdapter`, `EmbeddingsProtoAdapter`,
- * `DiffusionProtoAdapter`, `StructuredOutputProtoAdapter`,
- * `VLMProtoAdapter`, etc.) without any further per-package wiring.
+ * tool calling, structured output, LoRA, and VLM all flow through
+ * `@runanywhere/web` core's proto-byte adapters (`LLMProtoAdapter`,
+ * `StructuredOutputProtoAdapter`, `VLMProtoAdapter`, etc.) without any
+ * further per-package wiring. ONNX owns Web embeddings and cross-WASM RAG.
  *
  * Usage:
  *
@@ -39,14 +38,15 @@ import {
   setModelLoadFailureRecovery,
   setVisionLanguageProvider,
   SDKLogger,
-} from '@runanywhere/web/internal';
+  type BackendRegistrationState,
+  type RuntimeModelLoadRequest,
+} from '@runanywhere/web/backend';
 import {
   ModelCategory,
   type ModelInfo,
-  type ModelLoadRequest,
 } from '@runanywhere/proto-ts/model_types';
-import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
-import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider';
+import { LlamaCppBridge } from './Foundation/LlamaCppBridge.js';
+import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider.js';
 
 const logger = new SDKLogger('LlamaCPP');
 
@@ -54,28 +54,32 @@ const MODULE_ID = 'llamacpp';
 
 let _isRegistered = false;
 let _registeringPromise: Promise<void> | null = null;
+let _registrationState: BackendRegistrationState = 'unregistered';
 const lifecycleVLMProvider = new LifecycleVLMProvider();
 
-function modelLoadCategory(request: unknown, model: unknown): ModelCategory | undefined {
-  const requestCategory = (request as Partial<ModelLoadRequest> | null)?.category;
+function modelLoadCategory(
+  request: RuntimeModelLoadRequest,
+  model: ModelInfo | null,
+): ModelCategory | undefined {
+  const requestCategory = request.category;
   if (requestCategory !== undefined) return requestCategory;
-  return (model as Partial<ModelInfo> | null)?.category;
+  return model?.category;
 }
 
-function isVisionModelCategory(category: unknown): boolean {
+function isVisionModelCategory(category: ModelCategory | undefined): boolean {
   return category === ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
     category === ModelCategory.MODEL_CATEGORY_VISION;
 }
 
-function modelIdFromLoadRequest(request: unknown): string {
-  return String((request as Partial<ModelLoadRequest> | null)?.modelId ?? '').toLowerCase();
+function modelIdFromLoadRequest(request: RuntimeModelLoadRequest): string {
+  return request.modelId.toLowerCase();
 }
 
 function shouldPrepareCpuForModelLoad(
   bridge: LlamaCppBridge,
-  request: unknown,
-  model: unknown,
-): request is ModelLoadRequest {
+  request: RuntimeModelLoadRequest,
+  model: ModelInfo | null,
+): boolean {
   if (bridge.accelerationMode !== 'webgpu') return false;
   const modelId = modelIdFromLoadRequest(request);
   if (!modelId) return false;
@@ -96,18 +100,17 @@ const LLAMACPP_ELIGIBLE_CATEGORIES: ReadonlySet<ModelCategory> = new Set([
 
 function shouldFallbackWebGPUModelLoad(
   bridge: LlamaCppBridge,
-  request: unknown,
+  request: RuntimeModelLoadRequest,
   error: unknown,
-): request is ModelLoadRequest {
+): boolean {
   if (bridge.accelerationMode !== 'webgpu') return false;
-  const loadRequest = request as Partial<ModelLoadRequest> | null;
-  if (!loadRequest?.modelId) return false;
+  if (!request.modelId) return false;
   // Require an explicit, LlamaCpp-eligible category. An undefined/unknown
   // category is treated as "not ours" so STT/TTS requests that bubble up
   // load failures don't get incorrectly retried through this hook.
   if (
-    loadRequest.category === undefined ||
-    !LLAMACPP_ELIGIBLE_CATEGORIES.has(loadRequest.category)
+    request.category === undefined ||
+    !LLAMACPP_ELIGIBLE_CATEGORIES.has(request.category)
   ) {
     return false;
   }
@@ -138,6 +141,11 @@ export const LlamaCPP = {
     return _isRegistered;
   },
 
+  /** Typed registration lifecycle for UI and diagnostics. */
+  get registrationState(): BackendRegistrationState {
+    return _registrationState;
+  },
+
   /** Active hardware acceleration mode (cpu | webgpu). Available after `register()`. */
   get accelerationMode(): 'cpu' | 'webgpu' {
     return LlamaCppBridge.shared.accelerationMode;
@@ -154,10 +162,8 @@ export const LlamaCPP = {
    * 4. Calls `rac_init()` (async, may suspend through ASYNCIFY).
    * 5. Calls `rac_backend_llamacpp_register()` — the unified entry point
    *    that wires both LLM and VLM modalities in a single call.
-   * 6. Installs the module on `setRunanywhereModule()` so every core
-   *    proto-byte adapter (LLM/VLM/embeddings/diffusion/structured/tool/
-   *    model-registry/lifecycle/download/hardware/storage/SDKEvent/HTTP)
-   *    can find it.
+   * 6. Registers the module for its actual LLM/VLM/structured/tool/LoRA
+   *    capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
    *    acceleration switcher.
    *
@@ -174,8 +180,9 @@ export const LlamaCPP = {
     }
 
     _registeringPromise = (async () => {
+      _registrationState = 'registering';
+      const bridge = LlamaCppBridge.shared;
       try {
-        const bridge = LlamaCppBridge.shared;
         if (options.wasmUrl) bridge.wasmUrl = options.wasmUrl;
         if (options.webgpuWasmUrl) bridge.webgpuWasmUrl = options.webgpuWasmUrl;
 
@@ -226,7 +233,21 @@ export const LlamaCPP = {
         await completeDeferredServicesInitialization();
 
         _isRegistered = true;
+        _registrationState = 'registered';
         logger.info(`LlamaCpp backend registered (${bridge.accelerationMode})`);
+      } catch (error) {
+        // Registration installs core hooks before deferred service startup.
+        // A late failure must not leave those hooks pointing at a backend that
+        // reports `isRegistered === false` or retain a partially loaded module.
+        setAccelerationSwitcher(null);
+        setActiveAccelerationMode(null);
+        setModelLoadPreparation(null);
+        setModelLoadFailureRecovery(null);
+        setVisionLanguageProvider(null);
+        bridge.shutdown();
+        _isRegistered = false;
+        _registrationState = 'failed';
+        throw error;
       } finally {
         _registeringPromise = null;
       }
@@ -239,7 +260,10 @@ export const LlamaCPP = {
    * Unregister the backend and release its WASM module.
    */
   unregister(): void {
-    if (!_isRegistered) return;
+    if (!_isRegistered) {
+      _registrationState = 'unregistered';
+      return;
+    }
     setAccelerationSwitcher(null);
     setActiveAccelerationMode(null);
     setModelLoadPreparation(null);
@@ -247,6 +271,7 @@ export const LlamaCPP = {
     setVisionLanguageProvider(null);
     LlamaCppBridge.shared.shutdown();
     _isRegistered = false;
+    _registrationState = 'unregistered';
     logger.info('LlamaCpp backend unregistered');
   },
 };
@@ -258,8 +283,10 @@ export const LlamaCPP = {
  * the registration error (e.g. when Vite tries to load the WASM but the
  * file isn't present yet during a dev cold start).
  */
-export function autoRegister(): void {
-  LlamaCPP.register().catch((err) => {
+export function autoRegister(
+  options: LlamaCPPRegisterOptions = {},
+): Promise<void> {
+  return LlamaCPP.register(options).catch((err: unknown) => {
     logger.warning(
       `LlamaCpp auto-registration failed: ${err instanceof Error ? err.message : String(err)}`,
     );

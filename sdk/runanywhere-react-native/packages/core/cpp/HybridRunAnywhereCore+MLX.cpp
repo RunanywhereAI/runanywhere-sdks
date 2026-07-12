@@ -35,7 +35,9 @@ Fn lookupMLXRuntimeSymbol(const char *symbol) {
 }
 
 bool isRACSuccess(int32_t result) {
-  return result == RAC_SUCCESS || result == RAC_ERROR_MODULE_ALREADY_REGISTERED;
+  return result == RAC_SUCCESS ||
+         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
+         result == RAC_ERROR_PLUGIN_DUPLICATE;
 }
 
 bool callMLXNoArgBoolSymbol(const char *symbol) {

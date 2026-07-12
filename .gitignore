@@ -165,6 +165,7 @@ SHARED_TASK_NOTES.md
 *.temp
 
 # Android
+/examples/android/RunAnywhereAI/play-assets/
 *.apk
 *.aar
 *.ap_
@@ -250,8 +251,6 @@ sdk/runanywhere-web/packages/*/wasm/*.wasm
 sdk/runanywhere-web/packages/*/wasm/*.wasm.map
 sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
-sdk/runanywhere-web/package-lock.json
-sdk/shared/proto-ts/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
@@ -395,6 +394,8 @@ sdk/runanywhere-flutter/android/*.aar
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 tools/
+!examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/
+!examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/tools/WebSearchTool.kt
 
 # Python virtual environments
 .venv*/

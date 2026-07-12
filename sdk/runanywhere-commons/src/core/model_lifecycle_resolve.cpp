@@ -175,9 +175,8 @@ void synthesize_artifact_resolution_from_descriptors(const runanywhere::v1::Mode
     if (!out || artifact_root.empty()) {
         return;
     }
-    const bool directory_based =
-        rac_framework_uses_directory_based_models(c_framework_from_proto(model.framework())) ==
-        RAC_TRUE;
+    const bool directory_based = rac_framework_uses_directory_based_models(
+                                     c_framework_from_proto(model.framework())) == RAC_TRUE;
     const bool can_set_primary =
         !directory_based && (out->resolved_path.empty() || out->resolved_path == artifact_root);
 

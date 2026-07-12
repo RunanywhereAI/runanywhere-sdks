@@ -11,6 +11,13 @@ import CRACommons
 
 extension CppBridge {
 
+    /// Voice-agent pointer owned by the shared actor. Commons synchronizes its
+    /// internal pipeline; the wrapper prevents the raw pointer itself from
+    /// crossing Swift concurrency boundaries.
+    struct VoiceAgentHandle: @unchecked Sendable {
+        let rawValue: rac_voice_agent_handle_t
+    }
+
     /// VoiceAgent component manager
     /// Provides thread-safe access to the C++ VoiceAgent component
     public actor VoiceAgent {
@@ -27,19 +34,13 @@ extension CppBridge {
 
         /// Get or create the VoiceAgent handle
         /// Requires LLM, STT, TTS, and VAD components to be available
-        public func getHandle() async throws -> rac_voice_agent_handle_t {
+        func getHandle() async throws -> VoiceAgentHandle {
             if let handle = handle {
-                return handle
+                return VoiceAgentHandle(rawValue: handle)
             }
 
-            // Get handles from all required components
-            let llm = try await CppBridge.LLM.shared.getHandle()
-            let stt = try await CppBridge.STT.shared.getHandle()
-            let tts = try await CppBridge.TTS.shared.getHandle()
-            let vad = try await CppBridge.VAD.shared.getHandle()
-
             var newHandle: rac_voice_agent_handle_t?
-            let result = rac_voice_agent_create(llm, stt, tts, vad, &newHandle)
+            let result = rac_voice_agent_create_standalone(&newHandle)
 
             guard result == RAC_SUCCESS, let handle = newHandle else {
                 throw SDKException(code: .initializationFailed, message: "Failed to create voice agent: \(result)", category: .component)
@@ -47,14 +48,22 @@ extension CppBridge {
 
             self.handle = handle
             logger.info("Voice agent created")
-            return handle
+            return VoiceAgentHandle(rawValue: handle)
         }
 
-        func requireExistingHandle() throws -> rac_voice_agent_handle_t {
+        private func requireExistingHandle() throws -> rac_voice_agent_handle_t {
             guard let handle else {
                 throw SDKException(code: .notInitialized, message: "Voice agent not initialized", category: .component)
             }
             return handle
+        }
+
+        func initialize(_ config: RAVoiceAgentComposeConfig) throws -> RAVoiceAgentComponentStates {
+            try initialize(handle: requireExistingHandle(), config)
+        }
+
+        func componentStates() throws -> RAVoiceAgentComponentStates {
+            try componentStatesProto(handle: requireExistingHandle())
         }
 
         // MARK: - State

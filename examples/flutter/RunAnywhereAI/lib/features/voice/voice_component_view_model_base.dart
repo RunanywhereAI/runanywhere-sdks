@@ -116,29 +116,26 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
     }
     _hasSubscribedToSDKEvents = true;
 
-    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen(
-      (change) {
-        if (change.component != component &&
-            change.event.category != eventCategory) {
-          return;
-        }
-        switch (change.kind) {
-          case sdk.ModelLifecycleChangeKind.loaded:
-            // Resolve from the event payload, never re-query the SDK here:
-            // `modelLifecycle.current()` itself publishes a loaded lifecycle
-            // event, so calling it from inside this handler feeds back into an
-            // infinite loaded -> current() -> loaded loop that ANRs the app.
-            // The change carries the model id; resolve the rest from the
-            // catalog and apply through `applyLoadedModel` so the subclass
-            // overrides (STT live-mode, TTS system-voice) still run.
-            applyLoadedModel(resolveLoadedModel(change.modelId));
-            debugPrint('Voice component model loaded: ${change.modelId}');
-          case sdk.ModelLifecycleChangeKind.unloaded:
-            clearLoadedModel();
-            debugPrint('Voice component model unloaded');
-        }
-      },
-    );
+    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen((
+      change,
+    ) {
+      if (change.component != component &&
+          change.event.category != eventCategory) {
+        return;
+      }
+      switch (change.kind) {
+        case sdk.ModelLifecycleChangeKind.loaded:
+          // Resolve from the event payload rather than doing extra snapshot
+          // work inside the lifecycle handler. The change carries the model
+          // id; resolve the rest from the catalog and apply through
+          // `applyLoadedModel` so the subclass
+          // overrides (STT live-mode, TTS system-voice) still run.
+          applyLoadedModel(resolveLoadedModel(change.modelId));
+        case sdk.ModelLifecycleChangeKind.unloaded:
+          clearLoadedModel();
+          debugPrint('Voice component model unloaded');
+      }
+    });
   }
 
   // --- Initial model state ----------------------------------------------------
@@ -151,9 +148,8 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// Resolve the current model for this modality via the SDK snapshot and
   /// apply it to published state. Used ONLY at cold start
   /// ([checkInitialModelState]); a one-shot `current()` outside an event
-  /// handler is safe. The lifecycle-loaded listener must NOT call this:
-  /// `modelLifecycle.current()` re-publishes a loaded event, which from inside
-  /// the handler loops forever — it resolves from the event payload instead.
+  /// handler is safe. The lifecycle-loaded listener resolves from the event
+  /// payload instead so it does not perform redundant SDK snapshot work.
   @protected
   Future<void> applyCurrentModelSnapshot(String reason) async {
     final result = await sdk.RunAnywhere.modelLifecycle.current(
@@ -190,8 +186,9 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   @protected
   void applyLoadedModelFromCatalog(ModelInfo model) {
     selectedModelId = model.id;
-    final matches = ModelListViewModel.shared.availableModels
-        .where((m) => m.id == model.id);
+    final matches = ModelListViewModel.shared.availableModels.where(
+      (m) => m.id == model.id,
+    );
     if (matches.isNotEmpty) {
       final match = matches.first;
       selectedModelName = match.name;
@@ -210,8 +207,9 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// subclass `applyLoadedModel` overrides a populated name/framework.
   @protected
   ModelInfo resolveLoadedModel(String modelId) {
-    final matches = ModelListViewModel.shared.availableModels
-        .where((m) => m.id == modelId);
+    final matches = ModelListViewModel.shared.availableModels.where(
+      (m) => m.id == modelId,
+    );
     if (matches.isNotEmpty) return matches.first;
     return ModelInfo()..id = modelId;
   }

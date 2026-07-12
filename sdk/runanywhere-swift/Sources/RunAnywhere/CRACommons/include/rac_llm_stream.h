@@ -21,6 +21,12 @@
  * copy them out — the C++ side reuses a thread-local scratch buffer and
  * an arena-backed proto message (`cc_enable_arenas` in llm_service.proto)
  * across events, so holding onto the pointer is undefined behavior.
+ *
+ * Classification: SDK-facing default. The callback carries serialized
+ * runanywhere.v1.LLMStreamEvent bytes.
+ *
+ * Classification: SDK-facing default. The callback carries serialized
+ * runanywhere.v1.LLMStreamEvent bytes.
  */
 
 #ifndef RAC_FEATURES_LLM_RAC_LLM_STREAM_H
@@ -68,6 +74,9 @@ typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes,
  *                                         Protobuf (no rac_idl target);
  *                                         frontend should fall back to
  *                                         the struct callback path.
+ *
+ * @warning Before freeing @p user_data, callers MUST unregister this
+ *          callback and then call rac_llm_proto_quiesce().
  */
 RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    handle,
                                                         rac_llm_stream_proto_callback_fn callback,
@@ -83,6 +92,14 @@ RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t             
  * @retval RAC_ERROR_INVALID_HANDLE @p handle is null.
  */
 RAC_API rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);
+
+/**
+ * @brief Spin-wait until all in-flight LLM proto-byte dispatches return.
+ *
+ * Safe to call from any thread. Call after unregistering the callback and
+ * before freeing its user_data.
+ */
+RAC_API void rac_llm_proto_quiesce(void);
 
 #ifdef __cplusplus
 }  /* extern "C" */

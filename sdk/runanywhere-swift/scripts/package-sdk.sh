@@ -27,6 +27,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # Load the shared build-mode detection
+# The sourced path is resolved from this script at runtime.
+# shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
@@ -63,6 +65,10 @@ if [ -n "$NATIVES_FROM" ] && [ "$NATIVES_FROM" != "$BINARIES_DIR" ]; then
 fi
 
 cd "$REPO_ROOT"
+
+# Package.swift defaults to remote release artifacts for external consumers.
+# This build contract has just staged local XCFrameworks, so opt in explicitly.
+export RUNANYWHERE_USE_LOCAL_NATIVES=1
 
 echo ">> swift package resolve"
 swift package resolve

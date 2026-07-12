@@ -33,8 +33,7 @@ extension RAJSONSchema {
     ///
     /// Delegates to `rac_structured_output_schema_to_json_proto` so
     /// every SDK shares the same byte-exact, key-sorted, compact serializer.
-    /// Returns `"{}"` on any serialization or ABI failure to preserve the
-    /// previous fallback contract.
+    /// Returns `"{}"` when serialization or ABI conversion fails.
     public var jsonSchemaString: String {
         guard let serialized = try? self.serializedData() else { return "{}" }
         var outBuffer = rac_proto_buffer_t()

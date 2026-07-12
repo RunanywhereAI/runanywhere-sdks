@@ -21,10 +21,19 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         private const val TAG = "RunAnywherePlugin"
         private const val CHANNEL_NAME = "runanywhere"
-        private const val SDK_VERSION = "0.19.13"
-        private const val COMMONS_VERSION = "0.19.13"
+        private const val SDK_VERSION = "0.20.0"
+        private const val COMMONS_VERSION = "0.20.0"
 
         init {
+            // Load the Flutter-owned helper through the JVM so JNI_OnLoad can
+            // cache the synchronous secure-storage bridge before Dart FFI
+            // resolves its exported symbols.
+            try {
+                System.loadLibrary("runanywhere_flutter_helpers")
+            } catch (_: Throwable) {
+                Log.e(TAG, "Flutter native helpers unavailable")
+            }
+
             // Install the OkHttp transport via the canonical Kotlin-SDK-aligned
             // adapter at `com.runanywhere.sdk.httptransport.OkHttpHttpTransport`.
             // The JNI shim (sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp:557)
@@ -42,13 +51,20 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
                 if (!ok) {
                     Log.w(TAG, "OkHttp HTTP transport registration failed; HTTP will error out")
                 }
-            } catch (t: Throwable) {
-                Log.e(TAG, "OkHttp HTTP transport unavailable: ${t.message}", t)
+            } catch (_: Throwable) {
+                Log.e(TAG, "OkHttp HTTP transport unavailable")
             }
         }
     }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        try {
+            FlutterSecureStorageBridge.initialize(flutterPluginBinding.applicationContext)
+        } catch (_: Throwable) {
+            // Keep plugin registration alive so the Dart bridge can surface a
+            // canonical secure-storage failure from initialization.
+            Log.e(TAG, "Secure storage initialization failed")
+        }
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
     }

@@ -122,10 +122,6 @@ private fun isSDKDebugBuild(): Boolean =
  *   development placeholder is used when the development convenience
  *   constructor is invoked.
  * - [environment] — environment mode (development/staging/production).
- * - [deviceId] — optional override for the device identifier; null lets the
- *   SDK derive the value from the platform identifier or persisted Keychain
- *   entry.
- *
  * All three Swift convenience initializers are surfaced as Kotlin factories
  * on the companion object so the call shape mirrors Swift line-for-line.
  */
@@ -133,7 +129,6 @@ data class SDKInitParams(
     val apiKey: String,
     val baseURL: String,
     val environment: SDKEnvironment,
-    val deviceId: String? = null,
 ) {
     companion object {
         /**
@@ -157,14 +152,12 @@ data class SDKInitParams(
             apiKey: String,
             baseURL: String,
             environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-            deviceId: String? = null,
         ): SDKInitParams {
             val params =
                 SDKInitParams(
                     apiKey = apiKey,
                     baseURL = baseURL,
                     environment = environment,
-                    deviceId = deviceId,
                 )
             params.validate()
             return params
@@ -176,13 +169,11 @@ data class SDKInitParams(
          */
         fun forDevelopment(
             apiKey: String = "",
-            deviceId: String? = null,
         ): SDKInitParams =
             SDKInitParams(
                 apiKey = apiKey,
                 baseURL = DEVELOPMENT_PLACEHOLDER_URL,
                 environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-                deviceId = deviceId,
             )
     }
 

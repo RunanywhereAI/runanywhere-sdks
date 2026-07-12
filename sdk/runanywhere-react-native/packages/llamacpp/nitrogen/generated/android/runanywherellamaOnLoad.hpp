@@ -11,9 +11,6 @@
 
 namespace margelo::nitro::runanywhere::llama {
 
-  [[deprecated("Use registerNatives() instead.")]]
-  int initialize(JavaVM* vm);
-
   /**
    * Register the native (C++) part of runanywherellama, and autolinks all Hybrid Objects.
    * Call this in your `JNI_OnLoad` function (probably inside `cpp-adapter.cpp`),

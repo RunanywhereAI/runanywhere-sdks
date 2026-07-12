@@ -553,19 +553,6 @@ void populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
         cfg->set_prompt_template(n->scalar);
 }
 
-void populate_wake_word(const YamlNode& node, runanywhere::v1::WakeWordConfig* cfg) {
-    if (auto n = node.find("model_id"))
-        cfg->set_model_id(n->scalar);
-    if (auto n = node.find("keyword"))
-        cfg->set_keyword(n->scalar);
-    if (auto n = node.find("threshold"))
-        cfg->set_threshold(to_float(n->scalar));
-    if (auto n = node.find("pre_roll_ms"))
-        cfg->set_pre_roll_ms(to_int(n->scalar));
-    if (auto n = node.find("sample_rate_hz"))
-        cfg->set_sample_rate_hz(to_int(n->scalar, 16000));
-}
-
 rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionConfig* cfg) {
     if (root.kind != YamlNode::Kind::Mapping) {
         rac_error_set_details("YAML root must be a mapping");
@@ -579,11 +566,7 @@ rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionCo
         populate_rag(*n, cfg->mutable_rag());
         return RAC_SUCCESS;
     }
-    if (auto n = root.find("wake_word"); n && n->kind == YamlNode::Kind::Mapping) {
-        populate_wake_word(*n, cfg->mutable_wake_word());
-        return RAC_SUCCESS;
-    }
-    rac_error_set_details("SolutionConfig YAML must declare one of: voice_agent, rag, wake_word");
+    rac_error_set_details("SolutionConfig YAML must declare one of: voice_agent, rag");
     return RAC_ERROR_INVALID_FORMAT;
 }
 

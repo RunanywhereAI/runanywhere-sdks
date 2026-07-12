@@ -5,7 +5,6 @@ kotlin = "2.4.0"
 coreKtx = "1.18.0"
 
 coroutines = "1.11.0"
-datetime = "0.8.0"
 kotlinxSerialization = "1.11.0"
 # Wire runtime — MUST mirror WIRE_VERSION in sdk/runanywhere-commons/VERSIONS
 # (the single source of truth). The committed Kotlin bindings under
@@ -18,74 +17,31 @@ junit = "4.13.2"
 junit-vintage = "6.1.0"
 mockk = "1.14.11"
 
-sentry = "8.43.0"
-
 okhttp = "5.3.2"
-retrofit = "3.0.0"
-ktor = "3.5.0"
-
-gson = "2.14.0"
-json = "20260522"
 
 detekt = "1.23.8"
 ktlint = "14.2.0"
 
-workManager = "2.11.2"
-
-commonsIo = "2.22.0"
 okio = "3.17.0"
-
-whisperJni = "1.7.1"
-androidVad = "2.0.10"
-
-prdownloader = "1.0.2"
-
-securityCrypto = "1.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
-kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-
-kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "datetime" }
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
-sentry = { group = "io.sentry", name = "sentry", version.ref = "sentry" }
-
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
-
-ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
-ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
-ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
-ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
-
-gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
-json = { module = "org.json:json", version.ref = "json" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-vintage" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
-androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
-
-commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
 wire-runtime = { group = "com.squareup.wire", name = "wire-runtime", version.ref = "wire" }
-
-whisper-jni = { group = "io.github.givimad", name = "whisper-jni", version.ref = "whisperJni" }
-
-android-vad-webrtc = { group = "com.github.gkonovalov.android-vad", name = "webrtc", version.ref = "androidVad" }
-
-prdownloader = { group = "com.github.amitshekhariitbhu", name = "PRDownloader", version.ref = "prdownloader" }
-
-androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 
 [plugins]
 android-library = { id = "com.android.library", version.ref = "agp" }

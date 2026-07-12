@@ -18,12 +18,11 @@
  * (statically via `RAC_STATIC_RUNTIME_REGISTER` or dynamically via the
  * loader, identical to the engine-plugin mechanism).
  *
- * ABI v2 providers expose a `rac_runtime_vtable_v2_t` extension through
- * `rac_runtime_vtable_t::reserved_slot_0`. The v1-shaped op slots
- * (`run_session`, `alloc_buffer`, …) remain in the struct layout for
- * binary stability, but the registry now accepts ABI v2 only — v1-only
- * plugins (i.e. plugins that omit the `reserved_slot_0` v2 extension) are
- * hard-rejected with `RAC_ERROR_ABI_VERSION_MISMATCH`.
+ * ABI v2 providers expose tensor ownership and device-buffer operations through
+ * the `rac_runtime_vtable_v2_t` extension in
+ * `rac_runtime_vtable_t::reserved_slot_0`. The registry accepts ABI v2 only;
+ * plugins without the current extension are rejected with
+ * `RAC_ERROR_ABI_VERSION_MISMATCH`.
  */
 
 #ifndef RAC_PLUGIN_RUNTIME_VTABLE_H
@@ -56,23 +55,10 @@ extern "C" {
  * — those are handled by `metadata.capability_flags` and the reserved slots
  * inside `rac_runtime_id_t`.
  *
- * Version history:
- *   1u — T4.1 initial release.
- *   2u — CPP-RUNTIME-01 v2 extension via reserved_slot_0.
+ * The only supported layout is version 2, which includes the extension table
+ * published through `reserved_slot_0`.
  */
-#define RAC_RUNTIME_ABI_VERSION_V1 1u
-#define RAC_RUNTIME_ABI_VERSION_V2 2u
-#define RAC_RUNTIME_ABI_VERSION RAC_RUNTIME_ABI_VERSION_V2
-/**
- * Lowest ABI version the registry will accept. Today MIN == current —
- * `rac_runtime_register` requires exact equality with `RAC_RUNTIME_ABI_VERSION`
- * and rejects v1-only plugins (no `reserved_slot_0` extension) with
- * `RAC_ERROR_ABI_VERSION_MISMATCH`. The macro is kept distinct so a future
- * release that adds a true compatibility shim can widen the accepted range
- * (e.g. `[MIN, RAC_RUNTIME_ABI_VERSION]`) without renaming the constant the
- * registry already logs in mismatch diagnostics.
- */
-#define RAC_RUNTIME_ABI_VERSION_MIN RAC_RUNTIME_ABI_VERSION_V2
+#define RAC_RUNTIME_ABI_VERSION 2u
 
 /* ===========================================================================
  * Device + capability descriptors (by-value POD, safe to include-only).
@@ -133,8 +119,8 @@ typedef struct rac_runtime_capabilities {
  *  `create_session` / `run_session` / `destroy_session` (+ buffer ops) and can
  *  actually run inference, not merely describe hardware. Runtimes that fill
  *  those vtable slots MUST set this bit in `capabilities()`; capability-only
- *  runtimes (which leave the session slots NULL) MUST NOT. The engine router
- *  uses this flag to tell "can this runtime host a session?" apart from "this
+ *  runtimes (which leave the session slots NULL) MUST NOT. Callers use this
+ *  flag to tell "can this runtime host a session?" apart from "this
  *  runtime exists and reports device_info/capabilities". See the two-role note
  *  on `rac_runtime_vtable` below. */
 #define RAC_RUNTIME_CAP_SESSION_EXECUTION (1ull << 10)
@@ -284,7 +270,7 @@ typedef struct rac_runtime_tensor {
  * @brief ABI v2 extension. A v2 provider sets
  *        `rac_runtime_vtable_t::reserved_slot_0` to this struct.
  *
- * `abi_version` MUST be `RAC_RUNTIME_ABI_VERSION_V2`; `struct_size` MUST be at
+ * `abi_version` MUST be `RAC_RUNTIME_ABI_VERSION`; `struct_size` MUST be at
  * least `RAC_RUNTIME_VTABLE_V2_MIN_SIZE`. All op slots are optional and are
  * probed independently.
  */
@@ -334,7 +320,7 @@ typedef struct rac_runtime_vtable_v2 {
  */
 #define RAC_RUNTIME_VTABLE_V2_CAPABILITY_ONLY                    \
     {                                                            \
-        /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,      \
+        /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION,         \
         /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t), \
         /* .run_session_v2 = */ NULL,                            \
         /* .alloc_buffer   = */ NULL,                            \
@@ -443,7 +429,7 @@ typedef struct rac_runtime_metadata {
  *
  *   1. Capability role (MANDATORY): identity (`metadata`) + `init` + `destroy`
  *      + `device_info` + `capabilities`. Every runtime MUST implement these so
- *      the engine router can do hardware-aware selection. A "capability-only"
+ *      callers can inspect hardware availability. A "capability-only"
  *      runtime stops here and leaves the session-execution slots NULL.
  *
  *   2. Session-execution role (OPTIONAL): `create_session` / `run_session` /
@@ -513,12 +499,12 @@ typedef struct rac_runtime_vtable {
 
 static inline const rac_runtime_vtable_v2_t*
 rac_runtime_vtable_get_v2(const rac_runtime_vtable_t* vtable) {
-    if (vtable == NULL || vtable->metadata.abi_version < RAC_RUNTIME_ABI_VERSION_V2 ||
+    if (vtable == NULL || vtable->metadata.abi_version != RAC_RUNTIME_ABI_VERSION ||
         vtable->reserved_slot_0 == NULL) {
         return NULL;
     }
     const rac_runtime_vtable_v2_t* v2 = (const rac_runtime_vtable_v2_t*)vtable->reserved_slot_0;
-    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION_V2 ||
+    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION ||
         v2->struct_size < RAC_RUNTIME_VTABLE_V2_MIN_SIZE) {
         return NULL;
     }

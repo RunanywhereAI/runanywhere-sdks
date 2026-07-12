@@ -20,6 +20,7 @@
 #include <string>
 
 #include "rac/core/rac_types.h"
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -31,6 +32,27 @@
 #endif
 
 namespace rac::voice_agent::detail {
+
+// Canonical split used by every voice-agent entry point. `answer` is the only
+// text that may be rendered, stored in conversation history, or sent to TTS;
+// `thinking` is retained separately for typed events/result metadata.
+struct VoiceResponseParts {
+    std::string answer;
+    std::string thinking;
+};
+
+// Canonical deterministic, no-thinking generation policy used by both the
+// one-shot text helper and the full STT -> LLM -> TTS turn.
+rac_llm_options_t make_voice_llm_options();
+
+// Extract thinking metadata and sanitize the speakable answer. The answer has
+// reasoning blocks removed, ASCII control bytes discarded, and whitespace
+// trimmed/collapsed so an empty result can be rejected before TTS.
+VoiceResponseParts split_voice_response(const char* raw_text);
+
+// A successful backend call with no speakable answer is still an LLM failure;
+// callers must stop the turn instead of passing an empty string to TTS.
+rac_result_t validate_voice_response(const VoiceResponseParts& response);
 
 // RAII admission guard for every long-running voice-agent entry
 // point (process_voice_turn{,_proto}, process_stream, process_turn_proto,

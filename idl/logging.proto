@@ -1,26 +1,14 @@
 // RunAnywhere IDL — cross-platform logging configuration + records.
 //
-// Every SDK hand-writes an identical LogLevel enum + LoggingConfiguration +
-// LogEntry, each commented "must match Swift". Several SDKs declare the level
-// enum two or three times:
-//   Swift   Infrastructure/Logging/SDKLogger.swift  (LogLevel, LoggingConfiguration, LogEntry)
-//   Kotlin  public/extensions/RunAnywhereLogging.kt (LogLevel) +
-//           infrastructure/logging/SDKLogger.kt (LogLevel, LoggingConfiguration, LogEntry) +
-//           foundation/bridge/CppBridgeModelRegistry.kt (LogLevel)
-//   Flutter foundation/logging/sdk_logger.dart (LogLevel) +
-//           runanywhere_logging.dart (LoggingConfiguration, LogEntry, LogLevelC) +
-//           basic_types.dart (RacLogLevel)
-//   RN      Foundation/Logging/Models/LogLevel.ts + LoggingConfiguration.ts
-//   Web     Foundation/Logging/* (LoggingConfiguration, LogLevel)
-// This file is the single source of truth that replaces all of them.
+// This file is the single source of truth for the structured logging types
+// consumed by every SDK. Platform loggers add only sink-specific behavior.
 //
 // LogLevel mirrors the C ABI `rac_log_level_t`
 // (sdk/runanywhere-commons/include/rac/core/rac_types.h:196) EXACTLY, so the
 // generated enum round-trips with the platform-adapter `log` callback
-// (rac_platform_adapter.h) without a translation table. NOTE: the SDKs'
-// hand-written public LogLevel enums currently use a 5-value debug=0..fault=4
-// numbering that does NOT match the C ABI (trace=0..fatal=5); they should
-// converge onto this canonical enum.
+// (rac_platform_adapter.h) without a translation table. Public SDK logging
+// APIs consume this canonical enum directly; platform-local adapters preserve
+// the same trace=0..fatal=5 numeric contract.
 
 syntax = "proto3";
 
@@ -53,11 +41,12 @@ enum LogLevel {
 }
 
 // ---------------------------------------------------------------------------
-// SDK logging configuration. Union of the fields the per-SDK
-// LoggingConfiguration structs carry today; per-environment presets
+// SDK logging configuration. Per-environment presets
 // (development/staging/production) stay in each SDK as factory helpers.
 // ---------------------------------------------------------------------------
 message LoggingConfiguration {
+    reserved 6;
+
     // Write logs to the platform-local sink (os_log / Logcat / console).
     bool     enable_local_logging    = 1 [(runanywhere.v1.rac_default) = "true"];
 
@@ -73,8 +62,6 @@ message LoggingConfiguration {
     // Forward records to the remote logging pipeline.
     bool     enable_remote_logging   = 5;
 
-    // Forward error/fatal records to Sentry.
-    bool     enable_sentry_logging   = 6;
 }
 
 // ---------------------------------------------------------------------------

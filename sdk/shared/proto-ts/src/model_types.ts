@@ -280,7 +280,7 @@ export enum InferenceFramework {
   INFERENCE_FRAMEWORK_BUILT_IN = 20,
   INFERENCE_FRAMEWORK_NONE = 21,
   INFERENCE_FRAMEWORK_UNKNOWN = 22,
-  /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+  /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD) */
   INFERENCE_FRAMEWORK_SHERPA = 23,
   /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
   INFERENCE_FRAMEWORK_QHEXRT = 24,
@@ -1187,7 +1187,6 @@ export interface ModelInfo {
   contextLength: number;
   supportsThinking: boolean;
   supportsLora: boolean;
-  description: string;
   source: ModelSource;
   createdAtUnixMs: number;
   updatedAtUnixMs: number;
@@ -1212,11 +1211,7 @@ export interface ModelInfo {
   thinkingPattern?:
     | ThinkingTagPattern
     | undefined;
-  /**
-   * Structured public catalog metadata. `description` (field 12) is kept for
-   * backward compatibility and should mirror metadata.description when both
-   * are populated.
-   */
+  /** Structured public catalog metadata, including the model description. */
   metadata?: ModelInfoMetadata | undefined;
   singleFile?: SingleFileArtifact | undefined;
   archive?: ArchiveArtifact | undefined;
@@ -2120,7 +2115,6 @@ function createBaseModelInfo(): ModelInfo {
     contextLength: 0,
     supportsThinking: false,
     supportsLora: false,
-    description: "",
     source: 0,
     createdAtUnixMs: 0,
     updatedAtUnixMs: 0,
@@ -2183,9 +2177,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     }
     if (message.supportsLora !== false) {
       writer.uint32(88).bool(message.supportsLora);
-    }
-    if (message.description !== "") {
-      writer.uint32(98).string(message.description);
     }
     if (message.source !== 0) {
       writer.uint32(104).int32(message.source);
@@ -2358,14 +2349,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
           }
 
           message.supportsLora = reader.bool();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.description = reader.string();
           continue;
         }
         case 13: {
@@ -2614,7 +2597,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
         : isSet(object.supports_lora)
         ? globalThis.Boolean(object.supports_lora)
         : false,
-      description: isSet(object.description) ? globalThis.String(object.description) : "",
       source: isSet(object.source) ? modelSourceFromJSON(object.source) : 0,
       createdAtUnixMs: isSet(object.createdAtUnixMs)
         ? globalThis.Number(object.createdAtUnixMs)
@@ -2762,9 +2744,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.supportsLora !== false) {
       obj.supportsLora = message.supportsLora;
     }
-    if (message.description !== "") {
-      obj.description = message.description;
-    }
     if (message.source !== 0) {
       obj.source = modelSourceToJSON(message.source);
     }
@@ -2859,7 +2838,6 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     message.contextLength = object.contextLength ?? 0;
     message.supportsThinking = object.supportsThinking ?? false;
     message.supportsLora = object.supportsLora ?? false;
-    message.description = object.description ?? "";
     message.source = object.source ?? 0;
     message.createdAtUnixMs = object.createdAtUnixMs ?? 0;
     message.updatedAtUnixMs = object.updatedAtUnixMs ?? 0;

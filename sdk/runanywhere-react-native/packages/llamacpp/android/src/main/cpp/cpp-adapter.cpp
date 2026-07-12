@@ -6,9 +6,11 @@
  */
 
 #include <jni.h>
+#include <fbjni/fbjni.h>
 #include "runanywherellamaOnLoad.hpp"
 
 extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    // Initialize nitrogen module and register HybridObjects
-    return margelo::nitro::runanywhere::llama::initialize(vm);
+    return facebook::jni::initialize(vm, []() {
+        margelo::nitro::runanywhere::llama::registerAllNatives();
+    });
 }

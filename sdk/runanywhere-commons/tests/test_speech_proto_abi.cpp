@@ -3,12 +3,17 @@
  * @brief Generated-proto C ABI coverage for STT/TTS/VAD/VoiceAgent.
  */
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -237,7 +242,7 @@ struct MockTts {
 };
 
 struct MockVad {
-    float threshold{0.1f};
+    float threshold{0.5f};
     bool active{false};
     bool speech{false};
 };
@@ -245,6 +250,19 @@ struct MockVad {
 struct MockLlm {
     bool initialized{false};
 };
+
+std::string g_mock_llm_response = "assistant mock";
+std::string g_last_tts_input;
+std::atomic<int> g_stt_active_calls{0};
+std::atomic<int> g_stt_max_active_calls{0};
+std::atomic<int> g_stt_delay_ms{0};
+MockVad* g_last_mock_vad{nullptr};
+std::mutex g_llm_cancel_mutex;
+std::condition_variable g_llm_cancel_cv;
+bool g_llm_block_until_cancel{false};
+bool g_llm_generate_entered{false};
+bool g_llm_cancel_requested{false};
+std::atomic<int> g_llm_cancel_calls{0};
 
 rac_result_t mock_stt_create(const char*, const char*, void** out_impl) {
     *out_impl = new MockStt();
@@ -260,10 +278,18 @@ rac_result_t mock_stt_transcribe(void* impl, const void* audio_data, size_t audi
                                  const rac_stt_options_t*, rac_stt_result_t* out_result) {
     if (!impl || !audio_data || audio_size == 0 || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
+    const int active = g_stt_active_calls.fetch_add(1) + 1;
+    int observed = g_stt_max_active_calls.load();
+    while (active > observed && !g_stt_max_active_calls.compare_exchange_weak(observed, active)) {}
+    const int delay_ms = g_stt_delay_ms.load();
+    if (delay_ms > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    }
     out_result->text = dup_cstr("hello mock");
     out_result->detected_language = dup_cstr("en");
     out_result->confidence = 0.87f;
     out_result->processing_time_ms = 12;
+    g_stt_active_calls.fetch_sub(1);
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
@@ -299,6 +325,7 @@ rac_result_t mock_tts_synthesize(void* impl, const char* text, const rac_tts_opt
                                  rac_tts_result_t* out_result) {
     if (!impl || !text || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
+    g_last_tts_input = text;
     constexpr float samples[] = {0.0f, 0.25f, -0.25f, 0.0f};
     out_result->audio_size = sizeof(samples);
     out_result->audio_data = std::malloc(out_result->audio_size);
@@ -333,7 +360,8 @@ void mock_tts_destroy(void* impl) {
 }
 
 rac_result_t mock_vad_create(const char*, const char*, void** out_impl) {
-    *out_impl = new MockVad();
+    g_last_mock_vad = new MockVad();
+    *out_impl = g_last_mock_vad;
     return RAC_SUCCESS;
 }
 
@@ -378,6 +406,9 @@ rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_sampl
 
 void mock_vad_destroy(void* impl) {
     delete static_cast<MockVad*>(impl);
+    if (g_last_mock_vad == impl) {
+        g_last_mock_vad = nullptr;
+    }
 }
 
 rac_result_t mock_llm_create(const char*, const char*, void** out_impl) {
@@ -394,12 +425,31 @@ rac_result_t mock_llm_generate(void*, const char* prompt, const rac_llm_options_
                                rac_llm_result_t* out_result) {
     if (!prompt || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
-    out_result->text = dup_cstr("assistant mock");
+    {
+        std::unique_lock<std::mutex> lock(g_llm_cancel_mutex);
+        if (g_llm_block_until_cancel) {
+            g_llm_generate_entered = true;
+            g_llm_cancel_cv.notify_all();
+            g_llm_cancel_cv.wait(lock, [] { return g_llm_cancel_requested; });
+            return RAC_ERROR_CANCELLED;
+        }
+    }
+    out_result->text = dup_cstr(g_mock_llm_response.c_str());
     out_result->prompt_tokens = 2;
     out_result->completion_tokens = 2;
     out_result->total_tokens = 4;
     out_result->total_time_ms = 9;
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+}
+
+rac_result_t mock_llm_cancel(void*) {
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_cancel_requested = true;
+    }
+    g_llm_cancel_calls.fetch_add(1);
+    g_llm_cancel_cv.notify_all();
+    return RAC_SUCCESS;
 }
 
 void mock_llm_destroy(void* impl) {
@@ -442,6 +492,7 @@ void install_mock_plugin() {
     g_llm_ops.create = mock_llm_create;
     g_llm_ops.initialize = mock_llm_initialize;
     g_llm_ops.generate = mock_llm_generate;
+    g_llm_ops.cancel = mock_llm_cancel;
     g_llm_ops.destroy = mock_llm_destroy;
 
     g_speech_vtable = {};
@@ -471,6 +522,44 @@ void install_mock_plugin() {
     (void)rac_plugin_unregister("sherpa");
     CHECK(rac_plugin_register(&g_speech_vtable) == RAC_SUCCESS, "mock speech plugin registers");
     CHECK(rac_plugin_register(&g_llm_vtable) == RAC_SUCCESS, "mock LLM plugin registers");
+}
+
+int test_stt_service_serializes_shared_engine() {
+    MockStt impl;
+    rac_stt_service_t service{&g_stt_ops, &impl, "shared-whisper"};
+    const int16_t audio[] = {0, 1, 2, 3};
+    std::atomic<int> ready{0};
+    std::atomic<bool> go{false};
+    std::atomic<int> successful_calls{0};
+    g_stt_active_calls = 0;
+    g_stt_max_active_calls = 0;
+    g_stt_delay_ms = 40;
+
+    auto transcribe = [&]() {
+        ready.fetch_add(1);
+        while (!go.load()) {
+            std::this_thread::yield();
+        }
+        rac_stt_result_t result{};
+        if (rac_stt_transcribe(&service, audio, sizeof(audio), nullptr, &result) == RAC_SUCCESS) {
+            successful_calls.fetch_add(1);
+        }
+        rac_stt_result_free(&result);
+    };
+    std::thread first(transcribe);
+    std::thread second(transcribe);
+    while (ready.load() != 2) {
+        std::this_thread::yield();
+    }
+    go = true;
+    first.join();
+    second.join();
+    g_stt_delay_ms = 0;
+
+    CHECK(successful_calls.load() == 2, "concurrent STT service calls succeed");
+    CHECK(g_stt_max_active_calls.load() == 1,
+          "STT service serializes Talk and Transcription access to one engine");
+    return 0;
 }
 
 bool poll_sdk_until_failure() {
@@ -621,6 +710,17 @@ int test_mocked_vad_and_activity() {
     CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "mock VAD component creates");
     CHECK(rac_vad_component_load_model(vad, "mock-vad", "mock-vad", "Mock VAD") == RAC_SUCCESS,
           "mock VAD model loads");
+    CHECK(g_last_mock_vad && g_last_mock_vad->active,
+          "VAD load starts the model detector");
+    CHECK(rac_vad_component_get_energy_threshold(vad) == 0.5f,
+          "model VAD reports its detector threshold");
+    CHECK(rac_vad_component_set_energy_threshold(vad, 0.2f) == RAC_SUCCESS &&
+              g_last_mock_vad->threshold == 0.2f,
+          "model VAD threshold routes to the backend");
+    CHECK(rac_vad_component_stop(vad) == RAC_SUCCESS && !g_last_mock_vad->active,
+          "VAD stop routes to the model backend");
+    CHECK(rac_vad_component_start(vad) == RAC_SUCCESS && g_last_mock_vad->active,
+          "VAD start routes to the model backend");
 
     runanywhere::v1::VADOptions options;
     options.set_threshold(0.1f);
@@ -634,6 +734,14 @@ int test_mocked_vad_and_activity() {
     runanywhere::v1::VADResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VADResult parses");
     CHECK(result.is_speech(), "mock VAD detects speech");
+    CHECK(rac_vad_component_get_energy_threshold(vad) == 0.2f &&
+              g_last_mock_vad->threshold == 0.2f,
+          "per-call model threshold override is restored");
+    CHECK(rac_vad_component_is_speech_active(vad) == RAC_TRUE,
+          "model VAD active-state query routes to the backend");
+    CHECK(rac_vad_component_reset(vad) == RAC_SUCCESS &&
+              rac_vad_component_is_speech_active(vad) == RAC_FALSE,
+          "VAD reset routes to the model backend");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
@@ -760,12 +868,17 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     CHECK(states.ready(), "voice component states report ready");
     rac_proto_buffer_free(&out);
 
+    g_mock_llm_response = "<think>private plan</think>\nassistant mock";
+    g_last_tts_input.clear();
     rac_proto_buffer_init(&out);
     rc = rac_voice_agent_process_voice_turn_proto(agent, audio, sizeof(audio), &out);
     runanywhere::v1::VoiceAgentResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VoiceAgentResult parses");
     CHECK(result.transcription() == "hello mock", "voice turn transcription matches");
     CHECK(result.assistant_response() == "assistant mock", "voice turn response matches");
+    CHECK(result.thinking_content() == "private plan",
+          "voice turn retains reasoning as separate metadata");
+    CHECK(g_last_tts_input == "assistant mock", "voice turn sends only clean answer text to TTS");
     CHECK(result.has_final_state() && result.final_state().ready(),
           "voice turn final state is ready");
     CHECK(saw_turn_kind(capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED),
@@ -775,6 +888,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     CHECK(saw_turn_kind(capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED),
           "voice turn emits completed event");
     rac_proto_buffer_free(&out);
+    g_mock_llm_response = "assistant mock";
     rac_voice_agent_destroy(agent);
     return 0;
 }
@@ -817,6 +931,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
         }
     };
 
+    g_mock_llm_response = "<think>private plan</think>\nassistant mock";
+    g_last_tts_input.clear();
     rac_result_t rc = rac_voice_agent_process_turn_proto(agent, request_bytes.data(),
                                                          request_bytes.size(), cb, &capture);
     CHECK(rc == RAC_SUCCESS, "D-7 process_turn_proto returns success");
@@ -828,6 +944,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     int vad_speech_end_count = 0;
     bool saw_user_said = false;
     bool saw_assistant_token = false;
+    bool saw_thought_token = false;
+    bool saw_clean_answer_token = false;
     bool saw_audio = false;
     bool envelope_valid = true;
     for (const auto& event : capture.events) {
@@ -853,6 +971,13 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
         }
         if (event.has_assistant_token() && event.assistant_token().is_final()) {
             saw_assistant_token = true;
+            saw_clean_answer_token =
+                event.assistant_token().kind() == runanywhere::v1::TOKEN_KIND_ANSWER &&
+                event.assistant_token().text() == "assistant mock";
+        }
+        if (event.has_assistant_token() &&
+            event.assistant_token().kind() == runanywhere::v1::TOKEN_KIND_THOUGHT) {
+            saw_thought_token = event.assistant_token().text() == "private plan";
         }
         if (event.has_audio() && event.audio().is_final()) {
             saw_audio = true;
@@ -873,8 +998,148 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
           "D-7 SPEECH_ENDED count matches SPEECH_STARTED count");
     CHECK(saw_user_said, "D-7 emits userSaid");
     CHECK(saw_assistant_token, "D-7 emits assistant_token");
+    CHECK(saw_thought_token, "D-7 emits reasoning only as a typed thought token");
+    CHECK(saw_clean_answer_token, "D-7 emits a tag-free typed answer token");
+    CHECK(g_last_tts_input == "assistant mock", "D-7 sends only clean answer text to TTS");
     CHECK(saw_audio, "D-7 emits audio frame with is_final");
 
+    g_mock_llm_response = "assistant mock";
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_queued_cancel_and_next_request_isolation() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 queued-cancel voice agent creates");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
+    CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
+          "D-7 queued-cancel voice agent initializes");
+
+    VoiceCapture handle_capture;
+    CHECK(rac_voice_agent_set_proto_callback(agent, voice_callback, &handle_capture) == RAC_SUCCESS,
+          "D-7 queued-cancel handle callback registers");
+
+    runanywhere::v1::VoiceAgentTurnRequest cancelled_request;
+    cancelled_request.set_request_id("req-cancel-queued");
+    cancelled_request.set_session_id("session-cancel-queued");
+    const int16_t audio[] = {0, 1, 2, 3};
+    cancelled_request.set_audio_data(audio, sizeof(audio));
+    cancelled_request.set_sample_rate_hz(16000);
+    cancelled_request.set_channels(1);
+    cancelled_request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
+    std::vector<uint8_t> cancelled_bytes;
+    CHECK(serialize(cancelled_request, &cancelled_bytes), "D-7 queued-cancel request serializes");
+
+    g_llm_cancel_calls = 0;
+    CHECK(rac_voice_agent_cancel_turn_proto(agent, cancelled_bytes.data(),
+                                            cancelled_bytes.size()) == RAC_SUCCESS,
+          "D-7 accepts cancellation before worker turn starts");
+    CHECK(g_llm_cancel_calls.load() == 0,
+          "D-7 cancel-before-start latches without interrupting an inactive backend");
+
+    VoiceCapture turn_capture;
+    const rac_result_t cancelled_rc = rac_voice_agent_process_turn_proto(
+        agent, cancelled_bytes.data(), cancelled_bytes.size(), voice_callback, &turn_capture);
+    CHECK(cancelled_rc == RAC_ERROR_CANCELLED, "D-7 queued request exits with RAC_ERROR_CANCELLED");
+    CHECK(g_llm_cancel_calls.load() == 0, "D-7 latched cancellation refuses backend admission");
+
+    bool saw_app_stop = false;
+    bool saw_stopped = false;
+    for (const auto& event : turn_capture.events) {
+        saw_app_stop = saw_app_stop ||
+                       (event.has_interrupted() &&
+                        event.interrupted().reason() == runanywhere::v1::INTERRUPT_REASON_APP_STOP);
+        saw_stopped =
+            saw_stopped || (event.has_state() &&
+                            event.state().current() == runanywhere::v1::PIPELINE_STATE_STOPPED);
+    }
+    CHECK(saw_app_stop, "D-7 queued cancellation emits structured APP_STOP interruption");
+    CHECK(saw_stopped, "D-7 queued cancellation emits STOPPED pipeline state");
+    CHECK(saw_turn_kind(handle_capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_CANCELLED),
+          "D-7 queued cancellation emits TURN_CANCELLED lifecycle event");
+
+    runanywhere::v1::VoiceAgentTurnRequest next_request = cancelled_request;
+    next_request.set_request_id("req-after-cancel");
+    next_request.set_session_id("session-after-cancel");
+    std::vector<uint8_t> next_bytes;
+    CHECK(serialize(next_request, &next_bytes), "D-7 post-cancel request serializes");
+    VoiceCapture next_capture;
+    const rac_result_t next_rc = rac_voice_agent_process_turn_proto(
+        agent, next_bytes.data(), next_bytes.size(), voice_callback, &next_capture);
+    CHECK(next_rc == RAC_SUCCESS, "D-7 cancellation is isolated and the next request completes");
+
+    (void)rac_voice_agent_set_proto_callback(agent, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_active_llm_cancel() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 active-cancel voice agent creates");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
+    CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
+          "D-7 active-cancel voice agent initializes");
+
+    VoiceCapture handle_capture;
+    CHECK(rac_voice_agent_set_proto_callback(agent, voice_callback, &handle_capture) == RAC_SUCCESS,
+          "D-7 active-cancel handle callback registers");
+
+    runanywhere::v1::VoiceAgentTurnRequest request;
+    request.set_request_id("req-cancel-active-llm");
+    request.set_session_id("session-cancel-active-llm");
+    const int16_t audio[] = {0, 1, 2, 3};
+    request.set_audio_data(audio, sizeof(audio));
+    request.set_sample_rate_hz(16000);
+    request.set_channels(1);
+    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
+    std::vector<uint8_t> request_bytes;
+    CHECK(serialize(request, &request_bytes), "D-7 active-cancel request serializes");
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_block_until_cancel = true;
+        g_llm_generate_entered = false;
+        g_llm_cancel_requested = false;
+    }
+    g_llm_cancel_calls = 0;
+
+    VoiceCapture turn_capture;
+    std::atomic<rac_result_t> process_rc{RAC_ERROR_UNKNOWN};
+    std::thread worker([&] {
+        process_rc = rac_voice_agent_process_turn_proto(
+            agent, request_bytes.data(), request_bytes.size(), voice_callback, &turn_capture);
+    });
+
+    bool entered_llm = false;
+    {
+        std::unique_lock<std::mutex> lock(g_llm_cancel_mutex);
+        entered_llm = g_llm_cancel_cv.wait_for(lock, std::chrono::seconds(2),
+                                               [] { return g_llm_generate_entered; });
+    }
+    CHECK(entered_llm, "D-7 active-cancel fixture reaches blocking LLM stage");
+    CHECK(rac_voice_agent_cancel_turn_proto(agent, request_bytes.data(), request_bytes.size()) ==
+              RAC_SUCCESS,
+          "D-7 active LLM cancellation request is accepted");
+    worker.join();
+
+    CHECK(g_llm_cancel_calls.load() == 1,
+          "D-7 active LLM cancellation forwards exactly one backend interrupt");
+    CHECK(process_rc.load() == RAC_ERROR_CANCELLED,
+          "D-7 active LLM turn exits with RAC_ERROR_CANCELLED");
+    CHECK(saw_turn_kind(handle_capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_CANCELLED),
+          "D-7 active LLM cancellation emits TURN_CANCELLED lifecycle event");
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_block_until_cancel = false;
+        g_llm_generate_entered = false;
+        g_llm_cancel_requested = false;
+    }
+    (void)rac_voice_agent_set_proto_callback(agent, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
     rac_voice_agent_destroy(agent);
     return 0;
 }
@@ -958,12 +1223,15 @@ int main() {
         test_tts_generated_service_contract();
         test_vad_generated_service_contract();
         install_mock_plugin();
+        test_stt_service_serializes_shared_engine();
         test_parse_failure_and_missing_component();
         test_mocked_stt();
         test_mocked_tts();
         test_mocked_vad_and_activity();
         test_voice_agent_proto_sequence_and_component_failure();
         test_voice_agent_d7_process_turn_proto_full_flow();
+        test_voice_agent_d7_queued_cancel_and_next_request_isolation();
+        test_voice_agent_d7_active_llm_cancel();
         test_voice_agent_d7_transcribe_proto();
         test_voice_agent_d7_synthesize_speech_proto();
         test_voice_agent_d7_component_create_destroy_proto();

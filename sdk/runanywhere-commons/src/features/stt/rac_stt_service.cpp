@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 
 #include "../common/rac_service_factory_internal.h"
@@ -20,6 +21,15 @@
 static const char* LOG_CAT = "STT.Service";
 
 namespace {
+
+// STT engine instances are process-wide lifecycle resources and backends such
+// as Whisper/QHexRT mutate a shared session during inference. Serialize all
+// service dispatch so Talk, Live Transcription, and batch transcription can
+// hand off the same loaded model safely during navigation.
+std::mutex& stt_operation_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
 
 const rac_stt_service_ops_t* stt_ops(const rac_engine_vtable_t* vt) {
     return vt ? vt->stt_ops : nullptr;
@@ -46,7 +56,7 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     rac_result_t result = rac::features::resolve_model_reference(
         model_path,
         {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_UNKNOWN,
+         .default_framework = RAC_FRAMEWORK_SHERPA,
          .allow_null_model_id = true,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over
@@ -90,6 +100,7 @@ rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->initialize(service->impl, model_path);
 }
 
@@ -103,6 +114,7 @@ rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data, siz
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->transcribe(service->impl, audio_data, audio_size, options, out_result);
 }
 
@@ -117,6 +129,7 @@ rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_da
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->transcribe_stream(service->impl, audio_data, audio_size, options, callback,
                                            user_data);
 }
@@ -142,6 +155,7 @@ rac_result_t rac_stt_cleanup(rac_handle_t handle) {
         return RAC_SUCCESS;  // No-op if not supported
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->cleanup(service->impl);
 }
 
@@ -175,6 +189,7 @@ rac_result_t rac_stt_get_languages(rac_handle_t handle, char** out_json) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->get_languages(service->impl, out_json);
 }
 
@@ -189,6 +204,7 @@ rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* audio_data
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    std::lock_guard<std::mutex> operation_lock(stt_operation_mutex());
     return service->ops->detect_language(service->impl, audio_data, audio_size, options,
                                          out_language);
 }

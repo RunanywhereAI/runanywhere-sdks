@@ -3,10 +3,12 @@
  * @brief HTTP bridge implementation
  *
  * NOTE: Public RN HTTP is handled by rac_http_client_*; this bridge manages
- * shared configuration and optional legacy executors.
+ * shared bootstrap configuration only.
  */
 
 #include "HTTPBridge.hpp"
+
+#include <cstddef>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -14,16 +16,26 @@
 #define LOG_TAG "HTTPBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #else
 #include <cstdio>
 #define LOGI(...) printf("[HTTPBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[HTTPBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[HTTPBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
 #endif
 
 namespace runanywhere {
 namespace bridges {
+
+namespace {
+
+void wipeAndClear(std::string &value) {
+  volatile char *bytes = value.empty() ? nullptr : value.data();
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    bytes[i] = '\0';
+  }
+  value.clear();
+}
+
+} // anonymous namespace
 
 HTTPBridge& HTTPBridge::shared() {
     static HTTPBridge instance;
@@ -31,53 +43,70 @@ HTTPBridge& HTTPBridge::shared() {
 }
 
 void HTTPBridge::configure(const std::string& baseURL, const std::string& apiKey) {
-    baseURL_ = baseURL;
-    apiKey_ = apiKey;
-    configured_ = true;
+  std::lock_guard<std::mutex> lock(mutex_);
+  wipeAndClear(apiKey_);
+  baseURL_ = baseURL;
+  apiKey_ = apiKey;
+  configured_ = true;
 
-    LOGI("HTTP configured: baseURL=%s", baseURL.c_str());
+  LOGI("HTTP bridge configured");
+}
+
+bool HTTPBridge::isConfigured() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return configured_;
+}
+
+std::string HTTPBridge::getBaseURL() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return baseURL_;
+}
+
+std::string HTTPBridge::getAPIKey() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return apiKey_;
 }
 
 void HTTPBridge::setAuthorizationToken(const std::string& token) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (authToken_) {
+    wipeAndClear(*authToken_);
+  }
     authToken_ = token;
     LOGD("Authorization token set");
 }
 
 std::optional<std::string> HTTPBridge::getAuthorizationToken() const {
-    return authToken_;
+  std::lock_guard<std::mutex> lock(mutex_);
+  return authToken_;
 }
 
 void HTTPBridge::clearAuthorizationToken() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (authToken_) {
+    wipeAndClear(*authToken_);
+  }
     authToken_.reset();
     LOGD("Authorization token cleared");
 }
 
-void HTTPBridge::setHTTPExecutor(HTTPExecutor executor) {
-    executor_ = executor;
-    LOGI("HTTP executor registered");
-}
-
-std::optional<HTTPResponse> HTTPBridge::execute(
-    const std::string& method,
-    const std::string& endpoint,
-    const std::string& body,
-    bool requiresAuth
-) {
-    if (!executor_) {
-        LOGE("No HTTP executor registered for legacy HTTPBridge::execute caller");
-        return std::nullopt;
-    }
-
-    std::string url = buildURL(endpoint);
-    LOGD("Executing %s %s", method.c_str(), url.c_str());
-
-    return executor_(method, url, body, requiresAuth);
+void HTTPBridge::reset() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  wipeAndClear(apiKey_);
+  if (authToken_) {
+    wipeAndClear(*authToken_);
+  }
+  authToken_.reset();
+  baseURL_.clear();
+  configured_ = false;
+  LOGD("HTTP configuration reset");
 }
 
 std::string HTTPBridge::buildURL(const std::string& endpoint) const {
-    if (baseURL_.empty()) {
-        return endpoint;
-    }
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (baseURL_.empty()) {
+    return endpoint;
+  }
 
     // Ensure proper URL joining
     std::string url = baseURL_;

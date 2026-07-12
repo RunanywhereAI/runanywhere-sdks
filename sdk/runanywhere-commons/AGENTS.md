@@ -42,17 +42,13 @@ cmake --build build
 # iOS build
 ./scripts/ios/download-onnx.sh           # Download ONNX Runtime xcframework
 ./scripts/ios/download-sherpa-onnx.sh    # Download Sherpa-ONNX xcframework
-./scripts/build-ios.sh                   # Full build → dist/RACommons.xcframework
-./scripts/build-ios.sh --skip-download   # Use cached deps
-./scripts/build-ios.sh --backend llamacpp
-./scripts/build-ios.sh --clean --package # Clean build + create ZIPs
+./scripts/build-ios.sh                   # Canonical Apple build + versioned packages
 
 # Android build
 ./scripts/android/download-sherpa-onnx.sh          # Download Sherpa-ONNX .so files
-./scripts/build-android.sh                          # All backends, all ABIs
-./scripts/build-android.sh llamacpp                 # LlamaCPP only
-./scripts/build-android.sh onnx arm64-v8a           # Specific backend + ABI
-./scripts/build-android.sh --check                  # Verify 16KB page alignment
+for abi in arm64-v8a armeabi-v7a x86_64; do
+  ./scripts/build-android.sh "$abi"                 # Complete public set for one ABI
+done
 
 # macOS / Linux / Windows dependency downloads
 ./scripts/macos/download-onnx.sh
@@ -117,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+WakeWord) | coreml (Image/Diffusion, Apple)         │
+│  onnx (Embed) | coreml (Image/Diffusion, Apple)                  │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -182,7 +178,7 @@ Foundation Models, System TTS, and CoreML Diffusion all use the same pattern:
 - **Lock-copy-dispatch** in event publisher — prevents deadlock if callbacks re-enter
 - **Atomic cancel** in LLM component — `cancel_requested` is `std::atomic<bool>`, read without mutex in the token callback to avoid deadlock with the generating thread
 - **Lifecycle refcount pinning** — `rac_lifecycle_acquire_service/release_service` prevents model unload during active inference; unload waits on `condition_variable` for refcount == 0
-- **Lock-free VAD path** in voice agent — `rac_voice_agent_detect_speech()` uses `in_flight` atomic counter instead of mutex for real-time audio; `destroy()` spins on `in_flight > 0` after setting `is_shutting_down`
+- **VAD component backend selection** — `rac_vad_component_*` routes model-backed operations through the selected plugin and falls back to the component-owned energy VAD when no model is loaded
 - **Energy VAD hot path** — mean-square computed without sqrt (compares `mean_sq > threshold_sq`); 4-way loop unrolling; callbacks deferred outside lock
 
 ### Voice Agent Pipeline
@@ -216,6 +212,42 @@ SDK-facing errors cross the boundary as `runanywhere.v1.SDKError` proto bytes vi
 
 Atomic level-check on hot path (no mutex). `RAC_LOG_TRACE/DEBUG/INFO/WARNING/ERROR/FATAL` macros skip `vsnprintf` entirely when level is filtered. Pre-init: falls back to stderr. Per-environment defaults: dev=DEBUG, staging=INFO, prod=WARNING.
 
+### RAG (`src/features/rag/`)
+
+Hybrid retrieval-augmented generation behind the proto-byte C ABI `rac_rag_*`
+(`include/rac/features/rag/rac_rag.h`). Query flow: `rac_rag_query_proto` → `RAGBackend::query`
+(`rag_backend.cpp`) → `run_rag_query` (`rag_pipeline_graph.cpp`): embed query → USearch
+dense search → BM25 keyword search → RRF fusion (`kRRFConstant=60`) → context assembly
+(token budget) → prompt format → streaming LLM generate. Ingest: `rac_rag_ingest_proto` →
+`RAGBackend::add_document`: recursive char-chunk → batch embed → USearch + BM25 insert.
+Dense store is USearch HNSW (`vector_store_usearch.cpp`), sparse store is a hand-rolled
+Okapi BM25 inverted index (`bm25_index.cpp`). Per-session `RAGBackend` guarded by a single
+`mutex_`; the graph runs outside the lock. Multi-session; each handle independent.
+
+Design rules for RAG work (do not relitigate):
+- **Keep USearch** as the dense ANN store. Do not replace it with a brute-force
+  Hamming/binary-quantized scan — techniques may be borrowed from reference engines, the
+  storage engine is not.
+- **Rerank is LLM-pointwise** (score fused candidates 1–5 with the existing LLM handle),
+  not a cross-encoder. The `rerank_ops` vtable slot / `RAC_PRIMITIVE_RERANK` was retired
+  in plugin ABI v4 — do not revive it for reranking.
+- **All RAG persistence goes through the platform adapter** file I/O
+  (`file_read`/`file_write`/`file_delete`/`file_exists`, `rac_platform_adapter.h`), never
+  direct `std::ofstream`/`fopen`. This is what makes persistence work on Web (OPFS) as well
+  as mobile.
+- **Content-addressed dedup: never re-embed the same input.** Documents are keyed by
+  `sha256(raw_bytes)` (files) or `sha256(normalized_text)` (text); chunk embeddings are
+  cached by `sha256(chunk_text) + embedding_model_fingerprint`. A matching hash + matching
+  fingerprint skips chunking/embedding. Embedding caches are **namespaced by embedding
+  fingerprint**, so switching models is safe and reversible.
+- **SHA-256 is the shared foundation util** `src/foundation/rac_sha256`. Do not add a
+  second SHA-256 implementation (the old file-local one in `rac_http_download.cpp` is being
+  consolidated here).
+- **Persisted indexes are fingerprint-guarded** (embedding model + dim + format version).
+  On mismatch, discard and re-embed — never load stale vectors against a different embedder.
+- Proto changes to `idl/rag.proto` are **additive only** (new optional fields); regenerate
+  all SDK bindings, no version bump.
+
 ## Error Code Ranges
 
 | Range | Category |
@@ -245,7 +277,6 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
-| **onnx-wakeword** | WakeWord | ONNX | openWakeWord | `rac_backend_wakeword_onnx_register()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 
@@ -264,9 +295,9 @@ All versions centralized in `VERSIONS` file. Consumed three ways:
 
 ## Build Outputs
 
-**iOS**: `dist/RACommons.xcframework`, `dist/RABackendLLAMACPP.xcframework`, `dist/RABackendONNX.xcframework`
+**Apple**: XCFrameworks under `../runanywhere-swift/Binaries/`; versioned reproducible archives under `dist/packages/`.
 
-**Android**: `dist/android/jni/{abi}/librac_commons_jni.so` + per-backend JNI `.so` files. 16KB page alignment required for Play Store (Android 15+).
+**Android**: one versioned `dist/RACommons-android-{abi}-v{version}.zip` plus checksum per invocation. The archive contains the public core, LlamaCPP, and ONNX/Sherpa native sets for that ABI. 16 KB ELF alignment is enforced before packaging.
 
 **JNI separation**: `librac_commons_jni.so` links only `rac_commons` (no backends). Each backend ships its own JNI `.so` that calls `rac_backend_*_register()`. Mirrors iOS XCFramework separation.
 

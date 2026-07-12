@@ -14,7 +14,7 @@
     "baseUrl": ".",
     "paths": {
       "@runanywhere/web": ["../../../sdk/runanywhere-web/packages/core/src/index.ts"],
-      "@runanywhere/web/internal": ["../../../sdk/runanywhere-web/packages/core/src/internal.ts"],
+      "@runanywhere/web/backend": ["../../../sdk/runanywhere-web/packages/core/src/backend.ts"],
       "@runanywhere/web/browser": ["../../../sdk/runanywhere-web/packages/core/src/browser.ts"],
       "@runanywhere/web-llamacpp": ["../../../sdk/runanywhere-web/packages/llamacpp/src/index.ts"],
       "@runanywhere/web-onnx": ["../../../sdk/runanywhere-web/packages/onnx/src/index.ts"],
@@ -22,5 +22,5 @@
       "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/src/*.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

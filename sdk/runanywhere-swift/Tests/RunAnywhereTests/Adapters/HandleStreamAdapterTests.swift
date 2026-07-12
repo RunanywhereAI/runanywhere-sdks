@@ -100,7 +100,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumer = Task {
@@ -144,7 +145,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumerCount = 10
@@ -203,7 +205,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         // Drive the failing install. The for-await must drain to zero
@@ -287,7 +290,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                 captureA.withLock { $0 = snapshot }
                 return 0
             },
-            unregister: { _ in }
+            unregister: { _ in },
+            quiesce: {}
         )
         let adapterB = HandleStreamAdapter<CollidingHandle, RAChatMessage>(
             handle: handleB,
@@ -297,7 +301,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                 captureB.withLock { $0 = snapshot }
                 return 0
             },
-            unregister: { _ in }
+            unregister: { _ in },
+            quiesce: {}
         )
 
         let receivedA = OSAllocatedUnfairLock<[String]>(initialState: [])
@@ -397,7 +402,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                     }
                 }
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumer = Task {
@@ -470,14 +476,21 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumerCount = 5
         var consumers: [Task<Void, Never>] = []
         for _ in 0..<consumerCount {
+            // Construct the stream synchronously so every subscriber is
+            // attached before cancellation begins. Starting the Task first
+            // lets a slow executor leave some bodies unstarted; those
+            // already-cancelled bodies can then attach after teardown and
+            // create a second, unrelated registration.
+            let stream = adapter.stream()
             consumers.append(Task {
-                for await _ in adapter.stream() {
+                for await _ in stream {
                     // No events; we cancel below.
                 }
             })

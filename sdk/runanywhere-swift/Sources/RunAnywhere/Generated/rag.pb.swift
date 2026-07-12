@@ -19,43 +19,8 @@
 //   - RAGResult          (full query result: answer + chunks + timings)
 //   - RAGStatistics      (index-level counters)
 //
-// Pre-IDL drift table (motivation for this schema):
-//
-//   RAGConfiguration:
-//     Swift   RAGTypes.swift:15        (11 fields, similarityThreshold default 0.12,
-//                                        chunkSize 180, chunkOverlap 30, topK 3)
-//     Kotlin  RAGTypes.kt:19           (11 fields, similarityThreshold default 0.15f,
-//                                        chunkSize 512, chunkOverlap 50, topK 3)
-//     Dart    rag_types.dart:13        (11 fields, similarityThreshold default 0.15,
-//                                        chunkSize 180, chunkOverlap 30, topK 10)
-//     RN      RAGTypes.ts:9            (11 fields, all numerics optional)
-//     Web     RAGTypes.ts:6            (11 fields, copy of RN)
-//
-//   RAGQueryOptions:
-//     Swift / Kotlin / Dart / RN / Web all define the same 6-field shape with
-//     consistent defaults (maxTokens 512, temperature 0.7, topP 0.9, topK 40).
-//
-//   RAGSearchResult:
-//     Swift / Kotlin / Dart       — metadataJSON as a single optional string
-//     RN / Web                    — metadataJson (lowercase j) optional string
-//     Note: pre-IDL all SDKs encoded metadata as a JSON *string*. The proto
-//     canonicalizes to map<string,string> so consumers don't all re-parse JSON
-//     and source_document is hoisted to a first-class field.
-//
-//   RAGResult:
-//     Swift / Kotlin / Dart       — timing fields are double (ms, fractional)
-//     RN / Web                    — timing fields are number
-//     Note: proto canonicalizes timings to int64 millis (matches the C ABI
-//     rac_rag_result_t which already uses fixed millis at the boundary).
-//
-//   RAGStatistics:
-//     Dart    rag_types.dart:241      ({statsJson} only — JSON blob)
-//     RN      RAGTypes.ts:59          ({documentCount, chunkCount, vectorStoreSize, statsJson})
-//     Web     RAGTypes.ts:45          (copy of RN)
-//     Swift / Kotlin                  — not yet defined pre-IDL
-//     Note: proto canonicalizes to typed counters (indexed_documents,
-//     indexed_chunks, total_tokens_indexed, last_updated_ms, index_path) so
-//     the JSON-blob escape hatch isn't needed.
+// All SDKs consume these generated messages directly so configuration,
+// metadata, results, and statistics have one portable shape.
 
 import SwiftProtobuf
 
@@ -175,10 +140,12 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// score are discarded before being passed to the LLM as context.
   /// Optional so callers can distinguish "unset" from explicit 0.0
   /// (accept-everything) without losing the canonical default.
-  /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-  /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-  /// so a 0.7 floor filters out every match and retrieval returns nothing
-  /// (validated by generated SDK helpers and commons session creation).
+  /// Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+  /// produce cosine similarities that rarely exceed ~0.5 even for relevant
+  /// chunks, and chunking a document lowers each chunk's similarity further, so
+  /// any positive floor filters out real matches — a multi-chunk document then
+  /// retrieves nothing and the answer model reports "no information". top_k
+  /// bounds the result count instead of a similarity floor.
   public var similarityThreshold: Float {
     get {_similarityThreshold ?? 0}
     set {_similarityThreshold = newValue}
@@ -404,7 +371,17 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   /// Retrieval overrides. 0/unset = use RAGConfiguration defaults.
   public var retrievalTopK: Int32 = 0
 
-  public var similarityThreshold: Float = 0
+  /// Per-query similarity floor. `optional` so an explicit 0.0 (accept
+  /// everything) is distinguishable from "unset" and can override a positive
+  /// session-level default; unset falls back to RAGConfiguration.
+  public var similarityThreshold: Float {
+    get {_similarityThreshold ?? 0}
+    set {_similarityThreshold = newValue}
+  }
+  /// Returns true if `similarityThreshold` has been explicitly set.
+  public var hasSimilarityThreshold: Bool {self._similarityThreshold != nil}
+  /// Clears the value of `similarityThreshold`. Subsequent reads from it will return its default value.
+  public mutating func clearSimilarityThreshold() {self._similarityThreshold = nil}
 
   public var stream: Bool = false
 
@@ -413,11 +390,41 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   /// directive instead of the app injecting "/no_think"). Default false.
   public var disableThinking: Bool = false
 
+  /// Multi-query expansion: when true, the answer LLM rewrites the question
+  /// into `multi_query_count` variants; retrieval runs for the original plus
+  /// each variant and the rankings are RRF-fused before rerank. Falls back to
+  /// a single query if expansion yields nothing.
+  public var enableMultiQuery: Bool = false
+
+  public var multiQueryCount: Int32 {
+    get {_multiQueryCount ?? 0}
+    set {_multiQueryCount = newValue}
+  }
+  /// Returns true if `multiQueryCount` has been explicitly set.
+  public var hasMultiQueryCount: Bool {self._multiQueryCount != nil}
+  /// Clears the value of `multiQueryCount`. Subsequent reads from it will return its default value.
+  public mutating func clearMultiQueryCount() {self._multiQueryCount = nil}
+
+  /// Scoped retrieval: when set, only chunks whose document id begins with
+  /// this prefix are eligible (e.g. a chat/collection namespace). Unset =
+  /// search the whole index.
+  public var scopePrefix: String {
+    get {_scopePrefix ?? String()}
+    set {_scopePrefix = newValue}
+  }
+  /// Returns true if `scopePrefix` has been explicitly set.
+  public var hasScopePrefix: Bool {self._scopePrefix != nil}
+  /// Clears the value of `scopePrefix`. Subsequent reads from it will return its default value.
+  public mutating func clearScopePrefix() {self._scopePrefix = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _systemPrompt: String? = nil
+  fileprivate var _similarityThreshold: Float? = nil
+  fileprivate var _multiQueryCount: Int32? = nil
+  fileprivate var _scopePrefix: String? = nil
 }
 
 public nonisolated struct RARAGQueryRequest: Sendable {
@@ -474,8 +481,7 @@ public nonisolated struct RARAGSearchResult: Sendable {
   public mutating func clearSourceDocument() {self._sourceDocument = nil}
 
   /// Free-form metadata associated with the chunk (e.g. page number, section,
-  /// ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-  /// canonicalized here as a typed map so consumers don't re-parse.
+  /// ingestion timestamp).
   public var metadata: Dictionary<String,String> = [:]
 
   public var rank: Int32 = 0
@@ -912,7 +918,7 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{b}metadata_json\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1021,7 +1027,7 @@ nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0\u{3}disable_thinking\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0\u{3}disable_thinking\0\u{3}enable_multi_query\0\u{3}multi_query_count\0\u{3}scope_prefix\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1036,9 +1042,12 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
       case 5: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.retrievalTopK) }()
-      case 8: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
+      case 8: try { try decoder.decodeSingularFloatField(value: &self._similarityThreshold) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self.stream) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self.disableThinking) }()
+      case 11: try { try decoder.decodeSingularBoolField(value: &self.enableMultiQuery) }()
+      case 12: try { try decoder.decodeSingularInt32Field(value: &self._multiQueryCount) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._scopePrefix) }()
       default: break
       }
     }
@@ -1070,15 +1079,24 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if self.retrievalTopK != 0 {
       try visitor.visitSingularInt32Field(value: self.retrievalTopK, fieldNumber: 7)
     }
-    if self.similarityThreshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.similarityThreshold, fieldNumber: 8)
-    }
+    try { if let v = self._similarityThreshold {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 8)
+    } }()
     if self.stream != false {
       try visitor.visitSingularBoolField(value: self.stream, fieldNumber: 9)
     }
     if self.disableThinking != false {
       try visitor.visitSingularBoolField(value: self.disableThinking, fieldNumber: 10)
     }
+    if self.enableMultiQuery != false {
+      try visitor.visitSingularBoolField(value: self.enableMultiQuery, fieldNumber: 11)
+    }
+    try { if let v = self._multiQueryCount {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 12)
+    } }()
+    try { if let v = self._scopePrefix {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1090,9 +1108,12 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.topP != rhs.topP {return false}
     if lhs.topK != rhs.topK {return false}
     if lhs.retrievalTopK != rhs.retrievalTopK {return false}
-    if lhs.similarityThreshold != rhs.similarityThreshold {return false}
+    if lhs._similarityThreshold != rhs._similarityThreshold {return false}
     if lhs.stream != rhs.stream {return false}
     if lhs.disableThinking != rhs.disableThinking {return false}
+    if lhs.enableMultiQuery != rhs.enableMultiQuery {return false}
+    if lhs._multiQueryCount != rhs._multiQueryCount {return false}
+    if lhs._scopePrefix != rhs._scopePrefix {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1144,7 +1165,7 @@ nonisolated extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{b}metadata_json\0\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

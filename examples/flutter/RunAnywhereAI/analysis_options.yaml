@@ -29,7 +29,6 @@ linter:
     # ==========================================================================
     - avoid_returning_null_for_void     # Don't return null from void functions
     # avoid_returning_null_for_future removed in Dart 3.3.0
-    - avoid_null_checks_in_equality_operators  # Use == null pattern correctly
     - null_check_on_nullable_type_parameter    # Proper null checking
 
     # ==========================================================================

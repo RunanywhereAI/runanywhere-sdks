@@ -37,7 +37,7 @@ extension CppBridge {
             }
         }
 
-        func setProtoSession(_ session: rac_handle_t) {
+        private func setProtoSession(_ session: rac_handle_t) {
             if let existing = protoSession {
                 destroyRAGProtoSessionIfAvailable(existing)
             }
@@ -45,11 +45,38 @@ extension CppBridge {
             logger.debug("RAG proto session created")
         }
 
-        func requireProtoSession() throws -> rac_handle_t {
+        private func requireProtoSession() throws -> rac_handle_t {
             guard let protoSession else {
                 throw SDKException(code: .notInitialized, message: "RAG proto session not created", category: .component)
             }
             return protoSession
+        }
+
+        func replacePipeline(_ config: RARAGConfiguration) throws {
+            setProtoSession(try createPipeline(config))
+        }
+
+        func ingest(_ document: RARAGDocument) throws -> RARAGStatistics {
+            try ingest(handle: requireProtoSession(), document)
+        }
+
+        func ingest(_ documents: [RARAGDocument]) throws {
+            let session = try requireProtoSession()
+            for document in documents {
+                _ = try ingest(handle: session, document)
+            }
+        }
+
+        func statistics() throws -> RARAGStatistics {
+            try statsProto(handle: requireProtoSession())
+        }
+
+        func clearDocuments() throws -> RARAGStatistics {
+            try clearProto(handle: requireProtoSession())
+        }
+
+        func runQuery(_ options: RARAGQueryOptions) throws -> RARAGResult {
+            try query(handle: requireProtoSession(), options)
         }
     }
 }

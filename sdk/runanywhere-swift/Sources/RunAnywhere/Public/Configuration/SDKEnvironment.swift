@@ -23,7 +23,7 @@ public typealias SDKEnvironment = RASDKEnvironment
 // `wireString` and `from(wireString:)` are codegen-generated in
 // Generated/RAConvenience.swift from the `rac_wire_string` annotations in
 // idl/model_types.proto. The Codable conformance below delegates to those
-// generated accessors so legacy JSON payloads round-trip identically.
+// generated accessors so encoding and decoding share one canonical mapping.
 
 extension RASDKEnvironment: Codable {
     public init(from decoder: Swift.Decoder) throws {
@@ -129,7 +129,7 @@ public extension RASDKEnvironment {
 }
 
 /// SDK initialization parameters.
-public struct SDKInitParams {
+public struct SDKInitParams: Sendable {
     /// API key for authentication.
     public let apiKey: String
 

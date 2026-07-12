@@ -52,6 +52,7 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         out_ref->impl = (*token)->impl;
         out_ref->model_id = (*token)->model_id.c_str();
         out_ref->framework_name = (*token)->framework_name.c_str();
+        out_ref->supports_lora = (*token)->model.supports_lora();
     }
     out_ref->opaque = token.release();
     return RAC_SUCCESS;

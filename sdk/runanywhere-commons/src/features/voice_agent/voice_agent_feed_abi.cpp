@@ -133,8 +133,8 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
             s.silence_ms += kFrameMs;
         }
 
-        const int utterance_ms = static_cast<int>((s.utterance.size() / kBytesPerSample) * 1000 /
-                                                  kSampleRateHz);
+        const int utterance_ms =
+            static_cast<int>((s.utterance.size() / kBytesPerSample) * 1000 / kSampleRateHz);
         if (s.silence_ms >= kEndOfUtteranceSilenceMs || utterance_ms >= kMaxUtteranceMs) {
             const bool ok = s.speech_ms >= kMinSpeechMs;
             std::string audio = std::move(s.utterance);

@@ -479,8 +479,8 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
                     data_error = true;
                     break;
                 }
-                r = archive_write_data_block(ext, buff, size, offset);
-                if (r != ARCHIVE_OK) {
+                const la_ssize_t write_result = archive_write_data_block(ext, buff, size, offset);
+                if (write_result != ARCHIVE_OK) {
                     const char* err = archive_error_string(ext);
                     RAC_LOG_ERROR(kLogTag, "Error writing data for: %s (%s)", pathname,
                                   err ? err : "unknown");

@@ -530,7 +530,7 @@ static rac_result_t platform_diffusion_create_impl(const char* model_id,
     rac_diffusion_platform_config_t config = {};
     config.model_variant = RAC_DIFFUSION_MODEL_SD_1_5;
     config.enable_safety_checker = RAC_TRUE;
-    config.reduce_memory = RAC_FALSE;
+    config.max_memory_mb = 0;
     config.compute_units = 0;
     rac_handle_t backend_handle = callbacks->create(model_id, &config, callbacks->user_data);
     if (!backend_handle) {

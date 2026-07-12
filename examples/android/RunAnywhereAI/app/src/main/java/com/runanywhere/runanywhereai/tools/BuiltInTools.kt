@@ -11,8 +11,10 @@ import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
 import com.runanywhere.sdk.public.extensions.LLM.string
 import com.runanywhere.sdk.public.extensions.registerTool
 import com.runanywhere.sdk.public.types.RAToolDefinition
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 object BuiltInTools {
 
@@ -48,22 +50,6 @@ object BuiltInTools {
 
             RunAnywhere.registerTool(
                 RAToolDefinition(
-                    name = "get_weather",
-                    description = "Returns the current weather for a city or place name.",
-                    parameters = listOf(
-                        ToolParameter(
-                            name = "location",
-                            type = ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-                            description = "City or place name, e.g. 'Tokyo' or 'San Francisco'.",
-                            required = true,
-                        ),
-                    ),
-                    category = "Utility",
-                ),
-            ) { args -> WeatherTool.fetch(args["location"]?.string.orEmpty()) }
-
-            RunAnywhere.registerTool(
-                RAToolDefinition(
                     name = "calculate",
                     description = "Evaluates a math expression with + - * / and parentheses.",
                     parameters = listOf(
@@ -77,15 +63,24 @@ object BuiltInTools {
                     category = "Utility",
                 ),
             ) { args -> calculate(args["expression"]?.string.orEmpty()) }
+
+            RunAnywhere.registerTool(WebSearchTool.definition, WebSearchTool::execute)
         }.onFailure { RACLog.w("tool registration failed: ${it.message}") }
     }
 
     private fun currentTime(): Map<String, RAToolValue> {
-        val now = ZonedDateTime.now()
+        val now = Date()
+        val timeZone = TimeZone.getDefault()
+        val displayFormatter = SimpleDateFormat("EEEE, d MMMM yyyy, h:mm a", Locale.getDefault()).apply {
+            this.timeZone = timeZone
+        }
+        val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply {
+            this.timeZone = timeZone
+        }
         return mapOf(
-            "datetime" to RAToolValue.string(now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy, h:mm a"))),
-            "iso8601" to RAToolValue.string(now.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)),
-            "timezone" to RAToolValue.string(now.zone.id),
+            "datetime" to RAToolValue.string(displayFormatter.format(now)),
+            "iso8601" to RAToolValue.string(isoFormatter.format(now)),
+            "timezone" to RAToolValue.string(timeZone.id),
         )
     }
 

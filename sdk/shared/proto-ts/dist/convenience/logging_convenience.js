@@ -79,6 +79,5 @@ const loggingConfigurationDefaults = () => ({
     includeSourceLocation: false,
     includeDeviceMetadata: false,
     enableRemoteLogging: false,
-    enableSentryLogging: false,
 });
 exports.loggingConfigurationDefaults = loggingConfigurationDefaults;

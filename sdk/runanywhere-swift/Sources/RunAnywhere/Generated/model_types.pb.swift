@@ -257,7 +257,7 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
   case none // = 21
   case unknown // = 22
 
-  /// Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+  /// Sherpa-ONNX speech engine (STT/TTS/VAD)
   case sherpa // = 23
 
   /// Qualcomm Hexagon NPU (QHexRT runtime)
@@ -1098,11 +1098,6 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
     set {_uniqueStorage()._supportsLora = newValue}
   }
 
-  public var description_p: String {
-    get {_storage._description_p}
-    set {_uniqueStorage()._description_p = newValue}
-  }
-
   public var source: RAModelSource {
     get {_storage._source}
     set {_uniqueStorage()._source = newValue}
@@ -1151,9 +1146,7 @@ public nonisolated struct RAModelInfo: @unchecked Sendable {
   /// Clears the value of `thinkingPattern`. Subsequent reads from it will return its default value.
   public mutating func clearThinkingPattern() {_uniqueStorage()._thinkingPattern = nil}
 
-  /// Structured public catalog metadata. `description` (field 12) is kept for
-  /// backward compatibility and should mirror metadata.description when both
-  /// are populated.
+  /// Structured public catalog metadata, including the model description.
   public var metadata: RAModelInfoMetadata {
     get {_storage._metadata ?? RAModelInfoMetadata()}
     set {_uniqueStorage()._metadata = newValue}
@@ -3044,7 +3037,7 @@ nonisolated extension RAModelRuntimeCompatibility: SwiftProtobuf.Message, SwiftP
 
 nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfo"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{1}description\0\u{1}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}memory_required_bytes\0\u{3}checksum_sha256\0\u{3}thinking_pattern\0\u{1}metadata\0\u{3}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0\u{3}artifact_type\0\u{3}expected_files\0\u{3}acceleration_preference\0\u{3}routing_policy\0\u{1}compatibility\0\u{3}preferred_framework\0\u{3}registry_status\0\u{3}is_downloaded\0\u{3}is_available\0\u{3}last_used_at_unix_ms\0\u{3}usage_count\0\u{3}sync_pending\0\u{3}status_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{2}\u{2}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}memory_required_bytes\0\u{3}checksum_sha256\0\u{3}thinking_pattern\0\u{1}metadata\0\u{3}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0\u{3}artifact_type\0\u{3}expected_files\0\u{3}acceleration_preference\0\u{3}routing_policy\0\u{1}compatibility\0\u{3}preferred_framework\0\u{3}registry_status\0\u{3}is_downloaded\0\u{3}is_available\0\u{3}last_used_at_unix_ms\0\u{3}usage_count\0\u{3}sync_pending\0\u{3}status_message\0\u{c}\u{c}\u{1}")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -3058,7 +3051,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _contextLength: Int32 = 0
     var _supportsThinking: Bool = false
     var _supportsLora: Bool = false
-    var _description_p: String = String()
     var _source: RAModelSource = .unspecified
     var _createdAtUnixMs: Int64 = 0
     var _updatedAtUnixMs: Int64 = 0
@@ -3101,7 +3093,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
       _contextLength = source._contextLength
       _supportsThinking = source._supportsThinking
       _supportsLora = source._supportsLora
-      _description_p = source._description_p
       _source = source._source
       _createdAtUnixMs = source._createdAtUnixMs
       _updatedAtUnixMs = source._updatedAtUnixMs
@@ -3152,7 +3143,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._contextLength) }()
         case 10: try { try decoder.decodeSingularBoolField(value: &_storage._supportsThinking) }()
         case 11: try { try decoder.decodeSingularBoolField(value: &_storage._supportsLora) }()
-        case 12: try { try decoder.decodeSingularStringField(value: &_storage._description_p) }()
         case 13: try { try decoder.decodeSingularEnumField(value: &_storage._source) }()
         case 14: try { try decoder.decodeSingularInt64Field(value: &_storage._createdAtUnixMs) }()
         case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._updatedAtUnixMs) }()
@@ -3273,9 +3263,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
       if _storage._supportsLora != false {
         try visitor.visitSingularBoolField(value: _storage._supportsLora, fieldNumber: 11)
       }
-      if !_storage._description_p.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._description_p, fieldNumber: 12)
-      }
       if _storage._source != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._source, fieldNumber: 13)
       }
@@ -3379,7 +3366,6 @@ nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._contextLength != rhs_storage._contextLength {return false}
         if _storage._supportsThinking != rhs_storage._supportsThinking {return false}
         if _storage._supportsLora != rhs_storage._supportsLora {return false}
-        if _storage._description_p != rhs_storage._description_p {return false}
         if _storage._source != rhs_storage._source {return false}
         if _storage._createdAtUnixMs != rhs_storage._createdAtUnixMs {return false}
         if _storage._updatedAtUnixMs != rhs_storage._updatedAtUnixMs {return false}
@@ -3540,7 +3526,7 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{b}checksum\0\u{c}\u{5}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4796,7 +4782,7 @@ nonisolated extension RACurrentModelRequest: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RACurrentModelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CurrentModelResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}model\0\u{3}loaded_at_unix_ms\0\u{1}found\0\u{3}error_message\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}resolved_artifacts\0\u{b}has_model\0\u{c}\u{1}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}model\0\u{3}loaded_at_unix_ms\0\u{1}found\0\u{3}error_message\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}resolved_artifacts\0\u{c}\u{1}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

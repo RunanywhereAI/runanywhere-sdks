@@ -22,11 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
+import com.runanywhere.runanywhereai.ui.HybridBetaCopy
 import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
+import com.runanywhere.runanywhereai.ui.navigation.Tools
 import com.runanywhere.runanywhereai.ui.navigation.Tts
 import com.runanywhere.runanywhereai.ui.navigation.Vad
 import com.runanywhere.runanywhereai.ui.navigation.Vision
@@ -53,12 +55,13 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
     val entries = listOf(
         AdvancedEntry("Settings", "Personalization, privacy, and account controls", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
         AdvancedEntry("Document workbench", "Inspect document Q&A setup and sources", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Documents),
-        AdvancedEntry("Vision workbench", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision),
+        AdvancedEntry("Vision workbench", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision()),
         AdvancedEntry("Read aloud", "Generate speech and preview voices", RACIcons.Outline.Robot, AdvancedGroup.SPEECH, Tts),
-        AdvancedEntry("Transcription", "Batch, live, and hybrid speech recognition", RACIcons.Outline.Microphone, AdvancedGroup.SPEECH, Stt),
+        AdvancedEntry("Transcription", HybridBetaCopy.TRANSCRIPTION_ENTRY_DESCRIPTION, RACIcons.Outline.Microphone, AdvancedGroup.SPEECH, Stt),
         AdvancedEntry("Voice activity", "Tune speech detection infrastructure", RACIcons.Outline.Activity, AdvancedGroup.SPEECH, Vad),
+        AdvancedEntry("Web & tools", "Inspect and control assistant tools", RACIcons.Outline.Tool, AdvancedGroup.DEVELOPER, Tools),
         AdvancedEntry("Solutions", "Run YAML-driven SDK pipelines", RACIcons.Outline.Stack, AdvancedGroup.DEVELOPER, Solutions),
-        AdvancedEntry("Cloud providers", "Configure hybrid or cloud speech backends", RACIcons.Outline.Cloud, AdvancedGroup.DEVELOPER, CloudProviders),
+        AdvancedEntry("Cloud providers", HybridBetaCopy.CLOUD_PROVIDERS_ENTRY_DESCRIPTION, RACIcons.Outline.Cloud, AdvancedGroup.DEVELOPER, CloudProviders),
         AdvancedEntry("Benchmarks", "Measure speed, memory, and device behavior", RACIcons.Outline.Cpu, AdvancedGroup.DEVELOPER, Benchmarks),
     )
 
@@ -81,8 +84,6 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-
-        HexagonNpuCard()
 
         AdvancedGroup.entries.forEach { group ->
             AdvancedSection(group.title) {

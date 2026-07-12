@@ -18,20 +18,8 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
- * to `ToolCallingOptions.format_hint` (which remains a free-form string for
- * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
- * 1:1 to this enum).
- *
- * Drift across SDKs:
- *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
- *     today only exposes `default` and `lfm2` constants on a string-typed
- *     field — it is not yet an enum.
- *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
- * This enum is the union of formats LLM families actually emit; SDK frontends
- * should map their existing strings onto these values when surfacing the
- * strongly-typed field. Keep `format_hint` (string) populated for legacy
- * consumers until all SDKs migrate.
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
  * ---------------------------------------------------------------------------
  */
 public enum class ToolCallFormatName(
@@ -39,11 +27,7 @@ public enum class ToolCallFormatName(
 ) : WireEnum {
   TOOL_CALL_FORMAT_NAME_UNSPECIFIED(0),
   TOOL_CALL_FORMAT_NAME_JSON(1),
-  TOOL_CALL_FORMAT_NAME_XML(2),
-  TOOL_CALL_FORMAT_NAME_NATIVE(3),
-  TOOL_CALL_FORMAT_NAME_PYTHONIC(4),
-  TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS(5),
-  TOOL_CALL_FORMAT_NAME_HERMES(6),
+  TOOL_CALL_FORMAT_NAME_LFM2(7),
   ;
 
   public companion object {
@@ -60,11 +44,7 @@ public enum class ToolCallFormatName(
     public fun fromValue(`value`: Int): ToolCallFormatName? = when (`value`) {
       0 -> TOOL_CALL_FORMAT_NAME_UNSPECIFIED
       1 -> TOOL_CALL_FORMAT_NAME_JSON
-      2 -> TOOL_CALL_FORMAT_NAME_XML
-      3 -> TOOL_CALL_FORMAT_NAME_NATIVE
-      4 -> TOOL_CALL_FORMAT_NAME_PYTHONIC
-      5 -> TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS
-      6 -> TOOL_CALL_FORMAT_NAME_HERMES
+      7 -> TOOL_CALL_FORMAT_NAME_LFM2
       else -> null
     }
   }

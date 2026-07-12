@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# release-swift-binaries.sh — builds + zips + checksums all Swift binary
-# target xcframeworks (RACommons / RABackendLLAMACPP / RABackendONNX /
-# RABackendSherpa / RABackendMLX) for iOS (device + simulator) and patches
-# Package.swift checksums to match.
+# release-swift-binaries.sh — builds + zips + checksums all seven Apple
+# XCFrameworks (RACommons / RABackendLLAMACPP / RABackendONNX /
+# RABackendSherpa / RABackendMLX / RunAnywhereMLXRuntime /
+# RunAnywhereMLXMetal), packages the separate MLX resource payload, and
+# patches the root/Flutter manifests and Flutter MLX podspec checksums to match.
 #
 # Pre-requisites (manual, one-time on the release machine):
 #   1. Xcode 15+ with iOS SDK installed.
@@ -12,8 +13,9 @@
 #      present. Run:
 #        ./sdk/runanywhere-commons/scripts/ios/download-onnx.sh
 #      (or set RAC_BACKEND_ONNX=OFF to skip the ONNX backend.)
-#   3. `gh` CLI authenticated (only needed for the actual upload, which
-#      this script does NOT perform — see "Next steps" at the end).
+#   3. Pinned iOS Sherpa and macOS static Sherpa/ONNX inventories present. Run:
+#        ./sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+#        ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
 #
 # Usage:
 #   sdk/runanywhere-swift/scripts/release-swift-binaries.sh <version>          # builds + checksums
@@ -23,19 +25,18 @@
 # placeholders — only used to validate the pipeline end-to-end in CI):
 #   DRY_RUN=1 sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
 #
-# Skip ONNX (for dev iteration when onnxruntime-ios isn't extracted):
-#   RAC_BACKEND_ONNX=OFF sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
-#
 # Outputs:
 #   release-artifacts/native-ios-macos/RACommons-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendLLAMACPP-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip    (if ONNX enabled)
+#   release-artifacts/native-ios-macos/RABackendSherpa-ios-v${VERSION}.zip (if ONNX enabled)
 #   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip     (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXRuntime-ios-v${VERSION}.zip (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXMetal-ios-v${VERSION}.zip   (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXResources-ios-v${VERSION}.zip (if MLX enabled)
 #
-# Why this isn't fully automated (no `gh release upload` here):
-#   - Publishing requires `gh auth` on a release machine with the proper
-#     repo permissions; we intentionally keep the upload step operator-gated.
-#   - Same reason the tag/push steps happen outside this script.
+# Tagging and publication stay outside this build helper. The Release workflow
+# rebuilds and verifies these archives from the pushed tag before publishing.
 
 set -euo pipefail
 
@@ -47,25 +48,46 @@ VERSION="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/release-artifacts/native-ios-macos"
 
+MANIFEST_VERSION="$(sed -nE 's/^let sdkVersion = "([^"]+)"$/\1/p' "${REPO_ROOT}/Package.swift")"
+if [ -z "${MANIFEST_VERSION}" ]; then
+    echo "error: could not read sdkVersion from Package.swift" >&2
+    exit 1
+fi
+if [ "${VERSION}" != "${MANIFEST_VERSION}" ]; then
+    echo "error: requested version ${VERSION} does not match Package.swift sdkVersion ${MANIFEST_VERSION}" >&2
+    exit 1
+fi
+
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
 export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_MLX
+
+if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
+    echo "error: a Swift release requires every Apple binary/resource payload (ONNX and MLX must be ON)" >&2
+    exit 1
+fi
 
 if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: $0 only runs on macOS" >&2
     exit 1
 fi
 
-# Xcode version sanity: 15.0 minimum. Anything older lacks the
-# `-create-xcframework` flags we use below.
-if command -v xcodebuild >/dev/null 2>&1; then
-    xcver="$(xcodebuild -version 2>/dev/null | awk '/^Xcode /{print $2; exit}')"
-    xcmajor="${xcver%%.*}"
-    if [ -n "${xcmajor}" ] && [ "${xcmajor}" -lt 15 ]; then
-        echo "error: Xcode ${xcver} is too old; need Xcode 15.0 or newer" >&2
-        exit 1
-    fi
+# Archive hashes are committed before tagging and rebuilt in release CI, so a
+# merely compatible Xcode is insufficient: the exact canonical build must match.
+VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+XCODE_VERSION="$(sed -nE 's/^XCODE_VERSION=(.+)$/\1/p' "${VERSIONS_FILE}")"
+XCODE_BUILD="$(sed -nE 's/^XCODE_BUILD=(.+)$/\1/p' "${VERSIONS_FILE}")"
+if ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "error: xcodebuild is required" >&2
+    exit 1
+fi
+xcode_version_output="$(xcodebuild -version)"
+actual_xcode_version="$(awk '/^Xcode / { print $2 }' <<< "${xcode_version_output}")"
+actual_xcode_build="$(awk '/^Build version / { print $3 }' <<< "${xcode_version_output}")"
+if [ "${actual_xcode_version}" != "${XCODE_VERSION}" ] || [ "${actual_xcode_build}" != "${XCODE_BUILD}" ]; then
+    echo "error: expected Xcode ${XCODE_VERSION} (${XCODE_BUILD}), found ${actual_xcode_version} (${actual_xcode_build})" >&2
+    exit 1
 fi
 
 # ONNX prereq check. The actual path lives inside the commons submodule,
@@ -88,9 +110,10 @@ fi
 mkdir -p "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 1. Build all three xcframeworks (RACommons + per-backend).
+# 1. Build all seven xcframeworks plus the Swift MLX resource payload.
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}, RAC_BACKEND_MLX=${RAC_BACKEND_MLX})"
+export ZERO_AR_DATE=1
 "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -100,8 +123,13 @@ echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=
 #      ${DEST}/RACommons-ios-v${VERSION}.zip
 #      ${DEST}/RABackendLLAMACPP-ios-v${VERSION}.zip
 #      ${DEST}/RABackendONNX-ios-v${VERSION}.zip
+#      ${DEST}/RABackendSherpa-ios-v${VERSION}.zip
+#      ${DEST}/RABackendMLX-ios-v${VERSION}.zip
+#      ${DEST}/RunAnywhereMLXRuntime-ios-v${VERSION}.zip
+#      ${DEST}/RunAnywhereMLXMetal-ios-v${VERSION}.zip
+#      ${DEST}/RunAnywhereMLXResources-ios-v${VERSION}.zip
 # ────────────────────────────────────────────────────────────────────────────
-echo "▶ [2/3] Zipping xcframeworks"
+echo "▶ [2/3] Zipping XCFramework/resource payloads"
 
 BINARIES_DIR="${REPO_ROOT}/sdk/runanywhere-swift/Binaries"
 
@@ -128,7 +156,30 @@ zip_target() {
         exit 1
     fi
     echo "  ▶ ${zip}"
-    (cd "$(dirname "${xcf}")" && zip -qry "${zip}" "$(basename "${xcf}")")
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-xcframework-zip.sh" \
+        "${xcf}" "${zip}"
+}
+
+zip_resources() {
+    local resources_name="$1"
+    local zip_prefix="$2"
+    local resources="${BINARIES_DIR}/${resources_name}"
+    local zip="${DEST}/${zip_prefix}-v${VERSION}.zip"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        : > "${DEST}/.dryrun_placeholder_${resources_name}"
+        (cd "${DEST}" && zip -qry "${zip}" ".dryrun_placeholder_${resources_name}")
+        rm -f "${DEST}/.dryrun_placeholder_${resources_name}"
+        echo "[DRY RUN] (placeholder) Zipped ${zip}"
+        return
+    fi
+    if [ ! -d "${resources}" ]; then
+        echo "error: runtime resources not found: ${resources}" >&2
+        exit 1
+    fi
+    echo "  ▶ ${zip}"
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-directory-zip.sh" \
+        "${resources}" "${zip}"
 }
 
 zip_target "RACommons.xcframework"          "RACommons-ios"
@@ -148,14 +199,17 @@ else
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     zip_target "RABackendMLX.xcframework" "RABackendMLX-ios"
+    zip_target "RunAnywhereMLXRuntime.xcframework" "RunAnywhereMLXRuntime-ios"
+    zip_target "RunAnywhereMLXMetal.xcframework" "RunAnywhereMLXMetal-ios"
+    zip_resources "RunAnywhereMLXRuntimeResources" "RunAnywhereMLXResources-ios"
 else
-    echo "  ▶ Skipping RABackendMLX zip (RAC_BACKEND_MLX=OFF)"
+    echo "  ▶ Skipping all MLX binary/resource zips (RAC_BACKEND_MLX=OFF)"
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-# 3. Patch Package.swift checksums.
+# 3. Patch package-contract checksums.
 # ────────────────────────────────────────────────────────────────────────────
-echo "▶ [3/3] Patching Package.swift checksums via sync-checksums.sh"
+echo "▶ [3/3] Patching Apple package checksums via sync-checksums.sh"
 "${REPO_ROOT}/sdk/runanywhere-swift/scripts/sync-checksums.sh" "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -167,20 +221,21 @@ echo "✓ Release artifacts ready in: ${DEST}"
 ls -la "${DEST}" || true
 echo ""
 echo "Next steps (operator):"
-echo "  1. Review Package.swift diff:"
-echo "       git diff Package.swift"
-echo "  2. Verify swift build is green:"
-echo "       swift package resolve && swift build -c release"
-echo "  3. Create the GitHub release (and upload zips in the same call):"
-echo "       gh release create v${VERSION} ${DEST}/*.zip \\"
-echo "           --title 'v${VERSION}' --generate-notes"
-echo "  4. Commit the checksum bump + push:"
-echo "       git add Package.swift && \\"
+echo "  1. Review package checksum diffs:"
+echo "       git diff Package.swift sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec"
+echo "  2. Verify checksums and the local-native Swift build:"
+echo "       sdk/runanywhere-swift/scripts/sync-checksums.sh --check ${DEST}"
+echo "       RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build -c release"
+echo "  3. Commit and push the checksum manifest before creating the tag:"
+echo "       git add Package.swift sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec && \\"
 echo "           git commit -m 'release: bump xcframework checksums for v${VERSION}' && \\"
 echo "           git push origin HEAD"
+echo "  4. Tag that exact commit and push the tag; the Release workflow rebuilds,"
+echo "     verifies these deterministic checksums, validates consumers, and publishes:"
+echo "       git tag v${VERSION} && git push origin v${VERSION}"
 echo ""
 if [ "${DRY_RUN}" = "1" ]; then
-    echo "NOTE: DRY_RUN=1 was set. Checksums in Package.swift now correspond"
-    echo "      to placeholder zips — do NOT commit this Package.swift diff."
+    echo "NOTE: DRY_RUN=1 was set. Package contract checksums now correspond"
+    echo "      to placeholder zips — do NOT commit these checksum diffs."
     echo "      Re-run without DRY_RUN to produce real artifacts."
 fi

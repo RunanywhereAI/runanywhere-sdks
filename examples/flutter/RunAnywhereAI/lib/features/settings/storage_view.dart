@@ -20,7 +20,7 @@ class _StorageViewState extends State<StorageView> {
   bool _isLoading = false;
   int _totalUsageBytes = 0;
   int _availableBytes = 0;
-  List<sdk.StoredModel> _models = [];
+  List<sdk.ModelStorageMetrics> _models = [];
   String? _errorMessage;
 
   @override
@@ -66,8 +66,8 @@ class _StorageViewState extends State<StorageView> {
     await _runAction('Temporary files cleaned', sdk.RunAnywhere.cleanTempFiles);
   }
 
-  Future<void> _deleteModel(sdk.StoredModel model) async {
-    await _runAction('${model.name} deleted', () async {
+  Future<void> _deleteModel(sdk.ModelStorageMetrics model) async {
+    await _runAction('${_modelDisplayName(model.modelId)} deleted', () async {
       await sdk.RunAnywhere.deleteModel(model.modelId);
     });
   }
@@ -95,7 +95,7 @@ class _StorageViewState extends State<StorageView> {
   Widget build(BuildContext context) {
     final modelBytes = _models.fold<int>(
       0,
-      (total, model) => total + model.sizeBytes.toInt(),
+      (total, model) => total + model.sizeOnDiskBytes.toInt(),
     );
 
     return Scaffold(
@@ -145,7 +145,7 @@ class _StorageViewState extends State<StorageView> {
             )
           else
             ..._models.map(
-              (model) => _StoredModelRow(
+              (model) => _ModelStorageMetricsRow(
                 model: model,
                 onDelete: () => _deleteModel(model),
               ),
@@ -303,17 +303,18 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-class _StoredModelRow extends StatefulWidget {
-  const _StoredModelRow({required this.model, required this.onDelete});
+class _ModelStorageMetricsRow extends StatefulWidget {
+  const _ModelStorageMetricsRow({required this.model, required this.onDelete});
 
-  final sdk.StoredModel model;
+  final sdk.ModelStorageMetrics model;
   final Future<void> Function() onDelete;
 
   @override
-  State<_StoredModelRow> createState() => _StoredModelRowState();
+  State<_ModelStorageMetricsRow> createState() =>
+      _ModelStorageMetricsRowState();
 }
 
-class _StoredModelRowState extends State<_StoredModelRow> {
+class _ModelStorageMetricsRowState extends State<_ModelStorageMetricsRow> {
   bool _isDeleting = false;
 
   Future<void> _confirmDelete() async {
@@ -321,7 +322,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Model'),
-        content: Text('Delete ${widget.model.name}?'),
+        content: Text('Delete ${_modelDisplayName(widget.model.modelId)}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -353,11 +354,11 @@ class _StoredModelRowState extends State<_StoredModelRow> {
     final framework = catalogModel?.backendFramework;
     return Card(
       child: ListTile(
-        title: Text(widget.model.name),
+        title: Text(_modelDisplayName(widget.model.modelId)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.model.sizeBytes.toInt().formattedFileSize),
+            Text(widget.model.sizeOnDiskBytes.toInt().formattedFileSize),
             if (framework != null) ...[
               const SizedBox(height: AppSpacing.xxSmall),
               Row(
@@ -371,9 +372,9 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                   const SizedBox(width: AppSpacing.xxSmall),
                   Text(
                     framework.displayName,
-                    style: AppTypography.caption2(context).copyWith(
-                      color: framework.backendColor,
-                    ),
+                    style: AppTypography.caption2(
+                      context,
+                    ).copyWith(color: framework.backendColor),
                   ),
                 ],
               ),
@@ -395,14 +396,17 @@ class _StoredModelRowState extends State<_StoredModelRow> {
       ),
     );
   }
-
-  ModelInfo? _catalogModelFor(String modelId) {
-    for (final model in ModelListViewModel.shared.availableModels) {
-      if (model.id == modelId) return model;
-    }
-    return null;
-  }
 }
+
+ModelInfo? _catalogModelFor(String modelId) {
+  for (final model in ModelListViewModel.shared.availableModels) {
+    if (model.id == modelId) return model;
+  }
+  return null;
+}
+
+String _modelDisplayName(String modelId) =>
+    _catalogModelFor(modelId)?.name ?? modelId;
 
 class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});

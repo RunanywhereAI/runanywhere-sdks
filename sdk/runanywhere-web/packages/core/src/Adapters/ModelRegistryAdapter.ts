@@ -12,13 +12,13 @@
  * for discovery.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
 import {
   RAC_OK as RAC_SUCCESS,
   RAC_ERROR_NOT_FOUND,
   RAC_ERROR_FEATURE_NOT_AVAILABLE,
   RAC_ERROR_INVALID_ARGUMENT,
-} from '../Foundation/RACErrors';
+} from '../Foundation/RACErrors.js';
 import {
   ModelImportRequest as ProtoModelImportRequestCodec,
   ModelImportResult as ProtoModelImportResultCodec,
@@ -33,7 +33,7 @@ import {
   type ModelInfoList as ProtoModelInfoList,
   type ModelQuery as ProtoModelQuery,
 } from '@runanywhere/proto-ts/model_types';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('ModelRegistryAdapter');
 const OUT_PTR_SIZE = 4;
@@ -41,7 +41,6 @@ const OUT_PTR_SIZE = 4;
 export type ModelInfoList = ProtoModelInfoList;
 export type ModelRegistryAvailability =
   | { status: 'available' }
-  | { status: 'missingExports'; missingExports: string[] }
   | { status: 'unsupported'; resultCode: number; reason: string }
   | { status: 'notInstalled'; reason: string };
 
@@ -58,7 +57,7 @@ export interface ModelRegistryModule {
   HEAPU8?: Uint8Array;
   HEAPU32?: Uint32Array;
 
-  _rac_get_model_registry?(): number;
+  _rac_get_model_registry(): number;
   /**
    * `rac_result_t rac_model_registry_refresh_proto(handle, req_bytes,
    * req_size, out_proto_buffer)` — the single refresh entry point. Takes a
@@ -66,47 +65,52 @@ export interface ModelRegistryModule {
    * `ModelRegistryRefreshResult` via the out (bytes, size) pointer pair,
    * same shape as the other proto-byte registry calls in this file.
    */
-  _rac_model_registry_refresh_proto?(
+  _rac_model_registry_refresh_proto(
     handle: number,
     reqBytes: number,
     reqSize: number,
     outBytesPtr: number,
     outSizePtr: number,
   ): number;
-  _rac_model_registry_register_proto?(
+  _rac_model_registry_register_proto(
     handle: number,
     protoBytes: number,
     protoSize: number,
   ): number;
-  _rac_model_registry_update_proto?(
+  _rac_model_registry_update_proto(
     handle: number,
     protoBytes: number,
     protoSize: number,
   ): number;
-  _rac_model_registry_get_proto?(
+  _rac_model_registry_update_download_status(
+    handle: number,
+    modelId: number,
+    localPath: number,
+  ): number;
+  _rac_model_registry_get_proto(
     handle: number,
     modelId: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_list_proto?(
+  _rac_model_registry_list_proto(
     handle: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_query_proto?(
+  _rac_model_registry_query_proto(
     handle: number,
     queryProtoBytes: number,
     queryProtoSize: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_list_downloaded_proto?(
+  _rac_model_registry_list_downloaded_proto(
     handle: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_remove_proto?(
+  _rac_model_registry_remove_proto(
     handle: number,
     modelId: number,
   ): number;
@@ -117,13 +121,13 @@ export interface ModelRegistryModule {
    * `ModelImportResult` via the proto buffer. C++ owns import semantics
    * (Swift parity: CppBridge.ModelRegistry.importModel).
    */
-  _rac_model_registry_import_proto?(
+  _rac_model_registry_import_proto(
     handle: number,
     requestBytes: number,
     requestSize: number,
     outResult: number,
   ): number;
-  _rac_model_registry_proto_free?(protoBytes: number): void;
+  _rac_model_registry_proto_free(protoBytes: number): void;
 }
 
 let defaultModule: ModelRegistryModule | null = null;
@@ -158,8 +162,15 @@ export class ModelRegistryAdapter {
    * orchestrator runs in whichever module owns the `DownloadAdapter`, and
    * its `rac_get_model(...)` lookup must succeed regardless of which
    * backend bridge happens to own the `ModelRegistryAdapter` primary slot.
-   */
+  */
   static setDefaultModule(module: ModelRegistryModule): void {
+    const adapter = new ModelRegistryAdapter(module);
+    const missingExports = adapter.getMissingProtoExports();
+    if (missingExports.length > 0) {
+      throw new Error(
+        `Current RunAnywhere WASM artifact is missing required model-registry exports: ${missingExports.join(', ')}`,
+      );
+    }
     const isNewModule = !knownModules.has(module);
     defaultModule = module;
     knownModules.add(module);
@@ -184,7 +195,6 @@ export class ModelRegistryAdapter {
       }
     }
 
-    const adapter = new ModelRegistryAdapter(module);
     for (const listener of defaultModuleListeners) {
       try {
         listener(adapter);
@@ -243,10 +253,6 @@ export class ModelRegistryAdapter {
   }
 
   getProtoRegistryAvailability(): ModelRegistryAvailability {
-    const missingExports = this.getMissingProtoExports();
-    if (missingExports.length > 0) {
-      return { status: 'missingExports', missingExports };
-    }
     return protoAvailabilityByModule.get(this.module) ?? { status: 'available' };
   }
 
@@ -258,13 +264,6 @@ export class ModelRegistryAdapter {
    */
   refresh(options: RefreshOptions = {}): boolean {
     const mod = this.module;
-    if (!mod._rac_get_model_registry || !mod._rac_model_registry_refresh_proto) {
-      logger.warning(
-        'refresh: module missing rac_get_model_registry / rac_model_registry_refresh_proto exports',
-      );
-      return false;
-    }
-
     const handle = mod._rac_get_model_registry();
     if (!handle) {
       logger.warning('refresh: global registry handle is null');
@@ -310,20 +309,10 @@ export class ModelRegistryAdapter {
   /**
    * Register a model in every known WASM module's `s_model_registry`.
    *
-   * **Web-only contract (differs from native SDKs):** Because Emscripten
-   * modules do not share global state, each WASM backend has its own
-   * `s_model_registry` singleton. This method broadcasts the write to every
-   * known module and returns `true` when the PRIMARY module (the last one
-   * passed to `setDefaultModule`) accepts the registration. A sibling module
-   * rejecting the write (e.g. RAC_ERROR_FEATURE_NOT_AVAILABLE on a minimal
-   * WASM build) is logged at warning level but does not fail the call.
-   *
-   * On Swift/Kotlin/Flutter/RN a single shared `s_model_registry` handle is
-   * used, so `register` is all-or-nothing. On Web, the catalog diverges if
-   * the primary succeeds but a sibling fails — subsequent `get`/`list` calls
-   * will reflect the primary's state, but a backend WASM whose registry is
-   * out-of-sync may fail `rac_get_model` lookups. Callers that need strict
-   * all-module consistency should inspect the warning log after registration.
+   * Emscripten modules do not share global state, so each backend owns an
+   * `s_model_registry` singleton. The write is broadcast to every live module
+   * and returns true only when all modules accept it; partial synchronization
+   * is surfaced as failure.
    */
   register(model: ProtoModelInfo): boolean {
     const bytes = ProtoModelInfoCodec.encode(model).finish();
@@ -336,9 +325,7 @@ export class ModelRegistryAdapter {
 
   /**
    * Update an existing model entry in every known WASM module's registry.
-   * Same primary-wins / at-least-one-success broadcast contract as
-   * {@link register} — see that method's JSDoc for the Web vs native
-   * semantic difference.
+   * Uses the same all-live-modules contract as {@link register}.
    */
   update(model: ProtoModelInfo): boolean {
     const bytes = ProtoModelInfoCodec.encode(model).finish();
@@ -347,6 +334,38 @@ export class ModelRegistryAdapter {
         mod._rac_model_registry_update_proto!(handle, bytesPtr, bytesLen)
       ))
     ));
+  }
+
+  /**
+   * Set or explicitly clear a model's downloaded path in every known WASM
+   * registry. The dedicated C ABI is required for clears: proto3 cannot
+   * distinguish an omitted string from an explicitly empty `local_path`, so
+   * `update(...)` intentionally preserves the existing path in that case.
+   * Passing `null` forwards a null C pointer and resets downloaded state.
+   */
+  updateDownloadStatus(modelId: string, localPath: string | null): boolean {
+    if (modelId.length === 0) {
+      logger.warning('rac_model_registry_update_download_status requires a model id');
+      return false;
+    }
+    return this.broadcastWrite(
+      'rac_model_registry_update_download_status',
+      (mod, handle) => {
+        const idPtr = this.allocUtf8OnModule(mod, modelId);
+        if (!idPtr) return RAC_ERROR_INVALID_ARGUMENT;
+        const pathPtr = localPath === null ? 0 : this.allocUtf8OnModule(mod, localPath);
+        if (localPath !== null && !pathPtr) {
+          mod._free?.(idPtr);
+          return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        try {
+          return mod._rac_model_registry_update_download_status!(handle, idPtr, pathPtr);
+        } finally {
+          mod._free?.(idPtr);
+          if (pathPtr) mod._free?.(pathPtr);
+        }
+      },
+    );
   }
 
   /**
@@ -368,7 +387,6 @@ export class ModelRegistryAdapter {
     for (const mod of targets) {
       const isPrimary = mod === primary;
       const adapter = isPrimary ? this : new ModelRegistryAdapter(mod);
-      if (typeof mod._rac_model_registry_import_proto !== 'function') continue;
       const handle = adapter.getRegistryHandle('importModel');
       if (!handle) continue;
       const bridge = new ProtoWasmBridge(mod as unknown as ProtoWasmModule, logger);
@@ -452,11 +470,8 @@ export class ModelRegistryAdapter {
 
   /**
    * Remove a model from every known WASM module's registry.
-   * Same primary-wins / at-least-one-success broadcast contract as
-   * {@link register} — see that method's JSDoc for the Web vs native
-   * semantic difference. Sibling RAC_ERROR_NOT_FOUND results (the model was
-   * never seen by that module) are logged at warning level and do not fail
-   * the call.
+   * Uses the same all-live-modules contract as {@link register}. A missing
+   * model in any live registry makes the operation fail.
    */
   remove(modelId: string): boolean {
     return this.broadcastWrite('rac_model_registry_remove_proto', (mod, handle) => {
@@ -492,10 +507,6 @@ export class ModelRegistryAdapter {
 
   private getRegistryHandle(operation: string): number {
     const mod = this.module;
-    if (!mod._rac_get_model_registry) {
-      logger.warning(`${operation}: module missing rac_get_model_registry export`);
-      return 0;
-    }
     const handle = mod._rac_get_model_registry();
     if (!handle) {
       logger.warning(`${operation}: global registry handle is null`);
@@ -504,14 +515,8 @@ export class ModelRegistryAdapter {
     return handle;
   }
 
-  private ensureProtoExports(operation: string): boolean {
+  private ensureProtoExports(_operation: string): boolean {
     const availability = this.getProtoRegistryAvailability();
-    if (availability.status === 'missingExports') {
-      logger.warning(
-        `${operation}: module missing proto registry exports: ${availability.missingExports.join(', ')}`,
-      );
-      return false;
-    }
     if (availability.status === 'unsupported' || availability.status === 'notInstalled') {
       return false;
     }
@@ -524,14 +529,19 @@ export class ModelRegistryAdapter {
       '_malloc',
       '_free',
       'HEAPU8',
+      'lengthBytesUTF8',
+      'stringToUTF8',
       '_rac_get_model_registry',
+      '_rac_model_registry_refresh_proto',
       '_rac_model_registry_register_proto',
       '_rac_model_registry_update_proto',
+      '_rac_model_registry_update_download_status',
       '_rac_model_registry_get_proto',
       '_rac_model_registry_list_proto',
       '_rac_model_registry_query_proto',
       '_rac_model_registry_list_downloaded_proto',
       '_rac_model_registry_remove_proto',
+      '_rac_model_registry_import_proto',
       '_rac_model_registry_proto_free',
     ];
     return required.filter((key) => !mod[key]).map(String);
@@ -576,22 +586,11 @@ export class ModelRegistryAdapter {
 
   /**
    * Run a write op against every known WASM module (commons + every backend
-   * that registered against `ModelRegistryAdapter`). The return value is the
-   * result of the call against the PRIMARY module — sibling failures are
-   * logged at warning level but do not change the user-visible result.
+   * registered against `ModelRegistryAdapter`). Returns true only when the
+   * primary and every sibling succeed.
    *
-   * **Partial-failure contract:** If the primary accepts the write but a
-   * sibling rejects it, the method returns `true` while emitting a warning.
-   * This differs from native SDKs (Swift/Kotlin/Flutter/RN) where a single
-   * shared `s_model_registry` means the write is all-or-nothing. Callers
-   * that require strict cross-module consistency should treat any warning
-   * emission as a partial failure.
-   *
-   * Modules that don't expose proto-byte registry exports are skipped
-   * silently (e.g. a minimal WASM build that compiled out the proto path).
-   * Modules that expose the ABI but return RAC_ERROR_FEATURE_NOT_AVAILABLE
-   * are flagged via `markProtoRegistryUnsupported` and skipped on all
-   * subsequent calls.
+   * Every current WASM module must expose the registry ABI; installation
+   * rejects incomplete artifacts before they can enter this broadcast set.
    *
    * Used by `register`, `update`, and `remove` to keep the per-module C++
    * `s_model_registry` singletons in sync. Without this fan-out, the C++
@@ -605,7 +604,7 @@ export class ModelRegistryAdapter {
   ): boolean {
     const primary = this.module;
     let primaryResult: boolean | null = null;
-    let anySuccess = false;
+    let allSucceeded = true;
 
     // Snapshot the set so re-entrant register/listener pairs don't mutate
     // the iteration target. The primary module is guaranteed to be present
@@ -618,11 +617,13 @@ export class ModelRegistryAdapter {
       const isPrimary = mod === primary;
       const tempAdapter = isPrimary ? this : new ModelRegistryAdapter(mod);
       if (!tempAdapter.ensureProtoExports(functionName)) {
+        allSucceeded = false;
         if (isPrimary) primaryResult = false;
         continue;
       }
       const handle = tempAdapter.getRegistryHandle(functionName);
       if (!handle) {
+        allSucceeded = false;
         if (isPrimary) primaryResult = false;
         continue;
       }
@@ -635,20 +636,16 @@ export class ModelRegistryAdapter {
             error instanceof Error ? error.message : String(error)
           }`,
         );
+        allSucceeded = false;
         if (isPrimary) primaryResult = false;
         continue;
       }
       const ok = tempAdapter.handleResult(functionName, rc);
-      if (ok) anySuccess = true;
+      if (!ok) allSucceeded = false;
       if (isPrimary) primaryResult = ok;
     }
 
-    // If the primary module never reported a result (e.g. it lacked exports
-    // or its handle was null) treat the broadcast as successful when AT
-    // LEAST ONE sibling accepted the write. That keeps the catalog usable
-    // when commons happens to be the primary but only the backend WASM has
-    // the proto registry exports.
-    return primaryResult ?? anySuccess;
+    return primaryResult === true && allSucceeded;
   }
 
   private readOwnedProtoResult(

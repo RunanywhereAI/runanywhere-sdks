@@ -134,7 +134,7 @@ cmd_sdk_rn() {
 cmd_sdk_ios() {
     require_macos
     case "${1:-}" in
-        build)  (cd sdk/runanywhere-swift && swift build) ;;
+        build)  (cd sdk/runanywhere-swift && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build) ;;
         clean)  (cd sdk/runanywhere-swift && swift package clean) ;;
         *)      bad_subcommand "sdk ios" "${1:-}" ;;
     esac

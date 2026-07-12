@@ -69,6 +69,20 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhereqhexrt+auto
 get_filename_component(RN_NODE_MODULES "${CMAKE_SOURCE_DIR}/../../.." ABSOLUTE)
 set(CORE_INCLUDE_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/include")
 set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/${ANDROID_ABI}")
+set(QHEXRT_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/src/main/jniLibs/include")
+
+# Source checkouts can configure before native staging; published packages
+# always carry the same header under android/src/main/jniLibs/include.
+if(NOT EXISTS "${QHEXRT_INCLUDE_DIR}/rac/qhexrt/rac_qhexrt.h")
+    get_filename_component(QHEXRT_SOURCE_INCLUDE
+        "${CMAKE_SOURCE_DIR}/../../../../../engines/qhexrt/include" ABSOLUTE)
+    if(EXISTS "${QHEXRT_SOURCE_INCLUDE}/rac/qhexrt/rac_qhexrt.h")
+        set(QHEXRT_INCLUDE_DIR "${QHEXRT_SOURCE_INCLUDE}")
+    endif()
+endif()
+if(NOT EXISTS "${QHEXRT_INCLUDE_DIR}/rac/qhexrt/rac_qhexrt.h")
+    message(FATAL_ERROR "[RunAnywhereQHexRT] public QHexRT ABI header is missing; stage engines/qhexrt/include with the package")
+endif()
 
 include_directories(
     "src/main/cpp"
@@ -78,6 +92,8 @@ include_directories(
     "${CMAKE_SOURCE_DIR}/../../core/cpp/third_party"
     # RAC API headers from core package
     "${CORE_INCLUDE_DIR}"
+    # QHexRT-specific public ABI from this backend package
+    "${QHEXRT_INCLUDE_DIR}"
     "${CORE_INCLUDE_DIR}/rac"
     "${CORE_INCLUDE_DIR}/rac/core"
     "${CORE_INCLUDE_DIR}/rac/core/capabilities"

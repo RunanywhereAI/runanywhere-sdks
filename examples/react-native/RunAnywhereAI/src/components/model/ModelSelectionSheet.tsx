@@ -6,7 +6,13 @@
  * framework dropdown/accordion. Context-based filtering (LLM, STT, TTS, Voice,
  * VLM, RAG Embedding, RAG LLM) selects which models are shown.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -19,7 +25,6 @@ import { Icon, useTheme } from '../../theme/system';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
-  getFrameworkDisplayName,
   getFrameworkSystemIcon,
   getModelDownloadSizeBytes,
   getModelFormatLabel,
@@ -32,10 +37,13 @@ import {
   ModelCategory,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import {
+  getNpuCatalogSnapshot,
+  subscribeNpuCatalog,
+} from '../../services/NpuModelCatalog';
+import { listVisibleCatalogModels } from '../../services/ModelRegistryQueries';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
-const listModels = async (): Promise<SDKModelInfo[]> =>
-  (await RunAnywhere.listModels()).models?.models ?? [];
 
 type StorageSnapshot = Awaited<ReturnType<typeof RunAnywhere.getStorageInfo>>;
 
@@ -107,9 +115,15 @@ const getAllowedFrameworksForContext = (
 ): Set<InferenceFramework> | null => {
   switch (context) {
     case ModelSelectionContext.RagEmbedding:
-      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_ONNX]);
+      return new Set([
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+      ]);
     case ModelSelectionContext.RagLLM:
-      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]);
+      return new Set([
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+      ]);
     default:
       return null;
   }
@@ -132,7 +146,7 @@ const formatBytes = (bytes: number): string => {
 
 const modelSubtitle = (model: SDKModelInfo): string => {
   const size = getModelDownloadSizeBytes(model);
-  const framework = getFrameworkDisplayName(
+  const framework = RunAnywhere.formatFramework(
     getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK)
   );
   return [
@@ -171,12 +185,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   // so their rows can show a "LoRA" tag. listCatalog is a catalog op (no loaded
   // model required), so it's safe to call here.
   const [loraModelIds, setLoraModelIds] = useState<Set<string>>(new Set());
+  const npuCatalogSnapshot = useSyncExternalStore(
+    subscribeNpuCatalog,
+    getNpuCatalogSnapshot,
+    getNpuCatalogSnapshot
+  );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [allModels, storageInfo, loraCatalog] = await Promise.all([
-        listModels(),
+        listVisibleCatalogModels(npuCatalogSnapshot.registeredModelIds),
         RunAnywhere.getStorageInfo().catch(() => null),
         RunAnywhere.lora.listCatalog().catch(() => null),
       ]);
@@ -213,7 +232,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [context]);
+  }, [context, npuCatalogSnapshot.registeredModelIds]);
 
   useEffect(() => {
     loadData();

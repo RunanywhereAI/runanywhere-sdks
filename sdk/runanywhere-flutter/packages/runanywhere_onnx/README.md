@@ -27,8 +27,8 @@ Add both the core SDK and this backend to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.13
-  runanywhere_onnx: ^0.19.13
+  runanywhere: ^0.20.0
+  runanywhere_onnx: ^0.20.0
 ```
 
 Then run:
@@ -45,7 +45,7 @@ flutter pub get
 
 | Platform | Minimum Version | Requirements |
 |----------|-----------------|--------------|
-| iOS      | 17.0+           | Microphone permission |
+| iOS      | 17.5+           | Microphone permission |
 | Android  | API 24+         | RECORD_AUDIO permission |
 
 ---
@@ -57,7 +57,7 @@ flutter pub get
 Update `ios/Podfile`:
 
 ```ruby
-platform :ios, '17.0'
+platform :ios, '17.5'
 
 target 'Runner' do
   use_frameworks! :linkage => :static  # Required!
@@ -96,7 +96,7 @@ void main() async {
   // Initialize SDK
   await RunAnywhere.initialize();
 
-  // Register ONNX backend (auto-registers STT/TTS/VAD via Sherpa)
+  // Explicitly registers generic ONNX and Sherpa STT/TTS/VAD backends.
   await Onnx.register();
 
   runApp(MyApp());

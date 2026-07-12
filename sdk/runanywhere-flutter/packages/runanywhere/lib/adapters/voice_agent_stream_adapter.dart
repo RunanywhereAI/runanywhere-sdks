@@ -12,12 +12,11 @@
 //     await for (final event in stream) handleEvent(event);
 //
 // Cancellation: `StreamSubscription.cancel()` propagates through
-// `onCancel` to `Pointer.fromFunction` deregistration.
+// `onCancel` to native callback deregistration.
 
 import 'dart:async';
 import 'dart:ffi' as ffi;
-// NativeCallable moved from dart:isolate to dart:ffi in Dart 3.1+.
-import 'dart:ffi' show NativeCallable;
+import 'dart:isolate';
 import 'dart:typed_data' show Uint8List;
 
 // Wire-via-protoc generated VoiceEvent — see codegen output at
@@ -47,10 +46,12 @@ class VoiceAgentStreamAdapter {
       onListen: () {
         final attached = fanOut.attach(controller);
         if (!attached) {
-          controller.addError(StateError(
-            'rac_voice_agent_set_proto_callback failed '
-            '(Protobuf may not be linked)',
-          ));
+          controller.addError(
+            StateError(
+              'rac_voice_agent_set_proto_callback failed '
+              '(Protobuf may not be linked)',
+            ),
+          );
           unawaited(controller.close());
         }
       },
@@ -77,7 +78,7 @@ class _VoiceHandleFanOut {
   final ffi.Pointer<ffi.Void> _handle;
   final void Function() _onTornDown;
   final Set<StreamController<VoiceEvent>> _controllers = {};
-  NativeCallable<_CCallbackNative>? _nativeCb;
+  ReceivePort? _receivePort;
 
   bool attach(StreamController<VoiceEvent> controller) {
     // Add the controller BEFORE calling _install() so that a
@@ -85,12 +86,14 @@ class _VoiceHandleFanOut {
     // HandleStreamAdapter.swift:123-129) is not dropped
     // because _broadcast() snapshots an empty set.  Roll back on failure.
     _controllers.add(controller);
-    if (_nativeCb == null && !_install()) {
+    if (!_isInstalled && !_install()) {
       _controllers.remove(controller);
       return false;
     }
     return true;
   }
+
+  bool get _isInstalled => _receivePort != null;
 
   void detach(StreamController<VoiceEvent> controller) {
     _controllers.remove(controller);
@@ -100,42 +103,43 @@ class _VoiceHandleFanOut {
   }
 
   bool _install() {
-    // NativeCallable.listener dispatches the closure body
-    // asynchronously on the Dart isolate event loop — the C trampoline returns
-    // immediately and the commons dispatcher is free to overwrite its
-    // thread_local scratch buffer before this closure runs. The copy on line
-    // below therefore races the scratch buffer on a busy voice pipeline.
-    //
-    // The correct fix requires commons to expose either a poll-based owned-copy
-    // queue (`rac_voice_agent_proto_poll`, analogous to `rac_sdk_event_poll`)
-    // or an ABI that heap-allocates the proto bytes and transfers ownership
-    // to the caller (rac_proto_buffer_t pattern). Until that commons ABI
-    // exists, this listener-based path is the only available mechanism.
-    final cb = NativeCallable<_CCallbackNative>.listener((
-      ffi.Pointer<ffi.Uint8> bytesPtr,
-      int bytesLen,
-      ffi.Pointer<ffi.Void> _,
-    ) {
-      if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
-      final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+    final bindings = RacNative.bindings;
+    if (bindings.ra_flutter_voice_agent_set_proto_callback_native_port ==
+            null ||
+        bindings.ra_flutter_voice_agent_unset_proto_callback_native_port ==
+            null) {
+      return false;
+    }
+    return _installNativePort();
+  }
+
+  bool _installNativePort() {
+    final bindings = RacNative.bindings;
+    final setFn =
+        bindings.ra_flutter_voice_agent_set_proto_callback_native_port;
+    if (setFn == null) return false;
+
+    final port = ReceivePort();
+    port.listen((Object? message) {
+      if (message is! Uint8List) return;
       try {
-        _broadcast(VoiceEvent.fromBuffer(copy));
+        _broadcast(VoiceEvent.fromBuffer(message));
       } catch (e, st) {
         _broadcastError(e, st);
       }
     });
 
-    final rc = RacNative.bindings.rac_voice_agent_set_proto_callback(
+    final rc = setFn(
       _handle,
-      cb.nativeFunction,
-      ffi.nullptr,
+      port.sendPort.nativePort,
+      ffi.NativeApi.postCObject,
     );
     if (rc != 0) {
-      cb.close();
+      port.close();
       return false;
     }
 
-    _nativeCb = cb;
+    _receivePort = port;
     return true;
   }
 
@@ -161,33 +165,18 @@ class _VoiceHandleFanOut {
   }
 
   void _tearDown() {
-    final cb = _nativeCb;
-    if (cb == null) return;
-    // Teardown ordering: (1) unregister the C callback so no NEW
-    // dispatches will fire, (2) `rac_voice_agent_proto_quiesce()` spins
-    // until every in-flight dispatch returns, (3) close the NativeCallable
-    // whose `user_data` was the dispatcher's argument. Skipping the quiesce
-    // step lets the dispatcher invoke the trampoline after the
-    // NativeCallable is freed (UAF). Mirrors Swift's
-    // `HandleStreamAdapter.tearDown()` lock-release-before-unregister
-    // pattern in
-    // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
-    RacNative.bindings.rac_voice_agent_set_proto_callback(
-      _handle,
-      ffi.nullptr,
-      ffi.nullptr,
-    );
-    RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
-    cb.close();
-    _nativeCb = null;
+    if (_receivePort == null) return;
+    final unsetFn = RacNative
+        .bindings
+        .ra_flutter_voice_agent_unset_proto_callback_native_port;
+    if (unsetFn == null) {
+      throw UnsupportedError(
+        'ra_flutter_voice_agent_unset_proto_callback_native_port is unavailable',
+      );
+    }
+    unsetFn(_handle);
+    _receivePort?.close();
+    _receivePort = null;
     _onTornDown();
   }
 }
-
-/// `void (*)(uint8_t*, size_t, void*)` matching
-/// `rac_voice_agent_proto_event_callback_fn`.
-typedef _CCallbackNative = ffi.Void Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);

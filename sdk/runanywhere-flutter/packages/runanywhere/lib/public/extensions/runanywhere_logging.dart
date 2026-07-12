@@ -7,7 +7,6 @@
 //   - configureLogging(LoggingConfiguration)
 //   - setLocalLoggingEnabled(bool)
 //   - setLogLevel(LogLevel)
-//   - setSentryLoggingEnabled(bool)
 //   - addLogDestination(LogDestination)
 //   - setDebugMode(bool)
 //   - flushLogs()
@@ -71,12 +70,6 @@ class RunAnywhereLogging {
     SDKLoggerConfig.shared.setMinLogLevel(level);
   }
 
-  /// Enable or disable Sentry error tracking.
-  /// Mirrors Swift's `setSentryLoggingEnabled(_:)`.
-  static void setSentryLoggingEnabled(bool enabled) {
-    SDKLoggerConfig.shared.setSentryLoggingEnabled(enabled);
-  }
-
   /// Add a custom log destination.
   /// Mirrors Swift's `addLogDestination(_:)`. Destinations receive every
   /// log record after filtering by [LogLevel].
@@ -100,8 +93,7 @@ class RunAnywhereLogging {
   /// Enable verbose debugging mode.
   /// Mirrors Swift's `setDebugMode(_:)`.
   static void setDebugMode(bool enabled) {
-    setLogLevel(
-        enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
+    setLogLevel(enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
     setLocalLoggingEnabled(enabled);
   }
 

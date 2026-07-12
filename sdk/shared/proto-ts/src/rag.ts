@@ -117,10 +117,12 @@ export interface RAGConfiguration {
    * score are discarded before being passed to the LLM as context.
    * Optional so callers can distinguish "unset" from explicit 0.0
    * (accept-everything) without losing the canonical default.
-   * Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-   * cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-   * so a 0.7 floor filters out every match and retrieval returns nothing
-   * (validated by generated SDK helpers and commons session creation).
+   * Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+   * produce cosine similarities that rarely exceed ~0.5 even for relevant
+   * chunks, and chunking a document lowers each chunk's similarity further, so
+   * any positive floor filters out real matches — a multi-chunk document then
+   * retrieves nothing and the answer model reports "no information". top_k
+   * bounds the result count instead of a similarity floor.
    */
   similarityThreshold?:
     | number
@@ -228,7 +230,12 @@ export interface RAGQueryOptions {
   topK: number;
   /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
   retrievalTopK: number;
-  similarityThreshold: number;
+  /**
+   * Per-query similarity floor. `optional` so an explicit 0.0 (accept
+   * everything) is distinguishable from "unset" and can override a positive
+   * session-level default; unset falls back to RAGConfiguration.
+   */
+  similarityThreshold?: number | undefined;
   stream: boolean;
   /**
    * When true, suppress the answer model's thinking phase (maps to
@@ -236,6 +243,22 @@ export interface RAGQueryOptions {
    * directive instead of the app injecting "/no_think"). Default false.
    */
   disableThinking: boolean;
+  /**
+   * Multi-query expansion: when true, the answer LLM rewrites the question
+   * into `multi_query_count` variants; retrieval runs for the original plus
+   * each variant and the rankings are RRF-fused before rerank. Falls back to
+   * a single query if expansion yields nothing.
+   */
+  enableMultiQuery: boolean;
+  multiQueryCount?:
+    | number
+    | undefined;
+  /**
+   * Scoped retrieval: when set, only chunks whose document id begins with
+   * this prefix are eligible (e.g. a chat/collection namespace). Unset =
+   * search the whole index.
+   */
+  scopePrefix?: string | undefined;
 }
 
 export interface RAGQueryRequest {
@@ -270,8 +293,7 @@ export interface RAGSearchResult {
     | undefined;
   /**
    * Free-form metadata associated with the chunk (e.g. page number, section,
-   * ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-   * canonicalized here as a typed map so consumers don't re-parse.
+   * ingestion timestamp).
    */
   metadata: { [key: string]: string };
   rank: number;
@@ -1265,9 +1287,12 @@ function createBaseRAGQueryOptions(): RAGQueryOptions {
     topP: 0,
     topK: 0,
     retrievalTopK: 0,
-    similarityThreshold: 0,
+    similarityThreshold: undefined,
     stream: false,
     disableThinking: false,
+    enableMultiQuery: false,
+    multiQueryCount: undefined,
+    scopePrefix: undefined,
   };
 }
 
@@ -1294,7 +1319,7 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     if (message.retrievalTopK !== 0) {
       writer.uint32(56).int32(message.retrievalTopK);
     }
-    if (message.similarityThreshold !== 0) {
+    if (message.similarityThreshold !== undefined) {
       writer.uint32(69).float(message.similarityThreshold);
     }
     if (message.stream !== false) {
@@ -1302,6 +1327,15 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     }
     if (message.disableThinking !== false) {
       writer.uint32(80).bool(message.disableThinking);
+    }
+    if (message.enableMultiQuery !== false) {
+      writer.uint32(88).bool(message.enableMultiQuery);
+    }
+    if (message.multiQueryCount !== undefined) {
+      writer.uint32(96).int32(message.multiQueryCount);
+    }
+    if (message.scopePrefix !== undefined) {
+      writer.uint32(106).string(message.scopePrefix);
     }
     return writer;
   },
@@ -1393,6 +1427,30 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
           message.disableThinking = reader.bool();
           continue;
         }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.enableMultiQuery = reader.bool();
+          continue;
+        }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.multiQueryCount = reader.int32();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.scopePrefix = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1435,13 +1493,28 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
         ? globalThis.Number(object.similarityThreshold)
         : isSet(object.similarity_threshold)
         ? globalThis.Number(object.similarity_threshold)
-        : 0,
+        : undefined,
       stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
       disableThinking: isSet(object.disableThinking)
         ? globalThis.Boolean(object.disableThinking)
         : isSet(object.disable_thinking)
         ? globalThis.Boolean(object.disable_thinking)
         : false,
+      enableMultiQuery: isSet(object.enableMultiQuery)
+        ? globalThis.Boolean(object.enableMultiQuery)
+        : isSet(object.enable_multi_query)
+        ? globalThis.Boolean(object.enable_multi_query)
+        : false,
+      multiQueryCount: isSet(object.multiQueryCount)
+        ? globalThis.Number(object.multiQueryCount)
+        : isSet(object.multi_query_count)
+        ? globalThis.Number(object.multi_query_count)
+        : undefined,
+      scopePrefix: isSet(object.scopePrefix)
+        ? globalThis.String(object.scopePrefix)
+        : isSet(object.scope_prefix)
+        ? globalThis.String(object.scope_prefix)
+        : undefined,
     };
   },
 
@@ -1468,7 +1541,7 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     if (message.retrievalTopK !== 0) {
       obj.retrievalTopK = Math.round(message.retrievalTopK);
     }
-    if (message.similarityThreshold !== 0) {
+    if (message.similarityThreshold !== undefined) {
       obj.similarityThreshold = message.similarityThreshold;
     }
     if (message.stream !== false) {
@@ -1476,6 +1549,15 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     }
     if (message.disableThinking !== false) {
       obj.disableThinking = message.disableThinking;
+    }
+    if (message.enableMultiQuery !== false) {
+      obj.enableMultiQuery = message.enableMultiQuery;
+    }
+    if (message.multiQueryCount !== undefined) {
+      obj.multiQueryCount = Math.round(message.multiQueryCount);
+    }
+    if (message.scopePrefix !== undefined) {
+      obj.scopePrefix = message.scopePrefix;
     }
     return obj;
   },
@@ -1492,9 +1574,12 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     message.topP = object.topP ?? 0;
     message.topK = object.topK ?? 0;
     message.retrievalTopK = object.retrievalTopK ?? 0;
-    message.similarityThreshold = object.similarityThreshold ?? 0;
+    message.similarityThreshold = object.similarityThreshold ?? undefined;
     message.stream = object.stream ?? false;
     message.disableThinking = object.disableThinking ?? false;
+    message.enableMultiQuery = object.enableMultiQuery ?? false;
+    message.multiQueryCount = object.multiQueryCount ?? undefined;
+    message.scopePrefix = object.scopePrefix ?? undefined;
     return message;
   },
 };

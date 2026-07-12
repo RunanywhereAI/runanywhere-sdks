@@ -3,9 +3,8 @@
  *
  * T3.1 — Web live stream delivery MVP. Verifies that `streamCallback`:
  *
- *   1. Still drains every event for a purely synchronous native-call
- *      wrapper (backward compatibility with the production llamacpp /
- *      ONNX path).
+ *   1. Drains every event for the current synchronous native-call wrapper
+ *      used by the production llamacpp / ONNX path.
  *   2. Lets a cooperative ASYNC native-call wrapper deliver events to
  *      the consumer iterator BEFORE the wrapper's Promise resolves —
  *      i.e. live delivery, not "wait for the whole batch then drain".
@@ -17,8 +16,6 @@
  *
  *     npx vitest run tests/unit/Adapters/StreamLiveDelivery.test.ts
  *
- * See `docs/STREAM_DELIVERY_DESIGN.md` for the architectural framing
- * (MVP, follow-up options, recommended next step).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -122,7 +119,7 @@ async function collectAll<T>(iter: AsyncIterable<T>, max = 1_000): Promise<T[]> 
 // ---------------------------------------------------------------------------
 
 describe('streamCallback live delivery (T3.1 MVP)', () => {
-  it('drains every event from a synchronous native-call wrapper (backward compat)', async () => {
+  it('drains every event from the current synchronous native-call wrapper', async () => {
     const fake = makeFakeModule();
     const TOTAL = 100;
 

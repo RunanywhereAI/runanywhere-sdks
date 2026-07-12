@@ -8,32 +8,32 @@
 import CRACommons
 import Foundation
 
+private struct ClientInfoMetadata {
+    let sdkBinding: String
+    let appIdentifier: String
+    let appName: String
+    let appVersion: String
+    let appBuild: String
+    let locale: String
+    let timezone: String
+}
+
+private struct ClientInfoCStringPointers {
+    let sdkBinding: UnsafePointer<CChar>
+    let appIdentifier: UnsafePointer<CChar>
+    let appName: UnsafePointer<CChar>
+    let appVersion: UnsafePointer<CChar>
+    let appBuild: UnsafePointer<CChar>
+    let locale: UnsafePointer<CChar>
+    let timezone: UnsafePointer<CChar>
+}
+
 extension CppBridge {
 
     enum ClientInfo {
-        private struct Metadata {
-            let sdkBinding: String
-            let appIdentifier: String
-            let appName: String
-            let appVersion: String
-            let appBuild: String
-            let locale: String
-            let timezone: String
-        }
-
-        private struct CStringPointers {
-            let sdkBinding: UnsafePointer<CChar>
-            let appIdentifier: UnsafePointer<CChar>
-            let appName: UnsafePointer<CChar>
-            let appVersion: UnsafePointer<CChar>
-            let appBuild: UnsafePointer<CChar>
-            let locale: UnsafePointer<CChar>
-            let timezone: UnsafePointer<CChar>
-        }
-
         static func register() {
             let bundle = Bundle.main
-            let metadata = Metadata(
+            let metadata = ClientInfoMetadata(
                 sdkBinding: SDKConstants.binding,
                 appIdentifier: bundle.bundleIdentifier ?? "",
                 appName: bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
@@ -62,8 +62,8 @@ extension CppBridge {
         }
 
         private static func withCStringPointers<Result>(
-            _ metadata: Metadata,
-            _ body: (CStringPointers) -> Result
+            _ metadata: ClientInfoMetadata,
+            _ body: (ClientInfoCStringPointers) -> Result
         ) -> Result {
             metadata.sdkBinding.withCString { sdkBinding in
                 metadata.appIdentifier.withCString { appIdentifier in
@@ -73,7 +73,7 @@ extension CppBridge {
                                 metadata.locale.withCString { locale in
                                     metadata.timezone.withCString { timezone in
                                         body(
-                                            CStringPointers(
+                                            ClientInfoCStringPointers(
                                                 sdkBinding: sdkBinding,
                                                 appIdentifier: appIdentifier,
                                                 appName: appName,

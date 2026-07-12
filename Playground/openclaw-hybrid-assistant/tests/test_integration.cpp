@@ -27,9 +27,8 @@
 #include "audio/waiting_chime.h"
 
 // RAC headers
-#include <rac/backends/rac_vad_onnx.h>
-#include <rac/backends/rac_wakeword_onnx.h>
-#include <rac/features/voice_agent/rac_voice_agent.h>
+#include <rac/features/tts/rac_tts_component.h>
+#include <rac/plugin/rac_plugin_entry_sherpa.h>
 #include <rac/core/rac_error.h>
 
 #include <iostream>
@@ -574,8 +573,6 @@ TestResult test_tts_queue_parallel_playback() {
         }
     }
 
-    auto chunk1_play_start = std::chrono::steady_clock::now();
-
     // Push chunk 2 while chunk 1 is still "playing" (simulated)
     {
         openclaw::AudioChunk chunk;
@@ -786,7 +783,7 @@ TestResult test_tts_queue_push_while_playing() {
 // =============================================================================
 // Test: TTS Queue - Cancel During Active Playback (Barge-in Simulation)
 // =============================================================================
-// Simulates a wake word barge-in: the queue is actively playing a long response
+// Simulates a user interruption while the queue is playing a long response
 // (many chunks), cancel() is called mid-playback. Verifies:
 //   - Playback stops immediately (no more play() calls after cancel)
 //   - Remaining queued chunks are discarded
@@ -964,8 +961,8 @@ TestResult test_tts_queue_cancel_during_synthesis() {
 //   4. Verify: no more audio output after cancel
 //   5. Verify: pipeline state transitions back to non-SPEAKING
 //
-// This tests the exact cancel chain that fires when wake word interrupts TTS.
-// Uses the real VoicePipeline but with models loaded (requires ONNX backends).
+// This tests the exact cancel chain used when the user interrupts TTS.
+// Uses the real VoicePipeline with the Sherpa speech backend.
 // =============================================================================
 
 TestResult test_bargein_cancel_chain() {
@@ -1066,7 +1063,7 @@ TestResult test_bargein_cancel_chain() {
 // =============================================================================
 // Test: Barge-in - Rapid Cancel/Restart Cycle
 // =============================================================================
-// Simulates the user saying "Hey Jarvis" multiple times rapidly:
+// Simulates repeated user interruption and restart cycles:
 //   1. Start TTS with a response
 //   2. Cancel (barge-in)
 //   3. Immediately start TTS with a new response
@@ -1161,897 +1158,6 @@ TestResult test_bargein_rapid_restart() {
             << ", Cycle 3: cancel succeeded, pipeline clean";
     result.details = details.str();
 
-    return result;
-}
-
-// =============================================================================
-// Helper: Generate synthetic audio samples at 16kHz
-// =============================================================================
-
-// Generate silence (zeros)
-static std::vector<int16_t> generate_silence_16k(float duration_sec) {
-    int num = static_cast<int>(16000 * duration_sec);
-    return std::vector<int16_t>(num, 0);
-}
-
-// Generate a tone (for simulating speech-like audio that triggers VAD)
-static std::vector<int16_t> generate_tone_16k(float duration_sec, float freq = 300.0f, float amplitude = 8000.0f) {
-    int num = static_cast<int>(16000 * duration_sec);
-    std::vector<int16_t> samples(num);
-    for (int i = 0; i < num; ++i) {
-        float t = static_cast<float>(i) / 16000.0f;
-        samples[i] = static_cast<int16_t>(amplitude * std::sin(2.0f * 3.14159f * freq * t));
-    }
-    return samples;
-}
-
-// =============================================================================
-// Test: Wake Word - Single Detection (No Re-trigger)
-// =============================================================================
-// Feeds a real "Hey Jarvis" WAV into the pipeline and verifies:
-//   - Wake word fires exactly ONCE
-//   - Pipeline transitions to LISTENING state
-//   - The cooldown prevents re-triggering from residual audio
-//   - After silence timeout, returns to WAITING_FOR_WAKE_WORD
-// =============================================================================
-
-TestResult test_wakeword_single_detection() {
-    TestResult result;
-    result.name = "Wake Word - Single Detection (No Re-trigger)";
-
-    int wakeword_count = 0;
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float conf) {
-        wakeword_count++;
-        std::cout << "  [Test] Wake word #" << wakeword_count << " (conf=" << conf << ")\n";
-    };
-    config.on_audio_output = [](const int16_t*, size_t, int, const std::atomic<bool>&) {};
-    config.on_error = [](const std::string& e) { std::cerr << "  [Test] Error: " << e << "\n"; };
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Feed silence first (1 second - lets models warm up)
-    auto silence = generate_silence_16k(1.0f);
-    const size_t chunk = 256;
-    for (size_t i = 0; i + chunk <= silence.size(); i += chunk) {
-        pipeline.process_audio(silence.data() + i, chunk);
-    }
-
-    if (pipeline.state() != openclaw::PipelineState::WAITING_FOR_WAKE_WORD) {
-        result.details = "Pipeline not in WAITING_FOR_WAKE_WORD after silence";
-        pipeline.stop();
-        return result;
-    }
-
-    // Feed "Hey Jarvis" audio (use the real recording if available, else the TTS one)
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                result.details = "No hey-jarvis WAV file found for testing";
-                pipeline.stop();
-                return result;
-            }
-        }
-    }
-
-    // Simple WAV reader (reuse the inline one)
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    if (!wav_file.is_open()) {
-        result.details = "Cannot open " + wav_path;
-        pipeline.stop();
-        return result;
-    }
-
-    // Skip to data (simple: read entire file, find "data" chunk)
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    // Find data chunk
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (!audio_data || audio_samples == 0) {
-        result.details = "Failed to parse WAV file: " + wav_path;
-        pipeline.stop();
-        return result;
-    }
-
-    // Feed the "Hey Jarvis" audio
-    for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-        pipeline.process_audio(audio_data + i, chunk);
-    }
-
-    // Feed 2 more seconds of silence (should NOT re-trigger wake word)
-    auto post_silence = generate_silence_16k(2.0f);
-    for (size_t i = 0; i + chunk <= post_silence.size(); i += chunk) {
-        pipeline.process_audio(post_silence.data() + i, chunk);
-    }
-
-    pipeline.stop();
-
-    // The wake word should have fired at most ONCE
-    // (it might fire 0 times if the WAV is TTS-generated and doesn't match human speech)
-    if (wakeword_count > 1) {
-        result.details = "Wake word fired " + std::to_string(wakeword_count)
-                       + " times (expected at most 1). Cooldown not working!";
-        return result;
-    }
-
-    result.passed = true;
-    std::ostringstream details;
-    details << "Wake word fired " << wakeword_count << " time(s) from " << wav_path
-            << ", Pipeline state: " << pipeline.state_string();
-    result.details = details.str();
-
-    return result;
-}
-
-// =============================================================================
-// Test: Wake Word → Silence → Timeout → Back to Waiting
-// =============================================================================
-// Feeds wake word audio, then extended silence. Verifies the pipeline
-// transitions: WAITING → LISTENING → (timeout) → WAITING
-// =============================================================================
-
-TestResult test_wakeword_timeout_returns_to_waiting() {
-    TestResult result;
-    result.name = "Wake Word - Timeout Returns to WAITING_FOR_WAKE_WORD";
-
-    bool wakeword_detected = false;
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float) { wakeword_detected = true; };
-    config.on_audio_output = [](const int16_t*, size_t, int, const std::atomic<bool>&) {};
-    config.on_error = [](const std::string&) {};
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Manually activate wake word (simulate detection without needing real audio)
-    // We do this by feeding silence and then checking the timeout logic
-    // First, let's just force the state for this test
-    // Actually, we need to go through the real pipeline. Let's feed the real WAV.
-
-    // Feed silence to warm up
-    auto warmup = generate_silence_16k(0.5f);
-    const size_t chunk = 256;
-    for (size_t i = 0; i + chunk <= warmup.size(); i += chunk) {
-        pipeline.process_audio(warmup.data() + i, chunk);
-    }
-
-    // Feed "Hey Jarvis"
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                // Skip this test if no wake word audio available
-                result.passed = true;
-                result.details = "SKIPPED: No hey-jarvis WAV file available";
-                pipeline.stop();
-                return result;
-            }
-        }
-    }
-
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (audio_data && audio_samples > 0) {
-        for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-            pipeline.process_audio(audio_data + i, chunk);
-        }
-    }
-
-    if (!wakeword_detected) {
-        // WAV didn't trigger wake word (TTS audio) - skip test gracefully
-        result.passed = true;
-        result.details = "SKIPPED: WAV did not trigger wake word (may be TTS-generated)";
-        pipeline.stop();
-        return result;
-    }
-
-    // Wake word fired - should be in LISTENING now
-    if (pipeline.state() != openclaw::PipelineState::LISTENING) {
-        result.details = "After wake word, expected LISTENING but got " + pipeline.state_string();
-        pipeline.stop();
-        return result;
-    }
-
-    // Wait for the wake word timeout (10s) by feeding silence at ~real-time pace.
-    // The timeout uses wall clock, so we need actual elapsed time, not just audio samples.
-    // Feed a small chunk every 500ms for 11 seconds total.
-    auto silence_chunk = generate_silence_16k(0.5f);  // 0.5s of silence
-    auto timeout_start = std::chrono::steady_clock::now();
-    bool timed_out = false;
-
-    for (int i = 0; i < 22; i++) {  // 22 * 500ms = 11 seconds
-        for (size_t j = 0; j + chunk <= silence_chunk.size(); j += chunk) {
-            pipeline.process_audio(silence_chunk.data() + j, chunk);
-        }
-        if (pipeline.state() == openclaw::PipelineState::WAITING_FOR_WAKE_WORD) {
-            timed_out = true;
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-
-    auto timeout_elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - timeout_start
-    ).count();
-
-    if (!timed_out) {
-        result.details = "After " + std::to_string(timeout_elapsed_ms) + "ms, expected WAITING_FOR_WAKE_WORD but got " + pipeline.state_string();
-        pipeline.stop();
-        return result;
-    }
-
-    pipeline.stop();
-
-    result.passed = true;
-    result.details = "Wake word detected -> LISTENING -> timeout after "
-                   + std::to_string(timeout_elapsed_ms) + "ms -> WAITING_FOR_WAKE_WORD";
-
-    return result;
-}
-
-// =============================================================================
-// Test: Barge-in During TTS - Wake Word Cancels Playback
-// =============================================================================
-// Starts TTS playing a long response, then feeds "Hey Jarvis" audio.
-// Verifies:
-//   - TTS is cancelled immediately
-//   - Pipeline transitions to LISTENING (ready for next command)
-//   - No more TTS audio after cancellation
-// =============================================================================
-
-TestResult test_bargein_wakeword_during_tts() {
-    TestResult result;
-    result.name = "Barge-in - Wake Word During TTS Cancels Playback";
-
-    std::atomic<bool> wakeword_detected{false};
-    std::atomic<bool> speech_interrupted{false};
-    AudioCapture tts_capture;
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float) { wakeword_detected.store(true); };
-    config.on_speech_interrupted = [&]() { speech_interrupted.store(true); };
-    config.on_audio_output = [&tts_capture](const int16_t* s, size_t n, int sr, const std::atomic<bool>&) {
-        tts_capture.on_audio(s, n, sr);
-    };
-    config.on_error = [](const std::string&) {};
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Start TTS with a long response
-    pipeline.speak_text_async(
-        "This is a very long response from the agent. "
-        "It contains multiple sentences that take several seconds to synthesize and play. "
-        "The user should be able to interrupt this at any time by saying the wake word. "
-        "This fourth sentence keeps going to make the response even longer. "
-        "And the fifth sentence ensures we have plenty of time to test the barge-in."
-    );
-
-    // Wait for TTS to start
-    for (int i = 0; i < 100; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        if (tts_capture.total_samples() > 0) break;
-    }
-
-    if (tts_capture.total_samples() == 0) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.details = "TTS never started playing";
-        return result;
-    }
-
-    size_t samples_before_bargein = tts_capture.total_samples();
-
-    // Now feed "Hey Jarvis" audio while TTS is playing (barge-in!)
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                pipeline.cancel_speech();
-                pipeline.stop();
-                result.passed = true;
-                result.details = "SKIPPED: No hey-jarvis WAV for barge-in test";
-                return result;
-            }
-        }
-    }
-
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (audio_data && audio_samples > 0) {
-        const size_t chunk = 256;
-        for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-            pipeline.process_audio(audio_data + i, chunk);
-        }
-    }
-
-    // Wait a moment for cancel to propagate
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-    size_t samples_after_bargein = tts_capture.total_samples();
-
-    // Wait more - verify no audio leaks after barge-in
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    size_t samples_final = tts_capture.total_samples();
-
-    pipeline.stop();
-
-    // If wake word wasn't detected (TTS audio file doesn't work), skip gracefully
-    if (!wakeword_detected.load()) {
-        result.passed = true;
-        result.details = "SKIPPED: WAV did not trigger wake word during TTS (may need real human recording)";
-        return result;
-    }
-
-    // Verify TTS was cancelled (not all 5 sentences played)
-    if (!speech_interrupted.load()) {
-        result.details = "on_speech_interrupted callback was not fired";
-        return result;
-    }
-
-    if (pipeline.is_speaking()) {
-        result.details = "Pipeline still speaking after barge-in";
-        return result;
-    }
-
-    // Verify no more audio after barge-in
-    if (samples_final != samples_after_bargein) {
-        result.details = "Audio leaked after barge-in: " + std::to_string(samples_final - samples_after_bargein) + " extra samples";
-        return result;
-    }
-
-    result.passed = true;
-    std::ostringstream details;
-    details << "TTS samples before barge-in: " << samples_before_bargein
-            << ", After barge-in: " << samples_after_bargein
-            << ", Final (no leak): " << samples_final
-            << ", speech_interrupted callback fired: yes"
-            << ", State: " << pipeline.state_string();
-    result.details = details.str();
-
-    return result;
-}
-
-// =============================================================================
-// Test: Post-TTS Wake Word Reactivation
-// =============================================================================
-// Verifies that after speak_text_async completes normally (no barge-in),
-// the pipeline transitions back to WAITING_FOR_WAKE_WORD and a second
-// "Hey Jarvis" triggers successfully.
-// =============================================================================
-
-TestResult test_post_tts_wakeword_reactivation() {
-    TestResult result;
-    result.name = "Post-TTS Wake Word Reactivation";
-
-    std::atomic<int> wakeword_count{0};
-    AudioCapture tts_capture;
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float) { wakeword_count.fetch_add(1); };
-    config.on_audio_output = [&tts_capture](const int16_t* s, size_t n, int sr, const std::atomic<bool>&) {
-        tts_capture.on_audio(s, n, sr);
-    };
-    config.on_error = [](const std::string&) {};
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Step 1: Speak a short TTS response
-    pipeline.speak_text_async("Hello, this is a test response.");
-
-    // Wait for TTS to complete (poll state)
-    for (int i = 0; i < 200; i++) {  // Up to 10s
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        if (pipeline.state() != openclaw::PipelineState::SPEAKING) break;
-    }
-
-    if (pipeline.state() == openclaw::PipelineState::SPEAKING) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.details = "TTS never completed (still SPEAKING after 10s)";
-        return result;
-    }
-
-    if (pipeline.state() != openclaw::PipelineState::WAITING_FOR_WAKE_WORD) {
-        pipeline.stop();
-        result.details = "Expected WAITING_FOR_WAKE_WORD after TTS, got: " + pipeline.state_string();
-        return result;
-    }
-
-    // Step 2: Feed "Hey Jarvis" audio -- should trigger wake word
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                pipeline.stop();
-                result.passed = true;
-                result.details = "SKIPPED: No hey-jarvis WAV file";
-                return result;
-            }
-        }
-    }
-
-    // Feed silence to prime the model (500ms)
-    auto silence = generate_silence_16k(0.5f);
-    const size_t chunk = 256;
-    for (size_t i = 0; i + chunk <= silence.size(); i += chunk) {
-        pipeline.process_audio(silence.data() + i, chunk);
-    }
-
-    // Load and feed wake word audio
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (!audio_data || audio_samples == 0) {
-        pipeline.stop();
-        result.details = "Failed to parse WAV file";
-        return result;
-    }
-
-    wakeword_count.store(0);
-    for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-        pipeline.process_audio(audio_data + i, chunk);
-    }
-
-    // Feed post-silence
-    auto post = generate_silence_16k(0.5f);
-    for (size_t i = 0; i + chunk <= post.size(); i += chunk) {
-        pipeline.process_audio(post.data() + i, chunk);
-    }
-
-    pipeline.stop();
-
-    if (wakeword_count.load() == 0) {
-        result.details = "Wake word did NOT trigger after TTS completed";
-        return result;
-    }
-
-    if (pipeline.state() != openclaw::PipelineState::LISTENING) {
-        result.details = "Expected LISTENING after 2nd wake word, got: " + pipeline.state_string();
-        return result;
-    }
-
-    result.passed = true;
-    std::ostringstream details;
-    details << "TTS completed normally, state=" << pipeline.state_string()
-            << ", wake word fired " << wakeword_count.load() << " time(s)"
-            << ", TTS audio: " << tts_capture.duration_seconds() << "s";
-    result.details = details.str();
-    return result;
-}
-
-// =============================================================================
-// Test: Post-Barge-In Second Wake Word
-// =============================================================================
-// Full cycle: TTS -> barge-in -> state verified -> timeout ->
-// WAITING_FOR_WAKE_WORD -> 2nd wake word triggers
-// =============================================================================
-
-TestResult test_post_bargein_second_wakeword() {
-    TestResult result;
-    result.name = "Post-Barge-In - Second Wake Word Triggers";
-
-    std::atomic<int> wakeword_count{0};
-    std::atomic<bool> speech_interrupted{false};
-    AudioCapture tts_capture;
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float) { wakeword_count.fetch_add(1); };
-    config.on_speech_interrupted = [&]() { speech_interrupted.store(true); };
-    config.on_audio_output = [&tts_capture](const int16_t* s, size_t n, int sr, const std::atomic<bool>&) {
-        tts_capture.on_audio(s, n, sr);
-    };
-    config.on_error = [](const std::string&) {};
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Step 1: Start TTS
-    pipeline.speak_text_async(
-        "This is a long response. The user will interrupt before it finishes. "
-        "This third sentence ensures we have plenty of audio to interrupt.");
-
-    // Wait for TTS to start
-    for (int i = 0; i < 100; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        if (tts_capture.total_samples() > 0) break;
-    }
-
-    // Step 2: Feed "Hey Jarvis" for barge-in
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                pipeline.cancel_speech();
-                pipeline.stop();
-                result.passed = true;
-                result.details = "SKIPPED: No hey-jarvis WAV file";
-                return result;
-            }
-        }
-    }
-
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (!audio_data || audio_samples == 0) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.details = "Failed to parse WAV";
-        return result;
-    }
-
-    wakeword_count.store(0);
-    const size_t chunk = 256;
-
-    // Feed 1st "Hey Jarvis" (barge-in)
-    for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-        pipeline.process_audio(audio_data + i, chunk);
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-    int wakeword_after_bargein = wakeword_count.load();
-    bool interrupted = speech_interrupted.load();
-    auto state_after_bargein = pipeline.state();
-
-    if (wakeword_after_bargein == 0) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.passed = true;
-        result.details = "SKIPPED: WAV did not trigger wake word during TTS";
-        return result;
-    }
-
-    // Step 3: Verify barge-in state (should be LISTENING with wakeword_activated=true)
-    if (state_after_bargein != openclaw::PipelineState::LISTENING) {
-        pipeline.stop();
-        result.details = "Expected LISTENING after barge-in, got: " + pipeline.state_string();
-        return result;
-    }
-
-    // Step 4: Wait for wake word timeout (10s) to return to WAITING_FOR_WAKE_WORD
-    // Feed silence to trigger the timeout
-    std::cout << "  [Test] Waiting for wake word timeout (~10s)...\n";
-    auto timeout_start = std::chrono::steady_clock::now();
-    while (pipeline.state() != openclaw::PipelineState::WAITING_FOR_WAKE_WORD) {
-        auto silence_chunk = generate_silence_16k(0.5f);
-        for (size_t i = 0; i + chunk <= silence_chunk.size(); i += chunk) {
-            pipeline.process_audio(silence_chunk.data() + i, chunk);
-        }
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::steady_clock::now() - timeout_start).count();
-        if (elapsed > 15) {
-            pipeline.stop();
-            result.details = "Timeout: pipeline never returned to WAITING_FOR_WAKE_WORD (state="
-                           + pipeline.state_string() + ")";
-            return result;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    // Step 5: Feed 2nd "Hey Jarvis" -- should trigger again
-    // Prime with silence first
-    auto prime = generate_silence_16k(0.5f);
-    for (size_t i = 0; i + chunk <= prime.size(); i += chunk) {
-        pipeline.process_audio(prime.data() + i, chunk);
-    }
-
-    int count_before_2nd = wakeword_count.load();
-    for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-        pipeline.process_audio(audio_data + i, chunk);
-    }
-
-    // Post silence
-    auto post = generate_silence_16k(0.5f);
-    for (size_t i = 0; i + chunk <= post.size(); i += chunk) {
-        pipeline.process_audio(post.data() + i, chunk);
-    }
-
-    pipeline.stop();
-
-    int second_wakeword = wakeword_count.load() - count_before_2nd;
-    if (second_wakeword == 0) {
-        result.details = "2nd wake word did NOT trigger after barge-in cycle";
-        return result;
-    }
-
-    result.passed = true;
-    std::ostringstream details;
-    details << "Barge-in: interrupted=" << (interrupted ? "yes" : "no")
-            << ", state_after_bargein=LISTENING"
-            << ", 1st wakeword fired, timeout->WAITING_FOR_WAKE_WORD"
-            << ", 2nd wakeword fired (" << second_wakeword << " times)"
-            << ", final state=" << pipeline.state_string();
-    result.details = details.str();
-    return result;
-}
-
-// =============================================================================
-// Test: Barge-In ASR Readiness
-// =============================================================================
-// After barge-in, verify the pipeline is in LISTENING state with
-// wakeword_activated=true, meaning VAD/STT will run on the next audio.
-// =============================================================================
-
-TestResult test_bargein_asr_readiness() {
-    TestResult result;
-    result.name = "Barge-In ASR Readiness (LISTENING state after interrupt)";
-
-    std::atomic<bool> wakeword_detected{false};
-    std::atomic<bool> speech_interrupted{false};
-
-    openclaw::VoicePipelineConfig config;
-    config.enable_wake_word = true;
-    config.wake_word = "Hey Jarvis";
-    config.wake_word_threshold = 0.5f;
-    config.silence_duration_sec = 1.0;
-    config.min_speech_samples = 8000;
-
-    config.on_wake_word = [&](const std::string&, float) { wakeword_detected.store(true); };
-    config.on_speech_interrupted = [&]() { speech_interrupted.store(true); };
-    config.on_audio_output = [](const int16_t*, size_t, int, const std::atomic<bool>&) {};
-    config.on_error = [](const std::string&) {};
-
-    openclaw::VoicePipeline pipeline(config);
-    if (!pipeline.initialize()) {
-        result.details = "Failed to initialize: " + pipeline.last_error();
-        return result;
-    }
-    pipeline.start();
-
-    // Start TTS with a long response to ensure it stays in SPEAKING long enough
-    pipeline.speak_text_async(
-        "This is a long response to test ASR readiness after barge-in. "
-        "We need multiple sentences so the pipeline stays in SPEAKING state. "
-        "The user will interrupt before all sentences are synthesized and played.");
-
-    // Wait for TTS to enter SPEAKING state
-    bool entered_speaking = false;
-    for (int i = 0; i < 100; i++) {  // Up to 5s
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        if (pipeline.state() == openclaw::PipelineState::SPEAKING) {
-            entered_speaking = true;
-            break;
-        }
-    }
-
-    if (!entered_speaking) {
-        pipeline.stop();
-        result.details = "Pipeline never entered SPEAKING state: " + pipeline.state_string();
-        return result;
-    }
-
-    // Feed "Hey Jarvis" for barge-in
-    std::string wav_path = "tests/audio/hey-jarvis-real.wav";
-    {
-        struct stat st;
-        if (stat(wav_path.c_str(), &st) != 0) {
-            wav_path = "tests/audio/hey-jarvis-amplified.wav";
-            if (stat(wav_path.c_str(), &st) != 0) {
-                pipeline.cancel_speech();
-                pipeline.stop();
-                result.passed = true;
-                result.details = "SKIPPED: No hey-jarvis WAV file";
-                return result;
-            }
-        }
-    }
-
-    std::ifstream wav_file(wav_path, std::ios::binary);
-    wav_file.seekg(0, std::ios::end);
-    size_t file_size = wav_file.tellg();
-    wav_file.seekg(0);
-    std::vector<char> raw(file_size);
-    wav_file.read(raw.data(), file_size);
-    wav_file.close();
-
-    int16_t* audio_data = nullptr;
-    size_t audio_samples = 0;
-    for (size_t i = 0; i + 8 < file_size; i++) {
-        if (raw[i] == 'd' && raw[i+1] == 'a' && raw[i+2] == 't' && raw[i+3] == 'a') {
-            uint32_t data_size = *reinterpret_cast<uint32_t*>(&raw[i + 4]);
-            audio_data = reinterpret_cast<int16_t*>(&raw[i + 8]);
-            audio_samples = data_size / 2;
-            break;
-        }
-    }
-
-    if (!audio_data || audio_samples == 0) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.details = "Failed to parse WAV";
-        return result;
-    }
-
-    const size_t chunk = 256;
-    for (size_t i = 0; i + chunk <= audio_samples; i += chunk) {
-        pipeline.process_audio(audio_data + i, chunk);
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-    if (!wakeword_detected.load()) {
-        pipeline.cancel_speech();
-        pipeline.stop();
-        result.passed = true;
-        result.details = "SKIPPED: WAV did not trigger wake word during TTS";
-        return result;
-    }
-
-    // Key assertions:
-    // 1. State should be LISTENING (wakeword_activated=true, ready for VAD)
-    auto final_state = pipeline.state();
-    bool is_speaking = pipeline.is_speaking();
-
-    pipeline.stop();
-
-    if (final_state != openclaw::PipelineState::LISTENING) {
-        result.details = "Expected LISTENING after barge-in, got: " + pipeline.state_string();
-        return result;
-    }
-
-    if (is_speaking) {
-        result.details = "is_speaking() still true after barge-in";
-        return result;
-    }
-
-    if (!speech_interrupted.load()) {
-        result.details = "on_speech_interrupted callback was not fired";
-        return result;
-    }
-
-    result.passed = true;
-    std::ostringstream details;
-    details << "State: LISTENING (ASR-ready)"
-            << ", is_speaking=false"
-            << ", speech_interrupted=yes"
-            << ", wakeword_detected=yes";
-    result.details = details.str();
     return result;
 }
 
@@ -2232,94 +1338,62 @@ TestResult test_tts_synthesis() {
     TestResult result;
     result.name = "TTS Synthesis - Various Texts";
 
-    // Create voice agent for TTS
-    rac_voice_agent_handle_t agent = nullptr;
-    rac_result_t res = rac_voice_agent_create_standalone(&agent);
-    if (res != RAC_SUCCESS) {
-        result.details = "Failed to create voice agent";
+    rac_handle_t tts = nullptr;
+    rac_result_t status = rac_tts_component_create(&tts);
+    rac_tts_config_t config = RAC_TTS_CONFIG_DEFAULT;
+    if (status == RAC_SUCCESS) status = rac_tts_component_configure(tts, &config);
+    const std::string tts_path = openclaw::get_tts_model_path();
+    if (status == RAC_SUCCESS) {
+        status = rac_tts_component_load_voice(
+            tts, tts_path.c_str(), openclaw::TTS_MODEL_ID, "Piper Lessac Medium");
+    }
+    if (status != RAC_SUCCESS) {
+        result.details = "Failed to initialize TTS component (code " +
+                         std::to_string(status) + ")";
+        if (tts) rac_tts_component_destroy(tts);
         return result;
     }
 
-    // Load STT model (required for init)
-    std::string stt_path = openclaw::get_stt_model_path();
-    res = rac_voice_agent_load_stt_model(agent, stt_path.c_str(), openclaw::STT_MODEL_ID, "Parakeet");
-    if (res != RAC_SUCCESS) {
-        result.details = "Failed to load STT model";
-        rac_voice_agent_destroy(agent);
-        return result;
-    }
-
-    // Load TTS model
-    std::string tts_path = openclaw::get_tts_model_path();
-    res = rac_voice_agent_load_tts_voice(agent, tts_path.c_str(), "piper", "Piper");
-    if (res != RAC_SUCCESS) {
-        result.details = "Failed to load TTS model";
-        rac_voice_agent_destroy(agent);
-        return result;
-    }
-
-    res = rac_voice_agent_initialize_with_loaded_models(agent);
-    if (res != RAC_SUCCESS) {
-        result.details = "Failed to initialize voice agent";
-        rac_voice_agent_destroy(agent);
-        return result;
-    }
-
-    // Test texts - these simulate various OpenClaw responses
     struct TTSTestCase {
         std::string description;
         std::string text;
-        bool expect_audio;
     };
-
-    std::vector<TTSTestCase> test_cases = {
-        {"Simple sentence", "The weather is sunny today.", true},
-        {"Longer response", "I found several results for your query. The top recommendation is a restaurant called Blue Fin Sushi, located downtown. They have excellent reviews and are open until ten PM.", true},
-        {"With numbers", "The temperature is 72 degrees, and there is a 30 percent chance of rain.", true},
-        {"Short response", "Sure!", true},
-        {"Question response", "Would you like me to set a reminder for that?", true},
+    const std::vector<TTSTestCase> test_cases = {
+        {"Simple sentence", "The weather is sunny today."},
+        {"Longer response", "I found several results for your query. The top recommendation is a restaurant called Blue Fin Sushi, located downtown."},
+        {"With numbers", "The temperature is 72 degrees, and there is a 30 percent chance of rain."},
+        {"Short response", "Sure!"},
+        {"Question response", "Would you like me to set a reminder for that?"},
     };
 
     int passed = 0;
-    int total = static_cast<int>(test_cases.size());
     std::ostringstream details;
-
-    for (const auto& tc : test_cases) {
-        void* audio_data = nullptr;
-        size_t audio_size = 0;
-
-        res = rac_voice_agent_synthesize_speech(agent, tc.text.c_str(), &audio_data, &audio_size);
-
-        bool has_audio = (res == RAC_SUCCESS && audio_data != nullptr && audio_size > 0);
-
-        if (has_audio == tc.expect_audio) {
-            passed++;
-            size_t num_samples = audio_size / sizeof(int16_t);
-            float duration = num_samples / 22050.0f;
-            details << "  OK: " << tc.description
-                    << " (" << num_samples << " samples, " << duration << "s)\n";
+    const rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
+    for (const auto& test_case : test_cases) {
+        rac_tts_result_t synthesis{};
+        status = rac_tts_component_synthesize(
+            tts, test_case.text.c_str(), &options, &synthesis);
+        const bool has_audio =
+            status == RAC_SUCCESS && synthesis.audio_data != nullptr && synthesis.audio_size > 0;
+        if (has_audio) {
+            ++passed;
+            const size_t samples = synthesis.audio_size / sizeof(int16_t);
+            const int32_t sample_rate =
+                synthesis.sample_rate > 0 ? synthesis.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE;
+            details << "  OK: " << test_case.description << " (" << samples << " samples, "
+                    << static_cast<float>(samples) / sample_rate << "s)\n";
         } else {
-            details << "  FAIL: " << tc.description
-                    << " (expected audio=" << tc.expect_audio
-                    << ", got audio=" << has_audio << ")\n";
+            details << "  FAIL: " << test_case.description << " (code " << status << ")\n";
         }
-
-        if (audio_data) free(audio_data);
+        rac_tts_result_free(&synthesis);
     }
+    rac_tts_component_destroy(tts);
 
-    rac_voice_agent_destroy(agent);
-
-    result.passed = (passed == total);
-    result.details = std::to_string(passed) + "/" + std::to_string(total) + " TTS tests passed:\n" + details.str();
-
+    result.passed = passed == static_cast<int>(test_cases.size());
+    result.details = std::to_string(passed) + "/" + std::to_string(test_cases.size()) +
+                     " TTS tests passed:\n" + details.str();
     return result;
 }
-
-// =============================================================================
-// Test: Text Sanitization for TTS
-// =============================================================================
-// Tests the sanitize_text_for_tts function through VoicePipeline::speak_text.
-// We verify that special characters, emojis, and markdown are properly
 // handled before reaching TTS synthesis.
 // =============================================================================
 
@@ -2652,7 +1726,7 @@ void print_usage(const char* prog) {
               << "  --run-all                Run all integration tests\n"
               << "  --test-tts-queue         Test TTS queue parallel playback and cancel\n"
               << "  --test-chime             Test waiting chime timing and audio\n"
-              << "  --test-bargein           Test barge-in cancel chain and rapid restart (needs ONNX)\n"
+              << "  --test-interruption      Test cancellation and rapid restart (needs Sherpa)\n"
               << "  --test-sanitization      Test text sanitization for TTS\n"
               << "  --test-tts               Test TTS synthesis on various texts\n"
               << "  --test-openclaw-flow     Test full flow with fake OpenClaw server\n"
@@ -2660,7 +1734,7 @@ void print_usage(const char* prog) {
               << "  --help                   Show this help\n";
 }
 
-// Helper: Initialize model system and ONNX backends (expensive - only call when needed)
+// Helper: initialize the model system and Sherpa backend when needed.
 static bool g_backends_initialized = false;
 static bool ensure_backends_initialized() {
     if (g_backends_initialized) return true;
@@ -2669,8 +1743,10 @@ static bool ensure_backends_initialized() {
         std::cerr << "Failed to initialize model system\n";
         return false;
     }
-    rac_backend_onnx_register();
-    rac_backend_wakeword_onnx_register();
+    if (rac_backend_sherpa_register() != RAC_SUCCESS) {
+        std::cerr << "Failed to register Sherpa backend\n";
+        return false;
+    }
     g_backends_initialized = true;
     return true;
 }
@@ -2713,16 +1789,10 @@ int main(int argc, char* argv[]) {
             results.push_back(test_waiting_chime_timing());
             results.push_back(test_waiting_chime_audio_content());
         }
-        else if (arg == "--test-bargein") {
+        else if (arg == "--test-interruption") {
             if (!ensure_backends_initialized()) return 1;
             results.push_back(test_bargein_cancel_chain());
             results.push_back(test_bargein_rapid_restart());
-            results.push_back(test_wakeword_single_detection());
-            results.push_back(test_wakeword_timeout_returns_to_waiting());
-            results.push_back(test_bargein_wakeword_during_tts());
-            results.push_back(test_post_tts_wakeword_reactivation());
-            results.push_back(test_post_bargein_second_wakeword());
-            results.push_back(test_bargein_asr_readiness());
         }
         else if (arg == "--test-sanitization") {
             if (!ensure_backends_initialized()) return 1;
@@ -2766,19 +1836,13 @@ int main(int argc, char* argv[]) {
             std::cout << "\n--- Section 4: TTS Synthesis ---\n\n";
             results.push_back(test_tts_synthesis());
 
-            // --- Section 5: Barge-in + Wake Word ---
-            std::cout << "\n--- Section 5: Barge-in + Wake Word ---\n\n";
+            // --- Section 5: Interruption and restart ---
+            std::cout << "\n--- Section 5: Interruption and Restart ---\n\n";
             results.push_back(test_bargein_cancel_chain());
             results.push_back(test_bargein_rapid_restart());
-            results.push_back(test_wakeword_single_detection());
-            results.push_back(test_wakeword_timeout_returns_to_waiting());
-            results.push_back(test_bargein_wakeword_during_tts());
-            results.push_back(test_post_tts_wakeword_reactivation());
-            results.push_back(test_post_bargein_second_wakeword());
-            results.push_back(test_bargein_asr_readiness());
 
             // --- Section 6: Full OpenClaw Flow ---
-            std::cout << "\n--- Section 5: Full OpenClaw Flow ---\n\n";
+            std::cout << "\n--- Section 6: Full OpenClaw Flow ---\n\n";
 
             // Test with 5-second delay (moderate wait)
             std::cout << "Test 4.1: 5-second response delay\n";

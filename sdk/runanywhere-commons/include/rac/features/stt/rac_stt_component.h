@@ -74,6 +74,11 @@ RAC_API const char* rac_stt_component_get_model_id(rac_handle_t handle);
 /**
  * @brief Load a model
  *
+ * Any active proto stream sessions owned by this component are cancelled and
+ * drained before the current model is replaced. A re-entrant call from the
+ * component's own stream callback returns RAC_ERROR_SERVICE_BUSY rather than
+ * waiting for itself.
+ *
  * @param handle Component handle
  * @param model_path File path to the model (used for loading) - REQUIRED
  * @param model_id Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
@@ -88,6 +93,10 @@ RAC_API rac_result_t rac_stt_component_load_model(rac_handle_t handle, const cha
 /**
  * @brief Unload the current model
  *
+ * Cancels and drains all active proto stream sessions before unloading the
+ * provider service. A re-entrant call from the component's own stream callback
+ * returns RAC_ERROR_SERVICE_BUSY rather than waiting for itself.
+ *
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
@@ -95,6 +104,10 @@ RAC_API rac_result_t rac_stt_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
+ *
+ * Cancels and drains all active proto stream sessions before resetting the
+ * provider service. A re-entrant call from the component's own stream callback
+ * returns RAC_ERROR_SERVICE_BUSY rather than waiting for itself.
  *
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
@@ -165,6 +178,13 @@ RAC_API rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
 
 /**
  * @brief Destroy the STT component
+ *
+ * Cancels and drains all active proto stream sessions, closes admission to
+ * every public STT component operation, and waits for already-admitted calls
+ * before destroying the provider service and component. A re-entrant call
+ * from any operation or callback currently using this component is rejected
+ * internally and leaves the component alive because this legacy void API
+ * cannot report RAC_ERROR_SERVICE_BUSY; destroy it after that call returns.
  *
  * @param handle Component handle
  */
@@ -260,8 +280,8 @@ RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
  *
  * Partials / finals produced by the backend are pushed to @p callback
  * synchronously during the call. @p callback uses the same
- * rac_stt_stream_callback_t signature the legacy transcribe_stream path
- * exposes so commons can route both through the same bridge.
+ * rac_stt_stream_callback_t backend emission contract as one-shot
+ * transcribe_stream calls so commons can route both through the same bridge.
  *
  * @param handle        STT component handle.
  * @param stream_handle Stream handle returned by rac_stt_component_stream_create.

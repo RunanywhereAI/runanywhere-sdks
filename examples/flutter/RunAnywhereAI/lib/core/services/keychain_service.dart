@@ -12,10 +12,8 @@ class KeychainService {
 
   KeychainService._();
 
-  // `encryptedSharedPreferences` was removed in flutter_secure_storage 11.x;
-  // Jetpack Security is deprecated by Google. Data is auto-migrated to
-  // custom ciphers on first access — no code change needed beyond removing
-  // the deprecated flag.
+  // flutter_secure_storage 10.3 uses its supported custom Android ciphers;
+  // the deprecated Jetpack Security option is intentionally absent.
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(),
     iOptions: IOSOptions(

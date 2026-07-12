@@ -10,9 +10,8 @@
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
+      android:usesCleartextTraffic="false"
       android:theme="@style/AppTheme">
-      <!-- Declare vendor public library for QHexRT/QNN FastRPC DSP communication -->
-      <uses-native-library android:name="libcdsprpc.so" android:required="false" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

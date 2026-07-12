@@ -24,6 +24,10 @@ import {
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
+import {
+  LLMGenerationResult,
+  type LLMGenerationResult as ProtoLLMGenerationResult,
+} from '@runanywhere/proto-ts/llm_options';
 
 import {
   ModalityProtoAdapter,
@@ -51,6 +55,10 @@ const OFF_ERROR = 12;
 // ---------------------------------------------------------------------------
 
 interface StreamHandlers {
+  /** Optional non-streaming Asyncify-style generator. */
+  generate?: (
+    request: ProtoLLMGenerateRequest,
+  ) => ProtoLLMGenerationResult | Promise<ProtoLLMGenerationResult>;
   /**
    * Synchronous emitter invoked when `_rac_llm_generate_stream_proto`
    * is called. Receives the decoded request and an `emit` function for
@@ -60,7 +68,7 @@ interface StreamHandlers {
   generateStream: (
     request: ProtoLLMGenerateRequest,
     emit: (event: ProtoLLMStreamEvent) => void,
-  ) => number;
+  ) => number | Promise<number>;
   /**
    * Optional hook invoked when `_rac_llm_cancel_proto` is called.
    */
@@ -75,6 +83,12 @@ interface FakeModule extends ModalityProtoModule, EmscriptenRunanywhereModule {
   cancelCalls: number;
   /** Number of times the streaming entry point was invoked. */
   streamCalls: number;
+  /** Every `ccall` entrypoint and whether it enabled Asyncify. */
+  ccallCalls: Array<{ functionName: string; async: boolean }>;
+  /** Heap pointers released through `_free`. */
+  freeCalls: number[];
+  /** Request pointer retained by the current streaming call. */
+  lastStreamRequestPtr: number;
 }
 
 function makeFakeLLMModule(handlers: StreamHandlers): FakeModule {
@@ -115,16 +129,86 @@ function makeFakeLLMModule(handlers: StreamHandlers): FakeModule {
     return { ptr, size: bytes.byteLength };
   };
 
+  const decodeRequest = (requestPtr: number, requestSize: number): ProtoLLMGenerateRequest => (
+    LLMGenerateRequest.decode(heapU8.slice(requestPtr, requestPtr + requestSize))
+  );
+
+  const invokeStream = (
+    requestPtr: number,
+    requestSize: number,
+    callbackPtr: number,
+  ): number | Promise<number> => {
+    fakeModule.streamCalls = (fakeModule.streamCalls ?? 0) + 1;
+    fakeModule.lastStreamRequestPtr = requestPtr;
+    const fn = callbackTable.get(callbackPtr);
+    if (!fn) {
+      throw new Error(
+        `_rac_llm_generate_stream_proto: unknown callback id ${callbackPtr}`,
+      );
+    }
+    const request = decodeRequest(requestPtr, requestSize);
+    const emit = (event: ProtoLLMStreamEvent): void => {
+      const eventBytes = LLMStreamEvent.encode(event).finish();
+      const { ptr, size } = writeProtoBytes(eventBytes);
+      fn(ptr, size);
+    };
+    return handlers.generateStream(request, emit);
+  };
+
+  const numericArgument = (args: unknown[], index: number): number => {
+    const value = Number(args[index]);
+    if (!Number.isFinite(value)) throw new TypeError(`ccall argument ${index} is not numeric`);
+    return value;
+  };
+
   const fakeModule: Partial<FakeModule> = {
     HEAPU8: heapU8,
     HEAPU32: heapU32,
     HEAP32: heap32,
     _malloc: malloc,
-    _free: () => undefined,
+    _free(ptr: number): void {
+      fakeModule.freeCalls?.push(ptr);
+    },
     addFunction,
     removeFunction,
     cancelCalls: 0,
     streamCalls: 0,
+    ccallCalls: [],
+    freeCalls: [],
+    lastStreamRequestPtr: 0,
+    ccall(
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): unknown {
+      fakeModule.ccallCalls?.push({ functionName, async: options?.async === true });
+      if (functionName === 'rac_llm_generate_stream_proto') {
+        return invokeStream(
+          numericArgument(args, 0),
+          numericArgument(args, 1),
+          numericArgument(args, 2),
+        );
+      }
+      if (functionName === 'rac_llm_generate_proto') {
+        const requestPtr = numericArgument(args, 0);
+        const requestSize = numericArgument(args, 1);
+        const outResult = numericArgument(args, 2);
+        const request = decodeRequest(requestPtr, requestSize);
+        const generate = handlers.generate;
+        if (!generate) return 0;
+        return Promise.resolve(generate(request)).then((result) => {
+          const resultBytes = LLMGenerationResult.encode(result).finish();
+          const { ptr, size } = writeProtoBytes(resultBytes);
+          heapU32[(outResult + OFF_DATA) >>> 2] = ptr;
+          heapU32[(outResult + OFF_SIZE) >>> 2] = size;
+          heap32[(outResult + OFF_STATUS) >>> 2] = 0;
+          return 0;
+        });
+      }
+      throw new Error(`unexpected ccall: ${functionName}`);
+    },
     _rac_proto_buffer_init(bufferPtr: number): void {
       heapU32[(bufferPtr + OFF_DATA) >>> 2] = 0;
       heapU32[(bufferPtr + OFF_SIZE) >>> 2] = 0;
@@ -158,21 +242,11 @@ function makeFakeLLMModule(handlers: StreamHandlers): FakeModule {
       callbackPtr: number,
       _userData: number,
     ): number {
-      fakeModule.streamCalls = (fakeModule.streamCalls ?? 0) + 1;
-      const fn = callbackTable.get(callbackPtr);
-      if (!fn) {
-        throw new Error(
-          `_rac_llm_generate_stream_proto: unknown callback id ${callbackPtr}`,
-        );
+      const result = invokeStream(requestPtr, requestSize, callbackPtr);
+      if (typeof result !== 'number') {
+        throw new Error('direct stream export cannot represent an asynchronous result');
       }
-      const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
-      const request = LLMGenerateRequest.decode(requestBytes);
-      const emit = (event: ProtoLLMStreamEvent): void => {
-        const eventBytes = LLMStreamEvent.encode(event).finish();
-        const { ptr, size } = writeProtoBytes(eventBytes);
-        fn(ptr, size);
-      };
-      return handlers.generateStream(request, emit);
+      return result;
     },
     _rac_llm_cancel_proto(outEventPtr: number): number {
       fakeModule.cancelCalls = (fakeModule.cancelCalls ?? 0) + 1;
@@ -243,11 +317,12 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'Say hi',
       maxTokens: 16,
+      temperature: 0,
     });
 
     // The public contract is that `await generateStream(...)` resolves
@@ -275,9 +350,79 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
     expect(result.finishReason).toBe('stop');
 
     expect(capturedRequest?.prompt).toBe('Say hi');
-    expect(capturedRequest?.streamingEnabled).toBe(true);
+    expect(capturedRequest?.options?.streamingEnabled).toBe(true);
+    expect(capturedRequest?.options?.maxTokens).toBe(16);
+    expect(capturedRequest?.options?.temperature).toBe(0);
+    expect(capturedRequest?.options?.topP).toBe(1);
+    expect(capturedRequest?.options?.repetitionPenalty).toBe(1);
     expect(module.streamCalls).toBe(1);
+    expect(module.ccallCalls).toContainEqual({
+      functionName: 'rac_llm_generate_stream_proto',
+      async: true,
+    });
     expect(module.cancelCalls).toBe(0);
+  });
+
+  it('keeps non-streaming request/result buffers alive until Asyncify settles', async () => {
+    let releaseGeneration: (() => void) | undefined;
+    const generationGate = new Promise<void>((resolve) => {
+      releaseGeneration = resolve;
+    });
+    const module = makeFakeLLMModule({
+      async generate(request) {
+        expect(request.prompt).toBe('async prompt');
+        await generationGate;
+        return LLMGenerationResult.fromPartial({
+          text: 'async answer',
+          errorCode: 0,
+        });
+      },
+      generateStream: () => 0,
+    });
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
+
+    const resultPromise = TextGeneration.generate({ prompt: 'async prompt' });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(module.ccallCalls).toContainEqual({
+      functionName: 'rac_llm_generate_proto',
+      async: true,
+    });
+    expect(module.freeCalls).toHaveLength(0);
+
+    releaseGeneration?.();
+    await expect(resultPromise).resolves.toMatchObject({ text: 'async answer' });
+    expect(module.freeCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps streaming request bytes alive until the Asyncify call resolves', async () => {
+    let resolveNative: ((returnCode: number) => void) | undefined;
+    const nativeGate = new Promise<number>((resolve) => {
+      resolveNative = resolve;
+    });
+    const module = makeFakeLLMModule({
+      generateStream(_request, emit) {
+        emit(streamingTokenEvent('live'));
+        return nativeGate;
+      },
+    });
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
+
+    const handle = await TextGeneration.generateStream({ prompt: 'hold memory' });
+    const iterator = handle.stream[Symbol.asyncIterator]();
+    await expect(iterator.next()).resolves.toMatchObject({ value: 'live', done: false });
+
+    expect(module.lastStreamRequestPtr).toBeGreaterThan(0);
+    expect(module.freeCalls).not.toContain(module.lastStreamRequestPtr);
+    expect(module.ccallCalls).toContainEqual({
+      functionName: 'rac_llm_generate_stream_proto',
+      async: true,
+    });
+
+    resolveNative?.(0);
+    await expect(iterator.next()).resolves.toMatchObject({ done: true });
+    expect(module.freeCalls).toContain(module.lastStreamRequestPtr);
   });
 
   it('observes the first token before the terminal event reaches `result`', async () => {
@@ -312,7 +457,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'two letters',
@@ -347,7 +492,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'cancel me',

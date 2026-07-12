@@ -19,27 +19,27 @@ import type {
   ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import { WebModelLifecycle as ModelLifecycleCapability } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle as ModelLifecycleCapability } from './RunAnywhere+ModelLifecycle.js';
 import {
   ModelRegistry as ModelRegistryCapability,
-} from './RunAnywhere+ModelRegistry';
-import type { RefreshOptions } from '../../Adapters/ModelRegistryAdapter';
+} from './RunAnywhere+ModelRegistry.js';
+import type { RefreshOptions } from '../../Adapters/ModelRegistryAdapter.js';
 import {
   registerModelArchive as registerModelArchiveImpl,
   registerModelFromUrl,
   registerModelMultiFile as registerModelMultiFileImpl,
   type RegisterModelOptions,
   type RegisterMultiFileOptions,
-} from './RunAnywhere+Storage';
-import { TextGeneration as TextGenerationCapability } from './RunAnywhere+TextGeneration';
+} from './RunAnywhere+Storage.js';
+import { TextGeneration as TextGenerationCapability } from './RunAnywhere+TextGeneration.js';
 import {
   generateStructured as generateStructuredImpl,
   generateWithStructuredOutput as generateWithStructuredOutputImpl,
-} from './RunAnywhere+StructuredOutput';
-import { ToolCalling as ToolCallingCapability } from './RunAnywhere+ToolCalling';
-import { STT as STTCapability } from './RunAnywhere+STT';
-import { TTS as TTSCapability, stopTTSPlayback as stopTTSPlaybackImpl } from './RunAnywhere+TTS';
-import { VAD as VADCapability } from './RunAnywhere+VAD';
+} from './RunAnywhere+StructuredOutput.js';
+import { ToolCalling as ToolCallingCapability } from './RunAnywhere+ToolCalling.js';
+import { STT as STTCapability } from './RunAnywhere+STT.js';
+import { TTS as TTSCapability, stopTTSPlayback as stopTTSPlaybackImpl } from './RunAnywhere+TTS.js';
+import { VAD as VADCapability } from './RunAnywhere+VAD.js';
 import {
   ragAddDocumentsBatch as ragAddDocumentsBatchImpl,
   ragClearDocuments as ragClearDocumentsImpl,
@@ -50,7 +50,7 @@ import {
   ragIngest as ragIngestImpl,
   ragQuery as ragQueryImpl,
   ragResolvedConfiguration as ragResolvedConfigurationImpl,
-} from './RunAnywhere+RAG';
+} from './RunAnywhere+RAG.js';
 import {
   cleanupVoiceAgent as cleanupVoiceAgentImpl,
   defaultVADModelID as defaultVADModelIDImpl,
@@ -60,16 +60,16 @@ import {
   initializeVoiceAgentWithLoadedModels as initializeVoiceAgentWithLoadedModelsImpl,
   processVoiceTurn as processVoiceTurnImpl,
   streamVoiceAgent as streamVoiceAgentImpl,
-} from './RunAnywhere+VoiceAgent';
-import { VisionLanguage as VisionLanguageCapability } from './RunAnywhere+VisionLanguage';
-import { Logging as LoggingCapability } from './RunAnywhere+Logging';
+} from './RunAnywhere+VoiceAgent.js';
+import { VisionLanguage as VisionLanguageCapability } from './RunAnywhere+VisionLanguage.js';
+import { Logging as LoggingCapability } from './RunAnywhere+Logging.js';
 import {
   pcm16ToFloat32 as pcm16ToFloat32Impl,
   pcm16ToFloat32Samples as pcm16ToFloat32SamplesImpl,
   pcm16ToWav as pcm16ToWavImpl,
-} from './RunAnywhere+AudioConvert';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import type { CancellableCall } from '../RunAnywhere';
+} from './RunAnywhere+AudioConvert.js';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import type { CancellableCall } from '../RunAnywhere.js';
 
 function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
   if (signal?.aborted) {
@@ -286,7 +286,9 @@ export const flatFacade = {
     handle?: Parameters<typeof TTSCapability.stop>[0],
   ): boolean {
     stopTTSPlaybackImpl();
-    return handle !== undefined ? TTSCapability.stop(handle) : true;
+    return handle !== undefined
+      ? TTSCapability.stop(handle)
+      : TTSCapability.stopLoaded();
   },
 
   // -------------------------------------------------------------------------
@@ -439,8 +441,7 @@ export const flatFacade = {
   // -------------------------------------------------------------------------
   // Logging — pure delegates. Exactly Swift RunAnywhere+Logging.swift's flat
   // statics (`RunAnywhere.configureLogging` / `setLocalLoggingEnabled` /
-  // `setLogLevel` / `setSentryLoggingEnabled` / `addLogDestination` /
-  // `setDebugMode` / `flushLogs`).
+  // `setLogLevel` / `addLogDestination` / `setDebugMode` / `flushLogs`).
   // -------------------------------------------------------------------------
 
   configureLogging(
@@ -459,12 +460,6 @@ export const flatFacade = {
     ...args: Parameters<typeof LoggingCapability.setLogLevel>
   ): ReturnType<typeof LoggingCapability.setLogLevel> {
     return LoggingCapability.setLogLevel(...args);
-  },
-
-  setSentryLoggingEnabled(
-    ...args: Parameters<typeof LoggingCapability.setSentryLoggingEnabled>
-  ): ReturnType<typeof LoggingCapability.setSentryLoggingEnabled> {
-    return LoggingCapability.setSentryLoggingEnabled(...args);
   },
 
   addLogDestination(

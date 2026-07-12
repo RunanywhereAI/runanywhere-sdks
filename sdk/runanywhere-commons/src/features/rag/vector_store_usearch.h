@@ -31,16 +31,11 @@ struct DocumentChunk {
 
 /**
  * @brief Search result with similarity score
- *
- * Note: id/chunk_id and score/similarity are aliases kept for backward
- * compatibility with JNI and React Native bridges. Prefer id and score.
  */
 struct SearchResult {
-    std::string id;           // Primary chunk identifier
-    std::string chunk_id;     // Alias for id (kept for bridge compatibility)
+    std::string id;           // Chunk identifier
     std::string text;         // Chunk text content
-    float score = 0.0f;       // Primary similarity score (0.0-1.0)
-    float similarity = 0.0f;  // Alias for score (kept for bridge compatibility)
+    float score = 0.0f;       // Similarity score (0.0-1.0)
     nlohmann::json metadata;  // Additional metadata
 };
 
@@ -48,7 +43,7 @@ struct SearchResult {
  * @brief Vector store configuration
  */
 struct VectorStoreConfig {
-    size_t dimension = 384;        // Embedding dimension
+    size_t dimension = 0;          // Required embedding dimension
     size_t max_elements = 100000;  // Max capacity
     size_t connectivity = 16;      // HNSW connectivity (M)
     size_t expansion_add = 40;     // Construction search depth
@@ -119,14 +114,10 @@ class VectorStoreUSearch {
     nlohmann::json get_statistics() const;
 
     /**
-     * @brief Save index to file
+     * @brief Enumerate (chunk_id, text) for every stored chunk, e.g. to rebuild
+     * a companion index (BM25).
      */
-    bool save(const std::string& path) const;
-
-    /**
-     * @brief Load index from file
-     */
-    bool load(const std::string& path);
+    std::vector<std::pair<std::string, std::string>> all_chunk_texts() const;
 
    private:
     class Impl;

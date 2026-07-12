@@ -29,6 +29,7 @@ using f16_native_t = uint16_t;  // Use binary16 representation
 
 #include <fstream>
 #include <optional>
+#include <stdexcept>
 #include <usearch/index_dense.hpp>
 
 #include "rac/core/rac_logger.h"
@@ -49,6 +50,10 @@ using namespace unum::usearch;
 class VectorStoreUSearch::Impl {
    public:
     explicit Impl(const VectorStoreConfig& config) : config_(config) {
+        if (config.dimension == 0) {
+            throw std::invalid_argument("Vector store embedding dimension must be greater than 0");
+        }
+
         // Configure USearch index
         index_dense_config_t usearch_config;
         usearch_config.connectivity = config.connectivity;
@@ -163,7 +168,13 @@ class VectorStoreUSearch::Impl {
         RAC_LOG_INFO(LOG_TAG, "USearch returned %zu matches from %zu total vectors", matches.size(),
                      index_.size());
 
-        float effective_threshold = threshold;
+        // Real-RAG retrieval: let top_k (+ downstream fusion/rerank) do the
+        // selecting rather than an absolute cosine floor. all-MiniLM-class
+        // scores are low and often near-zero/negative even for relevant chunks,
+        // so any positive floor silently drops real matches (a multi-chunk doc
+        // then retrieves nothing). Only apply a floor when the caller explicitly
+        // set a positive threshold; <= 0 means accept-all, ranked by score.
+        const bool apply_floor = threshold > 0.0f;
         if (threshold > 0.5f) {
             LOGW(
                 "Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely "
@@ -182,7 +193,7 @@ class VectorStoreUSearch::Impl {
             // USearch cosine distance is 1 - cosine_similarity
             float similarity = 1.0f - distance;
 
-            if (similarity < effective_threshold) {
+            if (apply_floor && similarity < threshold) {
                 continue;
             }
 
@@ -193,11 +204,9 @@ class VectorStoreUSearch::Impl {
             }
 
             SearchResult result;
-            result.chunk_id = it->second.id;
-            result.id = it->second.id;  // Alias
+            result.id = it->second.id;
             result.text = it->second.text;
-            result.similarity = similarity;
-            result.score = similarity;  // Alias
+            result.score = similarity;
             result.metadata = it->second.metadata;
             results.push_back(std::move(result));
         }
@@ -245,6 +254,11 @@ class VectorStoreUSearch::Impl {
     void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
         index_.clear();
+        // USearch clear() releases the internal capacity buffers (vectors_lookup_),
+        // so a subsequent add() would write past an unreserved slot and crash.
+        // Re-reserve the configured headroom to leave the store usable, matching
+        // the constructor.
+        index_.reserve(config_.max_elements);
         chunks_.clear();
         id_to_key_.clear();
         next_key_ = 0;  // Reset counter
@@ -274,99 +288,15 @@ class VectorStoreUSearch::Impl {
         return stats;
     }
 
-    bool save(const std::string& path) const {
+    std::vector<std::pair<std::string, std::string>> all_chunk_texts() const {
         std::lock_guard<std::mutex> lock(mutex_);
-
-        // Save USearch index
-        auto save_result = index_.save(path.c_str());
-        if (!save_result) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to save USearch index: %s", save_result.error.what());
-            return false;
-        }
-
-        // Save metadata to JSON file
-        nlohmann::json metadata;
-        metadata["next_key"] = next_key_;
-        metadata["chunks"] = nlohmann::json::array();
-
+        std::vector<std::pair<std::string, std::string>> out;
+        out.reserve(chunks_.size());
         for (const auto& [key, chunk] : chunks_) {
-            nlohmann::json chunk_json;
-            chunk_json["key"] = key;
-            chunk_json["id"] = chunk.id;
-            chunk_json["text"] = chunk.text;
-            chunk_json["metadata"] = chunk.metadata;
-            metadata["chunks"].push_back(chunk_json);
+            (void)key;
+            out.emplace_back(chunk.id, chunk.text);
         }
-
-        std::string metadata_path = path + ".metadata.json";
-        std::ofstream metadata_file(metadata_path);
-        if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
-            return false;
-        }
-        metadata_file << metadata.dump();
-        metadata_file.close();
-
-        RAC_LOG_INFO(LOG_TAG, "Saved index and metadata to %s", path.c_str());
-        return true;
-    }
-
-    bool load(const std::string& path) {
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        // Load USearch index
-        auto load_result = index_.load(path.c_str());
-        if (!load_result) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to load USearch index: %s", load_result.error.what());
-            return false;
-        }
-
-        // Load metadata from JSON file
-        std::string metadata_path = path + ".metadata.json";
-        std::ifstream metadata_file(metadata_path);
-        if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
-            return false;
-        }
-
-        nlohmann::json metadata;
-        try {
-            metadata_file >> metadata;
-
-            const auto& chunks_json = metadata.at("chunks");
-            const std::size_t parsed_next_key = metadata.at("next_key").get<std::size_t>();
-
-            decltype(chunks_) new_chunks;
-            decltype(id_to_key_) new_id_to_key;
-
-            for (const auto& chunk_json : chunks_json) {
-                const std::size_t key = chunk_json.at("key").get<std::size_t>();
-
-                DocumentChunk chunk;
-                chunk.id = chunk_json.at("id").get<std::string>();
-                chunk.text = chunk_json.at("text").get<std::string>();
-                if (chunk_json.contains("embedding")) {
-                    chunk.embedding = chunk_json.at("embedding").get<std::vector<float>>();
-                }
-                chunk.metadata = chunk_json.at("metadata");
-
-                std::string chunk_id = chunk.id;
-                new_chunks[key] = std::move(chunk);
-                new_id_to_key[chunk_id] = key;
-            }
-
-            next_key_ = parsed_next_key;
-            chunks_ = std::move(new_chunks);
-            id_to_key_ = std::move(new_id_to_key);
-        } catch (const std::exception& e) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to parse metadata JSON: %s", e.what());
-            index_.clear();  // Revert to consistent empty state
-            return false;
-        }
-
-        RAC_LOG_INFO(LOG_TAG, "Loaded index and metadata from %s (next_key=%zu, chunks=%zu)",
-                     path.c_str(), next_key_, chunks_.size());
-        return true;
+        return out;
     }
 
    private:
@@ -432,12 +362,8 @@ nlohmann::json VectorStoreUSearch::get_statistics() const {
     return impl_->get_statistics();
 }
 
-bool VectorStoreUSearch::save(const std::string& path) const {
-    return impl_->save(path);
-}
-
-bool VectorStoreUSearch::load(const std::string& path) {
-    return impl_->load(path);
+std::vector<std::pair<std::string, std::string>> VectorStoreUSearch::all_chunk_texts() const {
+    return impl_->all_chunk_texts();
 }
 
 }  // namespace runanywhere::rag

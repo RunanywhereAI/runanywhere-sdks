@@ -1,5 +1,5 @@
 project(runanywherecore)
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 
 set(PACKAGE_NAME runanywherecore)
@@ -47,8 +47,8 @@ message(STATUS "[RunAnywhereCore] OkHttp HTTP transport adapter ENABLED (RAC_HAS
 # Source files - Core bridges only (no LLM/STT/TTS/VAD)
 # =============================================================================
 # Collect core bridge source files
-file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
+file(GLOB BRIDGE_SOURCES CONFIGURE_DEPENDS "../cpp/bridges/*.cpp")
+file(GLOB HYBRID_CORE_DOMAIN_SOURCES CONFIGURE_DEPENDS "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp

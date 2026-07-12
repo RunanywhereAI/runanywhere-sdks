@@ -514,25 +514,4 @@ void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& 
     slot.fn(scratch.data(), scratch.size(), slot.user_data);
 }
 
-/**
- * @brief Legacy 9-arg overload — preserves source compatibility for
- *        `llm_component.cpp` and the unit tests. Forwards to the
- *        struct-based canonical dispatcher with session / progress
- *        fields left at proto3 defaults (identical wire output to the
- *        pre-unification 9-field shape).
- */
-void dispatch_llm_stream_event(rac_handle_t handle, const char* token, bool is_final, int kind,
-                               uint32_t token_id, float logprob, const char* finish_reason,
-                               const char* error_message) {
-    LLMStreamEventParams p;
-    p.token = token ? token : "";
-    p.is_final = is_final;
-    p.kind = kind;
-    p.token_id = token_id;
-    p.logprob = logprob;
-    p.finish_reason = finish_reason;
-    p.error_message = error_message;
-    dispatch_llm_stream_event(handle, p);
-}
-
 }  // namespace rac::llm

@@ -31,6 +31,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ToolCall,
+  ToolCallFormatName,
   ToolCallingResult,
   ToolCallingSessionCreateRequest,
   ToolCallingSessionEvent,
@@ -50,7 +51,7 @@ import {
 import { ProtoErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
 import {
   clearRunanywhereModule,
-  setRunanywhereModule,
+  registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
 import { ToolCalling } from '../../../../src/Public/Extensions/RunAnywhere+ToolCalling';
@@ -138,11 +139,17 @@ interface SessionScript {
 interface FakeToolCallingModule extends EmscriptenRunanywhereModule {
   capturedCreateRequest: ProtoToolCallingSessionCreateRequest | undefined;
   capturedStepRequests: ProtoToolCallingSessionStepWithResultRequest[];
-  cancelHandles: Array<number | bigint>;
-  destroyHandles: Array<number | bigint>;
-  liveCallbacks: Map<number, (...args: number[]) => unknown>;
+  cancelHandles: bigint[];
+  destroyHandles: bigint[];
+  liveCallbacks: Map<number, (...args: Array<number | bigint>) => unknown>;
   activeCallbackIds: Set<number>;
   stepCallCount: number;
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
 }
 
 function makeFakeModule(script: SessionScript): FakeToolCallingModule {
@@ -159,12 +166,12 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
     return ptr;
   };
 
-  const callbackTable = new Map<number, (...args: number[]) => unknown>();
+  const callbackTable = new Map<number, (...args: Array<number | bigint>) => unknown>();
   const liveCallbackIds = new Set<number>();
   let nextCallbackId = 1;
 
   const addFunction = (
-    fn: (...args: number[]) => unknown,
+    fn: (...args: never[]) => number | bigint | void,
     _signature: string,
   ): number => {
     const id = nextCallbackId++;
@@ -246,10 +253,19 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       requestSize: number,
       callbackPtr: number,
       _userData: number,
-      outSessionHandlePtr: number,
+      handleCallbackPtr: number,
+      _handleUserData: number,
     ): number {
       const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
       fake.capturedCreateRequest = ToolCallingSessionCreateRequest.decode(requestBytes);
+
+      const handleCallback = callbackTable.get(handleCallbackPtr);
+      if (!handleCallback) {
+        throw new Error(`fake commons: unknown handle callback id ${handleCallbackPtr}`);
+      }
+      // Commons publishes the cancellable uint64 handle synchronously before
+      // initial generation/event delivery.
+      handleCallback(FAKE_SESSION_HANDLE, 0);
 
       // Synchronously emit the scripted events through the registered
       // callback — exactly how commons drives the run loop.
@@ -258,12 +274,6 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       } else {
         emitEvents(callbackPtr, script.onCreate);
       }
-
-      // Publish the session handle as low/high uint32 halves into the
-      // malloc'd 8-byte slot.
-      const handle = FAKE_SESSION_HANDLE;
-      heapU32[outSessionHandlePtr >>> 2] = Number(handle & 0xffff_ffffn);
-      heapU32[(outSessionHandlePtr >>> 2) + 1] = Number(handle >> 32n);
       return script.createRc ?? 0;
     },
     _rac_tool_calling_session_step_with_result_proto(
@@ -285,11 +295,11 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
       }
       return script.stepRc ?? 0;
     },
-    _rac_tool_calling_session_destroy_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_destroy_proto(handle: bigint): number {
       fake.destroyHandles!.push(handle);
       return 0;
     },
-    _rac_tool_calling_session_cancel_proto(handle: number | bigint): number {
+    _rac_tool_calling_session_cancel_proto(handle: bigint): number {
       fake.cancelHandles!.push(handle);
       return 0;
     },
@@ -341,7 +351,6 @@ function toolCallEvent(name: string, args: Record<string, unknown>): ToolCalling
     seq: 1,
     toolCall: ToolCall.fromPartial({
       id: `call-${name}`,
-      callId: `call-${name}`,
       name,
       argumentsJson: JSON.stringify(args),
     }),
@@ -402,7 +411,7 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
 
   it('serializes the session-create request with all session-level fields populated', async () => {
     const module = makeFakeModule({ onCreate: [finalResultEvent('hi')] });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     const tool = sampleToolDefinition();
     await ToolCalling.generateWithTools('What is the weather?', {
@@ -410,11 +419,14 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
       temperature: 0.42,
       maxTokens: 256,
       systemPrompt: 'You are helpful.',
-      maxIterations: 5,
+      maxToolCalls: 5,
       keepToolsAvailable: true,
-      formatHint: 'openai',
+      format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2,
       toolChoice: ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
       forcedToolName: 'get_weather',
+      autoExecute: false,
+      replaceSystemPrompt: true,
+      requireJsonArguments: false,
     });
 
     expect(module.capturedCreateRequest).toBeDefined();
@@ -424,8 +436,10 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
     expect(module.capturedCreateRequest!.systemPrompt).toBe('You are helpful.');
     expect(module.capturedCreateRequest!.tools).toHaveLength(1);
     expect(module.capturedCreateRequest!.tools[0]!.name).toBe('get_weather');
-    expect(module.capturedCreateRequest!.formatHint).toBe('openai');
-    expect(module.capturedCreateRequest!.maxIterations).toBe(5);
+    expect(module.capturedCreateRequest!.format).toBe(
+      ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2,
+    );
+    expect(module.capturedCreateRequest!.maxToolCalls).toBe(5);
     expect(module.capturedCreateRequest!.keepToolsAvailable).toBe(true);
     // Swift makeRunLoopRequest parity (RunAnywhere+ToolCalling.swift:528-536):
     // validate_calls stays UNSET unless the caller specifies it, so commons
@@ -435,18 +449,21 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
       ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     );
     expect(module.capturedCreateRequest!.forcedToolName).toBe('get_weather');
+    expect(module.capturedCreateRequest!.autoExecute).toBe(false);
+    expect(module.capturedCreateRequest!.replaceSystemPrompt).toBe(true);
+    expect(module.capturedCreateRequest!.requireJsonArguments).toBe(false);
   });
 
-  it('falls back to maxToolCalls when maxIterations is unset', async () => {
+  it('serializes maxToolCalls', async () => {
     const module = makeFakeModule({ onCreate: [finalResultEvent('done')] });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     await ToolCalling.generateWithTools('Q', {
       tools: [sampleToolDefinition()],
       maxToolCalls: 7,
     });
 
-    expect(module.capturedCreateRequest!.maxIterations).toBe(7);
+    expect(module.capturedCreateRequest!.maxToolCalls).toBe(7);
   });
 });
 
@@ -458,7 +475,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
 
   it('happy-path decode: serialized ToolCallingSessionEvent reaches the drain loop', async () => {
     const module = makeFakeModule({ onCreate: [finalResultEvent('decoded ok')] });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     const result = await ToolCalling.generateWithTools('hi', {
       tools: [sampleToolDefinition()],
@@ -478,7 +495,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
       onCreate: [],
       rawCallbackBytes: garbage,
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     let captured: unknown;
     try {
@@ -504,7 +521,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
       onCreate: [toolCallEvent('echo', { value: 'x' })],
       onStep: [[finalResultEvent('after-step')]],
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
@@ -533,7 +550,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
       onCreate: [toolCallEvent('bad', {})],
       onStep: [[finalResultEvent('after-fail')]],
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'bad' }),
@@ -567,7 +584,7 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
 
   it('installs exactly one callback during create and removes it on cleanup', async () => {
     const module = makeFakeModule({ onCreate: [finalResultEvent('ok')] });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     const addSpy = vi.spyOn(module, 'addFunction');
     const removeSpy = vi.spyOn(module, 'removeFunction');
@@ -576,13 +593,66 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
       tools: [sampleToolDefinition()],
     });
 
-    expect(addSpy).toHaveBeenCalledTimes(1);
-    expect(removeSpy).toHaveBeenCalledTimes(1);
+    expect(addSpy).toHaveBeenCalledTimes(2);
+    expect(removeSpy).toHaveBeenCalledTimes(2);
     // After cleanup, the callback table should be empty.
     expect(module.activeCallbackIds.size).toBe(0);
     // session_destroy ran during cleanup.
     expect(module.destroyHandles).toHaveLength(1);
-    expect(module.destroyHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.destroyHandles[0]).toBe(FAKE_SESSION_HANDLE);
+  });
+
+  it('keeps the callback live until Asyncify create and step calls resolve', async () => {
+    const module = makeFakeModule({
+      onCreate: [toolCallEvent('echo', { value: 'async' })],
+      onStep: [[finalResultEvent('async complete')]],
+    });
+    const directCreate = module._rac_tool_calling_session_create_proto!.bind(module);
+    const directStep = module._rac_tool_calling_session_step_with_result_proto!.bind(module);
+    const ccallSpy = vi.fn(async (
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): Promise<number> => {
+      expect(options).toEqual({ async: true });
+      await Promise.resolve();
+      expect(module.activeCallbackIds.size).toBe(2);
+      if (functionName === 'rac_tool_calling_session_create_proto') {
+        return directCreate(
+          Number(args[0]),
+          Number(args[1]),
+          Number(args[2]),
+          Number(args[3]),
+          Number(args[4]),
+          Number(args[5]),
+        );
+      }
+      if (functionName === 'rac_tool_calling_session_step_with_result_proto') {
+        return directStep(Number(args[0]), Number(args[1]));
+      }
+      throw new Error(`unexpected ccall: ${functionName}`);
+    });
+    module.ccall = ccallSpy;
+    registerWasmModule(['tool-calling'], module);
+
+    ToolCalling.registerTool(
+      ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
+      async (args) => ({ echoed: args['value']! }),
+    );
+
+    const result = await ToolCalling.generateWithTools('use echo', {
+      tools: [ToolDefinition.fromPartial({ name: 'echo' })],
+    });
+
+    expect(result.text).toBe('async complete');
+    expect(ccallSpy.mock.calls.map(([functionName]) => functionName)).toEqual([
+      'rac_tool_calling_session_create_proto',
+      'rac_tool_calling_session_step_with_result_proto',
+    ]);
+    expect(module.activeCallbackIds.size).toBe(0);
+    expect(module.destroyHandles).toEqual([FAKE_SESSION_HANDLE]);
   });
 
   it('removes the callback even when the executor closure rejects through the step path', async () => {
@@ -592,7 +662,7 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
       // terminal event. The drain loop throws — and cleanup still must run.
       onStep: [[errorEvent()]],
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'explodes' }),
@@ -625,7 +695,7 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
 
   it('pass3-syn-153: throws synchronously without touching session_create when signal is already aborted', async () => {
     const module = makeFakeModule({ onCreate: [finalResultEvent('should-not-run')] });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
     const createSpy = vi.spyOn(module, '_rac_tool_calling_session_create_proto');
 
     const controller = new AbortController();
@@ -662,7 +732,7 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
       onCreate: [toolCallEvent('noop', {})],
       onStep: [[finalResultEvent('done')]],
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['tool-calling'], module);
 
     const controller = new AbortController();
     ToolCalling.registerTool(
@@ -685,9 +755,51 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     expect(module.cancelHandles.length).toBeGreaterThanOrEqual(1);
     // Cancel arg must match the published session handle (low 32 bits of
     // FAKE_SESSION_HANDLE in this harness).
-    expect(module.cancelHandles[0]).toBe(Number(FAKE_SESSION_HANDLE));
+    expect(module.cancelHandles[0]).toBe(FAKE_SESSION_HANDLE);
     // Cleanup destroys the session exactly once.
     expect(module.destroyHandles).toHaveLength(1);
+  });
+
+  it('cancels an initial Asyncify generation before session_create resolves', async () => {
+    const module = makeFakeModule({ onCreate: [finalResultEvent('must not win')] });
+    const directCreate = module._rac_tool_calling_session_create_proto!.bind(module);
+    const createGate = deferred<number>();
+    module.ccall = vi.fn((
+      functionName: string,
+      _returnType: string | null,
+      _argumentTypes: string[],
+      args: unknown[],
+      options?: { async?: boolean },
+    ): Promise<number> => {
+      expect(functionName).toBe('rac_tool_calling_session_create_proto');
+      expect(options).toEqual({ async: true });
+      const rc = directCreate(
+        Number(args[0]),
+        Number(args[1]),
+        Number(args[2]),
+        Number(args[3]),
+        Number(args[4]),
+        Number(args[5]),
+      );
+      return createGate.promise.then(() => rc);
+    });
+    registerWasmModule(['tool-calling'], module);
+    const controller = new AbortController();
+
+    const generation = ToolCalling.generateWithTools(
+      'cancel the first generation',
+      { tools: [sampleToolDefinition()] },
+      { signal: controller.signal },
+    );
+    await Promise.resolve();
+    controller.abort();
+
+    expect(module.cancelHandles).toEqual([FAKE_SESSION_HANDLE]);
+    createGate.resolve(0);
+    await expect(generation).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+    });
+    expect(module.destroyHandles).toEqual([FAKE_SESSION_HANDLE]);
   });
 });
 
@@ -705,7 +817,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
   it('captures executor rejection as a failed ToolResult', async () => {
     // Argument parsing now routes through the commons ToolValue JSON bridge,
     // so executeTool needs a registered module.
-    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
+    registerWasmModule(['tool-calling'], makeFakeModule({ onCreate: [] }));
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'will_fail' }),
       async () => {
@@ -716,7 +828,6 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     const result = await ToolCalling.executeTool(
       ToolCall.fromPartial({
         id: 'tc-1',
-        callId: 'tc-1',
         name: 'will_fail',
         argumentsJson: '{}',
       }),
@@ -729,7 +840,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
   });
 
   it('surfaces malformed argumentsJson as a failed ToolResult (Swift parity)', async () => {
-    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
+    registerWasmModule(['tool-calling'], makeFakeModule({ onCreate: [] }));
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'never_runs' }),
       async () => {
@@ -740,7 +851,6 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     const result = await ToolCalling.executeTool(
       ToolCall.fromPartial({
         id: 'tc-bad',
-        callId: 'tc-bad',
         name: 'never_runs',
         argumentsJson: 'not json {{',
       }),
@@ -754,7 +864,6 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     const result = await ToolCalling.executeTool(
       ToolCall.fromPartial({
         id: 'tc-2',
-        callId: 'tc-2',
         name: 'not_registered',
         argumentsJson: '{}',
       }),
@@ -765,7 +874,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
   });
 
   it('returns a successful ToolResult with metadata defaults when the executor resolves', async () => {
-    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
+    registerWasmModule(['tool-calling'], makeFakeModule({ onCreate: [] }));
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'echo' }),
       async () => ({ echoed: ToolValue.fromPartial({ boolValue: true }) }),
@@ -774,7 +883,6 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     const result = await ToolCalling.executeTool(
       ToolCall.fromPartial({
         id: 'tc-3',
-        callId: 'tc-3',
         name: 'echo',
         argumentsJson: '{}',
       }),

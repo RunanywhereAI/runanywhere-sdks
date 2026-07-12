@@ -13,9 +13,10 @@
 #include "rac/features/llm/rac_llm_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "tool_calling.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 namespace rac::llm::tool_calling {
@@ -25,6 +26,9 @@ struct GenerationState {
     float temperature = 0.0f;
     float top_p = 0.0f;
     std::string system_prompt;
+    // Optional per-step stop marker. The synchronous generate call only
+    // borrows this string, so it is safe to expose through rac_llm_options_t.
+    std::string stop_sequence;
     bool disable_thinking = false;
     bool thinking_tags_resolved = false;
     std::string thinking_open_tag;
@@ -35,6 +39,7 @@ struct GenerationCancelBinding {
     std::mutex* active_ref_mu = nullptr;
     LifecycleLlmRef** active_ref = nullptr;
     std::atomic<bool>* cancel_requested = nullptr;
+    bool* generation_started = nullptr;  // guarded by active_ref_mu
 };
 
 inline void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
@@ -47,8 +52,7 @@ inline void split_display_text_and_thinking(const std::string& raw_text, std::st
     if (rac_llm_extract_thinking_with_tags(
             raw_text.c_str(),
             generation.thinking_open_tag.empty() ? nullptr : generation.thinking_open_tag.c_str(),
-            generation.thinking_close_tag.empty() ? nullptr
-                                                  : generation.thinking_close_tag.c_str(),
+            generation.thinking_close_tag.empty() ? nullptr : generation.thinking_close_tag.c_str(),
             &response, &response_len, &thinking, &thinking_len) != RAC_SUCCESS) {
         if (out_text) {
             *out_text = raw_text;
@@ -69,6 +73,25 @@ inline void split_display_text_and_thinking(const std::string& raw_text, std::st
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
+inline GenerationState generation_for_tool_step(const GenerationState& base, uint32_t iteration,
+                                                bool has_tool_choice,
+                                                runanywhere::v1::ToolChoiceMode tool_choice,
+                                                runanywhere::v1::ToolCallFormatName format) {
+    GenerationState step = base;
+    const bool forced_decision = iteration == 1 && has_tool_choice &&
+                                 tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+    if (!forced_decision) {
+        return step;
+    }
+    step.max_tokens = 192;
+    step.temperature = 0.0f;
+    step.top_p = 1.0f;
+    step.disable_thinking = true;
+    step.stop_sequence = format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2 ? "<|tool_call_end|>"
+                                                                               : "</tool_call>";
+    return step;
+}
+
 inline void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
                                           const std::string& raw_text,
                                           const GenerationState& generation) {
@@ -88,11 +111,20 @@ inline void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* re
 }
 #endif
 
-inline void publish_generation_completed_event(const LifecycleLlmRef& ref,
-                                               const rac_llm_result_t& raw) {
+inline void publish_generation_completed_event(
+    const LifecycleLlmRef& ref, const rac_llm_result_t& raw,
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED
+#else
+    int destination = 0
+#endif
+) {
 #if defined(RAC_HAVE_PROTOBUF)
     // Tool-calling generate calls still need the canonical LLM telemetry path.
     runanywhere::v1::SDKEvent llm_event;
+    if (destination != runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED) {
+        llm_event.set_destination(destination);
+    }
     auto* gen = llm_event.mutable_generation();
     gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
     if (ref.model_id != nullptr && ref.model_id[0] != '\0') {
@@ -116,13 +148,70 @@ inline void publish_generation_completed_event(const LifecycleLlmRef& ref,
 #else
     (void)ref;
     (void)raw;
+    (void)destination;
 #endif
 }
+
+// Aggregates the tool-calling loop's inner generations into ONE telemetry row
+// per logical request. Per-iteration completed events go PUBLIC-only (UI parity);
+// without this a single tool-calling request landed N unpaired "completed"
+// telemetry rows — one per loop iteration.
+struct GenerationTelemetryAgg {
+    int64_t input_tokens{0};
+    int64_t output_tokens{0};
+    double tokens_per_second{0.0};
+    int64_t time_to_first_token_ms{0};
+    uint32_t generations{0};
+    std::string model_id;
+};
+
+inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
+#if defined(RAC_HAVE_PROTOBUF)
+    if (agg.generations == 0) {
+        return;
+    }
+    runanywhere::v1::SDKEvent event;
+    // Telemetry-only: the per-iteration PUBLIC events already served consumers.
+    event.set_destination(runanywhere::v1::EVENT_DESTINATION_TELEMETRY);
+    (*event.mutable_properties())["iterations"] = std::to_string(agg.generations);
+    auto* gen = event.mutable_generation();
+    gen->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
+    if (!agg.model_id.empty()) {
+        gen->set_model_id(agg.model_id);
+    }
+    if (agg.output_tokens > 0) {
+        gen->set_tokens_count(static_cast<int32_t>(agg.output_tokens));
+        gen->set_tokens_used(static_cast<int32_t>(agg.output_tokens));
+    }
+    if (agg.input_tokens > 0) {
+        gen->set_input_tokens(static_cast<int32_t>(agg.input_tokens));
+    }
+    if (agg.tokens_per_second > 0.0) {
+        gen->set_tokens_per_second(agg.tokens_per_second);
+    }
+    if (agg.time_to_first_token_ms > 0) {
+        gen->set_time_to_first_token_ms(agg.time_to_first_token_ms);
+    }
+    (void)rac::events::publish(event, runanywhere::v1::SDK_COMPONENT_LLM,
+                               runanywhere::v1::EVENT_CATEGORY_LLM);
+#else
+    (void)agg;
+#endif
+}
+
+// Emits the aggregate on every loop exit path (success, tool failure, cancel).
+struct ToolLoopTelemetryScope {
+    GenerationTelemetryAgg agg;
+    ToolLoopTelemetryScope() = default;
+    ToolLoopTelemetryScope(const ToolLoopTelemetryScope&) = delete;
+    ToolLoopTelemetryScope& operator=(const ToolLoopTelemetryScope&) = delete;
+    ~ToolLoopTelemetryScope() { publish_tool_loop_telemetry(agg); }
+};
 
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
-                              rac_result_t* out_rc) {
+                              rac_result_t* out_rc, GenerationTelemetryAgg* agg = nullptr) {
     LifecycleLlmRef ref;
     rac_result_t rc = acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -136,11 +225,18 @@ inline bool run_generate_once(GenerationState& generation,
     if (generation.max_tokens > 0) {
         options.max_tokens = generation.max_tokens;
     }
-    if (generation.temperature > 0.0f) {
-        options.temperature = generation.temperature;
-    }
+    // 0.0 is an explicit greedy setting, not an "unset" sentinel. The old
+    // >0 guard silently retained RAC_LLM_OPTIONS_DEFAULT.temperature (0.8),
+    // making a caller-requested deterministic tool decision stochastic.
+    options.temperature = generation.temperature;
     if (generation.top_p > 0.0f) {
         options.top_p = generation.top_p;
+    }
+    const char* stop_sequences[2] = {nullptr, nullptr};
+    if (!generation.stop_sequence.empty()) {
+        stop_sequences[0] = generation.stop_sequence.c_str();
+        options.stop_sequences = stop_sequences;
+        options.num_stop_sequences = 1;
     }
     options.streaming_enabled = RAC_FALSE;
     options.system_prompt =
@@ -164,22 +260,49 @@ inline bool run_generate_once(GenerationState& generation,
     }
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref &&
-        cancel_binding.cancel_requested) {
-        std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
-        *cancel_binding.active_ref = &ref;
-        if (cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+        cancel_binding.cancel_requested && cancel_binding.generation_started) {
+        bool cancelled_before_start = false;
+        {
+            std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+            *cancel_binding.active_ref = &ref;
+            *cancel_binding.generation_started = false;
+            if (cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+                *cancel_binding.active_ref = nullptr;
+                cancelled_before_start = true;
+            } else {
+                *cancel_binding.generation_started = true;
+            }
+        }
+        if (cancelled_before_start) {
             request_lifecycle_llm_cancel(&ref);
+            release_lifecycle_llm(&ref);
+            if (out_rc) {
+                *out_rc = RAC_ERROR_CANCELLED;
+            }
+            return false;
         }
     }
 
     rac_llm_result_t raw{};
-    const std::string effective_prompt =
-        apply_no_think_directive(prompt, options.disable_thinking);
+    const std::string effective_prompt = apply_no_think_directive(prompt, options.disable_thinking);
     rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {
         std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+        if (cancel_binding.generation_started) {
+            *cancel_binding.generation_started = false;
+        }
         *cancel_binding.active_ref = nullptr;
+    }
+
+    if (cancel_binding.cancel_requested &&
+        cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+        rac_llm_result_free(&raw);
+        release_lifecycle_llm(&ref);
+        if (out_rc) {
+            *out_rc = RAC_ERROR_CANCELLED;
+        }
+        return false;
     }
 
     if (rc != RAC_SUCCESS) {
@@ -194,7 +317,27 @@ inline bool run_generate_once(GenerationState& generation,
     if (out_response) {
         *out_response = raw.text ? raw.text : "";
     }
-    publish_generation_completed_event(ref, raw);
+    if (agg) {
+        agg->generations++;
+        agg->input_tokens += raw.prompt_tokens;
+        agg->output_tokens += raw.completion_tokens;
+        if (agg->generations == 1) {
+            agg->time_to_first_token_ms = raw.time_to_first_token_ms;
+        }
+        if (raw.tokens_per_second > 0.0f) {
+            agg->tokens_per_second = raw.tokens_per_second;
+        }
+        if (agg->model_id.empty() && ref.model_id != nullptr) {
+            agg->model_id = ref.model_id;
+        }
+#if defined(RAC_HAVE_PROTOBUF)
+        publish_generation_completed_event(ref, raw, runanywhere::v1::EVENT_DESTINATION_PUBLIC);
+#else
+        publish_generation_completed_event(ref, raw);
+#endif
+    } else {
+        publish_generation_completed_event(ref, raw);
+    }
 
     rac_llm_result_free(&raw);
     release_lifecycle_llm(&ref);

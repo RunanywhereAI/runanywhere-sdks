@@ -1,10 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VLMImageFormat
-import ai.runanywhere.proto.v1.VLMStreamEventKind
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.data.conversation.GenerationMode
 import com.runanywhere.runanywhereai.data.conversation.StoredAttachment
@@ -24,14 +25,27 @@ import com.runanywhere.runanywhereai.data.conversation.StoredMessage
 import com.runanywhere.runanywhereai.data.conversation.StoredSource
 import com.runanywhere.runanywhereai.data.conversation.StoredStats
 import com.runanywhere.runanywhereai.data.conversation.StoredTool
+import com.runanywhere.runanywhereai.data.conversation.SmartTitleLifecycle
+import com.runanywhere.runanywhereai.data.conversation.SmartTitlePolicy
 import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
 import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSnapshot
+import com.runanywhere.runanywhereai.ui.screens.rag.RagPipelineCoordinator
+import com.runanywhere.runanywhereai.ui.screens.rag.RagPipelineIdentity
+import com.runanywhere.runanywhereai.ui.screens.rag.replaceRagCorpus
+import com.runanywhere.runanywhereai.ui.screens.vision.DEFAULT_VISION_PROMPT
+import com.runanywhere.runanywhereai.ui.screens.vision.VisionAnswerMode
+import com.runanywhere.runanywhereai.ui.screens.vision.VisionGenerationPolicy
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.SDKEvent
-import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
 import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.cancelGeneration
@@ -42,19 +56,25 @@ import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.generateWithTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
-import com.runanywhere.sdk.public.extensions.ragDestroyPipeline
+import com.runanywhere.sdk.public.extensions.ragClearDocuments
 import com.runanywhere.sdk.public.extensions.ragGetStatistics
 import com.runanywhere.sdk.public.extensions.ragIngest
 import com.runanywhere.sdk.public.extensions.ragQuery
-import com.runanywhere.sdk.public.extensions.processImageStream
+import com.runanywhere.sdk.public.extensions.processImage
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAToolDefinition
 import com.runanywhere.sdk.public.types.RAVLMImage
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -68,6 +88,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var isGenerating by mutableStateOf(false)
         private set
+    var isStopping by mutableStateOf(false)
+        private set
+    private var isTransitioning by mutableStateOf(false)
+
+    /** True while inference, native cancellation, or a conversation swap owns the chat. */
+    val isBusy: Boolean get() = isGenerating || isStopping || isTransitioning
 
     // Mirrors iOS Conversation.modelName restore (LLMViewModel+ModelManagement
     // loadConversation): the recorded model is preselected for display only,
@@ -77,16 +103,49 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     val conversationCreatedAt: Long get() = createdAt
 
-    // Mirrors iOS LLMViewModel.useToolCalling: the in-chat toggle reads and
-    // writes the persisted setting shared with the Web & Tools screen.
-    val toolsEnabled: Boolean get() = SettingsRepository.settings.toolCallingEnabled
+    // The preference records user intent; availability is derived from the
+    // lifecycle-confirmed model capability so an undersized context model can
+    // never reach the native tool run loop.
+    private val toolsRequested: Boolean
+        get() = WebSearchConsentPolicy.permitsTransfer(
+            WebSearchConsentState(
+                toolsEnabled = SettingsRepository.settings.toolCallingEnabled,
+                acceptedScope = SettingsRepository.settings.webSearchConsentScope,
+                currentScope = WebSearchConsentPolicy.routeFor(BuildConfig.WEB_SEARCH_URL)?.scope,
+            ),
+        )
+    private var showToolGateNotice by mutableStateOf(false)
 
-    val canSend: Boolean get() = input.isNotBlank() && !isGenerating && GlobalState.model.isLoaded
+    var showWebSearchDisclosure by mutableStateOf(false)
+        private set
+
+    val toolsEnabled: Boolean
+        get() = toolsRequested && ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
+
+    val toolsUnavailableMessage: String?
+        get() {
+            val availability = ToolCallingModelPolicy.evaluate(GlobalState.model.loaded)
+            return availability.message.takeIf {
+                !availability.isAvailable && (toolsRequested || showToolGateNotice)
+            }
+        }
+
+    val canSend: Boolean
+        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && GlobalState.model.isLoaded
 
     private var job: Job? = null
+    private var cancellationJob: Job? = null
+    private var conversationTransitionJob: Job? = null
+    private var persistJob: Job? = null
+    private var smartTitleJob: Job? = null
+    private val smartTitleLifecycle = SmartTitleLifecycle()
+    private val generationOwnership = ChatGenerationOwnership()
+    private var activeReplyIndex: Int? = null
+    private var activeGenerationModel: Pair<ChatGenerationRequest, String>? = null
     private var conversationId: String? = null
     private var createdAt: Long = 0L
-    private var ragPipelineKey: Pair<String, String>? = null
+    private var contentRevision: Long = 0L
+    private val ragPipelineOwner = "chat-${UUID.randomUUID()}"
 
     // TTFT/completion metrics from the SDK event bus, keyed like iOS
     // LLMViewModel.firstTokenLatencies. The chat runs one generation at a time,
@@ -97,6 +156,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var activeGenerationMetrics: SdkGenerationMetrics? = null
 
     init {
+        LlmModelChangeInterlock.install(this, ::awaitReadyForLlmModelChange)
+
         // Mirrors iOS LLMViewModel+Events.subscribeToModelLifecycle: generation
         // analytics (TTFT, completion metrics) come from the raw SDK event bus.
         viewModelScope.launch {
@@ -108,6 +169,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch {
+            RuntimeModelSelection.observe(ModelSelectionContext.LLM).collect { snapshot ->
+                val claim = activeGenerationModel ?: return@collect
+                if (generationOwnership.owns(claim.first) && snapshot?.id != claim.second) {
+                    // A non-picker path (for example a benchmark) changed the
+                    // process-wide model. Revoke the old request immediately;
+                    // the picker path is additionally interlocked before load.
+                    requestGenerationCancellation(
+                        finalizeVisibleReply = true,
+                        persistTerminalReply = true,
+                    )
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        LlmModelChangeInterlock.remove(this)
+        conversationTransitionJob?.cancel()
+        cancellationJob?.cancel()
+        job?.cancel()
+        persistJob?.cancel()
+        smartTitleJob?.cancel()
+        super.onCleared()
     }
 
     fun onInputChange(value: String) {
@@ -121,130 +206,213 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleTools() {
-        SettingsRepository.setToolCallingEnabled(!toolsEnabled)
+        if (toolsRequested) {
+            SettingsRepository.setWebToolsTransferEnabled(false)
+            showToolGateNotice = false
+            return
+        }
+        val availability = ToolCallingModelPolicy.evaluate(GlobalState.model.loaded)
+        if (availability.isAvailable) {
+            showWebSearchDisclosure = true
+            showToolGateNotice = false
+        } else {
+            showToolGateNotice = true
+        }
+    }
+
+    fun acceptWebSearchDisclosure() {
+        SettingsRepository.setWebToolsTransferEnabled(true)
+        showWebSearchDisclosure = false
+        showToolGateNotice = false
+    }
+
+    fun dismissWebSearchDisclosure() {
+        showWebSearchDisclosure = false
+    }
+
+    private fun ensureConversationId(): String {
+        val existingId = conversationId
+        if (existingId != null) {
+            return existingId
+        }
+
+        val newId = UUID.randomUUID().toString()
+        conversationId = newId
+        createdAt = System.currentTimeMillis()
+        return newId
     }
 
     fun send() {
         if (!canSend) return
-        val prompt = input.trim()
+        val request = beginGeneration() ?: return
+        val turn = ChatRequestPolicy.snapshot(input.trim(), messages)
+        val prompt = turn.prompt
         input = ""
-        messages += ChatMessage(prompt, isUser = true)
+        messages += ChatMessage(text = prompt, isUser = true)
         val replyIndex = messages.size
         messages += ChatMessage("", isUser = false)
-        isGenerating = true
-        activeGenerationTTFTMs = null
-        activeGenerationMetrics = null
+        activeReplyIndex = replyIndex
 
-        job = viewModelScope.launch {
+        val titleToStop = cancelSmartTitle()
+        val launched = viewModelScope.launch {
             try {
-                when {
-                    toolsEnabled && RunAnywhere.getRegisteredTools().isNotEmpty() ->
-                        generateWithTools(prompt, replyIndex)
-                    SettingsRepository.settings.streaming -> streamReply(prompt, replyIndex)
-                    else -> generateReply(prompt, replyIndex)
+                awaitSmartTitleStopped(titleToStop)
+                ensureOwns(request)
+                val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
+                bindActiveModel(request, activeModel)
+                val registeredTools = if (toolsRequested) {
+                    RunAnywhere.getRegisteredTools()
+                } else {
+                    emptyList()
+                }
+                val toolPreflight = ToolCallingModelPolicy.preflight(
+                    toolsRequested = toolsRequested,
+                    registeredToolCount = registeredTools.size,
+                    model = activeModel.model,
+                )
+                when (toolPreflight.route) {
+                    ToolCallingRoute.TOOL_GENERATION ->
+                        generateWithTools(request, prompt, replyIndex, activeModel, registeredTools)
+                    ToolCallingRoute.BLOCKED -> {
+                        showToolGateNotice = true
+                        updateReply(request, replyIndex) { reply ->
+                            reply.copy(
+                                text = toolPreflight.availability.message
+                                    ?: "Web & tools are unavailable for the current model.",
+                            )
+                        }
+                    }
+                    ToolCallingRoute.STANDARD_GENERATION -> {
+                        val streaming = SettingsRepository.settings.streaming
+                        val llmRequest = ChatRequestPolicy.buildRequest(
+                            turn = turn,
+                            options = generationOptions(activeModel),
+                            conversationId = ensureConversationId(),
+                            streaming = streaming,
+                        )
+                        if (streaming) {
+                            streamReply(request, llmRequest, replyIndex, activeModel)
+                        } else {
+                            generateReply(request, llmRequest, replyIndex, activeModel)
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("generation failed", e)
-                messages[replyIndex] = messages[replyIndex].copy(text = "Error: ${e.message}")
+                updateReply(request, replyIndex) { it.copy(text = "Error: ${e.message}", thinking = null) }
             } finally {
-                isGenerating = false
-                persist()
+                finishGeneration(request, replyIndex)
             }
         }
+        attachGenerationJob(request, launched)
     }
 
-    fun sendImage(uri: Uri, loadedModelName: String?) {
-        if (isGenerating) return
-        val prompt = input.trim().ifBlank { "Describe this image in detail." }
+    fun sendImage(uri: Uri, loadedModel: RAModelInfo?) {
+        val request = beginGeneration() ?: return
+        val typedPrompt = input.trim()
+        val prompt = typedPrompt.ifBlank { DEFAULT_VISION_PROMPT }
+        val answerMode = if (typedPrompt.isBlank()) {
+            VisionAnswerMode.DETAILED_DESCRIPTION
+        } else {
+            VisionAnswerMode.FOCUSED_QUESTION
+        }
         input = ""
-        isGenerating = true
-        activeGenerationTTFTMs = null
-        activeGenerationMetrics = null
 
-        job = viewModelScope.launch {
+        val titleToStop = cancelSmartTitle()
+        val launched = viewModelScope.launch {
             var replyIndex: Int? = null
             try {
+                awaitSmartTitleStopped(titleToStop)
+                ensureOwns(request)
                 val name = withContext(Dispatchers.IO) {
                     runCatching { displayName(uri) }.getOrNull()
                 } ?: "Selected image"
                 val file = withContext(Dispatchers.IO) {
                     copyUriToAttachmentFile(uri, "chat_image_", imageCacheSuffix(uri))
                 }
+                ensureOwns(request)
                 messages += ChatMessage(
                     text = prompt,
                     isUser = true,
                     attachment = ChatAttachment(
                         kind = ChatAttachmentKind.IMAGE,
                         name = name,
-                        detail = loadedModelName?.let { "Image model: $it" },
                         localPath = file.absolutePath,
                     ),
                 )
                 val imageReplyIndex = messages.size
                 replyIndex = imageReplyIndex
                 messages += ChatMessage("", isUser = false)
+                activeReplyIndex = imageReplyIndex
                 val image = RAVLMImage(
                     file_path = file.absolutePath,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
                 )
-                val options = RAVLMGenerationOptions(prompt = prompt, max_tokens = 300, temperature = 0.7f)
-                var accumulated = ""
-                RunAnywhere.processImageStream(image, options).collect { event ->
-                    when (event.kind) {
-                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
-                            if (event.token.isNotEmpty()) {
-                                accumulated += event.token
-                                messages[imageReplyIndex] = messages[imageReplyIndex].copy(text = accumulated)
-                            }
-                        }
-                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
-                            val result = event.result ?: return@collect
-                            val text = result.text.ifBlank { accumulated }
-                            messages[imageReplyIndex] = messages[imageReplyIndex].copy(
-                                text = text.ifBlank { "I could not read that image." },
-                                stats = GenerationStats(
-                                    tokens = result.completion_tokens,
-                                    tokensPerSecond = result.tokens_per_second.toDouble(),
-                                    timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
-                                    totalTimeMs = result.processing_time_ms,
-                                    modelName = loadedModelName,
-                                    mode = GenerationMode.STREAMING,
-                                ),
-                            )
-                        }
-                        else -> Unit
-                    }
+                val activeModel = RuntimeModelSelection.requireCurrent(
+                    ModelSelectionContext.VLM,
+                    listOfNotNull(loadedModel),
+                )
+                val options = VisionGenerationPolicy.options(
+                    prompt = prompt,
+                    model = activeModel.model,
+                    mode = answerMode,
+                    userLimit = SettingsRepository.settings.maxTokens,
+                )
+                ensureOwns(request)
+                messages[imageReplyIndex - 1] = messages[imageReplyIndex - 1].copy(
+                    attachment = messages[imageReplyIndex - 1].attachment?.copy(
+                        detail = "Image model: ${activeModel.model.name}",
+                    ),
+                )
+                // Image answers need the canonical final caption and native
+                // metrics. Use the result path so behavior stays uniform across
+                // backends with token, chunked, or whole-response streams.
+                val result = withContext(Dispatchers.Default) {
+                    RunAnywhere.processImage(image, options)
+                }
+                updateReply(request, imageReplyIndex) { reply ->
+                    reply.copy(
+                        text = result.text.ifBlank { "I could not read that image." },
+                        stats = GenerationStats(
+                            tokens = result.completion_tokens,
+                            tokensPerSecond = result.tokens_per_second.toDouble(),
+                            timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
+                            totalTimeMs = result.processing_time_ms,
+                            modelName = activeModel.model.name,
+                            mode = GenerationMode.NON_STREAMING,
+                        ),
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("image question failed", e)
                 val index = replyIndex
-                if (index != null && index in messages.indices) {
-                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
-                } else {
+                if (index != null) {
+                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                } else if (generationOwnership.owns(request)) {
                     messages += ChatMessage("Error: ${e.message}", isUser = false)
                 }
             } finally {
-                isGenerating = false
-                persist()
+                finishGeneration(request, replyIndex)
             }
         }
+        attachGenerationJob(request, launched)
     }
 
     fun sendDocument(uri: Uri, embeddingModel: RAModelInfo?, answerModel: RAModelInfo?) {
-        if (isGenerating) return
+        val request = beginGeneration() ?: return
         val prompt = input.trim().ifBlank { "Summarize this document." }
         input = ""
-        isGenerating = true
-        activeGenerationTTFTMs = null
-        activeGenerationMetrics = null
 
-        job = viewModelScope.launch {
+        val titleToStop = cancelSmartTitle()
+        val launched = viewModelScope.launch {
             var replyIndex: Int? = null
             try {
+                awaitSmartTitleStopped(titleToStop)
+                ensureOwns(request)
                 val name = withContext(Dispatchers.IO) {
                     runCatching { displayName(uri) }.getOrNull()
                 } ?: "Selected document"
@@ -253,6 +421,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val file = withContext(Dispatchers.IO) {
                     writeAttachmentTextFile(name, doc.text)
                 }
+                ensureOwns(request)
                 messages += ChatMessage(
                     text = prompt,
                     isUser = true,
@@ -267,12 +436,35 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val documentReplyIndex = messages.size
                 replyIndex = documentReplyIndex
                 messages += ChatMessage("", isUser = false)
+                activeReplyIndex = documentReplyIndex
                 val embedding = embeddingModel ?: error("Choose or download a document index model first.")
                 val answer = answerModel ?: error("Choose or download a document answer model first.")
-                ensureRagPipeline(embedding, answer)
-                RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
-                runCatching { RunAnywhere.ragGetStatistics() }
-                val result = RunAnywhere.ragQuery(prompt, RAGQueryOptions.defaults(question = prompt))
+                val pipeline = RagPipelineIdentity(
+                    embeddingModelId = embedding.id,
+                    llmModelId = answer.id,
+                    rerankEnabled = false,
+                )
+                val result = RagPipelineCoordinator.withPipeline(
+                    requestedOwner = ragPipelineOwner,
+                    requestedIdentity = pipeline,
+                    create = {
+                        RunAnywhere.ragCreatePipeline(embeddingModel = embedding, llmModel = answer)
+                    },
+                ) {
+                    replaceRagCorpus(
+                        clear = { RunAnywhere.ragClearDocuments() },
+                        ingest = {
+                            RunAnywhere.ragIngest(
+                                RAGDocument(text = doc.text, metadata = doc.metadata),
+                            )
+                        },
+                    )
+                    runCatching { RunAnywhere.ragGetStatistics() }
+                    // The coordinator lease prevents another screen from
+                    // swapping the singleton pipeline before the native query.
+                    RunAnywhere.ragQuery(prompt, RAGQueryOptions.defaults(question = prompt))
+                }
+                ensureOwns(request)
                 val sources = result.retrieved_chunks.map {
                     ChatSource(
                         text = it.text.trim(),
@@ -280,33 +472,35 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         document = it.source_document.orEmpty(),
                     )
                 }
-                messages[documentReplyIndex] = messages[documentReplyIndex].copy(
-                    text = result.answer.ifBlank { "I could not find an answer in that document." },
-                    sources = sources,
-                    stats = GenerationStats(
-                        tokens = 0,
-                        tokensPerSecond = 0.0,
-                        timeToFirstTokenMs = null,
-                        totalTimeMs = result.total_time_ms,
-                        modelName = answer.name,
-                        mode = GenerationMode.NON_STREAMING,
-                    ),
-                )
+                updateReply(request, documentReplyIndex) { reply ->
+                    reply.copy(
+                        text = result.answer.ifBlank { "I could not find an answer in that document." },
+                        sources = sources,
+                        stats = GenerationStats(
+                            tokens = 0,
+                            tokensPerSecond = 0.0,
+                            timeToFirstTokenMs = null,
+                            totalTimeMs = result.total_time_ms,
+                            modelName = answer.name,
+                            mode = GenerationMode.NON_STREAMING,
+                        ),
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 RACLog.e("document question failed", e)
                 val index = replyIndex
-                if (index != null && index in messages.indices) {
-                    messages[index] = messages[index].copy(text = "Error: ${e.message}")
-                } else {
+                if (index != null) {
+                    updateReply(request, index) { it.copy(text = "Error: ${e.message}", thinking = null) }
+                } else if (generationOwnership.owns(request)) {
                     messages += ChatMessage("Error: ${e.message}", isUser = false)
                 }
             } finally {
-                isGenerating = false
-                persist()
+                finishGeneration(request, replyIndex)
             }
         }
+        attachGenerationJob(request, launched)
     }
 
     // Mirrors iOS LLMViewModel+Events.handleGenerationEvent: record TTFT on
@@ -342,64 +536,88 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun generationOptions(): RALLMGenerationOptions {
+    private fun generationOptions(activeModel: RuntimeModelSnapshot): RALLMGenerationOptions {
         val s = SettingsRepository.settings
+        val budget = ChatGenerationBudgetPolicy.resolve(
+            requestedMaxTokens = s.maxTokens,
+            modelContextTokens = activeModel.model.context_length,
+        )
+        if (budget.isCapped) {
+            RACLog.i(
+                "chat output budget capped from ${budget.requestedMaxTokens} to " +
+                    "${budget.effectiveMaxTokens} for ${activeModel.model.id}",
+            )
+        }
         return RALLMGenerationOptions(
-            max_tokens = s.maxTokens,
+            max_tokens = budget.effectiveMaxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
             disable_thinking = s.disableThinking,
         )
     }
 
-    private suspend fun ensureRagPipeline(embeddingModel: RAModelInfo, answerModel: RAModelInfo) {
-        val key = embeddingModel.id to answerModel.id
-        if (ragPipelineKey == key) return
-        if (ragPipelineKey != null) runCatching { RunAnywhere.ragDestroyPipeline() }
-        RunAnywhere.ragCreatePipeline(embeddingModel = embeddingModel, llmModel = answerModel)
-        ragPipelineKey = key
-    }
-
-    private suspend fun generateReply(prompt: String, index: Int) {
-        val result = RunAnywhere.generate(prompt, generationOptions())
+    private suspend fun generateReply(
+        request: ChatGenerationRequest,
+        llmRequest: RALLMGenerateRequest,
+        index: Int,
+        activeModel: RuntimeModelSnapshot,
+    ) {
+        // The SDK one-shot bridge is synchronous JNI underneath its suspend
+        // surface. Never let it occupy Android's main dispatcher.
+        val result = withContext(Dispatchers.Default) {
+            RunAnywhere.generate(llmRequest)
+        }
+        ensureOwns(request)
         if (!result.error_message.isNullOrBlank()) {
-            messages[index] = messages[index].copy(text = "Error: ${result.error_message}")
+            updateReply(request, index) {
+                it.copy(text = "Error: ${result.error_message}", thinking = null)
+            }
             return
         }
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val tps = result.tokens_per_second.takeIf { it > 0 }
             ?: if (totalMs > 0 && result.tokens_generated > 0) result.tokens_generated * 1000.0 / totalMs else 0.0
-        messages[index] = messages[index].copy(
-            text = result.text,
-            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-            // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
-            // fall back to the value recorded from the SDK's first-token event;
-            // framework falls back to the loaded model's analytics key.
-            stats = GenerationStats(
-                tokens = result.tokens_generated,
-                tokensPerSecond = tps,
-                timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 } ?: activeGenerationTTFTMs,
-                totalTimeMs = totalMs,
-                inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
-                modelName = GlobalState.model.loaded?.name,
-                framework = result.framework?.takeIf { it.isNotBlank() }
-                    ?: GlobalState.model.loaded?.framework?.analyticsKey,
-                mode = GenerationMode.NON_STREAMING,
-            ),
-        )
+        updateReply(request, index) { reply ->
+            reply.copy(
+                text = result.text,
+                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+                // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
+                // fall back to the value recorded from the SDK's first-token event;
+                // framework falls back to the loaded model's analytics key.
+                stats = GenerationStats(
+                    tokens = result.tokens_generated,
+                    tokensPerSecond = tps,
+                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
+                        ?: activeGenerationTTFTMs,
+                    totalTimeMs = totalMs,
+                    inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
+                    modelName = activeModel.model.name,
+                    framework = result.framework?.takeIf { it.isNotBlank() }
+                        ?: activeModel.framework.analyticsKey,
+                    mode = GenerationMode.NON_STREAMING,
+                ),
+            )
+        }
     }
 
-    private suspend fun streamReply(prompt: String, index: Int) {
-        val options = generationOptions()
-        val events = RunAnywhere.generateStream(prompt, options)
+    private suspend fun streamReply(
+        request: ChatGenerationRequest,
+        llmRequest: RALLMGenerateRequest,
+        index: Int,
+        activeModel: RuntimeModelSnapshot,
+    ) {
+        val events = RunAnywhere.generateStream(llmRequest)
         val result =
-            RunAnywhere.aggregateStream(prompt, events) { accumulated ->
-                messages[index] = messages[index].copy(text = accumulated)
+            RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
+                updateReply(request, index) { it.copy(text = accumulated) }
             }
 
+        ensureOwns(request)
         if (!result.error_message.isNullOrBlank()) {
-            messages[index] = messages[index].copy(text = "Error: ${result.error_message}", thinking = null)
+            updateReply(request, index) {
+                it.copy(text = "Error: ${result.error_message}", thinking = null)
+            }
             return
         }
 
@@ -409,36 +627,64 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val tps = result.tokens_per_second.takeIf { it > 0 }
             ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
-        messages[index] = messages[index].copy(
-            text = result.text,
-            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-            stats = GenerationStats(
-                tokens = tokens,
-                tokensPerSecond = tps,
-                timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
-                    ?: activeGenerationTTFTMs
-                    ?: sdkMetrics?.timeToFirstTokenMs,
-                totalTimeMs = totalMs,
-                inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
-                modelName = GlobalState.model.loaded?.name,
-                framework = result.framework?.takeIf { it.isNotBlank() }
-                    ?: GlobalState.model.loaded?.framework?.analyticsKey,
-                mode = GenerationMode.STREAMING,
-            ),
-        )
+        updateReply(request, index) { reply ->
+            reply.copy(
+                text = result.text,
+                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+                stats = GenerationStats(
+                    tokens = tokens,
+                    tokensPerSecond = tps,
+                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
+                        ?: activeGenerationTTFTMs
+                        ?: sdkMetrics?.timeToFirstTokenMs,
+                    totalTimeMs = totalMs,
+                    inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
+                    modelName = activeModel.model.name,
+                    framework = result.framework?.takeIf { it.isNotBlank() }
+                        ?: activeModel.framework.analyticsKey,
+                    mode = GenerationMode.STREAMING,
+                ),
+            )
+        }
     }
 
-    private suspend fun generateWithTools(prompt: String, index: Int) {
-        val result = RunAnywhere.generateWithTools(
-            prompt = prompt,
-            options = generationOptions(),
-            toolOptions = RAToolCallingOptions(
-                max_iterations = 3,
-                auto_execute = true,
-            ),
-            toolChoice = null,
-            forcedToolName = null,
+    private suspend fun generateWithTools(
+        request: ChatGenerationRequest,
+        prompt: String,
+        index: Int,
+        activeModel: RuntimeModelSnapshot,
+        registeredTools: List<RAToolDefinition>,
+    ) {
+        updateReply(request, index) { it.copy(text = ToolCallingExecutionPolicy.PROGRESS_MESSAGE) }
+        val execution = ToolCallingExecutionPolicy.plan(
+            base = generationOptions(activeModel),
+            registeredTools = registeredTools,
         )
+        val result = try {
+            withTimeout(ToolCallingExecutionPolicy.TIMEOUT_MILLIS) {
+                withContext(Dispatchers.Default) {
+                    RunAnywhere.generateWithTools(
+                        prompt = prompt,
+                        options = execution.generationOptions,
+                        toolOptions = execution.toolOptions,
+                        toolChoice = execution.toolChoice,
+                        forcedToolName = execution.forcedToolName,
+                    )
+                }
+            }
+        } catch (_: TimeoutCancellationException) {
+            withContext(Dispatchers.Default) { runCatching { RunAnywhere.cancelGeneration() } }
+            val timeoutSeconds = ToolCallingExecutionPolicy.TIMEOUT_MILLIS / 1_000
+            updateReply(request, index) { reply ->
+                reply.copy(
+                    text = "${activeModel.model.name} did not finish the Web & tools request " +
+                        "within $timeoutSeconds seconds. Try a shorter request or another model.",
+                    thinking = null,
+                )
+            }
+            return
+        }
+        ensureOwns(request)
         val toolInfo = result.tool_calls.firstOrNull()?.let { call ->
             val toolResult = result.tool_results.firstOrNull { it.name == call.name }
             ToolCallInfo(
@@ -449,42 +695,54 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 error = toolResult?.error,
             )
         }
-        val content = result.text.ifBlank {
-            result.error_message?.takeIf { it.isNotBlank() }?.let { "Error: $it" }
-                ?: toolInfo?.let { "Used ${it.name}." }
-                ?: "(no response)"
+        val normalized = ChatToolResultNormalizer.normalize(result)
+        updateReply(request, index) { reply ->
+            reply.copy(
+                text = normalized.text,
+                thinking = normalized.thinking,
+                tool = toolInfo,
+            )
         }
-        messages[index] = messages[index].copy(
-            text = content,
-            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-            tool = toolInfo,
-        )
     }
 
     fun stop() {
-        job?.cancel()
-        viewModelScope.launch {
-            runCatching { RunAnywhere.cancelGeneration() }
-            runCatching { RunAnywhere.cancelVLMGeneration() }
-        }
-        isGenerating = false
+        requestGenerationCancellation(
+            finalizeVisibleReply = true,
+            persistTerminalReply = true,
+        )
     }
 
     fun clearChat() {
-        job?.cancel()
+        val revision = beginContentTransition()
+        val cancellation = requestGenerationCancellation(
+            finalizeVisibleReply = false,
+            persistTerminalReply = false,
+        )
         messages.clear()
+        activeReplyIndex = null
         input = ""
-        isGenerating = false
         conversationId = null
         createdAt = 0L
         conversationModelName = null
+        startConversationTransition(revision) {
+            cancellation?.join()
+            RagPipelineCoordinator.release(ragPipelineOwner)
+        }
     }
 
     fun loadConversation(id: String) {
-        viewModelScope.launch {
-            val stored = ConversationRepository.get(id) ?: return@launch
-            job?.cancel()
-            isGenerating = false
+        val revision = beginContentTransition()
+        val cancellation = requestGenerationCancellation(
+            finalizeVisibleReply = true,
+            persistTerminalReply = false,
+        )
+        startConversationTransition(revision) transition@{
+            cancellation?.join()
+            // A stored conversation does not rehydrate document bytes, so its
+            // questions must never inherit the previous conversation's corpus.
+            RagPipelineCoordinator.release(ragPipelineOwner)
+            val stored = ConversationRepository.get(id) ?: return@transition
+            if (contentRevision != revision) return@transition
             input = ""
             conversationId = stored.id
             createdAt = stored.createdAt
@@ -509,6 +767,159 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { ConversationRepository.setPinned(id, pinned) }
     }
 
+    private fun beginGeneration(): ChatGenerationRequest? {
+        if (isBusy) return null
+        val request = generationOwnership.tryStart() ?: return null
+        isGenerating = true
+        activeGenerationTTFTMs = null
+        activeGenerationMetrics = null
+        return request
+    }
+
+    private fun attachGenerationJob(request: ChatGenerationRequest, launched: Job) {
+        // invokeOnCompletion also covers cancellation before the coroutine ever
+        // enters its try/finally body.
+        launched.invokeOnCompletion { generationOwnership.finishWorker(request) }
+        if (generationOwnership.isBusy()) job = launched
+    }
+
+    private fun bindActiveModel(request: ChatGenerationRequest, model: RuntimeModelSnapshot) {
+        ensureOwns(request)
+        activeGenerationModel = request to model.id
+    }
+
+    private fun ensureOwns(request: ChatGenerationRequest) {
+        if (!generationOwnership.owns(request)) {
+            throw CancellationException("Chat generation no longer owns this conversation")
+        }
+    }
+
+    private inline fun updateReply(
+        request: ChatGenerationRequest,
+        index: Int,
+        transform: (ChatMessage) -> ChatMessage,
+    ): Boolean {
+        if (!generationOwnership.owns(request) || index !in messages.indices) return false
+        messages[index] = transform(messages[index])
+        return true
+    }
+
+    private fun finishGeneration(request: ChatGenerationRequest, replyIndex: Int?) {
+        val finish = generationOwnership.finishWorker(request)
+        if (!finish.ownedAtFinish) return
+
+        if (activeGenerationModel?.first == request) activeGenerationModel = null
+        replyIndex?.let { if (activeReplyIndex == it) activeReplyIndex = null }
+        job = null
+        isGenerating = false
+        persist()
+    }
+
+    /**
+     * Revoke the current request synchronously, then cancel JNI work and wait
+     * for its worker on a background barrier. UI animations stop immediately;
+     * [canSend] remains false until both terminal conditions are proven.
+     */
+    private fun requestGenerationCancellation(
+        finalizeVisibleReply: Boolean,
+        persistTerminalReply: Boolean,
+    ): Job? {
+        cancellationJob?.takeIf { it.isActive }?.let { return it }
+
+        val request = generationOwnership.requestCancellation()
+        val worker = job?.takeIf { !it.isCompleted }
+        val titleToStop = cancelSmartTitle()
+        if (request == null && titleToStop == null) return null
+        val cancellationContentRevision = contentRevision
+
+        if (request != null) {
+            if (finalizeVisibleReply) {
+                activeReplyIndex?.takeIf { it in messages.indices }?.let { index ->
+                    messages[index] = ChatGenerationCleanupPolicy.afterStop(messages[index])
+                }
+            }
+            activeReplyIndex = null
+            if (activeGenerationModel?.first == request) activeGenerationModel = null
+            isGenerating = false
+            worker?.cancel()
+        }
+
+        isStopping = true
+        lateinit var barrier: Job
+        barrier = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            var canPersistTerminalReply = false
+            try {
+                // Both APIs are safe to call when their modality is inactive.
+                // Running them off Main keeps Stop/New Chat/model selection responsive.
+                withContext(Dispatchers.Default) {
+                    runCatching { RunAnywhere.cancelGeneration() }
+                    runCatching { RunAnywhere.cancelVLMGeneration() }
+                }
+                request?.let(generationOwnership::markNativeCancellationIssued)
+                worker?.join()
+                titleToStop?.join()
+                if (request != null) {
+                    if (generationOwnership.completeCancellation(request)) {
+                        canPersistTerminalReply = persistTerminalReply
+                    } else {
+                        RACLog.e("generation cancellation did not reach a safe terminal state")
+                    }
+                }
+            } finally {
+                if (job === worker) job = null
+                if (cancellationJob === barrier) cancellationJob = null
+                if (!generationOwnership.isBusy()) isStopping = false
+            }
+            if (canPersistTerminalReply &&
+                contentRevision == cancellationContentRevision &&
+                !isTransitioning
+            ) {
+                persist()
+            }
+        }
+        cancellationJob = barrier
+        barrier.start()
+        return barrier
+    }
+
+    private suspend fun awaitReadyForLlmModelChange() {
+        withContext(Dispatchers.Main.immediate) {
+            conversationTransitionJob?.takeIf { it.isActive }?.join()
+            requestGenerationCancellation(
+                finalizeVisibleReply = true,
+                persistTerminalReply = true,
+            )?.join()
+            check(!generationOwnership.isBusy()) { "The previous response is still stopping." }
+        }
+    }
+
+    private fun beginContentTransition(): Long {
+        conversationTransitionJob?.cancel()
+        contentRevision += 1
+        isTransitioning = true
+        return contentRevision
+    }
+
+    private fun startConversationTransition(revision: Long, block: suspend () -> Unit) {
+        lateinit var transition: Job
+        transition = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.e("conversation transition failed", e)
+            } finally {
+                if (contentRevision == revision) {
+                    isTransitioning = false
+                    if (conversationTransitionJob === transition) conversationTransitionJob = null
+                }
+            }
+        }
+        conversationTransitionJob = transition
+        transition.start()
+    }
+
     private fun persist() {
         if (messages.none { it.isUser }) return
         val id = conversationId ?: UUID.randomUUID().toString().also {
@@ -524,29 +935,92 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val storedMessages = messages.map { it.toStored() }
         // Mirrors iOS finalizeGeneration: record the active model on the
         // conversation after each exchange.
-        val activeModelName = GlobalState.model.loaded?.name
-        val shouldGenerateSmartTitle = messages.size >= 2 && GlobalState.model.isLoaded
-        viewModelScope.launch {
-            val existing = ConversationRepository.get(id)
-            val now = System.currentTimeMillis()
-            ConversationRepository.save(
-                StoredConversation(
-                    id = id,
-                    title = existing?.title ?: derivedTitle,
-                    createdAt = existing?.createdAt ?: createdLocal.takeIf { it > 0 } ?: now,
-                    updatedAt = now,
-                    pinned = existing?.pinned ?: false,
-                    messages = storedMessages,
-                    modelName = activeModelName ?: existing?.modelName,
-                ),
-            )
-            // Mirrors iOS ConversationStore.addMessage: try a smart title after
-            // an assistant reply lands (skipped while another generation runs).
-            if (shouldGenerateSmartTitle && !isGenerating) {
-                ConversationRepository.generateSmartTitleIfNeeded(id)
+        val activeModelName = RuntimeModelSelection.cached(ModelSelectionContext.LLM)?.model?.name
+        val shouldGenerateSmartTitle = messages.size >= 2 &&
+            RuntimeModelSelection.cached(ModelSelectionContext.LLM) != null
+        val previousSave = persistJob?.takeIf { it.isActive }
+        lateinit var saveJob: Job
+        saveJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                // One writer per ChatViewModel: an older snapshot can never win
+                // a shared temp-file race after a newer response has completed.
+                previousSave?.join()
+                val existing = ConversationRepository.get(id)
+                val now = System.currentTimeMillis()
+                ConversationRepository.save(
+                    StoredConversation(
+                        id = id,
+                        title = existing?.title ?: derivedTitle,
+                        createdAt = existing?.createdAt ?: createdLocal.takeIf { it > 0 } ?: now,
+                        updatedAt = now,
+                        pinned = existing?.pinned ?: false,
+                        messages = storedMessages,
+                        modelName = activeModelName ?: existing?.modelName,
+                        smartTitleAttempted = existing?.smartTitleAttempted ?: false,
+                    ),
+                )
+                // Mirrors iOS ConversationStore.addMessage: try a smart title after
+                // an assistant reply lands (skipped while another generation runs).
+                if (shouldGenerateSmartTitle &&
+                    !isBusy &&
+                    !generationOwnership.isBusy() &&
+                    conversationId == id
+                ) {
+                    scheduleSmartTitle(id)
+                }
+            } finally {
+                if (persistJob === saveJob) persistJob = null
             }
         }
+        persistJob = saveJob
+        saveJob.start()
         conversationModelName = activeModelName ?: conversationModelName
+    }
+
+    private fun scheduleSmartTitle(conversationId: String) {
+        if (this.conversationId != conversationId) return
+        if (!smartTitleLifecycle.tryStart(conversationId)) return
+
+        lateinit var titleJob: Job
+        titleJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            // withTimeout cancels the coroutine; this sibling watchdog also
+            // reaches the blocking JNI call through the native cancel API.
+            val watchdog = launch {
+                delay(SmartTitlePolicy.TIMEOUT_MILLIS)
+                withContext(Dispatchers.Default) { RunAnywhere.cancelGeneration() }
+            }
+            try {
+                withTimeout(SmartTitlePolicy.TIMEOUT_MILLIS) {
+                    withContext(Dispatchers.Default) {
+                        ConversationRepository.generateSmartTitleIfNeeded(conversationId)
+                    }
+                }
+            } catch (_: TimeoutCancellationException) {
+                RACLog.w("smart title generation timed out")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RACLog.w("smart title generation failed: ${e.message}")
+            } finally {
+                watchdog.cancel()
+                smartTitleLifecycle.finish(conversationId)
+                if (smartTitleJob === titleJob) smartTitleJob = null
+            }
+        }
+        smartTitleJob = titleJob
+        titleJob.start()
+    }
+
+    private fun cancelSmartTitle(): Job? = smartTitleJob?.takeIf { it.isActive }?.also { it.cancel() }
+
+    private suspend fun awaitSmartTitleStopped(titleJob: Job?) {
+        if (titleJob == null) return
+        withContext(Dispatchers.Default) { RunAnywhere.cancelGeneration() }
+        val stopped = withTimeoutOrNull(SmartTitlePolicy.CANCEL_WAIT_MILLIS) {
+            titleJob.join()
+            true
+        } == true
+        check(stopped) { "Background title generation is still stopping. Please try again." }
     }
 
     private companion object {

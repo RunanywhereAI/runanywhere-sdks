@@ -69,22 +69,14 @@ if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     exit 127
 fi
 
-# Verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
-# (loaded from VERSIONS). The plugin does not expose --version in older
-# releases; fall back to a best-effort check.
-#
-# IMPORTANT: stdin must be redirected from /dev/null. protoc plugins (including
-# protoc_plugin) implement the CodeGeneratorRequest/Response protocol over
-# stdin/stdout — if stdin is left attached to a terminal or a parent's stdin,
-# the plugin blocks indefinitely waiting for a request, even when --version is
-# passed. Without `</dev/null` this hangs generate_dart.sh forever when run
-# from generate_all.sh.
-if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version </dev/null 2>&1)"; then
-    if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "${PROTOC_GEN_DART_VERSION}"; then
-        echo "warning: protoc_plugin version could not be verified as ${PROTOC_GEN_DART_VERSION}." >&2
-        echo "         Got: ${PLUGIN_VERSION_OUT}" >&2
-        echo "         Re-pin via: dart pub global activate protoc_plugin ${PROTOC_GEN_DART_VERSION}" >&2
-    fi
+# protoc plugins speak a binary request/response protocol and do not expose a
+# CLI version flag. Query Dart's global package registry instead and fail
+# closed so a local generator cannot silently drift from CI.
+PLUGIN_VERSION="$(dart pub global list | awk '$1 == "protoc_plugin" { print $2; exit }')"
+if [ "${PLUGIN_VERSION}" != "${PROTOC_GEN_DART_VERSION}" ]; then
+    echo "error: protoc_plugin ${PROTOC_GEN_DART_VERSION} is required; found '${PLUGIN_VERSION:-not installed}'." >&2
+    echo "       Re-pin via: dart pub global activate protoc_plugin ${PROTOC_GEN_DART_VERSION}" >&2
+    exit 1
 fi
 
 # Canonical proto-file list from generate_all.sh, with fallback to

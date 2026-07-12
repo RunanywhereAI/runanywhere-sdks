@@ -21,14 +21,14 @@ import os
 /// the C core (`rac_voice_agent_feed_audio_proto`); frames captured while a
 /// turn is processing are dropped by the bounded queue.
 final class VoiceAgentMicDriver: @unchecked Sendable {
-    private let handle: rac_voice_agent_handle_t
+    private let handle: CppBridge.VoiceAgentHandle
     private let capture = AudioCaptureManager()
     private let playback = AudioPlaybackManager()
     private let logger = SDKLogger(category: "VoiceAgentMic")
 
     private let chunkLock = OSAllocatedUnfairLock<[Data]>(initialState: [])
 
-    init(handle: rac_voice_agent_handle_t) {
+    init(handle: CppBridge.VoiceAgentHandle) {
         self.handle = handle
     }
 
@@ -137,7 +137,7 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                 if Task.isCancelled { return }
 
                 let (status, result) = try CppBridge.VoiceAgent.feedAudioProto(
-                    handle: handle,
+                    handle: handle.rawValue,
                     audio: chunk,
                     sampleRateHz: Int32(MicConstants.sampleRateHz),
                     channels: 1,

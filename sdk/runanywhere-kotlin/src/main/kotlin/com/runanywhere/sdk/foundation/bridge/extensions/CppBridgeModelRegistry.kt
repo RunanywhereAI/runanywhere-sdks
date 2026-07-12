@@ -49,8 +49,7 @@ object CppBridgeModelRegistry {
      * Inference framework constants matching C++ RAC_FRAMEWORK_* values.
      * IMPORTANT: Must match rac_model_types.h exactly!
      *
-     * Used by [CppBridgeModelPaths] for the JVM-only fallback path when the
-     * native `rac_framework_raw_value` is unavailable.
+     * Used by JNI surfaces that accept `rac_inference_framework_t` values.
      */
     object Framework {
         const val ONNX = 0 // RAC_FRAMEWORK_ONNX
@@ -79,9 +78,7 @@ object CppBridgeModelRegistry {
      * @throws RuntimeException if save fails
      */
     fun save(model: ProtoModelInfo) {
-        val result =
-            registerProto(model)
-                ?: throw RuntimeException("Native model registry proto ABI unavailable")
+        val result = registerProto(model)
 
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
             log(CppBridgePlatformAdapter.LogLevel.ERROR, "Failed to save model: ${model.id}, error=$result")
@@ -100,13 +97,7 @@ object CppBridgeModelRegistry {
      * @throws SDKException if the registry is unavailable or the model is not found.
      */
     fun update(model: ProtoModelInfo) {
-        val result =
-            updateProto(model)
-                ?: throw SDKException.make(
-                    code = ProtoErrorCode.ERROR_CODE_NOT_SUPPORTED,
-                    message = "$TAG: Native registry proto ABI unavailable for updateProto",
-                    category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
-                )
+        val result = updateProto(model)
 
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
             throw SDKException.modelNotFound(model.id)
@@ -175,8 +166,8 @@ object CppBridgeModelRegistry {
      * registry. Mirrors Swift `CppBridge.ModelRegistry.discoverDownloadedModels(_:)`.
      *
      * Uses the canonical [ProtoModelDiscoveryRequest] / [ProtoModelDiscoveryResult]
-     * proto ABI (`rac_model_registry_discover_proto`). On failure (native ABI
-     * unavailable, deserialization issue, etc.) returns a result with
+     * proto ABI (`rac_model_registry_discover_proto`). On failure (native
+     * operation failure, deserialization issue, etc.) returns a result with
      * `success = false` and the failure reason in `error_message`.
      *
      * @param request The discovery request. Defaults to the same configuration
@@ -187,13 +178,11 @@ object CppBridgeModelRegistry {
         request: ProtoModelDiscoveryRequest = defaultDiscoveryRequest(),
     ): ProtoModelDiscoveryResult {
         val bytes =
-            callProtoBytes("discoverProto") {
-                RunAnywhereBridge.racModelRegistryDiscoverProto(
-                    ProtoModelDiscoveryRequest.ADAPTER.encode(request),
-                )
-            } ?: return ProtoModelDiscoveryResult(
+            RunAnywhereBridge.racModelRegistryDiscoverProto(
+                ProtoModelDiscoveryRequest.ADAPTER.encode(request),
+            ) ?: return ProtoModelDiscoveryResult(
                 success = false,
-                error_message = "Native registry proto ABI unavailable for discoverProto",
+                error_message = "Native registry returned no response for discoverProto",
             )
 
         return try {
@@ -218,17 +207,13 @@ object CppBridgeModelRegistry {
      * `RunAnywhere.registerModelFromUrl(_:)`.
      *
      * Commons performs the full build-and-save flow (URL → ModelInfoMakeRequest
-     * → registry save) and returns the persisted [ProtoModelInfo]. Returns
-     * `null` when the native ABI is not yet bound so callers can fall back to
-     * the legacy local build-and-save path.
+     * → registry save) and returns the persisted [ProtoModelInfo].
      */
     fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
         val bytes =
-            callProtoBytes("registerModelFromUrlProto") {
-                RunAnywhereBridge.racRegisterModelFromUrlProto(
-                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
-                )
-            } ?: return null
+            RunAnywhereBridge.racRegisterModelFromUrlProto(
+                ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+            ) ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -238,16 +223,13 @@ object CppBridgeModelRegistry {
      * model+vocab sets) via the `rac_register_multi_file_model_proto` C ABI.
      * Mirrors Swift `CppBridge.ModelRegistry.registerMultiFile(_:)` — commons
      * builds the MultiFileArtifact ModelInfo and persists it with
-     * merge-on-reseed semantics. Returns `null` when the native ABI is not
-     * yet bound.
+     * merge-on-reseed semantics.
      */
     fun registerMultiFileModel(request: ProtoRegisterMultiFileModelRequest): ProtoModelInfo? {
         val bytes =
-            callProtoBytes("registerMultiFileModelProto") {
-                RunAnywhereBridge.racRegisterMultiFileModelProto(
-                    ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
-                )
-            } ?: return null
+            RunAnywhereBridge.racRegisterMultiFileModelProto(
+                ProtoRegisterMultiFileModelRequest.ADAPTER.encode(request),
+            ) ?: return null
 
         return decodeProtoModel(bytes)
     }
@@ -262,18 +244,16 @@ object CppBridgeModelRegistry {
      *
      * @param request The import request describing the model and source path.
      * @return The serialized import result from commons.
-     * @throws SDKException if the native ABI is unavailable or the response
+     * @throws SDKException if the native operation fails or the response
      *         cannot be decoded.
      */
     fun importModel(request: ProtoModelImportRequest): ProtoModelImportResult {
         val bytes =
-            callProtoBytes("importProto") {
-                RunAnywhereBridge.racModelRegistryImportProto(
-                    ProtoModelImportRequest.ADAPTER.encode(request),
-                )
-            } ?: throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_NOT_SUPPORTED,
-                message = "$TAG: Native registry proto ABI unavailable for importProto",
+            RunAnywhereBridge.racModelRegistryImportProto(
+                ProtoModelImportRequest.ADAPTER.encode(request),
+            ) ?: throw SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+                message = "$TAG: Native registry returned no response for importProto",
                 category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
             )
 
@@ -318,9 +298,7 @@ object CppBridgeModelRegistry {
         if (protoResult == RunAnywhereBridge.RAC_SUCCESS) {
             return true
         }
-        if (protoResult != null) {
-            log(CppBridgePlatformAdapter.LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
-        }
+        log(CppBridgePlatformAdapter.LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
         return false
     }
 
@@ -347,30 +325,20 @@ object CppBridgeModelRegistry {
 
     // Proto ABI
 
-    private fun registerProto(model: ProtoModelInfo): Int? =
-        callProtoInt("registerProto") {
-            RunAnywhereBridge.racModelRegistryRegisterProto(ProtoModelInfo.ADAPTER.encode(model))
-        }
+    private fun registerProto(model: ProtoModelInfo): Int =
+        RunAnywhereBridge.racModelRegistryRegisterProto(ProtoModelInfo.ADAPTER.encode(model))
 
-    private fun updateProto(model: ProtoModelInfo): Int? =
-        callProtoInt("updateProto") {
-            RunAnywhereBridge.racModelRegistryUpdateProto(ProtoModelInfo.ADAPTER.encode(model))
-        }
+    private fun updateProto(model: ProtoModelInfo): Int =
+        RunAnywhereBridge.racModelRegistryUpdateProto(ProtoModelInfo.ADAPTER.encode(model))
 
     private fun getProto(modelId: String): ProtoModelInfo? {
-        val bytes =
-            callProtoBytes("getProto") {
-                RunAnywhereBridge.racModelRegistryGetProto(modelId)
-            } ?: return null
+        val bytes = RunAnywhereBridge.racModelRegistryGetProto(modelId) ?: return null
 
         return decodeProtoModel(bytes)
     }
 
     private fun listProto(): ProtoModelInfoList? {
-        val bytes =
-            callProtoBytes("listProto") {
-                RunAnywhereBridge.racModelRegistryListProto()
-            } ?: return null
+        val bytes = RunAnywhereBridge.racModelRegistryListProto() ?: return null
 
         return try {
             ProtoModelInfoList.ADAPTER.decode(bytes)
@@ -382,29 +350,23 @@ object CppBridgeModelRegistry {
 
     private fun queryProto(query: ProtoModelQuery): ProtoModelInfoList? {
         val bytes =
-            callProtoBytes("queryProto") {
-                RunAnywhereBridge.racModelRegistryQueryProto(ProtoModelQuery.ADAPTER.encode(query))
-            } ?: return null
+            RunAnywhereBridge.racModelRegistryQueryProto(ProtoModelQuery.ADAPTER.encode(query))
+                ?: return null
 
         return decodeModelInfoList(bytes, "ModelQuery")
     }
 
     private fun listDownloadedProto(): ProtoModelInfoList? {
-        val bytes =
-            callProtoBytes("listDownloadedProto") {
-                RunAnywhereBridge.racModelRegistryListDownloadedProto()
-            } ?: return null
+        val bytes = RunAnywhereBridge.racModelRegistryListDownloadedProto() ?: return null
 
         return decodeModelInfoList(bytes, "downloaded ModelInfoList")
     }
 
     private fun refreshProto(request: ProtoModelRegistryRefreshRequest): ProtoModelRegistryRefreshResult? {
         val bytes =
-            callProtoBytes("refreshProto") {
-                RunAnywhereBridge.racModelRegistryRefreshProto(
-                    ProtoModelRegistryRefreshRequest.ADAPTER.encode(request),
-                )
-            } ?: return null
+            RunAnywhereBridge.racModelRegistryRefreshProto(
+                ProtoModelRegistryRefreshRequest.ADAPTER.encode(request),
+            ) ?: return null
 
         return try {
             ProtoModelRegistryRefreshResult.ADAPTER.decode(bytes)
@@ -414,10 +376,8 @@ object CppBridgeModelRegistry {
         }
     }
 
-    private fun removeProto(modelId: String): Int? =
-        callProtoInt("removeProto") {
-            RunAnywhereBridge.racModelRegistryRemoveProto(modelId)
-        }
+    private fun removeProto(modelId: String): Int =
+        RunAnywhereBridge.racModelRegistryRemoveProto(modelId)
 
     private fun decodeProtoModel(bytes: ByteArray): ProtoModelInfo? =
         try {
@@ -432,22 +392,6 @@ object CppBridgeModelRegistry {
             ProtoModelInfoList.ADAPTER.decode(bytes)
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode $label proto: ${e.message}")
-            null
-        }
-
-    private fun callProtoInt(operation: String, block: () -> Int): Int? =
-        try {
-            block()
-        } catch (e: UnsatisfiedLinkError) {
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
-            null
-        }
-
-    private fun callProtoBytes(operation: String, block: () -> ByteArray?): ByteArray? =
-        try {
-            block()
-        } catch (e: UnsatisfiedLinkError) {
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
             null
         }
 

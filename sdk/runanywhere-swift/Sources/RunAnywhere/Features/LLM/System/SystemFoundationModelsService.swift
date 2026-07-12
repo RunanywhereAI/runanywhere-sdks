@@ -17,7 +17,7 @@ import FoundationModels
 /// This service provides LLM text generation using Apple's built-in Foundation Models.
 /// It requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
 @available(iOS 26.0, macOS 26.0, *)
-public class SystemFoundationModelsService {
+public actor SystemFoundationModelsService {
     private let logger = SDKLogger(category: "SystemFoundationModels")
 
     #if canImport(FoundationModels)
@@ -158,7 +158,7 @@ public class SystemFoundationModelsService {
     public func streamGenerate(
         prompt: String,
         options: RALLMGenerationOptions,
-        onToken: @escaping (String) -> Void
+        onToken: @escaping @Sendable (String) -> Void
     ) async throws {
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
 
@@ -215,7 +215,7 @@ public class SystemFoundationModelsService {
         with session: LanguageModelSession,
         prompt: String,
         temperature: Double,
-        onToken: @escaping (String) -> Void
+        onToken: @escaping @Sendable (String) -> Void
     ) async throws {
         let foundationOptions = GenerationOptions(temperature: temperature)
         let responseStream = session.streamResponse(to: prompt, options: foundationOptions)

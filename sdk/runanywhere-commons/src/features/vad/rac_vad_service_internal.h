@@ -6,11 +6,8 @@
  * include this header.
  *
  * Gives VAD the same Component+Service split STT/TTS already have. The
- * public `rac_vad_*` struct API declared in `rac/features/vad/rac_vad_service.h`
- * is `delete after SDK migration` dead surface (never implemented), and its
- * `rac_vad_create(rac_handle_t*)` signature has no model-path parameter. So the
- * model-VAD service factory lives here as an internal helper instead, mirroring
- * the structure of `rac_stt_create` (registry lookup → null-check vad_ops →
+ * model-VAD service factory lives here as an internal helper, mirroring the
+ * structure of the STT factory (registry lookup → null-check vad_ops →
  * create → wrap in rac_vad_service_t → "vad.backend.created" telemetry) without
  * resurrecting any dead public symbol.
  *

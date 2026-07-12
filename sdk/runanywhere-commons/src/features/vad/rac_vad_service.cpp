@@ -8,10 +8,8 @@
  * rac_vad_service_t, and fires the "vad.backend.created" telemetry once from the
  * commons service layer (single source of truth, so future backends inherit it).
  *
- * The public rac_vad_* struct API in rac/features/vad/rac_vad_service.h is
- * `delete after SDK migration` dead surface (never implemented) — the canonical
- * surface is the proto/component ABI in vad_module.cpp — so no generic
- * vtable-dispatch wrappers live here; there are none to relocate. The VAD
+ * The SDK-facing surface is the proto lifecycle ABI in vad_module.cpp, so no
+ * generic struct-level vtable-dispatch wrappers live here. The VAD
  * component (vad_module.cpp) still owns both the energy-VAD fallback and the
  * model service produced here, and selects model-first / energy-fallback at
  * process time.
@@ -47,7 +45,7 @@ rac_result_t create_model_vad_service(const char* model_path, rac_vad_service_t*
     rac_result_t result = rac::features::resolve_model_reference(
         model_path,
         {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_ONNX,
+         .default_framework = RAC_FRAMEWORK_SHERPA,
          .allow_null_model_id = false,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over

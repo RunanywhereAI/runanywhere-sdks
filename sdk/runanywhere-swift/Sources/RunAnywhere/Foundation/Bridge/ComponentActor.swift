@@ -21,6 +21,13 @@ import CRACommons
 
 extension CppBridge {
 
+    /// Opaque component pointer whose lifetime is owned and serialized by a
+    /// `ComponentActor`. The wrapper is the only value allowed to cross actor
+    /// boundaries; callers unwrap it immediately for one synchronous C call.
+    struct ComponentHandle: @unchecked Sendable {
+        let rawValue: rac_handle_t
+    }
+
     /// Generic component actor: holds one opaque C++ handle and routes
     /// all calls through a `ComponentVTable`.
     ///
@@ -46,27 +53,39 @@ extension CppBridge {
         /// agnostic). Cleared on `unload()` and `destroy()`.
         private var loadedAssetId: String?
 
-        /// Once true, the actor has been destroyed and is no longer
-        /// usable; further `getHandle()` calls throw.
+        /// Tracks whether this actor was destroyed in the prior bridge
+        /// lifetime. A new handle is admitted only after the bridge completes
+        /// a later initialization.
         private var isClosed = false
 
+        private let bridgeIsInitialized: @Sendable () -> Bool
         private let logger: SDKLogger
 
         // MARK: - Init
 
         public init(vtable: ComponentVTable) {
             self.vtable = vtable
+            self.bridgeIsInitialized = { CppBridge.isInitialized }
+            self.logger = SDKLogger(category: "CppBridge.\(vtable.component.displayName)")
+        }
+
+        init(
+            vtable: ComponentVTable,
+            bridgeIsInitialized: @escaping @Sendable () -> Bool
+        ) {
+            self.vtable = vtable
+            self.bridgeIsInitialized = bridgeIsInitialized
             self.logger = SDKLogger(category: "CppBridge.\(vtable.component.displayName)")
         }
 
         // MARK: - Handle Management
 
         /// Get or lazily create the underlying C handle.
-        public func getHandle() throws -> rac_handle_t {
+        func getHandle() throws -> ComponentHandle {
             if let handle = handle {
-                return handle
+                return ComponentHandle(rawValue: handle)
             }
-            if isClosed {
+            if isClosed && !bridgeIsInitialized() {
                 throw SDKException(
                     code: .notInitialized,
                     message: "\(vtable.component.displayName) component is shut down",
@@ -84,8 +103,9 @@ extension CppBridge {
                 )
             }
             self.handle = createdHandle
+            isClosed = false
             logger.debug("\(vtable.component.displayName) component created")
-            return createdHandle
+            return ComponentHandle(rawValue: createdHandle)
         }
 
         // MARK: - State queries
@@ -106,7 +126,9 @@ extension CppBridge {
 
         /// Read-only access to the raw handle without triggering creation.
         /// Returns `nil` if the handle has not been created yet.
-        public func existingHandle() -> rac_handle_t? { handle }
+        func existingHandle() -> ComponentHandle? {
+            handle.map(ComponentHandle.init(rawValue:))
+        }
 
         // MARK: - Lifecycle
 
@@ -125,7 +147,7 @@ extension CppBridge {
                     category: .component
                 )
             }
-            let handle = try getHandle()
+            let handle = try getHandle().rawValue
             let status = path.withCString { pathPtr in
                 id.withCString { idPtr in
                     name.withCString { namePtr in
@@ -162,8 +184,8 @@ extension CppBridge {
             logger.info("\(vtable.component.displayName) model unloaded")
         }
 
-        /// Destroy the component, releasing C resources and marking the
-        /// actor closed. Subsequent `getHandle()` throws.
+        /// Destroy the component, releasing C resources and closing handle
+        /// creation until a later bridge lifetime is initialized.
         public func destroy() {
             if let handle = handle {
                 vtable.destroy(handle)

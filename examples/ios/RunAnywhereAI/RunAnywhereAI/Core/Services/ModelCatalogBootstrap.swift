@@ -19,10 +19,18 @@ enum ModelCatalogBootstrap {
         subsystem: "com.runanywhere.RunAnywhereAI",
         category: "ModelCatalogBootstrap"
     )
+    @TaskLocal private static var mlxCatalogEnabled = false
 
-    static func registerAll() async {
+    static func registerAll(mlxRegistered: Bool) async {
+        await $mlxCatalogEnabled.withValue(mlxRegistered) {
+            await registerCatalog()
+        }
+    }
+
+    private static func registerCatalog() async {
         logger.info("Registering modules with their models...")
 
+        #if canImport(LlamaCPPRuntime)
         // --- LLM models (LlamaCpp backend) ------------------------------------
         await registerLLM(
             id: "smollm2-360m-q8_0",
@@ -137,6 +145,7 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_000_000_000
         )
         logger.info("LLM models registered")
+        #endif
 
         // --- MLX models (Apple Metal, Hugging Face repo-folder bundles) -------
         await registerLLM(
@@ -216,8 +225,13 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
-        logger.info("MLX models registered")
+        if mlxCatalogEnabled {
+            logger.info("MLX models registered")
+        } else {
+            logger.info("Skipping MLX models because this target cannot execute the runtime")
+        }
 
+        #if canImport(LlamaCPPRuntime)
         // --- VLM models (multi-modal, multi-file) -----------------------------
         await registerMultiFile(
             id: "smolvlm2-256m-video-instruct-q8_0",
@@ -321,7 +335,9 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 600_000_000
         )
         logger.info("VLM models registered")
+        #endif
 
+        #if canImport(ONNXRuntime)
         // --- STT models (Sherpa-ONNX) -----------------------------------------
         await registerArchive(
             id: "sherpa-onnx-whisper-tiny.en",
@@ -333,8 +349,14 @@ enum ModelCatalogBootstrap {
             structure: .nestedDirectory,
             memoryRequirement: 75_000_000
         )
+        #endif
 
         // --- STT models (MLX, Apple Metal) -----------------------------------
+        // Keep the iOS example on the same MLX speech bundles that are proven
+        // to load in the local DevTools CLI. Several repo-style Whisper
+        // bundles previously registered here fail against the current
+        // MLXAudioSTT loader at runtime, so we intentionally do not surface
+        // them in the example catalog.
         await registerMultiFile(
             id: "mlx-qwen3-asr-0.6b-8bit",
             name: "MLX Qwen3-ASR 0.6B 8bit",
@@ -430,6 +452,7 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 1_288_437_789
         )
 
+        #if canImport(ONNXRuntime)
         // --- TTS models (Sherpa-ONNX Piper VITS) ------------------------------
         await registerArchive(
             id: "vits-piper-en_US-lessac-medium",
@@ -451,8 +474,12 @@ enum ModelCatalogBootstrap {
             structure: .nestedDirectory,
             memoryRequirement: 65_000_000
         )
+        #endif
 
         // --- TTS models (MLX, Apple Metal) -----------------------------------
+        // Match the MLX TTS bundles we verified locally through the DevTools
+        // CLI on macOS. Keep only models that completed a real load/synthesis
+        // pass with the current MLXAudioTTS runtime.
         await registerMultiFile(
             id: "mlx-soprano-1.1-80m-5bit",
             name: "MLX Soprano 1.1 80M 5bit",
@@ -489,6 +516,108 @@ enum ModelCatalogBootstrap {
             framework: .mlx,
             modality: .speechSynthesis,
             memoryRequirement: 82_220_814
+        )
+        await registerLLM(
+            id: "mlx-kokoro-82m-6bit",
+            name: "MLX Kokoro 82M 6bit",
+            url: "https://huggingface.co/mlx-community/Kokoro-82M-6bit",
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 309_640_166
+        )
+        await registerMultiFile(
+            id: "mlx-pocket-tts",
+            name: "MLX Pocket TTS",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/special_tokens_map.json",
+                    filename: "special_tokens_map.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer.json",
+                    filename: "tokenizer.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/tokenizer_config.json",
+                    filename: "tokenizer_config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/alba.safetensors",
+                    filename: "embeddings/alba.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/azelma.safetensors",
+                    filename: "embeddings/azelma.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/cosette.safetensors",
+                    filename: "embeddings/cosette.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/eponine.safetensors",
+                    filename: "embeddings/eponine.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/fantine.safetensors",
+                    filename: "embeddings/fantine.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/javert.safetensors",
+                    filename: "embeddings/javert.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/jean.safetensors",
+                    filename: "embeddings/jean.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/pocket-tts/resolve/main/embeddings/marius.safetensors",
+                    filename: "embeddings/marius.safetensors"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 420_000_000
+        )
+        await registerMultiFile(
+            id: "mlx-kitten-tts-nano-0.8-5bit",
+            name: "MLX Kitten TTS Nano 0.8 5bit",
+            files: [
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/config.json",
+                    filename: "config.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors",
+                    filename: "model.safetensors"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8-5bit/resolve/main/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json"
+                ),
+                .init(
+                    url: "https://huggingface.co/mlx-community/kitten-tts-nano-0.8/resolve/1a06939883365626208c9cd832133f36fbc6fe82/voices.safetensors",
+                    filename: "voices.safetensors"
+                )
+            ],
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 120_000_000
+        )
+        await registerLLM(
+            id: "mlx-qwen3-tts-12hz-0.6b-base-4bit",
+            name: "MLX Qwen3-TTS 12Hz 0.6B Base 4bit",
+            url: "https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit",
+            framework: .mlx,
+            modality: .speechSynthesis,
+            memoryRequirement: 1_711_328_624
         )
         await registerMultiFile(
             id: "mlx-qwen3-tts-12hz-0.6b-base-8bit",
@@ -548,6 +677,7 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 1_991_299_138
         )
 
+        #if canImport(ONNXRuntime)
         // --- VAD (Silero, ONNX) -----------------------------------------------
         await registerLLM(
             id: "silero-vad",
@@ -563,7 +693,9 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_327_524
         )
         logger.info("Sherpa STT/TTS + Silero VAD models registered")
+        #endif
 
+        #if canImport(ONNXRuntime)
         // --- ONNX Embedding (RAG) ---------------------------------------------
         // MiniLM needs model.onnx + vocab.txt in the same folder for the C++
         // RAG pipeline to find its vocab next to the model.
@@ -578,6 +710,7 @@ enum ModelCatalogBootstrap {
             modality: .embedding,
             memoryRequirement: 25_500_000
         )
+        #endif
         await registerLLM(
             id: "mlx-qwen3-embedding-0.6b-4bit-dwq",
             name: "MLX Qwen3 Embedding 0.6B 4bit DWQ",
@@ -588,10 +721,15 @@ enum ModelCatalogBootstrap {
         )
         logger.info("Embedding models registered")
 
+        // QHexRT/HNPU bundles are Qualcomm-Android-only and are intentionally
+        // not registered on Apple platforms.
+
         // --- LoRA adapters ------------------------------------------------------
         // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.
+        #if canImport(LlamaCPPRuntime)
         await registerLoraAdapters()
         logger.info("LoRA adapters registered")
+        #endif
 
         // Diffusion (CoreML) backend is deferred scope for
         // Swift v1. Their model catalog entries are intentionally omitted.
@@ -646,6 +784,7 @@ enum ModelCatalogBootstrap {
         supportsThinking: Bool = false,
         supportsLora: Bool = false
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
             _ = try await RunAnywhere.registerModel(
                 id: id,
@@ -672,6 +811,7 @@ enum ModelCatalogBootstrap {
         structure: ArchiveStructure,
         memoryRequirement: Int64
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
             _ = try await RunAnywhere.registerModel(
                 archive: url,
@@ -714,6 +854,7 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory,
         memoryRequirement: Int64
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
             guard let fileURL = URL(string: file.url) else { return nil }
             var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: file.isRequired)

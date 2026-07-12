@@ -104,7 +104,7 @@ export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_BUILT_IN = 20,
     INFERENCE_FRAMEWORK_NONE = 21,
     INFERENCE_FRAMEWORK_UNKNOWN = 22,
-    /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    /** INFERENCE_FRAMEWORK_SHERPA - Sherpa-ONNX speech engine (STT/TTS/VAD) */
     INFERENCE_FRAMEWORK_SHERPA = 23,
     /** INFERENCE_FRAMEWORK_QHEXRT - Qualcomm Hexagon NPU (QHexRT runtime) */
     INFERENCE_FRAMEWORK_QHEXRT = 24,
@@ -362,7 +362,6 @@ export interface ModelInfo {
     contextLength: number;
     supportsThinking: boolean;
     supportsLora: boolean;
-    description: string;
     source: ModelSource;
     createdAtUnixMs: number;
     updatedAtUnixMs: number;
@@ -381,11 +380,7 @@ export interface ModelInfo {
      * capability flag; this optional pattern declares model-specific tags.
      */
     thinkingPattern?: ThinkingTagPattern | undefined;
-    /**
-     * Structured public catalog metadata. `description` (field 12) is kept for
-     * backward compatibility and should mirror metadata.description when both
-     * are populated.
-     */
+    /** Structured public catalog metadata, including the model description. */
     metadata?: ModelInfoMetadata | undefined;
     singleFile?: SingleFileArtifact | undefined;
     archive?: ArchiveArtifact | undefined;

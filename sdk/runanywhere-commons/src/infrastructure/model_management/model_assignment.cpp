@@ -381,7 +381,9 @@ static rac_result_t assignment_default_http_get(const char* endpoint, rac_bool_t
     request.headers = headers.empty() ? nullptr : headers.data();
     request.header_count = headers.size();
     request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
-    request.follow_redirects = RAC_TRUE;
+    // Assignment fetches carry apikey and bearer credentials. The configured
+    // control-plane origin must answer directly; redirects fail closed.
+    request.follow_redirects = RAC_FALSE;
 
     rac_http_response_t response = {};
     rc = rac_http_request_send(client, &request, &response);
@@ -702,15 +704,6 @@ static void normalize_assignment_model(ModelInfo* model) {
 
     if (model->download_size_bytes() < 0) {
         model->set_download_size_bytes(0);
-    }
-
-    if (model->description().empty() && model->has_metadata() &&
-        !model->metadata().description().empty()) {
-        model->set_description(model->metadata().description());
-    }
-    if (!model->description().empty() &&
-        (!model->has_metadata() || model->metadata().description().empty())) {
-        model->mutable_metadata()->set_description(model->description());
     }
 
     if (model->artifact_case() == ModelInfo::ARTIFACT_NOT_SET) {
@@ -1118,7 +1111,10 @@ static bool parse_assignment_json_models(const char* data, size_t len,
         model.set_id(json_first_string(object, {"id", "model_id", "modelId"}));
         model.set_name(json_first_string(object, {"name", "display_name", "displayName"}));
         model.set_download_url(json_first_string(object, {"download_url", "downloadUrl", "url"}));
-        model.set_description(json_first_string(object, {"description"}));
+        const std::string top_level_description = json_first_string(object, {"description"});
+        if (!top_level_description.empty()) {
+            model.mutable_metadata()->set_description(top_level_description);
+        }
         model.set_download_size_bytes(
             json_first_int(object, 0, {"download_size_bytes", "download_size", "downloadSize"}));
         model.set_context_length(
@@ -1475,9 +1471,17 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                 // Preserve artifact_info if existing has more specific type
                 if (existing->artifact_info.kind != RAC_ARTIFACT_KIND_SINGLE_FILE &&
                     model->artifact_info.kind == RAC_ARTIFACT_KIND_SINGLE_FILE) {
+                    // Transfer ownership of the heap members to `model` and null
+                    // them on `existing`: `model` outlives this block (copied into
+                    // the cache, freed at the end of the fetch), so a shallow
+                    // alias here + rac_model_info_free(existing) below left
+                    // dangling pointers that were re-freed later — use-after-free
+                    // crash (bionic tagged-pointer SIGABRT) on second launch.
                     model->artifact_info = existing->artifact_info;
-                    // Note: This is a shallow copy — existing must stay alive until
-                    // after rac_model_registry_save deep-copies the data.
+                    existing->artifact_info.expected_files = nullptr;
+                    existing->artifact_info.file_descriptors = nullptr;
+                    existing->artifact_info.file_descriptor_count = 0;
+                    existing->artifact_info.strategy_id = nullptr;
                 }
                 rac_model_registry_save(registry, model);
                 rac_model_info_free(existing);

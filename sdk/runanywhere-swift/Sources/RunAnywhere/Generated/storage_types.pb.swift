@@ -10,11 +10,8 @@
 
 // RunAnywhere IDL — storage / device-capacity / model-on-disk types.
 //
-// Every message and enum below is the *union* of cases currently declared by
-// hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift between the per-language storage definitions is what motivated this
-// schema. Every SDK consumes
-// generated output; nothing is hand-written.
+// Every SDK consumes these canonical generated types. Storage metrics keep
+// model metadata and on-disk accounting together across platforms.
 //
 // Pre-IDL drift table (canonicalized by this file):
 //
@@ -42,10 +39,7 @@
 //   Swift   StorageTypes.swift:66         (model:ModelInfo + sizeOnDisk:Int64)
 //   Kotlin  StorageTypes.kt:66            (model:ModelInfo + sizeOnDisk:Long)
 //   Dart    storage_types.dart:95         (model:ModelInfo + sizeOnDisk:int)
-//   Older Kotlin models/storage/StorageInfo.kt:122 (StoredModel had a `lastUsed:Instant?`
-//                                          field — fold that into this canonical type)
 //   RN      RunAnywhere+Storage.ts        (no per-model breakdown — only modelCount)
-//   Web     types/models.ts:163 (StoredModel: id, name, sizeOnDisk, downloadedAt, lastUsed)
 //
 //   ── StorageAvailability ────────────────────────────────────────────────────
 //   Swift   StorageTypes.swift:175        (isAvailable, requiredSpace,
@@ -53,9 +47,6 @@
 //                                          recommendation:String?)
 //   Kotlin  StorageTypes.kt:178           (matches Swift)
 //   Dart    storage_types.dart:262        (matches Swift)
-//   Older Kotlin models/storage/StorageInfo.kt:140 (enum HEALTHY/LOW/CRITICAL/FULL)
-//                                          ← drift: same name, totally different shape;
-//                                          canonical struct shape wins.
 //   RN / Web (no equivalent type pre-IDL)
 //
 //   ── NPUChip ───────────────────────────────────────────────────────────────
@@ -81,9 +72,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 /// ---------------------------------------------------------------------------
 /// NPU chipset detected on the host device. Used to drive vendor-NPU
 /// model-download URL selection and runtime backend wiring.
-/// Sources pre-IDL:
-///   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
-/// Canonical superset (this file): vendor-grouped, vendor-agnostic.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RANPUChip: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
@@ -219,10 +207,8 @@ public nonisolated struct RAAppStorageInfo: Sendable {
 /// model_types.proto. This avoids circular embeds and keeps the wire payload
 /// for storage queries small.
 ///
-/// `last_used_ms` (epoch ms, optional) preserves the field that lived on the
-/// older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
-/// other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
-/// LRU eviction without another type round-trip.
+/// `last_used_ms` supports LRU presentation and eviction without another type
+/// round-trip.
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
@@ -346,45 +332,6 @@ public nonisolated struct RAStorageAvailability: Sendable {
 
   fileprivate var _warningMessage: String? = nil
   fileprivate var _recommendation: String? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
-/// surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
-/// flattens to the columns those SDKs actually exposed via computed
-/// properties (id, name, size, local path, downloaded-at), so RN / Web can
-/// emit the same shape without round-tripping through `ModelInfo`.
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RAStoredModel: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var modelID: String = String()
-
-  public var name: String = String()
-
-  public var sizeBytes: Int64 = 0
-
-  public var localPath: String = String()
-
-  /// Unix epoch ms of download completion
-  public var downloadedAtMs: Int64 {
-    get {_downloadedAtMs ?? 0}
-    set {_downloadedAtMs = newValue}
-  }
-  /// Returns true if `downloadedAtMs` has been explicitly set.
-  public var hasDownloadedAtMs: Bool {self._downloadedAtMs != nil}
-  /// Clears the value of `downloadedAtMs`. Subsequent reads from it will return its default value.
-  public mutating func clearDownloadedAtMs() {self._downloadedAtMs = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _downloadedAtMs: Int64? = nil
 }
 
 public nonisolated struct RAStorageInfoRequest: Sendable {
@@ -904,60 +851,6 @@ nonisolated extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobu
     if lhs._recommendation != rhs._recommendation {return false}
     if lhs.shortfallBytes != rhs.shortfallBytes {return false}
     if lhs.requiredToAvailableRatio != rhs.requiredToAvailableRatio {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".StoredModel"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}name\0\u{3}size_bytes\0\u{3}local_path\0\u{3}downloaded_at_ms\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.sizeBytes) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self._downloadedAtMs) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
-    }
-    if self.sizeBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.sizeBytes, fieldNumber: 3)
-    }
-    if !self.localPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 4)
-    }
-    try { if let v = self._downloadedAtMs {
-      try visitor.visitSingularInt64Field(value: v, fieldNumber: 5)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAStoredModel, rhs: RAStoredModel) -> Bool {
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.name != rhs.name {return false}
-    if lhs.sizeBytes != rhs.sizeBytes {return false}
-    if lhs.localPath != rhs.localPath {return false}
-    if lhs._downloadedAtMs != rhs._downloadedAtMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

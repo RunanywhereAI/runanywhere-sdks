@@ -1,4 +1,4 @@
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
@@ -73,6 +73,16 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 # subdirectory of the top-level project.
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
+# --- Kotlin JNI request cancellation admission ----------------------
+# Header-only relay used by request-scoped VLM/RAG JNI wrappers. Covers
+# cancel-before-entry ownership, backend-publication retry, and the completion
+# exclusion that prevents a stale pulse from reaching a successor request.
+find_package(Threads REQUIRED)
+add_executable(test_jni_request_cancellation_relay test_jni_request_cancellation_relay.cpp)
+target_compile_features(test_jni_request_cancellation_relay PRIVATE cxx_std_20)
+target_link_libraries(test_jni_request_cancellation_relay PRIVATE Threads::Threads)
+add_test(NAME jni_request_cancellation_relay_tests COMMAND test_jni_request_cancellation_relay)
+
 # --- DAG graph primitives unit tests --------------------------
 # CancelToken + RingBuffer + StreamEdge. Header-only
 # primitives; no backend dependency. Always built.
@@ -143,6 +153,18 @@ target_link_libraries(test_device_identity PRIVATE rac_commons)
 rac_link_archive_deps(test_device_identity)
 target_compile_features(test_device_identity PRIVATE cxx_std_17)
 add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
+
+# Device callback ownership: Web installs Emscripten function-table entries,
+# so native callback storage must be clearable before those entries are freed.
+add_executable(test_device_manager_callbacks test_device_manager_callbacks.cpp)
+target_include_directories(test_device_manager_callbacks PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_device_manager_callbacks PRIVATE rac_commons)
+rac_link_archive_deps(test_device_manager_callbacks)
+target_compile_features(test_device_manager_callbacks PRIVATE cxx_std_17)
+add_test(NAME device_manager_callback_tests COMMAND test_device_manager_callbacks --run-all)
 
 # --- Model path layout tests ----------------------------------------
 add_executable(test_model_paths test_model_paths.cpp)
@@ -244,14 +266,28 @@ rac_link_archive_deps(test_llm_thinking)
 target_compile_features(test_llm_thinking PRIVATE cxx_std_17)
 add_test(NAME llm_thinking_tests COMMAND test_llm_thinking)
 
-# --- Rac_tool_call_* C ABI test ----------------------
-# Behavioral tests for the single-source-of-truth tool-calling API shared by
-# Swift, Kotlin, Flutter, Web, and React Native SDKs. Covers parse (default +
-# LFM2), free-form, format_prompt, build_initial/followup_prompt, normalize_json,
-# and free-function idempotence.
+# --- Voice-agent response policy tests ----------------------
+# Host-only coverage for the deterministic no-thinking generation policy,
+# reasoning removal, speakable-text sanitization, and the blank-answer gate
+# that prevents an invalid TTS invocation.
+add_executable(test_voice_agent_response_policy test_voice_agent_response_policy.cpp)
+target_include_directories(test_voice_agent_response_policy PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_voice_agent_response_policy PRIVATE rac_commons)
+rac_link_archive_deps(test_voice_agent_response_policy)
+target_compile_features(test_voice_agent_response_policy PRIVATE cxx_std_17)
+add_test(NAME voice_agent_response_policy_tests COMMAND test_voice_agent_response_policy)
+
+# --- Tool parser implementation test ----------------------
+# Behavioral tests for the private parser used behind the generated-proto
+# public ABI. Covers both formats, prompt construction, normalization, and
+# allocation cleanup.
 add_executable(test_tool_calling test_tool_calling.cpp)
 target_include_directories(test_tool_calling PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_SOURCE_DIR}/include
 )
 target_link_libraries(test_tool_calling PRIVATE rac_commons)
@@ -261,9 +297,9 @@ rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
 # --- commons-owned RAModelInfo heuristics --------
-# Exercises rac_tool_call_format_from_model_info_proto +
-# rac_model_info_parameter_count_b_proto + rac_model_info_is_small_model_proto.
-# Replaces example-side detectToolCallFormat / isLikelySmallModel duplication.
+# Exercises rac_model_info_parameter_count_b_proto +
+# rac_model_info_is_small_model_proto.
+# Replaces example-side isLikelySmallModel duplication.
 add_executable(test_model_heuristics test_model_heuristics.cpp)
 target_include_directories(test_model_heuristics PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -380,6 +416,7 @@ add_executable(test_llm_stream_proto test_llm_stream_proto.cpp)
 target_include_directories(test_llm_stream_proto PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
 )
 target_link_libraries(test_llm_stream_proto PRIVATE rac_commons)
 rac_link_archive_deps(test_llm_stream_proto)
@@ -436,15 +473,15 @@ rac_link_archive_deps(test_engine_vtable)
 target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
 
-add_executable(test_legacy_coexistence test_legacy_coexistence.cpp)
-target_include_directories(test_legacy_coexistence PRIVATE
+add_executable(test_plugin_registry_isolation test_plugin_registry_isolation.cpp)
+target_include_directories(test_plugin_registry_isolation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
-target_link_libraries(test_legacy_coexistence PRIVATE rac_commons)
-rac_link_archive_deps(test_legacy_coexistence)
-target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
-add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
+target_link_libraries(test_plugin_registry_isolation PRIVATE rac_commons)
+rac_link_archive_deps(test_plugin_registry_isolation)
+target_compile_features(test_plugin_registry_isolation PRIVATE cxx_std_17)
+add_test(NAME plugin_registry_isolation_tests COMMAND test_plugin_registry_isolation)
 
 # --- Shared C ABI proto-byte buffer ownership tests -------------------------
 add_executable(test_proto_buffer test_proto_buffer.cpp)
@@ -492,6 +529,17 @@ rac_link_archive_deps(test_auth_sdk_events)
 target_compile_features(test_auth_sdk_events PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_auth_sdk_events)
 add_test(NAME auth_sdk_event_tests COMMAND test_auth_sdk_events)
+
+# --- Auth secure-storage failure semantics ---------------------------------
+add_executable(test_auth_secure_storage test_auth_secure_storage.cpp)
+target_include_directories(test_auth_secure_storage PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_auth_secure_storage PRIVATE rac_commons)
+rac_link_archive_deps(test_auth_secure_storage)
+target_compile_features(test_auth_secure_storage PRIVATE cxx_std_17)
+add_test(NAME auth_secure_storage_tests COMMAND test_auth_secure_storage)
 
 # --- Canonical two-phase SDK init ABI tests --------------------------
 # Drives rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto with hand
@@ -676,6 +724,17 @@ target_compile_features(test_tts_config_defaults PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tts_config_defaults)
 add_test(NAME tts_config_defaults_tests COMMAND test_tts_config_defaults)
 
+# Shared SHA-256 foundation util — known-answer + streaming parity.
+add_executable(test_sha256 test_sha256.cpp)
+target_include_directories(test_sha256 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_sha256 PRIVATE rac_commons)
+rac_link_archive_deps(test_sha256)
+target_compile_features(test_sha256 PRIVATE cxx_std_17)
+add_test(NAME sha256_tests COMMAND test_sha256)
+
 # RAG symbols are folded into rac_commons only when the RAG OBJECT target is
 # enabled, so guard these tests the same way as test_advanced_modality_proto_abi.
 if(TARGET rac_backend_rag)
@@ -693,6 +752,51 @@ if(TARGET rac_backend_rag)
     target_compile_features(test_rag_pipeline_graph PRIVATE cxx_std_17)
     rac_test_define_have_protobuf(test_rag_pipeline_graph)
     add_test(NAME rag_pipeline_graph_tests COMMAND test_rag_pipeline_graph)
+
+    # Deterministic unit test for rerank score parsing + reordering (no LLM).
+    add_executable(test_rag_rerank test_rag_rerank.cpp)
+    target_include_directories(test_rag_rerank PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_rerank PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_rerank)
+    target_compile_features(test_rag_rerank PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_rerank)
+    add_test(NAME rag_rerank_tests COMMAND test_rag_rerank)
+
+    # Deterministic unit test for N-way RRF fusion + query-variant parsing.
+    add_executable(test_rag_fusion test_rag_fusion.cpp)
+    target_include_directories(test_rag_fusion PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_fusion PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_fusion)
+    target_compile_features(test_rag_fusion PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_fusion)
+    add_test(NAME rag_fusion_tests COMMAND test_rag_fusion)
+endif()
+
+# End-to-end RAG test with real models (ONNX embeddings + GGUF LLM). SKIPs
+# gracefully when the models are absent, so it is safe to register whenever the
+# RAG, llamacpp and onnx backends are all built.
+if(TARGET rac_backend_rag AND RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX)
+    add_executable(test_rag_e2e test_rag_e2e.cpp)
+    target_include_directories(test_rag_e2e PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_e2e PRIVATE rac_commons rac_backend_llamacpp rac_backend_onnx)
+    rac_link_archive_deps(test_rag_e2e)
+    target_compile_features(test_rag_e2e PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_e2e)
+    target_compile_definitions(test_rag_e2e PRIVATE
+        RAG_SAMPLE_DOC_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/rag_sample.md")
+    add_test(NAME rag_e2e_tests COMMAND test_rag_e2e)
 endif()
 
 # --- Per-framework "is this file a model file?" parity tests -----------------
@@ -1259,11 +1363,11 @@ target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_download_orchestrator)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
-# --- Sherpa-ONNX speech tests (VAD, STT, TTS, WakeWord) ---
+# --- Sherpa-ONNX speech tests (VAD, STT, TTS) ---
 # Engine-independence refactor: tests link rac_backend_sherpa
-# (which owns the speech ops) and depend on rac_backend_onnx only for the
-# ONNX-named typedefs used in their config defaults. The engines/sherpa/
-# include path exposes the public sherpa function declarations.
+# (which owns the speech ops) and rac_backend_onnx because the test setup
+# registers both shipped plugins. The engines/sherpa/ include path exposes
+# the private engine declarations exercised by these native backend tests.
 if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     # VAD test
     add_executable(test_vad test_vad.cpp)
@@ -1298,9 +1402,6 @@ if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE)
     target_compile_features(test_tts PRIVATE cxx_std_20)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
-    # WakeWord test is temporarily disabled: the legacy rac_wakeword_onnx.h API
-    # was removed, and wake-word coverage needs to migrate to the current
-    # voice-agent/VAD ingress APIs before it can be part of the required lane.
 endif()
 
 # --- LLM test: Requires LlamaCPP backend ---
@@ -1337,7 +1438,7 @@ endif()
 # --- macOS RPATH for ONNX Runtime dylib ---
 if(APPLE)
     set(ONNX_MACOS_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "${ONNX_MACOS_LIB_DIR}"
@@ -1350,7 +1451,7 @@ endif()
 # --- Linux RPATH for Sherpa-ONNX shared libs ---
 if(UNIX AND NOT APPLE)
     set(SHERPA_LINUX_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-linux/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "$ORIGIN;${SHERPA_LINUX_LIB_DIR}"
@@ -1366,7 +1467,7 @@ endif()
 # is ON). If it's unset the EXISTS check silently evaluates against
 # "/lib/onnxruntime.dll" which is never what we want.
 if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" STREQUAL "")
-    foreach(test_target test_vad test_stt test_tts test_wakeword)
+    foreach(test_target test_vad test_stt test_tts)
         if(TARGET ${test_target})
             if(EXISTS "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll")
                 add_custom_command(TARGET ${test_target} POST_BUILD
@@ -1395,14 +1496,19 @@ target_compile_features(test_hf_resolver_folder PRIVATE cxx_std_20)
 add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 
 # --- Bundle-policy registry + the QHexRT policy (offline) --------------
-# Registry semantics plus the real QHexRT manifest predicate, included
-# header-only from engines/qhexrt (public-repo source; no prebuilt engine
-# needed) and driven through the generic folder resolver.
-add_executable(test_bundle_policy test_bundle_policy.cpp)
+# Registry semantics plus the real public QHexRT policy, driven through the
+# generic folder resolver without any private runtime headers or binaries.
+get_filename_component(QHEXRT_ENGINE_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../../engines/qhexrt" ABSOLUTE)
+add_executable(test_bundle_policy
+    test_bundle_policy.cpp
+    ${QHEXRT_ENGINE_DIR}/qhexrt_device_capability.cpp
+)
 target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
-    ${CMAKE_SOURCE_DIR}/engines/qhexrt
+    ${CMAKE_SOURCE_DIR}/include
+    ${QHEXRT_ENGINE_DIR}
+    ${QHEXRT_ENGINE_DIR}/include
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)
@@ -1430,7 +1536,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     include(FetchContent)
     find_package(Threads REQUIRED)
 
-    # GoogleTest pinned via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION
+    # GoogleTest pinned via RAC_GOOGLETEST_VERSION from LoadVersions.
     # so the RAG and benchmark suites below agree on a single tag (previously
     # this block requested release-1.12.1 while the benchmark block fetched
     # FetchContent dedupes by name and silently used whichever
@@ -1438,7 +1544,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        ${GOOGLETEST_VERSION}
+        GIT_TAG        ${RAC_GOOGLETEST_VERSION}
         GIT_SHALLOW    TRUE
     )
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -1471,7 +1577,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         Threads::Threads
         GTest::gtest_main
     )
-    # Force the bundled (centralized GOOGLETEST_VERSION) gtest headers to win
+    # Force the bundled, centrally pinned GoogleTest headers to win
     # over any system gtest (e.g. /opt/homebrew/include) — without this the
     # prebuilt libgtest_main.a (older `const char*` ABI) link-fails when the
     # test picks up the newer `std::string` header signatures. Same fix as
@@ -1520,13 +1626,13 @@ endif()
 
 include(FetchContent)
 
-# Pin via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION so this and the
+# Pin via RAC_GOOGLETEST_VERSION so this and the
 # RAG-test block above share a single FetchContent declaration. (FetchContent
 # dedupes by content name; first declaration wins. Both must match.)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG ${GOOGLETEST_VERSION}
+    GIT_TAG ${RAC_GOOGLETEST_VERSION}
 )
 
 # Prevent GoogleTest from overriding compiler/linker options

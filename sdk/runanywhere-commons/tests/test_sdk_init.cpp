@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -84,6 +85,32 @@ void run_phase1_development() {
     CHECK(rac_state_is_initialized(), "rac_state_is_initialized() after phase1");
     CHECK(rac_state_get_environment() == RAC_ENV_DEVELOPMENT,
           "rac_state_get_environment() == DEVELOPMENT");
+
+    rac_proto_buffer_free(&out);
+}
+
+void run_phase2_without_external_config() {
+    std::fprintf(stdout, "-- phase2 skips control-plane setup without external config --\n");
+    CHECK(rac_state_is_initialized(), "phase2 no-config prereq: development state initialized");
+
+    SdkInitPhase2Request request;
+    std::vector<uint8_t> bytes;
+    bytes.assign(request.ByteSizeLong(), 0u);
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = rac_sdk_init_phase2_proto(bytes.data(), bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS, "phase2 no-config returns RAC_SUCCESS");
+
+    SdkInitResult result;
+    CHECK(parse_result(out, &result), "phase2 no-config result parses");
+    CHECK(result.success(), "phase2 no-config succeeds");
+    CHECK(!result.http_applicable(), "phase2 no-config reports http_applicable=false");
+    CHECK(!result.device_registered(), "phase2 no-config reports device_registered=false");
+    CHECK(result.warning().find("auth setup deferred") == std::string::npos,
+          "phase2 no-config does not report deferred auth");
+    CHECK(result.warning().find("device registration deferred") == std::string::npos,
+          "phase2 no-config does not report deferred device registration");
 
     rac_proto_buffer_free(&out);
 }
@@ -235,6 +262,19 @@ void run_invalid_arguments() {
     CHECK(rc3 == RAC_ERROR_INVALID_ARGUMENT, "retryHTTP NULL out_buffer rejected");
 }
 
+void run_sdk_config_reset() {
+    std::fprintf(stdout, "-- sdk config reset wipes copied credentials --\n");
+    CHECK(rac_sdk_is_initialized(), "sdk config initialized before reset");
+    CHECK(rac_sdk_get_config() != nullptr, "sdk config snapshot available before reset");
+
+    rac_sdk_reset();
+
+    CHECK(!rac_sdk_is_initialized(), "sdk config reports uninitialized after reset");
+    CHECK(rac_sdk_get_config() == nullptr, "sdk config snapshot unavailable after reset");
+    CHECK(rac_sdk_get_environment() == RAC_ENV_DEVELOPMENT,
+          "sdk environment returns non-sensitive default after reset");
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -248,11 +288,13 @@ int main() {
 #else
     run_invalid_arguments();
     run_phase1_development();
+    run_phase2_without_external_config();
     run_phase1_production_validation_failure();
     run_phase1_production_success();
     run_phase2_offline_mode();
     run_phase2_without_phase1();
     run_retry_http_no_external_config();
+    run_sdk_config_reset();
 
     rac_state_shutdown();
     rac_auth_reset();

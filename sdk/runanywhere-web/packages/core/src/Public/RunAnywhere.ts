@@ -2,8 +2,9 @@
  * RunAnywhere Web SDK - Main Entry Point
  *
  * The public API for the RunAnywhere Web SDK.
- * Core is pure TypeScript — no WASM. Backend packages ship their own WASM
- * and install proto-byte adapters via `setRunanywhereModule(...)`.
+ * Core owns the backend-neutral TypeScript facade plus its commons-only WASM.
+ * Backend packages ship separate capability WASMs and install them through the
+ * typed backend contract.
  *
  * After the V2 cleanup, model lifecycle, registry, downloads, and provider
  * routing are all owned by the commons C ABI through the proto-byte adapters.
@@ -13,8 +14,7 @@
  *   import { RunAnywhere } from '@runanywhere/web';
  *
  *   await RunAnywhere.initialize({ environment: 'development' });
- *   // Backend packages register their WASM module via setRunanywhereModule();
- *   // typed adapters (ModelLifecycleAdapter, DownloadAdapter, ...) become live.
+ *   // Install needed capabilities through LlamaCPP.register()/ONNX.register().
  */
 
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
@@ -41,69 +41,77 @@ import {
   SdkInitResult,
   type SdkInitResult as ProtoSdkInitResult,
 } from '@runanywhere/proto-ts/sdk_init';
-import type { SDKInitOptions } from '../types/models';
-import { EventBus } from '../Foundation/EventBus';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
-import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
-import { OPFSBridge } from '../Infrastructure/OPFSBridge';
+import type { SDKInitOptions } from '../types/models.js';
+import { EventBus } from '../Foundation/EventBus.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
+import { LocalFileStorage } from '../Infrastructure/LocalFileStorage.js';
+import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
-} from '../Infrastructure/FrameworkOPFSPaths';
-import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
-import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
-import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
-import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings';
-import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
-import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG';
-import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent';
-import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
-import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
-import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
-import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
-import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
-import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
-import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
-import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
-import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
-import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywhere+TTS';
-import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
-import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
-import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+} from '../Infrastructure/FrameworkOPFSPaths.js';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
+import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig.js';
+import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions.js';
+import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings.js';
+import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA.js';
+import {
+  RAG as RAGCapability,
+  ragDestroyPipeline,
+  resetRAGFacadeState,
+} from './Extensions/RunAnywhere+RAG.js';
+import {
+  VoiceAgent as VoiceAgentCapability,
+  resetVoiceAgentFacadeState,
+} from './Extensions/RunAnywhere+VoiceAgent.js';
+import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads.js';
+import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents.js';
+import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry.js';
+import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle.js';
+import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration.js';
+import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput.js';
+import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling.js';
+import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging.js';
+import { STT as STTCapability } from './Extensions/RunAnywhere+STT.js';
+import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywhere+TTS.js';
+import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD.js';
+import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader.js';
+import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
   VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
-import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid';
-import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
+import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid.js';
 import {
   createStorageNamespace,
   setRegisterModelHydrateHook,
-} from './Extensions/RunAnywhere+Storage';
-import { flatFacade } from './Extensions/RunAnywhere+FlatFacade';
-import { StorageAdapter } from '../Adapters/StorageAdapter';
-import { HTTPAdapter } from '../Adapters/HTTPAdapter';
-import { SDK_PLATFORM, SDK_VERSION } from '../Foundation/Version';
+} from './Extensions/RunAnywhere+Storage.js';
+import { flatFacade } from './Extensions/RunAnywhere+FlatFacade.js';
+import { StorageAdapter } from '../Adapters/StorageAdapter.js';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter.js';
+import { DeviceRegistrationAdapter } from '../Adapters/DeviceRegistrationAdapter.js';
+import { SDK_PLATFORM, SDK_VERSION } from '../Foundation/Version.js';
 import {
   clearRunanywhereModule,
   getAllRegisteredModules,
   getModuleForCapability,
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
-import { CommonsModule } from '../runtime/CommonsModule';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
-import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge';
-import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry';
+} from '../runtime/EmscriptenModule.js';
+import { CommonsModule } from '../runtime/CommonsModule.js';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
+import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
 
 /**
  * Persistent storage backend active for the current SDK session.
  * - `fsAccess`: File System Access API (user picked a real directory, Chrome 122+).
  * - `opfs`: Origin Private File System (default persistent fallback).
- * - `memory`: No persistent backend — models live in volatile MEMFS.
+ * - `memory`: No persistent backend — model downloads are unavailable because
+ *   independent backend WASMs cannot share their private MEMFS instances.
  */
 export type StorageBackend = 'fsAccess' | 'opfs' | 'memory';
 
@@ -131,6 +139,8 @@ const logger = new SDKLogger('RunAnywhere');
 let _isInitialized = false;
 let _initOptions: SDKInitOptions | null = null;
 let _initializingPromise: Promise<void> | null = null;
+let _shutdownPromise: Promise<void> | null = null;
+let _shutdownRequired = false;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
@@ -143,6 +153,10 @@ let _hasCompletedServicesInit = false;
 // retries HTTP-only on the next API call without re-running Phase 2.
 let _hasCompletedHTTPSetup = false;
 let _servicesInitPromise: Promise<void> | null = null;
+// Invalidates asynchronous work that belongs to an SDK lifetime which has
+// already been shut down. JavaScript fetches can settle after teardown even
+// when their AbortSignal fires, so state commits must also be generation-safe.
+let _lifecycleGeneration = 0;
 
 interface SdkInitModule extends EmscriptenRunanywhereModule {
   _rac_sdk_init_phase1_proto?(
@@ -155,7 +169,6 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
-  _rac_sdk_retry_http_proto?(outResult: number): number;
   _rac_wasm_set_client_info?(
     sdkBinding: number,
     appIdentifier: number,
@@ -172,6 +185,7 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;
   _rac_state_is_device_registered?(): number;
+  _rac_device_manager_register_if_needed?(environment: number, buildTokenPtr: number): number;
 }
 
 /** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
@@ -186,56 +200,47 @@ function generateDeviceId(): string {
   });
 }
 
-/** Persist + retrieve a device ID across SDK sessions.
- *
- * Mirrors Swift's `CppBridge.Device.persistentId`: delegates to commons'
- * device-identity chain (secure_get → vendor ID → synthesized UUID) when a
- * WASM module is available, falling back to the TS-local UUID only when no
- * module is installed. This ensures the same canonical ID is returned whether
- * the call happens before or after a backend module registers.
- *
- * The `rac_state_get_persistent_device_id` function is exported by the commons
- * WASM and reads/writes via the `secure_get` / `secure_set` ABI backed by
- * `localStorage` with the `rac_sdk_` key prefix — the same storage slot that
- * C++ uses, so there is only one device-ID registry entry.
- */
+const DEVICE_ID_STORAGE_KEY =
+  'rac_sdk_plaintext_com.runanywhere.sdk.device.uuid';
+const CANONICAL_DEVICE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Persist + retrieve the canonical browser device ID across SDK sessions. */
 function ensureDeviceId(): string {
   if (_deviceId) return _deviceId;
 
-  // Prefer the commons device-identity chain so all layers share one ID.
-  try {
-    const mod = tryRunanywhereModule();
-    const modWithDeviceId = mod as (EmscriptenRunanywhereModule & { _rac_state_get_persistent_device_id?: () => number }) | null;
-    if (modWithDeviceId && typeof modWithDeviceId._rac_state_get_persistent_device_id === 'function') {
-      const ptr = modWithDeviceId._rac_state_get_persistent_device_id();
-      if (ptr) {
-        const id = modWithDeviceId.UTF8ToString(ptr);
-        if (id) {
-          _deviceId = id;
-          return id;
-        }
-      }
-    }
-  } catch { /* fall through to TS fallback */ }
+  if (typeof localStorage === 'undefined') {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      'Persistent browser storage is required for device identity.',
+    );
+  }
 
-  // TS fallback: keep backwards-compat key so existing installs keep their ID.
   try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('runanywhere.deviceId');
-      if (stored) {
-        _deviceId = stored;
-        return stored;
+    const stored = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (stored !== null) {
+      if (!CANONICAL_DEVICE_ID_PATTERN.test(stored)) {
+        throw new Error('stored device identity is not a canonical UUID');
       }
+      _deviceId = stored;
+      return stored;
     }
-  } catch { /* ignore */ }
-  const id = generateDeviceId();
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('runanywhere.deviceId', id);
+
+    const id = generateDeviceId();
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+    if (localStorage.getItem(DEVICE_ID_STORAGE_KEY) !== id) {
+      throw new Error('localStorage did not retain the device identity');
     }
-  } catch { /* ignore */ }
-  _deviceId = id;
-  return id;
+    _deviceId = id;
+    return id;
+  } catch (error) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Failed to persist browser device identity: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
@@ -275,6 +280,45 @@ function invokeSdkResultProto(
     (outResult) => fn(outResult),
     functionName,
   );
+}
+
+async function completePendingDeviceRegistration(
+  module: SdkInitModule,
+  environment: SDKEnvironment,
+  buildToken: string,
+  lifecycleGeneration: number,
+): Promise<void> {
+  if (!(await DeviceRegistrationAdapter.waitForPendingRegistration(module))) return;
+  if (lifecycleGeneration !== _lifecycleGeneration) return;
+  const register = module._rac_device_manager_register_if_needed;
+  if (typeof register !== 'function') {
+    logger.warning(
+      'WASM module cannot finalize asynchronous device registration; rebuild the Web artifact.',
+    );
+    return;
+  }
+
+  const token = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+    ? buildToken.trim()
+    : '';
+  let tokenPtr = 0;
+  try {
+    if (token) {
+      const size = module.lengthBytesUTF8(token) + 1;
+      tokenPtr = module._malloc(size);
+      if (!tokenPtr) {
+        logger.warning('Device registration build-token allocation failed.');
+        return;
+      }
+      module.stringToUTF8(token, tokenPtr, size);
+    }
+    const result = register.call(module, mapSdkInitEnvironment(environment), tokenPtr);
+    if (result !== 0) {
+      logger.warning(`Device registration remained deferred (code ${result}).`);
+    }
+  } finally {
+    if (tokenPtr) module._free(tokenPtr);
+  }
 }
 
 function normalizeMetadataString(value: string | null | undefined): string | null {
@@ -392,7 +436,7 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
     });
   }
   if (result.warning) {
-    logger.warning(`${phase} warning: ${result.warning}`);
+    logger.warning(`${phase} completed with a warning`);
   }
 }
 
@@ -491,8 +535,21 @@ function attachSignalToCancel(
       cancel();
     } catch { /* best-effort; native cancel may not be wired yet */ }
   };
-  signal.addEventListener('abort', onAbort);
+  if (signal.aborted) {
+    onAbort();
+    return () => undefined;
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
   return () => signal.removeEventListener('abort', onAbort);
+}
+
+function throwIfStaleLifecycle(generation: number, operation: string): void {
+  if (generation !== _lifecycleGeneration) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_CANCELLED,
+      `${operation} cancelled because the SDK lifetime ended`,
+    );
+  }
 }
 
 /**
@@ -705,6 +762,16 @@ async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
   }
 }
 
+function isVisionLanguageCategory(category: ModelCategory): boolean {
+  return category === ModelCategory.MODEL_CATEGORY_MULTIMODAL
+    || category === ModelCategory.MODEL_CATEGORY_VISION;
+}
+
+/** Let a JSPI promising export fully unwind before entering its WASM again. */
+function nextLifecycleTurn(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 /**
  * Plan a download and retry once after clearing oversize partial bytes.
  *
@@ -766,38 +833,33 @@ async function planDownloadWithSelfHeal(
 async function retryHTTPSetup(): Promise<void> {
   if (_hasCompletedHTTPSetup) return;
   const module = tryRunanywhereModule() as SdkInitModule | null;
-  if (!module) return;
-
-  if (typeof module._rac_sdk_retry_http_proto === 'function') {
-    const result = invokeSdkResultProto(
-      module,
-      module._rac_sdk_retry_http_proto.bind(module),
-      'rac_sdk_retry_http_proto',
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'No active commons WASM module is available for HTTP setup retry.',
     );
-    throwIfSdkInitFailed(result, 'SDK HTTP retry');
-    _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
-    if (result?.warning) {
-      logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
-    }
-    if (_hasCompletedHTTPSetup) {
-      logger.info('HTTP/Auth setup succeeded on retry');
-    }
-    return;
+  }
+  const retry = module._rac_sdk_retry_http_proto;
+  if (typeof retry !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'The loaded WASM artifact does not export _rac_sdk_retry_http_proto. ' +
+        'Rebuild and package the current Web native artifacts.',
+    );
   }
 
-  // Backward compatibility for stale WASM artifacts that predate
-  // rac_sdk_retry_http_proto. New builds export the commons-owned retry path.
-  const authFn = module._rac_auth_is_authenticated;
-  if (typeof authFn !== 'function') return;
-
-  try {
-    const authenticated = authFn.call(module) !== 0;
-    if (authenticated) {
-      _hasCompletedHTTPSetup = true;
-      logger.info('HTTP/Auth setup succeeded on retry');
-    }
-  } catch {
-    // Still offline or auth state unavailable — leave _hasCompletedHTTPSetup false.
+  const result = invokeSdkResultProto(
+    module,
+    retry.bind(module),
+    'rac_sdk_retry_http_proto',
+  );
+  throwIfSdkInitFailed(result, 'SDK HTTP retry');
+  _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+  if (result?.warning) {
+    logger.debug('HTTP/Auth retry completed with a warning');
+  }
+  if (_hasCompletedHTTPSetup) {
+    logger.info('HTTP/Auth setup succeeded on retry');
   }
 }
 
@@ -913,6 +975,14 @@ export const RunAnywhere = {
    * deterministic init phases once a WASM module is available.
    */
   async initialize(options: SDKInitOptions = {}): Promise<void> {
+    if (_shutdownPromise) {
+      await _shutdownPromise;
+    }
+    if (_shutdownRequired) {
+      throw SDKException.invalidState(
+        'The previous SDK shutdown did not complete; retry shutdown before initialization.',
+      );
+    }
     if (_isInitialized) {
       logger.debug('Already initialized');
       return;
@@ -923,7 +993,8 @@ export const RunAnywhere = {
       return _initializingPromise;
     }
 
-    _initializingPromise = (async () => {
+    const lifecycleGeneration = _lifecycleGeneration;
+    const initializingPromise = (async () => {
       try {
         const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         _initOptions = { ...options, environment: env };
@@ -946,18 +1017,26 @@ export const RunAnywhere = {
 
         try {
           await RunAnywhere.storage.restoreLocalStorage();
-        } catch (err) {
-          logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
+        } catch {
+          logger.warning('Failed to restore local storage');
         }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         await requestPersistentStorage();
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native
         // backing. Swift parity (RunAnywhere.swift performCoreInitSerial):
         // Phase 1 failure is fatal — initialize() rethrows and
         // `isInitialized` stays false.
-        await CommonsModule.shared.ensureLoaded();
+        await CommonsModule.shared.ensureLoaded({
+          apiKey: _initOptions.apiKey,
+          baseURL: _initOptions.baseURL,
+          environment: env,
+          sdkVersion: SDK_VERSION,
+        });
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         _isInitialized = true;
 
@@ -975,9 +1054,9 @@ export const RunAnywhere = {
         // The promise itself is intentionally fire-and-forget; consumers
         // who need to wait can call `RunAnywhere.completeServicesInitialization()`
         // (or `ensureServicesReady()`) directly and await the same promise.
-        void RunAnywhere.completeServicesInitialization().catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          logger.warning(`Phase 2 init failed (non-fatal): ${message}`);
+        void RunAnywhere.completeServicesInitialization().catch(() => {
+          const message = 'Phase 2 initialization failed';
+          logger.warning('Phase 2 init failed (non-fatal)');
           EventBus.shared.publish(
             'sdk.initializationFailed',
             EventCategory.EVENT_CATEGORY_INITIALIZATION,
@@ -993,29 +1072,50 @@ export const RunAnywhere = {
         // call is idempotent and no-ops if the registry is empty.
         try {
           await RunAnywhere.hydrateModelRegistry();
-        } catch (err) {
-          logger.warning(
-            `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-          );
+        } catch {
+          logger.warning('Initial model registry hydrate failed (non-fatal)');
         }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
       } catch (error) {
+        if (lifecycleGeneration !== _lifecycleGeneration) {
+          logger.debug('Discarding initialization work from a shut-down SDK lifetime');
+          throw error;
+        }
         // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
         // reset init state fully and rethrow so callers observe the failure.
-        logger.error(
-          `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        logger.error('Initialization failed');
+        const rollbackFailures: unknown[] = [];
+        const rollback = (operation: string, action: () => void): void => {
+          try {
+            action();
+          } catch (rollbackError) {
+            logger.warning(`${operation} failed during initialization rollback`);
+            rollbackFailures.push(rollbackError);
+          }
+        };
+        rollback('Commons shutdown', () => CommonsModule.shared.shutdown());
+        rollback('WASM module cleanup', clearRunanywhereModule);
+        rollback('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+        rollback('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
         _isInitialized = false;
         _initOptions = null;
+        _deviceId = null;
+        _hasCompletedNativePhase1 = false;
         _hasCompletedServicesInit = false;
         _hasCompletedHTTPSetup = false;
         _servicesInitPromise = null;
+        _shutdownRequired = rollbackFailures.length > 0;
         throw error;
-      } finally {
-        _initializingPromise = null;
       }
     })();
+    _initializingPromise = initializingPromise;
+    void initializingPromise.finally(() => {
+      if (_initializingPromise === initializingPromise) {
+        _initializingPromise = null;
+      }
+    }).catch(() => undefined);
 
-    return _initializingPromise;
+    return initializingPromise;
   },
 
   /**
@@ -1028,14 +1128,21 @@ export const RunAnywhere = {
    * work.
    */
   async completeServicesInitialization(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
     if (_hasCompletedServicesInit) return;
     if (_servicesInitPromise) return _servicesInitPromise;
 
-    _servicesInitPromise = (async () => {
+    const lifecycleGeneration = _lifecycleGeneration;
+    const servicesInitPromise = Promise.resolve().then(async () => {
       try {
         const module = tryRunanywhereModule() as SdkInitModule | null;
         if (!module) {
           logger.debug('Services initialization deferred until a Web backend registers a WASM module');
+          if (_servicesInitPromise === servicesInitPromise) {
+            _servicesInitPromise = null;
+          }
           return;
         }
 
@@ -1062,6 +1169,13 @@ export const RunAnywhere = {
             'rac_sdk_init_phase2_proto',
           );
           throwIfSdkInitFailed(result, 'SDK Phase 2');
+          await completePendingDeviceRegistration(
+            module,
+            environment,
+            _initOptions?.buildToken ?? '',
+            lifecycleGeneration,
+          );
+          if (lifecycleGeneration !== _lifecycleGeneration) return;
           httpConfigured = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
           const linkedModelsCount = result?.linkedModelsCount ?? 0;
           if (linkedModelsCount > 0) {
@@ -1073,6 +1187,7 @@ export const RunAnywhere = {
           );
         }
 
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
         _hasCompletedServicesInit = true;
         _hasCompletedHTTPSetup = httpConfigured;
         if (httpConfigured) {
@@ -1081,15 +1196,29 @@ export const RunAnywhere = {
           logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
         }
       } catch (err) {
+        // A shutdown owns the stale lifetime's outcome. Do not let a late
+        // rejection clear or fail a newer lifecycle's services promise.
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
         // Clear the promise on failure so a subsequent retry can re-enter.
-        _servicesInitPromise = null;
+        if (_servicesInitPromise === servicesInitPromise) {
+          _servicesInitPromise = null;
+        }
         throw err;
       }
       // Success path: leave _servicesInitPromise set so any late concurrent
       // caller that reads it after _hasCompletedServicesInit flips true still
       // gets a resolved promise rather than re-entering the init logic.
-    })();
-    return _servicesInitPromise;
+    });
+    _servicesInitPromise = servicesInitPromise;
+    void servicesInitPromise.finally(() => {
+      if (!_hasCompletedServicesInit && _servicesInitPromise === servicesInitPromise) {
+        // A no-module/deferred path must remain retryable. Keeping this
+        // resolved no-op promise would permanently suppress Phase 2 after a
+        // module is registered later in the same SDK lifetime.
+        _servicesInitPromise = null;
+      }
+    }).catch(() => undefined);
+    return servicesInitPromise;
   },
 
   /**
@@ -1100,6 +1229,14 @@ export const RunAnywhere = {
    *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
    */
   async ensureServicesReady(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
+    if (!_isInitialized && !tryRunanywhereModule()) {
+      throw SDKException.notInitialized(
+        'RunAnywhere.initialize() must complete before services can be used.',
+      );
+    }
     if (_hasCompletedServicesInit && _hasCompletedHTTPSetup) {
       return;
     }
@@ -1160,6 +1297,10 @@ export const RunAnywhere = {
 
       const success = await _localFileStorage.chooseDirectory();
       if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
+        if (_isInitialized) {
+          await RunAnywhere.hydrateModelRegistry();
+        }
         EventBus.shared.publish('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
           directoryName: _localFileStorage.directoryName,
         });
@@ -1176,14 +1317,27 @@ export const RunAnywhere = {
 
       const success = await _localFileStorage.restoreDirectory();
       if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
         logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
+      } else {
+        // A stored handle with prompt/denied permission must not remain the
+        // active write target. Continue safely on OPFS until a user gesture
+        // grants access through requestLocalStorageAccess().
+        OPFSBridge.setPersistentRoot(null);
       }
       return success;
     },
 
     async requestLocalStorageAccess(): Promise<boolean> {
       if (!_localFileStorage) return false;
-      return _localFileStorage.requestAccess();
+      const success = await _localFileStorage.requestAccess();
+      if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
+        if (_isInitialized) {
+          await RunAnywhere.hydrateModelRegistry();
+        }
+      }
+      return success;
     },
   }),
 
@@ -1201,7 +1355,7 @@ export const RunAnywhere = {
   // internal, and the canonical cross-SDK surface is the flat verbs
   // (`downloadModel` / `downloadModelStream` / `listModels` / `queryModels` /
   // `getModel` / `downloadedModels` / `importModel` / `refreshModelRegistry`).
-  // Backend packages reach the bridge objects via `@runanywhere/web/internal`.
+  // Backend packages reach the bridge objects via `@runanywhere/web/backend`.
   // =========================================================================
 
   /** C++ SDKEvent proto stream — subscribe/publish/poll/failure. */
@@ -1269,13 +1423,6 @@ export const RunAnywhere = {
   /** Runtime plugin loader — unavailable on plain WASM unless host exports the ABI. */
   pluginLoader: PluginLoaderCapability,
 
-  /**
-   * Backend availability snapshots — `RunAnywhere.backends.onnxStatus()`
-   * etc. Returns build-flag-free reasons that example apps can render
-   * directly without leaking CMake symbol names into the UI.
-   */
-  backends: BackendsCapability,
-
   // =========================================================================
   // Swift-shaped flat facade
   //
@@ -1299,7 +1446,8 @@ export const RunAnywhere = {
     // `RunAnywhere.visionLanguage.loadCurrentModel()` itself after every
     // load — the SDK now owns that coupling so example views stay free
     // of SDK-internal lifecycle bridge calls.
-    if (result?.success) {
+    if (result?.success && isVisionLanguageCategory(result.category)) {
+      await nextLifecycleTurn();
       await syncVisionLanguageProviderToLifecycle();
     }
     return result;
@@ -1314,6 +1462,7 @@ export const RunAnywhere = {
     // next processImage call surfaces "no model loaded" instead of
     // dispatching against a stale provider handle.
     if (result?.success) {
+      await nextLifecycleTurn();
       await syncVisionLanguageProviderToLifecycle();
     }
     return result;
@@ -1331,6 +1480,21 @@ export const RunAnywhere = {
       throw SDKException.backendNotAvailable(
         'downloadModel',
         `Model metadata for '${request.modelId}' is not registered.`,
+      );
+    }
+
+    // The split Web SDK downloads through the commons WASM, while inference
+    // runs in a separate backend WASM with its own private MEMFS. OPFS (or a
+    // user-approved directory routed through OPFSBridge) is the transfer
+    // medium between those modules. Reject before planning or starting the
+    // network request when no such medium exists; downloading into the
+    // commons MEMFS would leave bytes that no inference backend can read.
+    if (!OPFSBridge.isSupported) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+        'Model download requires persistent browser storage.',
+        'This browser provides neither OPFS nor an approved local directory. '
+          + 'Use a browser with OPFS support or choose a local storage folder, then retry.',
       );
     }
 
@@ -1609,8 +1773,7 @@ export const RunAnywhere = {
       if (!exists) {
         if (existing.localPath || existing.isDownloaded) {
           try {
-            ModelRegistryCapability.updateModel({ ...existing, localPath: '', isDownloaded: false });
-            patched++;
+            if (ModelRegistryCapability.updateDownloadStatus(existing.id, null)) patched++;
           } catch { /* ignore */ }
         }
         continue;
@@ -1619,8 +1782,7 @@ export const RunAnywhere = {
       if (existing.localPath && existing.isDownloaded) continue;
 
       try {
-        ModelRegistryCapability.updateModel({ ...existing, localPath, isDownloaded: true });
-        patched++;
+        if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;
       } catch { /* ignore */ }
     }
     if (patched > 0) {
@@ -1685,6 +1847,7 @@ export const RunAnywhere = {
   ): ReturnType<typeof TextGenerationCapability.generate> {
     throwIfAborted(extra.signal, 'generate');
     await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generate');
     // Mirror Swift's Task cancellation: bridge the abort signal to commons
     // cancelGeneration so the synchronous WASM call returns early.
     const detach = attachSignalToCancel(extra.signal, () => TextGenerationCapability.cancelGeneration());
@@ -1697,28 +1860,22 @@ export const RunAnywhere = {
   ): Promise<Awaited<ReturnType<typeof TextGenerationCapability.generateStream>>> {
     throwIfAborted(extra.signal, 'generateStream');
     await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateStream');
     const stream = await TextGenerationCapability.generateStream(options);
+    if (extra.signal?.aborted) {
+      stream.cancel();
+      throwIfAborted(extra.signal, 'generateStream');
+    }
     const detach = attachSignalToCancel(extra.signal, () => stream.cancel());
-    void stream.result.finally(detach);
+    void stream.result.finally(detach).catch(() => undefined);
     return stream;
   },
 
   transcribeStream(
-    handle: Parameters<typeof STTCapability.transcribeStream>[0],
-    audio: Parameters<typeof STTCapability.transcribeStream>[1],
-    options: Parameters<typeof STTCapability.transcribeStream>[2],
-    extra: CancellableCall = {},
-  ): ReturnType<typeof STTCapability.transcribeStream> {
-    throwIfAborted(extra.signal, 'transcribeStream');
-    const iterable = STTCapability.transcribeStream(handle, audio, options);
-    if (!extra.signal) return iterable;
-    const signal = extra.signal;
-    return (async function* () {
-      for await (const partial of iterable) {
-        throwIfAborted(signal, 'transcribeStream');
-        yield partial;
-      }
-    })();
+    audio: Parameters<typeof STTCapability.transcribeStreamAuto>[0],
+    options?: Parameters<typeof STTCapability.transcribeStreamAuto>[1],
+  ): ReturnType<typeof STTCapability.transcribeStreamAuto> {
+    return STTCapability.transcribeStreamAuto(audio, options);
   },
 
   synthesizeStream(
@@ -1779,12 +1936,10 @@ export const RunAnywhere = {
   },
 
   async *streamVAD(
-    audio: AsyncIterable<Parameters<typeof VADCapability.detectVoiceAuto>[0]>,
-    options?: Parameters<typeof VADCapability.detectVoiceAuto>[1],
-  ): AsyncIterable<Awaited<ReturnType<typeof VADCapability.detectVoiceAuto>>> {
-    for await (const chunk of audio) {
-      yield await VADCapability.detectVoiceAuto(chunk, options);
-    }
+    audio: Parameters<typeof VADCapability.streamVoiceAuto>[0],
+    options?: Parameters<typeof VADCapability.streamVoiceAuto>[1],
+  ): ReturnType<typeof VADCapability.streamVoiceAuto> {
+    yield* VADCapability.streamVoiceAuto(audio, options);
   },
 
   async processImage(
@@ -1796,6 +1951,7 @@ export const RunAnywhere = {
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
+    throwIfAborted(extra.signal, 'processImage');
     const detach = attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
@@ -1820,6 +1976,7 @@ export const RunAnywhere = {
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
+    throwIfAborted(extra.signal, 'processImageStream');
     const stream = promptForm
       ? await VisionLanguageCapability.processImageStream(
         image,
@@ -1827,31 +1984,131 @@ export const RunAnywhere = {
         maybeOptionsOrExtra as VLMGenerationOptions | undefined,
       )
       : await VisionLanguageCapability.processImageStream(image, optionsOrPrompt);
-    attachSignalToCancel(
+    if (extra.signal?.aborted) {
+      void VisionLanguageCapability.cancelVLMGeneration();
+      throwIfAborted(extra.signal, 'processImageStream');
+    }
+    const detach = attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
     );
-    return stream;
+    return {
+      async *[Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {
+        try {
+          yield* stream;
+        } finally {
+          detach();
+        }
+      },
+    };
   },
 
   // =========================================================================
   // Shutdown
   // =========================================================================
 
-  async shutdown(): Promise<void> {
-    logger.info('Shutting down RunAnywhere Web SDK...');
+  shutdown(): Promise<void> {
+    if (_shutdownPromise) return _shutdownPromise;
 
-    // Clear every WASM adapter singleton that `setRunanywhereModule()`
+    // Invalidate Phase 2 before its fetch can settle and before teardown starts.
+    // The generation check prevents this lifetime from mutating flags after a
+    // subsequent initialize has begun.
+    _lifecycleGeneration += 1;
+    _shutdownRequired = true;
+    // Close the public facade synchronously. Native/module owners remain alive
+    // until the shared shutdown promise drains them below.
+    _isInitialized = false;
+    const initializingPromise = _initializingPromise;
+    const servicesInitPromise = _servicesInitPromise;
+    const shutdownPromise = (async () => {
+      logger.info('Shutting down RunAnywhere Web SDK...');
+      const shutdownFailures: unknown[] = [];
+      const recordShutdownFailure = (operation: string, error: unknown): void => {
+        logger.warning(`${operation} failed during SDK shutdown`);
+        shutdownFailures.push(error);
+      };
+      const cleanup = (operation: string, action: () => void): void => {
+        try {
+          action();
+        } catch (error) {
+          recordShutdownFailure(operation, error);
+        }
+      };
+
+      // Initialization owns module registration and state publication. Join
+      // the invalidated lifetime before tearing those resources down so stale
+      // async work cannot resurrect them after shutdown returns.
+      if (initializingPromise) {
+        try {
+          await initializingPromise;
+        } catch {
+          // Expected when the generation guard cancels stale initialization.
+        }
+      }
+
+      // Phase 2 may be awaiting browser fetch/device registration while holding
+      // callbacks borrowed from Commons. Join the invalidated operation before
+      // releasing those callbacks or the WASM module.
+      if (servicesInitPromise) {
+        try {
+          await servicesInitPromise;
+        } catch {
+          // The originating caller owns the Phase-2 error. Generation guards
+          // prevent stale state publication; shutdown only needs quiescence.
+        }
+      }
+
+      // Stop admitting destructive storage work and drain every delete accepted
+      // by this runtime before destroying its analyzer callbacks or WASM module.
+      try {
+        await StorageAdapter.prepareForShutdown();
+      } catch (error) {
+        recordShutdownFailure('StorageAdapter.prepareForShutdown', error);
+      }
+
+    // Voice-agent providers may own native handles, stream subscribers, and
+    // cross-WASM conversation state. Release them before their backend modules.
+      try {
+        await resetVoiceAgentFacadeState();
+      } catch (err) {
+        recordShutdownFailure('Voice-agent teardown', err);
+      }
+
+    // RAG owns provider state outside the WASM adapter registry (including
+    // the cross-WASM in-memory vector index). Destroy it while backend modules
+    // are still available when possible, then synchronously invalidate the
+    // facade even if a caller already unregistered a backend or destroy fails.
+      try {
+        await ragDestroyPipeline();
+      } catch (err) {
+        recordShutdownFailure('RAG teardown', err);
+      } finally {
+        cleanup('RAG facade cleanup', resetRAGFacadeState);
+      }
+
+    // Release the core WASM singleton itself, not only the adapter registry.
+    // `initialize()` obtains this singleton again on the next SDK lifetime;
+    // leaving it marked loaded after clearing the registry made a subsequent
+    // initialize() skip module registration and produced a half-initialized
+    // runtime. Backend packages still own and unregister their modules before
+    // callers invoke this full SDK shutdown.
+      try {
+        CommonsModule.shared.shutdown();
+      } catch (err) {
+        recordShutdownFailure('CommonsModule shutdown', err);
+      }
+
+    // Clear every WASM adapter singleton that module registration
     // installed (DownloadAdapter, ModelLifecycleAdapter,
     // ModelRegistryAdapter, ModalityProtoAdapter, SDKEventStreamAdapter)
     // and null the global module so post-shutdown calls into
     // ModalityProtoAdapter / tryRunanywhereModule()
     // can't acquire stale references to a torn-down backend.
-    clearRunanywhereModule();
-    // HTTPAdapter and StorageAdapter are owned outside setRunanywhereModule(),
+      cleanup('WASM module cleanup', clearRunanywhereModule);
+    // HTTPAdapter and StorageAdapter are owned outside the capability registry,
     // so they must be cleared explicitly to complete the ownership boundary.
-    HTTPAdapter.clearDefaultModule();
-    StorageAdapter.clearDefaultHandles();
+      cleanup('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+      cleanup('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
 
     // Tear down the Worker streaming pipeline. The WASM ownership boundary
     // is `clearRunanywhereModule()`, but the Worker singletons
@@ -1861,26 +2118,47 @@ export const RunAnywhere = {
     // mirror Emscripten module + loaded model weights alive across
     // logout / account-switch / test reset, and the next `initialize()`
     // would reuse the stale bridge.
-    try {
-      OffscreenRuntimeBridge.disposeShared();
-    } catch (err) {
-      logger.warning(`OffscreenRuntimeBridge.disposeShared threw during shutdown: ${String(err)}`);
-    }
-    setStreamWorkerFactory(null);
-    setStreamWorkerInit(null);
+      try {
+        OffscreenRuntimeBridge.disposeShared();
+      } catch (err) {
+        recordShutdownFailure('Offscreen runtime cleanup', err);
+      }
+      cleanup('Stream worker factory cleanup', () => setStreamWorkerFactory(null));
+      cleanup('Stream worker state cleanup', () => setStreamWorkerInit(null));
 
-    EventBus.reset();
+      cleanup('Event bus cleanup', () => EventBus.reset());
 
-    _isInitialized = false;
-    _initOptions = null;
-    _initializingPromise = null;
-    _localFileStorage = null;
-    _hasCompletedNativePhase1 = false;
-    _hasCompletedServicesInit = false;
-    _hasCompletedHTTPSetup = false;
-    _servicesInitPromise = null;
+      _isInitialized = false;
+      _initOptions = null;
+      _deviceId = null;
+      OPFSBridge.setPersistentRoot(null);
+      _localFileStorage = null;
+      _hasCompletedNativePhase1 = false;
+      _hasCompletedServicesInit = false;
+      _hasCompletedHTTPSetup = false;
+      _servicesInitPromise = null;
 
-    logger.info('RunAnywhere Web SDK shut down');
+      if (shutdownFailures.length === 0) {
+        _shutdownRequired = false;
+        logger.info('RunAnywhere Web SDK shut down');
+      } else {
+        logger.warning('RunAnywhere Web SDK shutdown remains incomplete');
+      }
+      if (shutdownFailures.length === 1) throw shutdownFailures[0];
+      if (shutdownFailures.length > 1) {
+        throw new AggregateError(
+          shutdownFailures,
+          'Multiple SDK shutdown operations failed',
+        );
+      }
+    })();
+    _shutdownPromise = shutdownPromise;
+    void shutdownPromise.finally(() => {
+      if (_shutdownPromise === shutdownPromise) {
+        _shutdownPromise = null;
+      }
+    }).catch(() => undefined);
+    return shutdownPromise;
   },
 
   reset(): Promise<void> {

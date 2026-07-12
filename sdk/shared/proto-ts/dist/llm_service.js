@@ -85,29 +85,10 @@ function lLMStreamEventKindToJSON(object) {
 function createBaseLLMGenerateRequest() {
     return {
         prompt: "",
-        maxTokens: 0,
-        temperature: 0,
-        topP: 0,
-        topK: 0,
-        systemPrompt: "",
         emitThoughts: false,
-        repetitionPenalty: 0,
-        stopSequences: [],
-        streamingEnabled: false,
-        preferredFramework: "",
-        jsonSchema: "",
-        executionTarget: "",
         requestId: "",
         modelId: "",
         conversationId: "",
-        seed: 0,
-        frequencyPenalty: 0,
-        presencePenalty: 0,
-        minP: 0,
-        grammar: "",
-        responseFormat: "",
-        echoPrompt: false,
-        nThreads: 0,
         metadata: {},
         options: undefined,
         history: [],
@@ -118,41 +99,8 @@ exports.LLMGenerateRequest = {
         if (message.prompt !== "") {
             writer.uint32(10).string(message.prompt);
         }
-        if (message.maxTokens !== 0) {
-            writer.uint32(16).int32(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            writer.uint32(29).float(message.temperature);
-        }
-        if (message.topP !== 0) {
-            writer.uint32(37).float(message.topP);
-        }
-        if (message.topK !== 0) {
-            writer.uint32(40).int32(message.topK);
-        }
-        if (message.systemPrompt !== "") {
-            writer.uint32(50).string(message.systemPrompt);
-        }
         if (message.emitThoughts !== false) {
             writer.uint32(56).bool(message.emitThoughts);
-        }
-        if (message.repetitionPenalty !== 0) {
-            writer.uint32(69).float(message.repetitionPenalty);
-        }
-        for (const v of message.stopSequences) {
-            writer.uint32(74).string(v);
-        }
-        if (message.streamingEnabled !== false) {
-            writer.uint32(80).bool(message.streamingEnabled);
-        }
-        if (message.preferredFramework !== "") {
-            writer.uint32(90).string(message.preferredFramework);
-        }
-        if (message.jsonSchema !== "") {
-            writer.uint32(98).string(message.jsonSchema);
-        }
-        if (message.executionTarget !== "") {
-            writer.uint32(106).string(message.executionTarget);
         }
         if (message.requestId !== "") {
             writer.uint32(114).string(message.requestId);
@@ -162,30 +110,6 @@ exports.LLMGenerateRequest = {
         }
         if (message.conversationId !== "") {
             writer.uint32(130).string(message.conversationId);
-        }
-        if (message.seed !== 0) {
-            writer.uint32(136).int64(message.seed);
-        }
-        if (message.frequencyPenalty !== 0) {
-            writer.uint32(149).float(message.frequencyPenalty);
-        }
-        if (message.presencePenalty !== 0) {
-            writer.uint32(157).float(message.presencePenalty);
-        }
-        if (message.minP !== 0) {
-            writer.uint32(165).float(message.minP);
-        }
-        if (message.grammar !== "") {
-            writer.uint32(170).string(message.grammar);
-        }
-        if (message.responseFormat !== "") {
-            writer.uint32(178).string(message.responseFormat);
-        }
-        if (message.echoPrompt !== false) {
-            writer.uint32(184).bool(message.echoPrompt);
-        }
-        if (message.nThreads !== 0) {
-            writer.uint32(192).int32(message.nThreads);
         }
         globalThis.Object.entries(message.metadata).forEach(([key, value]) => {
             exports.LLMGenerateRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(202).fork()).join();
@@ -212,88 +136,11 @@ exports.LLMGenerateRequest = {
                     message.prompt = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 29) {
-                        break;
-                    }
-                    message.temperature = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.topP = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.topK = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.systemPrompt = reader.string();
-                    continue;
-                }
                 case 7: {
                     if (tag !== 56) {
                         break;
                     }
                     message.emitThoughts = reader.bool();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 69) {
-                        break;
-                    }
-                    message.repetitionPenalty = reader.float();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.stopSequences.push(reader.string());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.streamingEnabled = reader.bool();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.preferredFramework = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.jsonSchema = reader.string();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 106) {
-                        break;
-                    }
-                    message.executionTarget = reader.string();
                     continue;
                 }
                 case 14: {
@@ -315,62 +162,6 @@ exports.LLMGenerateRequest = {
                         break;
                     }
                     message.conversationId = reader.string();
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 136) {
-                        break;
-                    }
-                    message.seed = longToNumber(reader.int64());
-                    continue;
-                }
-                case 18: {
-                    if (tag !== 149) {
-                        break;
-                    }
-                    message.frequencyPenalty = reader.float();
-                    continue;
-                }
-                case 19: {
-                    if (tag !== 157) {
-                        break;
-                    }
-                    message.presencePenalty = reader.float();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 165) {
-                        break;
-                    }
-                    message.minP = reader.float();
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.grammar = reader.string();
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.responseFormat = reader.string();
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 184) {
-                        break;
-                    }
-                    message.echoPrompt = reader.bool();
-                    continue;
-                }
-                case 24: {
-                    if (tag !== 192) {
-                        break;
-                    }
-                    message.nThreads = reader.int32();
                     continue;
                 }
                 case 25: {
@@ -408,62 +199,11 @@ exports.LLMGenerateRequest = {
     fromJSON(object) {
         return {
             prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-            topP: isSet(object.topP)
-                ? globalThis.Number(object.topP)
-                : isSet(object.top_p)
-                    ? globalThis.Number(object.top_p)
-                    : 0,
-            topK: isSet(object.topK)
-                ? globalThis.Number(object.topK)
-                : isSet(object.top_k)
-                    ? globalThis.Number(object.top_k)
-                    : 0,
-            systemPrompt: isSet(object.systemPrompt)
-                ? globalThis.String(object.systemPrompt)
-                : isSet(object.system_prompt)
-                    ? globalThis.String(object.system_prompt)
-                    : "",
             emitThoughts: isSet(object.emitThoughts)
                 ? globalThis.Boolean(object.emitThoughts)
                 : isSet(object.emit_thoughts)
                     ? globalThis.Boolean(object.emit_thoughts)
                     : false,
-            repetitionPenalty: isSet(object.repetitionPenalty)
-                ? globalThis.Number(object.repetitionPenalty)
-                : isSet(object.repetition_penalty)
-                    ? globalThis.Number(object.repetition_penalty)
-                    : 0,
-            stopSequences: globalThis.Array.isArray(object?.stopSequences)
-                ? object.stopSequences.map((e) => globalThis.String(e))
-                : globalThis.Array.isArray(object?.stop_sequences)
-                    ? object.stop_sequences.map((e) => globalThis.String(e))
-                    : [],
-            streamingEnabled: isSet(object.streamingEnabled)
-                ? globalThis.Boolean(object.streamingEnabled)
-                : isSet(object.streaming_enabled)
-                    ? globalThis.Boolean(object.streaming_enabled)
-                    : false,
-            preferredFramework: isSet(object.preferredFramework)
-                ? globalThis.String(object.preferredFramework)
-                : isSet(object.preferred_framework)
-                    ? globalThis.String(object.preferred_framework)
-                    : "",
-            jsonSchema: isSet(object.jsonSchema)
-                ? globalThis.String(object.jsonSchema)
-                : isSet(object.json_schema)
-                    ? globalThis.String(object.json_schema)
-                    : "",
-            executionTarget: isSet(object.executionTarget)
-                ? globalThis.String(object.executionTarget)
-                : isSet(object.execution_target)
-                    ? globalThis.String(object.execution_target)
-                    : "",
             requestId: isSet(object.requestId)
                 ? globalThis.String(object.requestId)
                 : isSet(object.request_id)
@@ -479,38 +219,6 @@ exports.LLMGenerateRequest = {
                 : isSet(object.conversation_id)
                     ? globalThis.String(object.conversation_id)
                     : "",
-            seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
-            frequencyPenalty: isSet(object.frequencyPenalty)
-                ? globalThis.Number(object.frequencyPenalty)
-                : isSet(object.frequency_penalty)
-                    ? globalThis.Number(object.frequency_penalty)
-                    : 0,
-            presencePenalty: isSet(object.presencePenalty)
-                ? globalThis.Number(object.presencePenalty)
-                : isSet(object.presence_penalty)
-                    ? globalThis.Number(object.presence_penalty)
-                    : 0,
-            minP: isSet(object.minP)
-                ? globalThis.Number(object.minP)
-                : isSet(object.min_p)
-                    ? globalThis.Number(object.min_p)
-                    : 0,
-            grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : "",
-            responseFormat: isSet(object.responseFormat)
-                ? globalThis.String(object.responseFormat)
-                : isSet(object.response_format)
-                    ? globalThis.String(object.response_format)
-                    : "",
-            echoPrompt: isSet(object.echoPrompt)
-                ? globalThis.Boolean(object.echoPrompt)
-                : isSet(object.echo_prompt)
-                    ? globalThis.Boolean(object.echo_prompt)
-                    : false,
-            nThreads: isSet(object.nThreads)
-                ? globalThis.Number(object.nThreads)
-                : isSet(object.n_threads)
-                    ? globalThis.Number(object.n_threads)
-                    : 0,
             metadata: isObject(object.metadata)
                 ? globalThis.Object.entries(object.metadata).reduce((acc, [key, value]) => {
                     acc[key] = globalThis.String(value);
@@ -528,41 +236,8 @@ exports.LLMGenerateRequest = {
         if (message.prompt !== "") {
             obj.prompt = message.prompt;
         }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            obj.temperature = message.temperature;
-        }
-        if (message.topP !== 0) {
-            obj.topP = message.topP;
-        }
-        if (message.topK !== 0) {
-            obj.topK = Math.round(message.topK);
-        }
-        if (message.systemPrompt !== "") {
-            obj.systemPrompt = message.systemPrompt;
-        }
         if (message.emitThoughts !== false) {
             obj.emitThoughts = message.emitThoughts;
-        }
-        if (message.repetitionPenalty !== 0) {
-            obj.repetitionPenalty = message.repetitionPenalty;
-        }
-        if (message.stopSequences?.length) {
-            obj.stopSequences = message.stopSequences;
-        }
-        if (message.streamingEnabled !== false) {
-            obj.streamingEnabled = message.streamingEnabled;
-        }
-        if (message.preferredFramework !== "") {
-            obj.preferredFramework = message.preferredFramework;
-        }
-        if (message.jsonSchema !== "") {
-            obj.jsonSchema = message.jsonSchema;
-        }
-        if (message.executionTarget !== "") {
-            obj.executionTarget = message.executionTarget;
         }
         if (message.requestId !== "") {
             obj.requestId = message.requestId;
@@ -572,30 +247,6 @@ exports.LLMGenerateRequest = {
         }
         if (message.conversationId !== "") {
             obj.conversationId = message.conversationId;
-        }
-        if (message.seed !== 0) {
-            obj.seed = Math.round(message.seed);
-        }
-        if (message.frequencyPenalty !== 0) {
-            obj.frequencyPenalty = message.frequencyPenalty;
-        }
-        if (message.presencePenalty !== 0) {
-            obj.presencePenalty = message.presencePenalty;
-        }
-        if (message.minP !== 0) {
-            obj.minP = message.minP;
-        }
-        if (message.grammar !== "") {
-            obj.grammar = message.grammar;
-        }
-        if (message.responseFormat !== "") {
-            obj.responseFormat = message.responseFormat;
-        }
-        if (message.echoPrompt !== false) {
-            obj.echoPrompt = message.echoPrompt;
-        }
-        if (message.nThreads !== 0) {
-            obj.nThreads = Math.round(message.nThreads);
         }
         if (message.metadata) {
             const entries = globalThis.Object.entries(message.metadata);
@@ -620,29 +271,10 @@ exports.LLMGenerateRequest = {
     fromPartial(object) {
         const message = createBaseLLMGenerateRequest();
         message.prompt = object.prompt ?? "";
-        message.maxTokens = object.maxTokens ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.topP = object.topP ?? 0;
-        message.topK = object.topK ?? 0;
-        message.systemPrompt = object.systemPrompt ?? "";
         message.emitThoughts = object.emitThoughts ?? false;
-        message.repetitionPenalty = object.repetitionPenalty ?? 0;
-        message.stopSequences = object.stopSequences?.map((e) => e) || [];
-        message.streamingEnabled = object.streamingEnabled ?? false;
-        message.preferredFramework = object.preferredFramework ?? "";
-        message.jsonSchema = object.jsonSchema ?? "";
-        message.executionTarget = object.executionTarget ?? "";
         message.requestId = object.requestId ?? "";
         message.modelId = object.modelId ?? "";
         message.conversationId = object.conversationId ?? "";
-        message.seed = object.seed ?? 0;
-        message.frequencyPenalty = object.frequencyPenalty ?? 0;
-        message.presencePenalty = object.presencePenalty ?? 0;
-        message.minP = object.minP ?? 0;
-        message.grammar = object.grammar ?? "";
-        message.responseFormat = object.responseFormat ?? "";
-        message.echoPrompt = object.echoPrompt ?? false;
-        message.nThreads = object.nThreads ?? 0;
         message.metadata = globalThis.Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
             if (value !== undefined) {
                 acc[key] = globalThis.String(value);

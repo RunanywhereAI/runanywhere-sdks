@@ -577,11 +577,11 @@ constexpr RAGQueryOptions::ParseTableT_ RAGQueryOptions::InternalGenerateParseTa
     {
       PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_._has_bits_),
       0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
+      13, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
+      4294959104,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
+      13,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -601,40 +601,49 @@ constexpr RAGQueryOptions::ParseTableT_ RAGQueryOptions::InternalGenerateParseTa
        {18, 1, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.system_prompt_)}},
       // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.max_tokens_), 2>(),
-       {24, 2, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.max_tokens_), 3>(),
+       {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.max_tokens_)}},
       // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
       {::_pbi::TcParser::FastF32S1,
-       {37, 3, 0,
+       {37, 4, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.temperature_)}},
       // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
       {::_pbi::TcParser::FastF32S1,
-       {45, 4, 0,
+       {45, 5, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_p_)}},
       // int32 top_k = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.top_k_), 5>(),
-       {48, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.top_k_), 6>(),
+       {48, 6, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_k_)}},
       // int32 retrieval_top_k = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.retrieval_top_k_), 6>(),
-       {56, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.retrieval_top_k_), 7>(),
+       {56, 7, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.retrieval_top_k_)}},
-      // float similarity_threshold = 8;
+      // optional float similarity_threshold = 8;
       {::_pbi::TcParser::FastF32S1,
-       {69, 7, 0,
+       {69, 8, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.similarity_threshold_)}},
       // bool stream = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RAGQueryOptions, _impl_.stream_), 8>(),
-       {72, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RAGQueryOptions, _impl_.stream_), 9>(),
+       {72, 9, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.stream_)}},
       // bool disable_thinking = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RAGQueryOptions, _impl_.disable_thinking_), 9>(),
-       {80, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RAGQueryOptions, _impl_.disable_thinking_), 10>(),
+       {80, 10, 0,
         PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.disable_thinking_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // bool enable_multi_query = 11;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RAGQueryOptions, _impl_.enable_multi_query_), 11>(),
+       {88, 11, 0,
+        PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.enable_multi_query_)}},
+      // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGQueryOptions, _impl_.multi_query_count_), 12>(),
+       {96, 12, 0,
+        PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.multi_query_count_)}},
+      // optional string scope_prefix = 13;
+      {::_pbi::TcParser::FastUS1,
+       {106, 2, 0,
+        PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.scope_prefix_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
@@ -645,28 +654,35 @@ constexpr RAGQueryOptions::ParseTableT_ RAGQueryOptions::InternalGenerateParseTa
       // optional string system_prompt = 2;
       {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.system_prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.max_tokens_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.max_tokens_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // int32 top_k = 6;
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 retrieval_top_k = 7;
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.retrieval_top_k_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float similarity_threshold = 8;
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.similarity_threshold_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.retrieval_top_k_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional float similarity_threshold = 8;
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.similarity_threshold_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool stream = 9;
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.stream_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.stream_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool disable_thinking = 10;
-      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.disable_thinking_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.disable_thinking_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool enable_multi_query = 11;
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.enable_multi_query_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.multi_query_count_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional string scope_prefix = 13;
+      {PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.scope_prefix_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\36\10\15\0\0\0\0\0\0\0\0\0\0\0\0\0"
+      "\36\10\15\0\0\0\0\0\0\0\0\0\0\14\0\0"
       "runanywhere.v1.RAGQueryOptions"
       "question"
       "system_prompt"
+      "scope_prefix"
     }},
   };
 }
@@ -682,6 +698,9 @@ inline constexpr RAGQueryOptions::Impl_::Impl_(
         system_prompt_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        scope_prefix_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         max_tokens_{0},
         temperature_{0},
         top_p_{0},
@@ -689,7 +708,9 @@ inline constexpr RAGQueryOptions::Impl_::Impl_(
         retrieval_top_k_{0},
         similarity_threshold_{0},
         stream_{false},
-        disable_thinking_{false} {}
+        disable_thinking_{false},
+        enable_multi_query_{false},
+        multi_query_count_{0} {}
 
 template <typename>
 constexpr RAGQueryOptions::RAGQueryOptions(::_pbi::ConstantInitialized,
@@ -1100,7 +1121,7 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RAGConfiguration, _impl_.top_k_), 8>(),
        {32, 8, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_)}},
-      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {45, 9, 0,
         PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_)}},
@@ -1155,7 +1176,7 @@ constexpr RAGConfiguration::ParseTableT_ RAGConfiguration::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.embedding_dimension_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.top_k_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.similarity_threshold_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(RAGConfiguration, _impl_.chunk_size_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -3053,7 +3074,7 @@ const ::uint32_t
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_._has_bits_),
-        13, // hasbit index offset
+        16, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.question_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.system_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.max_tokens_),
@@ -3064,9 +3085,11 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.similarity_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.stream_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.disable_thinking_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.enable_multi_query_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.multi_query_count_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryOptions, _impl_.scope_prefix_),
         0,
         1,
-        2,
         3,
         4,
         5,
@@ -3074,6 +3097,10 @@ const ::uint32_t
         7,
         8,
         9,
+        10,
+        11,
+        12,
+        2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RAGQueryRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
@@ -3235,15 +3262,15 @@ static const ::_pbi::MigrationSchema
         {57, sizeof(::runanywhere::v1::RAGIngestRequest_MetadataEntry_DoNotUse)},
         {64, sizeof(::runanywhere::v1::RAGIngestRequest)},
         {75, sizeof(::runanywhere::v1::RAGQueryOptions)},
-        {98, sizeof(::runanywhere::v1::RAGQueryRequest_MetadataEntry_DoNotUse)},
-        {105, sizeof(::runanywhere::v1::RAGQueryRequest)},
-        {114, sizeof(::runanywhere::v1::RAGSearchResult_MetadataEntry_DoNotUse)},
-        {121, sizeof(::runanywhere::v1::RAGSearchResult)},
-        {142, sizeof(::runanywhere::v1::RAGResult)},
-        {171, sizeof(::runanywhere::v1::RAGStatistics)},
-        {196, sizeof(::runanywhere::v1::RAGIngestResult)},
-        {211, sizeof(::runanywhere::v1::RAGStreamEvent)},
-        {232, sizeof(::runanywhere::v1::RAGServiceState)},
+        {104, sizeof(::runanywhere::v1::RAGQueryRequest_MetadataEntry_DoNotUse)},
+        {111, sizeof(::runanywhere::v1::RAGQueryRequest)},
+        {120, sizeof(::runanywhere::v1::RAGSearchResult_MetadataEntry_DoNotUse)},
+        {127, sizeof(::runanywhere::v1::RAGSearchResult)},
+        {148, sizeof(::runanywhere::v1::RAGResult)},
+        {177, sizeof(::runanywhere::v1::RAGStatistics)},
+        {202, sizeof(::runanywhere::v1::RAGIngestResult)},
+        {217, sizeof(::runanywhere::v1::RAGStreamEvent)},
+        {238, sizeof(::runanywhere::v1::RAGServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3270,7 +3297,7 @@ const char descriptor_table_protodef_rag_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIAB
     "_model_id\030\001 \001(\t\022\024\n\014llm_model_id\030\002 \001(\t\022 \n"
     "\023embedding_dimension\030\003 \001(\005H\000\210\001\001\022\035\n\005top_k"
     "\030\004 \001(\005B\t\212\265\030\0015\240\265\030\001H\001\210\001\001\022@\n\024similarity_thr"
-    "eshold\030\005 \001(\002B\035\212\265\030\0030.3\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
+    "eshold\030\005 \001(\002B\035\212\265\030\0030.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000"
     "\000\360\?H\002\210\001\001\022$\n\nchunk_size\030\006 \001(\005B\013\212\265\030\003512\240\265\030"
     "\001H\003\210\001\001\022&\n\rchunk_overlap\030\007 \001(\005B\n\212\265\030\00264\240\265\030"
     "\000H\004\210\001\001\022\037\n\022max_context_tokens\030\010 \001(\005H\005\210\001\001\022"
@@ -3284,7 +3311,7 @@ const char descriptor_table_protodef_rag_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIAB
     "unk_overlapB\025\n\023_max_context_tokensB\022\n\020_p"
     "rompt_templateB\030\n\026_embedding_config_json"
     "B\022\n\020_llm_config_jsonB\r\n\013_index_pathB\024\n\022_"
-    "reranker_model_id\"\276\002\n\013RAGDocument\022\n\n\002id\030"
+    "reranker_model_id\"\257\002\n\013RAGDocument\022\n\n\002id\030"
     "\001 \001(\t\022\014\n\004text\030\002 \001(\t\022;\n\010metadata\030\004 \003(\0132)."
     "runanywhere.v1.RAGDocument.MetadataEntry"
     "\022\027\n\nsource_uri\030\005 \001(\tH\000\210\001\001\022\033\n\016adapter_han"
@@ -3292,97 +3319,101 @@ const char descriptor_table_protodef_rag_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIAB
     "\022\n\nsize_bytes\030\010 \001(\003\032/\n\rMetadataEntry\022\013\n\003"
     "key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\r\n\013_source_"
     "uriB\021\n\017_adapter_handleB\r\n\013_media_typeJ\004\010"
-    "\003\020\004R\rmetadata_json\"\343\001\n\020RAGIngestRequest\022"
-    "\022\n\nrequest_id\030\001 \001(\t\022.\n\tdocuments\030\002 \003(\0132\033"
-    ".runanywhere.v1.RAGDocument\022\030\n\020replace_e"
-    "xisting\030\003 \001(\010\022@\n\010metadata\030\004 \003(\0132..runany"
-    "where.v1.RAGIngestRequest.MetadataEntry\032"
-    "/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002"
-    " \001(\t:\0028\001\"\224\002\n\017RAGQueryOptions\022\020\n\010question"
-    "\030\001 \001(\t\022\032\n\rsystem_prompt\030\002 \001(\tH\000\210\001\001\022\033\n\nma"
-    "x_tokens\030\003 \001(\005B\007\212\265\030\003512\022\034\n\013temperature\030\004"
-    " \001(\002B\007\212\265\030\0030.7\022\026\n\005top_p\030\005 \001(\002B\007\212\265\030\0031.0\022\r\n"
-    "\005top_k\030\006 \001(\005\022\027\n\017retrieval_top_k\030\007 \001(\005\022\034\n"
-    "\024similarity_threshold\030\010 \001(\002\022\016\n\006stream\030\t "
-    "\001(\010\022\030\n\020disable_thinking\030\n \001(\010B\020\n\016_system"
-    "_prompt\"\332\001\n\017RAGQueryRequest\022\022\n\nrequest_i"
-    "d\030\001 \001(\t\0225\n\007options\030\002 \001(\0132\037.runanywhere.v"
-    "1.RAGQueryOptionsH\000\210\001\001\022\?\n\010metadata\030\003 \003(\013"
-    "2-.runanywhere.v1.RAGQueryRequest.Metada"
-    "taEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n"
-    "\005value\030\002 \001(\t:\0028\001B\n\n\010_options\"\321\002\n\017RAGSear"
-    "chResult\022\020\n\010chunk_id\030\001 \001(\t\022\014\n\004text\030\002 \001(\t"
-    "\022\030\n\020similarity_score\030\003 \001(\002\022\034\n\017source_doc"
-    "ument\030\004 \001(\tH\000\210\001\001\022\?\n\010metadata\030\005 \003(\0132-.run"
-    "anywhere.v1.RAGSearchResult.MetadataEntr"
-    "y\022\014\n\004rank\030\007 \001(\005\022\024\n\014start_offset\030\010 \001(\005\022\022\n"
-    "\nend_offset\030\t \001(\005\022\023\n\013token_count\030\n \001(\005\032/"
-    "\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 "
-    "\001(\t:\0028\001B\022\n\020_source_documentJ\004\010\006\020\007R\rmetad"
-    "ata_json\"\214\003\n\tRAGResult\022\016\n\006answer\030\001 \001(\t\0229"
-    "\n\020retrieved_chunks\030\002 \003(\0132\037.runanywhere.v"
-    "1.RAGSearchResult\022\024\n\014context_used\030\003 \001(\t\022"
-    "\031\n\021retrieval_time_ms\030\004 \001(\003\022\032\n\022generation"
-    "_time_ms\030\005 \001(\003\022\025\n\rtotal_time_ms\030\006 \001(\003\022\025\n"
-    "\rprompt_tokens\030\007 \001(\005\022\031\n\021completion_token"
-    "s\030\010 \001(\005\022\024\n\014total_tokens\030\t \001(\005\022\032\n\rerror_m"
-    "essage\030\n \001(\tH\000\210\001\001\022\022\n\nerror_code\030\013 \001(\005\022\022\n"
-    "\nrequest_id\030\014 \001(\t\022\035\n\020thinking_content\030\r "
-    "\001(\tH\001\210\001\001B\020\n\016_error_messageB\023\n\021_thinking_"
-    "content\"\332\002\n\rRAGStatistics\022\031\n\021indexed_doc"
-    "uments\030\001 \001(\003\022\026\n\016indexed_chunks\030\002 \001(\003\022\034\n\024"
-    "total_tokens_indexed\030\003 \001(\003\022\027\n\017last_updat"
-    "ed_ms\030\004 \001(\003\022\027\n\nindex_path\030\005 \001(\tH\000\210\001\001\022\027\n\n"
-    "stats_json\030\006 \001(\tH\001\210\001\001\022\037\n\027vector_store_si"
-    "ze_bytes\030\007 \001(\003\022\025\n\ris_persistent\030\010 \001(\010\022\025\n"
-    "\rlast_query_ms\030\t \001(\003\022\032\n\rerror_message\030\n "
-    "\001(\tH\002\210\001\001\022\022\n\nerror_code\030\013 \001(\005B\r\n\013_index_p"
-    "athB\r\n\013_stats_jsonB\020\n\016_error_message\"\343\001\n"
-    "\017RAGIngestResult\022\022\n\nrequest_id\030\001 \001(\t\022\032\n\022"
-    "documents_ingested\030\002 \001(\003\022\027\n\017chunks_inges"
-    "ted\030\003 \001(\003\0226\n\nstatistics\030\004 \001(\0132\035.runanywh"
-    "ere.v1.RAGStatisticsH\000\210\001\001\022\032\n\rerror_messa"
-    "ge\030\005 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001(\005B\r\n\013_st"
-    "atisticsB\020\n\016_error_message\"\304\002\n\016RAGStream"
-    "Event\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003"
-    "\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".run"
-    "anywhere.v1.RAGStreamEventKind\0223\n\005chunk\030"
-    "\005 \001(\0132\037.runanywhere.v1.RAGSearchResultH\000"
-    "\210\001\001\022\r\n\005token\030\006 \001(\t\022.\n\006result\030\007 \001(\0132\031.run"
-    "anywhere.v1.RAGResultH\001\210\001\001\022\032\n\rerror_mess"
-    "age\030\010 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\t \001(\005B\010\n\006_c"
-    "hunkB\t\n\007_resultB\020\n\016_error_message\"\214\002\n\017RA"
-    "GServiceState\022\020\n\010is_ready\030\001 \001(\010\0226\n\nstati"
-    "stics\030\002 \001(\0132\035.runanywhere.v1.RAGStatisti"
-    "csH\000\210\001\001\022\023\n\013is_indexing\030\003 \001(\010\022\023\n\013is_query"
-    "ing\030\004 \001(\010\022\036\n\021active_request_id\030\005 \001(\tH\001\210\001"
-    "\001\022\032\n\rerror_message\030\006 \001(\tH\002\210\001\001\022\022\n\nerror_c"
-    "ode\030\007 \001(\005B\r\n\013_statisticsB\024\n\022_active_requ"
-    "est_idB\020\n\016_error_message*\243\002\n\022RAGStreamEv"
-    "entKind\022%\n!RAG_STREAM_EVENT_KIND_UNSPECI"
-    "FIED\020\000\022+\n\'RAG_STREAM_EVENT_KIND_RETRIEVA"
-    "L_STARTED\020\001\022)\n%RAG_STREAM_EVENT_KIND_CHU"
-    "NK_RETRIEVED\020\002\022\'\n#RAG_STREAM_EVENT_KIND_"
-    "CONTEXT_READY\020\003\022\037\n\033RAG_STREAM_EVENT_KIND"
-    "_TOKEN\020\004\022#\n\037RAG_STREAM_EVENT_KIND_COMPLE"
-    "TED\020\005\022\037\n\033RAG_STREAM_EVENT_KIND_ERROR\020\0062\213"
-    "\004\n\003RAG\022K\n\006Create\022 .runanywhere.v1.RAGCon"
-    "figuration\032\037.runanywhere.v1.RAGServiceSt"
-    "ate\022K\n\006Ingest\022 .runanywhere.v1.RAGIngest"
-    "Request\032\037.runanywhere.v1.RAGIngestResult"
-    "\022C\n\005Query\022\037.runanywhere.v1.RAGQueryReque"
-    "st\032\031.runanywhere.v1.RAGResult\022D\n\006Search\022"
-    "\037.runanywhere.v1.RAGQueryRequest\032\031.runan"
-    "ywhere.v1.RAGResult\022G\n\005Stats\022\037.runanywhe"
-    "re.v1.RAGServiceState\032\035.runanywhere.v1.R"
-    "AGStatistics\022I\n\005Clear\022\037.runanywhere.v1.R"
-    "AGServiceState\032\037.runanywhere.v1.RAGServi"
-    "ceState\022K\n\006Stream\022\037.runanywhere.v1.RAGQu"
-    "eryRequest\032\036.runanywhere.v1.RAGStreamEve"
-    "nt0\001B\203\001\n\027ai.runanywhere.proto.v1B\010RagPro"
-    "toP\001Z<github.com/runanywhere/runanywhere"
-    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
-    "unanywhere.V1\272\002\002RAb\006proto3"
+    "\003\020\004\"\343\001\n\020RAGIngestRequest\022\022\n\nrequest_id\030\001"
+    " \001(\t\022.\n\tdocuments\030\002 \003(\0132\033.runanywhere.v1"
+    ".RAGDocument\022\030\n\020replace_existing\030\003 \001(\010\022@"
+    "\n\010metadata\030\004 \003(\0132..runanywhere.v1.RAGIng"
+    "estRequest.MetadataEntry\032/\n\rMetadataEntr"
+    "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\277\003\n\017RA"
+    "GQueryOptions\022\020\n\010question\030\001 \001(\t\022\032\n\rsyste"
+    "m_prompt\030\002 \001(\tH\000\210\001\001\022\033\n\nmax_tokens\030\003 \001(\005B"
+    "\007\212\265\030\003512\022\034\n\013temperature\030\004 \001(\002B\007\212\265\030\0030.7\022\026"
+    "\n\005top_p\030\005 \001(\002B\007\212\265\030\0031.0\022\r\n\005top_k\030\006 \001(\005\022\027\n"
+    "\017retrieval_top_k\030\007 \001(\005\022!\n\024similarity_thr"
+    "eshold\030\010 \001(\002H\001\210\001\001\022\016\n\006stream\030\t \001(\010\022\030\n\020dis"
+    "able_thinking\030\n \001(\010\022\032\n\022enable_multi_quer"
+    "y\030\013 \001(\010\022-\n\021multi_query_count\030\014 \001(\005B\r\212\265\030\001"
+    "3\240\265\030\001\250\265\030\010H\002\210\001\001\022\031\n\014scope_prefix\030\r \001(\tH\003\210\001"
+    "\001B\020\n\016_system_promptB\027\n\025_similarity_thres"
+    "holdB\024\n\022_multi_query_countB\017\n\r_scope_pre"
+    "fix\"\332\001\n\017RAGQueryRequest\022\022\n\nrequest_id\030\001 "
+    "\001(\t\0225\n\007options\030\002 \001(\0132\037.runanywhere.v1.RA"
+    "GQueryOptionsH\000\210\001\001\022\?\n\010metadata\030\003 \003(\0132-.r"
+    "unanywhere.v1.RAGQueryRequest.MetadataEn"
+    "try\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005val"
+    "ue\030\002 \001(\t:\0028\001B\n\n\010_options\"\302\002\n\017RAGSearchRe"
+    "sult\022\020\n\010chunk_id\030\001 \001(\t\022\014\n\004text\030\002 \001(\t\022\030\n\020"
+    "similarity_score\030\003 \001(\002\022\034\n\017source_documen"
+    "t\030\004 \001(\tH\000\210\001\001\022\?\n\010metadata\030\005 \003(\0132-.runanyw"
+    "here.v1.RAGSearchResult.MetadataEntry\022\014\n"
+    "\004rank\030\007 \001(\005\022\024\n\014start_offset\030\010 \001(\005\022\022\n\nend"
+    "_offset\030\t \001(\005\022\023\n\013token_count\030\n \001(\005\032/\n\rMe"
+    "tadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:"
+    "\0028\001B\022\n\020_source_documentJ\004\010\006\020\007\"\214\003\n\tRAGRes"
+    "ult\022\016\n\006answer\030\001 \001(\t\0229\n\020retrieved_chunks\030"
+    "\002 \003(\0132\037.runanywhere.v1.RAGSearchResult\022\024"
+    "\n\014context_used\030\003 \001(\t\022\031\n\021retrieval_time_m"
+    "s\030\004 \001(\003\022\032\n\022generation_time_ms\030\005 \001(\003\022\025\n\rt"
+    "otal_time_ms\030\006 \001(\003\022\025\n\rprompt_tokens\030\007 \001("
+    "\005\022\031\n\021completion_tokens\030\010 \001(\005\022\024\n\014total_to"
+    "kens\030\t \001(\005\022\032\n\rerror_message\030\n \001(\tH\000\210\001\001\022\022"
+    "\n\nerror_code\030\013 \001(\005\022\022\n\nrequest_id\030\014 \001(\t\022\035"
+    "\n\020thinking_content\030\r \001(\tH\001\210\001\001B\020\n\016_error_"
+    "messageB\023\n\021_thinking_content\"\332\002\n\rRAGStat"
+    "istics\022\031\n\021indexed_documents\030\001 \001(\003\022\026\n\016ind"
+    "exed_chunks\030\002 \001(\003\022\034\n\024total_tokens_indexe"
+    "d\030\003 \001(\003\022\027\n\017last_updated_ms\030\004 \001(\003\022\027\n\ninde"
+    "x_path\030\005 \001(\tH\000\210\001\001\022\027\n\nstats_json\030\006 \001(\tH\001\210"
+    "\001\001\022\037\n\027vector_store_size_bytes\030\007 \001(\003\022\025\n\ri"
+    "s_persistent\030\010 \001(\010\022\025\n\rlast_query_ms\030\t \001("
+    "\003\022\032\n\rerror_message\030\n \001(\tH\002\210\001\001\022\022\n\nerror_c"
+    "ode\030\013 \001(\005B\r\n\013_index_pathB\r\n\013_stats_jsonB"
+    "\020\n\016_error_message\"\343\001\n\017RAGIngestResult\022\022\n"
+    "\nrequest_id\030\001 \001(\t\022\032\n\022documents_ingested\030"
+    "\002 \001(\003\022\027\n\017chunks_ingested\030\003 \001(\003\0226\n\nstatis"
+    "tics\030\004 \001(\0132\035.runanywhere.v1.RAGStatistic"
+    "sH\000\210\001\001\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001\022\022\n\ner"
+    "ror_code\030\006 \001(\005B\r\n\013_statisticsB\020\n\016_error_"
+    "message\"\304\002\n\016RAGStreamEvent\022\013\n\003seq\030\001 \001(\004\022"
+    "\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001("
+    "\t\0220\n\004kind\030\004 \001(\0162\".runanywhere.v1.RAGStre"
+    "amEventKind\0223\n\005chunk\030\005 \001(\0132\037.runanywhere"
+    ".v1.RAGSearchResultH\000\210\001\001\022\r\n\005token\030\006 \001(\t\022"
+    ".\n\006result\030\007 \001(\0132\031.runanywhere.v1.RAGResu"
+    "ltH\001\210\001\001\022\032\n\rerror_message\030\010 \001(\tH\002\210\001\001\022\022\n\ne"
+    "rror_code\030\t \001(\005B\010\n\006_chunkB\t\n\007_resultB\020\n\016"
+    "_error_message\"\214\002\n\017RAGServiceState\022\020\n\010is"
+    "_ready\030\001 \001(\010\0226\n\nstatistics\030\002 \001(\0132\035.runan"
+    "ywhere.v1.RAGStatisticsH\000\210\001\001\022\023\n\013is_index"
+    "ing\030\003 \001(\010\022\023\n\013is_querying\030\004 \001(\010\022\036\n\021active"
+    "_request_id\030\005 \001(\tH\001\210\001\001\022\032\n\rerror_message\030"
+    "\006 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\007 \001(\005B\r\n\013_stati"
+    "sticsB\024\n\022_active_request_idB\020\n\016_error_me"
+    "ssage*\243\002\n\022RAGStreamEventKind\022%\n!RAG_STRE"
+    "AM_EVENT_KIND_UNSPECIFIED\020\000\022+\n\'RAG_STREA"
+    "M_EVENT_KIND_RETRIEVAL_STARTED\020\001\022)\n%RAG_"
+    "STREAM_EVENT_KIND_CHUNK_RETRIEVED\020\002\022\'\n#R"
+    "AG_STREAM_EVENT_KIND_CONTEXT_READY\020\003\022\037\n\033"
+    "RAG_STREAM_EVENT_KIND_TOKEN\020\004\022#\n\037RAG_STR"
+    "EAM_EVENT_KIND_COMPLETED\020\005\022\037\n\033RAG_STREAM"
+    "_EVENT_KIND_ERROR\020\0062\213\004\n\003RAG\022K\n\006Create\022 ."
+    "runanywhere.v1.RAGConfiguration\032\037.runany"
+    "where.v1.RAGServiceState\022K\n\006Ingest\022 .run"
+    "anywhere.v1.RAGIngestRequest\032\037.runanywhe"
+    "re.v1.RAGIngestResult\022C\n\005Query\022\037.runanyw"
+    "here.v1.RAGQueryRequest\032\031.runanywhere.v1"
+    ".RAGResult\022D\n\006Search\022\037.runanywhere.v1.RA"
+    "GQueryRequest\032\031.runanywhere.v1.RAGResult"
+    "\022G\n\005Stats\022\037.runanywhere.v1.RAGServiceSta"
+    "te\032\035.runanywhere.v1.RAGStatistics\022I\n\005Cle"
+    "ar\022\037.runanywhere.v1.RAGServiceState\032\037.ru"
+    "nanywhere.v1.RAGServiceState\022K\n\006Stream\022\037"
+    ".runanywhere.v1.RAGQueryRequest\032\036.runany"
+    "where.v1.RAGStreamEvent0\001B\203\001\n\027ai.runanyw"
+    "here.proto.v1B\010RagProtoP\001Z<github.com/ru"
+    "nanywhere/runanywhere-sdks/idl/v1;runany"
+    "wherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb"
+    "\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_rag_2eproto_deps[1] = {
@@ -3392,7 +3423,7 @@ static ::absl::once_flag descriptor_table_rag_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rag_2eproto = {
     false,
     false,
-    4706,
+    4847,
     descriptor_table_protodef_rag_2eproto,
     "rag.proto",
     &descriptor_table_rag_2eproto_once,
@@ -3625,7 +3656,7 @@ PROTOBUF_NOINLINE void RAGConfiguration::Clear() {
             stream, this_._internal_top_k(), target);
   }
 
-  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -4793,7 +4824,8 @@ PROTOBUF_NDEBUG_INLINE RAGQueryOptions::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         question_(arena, from.question_),
-        system_prompt_(arena, from.system_prompt_) {}
+        system_prompt_(arena, from.system_prompt_),
+        scope_prefix_(arena, from.scope_prefix_) {}
 
 RAGQueryOptions::RAGQueryOptions(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4813,9 +4845,9 @@ RAGQueryOptions::RAGQueryOptions(
                offsetof(Impl_, max_tokens_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, max_tokens_),
-           offsetof(Impl_, disable_thinking_) -
+           offsetof(Impl_, multi_query_count_) -
                offsetof(Impl_, max_tokens_) +
-               sizeof(Impl_::disable_thinking_));
+               sizeof(Impl_::multi_query_count_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.RAGQueryOptions)
 }
@@ -4824,16 +4856,17 @@ PROTOBUF_NDEBUG_INLINE RAGQueryOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         question_(arena),
-        system_prompt_(arena) {}
+        system_prompt_(arena),
+        scope_prefix_(arena) {}
 
 inline void RAGQueryOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, max_tokens_),
            0,
-           offsetof(Impl_, disable_thinking_) -
+           offsetof(Impl_, multi_query_count_) -
                offsetof(Impl_, max_tokens_) +
-               sizeof(Impl_::disable_thinking_));
+               sizeof(Impl_::multi_query_count_));
 }
 RAGQueryOptions::~RAGQueryOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.RAGQueryOptions)
@@ -4848,6 +4881,7 @@ inline void RAGQueryOptions::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.question_.Destroy();
   this_._impl_.system_prompt_.Destroy();
+  this_._impl_.scope_prefix_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -4885,23 +4919,26 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.question_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _impl_.system_prompt_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.scope_prefix_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
     ::memset(&_impl_.max_tokens_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.similarity_threshold_) -
-        reinterpret_cast<char*>(&_impl_.max_tokens_)) + sizeof(_impl_.similarity_threshold_));
+        reinterpret_cast<char*>(&_impl_.retrieval_top_k_) -
+        reinterpret_cast<char*>(&_impl_.max_tokens_)) + sizeof(_impl_.retrieval_top_k_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.stream_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.disable_thinking_) -
-        reinterpret_cast<char*>(&_impl_.stream_)) + sizeof(_impl_.disable_thinking_));
+  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
+    ::memset(&_impl_.similarity_threshold_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.multi_query_count_) -
+        reinterpret_cast<char*>(&_impl_.similarity_threshold_)) + sizeof(_impl_.multi_query_count_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4945,7 +4982,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_max_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
@@ -4954,7 +4991,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -4963,7 +5000,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -4972,7 +5009,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // int32 top_k = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_top_k() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
@@ -4981,7 +5018,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // int32 retrieval_top_k = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_retrieval_top_k() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
@@ -4989,17 +5026,15 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
     }
   }
 
-  // float similarity_threshold = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_similarity_threshold()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          8, this_._internal_similarity_threshold(), target);
-    }
+  // optional float similarity_threshold = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteFloatToArray(
+        8, this_._internal_similarity_threshold(), target);
   }
 
   // bool stream = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_stream() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -5008,12 +5043,36 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
   }
 
   // bool disable_thinking = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_disable_thinking() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           10, this_._internal_disable_thinking(), target);
     }
+  }
+
+  // bool enable_multi_query = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (this_._internal_enable_multi_query() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          11, this_._internal_enable_multi_query(), target);
+    }
+  }
+
+  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    target =
+        ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
+            stream, this_._internal_multi_query_count(), target);
+  }
+
+  // optional string scope_prefix = 13;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_scope_prefix();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RAGQueryOptions.scope_prefix");
+    target = stream->WriteStringMaybeAliased(13, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5041,6 +5100,7 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
+  total_size += static_cast<bool>(0x00000100U & cached_has_bits) * 5;
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string question = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -5054,58 +5114,68 @@ PROTOBUF_NOINLINE void RAGQueryOptions::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_system_prompt());
     }
-    // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
+    // optional string scope_prefix = 13;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_scope_prefix());
+    }
+    // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_max_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_tokens());
       }
     }
     // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
         total_size += 5;
       }
     }
     // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
         total_size += 5;
       }
     }
     // int32 top_k = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_top_k() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_top_k());
       }
     }
     // int32 retrieval_top_k = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_retrieval_top_k() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_retrieval_top_k());
       }
     }
-    // float similarity_threshold = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_similarity_threshold()) != 0) {
-        total_size += 5;
-      }
-    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00001e00U)) {
     // bool stream = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_stream() != 0) {
         total_size += 2;
       }
     }
     // bool disable_thinking = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_disable_thinking() != 0) {
         total_size += 2;
       }
+    }
+    // bool enable_multi_query = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      if (this_._internal_enable_multi_query() != 0) {
+        total_size += 2;
+      }
+    }
+    // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+      total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+          this_._internal_multi_query_count());
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -5139,46 +5209,55 @@ void RAGQueryOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_system_prompt(from._internal_system_prompt());
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_scope_prefix(from._internal_scope_prefix());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_max_tokens() != 0) {
         _this->_impl_.max_tokens_ = from._impl_.max_tokens_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_temperature()) != 0) {
         _this->_impl_.temperature_ = from._impl_.temperature_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_top_p()) != 0) {
         _this->_impl_.top_p_ = from._impl_.top_p_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_top_k() != 0) {
         _this->_impl_.top_k_ = from._impl_.top_k_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_retrieval_top_k() != 0) {
         _this->_impl_.retrieval_top_k_ = from._impl_.retrieval_top_k_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_similarity_threshold()) != 0) {
-        _this->_impl_.similarity_threshold_ = from._impl_.similarity_threshold_;
-      }
-    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      _this->_impl_.similarity_threshold_ = from._impl_.similarity_threshold_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_stream() != 0) {
         _this->_impl_.stream_ = from._impl_.stream_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (from._internal_disable_thinking() != 0) {
         _this->_impl_.disable_thinking_ = from._impl_.disable_thinking_;
       }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      if (from._internal_enable_multi_query() != 0) {
+        _this->_impl_.enable_multi_query_ = from._impl_.enable_multi_query_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+      _this->_impl_.multi_query_count_ = from._impl_.multi_query_count_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -5202,9 +5281,10 @@ void RAGQueryOptions::InternalSwap(RAGQueryOptions* PROTOBUF_RESTRICT PROTOBUF_N
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.question_, &other->_impl_.question_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.system_prompt_, &other->_impl_.system_prompt_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.scope_prefix_, &other->_impl_.scope_prefix_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.disable_thinking_)
-      + sizeof(RAGQueryOptions::_impl_.disable_thinking_)
+      PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.multi_query_count_)
+      + sizeof(RAGQueryOptions::_impl_.multi_query_count_)
       - PROTOBUF_FIELD_OFFSET(RAGQueryOptions, _impl_.max_tokens_)>(
           reinterpret_cast<char*>(&_impl_.max_tokens_),
           reinterpret_cast<char*>(&other->_impl_.max_tokens_));

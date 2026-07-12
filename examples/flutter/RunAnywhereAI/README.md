@@ -5,10 +5,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%2013.0%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 13.0+ | Android 7.0+" />
-  <img src="https://img.shields.io/badge/Flutter-3.24%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" />
-  <img src="https://img.shields.io/badge/Dart-3.5%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" />
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/Platform-iOS%2017.5%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 17.5+ | Android 7.0+" />
+  <img src="https://img.shields.io/badge/Flutter-3.44.6%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.44.6+" />
+  <img src="https://img.shields.io/badge/Dart-3.12.2%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.12.2+" />
+  <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
 **A production-ready reference app demonstrating the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) capabilities for on-device AI.** This app showcases how to build privacy-first, offline-capable AI features with LLM chat, speech-to-text, text-to-speech, and a complete voice assistant pipeline—all running locally on your device.
@@ -23,9 +23,9 @@
 
 Prerequisites:
 
-- Flutter 3.24+ and Dart 3.5+ on `PATH`.
+- Flutter 3.44.6+ and Dart 3.12.2+ on `PATH`.
 - Android Studio with Android SDK 24+, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
-- Xcode 15+ and CocoaPods for iOS simulator builds.
+- Xcode 26+ and CocoaPods for iOS simulator builds.
 - JDK 17 and enough disk for native artifacts and downloaded AI models.
 
 From a fresh checkout:
@@ -48,7 +48,7 @@ flutter build ios --simulator --debug
 Notes:
 
 - `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
-- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
+- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages all package-owned Apple frameworks. Core/LlamaCPP/ONNX can use SwiftPM; MLX intentionally uses CocoaPods so Hub/Crypto are copied to the app root.
 - If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
 - `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 
@@ -72,13 +72,13 @@ This sample app's `pubspec.yaml` uses path dependencies to reference the local F
 ```
 This Sample App → Local Flutter SDK packages (sdk/runanywhere-flutter/packages/)
                           ↓
-              Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/src/main/jniLibs/)
+              Local XCFrameworks/JNI libs (in package-owned ios/<package>/Frameworks/ and android/src/main/jniLibs/)
                           ↑
            Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh + ./scripts/build/build-core-android.sh
 ```
 
 Repo-root native build scripts (called from project root):
-1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
+1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into package-owned `sdk/runanywhere-flutter/packages/*/ios/<package>/Frameworks/` directories.
 2. `./scripts/build/build-core-android.sh <ABI>` — builds Android `.so` libraries and stages them into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
 
 Local consumption is enabled by the `runanywhere.useLocalNatives=true` Gradle property (default for development checkouts).
@@ -125,6 +125,7 @@ This sample app demonstrates the full power of the RunAnywhere Flutter SDK:
 | Feature | Description | SDK Integration |
 |---------|-------------|-----------------|
 | **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhere.llm.generateStream()` |
+| **Apple MLX** | Physical-iOS-device LLM, VLM, embeddings, STT, and TTS through the Swift MLX runtime | `MLX.register()` |
 | **Thinking Mode** | Support for models with `<think>...</think>` reasoning | Thinking tag parsing |
 | **Real-time Analytics** | Token speed, generation time, inference metrics | `MessageAnalytics` |
 | **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.stt.transcribe()` |
@@ -248,9 +249,9 @@ RunAnywhereAI/
 
 ### Prerequisites
 
-- **Flutter** 3.10.0 or later ([install guide](https://flutter.dev/docs/get-started/install))
-- **Dart** 3.0.0 or later (included with Flutter)
-- **iOS** — Xcode 14+ (for iOS builds)
+- **Flutter** 3.44.6 or later ([install guide](https://flutter.dev/docs/get-started/install))
+- **Dart** 3.12.2 or later (included with Flutter)
+- **iOS** — Xcode 26+ with an iOS 17.5+ deployment target
 - **Android** — Android Studio + SDK 21+ (for Android builds)
 - **~2GB** free storage for AI models
 - **Device** — Physical device recommended for best performance
@@ -300,14 +301,19 @@ The SDK is initialized in `runanywhere_ai_app.dart`:
 ```dart
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
-// 1. Initialize SDK in development mode
+// 1. Register optional backends before SDK initialization.
+LlamaCpp.register();
+final mlxRegistered = await MLX.register(); // False unless this is a physical iOS device.
+await Onnx.register();
+
+// 2. Initialize SDK in development mode.
 await RunAnywhere.initialize();
 
-// 2. Register LlamaCpp module for LLM models (GGUF)
-await LlamaCpp.register();
-RunAnywhere.models.register(
+// 3. Seed models only for backends that actually registered.
+await RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: Uri.parse('https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf'),
@@ -315,9 +321,7 @@ RunAnywhere.models.register(
   memoryRequirement: 500000000,
 );
 
-// 3. Register ONNX module for STT/TTS models
-await Onnx.register();
-RunAnywhere.models.register(
+await RunAnywhere.models.register(
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
@@ -325,6 +329,17 @@ RunAnywhere.models.register(
   modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   memoryRequirement: 75000000,
 );
+
+if (mlxRegistered) {
+  await RunAnywhere.models.register(
+    id: 'mlx-qwen3-0.6b-4bit',
+    name: 'MLX Qwen3 0.6B 4bit',
+    url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+    memoryRequirement: 650000000,
+    supportsThinking: true,
+  );
+}
 ```
 
 ### Download & Load a Model
@@ -664,7 +679,7 @@ git push origin feature/your-feature
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see [LICENSE](../../../LICENSE) for details.
+This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../../LICENSE) for details.
 
 ---
 

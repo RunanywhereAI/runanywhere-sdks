@@ -47,14 +47,6 @@
 # Third-party Dependencies Used by SDK
 # ========================================================================================
 
-# Whisper JNI
--keep class io.github.givimad.whisperjni.** { *; }
--dontwarn io.github.givimad.whisperjni.**
-
-# VAD classes
--keep class com.konovalov.vad.** { *; }
--dontwarn com.konovalov.vad.**
-
 # ONNX Runtime
 -keep class ai.onnxruntime.** { *; }
 -dontwarn ai.onnxruntime.**

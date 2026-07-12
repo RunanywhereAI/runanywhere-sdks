@@ -79,31 +79,15 @@ function toolParameterTypeToJSON(object) {
 }
 /**
  * ---------------------------------------------------------------------------
- * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
- * to `ToolCallingOptions.format_hint` (which remains a free-form string for
- * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
- * 1:1 to this enum).
- *
- * Drift across SDKs:
- *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
- *     today only exposes `default` and `lfm2` constants on a string-typed
- *     field — it is not yet an enum.
- *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
- * This enum is the union of formats LLM families actually emit; SDK frontends
- * should map their existing strings onto these values when surfacing the
- * strongly-typed field. Keep `format_hint` (string) populated for legacy
- * consumers until all SDKs migrate.
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
  * ---------------------------------------------------------------------------
  */
 var ToolCallFormatName;
 (function (ToolCallFormatName) {
     ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_UNSPECIFIED"] = 0] = "TOOL_CALL_FORMAT_NAME_UNSPECIFIED";
     ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_JSON"] = 1] = "TOOL_CALL_FORMAT_NAME_JSON";
-    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_XML"] = 2] = "TOOL_CALL_FORMAT_NAME_XML";
-    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_NATIVE"] = 3] = "TOOL_CALL_FORMAT_NAME_NATIVE";
-    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_PYTHONIC"] = 4] = "TOOL_CALL_FORMAT_NAME_PYTHONIC";
-    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS"] = 5] = "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS";
-    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_HERMES"] = 6] = "TOOL_CALL_FORMAT_NAME_HERMES";
+    ToolCallFormatName[ToolCallFormatName["TOOL_CALL_FORMAT_NAME_LFM2"] = 7] = "TOOL_CALL_FORMAT_NAME_LFM2";
     ToolCallFormatName[ToolCallFormatName["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ToolCallFormatName || (exports.ToolCallFormatName = ToolCallFormatName = {}));
 function toolCallFormatNameFromJSON(object) {
@@ -114,21 +98,9 @@ function toolCallFormatNameFromJSON(object) {
         case 1:
         case "TOOL_CALL_FORMAT_NAME_JSON":
             return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-        case 2:
-        case "TOOL_CALL_FORMAT_NAME_XML":
-            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML;
-        case 3:
-        case "TOOL_CALL_FORMAT_NAME_NATIVE":
-            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE;
-        case 4:
-        case "TOOL_CALL_FORMAT_NAME_PYTHONIC":
-            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
-        case 5:
-        case "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS":
-            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS;
-        case 6:
-        case "TOOL_CALL_FORMAT_NAME_HERMES":
-            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES;
+        case 7:
+        case "TOOL_CALL_FORMAT_NAME_LFM2":
+            return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -141,16 +113,8 @@ function toolCallFormatNameToJSON(object) {
             return "TOOL_CALL_FORMAT_NAME_UNSPECIFIED";
         case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON:
             return "TOOL_CALL_FORMAT_NAME_JSON";
-        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML:
-            return "TOOL_CALL_FORMAT_NAME_XML";
-        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE:
-            return "TOOL_CALL_FORMAT_NAME_NATIVE";
-        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC:
-            return "TOOL_CALL_FORMAT_NAME_PYTHONIC";
-        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS:
-            return "TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS";
-        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES:
-            return "TOOL_CALL_FORMAT_NAME_HERMES";
+        case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2:
+            return "TOOL_CALL_FORMAT_NAME_LFM2";
         case ToolCallFormatName.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -1062,7 +1026,7 @@ exports.ToolDefinition_MetadataEntry = {
     },
 };
 function createBaseToolCall() {
-    return { id: "", name: "", argumentsJson: "", type: "", callId: undefined, createdAtMs: 0, rawText: undefined };
+    return { id: "", name: "", argumentsJson: "", type: "", createdAtMs: 0, rawText: undefined };
 }
 exports.ToolCall = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1077,9 +1041,6 @@ exports.ToolCall = {
         }
         if (message.type !== "") {
             writer.uint32(34).string(message.type);
-        }
-        if (message.callId !== undefined) {
-            writer.uint32(50).string(message.callId);
         }
         if (message.createdAtMs !== 0) {
             writer.uint32(56).int64(message.createdAtMs);
@@ -1124,13 +1085,6 @@ exports.ToolCall = {
                     message.type = reader.string();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.callId = reader.string();
-                    continue;
-                }
                 case 7: {
                     if (tag !== 56) {
                         break;
@@ -1163,11 +1117,6 @@ exports.ToolCall = {
                     ? globalThis.String(object.arguments_json)
                     : "",
             type: isSet(object.type) ? globalThis.String(object.type) : "",
-            callId: isSet(object.callId)
-                ? globalThis.String(object.callId)
-                : isSet(object.call_id)
-                    ? globalThis.String(object.call_id)
-                    : undefined,
             createdAtMs: isSet(object.createdAtMs)
                 ? globalThis.Number(object.createdAtMs)
                 : isSet(object.created_at_ms)
@@ -1194,9 +1143,6 @@ exports.ToolCall = {
         if (message.type !== "") {
             obj.type = message.type;
         }
-        if (message.callId !== undefined) {
-            obj.callId = message.callId;
-        }
         if (message.createdAtMs !== 0) {
             obj.createdAtMs = Math.round(message.createdAtMs);
         }
@@ -1214,7 +1160,6 @@ exports.ToolCall = {
         message.name = object.name ?? "";
         message.argumentsJson = object.argumentsJson ?? "";
         message.type = object.type ?? "";
-        message.callId = object.callId ?? undefined;
         message.createdAtMs = object.createdAtMs ?? 0;
         message.rawText = object.rawText ?? undefined;
         return message;
@@ -1227,7 +1172,6 @@ function createBaseToolResult() {
         resultJson: "",
         error: undefined,
         success: false,
-        callId: undefined,
         startedAtMs: 0,
         completedAtMs: 0,
     };
@@ -1248,9 +1192,6 @@ exports.ToolResult = {
         }
         if (message.success !== false) {
             writer.uint32(40).bool(message.success);
-        }
-        if (message.callId !== undefined) {
-            writer.uint32(58).string(message.callId);
         }
         if (message.startedAtMs !== 0) {
             writer.uint32(64).int64(message.startedAtMs);
@@ -1302,13 +1243,6 @@ exports.ToolResult = {
                     message.success = reader.bool();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.callId = reader.string();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 64) {
                         break;
@@ -1346,11 +1280,6 @@ exports.ToolResult = {
                     : "",
             error: isSet(object.error) ? globalThis.String(object.error) : undefined,
             success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
-            callId: isSet(object.callId)
-                ? globalThis.String(object.callId)
-                : isSet(object.call_id)
-                    ? globalThis.String(object.call_id)
-                    : undefined,
             startedAtMs: isSet(object.startedAtMs)
                 ? globalThis.Number(object.startedAtMs)
                 : isSet(object.started_at_ms)
@@ -1380,9 +1309,6 @@ exports.ToolResult = {
         if (message.success !== false) {
             obj.success = message.success;
         }
-        if (message.callId !== undefined) {
-            obj.callId = message.callId;
-        }
         if (message.startedAtMs !== 0) {
             obj.startedAtMs = Math.round(message.startedAtMs);
         }
@@ -1401,7 +1327,6 @@ exports.ToolResult = {
         message.resultJson = object.resultJson ?? "";
         message.error = object.error ?? undefined;
         message.success = object.success ?? false;
-        message.callId = object.callId ?? undefined;
         message.startedAtMs = object.startedAtMs ?? 0;
         message.completedAtMs = object.completedAtMs ?? 0;
         return message;
@@ -1410,20 +1335,16 @@ exports.ToolResult = {
 function createBaseToolCallingOptions() {
     return {
         tools: [],
-        maxIterations: 0,
         autoExecute: false,
         temperature: undefined,
         maxTokens: undefined,
         systemPrompt: undefined,
         replaceSystemPrompt: false,
         keepToolsAvailable: false,
-        formatHint: "",
         format: undefined,
-        customSystemPrompt: undefined,
         maxToolCalls: undefined,
         toolChoice: 0,
         forcedToolName: undefined,
-        parallelToolCalls: false,
         requireJsonArguments: false,
         disableThinking: undefined,
     };
@@ -1432,9 +1353,6 @@ exports.ToolCallingOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         for (const v of message.tools) {
             exports.ToolDefinition.encode(v, writer.uint32(10).fork()).join();
-        }
-        if (message.maxIterations !== 0) {
-            writer.uint32(16).int32(message.maxIterations);
         }
         if (message.autoExecute !== false) {
             writer.uint32(24).bool(message.autoExecute);
@@ -1454,14 +1372,8 @@ exports.ToolCallingOptions = {
         if (message.keepToolsAvailable !== false) {
             writer.uint32(64).bool(message.keepToolsAvailable);
         }
-        if (message.formatHint !== "") {
-            writer.uint32(74).string(message.formatHint);
-        }
         if (message.format !== undefined) {
             writer.uint32(80).int32(message.format);
-        }
-        if (message.customSystemPrompt !== undefined) {
-            writer.uint32(90).string(message.customSystemPrompt);
         }
         if (message.maxToolCalls !== undefined) {
             writer.uint32(96).int32(message.maxToolCalls);
@@ -1471,9 +1383,6 @@ exports.ToolCallingOptions = {
         }
         if (message.forcedToolName !== undefined) {
             writer.uint32(114).string(message.forcedToolName);
-        }
-        if (message.parallelToolCalls !== false) {
-            writer.uint32(120).bool(message.parallelToolCalls);
         }
         if (message.requireJsonArguments !== false) {
             writer.uint32(128).bool(message.requireJsonArguments);
@@ -1495,13 +1404,6 @@ exports.ToolCallingOptions = {
                         break;
                     }
                     message.tools.push(exports.ToolDefinition.decode(reader, reader.uint32()));
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.maxIterations = reader.int32();
                     continue;
                 }
                 case 3: {
@@ -1546,25 +1448,11 @@ exports.ToolCallingOptions = {
                     message.keepToolsAvailable = reader.bool();
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.formatHint = reader.string();
-                    continue;
-                }
                 case 10: {
                     if (tag !== 80) {
                         break;
                     }
                     message.format = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.customSystemPrompt = reader.string();
                     continue;
                 }
                 case 12: {
@@ -1586,13 +1474,6 @@ exports.ToolCallingOptions = {
                         break;
                     }
                     message.forcedToolName = reader.string();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 120) {
-                        break;
-                    }
-                    message.parallelToolCalls = reader.bool();
                     continue;
                 }
                 case 16: {
@@ -1620,11 +1501,6 @@ exports.ToolCallingOptions = {
     fromJSON(object) {
         return {
             tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e) => exports.ToolDefinition.fromJSON(e)) : [],
-            maxIterations: isSet(object.maxIterations)
-                ? globalThis.Number(object.maxIterations)
-                : isSet(object.max_iterations)
-                    ? globalThis.Number(object.max_iterations)
-                    : 0,
             autoExecute: isSet(object.autoExecute)
                 ? globalThis.Boolean(object.autoExecute)
                 : isSet(object.auto_execute)
@@ -1651,17 +1527,7 @@ exports.ToolCallingOptions = {
                 : isSet(object.keep_tools_available)
                     ? globalThis.Boolean(object.keep_tools_available)
                     : false,
-            formatHint: isSet(object.formatHint)
-                ? globalThis.String(object.formatHint)
-                : isSet(object.format_hint)
-                    ? globalThis.String(object.format_hint)
-                    : "",
             format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
-            customSystemPrompt: isSet(object.customSystemPrompt)
-                ? globalThis.String(object.customSystemPrompt)
-                : isSet(object.custom_system_prompt)
-                    ? globalThis.String(object.custom_system_prompt)
-                    : undefined,
             maxToolCalls: isSet(object.maxToolCalls)
                 ? globalThis.Number(object.maxToolCalls)
                 : isSet(object.max_tool_calls)
@@ -1677,11 +1543,6 @@ exports.ToolCallingOptions = {
                 : isSet(object.forced_tool_name)
                     ? globalThis.String(object.forced_tool_name)
                     : undefined,
-            parallelToolCalls: isSet(object.parallelToolCalls)
-                ? globalThis.Boolean(object.parallelToolCalls)
-                : isSet(object.parallel_tool_calls)
-                    ? globalThis.Boolean(object.parallel_tool_calls)
-                    : false,
             requireJsonArguments: isSet(object.requireJsonArguments)
                 ? globalThis.Boolean(object.requireJsonArguments)
                 : isSet(object.require_json_arguments)
@@ -1698,9 +1559,6 @@ exports.ToolCallingOptions = {
         const obj = {};
         if (message.tools?.length) {
             obj.tools = message.tools.map((e) => exports.ToolDefinition.toJSON(e));
-        }
-        if (message.maxIterations !== 0) {
-            obj.maxIterations = Math.round(message.maxIterations);
         }
         if (message.autoExecute !== false) {
             obj.autoExecute = message.autoExecute;
@@ -1720,14 +1578,8 @@ exports.ToolCallingOptions = {
         if (message.keepToolsAvailable !== false) {
             obj.keepToolsAvailable = message.keepToolsAvailable;
         }
-        if (message.formatHint !== "") {
-            obj.formatHint = message.formatHint;
-        }
         if (message.format !== undefined) {
             obj.format = toolCallFormatNameToJSON(message.format);
-        }
-        if (message.customSystemPrompt !== undefined) {
-            obj.customSystemPrompt = message.customSystemPrompt;
         }
         if (message.maxToolCalls !== undefined) {
             obj.maxToolCalls = Math.round(message.maxToolCalls);
@@ -1737,9 +1589,6 @@ exports.ToolCallingOptions = {
         }
         if (message.forcedToolName !== undefined) {
             obj.forcedToolName = message.forcedToolName;
-        }
-        if (message.parallelToolCalls !== false) {
-            obj.parallelToolCalls = message.parallelToolCalls;
         }
         if (message.requireJsonArguments !== false) {
             obj.requireJsonArguments = message.requireJsonArguments;
@@ -1755,20 +1604,16 @@ exports.ToolCallingOptions = {
     fromPartial(object) {
         const message = createBaseToolCallingOptions();
         message.tools = object.tools?.map((e) => exports.ToolDefinition.fromPartial(e)) || [];
-        message.maxIterations = object.maxIterations ?? 0;
         message.autoExecute = object.autoExecute ?? false;
         message.temperature = object.temperature ?? undefined;
         message.maxTokens = object.maxTokens ?? undefined;
         message.systemPrompt = object.systemPrompt ?? undefined;
         message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
         message.keepToolsAvailable = object.keepToolsAvailable ?? false;
-        message.formatHint = object.formatHint ?? "";
         message.format = object.format ?? undefined;
-        message.customSystemPrompt = object.customSystemPrompt ?? undefined;
         message.maxToolCalls = object.maxToolCalls ?? undefined;
         message.toolChoice = object.toolChoice ?? 0;
         message.forcedToolName = object.forcedToolName ?? undefined;
-        message.parallelToolCalls = object.parallelToolCalls ?? false;
         message.requireJsonArguments = object.requireJsonArguments ?? false;
         message.disableThinking = object.disableThinking ?? undefined;
         return message;
@@ -2325,7 +2170,7 @@ exports.ToolPromptFormatRequest = {
     },
 };
 function createBaseToolPromptFormatResult() {
-    return { formattedPrompt: "", format: 0, formatHint: "", errorMessage: undefined, errorCode: 0 };
+    return { formattedPrompt: "", format: 0, errorMessage: undefined, errorCode: 0 };
 }
 exports.ToolPromptFormatResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2334,9 +2179,6 @@ exports.ToolPromptFormatResult = {
         }
         if (message.format !== 0) {
             writer.uint32(16).int32(message.format);
-        }
-        if (message.formatHint !== "") {
-            writer.uint32(26).string(message.formatHint);
         }
         if (message.errorMessage !== undefined) {
             writer.uint32(34).string(message.errorMessage);
@@ -2365,13 +2207,6 @@ exports.ToolPromptFormatResult = {
                         break;
                     }
                     message.format = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.formatHint = reader.string();
                     continue;
                 }
                 case 4: {
@@ -2404,11 +2239,6 @@ exports.ToolPromptFormatResult = {
                     ? globalThis.String(object.formatted_prompt)
                     : "",
             format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
-            formatHint: isSet(object.formatHint)
-                ? globalThis.String(object.formatHint)
-                : isSet(object.format_hint)
-                    ? globalThis.String(object.format_hint)
-                    : "",
             errorMessage: isSet(object.errorMessage)
                 ? globalThis.String(object.errorMessage)
                 : isSet(object.error_message)
@@ -2429,9 +2259,6 @@ exports.ToolPromptFormatResult = {
         if (message.format !== 0) {
             obj.format = toolCallFormatNameToJSON(message.format);
         }
-        if (message.formatHint !== "") {
-            obj.formatHint = message.formatHint;
-        }
         if (message.errorMessage !== undefined) {
             obj.errorMessage = message.errorMessage;
         }
@@ -2447,7 +2274,6 @@ exports.ToolPromptFormatResult = {
         const message = createBaseToolPromptFormatResult();
         message.formattedPrompt = object.formattedPrompt ?? "";
         message.format = object.format ?? 0;
-        message.formatHint = object.formatHint ?? "";
         message.errorMessage = object.errorMessage ?? undefined;
         message.errorCode = object.errorCode ?? 0;
         return message;
@@ -2999,13 +2825,16 @@ function createBaseToolCallingSessionCreateRequest() {
         topP: 0,
         systemPrompt: "",
         tools: [],
-        formatHint: "",
-        maxIterations: 0,
+        format: 0,
+        maxToolCalls: 0,
         keepToolsAvailable: false,
         validateCalls: undefined,
         toolChoice: undefined,
         forcedToolName: undefined,
         disableThinking: false,
+        autoExecute: undefined,
+        replaceSystemPrompt: false,
+        requireJsonArguments: false,
     };
 }
 exports.ToolCallingSessionCreateRequest = {
@@ -3028,11 +2857,11 @@ exports.ToolCallingSessionCreateRequest = {
         for (const v of message.tools) {
             exports.ToolDefinition.encode(v, writer.uint32(18).fork()).join();
         }
-        if (message.formatHint !== "") {
-            writer.uint32(26).string(message.formatHint);
+        if (message.format !== 0) {
+            writer.uint32(24).int32(message.format);
         }
-        if (message.maxIterations !== 0) {
-            writer.uint32(32).uint32(message.maxIterations);
+        if (message.maxToolCalls !== 0) {
+            writer.uint32(32).uint32(message.maxToolCalls);
         }
         if (message.keepToolsAvailable !== false) {
             writer.uint32(40).bool(message.keepToolsAvailable);
@@ -3048,6 +2877,15 @@ exports.ToolCallingSessionCreateRequest = {
         }
         if (message.disableThinking !== false) {
             writer.uint32(120).bool(message.disableThinking);
+        }
+        if (message.autoExecute !== undefined) {
+            writer.uint32(128).bool(message.autoExecute);
+        }
+        if (message.replaceSystemPrompt !== false) {
+            writer.uint32(136).bool(message.replaceSystemPrompt);
+        }
+        if (message.requireJsonArguments !== false) {
+            writer.uint32(144).bool(message.requireJsonArguments);
         }
         return writer;
     },
@@ -3101,17 +2939,17 @@ exports.ToolCallingSessionCreateRequest = {
                     continue;
                 }
                 case 3: {
-                    if (tag !== 26) {
+                    if (tag !== 24) {
                         break;
                     }
-                    message.formatHint = reader.string();
+                    message.format = reader.int32();
                     continue;
                 }
                 case 4: {
                     if (tag !== 32) {
                         break;
                     }
-                    message.maxIterations = reader.uint32();
+                    message.maxToolCalls = reader.uint32();
                     continue;
                 }
                 case 5: {
@@ -3149,6 +2987,27 @@ exports.ToolCallingSessionCreateRequest = {
                     message.disableThinking = reader.bool();
                     continue;
                 }
+                case 16: {
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.autoExecute = reader.bool();
+                    continue;
+                }
+                case 17: {
+                    if (tag !== 136) {
+                        break;
+                    }
+                    message.replaceSystemPrompt = reader.bool();
+                    continue;
+                }
+                case 18: {
+                    if (tag !== 144) {
+                        break;
+                    }
+                    message.requireJsonArguments = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3179,15 +3038,11 @@ exports.ToolCallingSessionCreateRequest = {
             tools: globalThis.Array.isArray(object?.tools)
                 ? object.tools.map((e) => exports.ToolDefinition.fromJSON(e))
                 : [],
-            formatHint: isSet(object.formatHint)
-                ? globalThis.String(object.formatHint)
-                : isSet(object.format_hint)
-                    ? globalThis.String(object.format_hint)
-                    : "",
-            maxIterations: isSet(object.maxIterations)
-                ? globalThis.Number(object.maxIterations)
-                : isSet(object.max_iterations)
-                    ? globalThis.Number(object.max_iterations)
+            format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
+            maxToolCalls: isSet(object.maxToolCalls)
+                ? globalThis.Number(object.maxToolCalls)
+                : isSet(object.max_tool_calls)
+                    ? globalThis.Number(object.max_tool_calls)
                     : 0,
             keepToolsAvailable: isSet(object.keepToolsAvailable)
                 ? globalThis.Boolean(object.keepToolsAvailable)
@@ -3214,6 +3069,21 @@ exports.ToolCallingSessionCreateRequest = {
                 : isSet(object.disable_thinking)
                     ? globalThis.Boolean(object.disable_thinking)
                     : false,
+            autoExecute: isSet(object.autoExecute)
+                ? globalThis.Boolean(object.autoExecute)
+                : isSet(object.auto_execute)
+                    ? globalThis.Boolean(object.auto_execute)
+                    : undefined,
+            replaceSystemPrompt: isSet(object.replaceSystemPrompt)
+                ? globalThis.Boolean(object.replaceSystemPrompt)
+                : isSet(object.replace_system_prompt)
+                    ? globalThis.Boolean(object.replace_system_prompt)
+                    : false,
+            requireJsonArguments: isSet(object.requireJsonArguments)
+                ? globalThis.Boolean(object.requireJsonArguments)
+                : isSet(object.require_json_arguments)
+                    ? globalThis.Boolean(object.require_json_arguments)
+                    : false,
         };
     },
     toJSON(message) {
@@ -3236,11 +3106,11 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.tools?.length) {
             obj.tools = message.tools.map((e) => exports.ToolDefinition.toJSON(e));
         }
-        if (message.formatHint !== "") {
-            obj.formatHint = message.formatHint;
+        if (message.format !== 0) {
+            obj.format = toolCallFormatNameToJSON(message.format);
         }
-        if (message.maxIterations !== 0) {
-            obj.maxIterations = Math.round(message.maxIterations);
+        if (message.maxToolCalls !== 0) {
+            obj.maxToolCalls = Math.round(message.maxToolCalls);
         }
         if (message.keepToolsAvailable !== false) {
             obj.keepToolsAvailable = message.keepToolsAvailable;
@@ -3257,6 +3127,15 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.disableThinking !== false) {
             obj.disableThinking = message.disableThinking;
         }
+        if (message.autoExecute !== undefined) {
+            obj.autoExecute = message.autoExecute;
+        }
+        if (message.replaceSystemPrompt !== false) {
+            obj.replaceSystemPrompt = message.replaceSystemPrompt;
+        }
+        if (message.requireJsonArguments !== false) {
+            obj.requireJsonArguments = message.requireJsonArguments;
+        }
         return obj;
     },
     create(base) {
@@ -3270,13 +3149,16 @@ exports.ToolCallingSessionCreateRequest = {
         message.topP = object.topP ?? 0;
         message.systemPrompt = object.systemPrompt ?? "";
         message.tools = object.tools?.map((e) => exports.ToolDefinition.fromPartial(e)) || [];
-        message.formatHint = object.formatHint ?? "";
-        message.maxIterations = object.maxIterations ?? 0;
+        message.format = object.format ?? 0;
+        message.maxToolCalls = object.maxToolCalls ?? 0;
         message.keepToolsAvailable = object.keepToolsAvailable ?? false;
         message.validateCalls = object.validateCalls ?? undefined;
         message.toolChoice = object.toolChoice ?? undefined;
         message.forcedToolName = object.forcedToolName ?? undefined;
         message.disableThinking = object.disableThinking ?? false;
+        message.autoExecute = object.autoExecute ?? undefined;
+        message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
+        message.requireJsonArguments = object.requireJsonArguments ?? false;
         return message;
     },
 };

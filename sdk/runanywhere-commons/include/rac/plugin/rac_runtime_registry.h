@@ -147,9 +147,7 @@ RAC_API rac_result_t rac_runtime_unload(rac_runtime_id_t id);
 #define RAC_STATIC_RUNTIME_REGISTER(name)                                                        \
     namespace rac_runtime_autoreg_##name {                                                       \
         struct Registrar {                                                                       \
-            Registrar() noexcept {                                                               \
-                (void)::rac_runtime_register(::rac_runtime_entry_##name());                      \
-            }                                                                                    \
+            Registrar() noexcept { (void)::rac_runtime_register(::rac_runtime_entry_##name()); } \
         };                                                                                       \
         RAC_STATIC_RUNTIME_USED_ATTR static Registrar g_registrar;                               \
     }                                                                                            \

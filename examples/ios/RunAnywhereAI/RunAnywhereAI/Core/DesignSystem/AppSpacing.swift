@@ -64,6 +64,7 @@ struct AppSpacing {
     static let cornerRadiusCard: CGFloat = 16
     static let cornerRadiusBubble: CGFloat = 18
     static let cornerRadiusModal: CGFloat = 20
+    static let cornerRadiusComposer: CGFloat = 24
 
     // Frame sizes (from existing usage)
     static let minFrameHeight: CGFloat = 150

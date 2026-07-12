@@ -29,13 +29,7 @@
 #ifdef RAC_HAVE_PROTOBUF
 #include "llm_service.pb.h"
 
-// Forward-declare the internal dispatcher (same symbol llm_component.cpp
-// links against). Matches rac_llm_stream.cpp's declaration.
-namespace rac::llm {
-void dispatch_llm_stream_event(rac_handle_t handle, const char* token, bool is_final, int kind,
-                               uint32_t token_id, float logprob, const char* finish_reason,
-                               const char* error_message);
-}
+#include "features/llm/rac_llm_stream_internal.h"
 #endif
 
 namespace {
@@ -98,20 +92,36 @@ int test_set_callback_returns_correct_status() {
 
 #ifdef RAC_HAVE_PROTOBUF
 
+rac::llm::LLMStreamEventParams token_event(const char* token, int kind = 1, uint32_t token_id = 0,
+                                           float logprob = 0.0f) {
+    rac::llm::LLMStreamEventParams event;
+    event.token = token;
+    event.kind = kind;
+    event.token_id = token_id;
+    event.logprob = logprob;
+    return event;
+}
+
+rac::llm::LLMStreamEventParams terminal_event(const char* finish_reason, int kind = 1,
+                                              const char* error_message = nullptr) {
+    rac::llm::LLMStreamEventParams event;
+    event.is_final = true;
+    event.kind = kind;
+    event.finish_reason = finish_reason;
+    event.error_message = error_message;
+    return event;
+}
+
 int test_synthetic_token_schedule() {
     reset_capture();
     int sentinel = 7;
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, &sentinel);
 
     // Synthetic 3-token generation ending with a terminal stop event.
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "Hello",
-                                        /*is_final*/ false, /*kind*/ 1, 0, 0.0f, nullptr, nullptr);
-    rac::llm::dispatch_llm_stream_event(fake_handle(), " ",
-                                        /*is_final*/ false, /*kind*/ 1, 0, 0.0f, nullptr, nullptr);
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "world",
-                                        /*is_final*/ false, /*kind*/ 1, 0, 0.0f, nullptr, nullptr);
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "",
-                                        /*is_final*/ true, /*kind*/ 1, 0, 0.0f, "stop", nullptr);
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event("Hello"));
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event(" "));
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event("world"));
+    rac::llm::dispatch_llm_stream_event(fake_handle(), terminal_event("stop"));
 
     ASSERT_EQ(g_capture.call_count, 4U);
     ASSERT_TRUE(g_capture.user_data == &sentinel);
@@ -148,11 +158,9 @@ int test_error_termination() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
 
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "partial",
-                                        /*is_final*/ false, /*kind*/ 1, 0, 0.0f, nullptr, nullptr);
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "",
-                                        /*is_final*/ true, /*kind*/ 0, 0, 0.0f, "error",
-                                        "engine backend vanished");
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event("partial"));
+    rac::llm::dispatch_llm_stream_event(
+        fake_handle(), terminal_event("error", /*kind=*/0, "engine backend vanished"));
 
     ASSERT_EQ(g_capture.call_count, 2U);
 
@@ -171,14 +179,12 @@ int test_unregister_stops_dispatch() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
 
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "first", false, 1, 0, 0.0f, nullptr,
-                                        nullptr);
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event("first"));
     ASSERT_EQ(g_capture.call_count, 1U);
 
     rac_llm_unset_stream_proto_callback(fake_handle());
 
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "must-not-fire", false, 1, 0, 0.0f, nullptr,
-                                        nullptr);
+    rac::llm::dispatch_llm_stream_event(fake_handle(), token_event("must-not-fire"));
     ASSERT_EQ(g_capture.call_count, 1U);
     return 0;
 }
@@ -189,8 +195,7 @@ int test_finish_reason_length_on_max_tokens() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
 
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "",
-                                        /*is_final*/ true, /*kind*/ 1, 0, 0.0f, "length", nullptr);
+    rac::llm::dispatch_llm_stream_event(fake_handle(), terminal_event("length"));
 
     runanywhere::v1::LLMStreamEvent terminal;
     ASSERT_TRUE(terminal.ParseFromArray(g_capture.events.back().data(),
@@ -206,10 +211,8 @@ int test_optional_fields_round_trip() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
 
-    rac::llm::dispatch_llm_stream_event(fake_handle(), "think",
-                                        /*is_final*/ false, /*kind*/ 2,
-                                        /*token_id*/ 12345,
-                                        /*logprob*/ -0.5f, nullptr, nullptr);
+    rac::llm::dispatch_llm_stream_event(
+        fake_handle(), token_event("think", /*kind=*/2, /*token_id=*/12345, /*logprob=*/-0.5f));
 
     runanywhere::v1::LLMStreamEvent decoded;
     ASSERT_TRUE(decoded.ParseFromArray(g_capture.events.back().data(),

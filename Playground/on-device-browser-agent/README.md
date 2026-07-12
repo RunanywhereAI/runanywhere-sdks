@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/898cc5c2-db77-4067-96e6-233c5da2bae5
 ### Prerequisites
 
 - **Chrome 124+** (required for WebGPU in service workers)
-- **Node.js 18+** and npm
+- **Node.js 22.12+** and npm
 - **GPU with WebGPU support** (most modern GPUs work)
 
 ### Installation

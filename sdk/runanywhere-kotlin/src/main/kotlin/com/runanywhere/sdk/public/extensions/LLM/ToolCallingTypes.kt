@@ -23,7 +23,6 @@
 package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.ToolValueJSON
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -73,21 +72,18 @@ internal data class RegisteredTool(
 
 // RAToolCallingOptions.defaults() — Swift parity
 
-internal const val DEFAULT_TOOL_CALL_MAX_ITERATIONS = 5
+internal const val DEFAULT_MAX_TOOL_CALLS = 5
 
 /**
  * Default tool-calling options mirroring Swift's
  * `RAToolCallingOptions.defaults()`:
- * `maxIterations=5, maxToolCalls=5, autoExecute=true, format=.json,
- * formatHint="default"`.
+ * `maxToolCalls=5, autoExecute=true, format=.json`.
  */
 fun ai.runanywhere.proto.v1.ToolCallingOptions.Companion.defaults(): RAToolCallingOptions =
     RAToolCallingOptions(
-        max_iterations = DEFAULT_TOOL_CALL_MAX_ITERATIONS,
-        max_tool_calls = DEFAULT_TOOL_CALL_MAX_ITERATIONS,
+        max_tool_calls = DEFAULT_MAX_TOOL_CALLS,
         auto_execute = true,
         format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-        format_hint = "default",
     )
 
 // LLMGenerationOptions -> ToolCallingOptions normalization
@@ -97,10 +93,9 @@ internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions {
     val providedToolOptions = generationOptions?.tool_calling
     val base = providedToolOptions ?: ToolCallingOptions()
     return base.copy(
-        max_iterations =
-            base.max_iterations.takeIf { it > 0 }
-                ?: base.max_tool_calls?.takeIf { it > 0 }
-                ?: if (providedToolOptions == null) DEFAULT_TOOL_CALL_MAX_ITERATIONS else 0,
+        max_tool_calls =
+            base.max_tool_calls?.takeIf { it > 0 }
+                ?: if (providedToolOptions == null) DEFAULT_MAX_TOOL_CALLS else null,
         auto_execute = if (providedToolOptions == null) true else base.auto_execute,
         temperature =
             base.temperature
@@ -109,66 +104,11 @@ internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions {
             base.max_tokens
                 ?: generationOptions?.max_tokens?.takeIf { it > 0 },
         system_prompt = base.system_prompt ?: generationOptions?.system_prompt,
-        format_hint = base.effectiveToolFormatHint(),
     )
 }
 
-internal fun ToolCallingOptions.effectiveMaxIterations(): Int =
-    max_iterations.takeIf { it > 0 }
-        ?: max_tool_calls?.takeIf { it > 0 }
-        ?: DEFAULT_TOOL_CALL_MAX_ITERATIONS
-
-internal fun ToolCallingOptions.effectiveToolFormatHint(): String =
-    format_hint.ifBlank { format.toToolFormatHint() }.ifBlank { "default" }
-
-/**
- * Lossy conversion from a tool-calling result back into the canonical LLM
- * generation result. Preserved so callers that still want the LLM-shaped
- * payload (text + tool_calls + tool_results) can opt in explicitly; the
- * public `generateWithTools` API now returns `RAToolCallingResult` directly
- * (Swift parity).
- */
-internal fun ToolCallingResult.toLLMGenerationResult(modelUsed: String = ""): LLMGenerationResult =
-    LLMGenerationResult(
-        text = text,
-        model_used = modelUsed,
-        finish_reason =
-            when {
-                error_message != null || error_code != 0 -> "error"
-                is_complete -> "stop"
-                else -> "tool_calls"
-            },
-        error_message = error_message,
-        error_code = error_code,
-        tool_calls = tool_calls,
-        tool_results = tool_results,
-    )
-
-/**
- * Map the generated [ToolCallFormatName] proto enum to its canonical runtime
- * hint string.
- *
- * This mirrors commons' single source of truth
- * `rac_tool_call_format_hint_from_format_name` (sdk/runanywhere-commons/
- * src/features/llm/tool_calling.cpp) exactly: PYTHONIC/HERMES -> "lfm2",
- * everything else -> "default". The previous table emitted "pythonic" /
- * "hermes" / "xml" / "native" / "openai", which the commons accept-list
- * (rac_tool_call_format_from_name) does not recognize and silently downgrades —
- * a per-SDK divergence from iOS. Returns only values commons accepts so the
- * Kotlin and Swift SDKs resolve identical format routes.
- */
-private fun ToolCallFormatName?.toToolFormatHint(): String =
-    when (this) {
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC,
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES,
-        -> "lfm2"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML,
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE,
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS,
-        -> "default"
-        else -> ""
-    }
+internal fun ToolCallingOptions.effectiveMaxToolCalls(): Int =
+    max_tool_calls?.takeIf { it > 0 } ?: DEFAULT_MAX_TOOL_CALLS
 
 // RAToolValue ergonomic helpers (mirror Swift `RAToolValue` extension)
 

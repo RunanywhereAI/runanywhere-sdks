@@ -73,7 +73,9 @@ class RunAnywhereStructuredOutput {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final generation = await generateWithStructuredOutput(
       prompt: prompt,
-      structuredOutput: StructuredOutputOptionsDefaults.defaults(schema: schema),
+      structuredOutput: StructuredOutputOptionsDefaults.defaults(
+        schema: schema,
+      ),
       options: options,
     );
     return RunAnywhereLLM.shared.extractStructuredOutput(
@@ -312,25 +314,25 @@ extension JSONSchemaStringHelpers on JSONSchema {
   ///
   /// Delegates to `rac_structured_output_schema_to_json_proto` so
   /// every SDK shares the same byte-exact, key-sorted, compact serializer —
-  /// mirroring Swift `RAJSONSchema.jsonSchemaString`. Falls back to the
-  /// `raw_json` field (or `'{}'`) when the commons binary predates that ABI.
+  /// mirroring Swift `RAJSONSchema.jsonSchemaString`.
   String get jsonSchemaString {
     final fn = RacNative.bindings.rac_structured_output_schema_to_json_proto;
-    if (fn == null) {
-      return rawJson.isNotEmpty ? rawJson : '{}';
-    }
     final bytes = writeToBuffer();
-    if (bytes.isEmpty) return '{}';
     final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
     final out = calloc<RacProtoBuffer>();
     try {
       RacNative.bindings.rac_proto_buffer_init(out);
       final code = fn(requestPtr, bytes.length, out);
       if (code != 0 || out.ref.status != 0) {
-        return rawJson.isNotEmpty ? rawJson : '{}';
+        throw SDKException.processingFailed(
+          'rac_structured_output_schema_to_json_proto failed '
+          '(code=$code status=${out.ref.status})',
+        );
       }
       if (out.ref.data == ffi.nullptr || out.ref.size == 0) {
-        return rawJson.isNotEmpty ? rawJson : '{}';
+        throw SDKException.processingFailed(
+          'rac_structured_output_schema_to_json_proto returned empty output',
+        );
       }
       return String.fromCharCodes(out.ref.data.asTypedList(out.ref.size));
     } finally {

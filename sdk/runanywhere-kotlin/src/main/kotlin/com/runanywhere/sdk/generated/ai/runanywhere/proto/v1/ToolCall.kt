@@ -83,29 +83,19 @@ public class ToolCall(
     schemaIndex = 3,
   )
   public val type: String = "",
-  /**
-   * Alias for id used by pre-proto SDK surfaces.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "callId",
-    schemaIndex = 4,
-  )
-  public val call_id: String? = null,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "createdAtMs",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val created_at_ms: Long = 0L,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "rawText",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val raw_text: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -124,7 +114,6 @@ public class ToolCall(
     if (name != other.name) return false
     if (arguments_json != other.arguments_json) return false
     if (type != other.type) return false
-    if (call_id != other.call_id) return false
     if (created_at_ms != other.created_at_ms) return false
     if (raw_text != other.raw_text) return false
     return true
@@ -138,7 +127,6 @@ public class ToolCall(
       result = result * 37 + name.hashCode()
       result = result * 37 + arguments_json.hashCode()
       result = result * 37 + type.hashCode()
-      result = result * 37 + (call_id?.hashCode() ?: 0)
       result = result * 37 + created_at_ms.hashCode()
       result = result * 37 + (raw_text?.hashCode() ?: 0)
       super.hashCode = result
@@ -152,7 +140,6 @@ public class ToolCall(
     result += """name=${sanitize(name)}"""
     result += """arguments_json=${sanitize(arguments_json)}"""
     result += """type=${sanitize(type)}"""
-    if (call_id != null) result += """call_id=${sanitize(call_id)}"""
     result += """created_at_ms=$created_at_ms"""
     if (raw_text != null) result += """raw_text=${sanitize(raw_text)}"""
     return result.joinToString(prefix = "ToolCall{", separator = ", ", postfix = "}")
@@ -163,11 +150,10 @@ public class ToolCall(
     name: String = this.name,
     arguments_json: String = this.arguments_json,
     type: String = this.type,
-    call_id: String? = this.call_id,
     created_at_ms: Long = this.created_at_ms,
     raw_text: String? = this.raw_text,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCall = ToolCall(id, name, arguments_json, type, call_id, created_at_ms, raw_text, unknownFields)
+  ): ToolCall = ToolCall(id, name, arguments_json, type, created_at_ms, raw_text, unknownFields)
 
   public companion object {
     @JvmField
@@ -193,7 +179,6 @@ public class ToolCall(
         if (value.type != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.type)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.call_id)
         if (value.created_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.created_at_ms)
         }
@@ -214,7 +199,6 @@ public class ToolCall(
         if (value.type != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
         if (value.created_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.created_at_ms)
         }
@@ -228,7 +212,6 @@ public class ToolCall(
         if (value.created_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.created_at_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
         if (value.type != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
         }
@@ -248,7 +231,6 @@ public class ToolCall(
         var name: String = ""
         var arguments_json: String = ""
         var type: String = ""
-        var call_id: String? = null
         var created_at_ms: Long = 0L
         var raw_text: String? = null
         val unknownFields = reader.forEachTag { tag ->
@@ -257,7 +239,6 @@ public class ToolCall(
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> arguments_json = ProtoAdapter.STRING.decode(reader)
             4 -> type = ProtoAdapter.STRING.decode(reader)
-            6 -> call_id = ProtoAdapter.STRING.decode(reader)
             7 -> created_at_ms = ProtoAdapter.INT64.decode(reader)
             8 -> raw_text = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -268,7 +249,6 @@ public class ToolCall(
           name = name,
           arguments_json = arguments_json,
           type = type,
-          call_id = call_id,
           created_at_ms = created_at_ms,
           raw_text = raw_text,
           unknownFields = unknownFields

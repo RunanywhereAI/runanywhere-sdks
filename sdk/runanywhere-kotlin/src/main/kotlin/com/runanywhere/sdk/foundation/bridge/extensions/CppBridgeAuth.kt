@@ -3,11 +3,10 @@
  *
  * This file was previously a ~150 LOC HTTP-transport adapter built on
  * HttpURLConnection that forwarded request/response bodies to the
- * matching rac_auth_* C ABI. The HTTP transport now lives in the
- * commons libcurl-backed `rac_http_client_*` ABI (exposed via
- * [RunAnywhereBridge.racHttpRequestExecute]). Kotlin now owns zero
- * network plumbing for auth — the whole round-trip (request build →
- * POST → response parse → state update) happens in native code.
+ * matching rac_auth_* C ABI. HTTP now flows through the registered OkHttp
+ * transport behind commons' `rac_http_client_*` ABI. Kotlin owns no separate
+ * auth transport — the whole round-trip (request build → POST → response
+ * parse → state update) happens in native code.
  *
  * SDKs still initialize secure storage and expose auth state accessors here;
  * network sequencing lives in commons via CppBridgeSdkInit.
@@ -15,6 +14,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -32,9 +32,9 @@ object CppBridgeAuth {
      * by the platform adapter's secureGet/secureSet/secureDelete callbacks.
      *
      * Must be called AFTER [CppBridgePlatformAdapter.register] has wired up
-     * the secure-storage delegate, otherwise rac_auth_save_tokens /
-     * rac_auth_clear fall back to in-memory-only and tokens are lost across
-     * process restarts. Idempotent.
+     * the secure-storage delegate. Missing or unreadable durable storage is an
+     * initialization error; only a clean first-launch key miss is accepted.
+     * Idempotent within one SDK lifetime.
      *
      * Called from [com.runanywhere.sdk.public.RunAnywhere]'s `performCoreInit`
      * during Phase 1.
@@ -43,7 +43,13 @@ object CppBridgeAuth {
         if (initialized) return
         synchronized(this) {
             if (initialized) return
-            RunAnywhereBridge.racAuthInit()
+            val loadResult = RunAnywhereBridge.racAuthInit()
+            if (
+                loadResult != RunAnywhereBridge.RAC_SUCCESS &&
+                loadResult != RunAnywhereBridge.RAC_ERROR_FILE_NOT_FOUND
+            ) {
+                SDKException.throwIfError(loadResult)
+            }
             com.runanywhere.sdk.infrastructure.logging
                 .SDKLogger(TAG)
                 .info("Native auth manager initialized with secure storage vtable")
@@ -65,6 +71,18 @@ object CppBridgeAuth {
      * secure-storage vtable, also deletes the persisted tokens.
      */
     fun clearAuth() {
-        RunAnywhereBridge.racAuthReset()
+        val result = RunAnywhereBridge.racAuthClear()
+        SDKException.throwIfError(result)
+    }
+
+    /**
+     * End the Kotlin facade's current auth lifetime without deleting durable
+     * state. The next [initialize] call reinstalls the native storage vtable
+     * and reloads the persisted snapshot after `rac_auth_reset` clears memory.
+     */
+    internal fun resetInitializationState() {
+        synchronized(this) {
+            initialized = false
+        }
     }
 }

@@ -7,12 +7,13 @@ Pod::Spec.new do |s|
   s.module_name  = "RunAnywhereCore"
   s.version      = package["version"]
   s.summary      = package["description"]
-  s.homepage     = "https://runanywhere.com"
-  s.license      = package["license"]
+  s.homepage     = "https://runanywhere.ai"
+  s.license      = { type: "RunAnywhere License", file: "LICENSE" }
   s.authors      = "RunAnywhere AI"
 
-  s.platforms    = { :ios => "17.0" }
-  s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
+  s.platforms    = { :ios => "17.5" }
+  s.swift_version = "6.2"
+  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
 
   # =============================================================================
   # Core SDK - RACommons xcframework is bundled in npm package
@@ -48,6 +49,11 @@ Pod::Spec.new do |s|
   s.preserve_paths = [
     "ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
   ]
+  # Keep one privacy declaration at the SDK boundary. This file is an exact
+  # copy of the canonical Swift SDK manifest and is validated during npm pack.
+  s.resource_bundles = {
+    "RunAnywhereCorePrivacy" => ["ios/PrivacyInfo.xcprivacy"],
+  }
 
   # The .inc.mm is an include-only implementation fragment: it is guarded by an
   # `#error` unless the wrapper (ios/URLSessionHttpTransport.mm) defines

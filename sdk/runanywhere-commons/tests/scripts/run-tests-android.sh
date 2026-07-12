@@ -111,7 +111,7 @@ while [[ "$#" -gt 0 ]]; do
             shift
             ;;
         --onnx)
-            TEST_FILTER="test_vad test_stt test_tts test_wakeword"
+            TEST_FILTER="test_vad test_stt test_tts"
             shift
             ;;
         --llm)
@@ -132,7 +132,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --device-models D  Use models already at path D on device"
             echo "  --serial SERIAL    Use specific device (adb -s)"
             echo "  --core             Run core tests only"
-            echo "  --onnx             Run ONNX backend tests (VAD, STT, TTS, WakeWord)"
+            echo "  --onnx             Run ONNX/Sherpa tests (VAD, STT, TTS)"
             echo "  --llm              Run LLM tests only"
             echo "  --agent            Run voice agent tests only"
             echo "  --help             Show this help"
@@ -233,7 +233,7 @@ print_ok "Cross-compilation complete"
 # Report which test binaries compiled
 echo ""
 echo "Test binaries:"
-for binary in test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent; do
+for binary in test_core test_vad test_stt test_tts test_llm test_voice_agent; do
     if [ -f "${TEST_BIN_DIR}/${binary}" ]; then
         echo -e "  ${GREEN}[OK]${NC} ${binary}"
     else
@@ -276,7 +276,7 @@ ${ADB_CMD} shell "rm -rf ${DEVICE_TEST_DIR} && mkdir -p ${DEVICE_TEST_DIR}/bin $
 
 # Push test binaries
 print_step "Pushing test binaries..."
-for binary in test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent; do
+for binary in test_core test_vad test_stt test_tts test_llm test_voice_agent; do
     if [ -f "${TEST_BIN_DIR}/${binary}" ]; then
         ${ADB_CMD} push "${TEST_BIN_DIR}/${binary}" "${DEVICE_TEST_DIR}/bin/" > /dev/null
         ${ADB_CMD} shell "chmod +x ${DEVICE_TEST_DIR}/bin/${binary}"
@@ -353,7 +353,7 @@ FAILED=0
 SKIPPED=0
 FAILED_NAMES=""
 
-ALL_TESTS="test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent"
+ALL_TESTS="test_core test_vad test_stt test_tts test_llm test_voice_agent"
 if [ -n "${TEST_FILTER}" ]; then
     ALL_TESTS="${TEST_FILTER}"
 fi

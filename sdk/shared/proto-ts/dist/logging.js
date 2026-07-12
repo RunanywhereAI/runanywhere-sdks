@@ -81,7 +81,6 @@ function createBaseLoggingConfiguration() {
         includeSourceLocation: false,
         includeDeviceMetadata: false,
         enableRemoteLogging: false,
-        enableSentryLogging: false,
     };
 }
 exports.LoggingConfiguration = {
@@ -100,9 +99,6 @@ exports.LoggingConfiguration = {
         }
         if (message.enableRemoteLogging !== false) {
             writer.uint32(40).bool(message.enableRemoteLogging);
-        }
-        if (message.enableSentryLogging !== false) {
-            writer.uint32(48).bool(message.enableSentryLogging);
         }
         return writer;
     },
@@ -148,13 +144,6 @@ exports.LoggingConfiguration = {
                     message.enableRemoteLogging = reader.bool();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.enableSentryLogging = reader.bool();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -190,11 +179,6 @@ exports.LoggingConfiguration = {
                 : isSet(object.enable_remote_logging)
                     ? globalThis.Boolean(object.enable_remote_logging)
                     : false,
-            enableSentryLogging: isSet(object.enableSentryLogging)
-                ? globalThis.Boolean(object.enableSentryLogging)
-                : isSet(object.enable_sentry_logging)
-                    ? globalThis.Boolean(object.enable_sentry_logging)
-                    : false,
         };
     },
     toJSON(message) {
@@ -214,9 +198,6 @@ exports.LoggingConfiguration = {
         if (message.enableRemoteLogging !== false) {
             obj.enableRemoteLogging = message.enableRemoteLogging;
         }
-        if (message.enableSentryLogging !== false) {
-            obj.enableSentryLogging = message.enableSentryLogging;
-        }
         return obj;
     },
     create(base) {
@@ -229,7 +210,6 @@ exports.LoggingConfiguration = {
         message.includeSourceLocation = object.includeSourceLocation ?? false;
         message.includeDeviceMetadata = object.includeDeviceMetadata ?? false;
         message.enableRemoteLogging = object.enableRemoteLogging ?? false;
-        message.enableSentryLogging = object.enableSentryLogging ?? false;
         return message;
     },
 };

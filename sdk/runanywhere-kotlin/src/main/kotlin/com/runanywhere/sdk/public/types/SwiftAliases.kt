@@ -51,6 +51,13 @@ public typealias RAVLMGenerationOptions = ai.runanywhere.proto.v1.VLMGenerationO
 public typealias RAVLMStreamEvent = ai.runanywhere.proto.v1.VLMStreamEvent
 public typealias RAVLMStreamEventKind = ai.runanywhere.proto.v1.VLMStreamEventKind
 
+// ─── Diffusion / Inpainting ─────────────────────────────────────────────────
+
+public typealias RADiffusionGenerationOptions = ai.runanywhere.proto.v1.DiffusionGenerationOptions
+public typealias RADiffusionGenerationRequest = ai.runanywhere.proto.v1.DiffusionGenerationRequest
+public typealias RADiffusionResult = ai.runanywhere.proto.v1.DiffusionResult
+public typealias RADiffusionMode = ai.runanywhere.proto.v1.DiffusionMode
+
 // ─── RAG ────────────────────────────────────────────────────────────────────
 
 public typealias RARAGConfiguration = ai.runanywhere.proto.v1.RAGConfiguration

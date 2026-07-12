@@ -11,14 +11,13 @@
  * - ONNX Runtime (cross-platform) - via ONNX backend
  *
  * Classification: pure include aggregator. See classification headers
- * on rac_diffusion_types.h, rac_diffusion_component.h,
- * rac_diffusion_service.h, and rac_diffusion_tokenizer.h.
+ * on rac_diffusion_types.h, rac_diffusion_service.h, and
+ * rac_diffusion_tokenizer.h.
  */
 
 #ifndef RAC_DIFFUSION_H
 #define RAC_DIFFUSION_H
 
-#include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"

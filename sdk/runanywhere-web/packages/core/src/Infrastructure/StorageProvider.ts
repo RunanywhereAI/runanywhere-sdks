@@ -5,7 +5,8 @@
  * On the Web platform we ship three concrete providers:
  *   - `fsAccess`   — File System Access API (user picked a directory)
  *   - `opfs`       — Origin Private File System (default persistent fallback)
- *   - `memory`     — Volatile MEMFS (no persistence)
+ *   - `memory`     — No persistent model storage; downloads are unavailable
+ *                    because independent backend WASMs cannot share MEMFS
  *
  * Mirrors the storage-backend contract so that other platforms (Swift / Kotlin /
  * Flutter / RN) can implement their analogue under a shared API name. Today

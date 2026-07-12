@@ -206,11 +206,11 @@ rac_result_t validate_v2_extension(const rac_runtime_vtable_t* v) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     const auto* v2 = reinterpret_cast<const rac_runtime_vtable_v2_t*>(v->reserved_slot_0);
-    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION_V2) {
+    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION) {
         RAC_LOG_ERROR(LOG_CAT,
                       "rac_runtime_register: '%s' v2 extension ABI mismatch "
                       "(plugin=%u host=%u)",
-                      v->metadata.name, v2->abi_version, RAC_RUNTIME_ABI_VERSION_V2);
+                      v->metadata.name, v2->abi_version, RAC_RUNTIME_ABI_VERSION);
         return RAC_ERROR_ABI_VERSION_MISMATCH;
     }
     if (v2->struct_size < RAC_RUNTIME_VTABLE_V2_MIN_SIZE) {
@@ -252,6 +252,7 @@ void insert_locked(State& s, Entry e) {
     s.entries.insert(pos, e);
 }
 
+#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
 bool attach_handle_locked(State& s, rac_runtime_id_t id, void* handle) {
     for (Entry& e : s.entries) {
         if (e.id == id) {
@@ -282,6 +283,7 @@ std::string entry_symbol_from_path(const char* path) {
     }
     return std::string("rac_runtime_entry_") + s;
 }
+#endif
 
 }  // namespace
 
@@ -303,11 +305,8 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     if (!abi_version_supported(vtable->metadata.abi_version)) {
-        RAC_LOG_ERROR(LOG_CAT,
-                      "rac_runtime_register: '%s' ABI mismatch (plugin=%u "
-                      "host_min=%u host_max=%u)",
-                      vtable->metadata.name, vtable->metadata.abi_version,
-                      RAC_RUNTIME_ABI_VERSION_MIN, RAC_RUNTIME_ABI_VERSION);
+        RAC_LOG_ERROR(LOG_CAT, "rac_runtime_register: '%s' ABI mismatch (plugin=%u host=%u)",
+                      vtable->metadata.name, vtable->metadata.abi_version, RAC_RUNTIME_ABI_VERSION);
         return RAC_ERROR_ABI_VERSION_MISMATCH;
     }
     rac_result_t rc = validate_v2_extension(vtable);

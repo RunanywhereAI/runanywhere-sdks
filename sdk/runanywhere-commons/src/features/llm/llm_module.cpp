@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -34,8 +35,8 @@
 #include <vector>
 
 #include "features/common/rac_component_lifecycle_internal.h"
-#include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/llm_thinking_tags_internal.h"
+#include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
 // registry-backed path (rac_llm_stream.cpp). The component section invokes
 // `rac::llm::dispatch_llm_stream_event()` once per token and once on terminal
@@ -44,6 +45,7 @@
 // `rac::llm::serialize_llm_stream_event()` directly.
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
+#include "features/llm/structured_output_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_logger.h"
@@ -689,12 +691,12 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     RAC_LOG_INFO("LLM.Component", "Generation completed");
 
     // Emit generation completed event
-    // Use estimated input_tokens for telemetry consistency across platforms
-    // (some backends return actual tokenized count including chat template,
-    // others return 0 - estimation ensures consistent user-facing metrics)
+    // Report the backend's real token counts — out_result falls back to a
+    // chars/4 estimate only when the backend returned 0; an estimate must
+    // never override a real count.
 #if defined(RAC_HAVE_PROTOBUF)
     emit_llm_generation_completed(
-        generation_id.c_str(), model_id, model_name, estimate_tokens(prompt),
+        generation_id.c_str(), model_id, model_name, out_result->prompt_tokens,
         out_result->completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/false, /*time_to_first_token_ms=*/0, component->actual_framework,
         effective_options->temperature, effective_options->max_tokens, context_length);
@@ -824,13 +826,10 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
     // sentinel chunks are suppressed entirely so subscribers don't have
     // to filter empty events themselves.
     if (!cleaned_empty) {
-        rac::llm::dispatch_llm_stream_event(ctx->component_handle, cleaned,
-                                            /*is_final*/ false,
-                                            /*kind*/ 1 /* ANSWER */,
-                                            /*token_id*/ 0,
-                                            /*logprob*/ 0.0f,
-                                            /*finish_reason*/ nullptr,
-                                            /*error_message*/ nullptr);
+        rac::llm::LLMStreamEventParams event;
+        event.token = cleaned;
+        event.kind = 1;  // ANSWER
+        rac::llm::dispatch_llm_stream_event(ctx->component_handle, event);
     }
 
     // Forward only non-empty cleaned tokens to the user callback so the
@@ -873,9 +872,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         emit_llm_generation_failed(generation_id.c_str(), model_id, model_name, "No model loaded");
 #endif
 
-        rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, 0, 0, 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "No model loaded");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "No model loaded";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(result, "No model loaded", user_data);
@@ -895,9 +896,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                                    "Streaming not supported");
 #endif
 
-        rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, 0, 0, 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "Streaming not supported");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "Streaming not supported";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
@@ -956,14 +959,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 #endif
 
         // Terminal error event on the proto stream.
-        rac::llm::dispatch_llm_stream_event(handle,
-                                            /*token*/ "",
-                                            /*is_final*/ true,
-                                            /*kind*/ 0 /* UNSPECIFIED */,
-                                            /*token_id*/ 0,
-                                            /*logprob*/ 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "Streaming generation failed");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "Streaming generation failed";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(result, "Streaming generation failed", user_data);
@@ -1002,11 +1002,15 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         ttft_ms = static_cast<double>(ttft_duration.count());
     }
 
-    // Calculate tokens per second
+    // Tokens/sec over decode time only — including prefill (TTFT) in the
+    // denominator systematically understates generation speed.
     double tokens_per_second = 0.0;
-    if (final_result.total_time_ms > 0) {
-        tokens_per_second = static_cast<double>(final_result.completion_tokens) /
-                            (static_cast<double>(final_result.total_time_ms) / 1000.0);
+    const double decode_ms = (ttft_ms > 0.0 && ttft_ms < static_cast<double>(total_time_ms))
+                                 ? static_cast<double>(total_time_ms) - ttft_ms
+                                 : static_cast<double>(total_time_ms);
+    if (decode_ms > 0.0) {
+        tokens_per_second =
+            static_cast<double>(final_result.completion_tokens) / (decode_ms / 1000.0);
         final_result.tokens_per_second = static_cast<float>(tokens_per_second);
     }
 
@@ -1033,14 +1037,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                ctx.token_count >= effective_options->max_tokens) {
         finish_reason_str = "length";
     }
-    rac::llm::dispatch_llm_stream_event(handle,
-                                        /*token*/ "",
-                                        /*is_final*/ true,
-                                        /*kind*/ 1 /* ANSWER */,
-                                        /*token_id*/ 0,
-                                        /*logprob*/ 0.0f,
-                                        /*finish_reason*/ finish_reason_str,
-                                        /*error_message*/ nullptr);
+    rac::llm::LLMStreamEventParams terminal_event;
+    terminal_event.is_final = true;
+    terminal_event.kind = 1;  // ANSWER
+    terminal_event.finish_reason = finish_reason_str;
+    rac::llm::dispatch_llm_stream_event(handle, terminal_event);
 
     // Free the duplicated text
     free(final_result.text);
@@ -1296,10 +1297,10 @@ rac_result_t publish_sdk_event(const SDKEvent& event) {
 void publish_generation_event(GenerationEventKind kind, const char* prompt, const char* token,
                               const char* response, const char* error, const char* model_id,
                               int32_t token_count, int64_t latency_ms, int32_t input_tokens = 0,
-                              const char* framework_name = nullptr,
-                              double tokens_per_second = 0.0, double ttft_ms = 0.0,
-                              float temperature = -1.0f, int32_t max_tokens = 0,
-                              int32_t context_length = 0, bool is_streaming = false) {
+                              const char* framework_name = nullptr, double tokens_per_second = 0.0,
+                              double ttft_ms = 0.0, float temperature = -1.0f,
+                              int32_t max_tokens = 0, int32_t context_length = 0,
+                              bool is_streaming = false) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -1391,20 +1392,18 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
-// Pick the canonical system_prompt from the embedded
-// LLMGenerationOptions when set, falling back to the legacy inline field.
+// Pick the system prompt from the sole generation-settings envelope.
 std::string system_prompt_from_request(const LLMGenerateRequest& request) {
     if (request.has_options() && request.options().has_system_prompt() &&
         !request.options().system_prompt().empty()) {
         return request.options().system_prompt();
     }
-    return request.system_prompt();
+    return {};
 }
 
 void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
                                          const rac::llm::LifecycleLlmRef& ref,
-                                         std::string* out_open_tag,
-                                         std::string* out_close_tag) {
+                                         std::string* out_open_tag, std::string* out_close_tag) {
     if (out_open_tag) {
         out_open_tag->clear();
     }
@@ -1432,46 +1431,35 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
 // into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
 // copies stopSequences into the canonical proto request.
 //
-// Prefer values from the canonical `request.options()` embedded
-// LLMGenerationOptions message when set; otherwise use direct request fields.
-rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
-                                       const std::string& system_prompt,
-                                       std::vector<std::string>& stop_storage,
-                                       std::vector<const char*>& stop_ptrs,
-                                       std::string& grammar_storage,
-                                       std::vector<std::string>& history_storage,
-                                       std::vector<const char*>& history_ptrs) {
+// `request.options()` is the sole generation-settings contract. When absent,
+// retain RAC_LLM_OPTIONS_DEFAULT values.
+rac_llm_options_t
+options_from_request(const LLMGenerateRequest& request, const std::string& system_prompt,
+                     std::vector<std::string>& stop_storage, std::vector<const char*>& stop_ptrs,
+                     std::string& grammar_storage, std::vector<std::string>& history_storage,
+                     std::vector<const char*>& history_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
     const auto& opts = request.options();
 
     // max_tokens proto3 zero means "unset → engine default" (idl/llm_options.proto:45-47).
-    const int max_tokens =
-        (has_options && opts.max_tokens() > 0) ? opts.max_tokens() : request.max_tokens();
-    if (max_tokens > 0) {
-        options.max_tokens = max_tokens;
+    if (has_options && opts.max_tokens() > 0) {
+        options.max_tokens = opts.max_tokens();
     }
 
     // temperature: when the canonical LLMGenerationOptions is set, pass its value through
     // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
-    // (idl/llm_options.proto:49). Mirrors RALLMTypes+CppBridge.swift:53. The legacy inline
-    // scalar still uses `> 0.0f` so an unmigrated caller that left the field zero gets the
-    // engine default (0.8) instead of accidental greedy decoding.
+    // (idl/llm_options.proto:49).
     if (has_options) {
         options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
-    } else if (request.temperature() > 0.0f) {
-        options.temperature = std::clamp(request.temperature(), 0.0f, 2.0f);
     }
 
     // top_p: proto3 zero is the unset sentinel, 1.0 means no truncation
-    // (idl/llm_options.proto:53). Gate both canonical and legacy fields so a
-    // canonical-only knob (for example disable_thinking) does not accidentally
-    // override the engine default with top_p=0.
+    // (idl/llm_options.proto:53). Gate the canonical field so an options
+    // envelope carrying only another knob does not override top_p with zero.
     if (has_options && opts.top_p() > 0.0f) {
         options.top_p = opts.top_p();
-    } else if (request.top_p() > 0.0f) {
-        options.top_p = request.top_p();
     }
 
     // Thread the remaining sampling knobs the proto exposes
@@ -1481,23 +1469,23 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     // struct default. repetition_penalty uses 1.0 = "no penalty"; proto3 zero
     // means unset, so only override when positive (mirrors Swift's
     // RALLMTypes+CppBridge defaults, which carry repetitionPenalty=1.0).
-    // Prefer the canonical embedded options; fall back to the legacy inline
-    // scalars for callers that have not migrated to `request.options()`.
-    options.top_k = has_options ? opts.top_k() : request.top_k();
-    const float repetition_penalty =
-        has_options ? opts.repetition_penalty() : request.repetition_penalty();
+    options.top_k = has_options ? opts.top_k() : 0;
+    const float repetition_penalty = has_options ? opts.repetition_penalty() : 0.0f;
     if (repetition_penalty > 0.0f) {
         options.repetition_penalty = repetition_penalty;
     }
-    options.frequency_penalty =
-        has_options ? opts.frequency_penalty() : request.frequency_penalty();
-    options.presence_penalty = has_options ? opts.presence_penalty() : request.presence_penalty();
-    options.min_p = has_options ? opts.min_p() : request.min_p();
-    options.seed = has_options ? opts.seed() : request.seed();
-    options.n_threads = has_options ? opts.n_threads() : request.n_threads();
+    options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
+    options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
+    options.min_p = has_options ? opts.min_p() : 0.0f;
+    options.seed = has_options ? opts.seed() : 0;
+    options.n_threads = has_options ? opts.n_threads() : 0;
     options.disable_thinking = (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
 
-    grammar_storage = has_options ? opts.grammar() : request.grammar();
+    grammar_storage = has_options ? opts.grammar() : std::string{};
+    if (grammar_storage.empty() && has_options && opts.has_structured_output() &&
+        opts.structured_output().has_grammar()) {
+        grammar_storage = opts.structured_output().grammar();
+    }
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
@@ -1505,13 +1493,10 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     stop_storage.clear();
     stop_ptrs.clear();
 
-    const auto& canonical_stop_sequences = (has_options && opts.stop_sequences_size() > 0)
-                                               ? opts.stop_sequences()
-                                               : request.stop_sequences();
-    const int stop_count = canonical_stop_sequences.size();
+    const int stop_count = has_options ? opts.stop_sequences_size() : 0;
     if (stop_count > 0) {
         stop_storage.reserve(static_cast<size_t>(stop_count));
-        for (const auto& seq : canonical_stop_sequences) {
+        for (const auto& seq : opts.stop_sequences()) {
             if (!seq.empty()) {
                 stop_storage.push_back(seq);
             }
@@ -1535,8 +1520,7 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     const int history_count = request.history_size();
     if (history_count > 0) {
         history_storage.reserve(static_cast<size_t>(history_count));
-        runanywhere::v1::MessageRole last_role =
-            runanywhere::v1::MESSAGE_ROLE_UNSPECIFIED;
+        runanywhere::v1::MessageRole last_role = runanywhere::v1::MESSAGE_ROLE_UNSPECIFIED;
         for (const auto& msg : request.history()) {
             const auto role = msg.role();
             if (role != runanywhere::v1::MESSAGE_ROLE_USER &&
@@ -1607,6 +1591,13 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
 
 void set_structured_output_if_present(const char* response, LLMGenerationResult* out) {
     if (!response || !out) {
+        return;
+    }
+    const auto* cursor = reinterpret_cast<const unsigned char*>(response);
+    while (*cursor != '\0' && std::isspace(*cursor)) {
+        ++cursor;
+    }
+    if (*cursor == '\0') {
         return;
     }
     rac_structured_output_validation_t validation{};
@@ -1693,8 +1684,7 @@ size_t matching_close_suffix_len(const std::string& text, const StreamThinkingTa
 
 const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
                                                      const StreamThinkingTagPair* pairs,
-                                                     size_t pair_count,
-                                                     size_t* out_open_pos) {
+                                                     size_t pair_count, size_t* out_open_pos) {
     size_t best = std::string::npos;
     const StreamThinkingTagPair* best_pair = nullptr;
     for (size_t i = 0; i < pair_count; ++i) {
@@ -1712,8 +1702,7 @@ const StreamThinkingTagPair* find_earliest_open_pair(const std::string& text,
 
 const StreamThinkingTagPair* find_earliest_close_pair(const std::string& text,
                                                       const StreamThinkingTagPair* pairs,
-                                                      size_t pair_count,
-                                                      size_t* out_close_pos) {
+                                                      size_t pair_count, size_t* out_close_pos) {
     size_t best = std::string::npos;
     const StreamThinkingTagPair* best_pair = nullptr;
     for (size_t i = 0; i < pair_count; ++i) {
@@ -1822,14 +1811,18 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
 
     if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT) {
         ctx->thinking_text += token;
-        if (!ctx->emit_thoughts) {
-            return;
-        }
     } else {
         ctx->response_text += token;
     }
 
+    // Completion accounting includes generated reasoning even when thought
+    // events are intentionally hidden from the consumer. Otherwise a stream
+    // that exhausts max_tokens inside <think> is misreported as a natural
+    // "stop" and its terminal result undercounts completion tokens.
     ctx->token_count += 1;
+    if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT && !ctx->emit_thoughts) {
+        return;
+    }
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
         ctx->first_token_ms = now_ms();
@@ -1858,10 +1851,9 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
     }};
     const StreamThinkingTagPair* tag_pairs =
         has_custom_tags ? custom_tag_pairs.data() : kDefaultStreamThinkingTags;
-    const size_t tag_pair_count =
-        has_custom_tags ? custom_tag_pairs.size()
-                        : sizeof(kDefaultStreamThinkingTags) /
-                              sizeof(kDefaultStreamThinkingTags[0]);
+    const size_t tag_pair_count = has_custom_tags ? custom_tag_pairs.size()
+                                                  : sizeof(kDefaultStreamThinkingTags) /
+                                                        sizeof(kDefaultStreamThinkingTags[0]);
 
     ctx->raw_text += token;
     ctx->pending_text += token;
@@ -1959,12 +1951,17 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_total_time_ms(total_time_ms);
+    int64_t ttft_ms = 0;
     if (ctx->first_token_ms > 0) {
-        final_result.set_time_to_first_token_ms(ctx->first_token_ms - ctx->started_ms);
+        ttft_ms = ctx->first_token_ms - ctx->started_ms;
+        final_result.set_time_to_first_token_ms(ttft_ms);
     }
-    if (total_time_ms > 0 && ctx->token_count > 0) {
+    // Tokens/sec over decode time only, not prefill-inclusive wall time.
+    const int64_t decode_ms =
+        (ttft_ms > 0 && ttft_ms < total_time_ms) ? total_time_ms - ttft_ms : total_time_ms;
+    if (decode_ms > 0 && ctx->token_count > 0) {
         final_result.set_tokens_per_second(static_cast<float>(
-            static_cast<double>(ctx->token_count) / (static_cast<double>(total_time_ms) / 1000.0)));
+            static_cast<double>(ctx->token_count) / (static_cast<double>(decode_ms) / 1000.0)));
     }
     final_result.set_finish_reason(
         (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");
@@ -2028,8 +2025,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
-                             0, ref.framework_name);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0, 0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -2037,9 +2034,9 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
-    rac_llm_options_t options = options_from_request(
-        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
-        history_ptrs);
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             history_storage, history_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -2072,8 +2069,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
     (void)rac_llm_extract_thinking_with_tags(
         raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
-        &response_len, &thinking, &thinking_len);
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response, &response_len,
+        &thinking, &thinking_len);
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
@@ -2139,8 +2136,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0, 0,
-                             0, ref.framework_name);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0, 0, ref.framework_name);
 
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
@@ -2148,9 +2145,9 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     std::string grammar_storage;
     std::vector<std::string> history_storage;
     std::vector<const char*> history_ptrs;
-    rac_llm_options_t options = options_from_request(
-        request, system_prompt, stop_storage, stop_ptrs, grammar_storage, history_storage,
-        history_ptrs);
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage,
+                             history_storage, history_ptrs);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -2213,18 +2210,22 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
             (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
-        publish_generation_event(
-            runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED, request.prompt().c_str(),
-            nullptr, ctx.response_text.c_str(), nullptr, ref.model_id, ctx.token_count,
-            stream_elapsed, ctx.prompt_tokens, ref.framework_name,
-            (ctx.token_count > 0 && stream_elapsed > 0)
-                ? ctx.token_count * 1000.0 / static_cast<double>(stream_elapsed)
-                : 0.0,
-            ctx.first_token_ms > ctx.started_ms
-                ? static_cast<double>(ctx.first_token_ms - ctx.started_ms)
-                : 0.0,
-            options.temperature, options.max_tokens, lifecycle_context_length(ref),
-            /*is_streaming=*/true);
+        // Tokens/sec over decode time only, not prefill-inclusive wall time.
+        const int64_t stream_ttft =
+            ctx.first_token_ms > ctx.started_ms ? ctx.first_token_ms - ctx.started_ms : 0;
+        const int64_t stream_decode = (stream_ttft > 0 && stream_ttft < stream_elapsed)
+                                          ? stream_elapsed - stream_ttft
+                                          : stream_elapsed;
+        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
+                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
+                                 nullptr, ref.model_id, ctx.token_count, stream_elapsed,
+                                 ctx.prompt_tokens, ref.framework_name,
+                                 (ctx.token_count > 0 && stream_decode > 0)
+                                     ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
+                                     : 0.0,
+                                 static_cast<double>(stream_ttft), options.temperature,
+                                 options.max_tokens, lifecycle_context_length(ref),
+                                 /*is_streaming=*/true);
     }
 
     rac::llm::release_lifecycle_llm(&ref);

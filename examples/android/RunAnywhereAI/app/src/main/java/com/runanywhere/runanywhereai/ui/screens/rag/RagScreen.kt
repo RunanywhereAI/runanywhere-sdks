@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -98,7 +99,10 @@ fun RagScreen() {
     val collapsible = ready && ragVm.hasDocuments
     val showFullSetup = setupExpanded || !collapsible
 
-    val onAdd = { picker.launch(DocumentExtractor.acceptedMimeTypes) }
+    val controlsEnabled = !ragVm.isCorpusBusy
+    val onAdd = {
+        if (controlsEnabled) picker.launch(DocumentExtractor.acceptedMimeTypes)
+    }
 
     if (isExpandedScreen()) {
         // Wide screens: setup on the left, the Q&A conversation on the right.
@@ -123,10 +127,15 @@ fun RagScreen() {
                     chunkCount = ragVm.chunkCount,
                     ready = ready,
                     isIngesting = ragVm.isIngesting,
+                    controlsEnabled = controlsEnabled,
                     collapsible = false,
+                    rerankEnabled = ragVm.rerankEnabled,
+                    onRerankChange = ragVm::updateRerank,
+                    multiQueryEnabled = ragVm.multiQueryEnabled,
+                    onMultiQueryChange = ragVm::updateMultiQuery,
                     onCollapse = {},
-                    onPickEmbedding = { sheet = embeddingVm },
-                    onPickLlm = { sheet = llmVm },
+                    onPickEmbedding = { if (controlsEnabled) sheet = embeddingVm },
+                    onPickLlm = { if (controlsEnabled) sheet = llmVm },
                     onAdd = onAdd,
                     onClear = ragVm::clearAll,
                 )
@@ -138,6 +147,7 @@ fun RagScreen() {
                 question = question,
                 onQuestionChange = { question = it },
                 onSend = { ragVm.ask(question); question = "" },
+                onStop = ragVm::stopQuery,
                 ready = ready,
                 modifier = Modifier
                     .weight(1.3f)
@@ -162,10 +172,15 @@ fun RagScreen() {
                     chunkCount = ragVm.chunkCount,
                     ready = ready,
                     isIngesting = ragVm.isIngesting,
+                    controlsEnabled = controlsEnabled,
                     collapsible = collapsible,
+                    rerankEnabled = ragVm.rerankEnabled,
+                    onRerankChange = ragVm::updateRerank,
+                    multiQueryEnabled = ragVm.multiQueryEnabled,
+                    onMultiQueryChange = ragVm::updateMultiQuery,
                     onCollapse = { setupExpanded = false },
-                    onPickEmbedding = { sheet = embeddingVm },
-                    onPickLlm = { sheet = llmVm },
+                    onPickEmbedding = { if (controlsEnabled) sheet = embeddingVm },
+                    onPickLlm = { if (controlsEnabled) sheet = llmVm },
                     onAdd = onAdd,
                     onClear = ragVm::clearAll,
                 )
@@ -174,6 +189,7 @@ fun RagScreen() {
                     documentCount = ragVm.documents.size,
                     chunkCount = ragVm.chunkCount,
                     isIngesting = ragVm.isIngesting,
+                    controlsEnabled = controlsEnabled,
                     onAdd = onAdd,
                     onExpand = { setupExpanded = true },
                 )
@@ -184,6 +200,7 @@ fun RagScreen() {
                 question = question,
                 onQuestionChange = { question = it },
                 onSend = { ragVm.ask(question); question = "" },
+                onStop = ragVm::stopQuery,
                 ready = ready,
                 modifier = Modifier.weight(1f),
             )
@@ -219,7 +236,12 @@ private fun SetupCard(
     chunkCount: Int,
     ready: Boolean,
     isIngesting: Boolean,
+    controlsEnabled: Boolean,
     collapsible: Boolean,
+    rerankEnabled: Boolean,
+    onRerankChange: (Boolean) -> Unit,
+    multiQueryEnabled: Boolean,
+    onMultiQueryChange: (Boolean) -> Unit,
     onCollapse: () -> Unit,
     onPickEmbedding: () -> Unit,
     onPickLlm: () -> Unit,
@@ -237,19 +259,96 @@ private fun SetupCard(
                 CollapseHeader(onCollapse = onCollapse)
                 Divider()
             }
-            SetupRow(RACIcons.Outline.Database, "Embedding model", embeddingName, onPickEmbedding)
+            SetupRow(RACIcons.Outline.Database, "Embedding model", embeddingName, controlsEnabled, onPickEmbedding)
             Divider()
-            SetupRow(RACIcons.Outline.MessageCircle, "Language model", llmName, onPickLlm)
+            SetupRow(RACIcons.Outline.MessageCircle, "Language model", llmName, controlsEnabled, onPickLlm)
             Divider()
             DocumentsSection(
                 documents = documents,
                 chunkCount = chunkCount,
                 ready = ready,
                 isIngesting = isIngesting,
+                controlsEnabled = controlsEnabled,
                 onAdd = onAdd,
                 onClear = onClear,
             )
+            Divider()
+            RetrievalOptions(
+                rerankEnabled = rerankEnabled,
+                onRerankChange = onRerankChange,
+                multiQueryEnabled = multiQueryEnabled,
+                onMultiQueryChange = onMultiQueryChange,
+                enabled = controlsEnabled,
+            )
         }
+    }
+}
+
+// Retrieval-quality toggles backed by the public SDK RAG options: rerank
+// (RAGConfiguration.rerank_results) and multi-query expansion
+// (RAGQueryOptions.enable_multi_query).
+@Composable
+private fun RetrievalOptions(
+    rerankEnabled: Boolean,
+    onRerankChange: (Boolean) -> Unit,
+    multiQueryEnabled: Boolean,
+    onMultiQueryChange: (Boolean) -> Unit,
+    enabled: Boolean,
+) {
+    val dimens = LocalDimens.current
+    Column(modifier = Modifier.padding(dimens.spacingLg), verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+        Text(
+            text = "Retrieval",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OptionToggle(
+            icon = RACIcons.Outline.Adjustments,
+            title = "Rerank results",
+            subtitle = "LLM re-scores retrieved chunks for relevance",
+            checked = rerankEnabled,
+            enabled = enabled,
+            onCheckedChange = onRerankChange,
+        )
+        OptionToggle(
+            icon = RACIcons.Outline.Search,
+            title = "Multi-query expansion",
+            subtitle = "Rewrites the question into variants, fuses results",
+            checked = multiQueryEnabled,
+            enabled = enabled,
+            onCheckedChange = onMultiQueryChange,
+        )
+    }
+}
+
+@Composable
+private fun OptionToggle(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(dimens.iconMd),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -262,6 +361,7 @@ private fun ConversationPane(
     question: String,
     onQuestionChange: (String) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
     ready: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -279,7 +379,9 @@ private fun ConversationPane(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
                 ) {
-                    items(ragVm.messages) { message -> MessageBubble(message) }
+                    items(ragVm.messages) { message ->
+                        MessageBubble(message)
+                    }
                     if (ragVm.isQuerying) {
                         item { SearchingRow() }
                     }
@@ -297,8 +399,10 @@ private fun ConversationPane(
         InputBar(
             value = question,
             onValueChange = onQuestionChange,
-            enabled = ragVm.hasDocuments && !ragVm.isQuerying,
+            enabled = ragVm.hasDocuments && !ragVm.isCorpusBusy,
             onSend = onSend,
+            isQuerying = ragVm.isQuerying,
+            onStop = onStop,
         )
     }
 }
@@ -310,6 +414,7 @@ private fun CompactSetupBar(
     documentCount: Int,
     chunkCount: Int,
     isIngesting: Boolean,
+    controlsEnabled: Boolean,
     onAdd: () -> Unit,
     onExpand: () -> Unit,
 ) {
@@ -334,7 +439,7 @@ private fun CompactSetupBar(
                 modifier = Modifier.size(dimens.iconSm),
             )
             Text(
-                text = "$documentCount document${if (documentCount == 1) "" else "s"} · $chunkCount chunks",
+                text = formatDocumentChunkSummary(documentCount, chunkCount),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -342,7 +447,7 @@ private fun CompactSetupBar(
             )
             if (isIngesting) {
                 CircularProgressIndicator(modifier = Modifier.size(dimens.iconSm), strokeWidth = 2.dp)
-            } else {
+            } else if (controlsEnabled) {
                 Icon(
                     imageVector = RACIcons.Outline.Plus,
                     contentDescription = "Add document",
@@ -390,13 +495,13 @@ private fun CollapseHeader(onCollapse: () -> Unit) {
 }
 
 @Composable
-private fun SetupRow(icon: ImageVector, label: String, value: String?, onClick: () -> Unit) {
+private fun SetupRow(icon: ImageVector, label: String, value: String?, enabled: Boolean, onClick: () -> Unit) {
     val dimens = LocalDimens.current
     val selected = value != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = dimens.spacingLg, vertical = dimens.spacingMd),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
@@ -431,6 +536,7 @@ private fun DocumentsSection(
     chunkCount: Int,
     ready: Boolean,
     isIngesting: Boolean,
+    controlsEnabled: Boolean,
     onAdd: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -441,13 +547,17 @@ private fun DocumentsSection(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (documents.isEmpty()) "Documents" else "${documents.size} document${if (documents.size == 1) "" else "s"} · $chunkCount chunks",
+                text = if (documents.isEmpty()) {
+                    "Documents"
+                } else {
+                    formatDocumentChunkSummary(documents.size, chunkCount)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
             if (documents.isNotEmpty()) {
-                TextButton(onClick = onClear) { Text("Clear") }
+                TextButton(onClick = onClear, enabled = controlsEnabled) { Text("Clear") }
             }
         }
 
@@ -480,7 +590,7 @@ private fun DocumentsSection(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(dimens.radiusMd))
-                    .then(if (ready && !isIngesting) Modifier.clickable(onClick = onAdd) else Modifier)
+                    .then(if (ready && controlsEnabled) Modifier.clickable(onClick = onAdd) else Modifier)
                     .fillMaxWidth()
                     .padding(dimens.spacingMd),
                 horizontalArrangement = Arrangement.Center,
@@ -665,6 +775,8 @@ private fun InputBar(
     onValueChange: (String) -> Unit,
     enabled: Boolean,
     onSend: () -> Unit,
+    isQuerying: Boolean,
+    onStop: () -> Unit,
 ) {
     val dimens = LocalDimens.current
     Row(
@@ -682,9 +794,25 @@ private fun InputBar(
             shape = RoundedCornerShape(dimens.radiusLg),
         )
         val canSend = enabled && value.isNotBlank()
-        val tint = if (canSend) primaryGreen else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        IconButton(onClick = onSend, enabled = canSend) {
-            Icon(RACIcons.Outline.Send, contentDescription = "Send", tint = tint, modifier = Modifier.size(dimens.iconMd))
+        if (isQuerying) {
+            TextButton(onClick = onStop) {
+                Icon(
+                    imageVector = RACIcons.Outline.PlayerStop,
+                    contentDescription = null,
+                    modifier = Modifier.size(dimens.iconSm),
+                )
+                Text("Stop", modifier = Modifier.padding(start = dimens.spacingXs))
+            }
+        } else {
+            val tint = if (canSend) primaryGreen else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            IconButton(onClick = onSend, enabled = canSend) {
+                Icon(
+                    imageVector = RACIcons.Outline.Send,
+                    contentDescription = "Send",
+                    tint = tint,
+                    modifier = Modifier.size(dimens.iconMd),
+                )
+            }
         }
     }
 }

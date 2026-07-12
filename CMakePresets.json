@@ -101,8 +101,13 @@
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
                 "RAC_BUILD_PLATFORM": "ON",
+                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "ON",
-                "CMAKE_OSX_ARCHITECTURES": "arm64"
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
+                "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
+                "CMAKE_OBJC_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
+                "CMAKE_OBJCXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
         },
@@ -121,7 +126,10 @@
                 "RAC_BUILD_SERVER": "ON",
                 "RAC_STATIC_PLUGINS": "ON",
                 "RAC_BUILD_SHARED": "OFF",
-                "RAC_BUILD_PLATFORM": "OFF"
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
+                "CMAKE_C_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks",
+                "CMAKE_CXX_FLAGS": "-ffile-prefix-map=${sourceDir}=/runanywhere-sdks -fmacro-prefix-map=${sourceDir}=/runanywhere-sdks -fdebug-prefix-map=${sourceDir}=/runanywhere-sdks"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
         },
@@ -162,7 +170,7 @@
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "iOS",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
-                "CMAKE_OSX_DEPLOYMENT_TARGET": "17.0",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "17.5",
                 "CMAKE_OSX_SYSROOT": "iphoneos",
                 "CMAKE_BUILD_TYPE": "Release",
                 "RAC_STATIC_PLUGINS": "ON",

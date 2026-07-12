@@ -4,14 +4,14 @@ import {
   type StructuredOutputParseRequest as ProtoStructuredOutputParseRequest,
   type StructuredOutputResult as ProtoStructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
-import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
   missingExports,
   modalityLogger as logger,
   type ModalityProtoModule,
-} from './ProtoAdapterTypes';
+} from './ProtoAdapterTypes.js';
 
 export class StructuredOutputProtoAdapter {
   static tryDefault(): StructuredOutputProtoAdapter | null {

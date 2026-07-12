@@ -3,8 +3,8 @@
  *
  * Vision Language Model (VLM) extension for the RunAnywhere core SDK.
  * Uses proto-canonical VLM shapes and the RN core Nitro bridge over commons
- * `rac_vlm_process_proto`, `rac_vlm_stream_proto`, and
- * `rac_vlm_cancel_proto`.
+ * `rac_vlm_generate_proto`, `rac_vlm_stream_proto`, and
+ * `rac_vlm_cancel_lifecycle_proto`.
  *
  * Backend packages register providers only; core owns the public VLM
  * lifecycle/process surface.
@@ -105,28 +105,20 @@ function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {
 /**
  * Process an image with full options and metrics.
  *
- * Canonical form matches iOS: `RunAnywhere.processImage(_:options:)` where
+ * Matches iOS: `RunAnywhere.processImage(_:options:)`, where
  * `options.prompt` carries the prompt text.
- *
- * Ergonomic overload: `processImage(image, prompt, options?)` — prompt is
- * merged into options.prompt so existing call sites continue to compile.
  */
 export async function processImage(
   image: VLMImage,
-  optionsOrPrompt: Partial<VLMGenerationOptions> | string,
-  legacyOptions?: Partial<VLMGenerationOptions>
+  options: Partial<VLMGenerationOptions>
 ): Promise<VLMResult> {
   // Swift parity: guard isInitialized (RunAnywhere+VisionLanguage.swift:28-30).
   requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VisionLanguage.swift:31 gates on ensureServicesReady.
   await ensureServicesReady();
-  const resolvedOptions: Partial<VLMGenerationOptions> =
-    typeof optionsOrPrompt === 'string'
-      ? { ...legacyOptions, prompt: optionsOrPrompt }
-      : optionsOrPrompt;
   const resultBytes = await native.vlmProcessProto(
-    encodeVLMRequest(image, resolvedOptions, false)
+    encodeVLMRequest(image, options, false)
   );
   return decodeVLMResult(resultBytes, 'vlmProcessProto');
 }
@@ -134,28 +126,20 @@ export async function processImage(
 /**
  * Stream image processing with canonical proto stream events.
  *
- * Canonical form matches iOS: `RunAnywhere.processImageStream(_:options:)` where
+ * Matches iOS: `RunAnywhere.processImageStream(_:options:)`, where
  * `options.prompt` carries the prompt text. RN exposes the native VLM stream
  * event proto as AsyncIterable.
- *
- * Ergonomic overload: `processImageStream(image, prompt, options?)` — prompt is
- * merged into options.prompt so existing call sites continue to compile.
  */
 export async function processImageStream(
   image: VLMImage,
-  optionsOrPrompt: Partial<VLMGenerationOptions> | string,
-  legacyOptions?: Partial<VLMGenerationOptions>
+  options: Partial<VLMGenerationOptions>
 ): Promise<AsyncIterable<VLMStreamEvent>> {
   // Swift parity: guard isInitialized (RunAnywhere+VisionLanguage.swift:56-58).
   requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VisionLanguage.swift:59 gates on ensureServicesReady.
   await ensureServicesReady();
-  const resolvedOptions: Partial<VLMGenerationOptions> =
-    typeof optionsOrPrompt === 'string'
-      ? { ...legacyOptions, prompt: optionsOrPrompt }
-      : optionsOrPrompt;
-  const requestBytes = encodeVLMRequest(image, resolvedOptions, true);
+  const requestBytes = encodeVLMRequest(image, options, true);
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {

@@ -19,20 +19,12 @@
 
 namespace margelo::nitro::runanywhere::llama {
 
-int initialize(JavaVM* vm) {
-  return facebook::jni::initialize(vm, []() {
-    ::margelo::nitro::runanywhere::llama::registerAllNatives();
-  });
-}
-
-
-
 void registerAllNatives() {
   using namespace margelo::nitro;
   using namespace margelo::nitro::runanywhere::llama;
 
   // Register native JNI methods
-
+  
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(

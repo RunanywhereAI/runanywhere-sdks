@@ -20,20 +20,29 @@
  *
  * This bridge is intentionally MINIMAL — it loads the core WASM, runs
  * `rac_init`, completes native Phase 1, then installs the module via
- * `setRunanywhereModule(...)` so the proto-byte adapters can reach it.
+ * `registerWasmModule(...)` so the proto-byte adapters can reach it.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
-import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter';
-import { HTTPAdapter } from '../Adapters/HTTPAdapter';
-import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
+import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter.js';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter.js';
+import {
+  DeviceRegistrationAdapter,
+  type DeviceRegistrationConfiguration,
+} from '../Adapters/DeviceRegistrationAdapter.js';
+import {
+  BrowserStorageAnalyzerAdapter,
+  type BrowserStorageAnalyzerModule,
+} from '../Adapters/StorageAdapter.js';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter.js';
 import {
   getModuleForCapability,
   registerWasmModule,
   unregisterWasmModule,
   type EmscriptenRunanywhereModule,
-} from './EmscriptenModule';
+} from './EmscriptenModule.js';
 
 // Note: `completeNativePhase1ForModule` is reached through a lazy
 // dynamic import to avoid a circular dependency with
@@ -104,12 +113,18 @@ export class CommonsModule {
   private _module: CoreCommonsModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
+  /** True after canonical native shutdown succeeds for the retained module. */
+  private _nativeShutdownComplete = false;
   /** Browser platform adapter installed into this module's `rac_init`
    * config. `rac_init` enforces non-NULL mandatory slots (file/secure/log/
    * now_ms), so a zero stub is not valid — the shared `PlatformAdapter`
    * populates the same MEMFS/localStorage/console callbacks the backend
    * bridges use. Lifetime matches the module. */
   private _platformAdapter: PlatformAdapter | null = null;
+  /** Browser callbacks installed into commons' native device manager. */
+  private _deviceRegistrationAdapter: DeviceRegistrationAdapter | null = null;
+  /** Browser filesystem/quota callbacks and native storage-analyzer handle. */
+  private _storageAnalyzerAdapter: BrowserStorageAnalyzerAdapter | null = null;
 
   /** Override the default URL to the racommons.js glue file. */
   wasmUrl: string | null = null;
@@ -139,13 +154,13 @@ export class CommonsModule {
   // Loading
   // -----------------------------------------------------------------------
 
-  async ensureLoaded(): Promise<void> {
+  async ensureLoaded(configuration: DeviceRegistrationConfiguration): Promise<void> {
     if (this._loaded) return;
     if (this._loading) {
       await this._loading;
       return;
     }
-    this._loading = this._doLoad();
+    this._loading = this._doLoad(configuration);
     try {
       await this._loading;
     } finally {
@@ -154,32 +169,78 @@ export class CommonsModule {
   }
 
   private _teardown(): void {
-    if (this._module && this._loaded) {
+    const failures: unknown[] = [];
+    const recordFailure = (operation: string, error: unknown): void => {
+      logger.warning(`${operation} failed during Commons teardown`);
+      failures.push(error);
+    };
+
+    if (this._storageAnalyzerAdapter) {
+      try {
+        this._storageAnalyzerAdapter.cleanup();
+        this._storageAnalyzerAdapter = null;
+      } catch (error) {
+        recordFailure('BrowserStorageAnalyzerAdapter cleanup', error);
+      }
+    }
+    if (this._deviceRegistrationAdapter) {
+      try {
+        this._deviceRegistrationAdapter.cleanup();
+        this._deviceRegistrationAdapter = null;
+      } catch (error) {
+        recordFailure('DeviceRegistrationAdapter cleanup', error);
+      }
+    }
+    if (this._module && !this._nativeShutdownComplete) {
       try {
         this._module._rac_shutdown?.();
-      } catch { /* ignore */ }
+        this._nativeShutdownComplete = true;
+      } catch (error) {
+        recordFailure('rac_shutdown', error);
+      }
     }
     if (this._platformAdapter) {
       try {
         this._platformAdapter.cleanup();
-      } catch { /* ignore */ }
-      this._platformAdapter = null;
+        this._platformAdapter = null;
+      } catch (error) {
+        recordFailure('PlatformAdapter cleanup', error);
+      }
     }
-    HTTPAdapter.clearDefaultModule();
+    try {
+      HTTPAdapter.clearDefaultModule();
+    } catch (error) {
+      recordFailure('HTTPAdapter cleanup', error);
+    }
     if (this._module) {
       // Drop ONLY this module from the registry adapter — siblings that
       // still hold the catalog stay untouched. `unregisterWasmModule`
       // below also performs this drop, so the explicit call here is just
       // defensive against an out-of-order shutdown sequence.
-      ModelRegistryAdapter.unregisterModule(this._module);
-      unregisterWasmModule(this._module);
+      try {
+        ModelRegistryAdapter.unregisterModule(this._module);
+      } catch (error) {
+        recordFailure('ModelRegistryAdapter cleanup', error);
+      }
+      try {
+        unregisterWasmModule(this._module);
+      } catch (error) {
+        recordFailure('WASM module unregister', error);
+      }
     }
-    this._module = null;
     this._loaded = false;
     this._loading = null;
+
+    if (failures.length === 0) {
+      this._module = null;
+      this._nativeShutdownComplete = false;
+      return;
+    }
+    if (failures.length === 1) throw failures[0];
+    throw new AggregateError(failures, 'Multiple Commons teardown operations failed');
   }
 
-  private async _doLoad(): Promise<void> {
+  private async _doLoad(configuration: DeviceRegistrationConfiguration): Promise<void> {
     // If a sibling backend has already registered for 'commons', reuse it —
     // the per-capability registry returns whichever module currently owns
     // the SDK-state surface. Avoids loading the core artifact twice when an
@@ -189,6 +250,14 @@ export class CommonsModule {
     if (existing) {
       logger.info('Reusing already-installed RACommons module from sibling backend');
       this._module = existing;
+      this._nativeShutdownComplete = false;
+      this._deviceRegistrationAdapter = DeviceRegistrationAdapter.install(
+        existing,
+        configuration,
+      );
+      this._storageAnalyzerAdapter = await BrowserStorageAnalyzerAdapter.install(
+        existing as unknown as BrowserStorageAnalyzerModule,
+      );
       this._loaded = true;
       return;
     }
@@ -197,7 +266,7 @@ export class CommonsModule {
     try {
       const moduleUrl = this.wasmUrl
         ?? new URL('../../wasm/racommons.js', import.meta.url).href;
-      logger.info(`Loading core variant: ${moduleUrl}`);
+      logger.info(`Loading core variant: ${redactResourceURL(moduleUrl)}`);
       this.wasmUrl = moduleUrl;
 
       // Dynamic import of Emscripten glue JS (vite-friendly).
@@ -213,6 +282,7 @@ export class CommonsModule {
         printErr: (text) => logger.info(text),
         locateFile: (path) => baseUrl + path,
       });
+      this._nativeShutdownComplete = false;
 
       // Smoke check
       const pingFn = this._module._rac_wasm_ping;
@@ -235,7 +305,7 @@ export class CommonsModule {
       await this._initRACommons();
       // Lazy import to avoid a static circular dependency with
       // `../Public/RunAnywhere`.
-      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere');
+      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere.js');
       completeNativePhase1ForModule(this._module);
 
       // Register against the 'commons' capability so the SDK facade's
@@ -249,14 +319,26 @@ export class CommonsModule {
       registerWasmModule(['commons'], this._module);
       HTTPAdapter.setDefaultModule(this._module);
       ModelRegistryAdapter.setDefaultModule(this._module);
+      this._deviceRegistrationAdapter = DeviceRegistrationAdapter.install(
+        this._module,
+        configuration,
+      );
+      this._storageAnalyzerAdapter = await BrowserStorageAnalyzerAdapter.install(
+        this._module as unknown as BrowserStorageAnalyzerModule,
+      );
 
       this._loaded = true;
       logger.info('Commons WASM module loaded successfully');
     } catch (error) {
-      this._module = null;
-      this._loaded = false;
+      try {
+        this._teardown();
+      } catch {
+        // Preserve the load error. The retained singleton owns any failed
+        // teardown resource and RunAnywhere's rollback will retry it.
+        logger.warning('Commons load rollback did not complete');
+      }
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to load Commons WASM: ${message}`);
+      logger.error('Failed to load Commons WASM');
       throw new SDKException(
         -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         `Failed to load Commons WASM module: ${message}`,
@@ -361,9 +443,9 @@ export class CommonsModule {
       m.stringToUTF8(base, ptr, len);
       const rc = setFn(ptr);
       if (rc !== 0) {
-        logger.warning(`rac_model_paths_set_base_dir('${base}') returned ${rc}`);
+        logger.warning(`rac_model_paths_set_base_dir returned ${rc}`);
       } else {
-        logger.info(`Model paths base dir set to synthetic prefix '${base}'`);
+        logger.info('Model paths base directory configured');
       }
     } finally {
       m._free(ptr);

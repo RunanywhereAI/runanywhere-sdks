@@ -19,12 +19,6 @@
 
 namespace margelo::nitro::runanywhere::qhexrt {
 
-int initialize(JavaVM* vm) {
-  return facebook::jni::initialize(vm, []() {
-    ::margelo::nitro::runanywhere::qhexrt::registerAllNatives();
-  });
-}
-
 void registerAllNatives() {
   using namespace margelo::nitro;
   using namespace margelo::nitro::runanywhere::qhexrt;

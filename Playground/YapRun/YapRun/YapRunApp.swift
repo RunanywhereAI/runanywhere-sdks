@@ -171,7 +171,7 @@ struct YapRunApp: App {
                 .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.backgroundPrimaryDark)
+        .background(AppColors.backgroundPrimary)
     }
 
     private func errorView(_ message: String) -> some View {
@@ -196,6 +196,6 @@ struct YapRunApp: App {
             .foregroundStyle(.black)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.backgroundPrimaryDark)
+        .background(AppColors.backgroundPrimary)
     }
 }

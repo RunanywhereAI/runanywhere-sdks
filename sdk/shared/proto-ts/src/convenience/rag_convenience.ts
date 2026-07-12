@@ -21,7 +21,7 @@ export const rAGConfigurationDefaults = (): RAGConfiguration => ({
   embeddingModelId: '',
   llmModelId: '',
   topK: 5,
-  similarityThreshold: 0.3,
+  similarityThreshold: 0.0,
   chunkSize: 512,
   chunkOverlap: 64,
   persistIndex: false,
@@ -32,7 +32,7 @@ export const validateRAGConfiguration = (m: RAGConfiguration): void => {
   if (m.topK !== undefined && (m.topK < 1)) {
     throw new ValidationError({
       fieldPath: 'RAGConfiguration.top_k',
-      message: `top_k must be in >= 1 (got ${m.topK})`,
+      message: `top_k must be >= 1 (got ${m.topK})`,
     });
   }
   if (m.similarityThreshold !== undefined && (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
@@ -44,13 +44,13 @@ export const validateRAGConfiguration = (m: RAGConfiguration): void => {
   if (m.chunkSize !== undefined && (m.chunkSize < 1)) {
     throw new ValidationError({
       fieldPath: 'RAGConfiguration.chunk_size',
-      message: `chunk_size must be in >= 1 (got ${m.chunkSize})`,
+      message: `chunk_size must be >= 1 (got ${m.chunkSize})`,
     });
   }
   if (m.chunkOverlap !== undefined && (m.chunkOverlap < 0)) {
     throw new ValidationError({
       fieldPath: 'RAGConfiguration.chunk_overlap',
-      message: `chunk_overlap must be in >= 0 (got ${m.chunkOverlap})`,
+      message: `chunk_overlap must be >= 0 (got ${m.chunkOverlap})`,
     });
   }
 };
@@ -62,7 +62,17 @@ export const rAGQueryOptionsDefaults = (): RAGQueryOptions => ({
   topP: 1.0,
   topK: 0,
   retrievalTopK: 0,
-  similarityThreshold: 0,
   stream: false,
   disableThinking: false,
+  enableMultiQuery: false,
+  multiQueryCount: 3,
 });
+
+export const validateRAGQueryOptions = (m: RAGQueryOptions): void => {
+  if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
+    throw new ValidationError({
+      fieldPath: 'RAGQueryOptions.multi_query_count',
+      message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
+    });
+  }
+};

@@ -52,10 +52,10 @@ enum StatusColor {
 
     var swiftUIColor: Color {
         switch self {
-        case .gray: return .gray
+        case .gray: return AppColors.statusGray
         case .orange: return AppColors.primaryAccent
-        case .green: return .green
-        case .red: return .red
+        case .green: return AppColors.statusGreen
+        case .red: return AppColors.statusRed
         case .blue: return AppColors.primaryAccent
         }
     }
@@ -68,10 +68,9 @@ enum MicButtonColor {
     var swiftUIColor: Color {
         switch self {
         case .orange: return AppColors.primaryAccent
-        case .red: return .red
+        case .red: return AppColors.statusRed
         case .blue: return AppColors.primaryAccent
-        case .green: return .green
+        case .green: return AppColors.statusGreen
         }
     }
 }
-

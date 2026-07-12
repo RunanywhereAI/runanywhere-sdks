@@ -1,9 +1,12 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,11 +29,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.types.RAModelInfo
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ModelRow(
     model: RAModelInfo,
@@ -41,16 +46,28 @@ fun ModelRow(
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)? = null,
+    highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     val brand = model.brand()
+    val hasHfToken = SettingsRepository.settings.hfToken.isNotBlank()
+    val isHighlighted = highlightLabel != null
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(if (isReady) Modifier.clickable(onClick = onSelect) else Modifier),
         shape = RoundedCornerShape(dimens.radiusLg),
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isHighlighted) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        border = if (isHighlighted) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+        } else {
+            null
+        },
     ) {
         Row(
             modifier = Modifier
@@ -70,18 +87,42 @@ fun ModelRow(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             ) {
+                if (highlightLabel != null) {
+                    Pill(highlightLabel, MaterialTheme.colorScheme.primary, icon = RACIcons.Filled.Bolt)
+                }
                 Text(
-                    model.name,
+                    model.displayTitle(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                BackendBadge(framework = model.framework)
-                Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                    Pill(model.quantizationLabel(), MaterialTheme.colorScheme.onSurfaceVariant)
-                    model.capabilityLabels().take(3).forEach { label ->
-                        Pill(label, MaterialTheme.colorScheme.primary)
+                // Size is always visible; backend rides along as a subtle badge.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+                ) {
+                    Text(
+                        model.sizeLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    BackendBadge(framework = model.framework, compact = true)
+                }
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                    verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                ) {
+                    // At most two clean tags (feel + one notable capability).
+                    model.consumerTags().forEach { tag ->
+                        Pill(tag.label, tag.kind.color())
+                    }
+                    if (model.requiresHfAuth()) {
+                        Pill(
+                            "Private",
+                            if (hasHfToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
                 if (isBusy && progressPercent != null) {
@@ -111,6 +152,13 @@ fun ModelRow(
     }
 }
 
+// Palette mapping for consumer tag kinds — keeps pill colors consistent app-wide.
+@Composable
+private fun ConsumerTagKind.color(): Color = when (this) {
+    ConsumerTagKind.FEEL -> MaterialTheme.colorScheme.tertiary
+    ConsumerTagKind.CAPABILITY -> MaterialTheme.colorScheme.primary
+}
+
 @Composable
 private fun TrailingAction(
     isCurrent: Boolean,
@@ -134,11 +182,13 @@ private fun TrailingAction(
 @Composable
 private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
     val dimens = LocalDimens.current
+    val needsHfToken = model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
     AssistChip(
         onClick = onDownload,
         label = {
+            // The row already shows the size; the chip stays a simple verb.
             Text(
-                text = formatModelSize(model.download_size_bytes),
+                text = if (needsHfToken) "Set token" else "Get",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -178,6 +228,8 @@ private fun Pill(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
             color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

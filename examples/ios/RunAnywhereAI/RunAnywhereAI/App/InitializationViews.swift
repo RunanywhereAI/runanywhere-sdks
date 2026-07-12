@@ -44,7 +44,7 @@ struct InitializationLoadingView: View {
                         .tint(AppColors.primaryAccent)
                         .frame(width: 240)
 
-                    Text("Initializing SDK...")
+                    Text("Getting things ready...")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -74,10 +74,10 @@ struct InitializationErrorView: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 60))
-                .foregroundColor(.orange)
+                .font(AppTypography.system60)
+                .foregroundColor(AppColors.statusOrange)
 
-            Text("Initialization Failed")
+            Text("RunAnywhere Couldn't Start")
                 .font(.title2)
                 .fontWeight(.semibold)
 

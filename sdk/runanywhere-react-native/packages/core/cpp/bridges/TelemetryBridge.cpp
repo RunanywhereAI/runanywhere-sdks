@@ -36,6 +36,11 @@
 namespace runanywhere {
 namespace bridges {
 
+struct TelemetryCallbackContext {
+  rac_telemetry_manager_t *manager;
+  rac_environment_t environment;
+};
+
 // Forward declarations for callbacks
 static void telemetryHttpCallback(
     void* userData,
@@ -49,100 +54,125 @@ static void telemetryHttpCallback(
 // Singleton
 // ============================================================================
 
-TelemetryBridge& TelemetryBridge::shared() {
-    static TelemetryBridge instance;
-    return instance;
-}
-
-TelemetryBridge::~TelemetryBridge() {
-    shutdown();
+TelemetryBridge &TelemetryBridge::shared() {
+  static TelemetryBridge instance;
+  return instance;
 }
 
 // ============================================================================
 // Lifecycle
 // ============================================================================
 
-void TelemetryBridge::initialize(
-    rac_environment_t environment,
-    const std::string& deviceId,
-    const std::string& deviceModel,
-    const std::string& osVersion,
-    const std::string& platform,
-    const std::string& sdkVersion
-) {
-    std::lock_guard<std::mutex> lock(mutex_);
+void TelemetryBridge::initialize(rac_environment_t environment,
+                                 const std::string &deviceId,
+                                 const std::string &deviceModel,
+                                 const std::string &osVersion,
+                                 const std::string &platform,
+                                 const std::string &sdkVersion) {
+  rac_telemetry_manager_t *previousManager = nullptr;
+  std::unique_ptr<TelemetryCallbackContext> previousContext;
+  bool detachPreviousSink = false;
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    stateChanged_.wait(lock, [this] { return !lifecycleTransition_; });
+    lifecycleTransition_ = true;
+    stateChanged_.wait(lock, [this] { return activeOperations_ == 0; });
+    previousManager = manager_;
+    manager_ = nullptr;
+    previousContext = std::move(callbackContext_);
+    detachPreviousSink = eventsCallbackRegistered_;
+    eventsCallbackRegistered_ = false;
+  }
 
-    // Destroy existing manager if any
-    if (manager_) {
-        rac_telemetry_manager_flush(manager_);
-        rac_telemetry_manager_destroy(manager_);
-        manager_ = nullptr;
-    }
+  if (detachPreviousSink) {
+    rac_events_set_telemetry_sink(nullptr);
+  }
+  if (previousManager) {
+    rac_telemetry_manager_flush(previousManager);
+    rac_telemetry_manager_destroy(previousManager);
+  }
 
-    environment_ = environment;
+  const std::string telemetryPlatform = platform.empty() ? "unknown" : platform;
 
-    const std::string telemetryPlatform = platform.empty() ? "unknown" : platform;
+  // Create telemetry manager
+  // Matches Swift: rac_telemetry_manager_create(Environment.toC(environment),
+  // did, plat, ver)
+  rac_telemetry_manager_t *manager = rac_telemetry_manager_create(
+      environment, deviceId.c_str(), telemetryPlatform.c_str(),
+      sdkVersion.c_str());
 
-    LOGI("Creating telemetry manager: device=%s, model=%s, os=%s, platform=%s, sdk=%s, env=%d",
-         deviceId.c_str(),
-         deviceModel.c_str(),
-         osVersion.c_str(),
-         telemetryPlatform.c_str(),
-         sdkVersion.c_str(),
-         environment);
-
-    // Create telemetry manager
-    // Matches Swift: rac_telemetry_manager_create(Environment.toC(environment), did, plat, ver)
-    manager_ = rac_telemetry_manager_create(
-        environment,
-        deviceId.c_str(),
-        telemetryPlatform.c_str(),
-        sdkVersion.c_str()
-    );
-
-    if (!manager_) {
-        LOGE("Failed to create telemetry manager");
-        return;
-    }
+  std::unique_ptr<TelemetryCallbackContext> context;
+  if (!manager) {
+    LOGE("Failed to create telemetry manager");
+  } else {
+    context = std::make_unique<TelemetryCallbackContext>(
+        TelemetryCallbackContext{manager, environment});
 
     // Set device info
-    // Matches Swift: rac_telemetry_manager_set_device_info(manager, model, os)
-    rac_telemetry_manager_set_device_info(manager_, deviceModel.c_str(), osVersion.c_str());
+    // Matches Swift: rac_telemetry_manager_set_device_info(manager, model,
+    // os)
+    rac_telemetry_manager_set_device_info(manager, deviceModel.c_str(),
+                                          osVersion.c_str());
 
     // Register HTTP callback - this is where platform provides HTTP transport
-    // Matches Swift: rac_telemetry_manager_set_http_callback(manager, telemetryHttpCallback, userData)
-    rac_telemetry_manager_set_http_callback(manager_, telemetryHttpCallback, this);
+    // Matches Swift: rac_telemetry_manager_set_http_callback(manager,
+    // telemetryHttpCallback, userData)
+    rac_telemetry_manager_set_http_callback(manager, telemetryHttpCallback,
+                                            context.get());
+  }
 
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    manager_ = manager;
+    callbackContext_ = std::move(context);
+    lifecycleTransition_ = false;
+  }
+  stateChanged_.notify_all();
+
+  if (manager) {
     LOGI("Telemetry manager initialized successfully");
+  }
 }
 
 void TelemetryBridge::shutdown() {
+  rac_telemetry_manager_t *manager = nullptr;
+  std::unique_ptr<TelemetryCallbackContext> context;
+  bool detachSink = false;
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    stateChanged_.wait(lock, [this] { return !lifecycleTransition_; });
+    lifecycleTransition_ = true;
+    stateChanged_.wait(lock, [this] { return activeOperations_ == 0; });
+    manager = manager_;
+    manager_ = nullptr;
+    context = std::move(callbackContext_);
+    detachSink = eventsCallbackRegistered_;
+    eventsCallbackRegistered_ = false;
+  }
+
+  // Stop new routed events before flushing/destroying the snapshotted
+  // manager. The callback context remains alive until both calls return.
+  if (detachSink) {
+    rac_events_set_telemetry_sink(nullptr);
+  }
+
+  if (manager) {
+    LOGI("Shutting down telemetry manager...");
+    rac_telemetry_manager_flush(manager);
+    rac_telemetry_manager_destroy(manager);
+    LOGI("Telemetry manager destroyed");
+  }
+
+  {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    // Detach the telemetry sink first so the C++ router stops feeding events
-    // into a manager we are about to destroy.
-    if (eventsCallbackRegistered_) {
-        rac_events_set_telemetry_sink(nullptr);
-        eventsCallbackRegistered_ = false;
-    }
-
-    if (manager_) {
-        LOGI("Shutting down telemetry manager...");
-
-        // Flush pending events
-        rac_telemetry_manager_flush(manager_);
-
-        // Destroy manager
-        rac_telemetry_manager_destroy(manager_);
-        manager_ = nullptr;
-
-        LOGI("Telemetry manager destroyed");
-    }
+    lifecycleTransition_ = false;
+  }
+  stateChanged_.notify_all();
 }
 
 bool TelemetryBridge::isInitialized() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return manager_ != nullptr;
+  std::lock_guard<std::mutex> lock(mutex_);
+  return manager_ != nullptr;
 }
 
 // ============================================================================
@@ -150,14 +180,24 @@ bool TelemetryBridge::isInitialized() const {
 // ============================================================================
 
 void TelemetryBridge::flush() {
+  rac_telemetry_manager_t *manager = nullptr;
+  {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!manager_) {
-        return;
+    if (!manager_ || lifecycleTransition_) {
+      return;
     }
+    manager = manager_;
+    ++activeOperations_;
+  }
 
-    LOGI("Flushing telemetry events...");
-    rac_telemetry_manager_flush(manager_);
+  LOGI("Flushing telemetry events...");
+  rac_telemetry_manager_flush(manager);
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    --activeOperations_;
+  }
+  stateChanged_.notify_all();
 }
 
 // ============================================================================
@@ -165,38 +205,54 @@ void TelemetryBridge::flush() {
 // ============================================================================
 
 void TelemetryBridge::registerEventsCallback() {
+  rac_telemetry_manager_t *manager = nullptr;
+  {
     std::lock_guard<std::mutex> lock(mutex_);
-
     if (eventsCallbackRegistered_) {
-        return;
+      return;
     }
-
-    if (!manager_) {
-        LOGW("Telemetry manager not initialized; skipping telemetry sink registration");
-        return;
+    if (!manager_ || lifecycleTransition_) {
+      LOGW("Telemetry manager not initialized; skipping telemetry sink "
+           "registration");
+      return;
     }
+    manager = manager_;
+    ++activeOperations_;
+  }
 
-    // Attach the telemetry manager as the C++ event router's telemetry sink.
-    // The router (rac::events::route) feeds every TELEMETRY-bit event into the
-    // manager via rac_telemetry_manager_track_proto and does the per-event
-    // translation internally — no analytics callback needed.
-    // Matches Swift: rac_events_set_telemetry_sink(mgr.ptr)
-    rac_events_set_telemetry_sink(manager_);
+  // Attach the telemetry manager as the C++ event router's telemetry sink.
+  // The router (rac::events::route) feeds every TELEMETRY-bit event into the
+  // manager via rac_telemetry_manager_track_proto and does the per-event
+  // translation internally — no analytics callback needed.
+  // Matches Swift: rac_events_set_telemetry_sink(mgr.ptr)
+  rac_events_set_telemetry_sink(manager);
 
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
     eventsCallbackRegistered_ = true;
-    LOGI("Telemetry sink registered");
+    --activeOperations_;
+  }
+  stateChanged_.notify_all();
+  LOGI("Telemetry sink registered");
 }
 
 void TelemetryBridge::unregisterEventsCallback() {
+  {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!eventsCallbackRegistered_) {
-        return;
+    if (!eventsCallbackRegistered_ || lifecycleTransition_) {
+      return;
     }
+    ++activeOperations_;
+  }
 
-    rac_events_set_telemetry_sink(nullptr);
+  rac_events_set_telemetry_sink(nullptr);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
     eventsCallbackRegistered_ = false;
-    LOGI("Telemetry sink unregistered");
+    --activeOperations_;
+  }
+  stateChanged_.notify_all();
+  LOGI("Telemetry sink unregistered");
 }
 
 // ============================================================================
@@ -215,116 +271,98 @@ void TelemetryBridge::unregisterEventsCallback() {
  *
  * Matches Swift's telemetryHttpCallback in CppBridge+Telemetry.swift
  */
-static void telemetryHttpCallback(
-    void* userData,
-    const char* endpoint,
-    const char* jsonBody,
-    size_t jsonLength,
-    rac_bool_t requiresAuth
-) {
-    if (!endpoint || !jsonBody) {
-        LOGE("Invalid telemetry HTTP callback parameters");
-        return;
+static void telemetryHttpCallback(void *userData, const char *endpoint,
+                                  const char *jsonBody, size_t jsonLength,
+                                  rac_bool_t requiresAuth) {
+  if (!endpoint || !jsonBody) {
+    LOGE("Invalid telemetry HTTP callback parameters");
+    return;
+  }
+
+  auto *context = static_cast<TelemetryCallbackContext *>(userData);
+  if (!context || !context->manager) {
+    LOGE("Telemetry callback context not available");
+    return;
+  }
+
+  std::string path(endpoint);
+  std::string json(jsonBody, jsonLength);
+  const rac_environment_t env = context->environment;
+  rac_telemetry_manager_t *manager = context->manager;
+
+  LOGI("Telemetry HTTP callback: bodyLen=%zu, env=%d", jsonLength, env);
+
+  // Build full URL based on environment
+  // Matches Swift HTTPService logic
+  std::string baseURL;
+  std::string apiKey;
+
+  if (env == RAC_ENV_DEVELOPMENT) {
+    // Development: Use Supabase from C++ dev config (development_config.cpp)
+    // NO FALLBACK - credentials must come from C++ config only
+    auto supabaseConfig = config::makeEndpointConfig(
+        rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url()
+                                          : "",
+        rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key()
+                                          : "");
+
+    if (!supabaseConfig.usable) {
+      LOGI("Skipping telemetry/device registration: no usable config");
+      rac_telemetry_manager_http_complete(manager, RAC_TRUE, "{}", nullptr);
+      return;
     }
 
-    auto* bridge = static_cast<TelemetryBridge*>(userData);
-    if (!bridge) {
-        LOGE("TelemetryBridge not available for HTTP callback");
-        return;
-    }
+    baseURL = supabaseConfig.baseURL;
+    apiKey = supabaseConfig.token;
+    LOGD("Telemetry using configured development Supabase endpoint");
+  } else {
+    // Production/Staging: Use configured Railway URL
+    // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
+    baseURL = config::trim(InitBridge::shared().getBaseURL());
 
-    std::string path(endpoint);
-    std::string json(jsonBody, jsonLength);
-    rac_environment_t env = bridge->getEnvironment();
-
-    LOGI("Telemetry HTTP callback: endpoint=%s, bodyLen=%zu, env=%d", path.c_str(), jsonLength, env);
-
-    // Build full URL based on environment
-    // Matches Swift HTTPService logic
-    std::string baseURL;
-    std::string apiKey;
-
-    if (env == RAC_ENV_DEVELOPMENT) {
-        // Development: Use Supabase from C++ dev config (development_config.cpp)
-        // NO FALLBACK - credentials must come from C++ config only
-        auto supabaseConfig = config::makeEndpointConfig(
-            rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
-            rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
-
-        if (!supabaseConfig.usable) {
-            LOGI("Skipping telemetry/device registration: no usable config");
-            rac_telemetry_manager_http_complete(
-                bridge->getHandle(),
-                RAC_TRUE,
-                "{}",
-                nullptr
-            );
-            return;
-        }
-
-        baseURL = supabaseConfig.baseURL;
-        apiKey = supabaseConfig.token;
-        LOGD("Telemetry using configured development Supabase endpoint");
+    // For production mode, prefer JWT access token (from authentication)
+    // over raw API key. This matches Swift/Kotlin behavior.
+    std::string accessToken = AuthBridge::shared().getAccessToken();
+    if (config::isUsableSecret(accessToken)) {
+      apiKey = accessToken; // Use JWT for Authorization header
+      LOGD("Telemetry using JWT access token");
     } else {
-        // Production/Staging: Use configured Railway URL
-        // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
-        baseURL = config::trim(InitBridge::shared().getBaseURL());
-
-        // For production mode, prefer JWT access token (from authentication)
-        // over raw API key. This matches Swift/Kotlin behavior.
-        std::string accessToken = AuthBridge::shared().getAccessToken();
-        if (config::isUsableSecret(accessToken)) {
-            apiKey = accessToken;  // Use JWT for Authorization header
-            LOGD("Telemetry using JWT access token");
-        } else {
-            // Fallback to API key if not authenticated yet
-            apiKey = config::trim(InitBridge::shared().getApiKey());
-            LOGD("Telemetry using API key (not authenticated)");
-        }
-
-        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
-            LOGI("Skipping telemetry/device registration: no usable config");
-            rac_telemetry_manager_http_complete(
-                bridge->getHandle(),
-                RAC_TRUE,
-                "{}",
-                nullptr
-            );
-            return;
-        }
-
-        LOGD("Telemetry using configured production/staging endpoint");
+      // Fallback to API key if not authenticated yet
+      apiKey = config::trim(InitBridge::shared().getApiKey());
+      LOGD("Telemetry using API key (not authenticated)");
     }
 
-    std::string fullURL = config::appendEndpointPath(baseURL, path);
-
-    LOGI("Telemetry POST to: %s", fullURL.c_str());
-
-    // Use shared native C++ HTTP transport (same as device registration).
-    auto [success, statusCode, responseBody, errorMessage] =
-        InitBridge::shared().httpPostSync(fullURL, json, apiKey);
-
-    if (success) {
-        LOGI("✅ Telemetry sent successfully (status=%d)", statusCode);
-
-        // Notify C++ that HTTP completed
-        rac_telemetry_manager_http_complete(
-            bridge->getHandle(),
-            RAC_TRUE,
-            responseBody.c_str(),
-            nullptr
-        );
-    } else {
-        LOGE("❌ Telemetry HTTP failed: status=%d, error=%s", statusCode, errorMessage.c_str());
-
-        // Notify C++ of failure
-        rac_telemetry_manager_http_complete(
-            bridge->getHandle(),
-            RAC_FALSE,
-            nullptr,
-            errorMessage.c_str()
-        );
+    if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+      LOGI("Skipping telemetry/device registration: no usable config");
+      rac_telemetry_manager_http_complete(manager, RAC_TRUE, "{}", nullptr);
+      return;
     }
+
+    LOGD("Telemetry using configured production/staging endpoint");
+  }
+
+  std::string fullURL = config::appendEndpointPath(baseURL, path);
+
+  LOGI("Telemetry POST starting");
+
+  // Use shared native C++ HTTP transport (same as device registration).
+  auto [success, statusCode, responseBody, errorMessage] =
+      InitBridge::shared().httpPostSync(fullURL, json, apiKey);
+  (void)errorMessage;
+
+  if (success) {
+    LOGI("Telemetry sent successfully (status=%d)", statusCode);
+
+    // Notify C++ that HTTP completed
+    rac_telemetry_manager_http_complete(manager, RAC_TRUE, responseBody.c_str(),
+                                        nullptr);
+  } else {
+    LOGE("Telemetry HTTP failed (status=%d)", statusCode);
+
+    // Notify C++ of failure
+    rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                        "Telemetry HTTP request failed");
+  }
 }
 
 } // namespace bridges

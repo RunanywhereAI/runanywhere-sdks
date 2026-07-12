@@ -74,6 +74,7 @@ class HandleStreamAdapterTest {
         runBlocking {
             val registerCount = AtomicInteger(0)
             val unregisterCount = AtomicInteger(0)
+            val quiesceCount = AtomicInteger(0)
             val handle = UniqueHandle()
             val streamKey = uniqueStreamKey()
 
@@ -89,6 +90,7 @@ class HandleStreamAdapterTest {
                     unregister = { _, _ ->
                         unregisterCount.incrementAndGet()
                     },
+                    quiesce = { quiesceCount.incrementAndGet() },
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )
@@ -106,6 +108,7 @@ class HandleStreamAdapterTest {
 
             val torn = waitFor { unregisterCount.get() == 1 }
             assertTrue("unregister must fire exactly once when the sole subscriber cancels", torn)
+            assertEquals("quiesce must follow native unregister", 1, quiesceCount.get())
             assertEquals("teardown must not re-enter register()", 1, registerCount.get())
         }
 
@@ -135,6 +138,7 @@ class HandleStreamAdapterTest {
                     unregister = { _, _ ->
                         unregisterCount.incrementAndGet()
                     },
+                    quiesce = {},
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )
@@ -189,6 +193,7 @@ class HandleStreamAdapterTest {
                     unregister = { _, _ ->
                         unregisterCount.incrementAndGet()
                     },
+                    quiesce = {},
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )
@@ -247,6 +252,7 @@ class HandleStreamAdapterTest {
                         1L
                     },
                     unregister = { _, _ -> },
+                    quiesce = {},
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )
@@ -259,6 +265,7 @@ class HandleStreamAdapterTest {
                         2L
                     },
                     unregister = { _, _ -> },
+                    quiesce = {},
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )
@@ -317,6 +324,7 @@ class HandleStreamAdapterTest {
                     unregister = { _, _ ->
                         unregisterCount.incrementAndGet()
                     },
+                    quiesce = {},
                     decodeEvent = { ChatMessage.ADAPTER.decode(it) },
                     isTerminalEvent = null,
                 )

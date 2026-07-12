@@ -1,6 +1,6 @@
 /**
  * @file test_stt.cpp
- * @brief Integration tests for ONNX STT backend via direct RAC API
+ * @brief Integration tests for Sherpa STT backend via direct RAC API
  *
  * Tests speech-to-text using the Sherpa-ONNX Whisper model.
  * Requires: whisper-tiny-en model directory at the configured path.
@@ -15,11 +15,9 @@
 #include <cstring>
 #include <ctime>
 
-#include "rac/backends/rac_stt_onnx.h"  // for RAC_STT_ONNX_CONFIG_DEFAULT typedefs
-#include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"  // for rac_backend_onnx_register()
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 
 // =============================================================================
 // Minimal Test Platform Adapter
@@ -178,7 +176,7 @@ static TestResult test_create_destroy() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
@@ -213,7 +211,8 @@ static TestResult test_create_invalid_path() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_stt_sherpa_create("/nonexistent", &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_stt_sherpa_create("/nonexistent", &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
 
     if (rc == RAC_SUCCESS) {
         result.passed = false;
@@ -248,7 +247,7 @@ static TestResult test_transcribe_silence() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -315,7 +314,7 @@ static TestResult test_transcribe_sine() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -373,7 +372,7 @@ static TestResult test_supports_streaming() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -410,7 +409,7 @@ static TestResult test_streaming_workflow() {
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
     rac_result_t rc =
-        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &handle);
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -508,7 +507,7 @@ static TestResult test_transcribe_tts_hello() {
     }
 
     // Create TTS handle and synthesize "Hello world"
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -538,7 +537,7 @@ static TestResult test_transcribe_tts_hello() {
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -613,7 +612,7 @@ static TestResult test_transcribe_tts_numbers() {
     }
 
     // Create TTS handle and synthesize "one two three four five"
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -643,7 +642,7 @@ static TestResult test_transcribe_tts_numbers() {
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
@@ -728,7 +727,7 @@ static TestResult test_transcribe_tts_sentence() {
     }
 
     // Create TTS handle and synthesize "The weather is sunny today"
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_SHERPA_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
     rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
@@ -758,7 +757,7 @@ static TestResult test_transcribe_tts_sentence() {
 
     // Create STT handle and transcribe
     rac_handle_t stt_handle = RAC_INVALID_HANDLE;
-    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_ONNX_CONFIG_DEFAULT, &stt_handle);
+    rc = rac_stt_sherpa_create(stt_model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &stt_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);

@@ -39,8 +39,8 @@ typedef struct rac_diffusion_platform_config {
     /** Enable safety checker */
     rac_bool_t enable_safety_checker;
 
-    /** Reduce memory mode */
-    rac_bool_t reduce_memory;
+    /** Maximum working-set memory in MiB (0 = engine default) */
+    int32_t max_memory_mb;
 
     /** Compute units to use (0 = auto, 1 = CPU, 2 = GPU, 3 = Neural Engine) */
     int32_t compute_units;

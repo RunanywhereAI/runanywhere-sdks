@@ -82,7 +82,6 @@ export class VLMService {
     try {
       const stream = await RunAnywhere.processImageStream(
         image,
-        prompt,
         VLMGenerationOptions.fromPartial({
           prompt,
           maxTokens,

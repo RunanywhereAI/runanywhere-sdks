@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-React Native 0.83.1 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/onnx`, `@runanywhere/qhexrt`, `@runanywhere/proto-ts`).
+React Native 0.85.3 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/mlx`, `@runanywhere/onnx`, `@runanywhere/qhexrt`, `@runanywhere/proto-ts`).
 
 ## Common Commands
 
@@ -54,6 +54,7 @@ yarn clean
 UI Screens (this app)
   └─> @runanywhere/core        (TypeScript API + NitroModules C++ bridge)
       ├─> @runanywhere/llamacpp (llama.cpp LLM/VLM backend)
+      ├─> @runanywhere/mlx      (Apple MLX LLM/VLM/speech/embedding backend)
       ├─> @runanywhere/onnx     (ONNX Runtime: STT/TTS/embeddings via Sherpa)
       └─> @runanywhere/qhexrt   (Qualcomm Hexagon NPU, Android-only)
           └─> runanywhere-commons (C++ core, delivered as xcframeworks + .so libs)
@@ -83,10 +84,15 @@ This pattern appears in: `ChatScreen.tsx`, `SettingsScreen.tsx`, `ModelSelection
 
 Three-state machine: `loading → ready | error`.
 
-1. Reads stored API key + base URL from AsyncStorage (set in Settings screen)
-2. `RunAnywhere.initialize()` with config (dev or prod based on stored credentials)
-3. `registerModulesAndModels()` — registers backends (LlamaCPP, QHexRT, ONNX) and all model URLs
-4. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
+1. Reads optional build-time configuration from the gitignored `.env`; Settings
+   can apply an API key for the current process without persisting it
+2. `registerBackends()` — registers LlamaCPP, physical-device-only MLX, QHexRT,
+   and ONNX; MLX reports unavailable in the iOS Simulator
+3. `RunAnywhere.initialize()` with validated HTTPS configuration, or development
+   mode when no usable configuration exists
+4. `registerAll(backendState)` — seeds only the successfully registered
+   backends' model catalogs
+5. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
 
 Backend registration uses dynamic `require()` with try/catch — `LlamaCPP` and `QHexRT` are optional.
 
@@ -131,19 +137,19 @@ Mirrors iOS Swift app design tokens exactly:
 
 ### iOS
 
-- **Min iOS**: 15.1
+- **Min iOS**: 17.5
 - **New Architecture**: enabled (`RCT_NEW_ARCH_ENABLED=1`), Hermes + Fabric both on
 - **Arch**: arm64 only (x86_64 simulator excluded in Podfile post_install)
-- **Podfile post-install patches**: (1) force iOS 15.1 deployment target on all pods, (2) exclude x86_64 simulator, (3) Xcode 16 sandbox fix (`always_out_of_date`), (4) RNZipArchive `-G` flag removal, (5) `fmt` pod C++17 + `FMT_USE_CONSTEVAL=0` for Xcode/AppleClang compatibility
+- **Podfile post-install patches**: (1) force iOS 17.5 deployment target on all pods, (2) exclude x86_64 simulator, (3) Xcode sandbox fix (`always_out_of_date`), (4) RNZipArchive `-G` flag removal, (5) `fmt` pod C++17 + `FMT_USE_CONSTEVAL=0` for AppleClang compatibility
 
 ### Android
 
-- **Min SDK**: 24, **Target/Compile SDK**: 36, **NDK**: 27.0.12077973, **Kotlin**: 2.1.20, **Gradle**: 9.0.0
+- **Min SDK**: 24, **Target/Compile SDK**: 36, **NDK**: 27.3.13750724, **Kotlin**: 2.1.20, **Gradle**: 9.0.0
 - **ABI filter**: `arm64-v8a` only
 - **`syncSdkNativeLibs` Gradle task**: copies `.so` files from `sdk/runanywhere-react-native/` into `node_modules/@runanywhere/*/android/` before each build (runs before `preBuild`)
 - **16KB page alignment**: enabled for Android 15+ compatibility (`useLegacyPackaging=false`, `ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON`)
 - **`packagingOptions.pickFirsts`**: resolves 12+ duplicate `.so` conflicts across SDK packages
-- QHexRT/QNN: `libcdsprpc.so` declared as optional native library in AndroidManifest
+- QHexRT/QNN: the QHexRT package declares FastRPC libraries and installs DSP skels from assets
 
 ### Monorepo / Metro
 
@@ -151,8 +157,7 @@ Mirrors iOS Swift app design tokens exactly:
 
 ### Patches (Applied Automatically via postinstall)
 
-1. **`patches/react-native+0.83.1.patch`**: Replaces `std::format` (C++20) with `std::ostringstream` (C++17) in `graphicsConversions.h` for compiler compatibility
-2. **`scripts/patch-agp-version.js`**: Downgrades AGP from 8.12.0 to 8.11.1 in `@react-native/gradle-plugin` for Android Studio compatibility
+1. **`scripts/patch-agp-version.js`**: Downgrades AGP from 8.12.0 to 8.11.1 in `@react-native/gradle-plugin` for Android Studio compatibility
 
 ## TypeScript Path Aliases
 

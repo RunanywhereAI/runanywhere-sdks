@@ -17,9 +17,11 @@
 #include <mutex>
 #include <ranges>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -331,6 +333,113 @@ rac_result_t acquire_lifecycle_llm_for_lora(rac::llm::LifecycleLlmRef* out_ref) 
     return rc;
 }
 
+struct LoraConfigValidation {
+    rac_result_t code{RAC_SUCCESS};
+    std::string message;
+    std::string required_model;
+
+    bool ok() const { return code == RAC_SUCCESS; }
+};
+
+LoraConfigValidation lora_validation_error(rac_result_t code, std::string message,
+                                           std::string required_model = {}) {
+    LoraConfigValidation validation;
+    validation.code = code;
+    validation.message = std::move(message);
+    validation.required_model = std::move(required_model);
+    return validation;
+}
+
+std::string base_model_id_for_message(const rac::llm::LifecycleLlmRef& ref) {
+    return (ref.model_id != nullptr && ref.model_id[0] != '\0') ? ref.model_id : "<unknown>";
+}
+
+bool config_has_adapter_id(const runanywhere::v1::LoRAAdapterConfig& config) {
+    return config.has_adapter_id() && !config.adapter_id().empty();
+}
+
+bool catalog_entry_supports_model(const rac_lora_entry_t* entry, const std::string& model_id) {
+    if (!entry || model_id.empty() || !entry->compatible_model_ids) {
+        return false;
+    }
+    for (size_t i = 0; i < entry->compatible_model_count; ++i) {
+        const char* compatible_id = entry->compatible_model_ids[i];
+        if (compatible_id && model_id == compatible_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string first_compatible_model_id(const rac_lora_entry_t* entry) {
+    if (!entry || !entry->compatible_model_ids) {
+        return {};
+    }
+    for (size_t i = 0; i < entry->compatible_model_count; ++i) {
+        const char* compatible_id = entry->compatible_model_ids[i];
+        if (compatible_id && compatible_id[0] != '\0') {
+            return compatible_id;
+        }
+    }
+    return {};
+}
+
+LoraConfigValidation
+validate_lora_config_for_loaded_model(const rac::llm::LifecycleLlmRef& ref,
+                                      const runanywhere::v1::LoRAAdapterConfig& config) {
+    if (config.adapter_path().empty()) {
+        return lora_validation_error(RAC_ERROR_INVALID_ARGUMENT,
+                                     "LoRAAdapterConfig.adapter_path is required");
+    }
+    if (!ref.supports_lora) {
+        return lora_validation_error(RAC_ERROR_NOT_SUPPORTED,
+                                     "Loaded model '" + base_model_id_for_message(ref) +
+                                         "' does not declare LoRA support");
+    }
+    if (!ref.ops || !ref.ops->load_lora) {
+        return lora_validation_error(RAC_ERROR_NOT_SUPPORTED,
+                                     "Backend does not support LoRA adapters");
+    }
+    if (!config_has_adapter_id(config)) {
+        return {};
+    }
+
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    rac_lora_entry_t* entry = nullptr;
+    const rac_result_t rc = rac_lora_registry_get(registry, config.adapter_id().c_str(), &entry);
+    if (rc != RAC_SUCCESS) {
+        return lora_validation_error(rc == RAC_ERROR_NOT_FOUND ? RAC_ERROR_NOT_FOUND : rc,
+                                     "LoRA adapter '" + config.adapter_id() +
+                                         "' is not registered in the catalog");
+    }
+
+    const std::string base_model_id =
+        (ref.model_id != nullptr && ref.model_id[0] != '\0') ? ref.model_id : std::string();
+    const std::string required_model = first_compatible_model_id(entry);
+    const bool is_compatible = catalog_entry_supports_model(entry, base_model_id);
+    rac_lora_entry_free(entry);
+
+    if (!is_compatible) {
+        return lora_validation_error(RAC_ERROR_INVALID_ARGUMENT,
+                                     "LoRA adapter '" + config.adapter_id() +
+                                         "' is not compatible with loaded model '" +
+                                         base_model_id_for_message(ref) + "'",
+                                     required_model);
+    }
+
+    return {};
+}
+
+void populate_compatibility_error(runanywhere::v1::LoraCompatibilityResult* result,
+                                  const LoraConfigValidation& validation) {
+    result->set_is_compatible(false);
+    result->set_error_code(static_cast<int32_t>(validation.code));
+    result->set_error_message(validation.message);
+    if (!validation.required_model.empty()) {
+        result->set_base_model_required(validation.required_model);
+    }
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -394,14 +503,9 @@ rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
         return copy_proto(result, out_result);
     }
 
-    // Adapter path emptiness is already validated by parse_config above.
-    // Backend capability + GGUF header check mirror the legacy
-    // rac_llm_component_check_lora_compat helper so generated callers retain
-    // the typed errors they used to see.
-    if (!ref.ops || !ref.ops->load_lora) {
-        result.set_is_compatible(false);
-        result.set_error_message("Backend does not support LoRA adapters");
-        result.set_error_code(static_cast<int32_t>(RAC_ERROR_NOT_SUPPORTED));
+    const LoraConfigValidation validation = validate_lora_config_for_loaded_model(ref, config);
+    if (!validation.ok()) {
+        populate_compatibility_error(&result, validation);
         rac::llm::release_lifecycle_llm(&ref);
         return copy_proto(result, out_result);
     }
@@ -470,13 +574,16 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         return copy_proto(result, out_result);
     }
 
-    if (!ref.ops || !ref.ops->load_lora) {
-        mark_apply_error(&result, RAC_ERROR_NOT_SUPPORTED,
-                         "Backend does not support LoRA adapters");
-        publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.apply",
-                        "Backend does not support LoRA adapters");
-        rac::llm::release_lifecycle_llm(&ref);
-        return copy_proto(result, out_result);
+    for (const auto& config : request.adapters()) {
+        const LoraConfigValidation validation = validate_lora_config_for_loaded_model(ref, config);
+        if (!validation.ok()) {
+            auto* info = result.add_adapters();
+            *info = make_info(config, false, validation.message.c_str(), validation.code);
+            mark_apply_error(&result, validation.code, validation.message.c_str());
+            publish_failure(validation.code, "lora.apply", validation.message.c_str());
+            rac::llm::release_lifecycle_llm(&ref);
+            return copy_proto(result, out_result);
+        }
     }
 
     if (request.replace_existing()) {
@@ -501,18 +608,6 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
     }
 
     for (const auto& config : request.adapters()) {
-        if (config.adapter_path().empty()) {
-            auto* info = result.add_adapters();
-            *info = make_info(config, false, "LoRAAdapterConfig.adapter_path is required",
-                              RAC_ERROR_INVALID_ARGUMENT);
-            mark_apply_error(&result, RAC_ERROR_INVALID_ARGUMENT,
-                             "LoRAAdapterConfig.adapter_path is required");
-            publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.apply",
-                            "LoRAAdapterConfig.adapter_path is required");
-            rac::llm::release_lifecycle_llm(&ref);
-            return copy_proto(result, out_result);
-        }
-
         const float scale = config.scale() > 0.0f ? config.scale() : 1.0f;
         rc = ref.ops->load_lora(ref.impl, config.adapter_path().c_str(), scale);
         if (rc != RAC_SUCCESS) {

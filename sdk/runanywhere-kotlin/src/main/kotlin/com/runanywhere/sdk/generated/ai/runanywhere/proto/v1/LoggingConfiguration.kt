@@ -30,8 +30,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * SDK logging configuration. Union of the fields the per-SDK
- * LoggingConfiguration structs carry today; per-environment presets
+ * SDK logging configuration. Per-environment presets
  * (development/staging/production) stay in each SDK as factory helpers.
  * ---------------------------------------------------------------------------
  */
@@ -92,17 +91,6 @@ public class LoggingConfiguration(
     schemaIndex = 4,
   )
   public val enable_remote_logging: Boolean = false,
-  /**
-   * Forward error/fatal records to Sentry.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableSentryLogging",
-    schemaIndex = 5,
-  )
-  public val enable_sentry_logging: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoggingConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -120,7 +108,6 @@ public class LoggingConfiguration(
     if (include_source_location != other.include_source_location) return false
     if (include_device_metadata != other.include_device_metadata) return false
     if (enable_remote_logging != other.enable_remote_logging) return false
-    if (enable_sentry_logging != other.enable_sentry_logging) return false
     return true
   }
 
@@ -133,7 +120,6 @@ public class LoggingConfiguration(
       result = result * 37 + include_source_location.hashCode()
       result = result * 37 + include_device_metadata.hashCode()
       result = result * 37 + enable_remote_logging.hashCode()
-      result = result * 37 + enable_sentry_logging.hashCode()
       super.hashCode = result
     }
     return result
@@ -146,7 +132,6 @@ public class LoggingConfiguration(
     result += """include_source_location=$include_source_location"""
     result += """include_device_metadata=$include_device_metadata"""
     result += """enable_remote_logging=$enable_remote_logging"""
-    result += """enable_sentry_logging=$enable_sentry_logging"""
     return result.joinToString(prefix = "LoggingConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -156,9 +141,8 @@ public class LoggingConfiguration(
     include_source_location: Boolean = this.include_source_location,
     include_device_metadata: Boolean = this.include_device_metadata,
     enable_remote_logging: Boolean = this.enable_remote_logging,
-    enable_sentry_logging: Boolean = this.enable_sentry_logging,
     unknownFields: ByteString = this.unknownFields,
-  ): LoggingConfiguration = LoggingConfiguration(enable_local_logging, min_log_level, include_source_location, include_device_metadata, enable_remote_logging, enable_sentry_logging, unknownFields)
+  ): LoggingConfiguration = LoggingConfiguration(enable_local_logging, min_log_level, include_source_location, include_device_metadata, enable_remote_logging, unknownFields)
 
   public companion object {
     @JvmField
@@ -188,9 +172,6 @@ public class LoggingConfiguration(
         if (value.enable_remote_logging != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.enable_remote_logging)
         }
-        if (value.enable_sentry_logging != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.enable_sentry_logging)
-        }
         return size
       }
 
@@ -210,17 +191,11 @@ public class LoggingConfiguration(
         if (value.enable_remote_logging != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_remote_logging)
         }
-        if (value.enable_sentry_logging != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.enable_sentry_logging)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoggingConfiguration) {
         writer.writeBytes(value.unknownFields)
-        if (value.enable_sentry_logging != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.enable_sentry_logging)
-        }
         if (value.enable_remote_logging != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_remote_logging)
         }
@@ -244,7 +219,6 @@ public class LoggingConfiguration(
         var include_source_location: Boolean = false
         var include_device_metadata: Boolean = false
         var enable_remote_logging: Boolean = false
-        var enable_sentry_logging: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> enable_local_logging = ProtoAdapter.BOOL.decode(reader)
@@ -256,7 +230,6 @@ public class LoggingConfiguration(
             3 -> include_source_location = ProtoAdapter.BOOL.decode(reader)
             4 -> include_device_metadata = ProtoAdapter.BOOL.decode(reader)
             5 -> enable_remote_logging = ProtoAdapter.BOOL.decode(reader)
-            6 -> enable_sentry_logging = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -266,7 +239,6 @@ public class LoggingConfiguration(
           include_source_location = include_source_location,
           include_device_metadata = include_device_metadata,
           enable_remote_logging = enable_remote_logging,
-          enable_sentry_logging = enable_sentry_logging,
           unknownFields = unknownFields
         )
       }

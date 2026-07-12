@@ -113,10 +113,13 @@ extension LLMViewModel {
             embeddingModel: embeddingModel,
             llmModel: answerModel
         )
-        try await RunAnywhere.ragIngest(
-            text: document.text,
-            metadataJSON: document.metadataJSON
-        )
+        var ragDocument = RARAGDocument()
+        ragDocument.text = document.text
+        ragDocument.metadata = [
+            "source": document.filename,
+            "filename": document.filename
+        ]
+        try await RunAnywhere.ragIngest(ragDocument)
         preparedDocumentRAGPipelineKey = key
     }
 

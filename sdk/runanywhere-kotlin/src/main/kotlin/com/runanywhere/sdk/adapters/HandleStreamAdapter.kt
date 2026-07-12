@@ -41,6 +41,7 @@
  *         streamKey = "llm",
  *         register = { h, cb -> bridge.registerCallback(h, cb) },
  *         unregister = { h, id -> bridge.unregisterCallback(h, id) },
+ *         quiesce = { bridge.quiesce() },
  *         decodeEvent = { bytes -> LLMStreamEvent.ADAPTER.decode(bytes) },
  *         isTerminalEvent = { it.is_final },
  *     )
@@ -88,7 +89,7 @@ import kotlinx.coroutines.flow.callbackFlow
  *   identified by `callbackId`. Pass a no-op id-less closure if your ABI
  *   uses a NULL-callback re-installation pattern (mirror Swift's
  *   VoiceAgent specialization).
- * @param quiesce Optional closure that waits for in-flight native callback
+ * @param quiesce Closure that waits for in-flight native callback
  *   dispatches to finish after [unregister] and before collector channels are
  *   closed. Mirrors Swift's HandleStreamAdapter teardown contract.
  * @param decodeEvent Closure that parses one proto-byte payload into
@@ -103,7 +104,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
     private val streamKey: String,
     private val register: (Handle, (ByteArray) -> Unit) -> Long,
     private val unregister: (Handle, Long) -> Unit,
-    private val quiesce: (() -> Unit)? = null,
+    private val quiesce: () -> Unit,
     private val decodeEvent: (ByteArray) -> Event,
     private val isTerminalEvent: ((Event) -> Boolean)? = null,
 ) {
@@ -173,7 +174,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         private val storeKey: StoreKey,
         private val register: (Any, (ByteArray) -> Unit) -> Long,
         private val unregister: (Any, Long) -> Unit,
-        private val quiesce: (() -> Unit)?,
+        private val quiesce: () -> Unit,
         private val decodeEvent: (ByteArray) -> Event,
         private val isTerminalEvent: ((Event) -> Boolean)?,
     ) {
@@ -304,7 +305,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
-                quiesce?.invoke()
+                quiesce()
             }
         }
 
@@ -331,7 +332,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
-                quiesce?.invoke()
+                quiesce()
             }
             for (c in snapshot) c.close()
         }
@@ -376,7 +377,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                     if (idToUnregister != INVALID_CALLBACK_ID) {
                         removeFanOut(storeKey)
                         unregister(handle, idToUnregister)
-                        quiesce?.invoke()
+                        quiesce()
                     }
                     for (c in snapshot) c.close(t)
                     return
@@ -408,7 +409,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (isFinal && idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
-                quiesce?.invoke()
+                quiesce()
             }
 
             for (c in snapshot) {
@@ -450,7 +451,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             handle: H,
             register: (H, (ByteArray) -> Unit) -> Long,
             unregister: (H, Long) -> Unit,
-            quiesce: (() -> Unit)?,
+            quiesce: () -> Unit,
             decodeEvent: (ByteArray) -> E,
             isTerminalEvent: ((E) -> Boolean)?,
         ): HandleFanOut<E> {

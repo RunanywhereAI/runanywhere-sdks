@@ -50,7 +50,7 @@ class Onnx {
   static const String version = '2.0.0';
 
   /// ONNX Runtime library version (underlying C library)
-  static const String onnxRuntimeVersion = '1.23.2';
+  static const String onnxRuntimeVersion = '1.24.3';
 
   // ============================================================================
   // Registration State
@@ -68,7 +68,7 @@ class Onnx {
   /// Register ONNX backend with the C++ service registry.
   ///
   /// This calls `rac_backend_onnx_register()` to register the generic ONNX
-  /// backend (embeddings + Silero VAD) and then registers the Sherpa-ONNX
+  /// backend (embeddings) and then registers the Sherpa-ONNX
   /// engine plugin so STT (Whisper/Zipformer/Paraformer), TTS (Piper/VITS),
   /// and Sherpa-backed VAD models with `framework == .sherpa` can resolve
   /// through the unified plugin router. The two plugins are peers: "onnx"

@@ -3,7 +3,7 @@
 // op_engine_backed.cpp — engine-backed operator factories.
 //
 // Materializes the six "engine-backed" `OperatorSpec.type` strings reachable
-// from `SolutionConfig` (voice_agent / rag / wake_word / agent_loop /
+// from `SolutionConfig` (voice_agent / rag / agent_loop /
 // time_series). Each factory produces a single-input / single-output
 // PipelineNode that:
 //
@@ -207,14 +207,15 @@ class GenerateTextNode final : public OperatorNode {
 
         runanywhere::v1::LLMGenerateRequest request;
         request.set_prompt(item.text());
+        auto* options = request.mutable_options();
+        options->set_temperature(temperature_ > 0.0f ? temperature_ : 0.8f);
+        options->set_top_p(1.0f);
+        options->set_repetition_penalty(1.0f);
         if (!system_prompt_.empty()) {
-            request.set_system_prompt(system_prompt_);
+            options->set_system_prompt(system_prompt_);
         }
         if (max_tokens_ > 0) {
-            request.set_max_tokens(max_tokens_);
-        }
-        if (temperature_ > 0.0f) {
-            request.set_temperature(temperature_);
+            options->set_max_tokens(max_tokens_);
         }
         if (!model_id_.empty()) {
             request.set_model_id(model_id_);

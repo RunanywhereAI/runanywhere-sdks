@@ -22,6 +22,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import Animated, {
   useAnimatedKeyboard,
@@ -40,7 +41,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RunAnywhere } from '@runanywhere/core';
 import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
-import { RAGConfiguration } from '@runanywhere/proto-ts/rag';
+import { RAGConfiguration, RAGDocument } from '@runanywhere/proto-ts/rag';
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 // MARK: - Types
@@ -104,6 +105,11 @@ export const RAGScreen: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [isQuerying, setIsQuerying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // RAG retrieval options. Rerank is a pipeline setting (RAGConfiguration);
+  // multi-query is a per-query option (RAGQueryOptions).
+  const [rerankEnabled, setRerankEnabled] = useState(false);
+  const [multiQueryEnabled, setMultiQueryEnabled] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -177,13 +183,18 @@ export const RAGScreen: React.FC = () => {
         ...rAGConfigurationDefaults(),
         embeddingModelId,
         llmModelId,
+        rerankResults: rerankEnabled,
       });
 
+      // Each document is queried in isolation. ragCreatePipeline destroys the
+      // prior session, so the fresh index holds only this document — replace the
+      // list rather than appending, which would misrepresent a wiped corpus as
+      // multiple loaded documents and answer "not enough info" for earlier ones.
       await RunAnywhere.ragCreatePipeline(config);
-      await RunAnywhere.ragIngest(text);
+      await RunAnywhere.ragIngest(RAGDocument.fromPartial({ text }));
 
       const name = result.name || 'Document';
-      setDocuments((prev) => [...prev, name]);
+      setDocuments([name]);
     } catch (err: unknown) {
       if (
         typeof err === 'object' &&
@@ -200,16 +211,55 @@ export const RAGScreen: React.FC = () => {
     } finally {
       setIsLoadingDocument(false);
     }
-  }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel]);
+  }, [
+    areModelsReady,
+    isNitroReady,
+    selectedEmbeddingModel,
+    selectedLLMModel,
+    rerankEnabled,
+  ]);
 
   const handleClearAll = useCallback(async () => {
-    await RunAnywhere.ragDestroyPipeline();
+    // Reset local state even if teardown fails, so the UI never references a
+    // pipeline that may already be gone (and no unhandled rejection escapes to
+    // the Switch/onValueChange caller).
+    try {
+      await RunAnywhere.ragDestroyPipeline();
+    } catch (err) {
+      console.error('[RAGScreen] Pipeline destroy failed:', err);
+    }
     setDocuments([]);
     setMessages([]);
     setError(null);
     setCurrentQuestion('');
     setSetupExpanded(true);
   }, []);
+
+  // Rerank is a pipeline-level setting, so changing it rebuilds the pipeline.
+  // The current corpus is dropped (re-add documents), matching a model change.
+  const handleRerankChange = useCallback(
+    async (value: boolean) => {
+      try {
+        if (documents.length > 0) {
+          await RunAnywhere.ragDestroyPipeline();
+          setDocuments([]);
+          setMessages([]);
+          setCurrentQuestion('');
+          setSetupExpanded(true);
+        }
+        setError(null);
+        setRerankEnabled(value);
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Failed to update rerank setting';
+        setError(msg);
+        console.error('[RAGScreen] Rerank toggle failed:', err);
+      }
+    },
+    [documents.length]
+  );
 
   // MARK: - Q&A
 
@@ -230,6 +280,7 @@ export const RAGScreen: React.FC = () => {
       const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
       const result = await RunAnywhere.ragQuery(question, {
         disableThinking: supportsThinking && !thinkingModeEnabled,
+        enableMultiQuery: multiQueryEnabled,
       });
       setMessages((prev) => [
         ...prev,
@@ -249,7 +300,7 @@ export const RAGScreen: React.FC = () => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
-  }, [currentQuestion, hasDocuments, selectedLLMModel]);
+  }, [currentQuestion, hasDocuments, selectedLLMModel, multiQueryEnabled]);
 
   // MARK: - Model Selection Callbacks
 
@@ -270,13 +321,32 @@ export const RAGScreen: React.FC = () => {
 
   if (nitroError) {
     return (
-      <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.fill,
+          { backgroundColor: colors.background, paddingTop: insets.top },
+        ]}
+      >
         <View style={styles.centered}>
           <Icon name="info" size={48} color={colors.error} />
-          <Text style={[typography.titleMedium, { color: colors.error, marginTop: dimens.spacing.md }]}>
+          <Text
+            style={[
+              typography.titleMedium,
+              { color: colors.error, marginTop: dimens.spacing.md },
+            ]}
+          >
             NitroModules Error
           </Text>
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: dimens.spacing.sm, textAlign: 'center' }]}>
+          <Text
+            style={[
+              typography.bodyMedium,
+              {
+                color: colors.onSurfaceVariant,
+                marginTop: dimens.spacing.sm,
+                textAlign: 'center',
+              },
+            ]}
+          >
             {nitroError}
           </Text>
         </View>
@@ -286,10 +356,20 @@ export const RAGScreen: React.FC = () => {
 
   if (!isNitroReady) {
     return (
-      <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.fill,
+          { backgroundColor: colors.background, paddingTop: insets.top },
+        ]}
+      >
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant, marginTop: dimens.spacing.md }]}>
+          <Text
+            style={[
+              typography.bodyMedium,
+              { color: colors.onSurfaceVariant, marginTop: dimens.spacing.md },
+            ]}
+          >
             Initializing…
           </Text>
         </View>
@@ -299,10 +379,15 @@ export const RAGScreen: React.FC = () => {
 
   // MARK: - Render
 
-  const addLabel = documents.length === 0 ? 'Add document' : 'Add another';
+  const addLabel = documents.length === 0 ? 'Add document' : 'Replace document';
 
   return (
-    <View style={[styles.fill, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.fill,
+        { backgroundColor: colors.background, paddingTop: insets.top },
+      ]}
+    >
       <Animated.View
         style={[
           styles.fill,
@@ -314,301 +399,520 @@ export const RAGScreen: React.FC = () => {
           keyboardStyle,
         ]}
       >
-
-          {/* Setup card / compact bar */}
-          {showFullSetup ? (
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderRadius: dimens.radius.lg }]}>
-              {/* Collapse header (only when collapsible) */}
-              {collapsible && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.collapseHeader, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.sm }]}
-                    onPress={() => setSetupExpanded(false)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, flex: 1 }]}>
-                      Setup
-                    </Text>
-                    <Icon name="chevronDown" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
-                  </TouchableOpacity>
-                  <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-                </>
-              )}
-
-              {/* Embedding model row */}
-              <TouchableOpacity
-                style={[styles.setupRow, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.md }]}
-                onPress={() => setShowingEmbeddingPicker(true)}
-                activeOpacity={0.7}
-              >
-                <Icon
-                  name="storage"
-                  size={dimens.icon.md}
-                  color={selectedEmbeddingModel ? colors.primary : colors.onSurfaceVariant}
-                />
-                <View style={styles.setupRowText}>
-                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
-                    Embedding model
-                  </Text>
-                  <Text
-                    style={[typography.bodyLarge, { color: colors.onSurface }]}
-                    numberOfLines={1}
-                  >
-                    {selectedEmbeddingModel?.name ?? 'Tap to select'}
-                  </Text>
-                </View>
-                <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-
-              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-              {/* LLM model row */}
-              <TouchableOpacity
-                style={[styles.setupRow, { paddingHorizontal: dimens.spacing.lg, paddingVertical: dimens.spacing.md }]}
-                onPress={() => setShowingLLMPicker(true)}
-                activeOpacity={0.7}
-              >
-                <Icon
-                  name="chat"
-                  size={dimens.icon.md}
-                  color={selectedLLMModel ? colors.primary : colors.onSurfaceVariant}
-                />
-                <View style={styles.setupRowText}>
-                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant }]}>
-                    Language model
-                  </Text>
-                  <Text
-                    style={[typography.bodyLarge, { color: colors.onSurface }]}
-                    numberOfLines={1}
-                  >
-                    {selectedLLMModel?.name ?? 'Tap to select'}
-                  </Text>
-                </View>
-                <Icon name="chevronRight" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-
-              <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-              {/* Documents section */}
-              <View style={{ padding: dimens.spacing.lg, gap: dimens.spacing.sm }}>
-                <View style={styles.docsHeader}>
-                  <Text style={[typography.bodySmall, { color: colors.onSurfaceVariant, flex: 1 }]}>
-                    {documents.length === 0
-                      ? 'Documents'
-                      : `${documents.length} document${documents.length === 1 ? '' : 's'}`}
-                  </Text>
-                  {documents.length > 0 && (
-                    <TouchableOpacity onPress={handleClearAll} hitSlop={8}>
-                      <Text style={[typography.labelMedium, { color: colors.primary }]}>Clear</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {documents.map((name, i) => (
-                  <View key={i} style={[styles.docRow, { gap: dimens.spacing.sm }]}>
-                    <Icon name="storage" size={dimens.icon.sm} color={colors.primary} />
-                    <Text
-                      style={[typography.bodyMedium, { color: colors.onSurface, flex: 1 }]}
-                      numberOfLines={1}
-                    >
-                      {name}
-                    </Text>
-                  </View>
-                ))}
-
-                {/* Add document button */}
+        {/* Setup card / compact bar */}
+        {showFullSetup ? (
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: colors.surfaceContainerHigh,
+                borderRadius: dimens.radius.lg,
+              },
+            ]}
+          >
+            {/* Collapse header (only when collapsible) */}
+            {collapsible && (
+              <>
                 <TouchableOpacity
                   style={[
-                    styles.addDocButton,
+                    styles.collapseHeader,
                     {
-                      backgroundColor: colors.surfaceContainerHighest,
-                      borderRadius: dimens.radius.md,
-                      padding: dimens.spacing.md,
-                      opacity: areModelsReady && !isLoadingDocument ? 1 : 0.5,
+                      paddingHorizontal: dimens.spacing.lg,
+                      paddingVertical: dimens.spacing.sm,
                     },
                   ]}
-                  onPress={handleSelectDocument}
-                  disabled={!areModelsReady || isLoadingDocument}
+                  onPress={() => setSetupExpanded(false)}
                   activeOpacity={0.7}
                 >
-                  {isLoadingDocument ? (
-                    <>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={[typography.bodyMedium, { color: colors.onSurface, marginLeft: dimens.spacing.sm }]}>
-                        Reading…
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Icon
-                        name="plus"
-                        size={dimens.icon.sm}
-                        color={areModelsReady ? colors.primary : colors.onSurfaceVariant}
-                      />
-                      <Text
-                        style={[
-                          typography.bodyMedium,
-                          { color: areModelsReady ? colors.primary : colors.onSurfaceVariant, marginLeft: dimens.spacing.sm },
-                        ]}
-                      >
-                        {areModelsReady ? addLabel : 'Pick models first'}
-                      </Text>
-                    </>
-                  )}
+                  <Text
+                    style={[
+                      typography.bodySmall,
+                      { color: colors.onSurfaceVariant, flex: 1 },
+                    ]}
+                  >
+                    Setup
+                  </Text>
+                  <Icon
+                    name="chevronDown"
+                    size={dimens.icon.sm}
+                    color={colors.onSurfaceVariant}
+                  />
                 </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            /* Compact bar */
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: colors.outlineVariant },
+                  ]}
+                />
+              </>
+            )}
+
+            {/* Embedding model row */}
             <TouchableOpacity
               style={[
-                styles.compactBar,
+                styles.setupRow,
                 {
-                  backgroundColor: colors.surfaceContainerHigh,
-                  borderRadius: dimens.radius.lg,
                   paddingHorizontal: dimens.spacing.lg,
                   paddingVertical: dimens.spacing.md,
                 },
               ]}
-              onPress={() => setSetupExpanded(true)}
+              onPress={() => setShowingEmbeddingPicker(true)}
               activeOpacity={0.7}
             >
-              <Icon name="storage" size={dimens.icon.sm} color={colors.primary} />
-              <Text
-                style={[typography.bodyMedium, { color: colors.onSurface, flex: 1 }]}
-                numberOfLines={1}
-              >
-                {documents.length} document{documents.length === 1 ? '' : 's'}
-              </Text>
-              {isLoadingDocument ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <TouchableOpacity onPress={handleSelectDocument} hitSlop={8}>
-                  <Icon name="plus" size={dimens.icon.md} color={colors.primary} />
-                </TouchableOpacity>
-              )}
-              <Icon name="chevronDown" size={dimens.icon.sm} color={colors.onSurfaceVariant} />
+              <Icon
+                name="storage"
+                size={dimens.icon.md}
+                color={
+                  selectedEmbeddingModel
+                    ? colors.primary
+                    : colors.onSurfaceVariant
+                }
+              />
+              <View style={styles.setupRowText}>
+                <Text
+                  style={[
+                    typography.bodySmall,
+                    { color: colors.onSurfaceVariant },
+                  ]}
+                >
+                  Embedding model
+                </Text>
+                <Text
+                  style={[typography.bodyLarge, { color: colors.onSurface }]}
+                  numberOfLines={1}
+                >
+                  {selectedEmbeddingModel?.name ?? 'Tap to select'}
+                </Text>
+              </View>
+              <Icon
+                name="chevronRight"
+                size={dimens.icon.sm}
+                color={colors.onSurfaceVariant}
+              />
             </TouchableOpacity>
-          )}
 
-          {/* Error text */}
-          {error && (
-            <Text style={[typography.bodySmall, { color: colors.error }]}>
-              {error}
-            </Text>
-          )}
+            <View
+              style={[
+                styles.divider,
+                { backgroundColor: colors.outlineVariant },
+              ]}
+            />
 
-          {/* Conversation pane */}
-          <View style={styles.fill}>
-            <ScrollView
-              ref={scrollViewRef}
-              style={styles.fill}
-              contentContainerStyle={[styles.messagesContent, { gap: dimens.spacing.md }]}
+            {/* LLM model row */}
+            <TouchableOpacity
+              style={[
+                styles.setupRow,
+                {
+                  paddingHorizontal: dimens.spacing.lg,
+                  paddingVertical: dimens.spacing.md,
+                },
+              ]}
+              onPress={() => setShowingLLMPicker(true)}
+              activeOpacity={0.7}
             >
-              {messages.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Icon name="rag" size={dimens.icon.lg} color={colors.primary} />
-                  <Text
-                    style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center', marginTop: dimens.spacing.md }]}
-                  >
-                    {!areModelsReady
-                      ? 'Pick an embedding model and an LLM to begin'
-                      : !hasDocuments
-                      ? 'Add a document, then ask a question about it'
-                      : 'Ask a question about your documents'}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {messages.map((msg, index) => (
-                    <View
-                      key={index}
+              <Icon
+                name="chat"
+                size={dimens.icon.md}
+                color={
+                  selectedLLMModel ? colors.primary : colors.onSurfaceVariant
+                }
+              />
+              <View style={styles.setupRowText}>
+                <Text
+                  style={[
+                    typography.bodySmall,
+                    { color: colors.onSurfaceVariant },
+                  ]}
+                >
+                  Language model
+                </Text>
+                <Text
+                  style={[typography.bodyLarge, { color: colors.onSurface }]}
+                  numberOfLines={1}
+                >
+                  {selectedLLMModel?.name ?? 'Tap to select'}
+                </Text>
+              </View>
+              <Icon
+                name="chevronRight"
+                size={dimens.icon.sm}
+                color={colors.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+
+            <View
+              style={[
+                styles.divider,
+                { backgroundColor: colors.outlineVariant },
+              ]}
+            />
+
+            {/* Documents section */}
+            <View
+              style={{ padding: dimens.spacing.lg, gap: dimens.spacing.sm }}
+            >
+              <View style={styles.docsHeader}>
+                <Text
+                  style={[
+                    typography.bodySmall,
+                    { color: colors.onSurfaceVariant, flex: 1 },
+                  ]}
+                >
+                  {documents.length === 0
+                    ? 'Documents'
+                    : `${documents.length} document${documents.length === 1 ? '' : 's'}`}
+                </Text>
+                {documents.length > 0 && (
+                  <TouchableOpacity onPress={handleClearAll} hitSlop={8}>
+                    <Text
                       style={[
-                        styles.bubbleRow,
-                        msg.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
+                        typography.labelMedium,
+                        { color: colors.primary },
                       ]}
                     >
-                      <View
+                      Clear
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {documents.map((name, i) => (
+                <View
+                  key={i}
+                  style={[styles.docRow, { gap: dimens.spacing.sm }]}
+                >
+                  <Icon
+                    name="storage"
+                    size={dimens.icon.sm}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[
+                      typography.bodyMedium,
+                      { color: colors.onSurface, flex: 1 },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                </View>
+              ))}
+
+              {/* Add document button */}
+              <TouchableOpacity
+                style={[
+                  styles.addDocButton,
+                  {
+                    backgroundColor: colors.surfaceContainerHighest,
+                    borderRadius: dimens.radius.md,
+                    padding: dimens.spacing.md,
+                    opacity: areModelsReady && !isLoadingDocument ? 1 : 0.5,
+                  },
+                ]}
+                onPress={handleSelectDocument}
+                disabled={!areModelsReady || isLoadingDocument}
+                activeOpacity={0.7}
+              >
+                {isLoadingDocument ? (
+                  <>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text
+                      style={[
+                        typography.bodyMedium,
+                        {
+                          color: colors.onSurface,
+                          marginLeft: dimens.spacing.sm,
+                        },
+                      ]}
+                    >
+                      Reading…
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Icon
+                      name="plus"
+                      size={dimens.icon.sm}
+                      color={
+                        areModelsReady
+                          ? colors.primary
+                          : colors.onSurfaceVariant
+                      }
+                    />
+                    <Text
+                      style={[
+                        typography.bodyMedium,
+                        {
+                          color: areModelsReady
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                          marginLeft: dimens.spacing.sm,
+                        },
+                      ]}
+                    >
+                      {areModelsReady ? addLabel : 'Pick models first'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View
+              style={[
+                styles.divider,
+                { backgroundColor: colors.outlineVariant },
+              ]}
+            />
+
+            {/* Retrieval options */}
+            <View
+              style={{ padding: dimens.spacing.lg, gap: dimens.spacing.md }}
+            >
+              <Text
+                style={[
+                  typography.bodySmall,
+                  { color: colors.onSurfaceVariant },
+                ]}
+              >
+                Retrieval
+              </Text>
+              <View style={styles.optionRow}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[typography.bodyLarge, { color: colors.onSurface }]}
+                  >
+                    Rerank results
+                  </Text>
+                  <Text
+                    style={[
+                      typography.bodySmall,
+                      { color: colors.onSurfaceVariant },
+                    ]}
+                  >
+                    LLM re-scores retrieved chunks for relevance
+                  </Text>
+                </View>
+                <Switch
+                  value={rerankEnabled}
+                  onValueChange={handleRerankChange}
+                />
+              </View>
+              <View style={styles.optionRow}>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[typography.bodyLarge, { color: colors.onSurface }]}
+                  >
+                    Multi-query expansion
+                  </Text>
+                  <Text
+                    style={[
+                      typography.bodySmall,
+                      { color: colors.onSurfaceVariant },
+                    ]}
+                  >
+                    Rewrites the question into variants, fuses results
+                  </Text>
+                </View>
+                <Switch
+                  value={multiQueryEnabled}
+                  onValueChange={setMultiQueryEnabled}
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* Compact bar */
+          <TouchableOpacity
+            style={[
+              styles.compactBar,
+              {
+                backgroundColor: colors.surfaceContainerHigh,
+                borderRadius: dimens.radius.lg,
+                paddingHorizontal: dimens.spacing.lg,
+                paddingVertical: dimens.spacing.md,
+              },
+            ]}
+            onPress={() => setSetupExpanded(true)}
+            activeOpacity={0.7}
+          >
+            <Icon name="storage" size={dimens.icon.sm} color={colors.primary} />
+            <Text
+              style={[
+                typography.bodyMedium,
+                { color: colors.onSurface, flex: 1 },
+              ]}
+              numberOfLines={1}
+            >
+              {documents.length} document{documents.length === 1 ? '' : 's'}
+            </Text>
+            {isLoadingDocument ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <TouchableOpacity onPress={handleSelectDocument} hitSlop={8}>
+                <Icon
+                  name="plus"
+                  size={dimens.icon.md}
+                  color={colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+            <Icon
+              name="chevronDown"
+              size={dimens.icon.sm}
+              color={colors.onSurfaceVariant}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Error text */}
+        {error && (
+          <Text style={[typography.bodySmall, { color: colors.error }]}>
+            {error}
+          </Text>
+        )}
+
+        {/* Conversation pane */}
+        <View style={styles.fill}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.fill}
+            contentContainerStyle={[
+              styles.messagesContent,
+              { gap: dimens.spacing.md },
+            ]}
+          >
+            {messages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Icon name="rag" size={dimens.icon.lg} color={colors.primary} />
+                <Text
+                  style={[
+                    typography.bodyLarge,
+                    {
+                      color: colors.onSurfaceVariant,
+                      textAlign: 'center',
+                      marginTop: dimens.spacing.md,
+                    },
+                  ]}
+                >
+                  {!areModelsReady
+                    ? 'Pick an embedding model and an LLM to begin'
+                    : !hasDocuments
+                      ? 'Add a document, then ask a question about it'
+                      : 'Ask a question about your documents'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {messages.map((msg, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.bubbleRow,
+                      msg.role === 'user'
+                        ? styles.bubbleRowUser
+                        : styles.bubbleRowAssistant,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.bubble,
+                        {
+                          backgroundColor:
+                            msg.role === 'user'
+                              ? colors.primary
+                              : colors.surfaceContainerHigh,
+                          borderRadius: dimens.radius.md,
+                          paddingHorizontal: dimens.spacing.md,
+                          paddingVertical: dimens.spacing.sm,
+                        },
+                      ]}
+                    >
+                      <Text
                         style={[
-                          styles.bubble,
+                          typography.bodyLarge,
                           {
-                            backgroundColor:
-                              msg.role === 'user' ? colors.primary : colors.surfaceContainerHigh,
-                            borderRadius: dimens.radius.md,
-                            paddingHorizontal: dimens.spacing.md,
-                            paddingVertical: dimens.spacing.sm,
+                            color:
+                              msg.role === 'user'
+                                ? colors.onPrimary
+                                : colors.onSurface,
                           },
                         ]}
                       >
-                        <Text
-                          style={[
-                            typography.bodyLarge,
-                            { color: msg.role === 'user' ? colors.onPrimary : colors.onSurface },
-                          ]}
-                        >
-                          {msg.text}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                  {isQuerying && (
-                    <View style={[styles.queryingRow, { gap: dimens.spacing.sm }]}>
-                      <ActivityIndicator size="small" color={colors.onSurfaceVariant} />
-                      <Text style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}>
-                        Searching your documents…
+                        {msg.text}
                       </Text>
                     </View>
-                  )}
-                </>
-              )}
-            </ScrollView>
-          </View>
+                  </View>
+                ))}
+                {isQuerying && (
+                  <View
+                    style={[styles.queryingRow, { gap: dimens.spacing.sm }]}
+                  >
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.onSurfaceVariant}
+                    />
+                    <Text
+                      style={[
+                        typography.bodyMedium,
+                        { color: colors.onSurfaceVariant },
+                      ]}
+                    >
+                      Searching your documents…
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
 
-          {/* Input bar */}
-          <View style={styles.inputBar}>
-            <View
+        {/* Input bar */}
+        <View style={styles.inputBar}>
+          <View
+            style={[
+              styles.inputWrapper,
+              { backgroundColor: colors.surfaceContainerHigh },
+            ]}
+          >
+            <TextInput
               style={[
-                styles.inputWrapper,
-                { backgroundColor: colors.surfaceContainerHigh },
+                styles.textInput,
+                typography.bodyLarge,
+                { color: colors.onSurface },
               ]}
-            >
-              <TextInput
-                style={[
-                  styles.textInput,
-                  typography.bodyLarge,
-                  { color: colors.onSurface },
-                ]}
-                placeholder="Ask about your documents"
-                placeholderTextColor={colors.onSurfaceVariant}
-                value={currentQuestion}
-                onChangeText={setCurrentQuestion}
-                editable={hasDocuments && !isQuerying}
-                returnKeyType="send"
-                onSubmitEditing={handleAskQuestion}
-                multiline
-                maxLength={2000}
-              />
-            </View>
-            <TouchableOpacity
-              onPress={handleAskQuestion}
-              disabled={!canAskQuestion}
-              activeOpacity={0.8}
-              style={[
-                styles.sendButton,
-                {
-                  backgroundColor: canAskQuestion
-                    ? colors.primary
-                    : colors.surfaceVariant,
-                },
-              ]}
-            >
-              <Icon
-                name="send"
-                size={20}
-                color={canAskQuestion ? colors.onPrimary : colors.onSurfaceVariant}
-              />
-            </TouchableOpacity>
+              placeholder="Ask about your documents"
+              placeholderTextColor={colors.onSurfaceVariant}
+              value={currentQuestion}
+              onChangeText={setCurrentQuestion}
+              editable={hasDocuments && !isQuerying}
+              returnKeyType="send"
+              onSubmitEditing={handleAskQuestion}
+              multiline
+              maxLength={2000}
+            />
           </View>
+          <TouchableOpacity
+            onPress={handleAskQuestion}
+            disabled={!canAskQuestion}
+            activeOpacity={0.8}
+            style={[
+              styles.sendButton,
+              {
+                backgroundColor: canAskQuestion
+                  ? colors.primary
+                  : colors.surfaceVariant,
+              },
+            ]}
+          >
+            <Icon
+              name="send"
+              size={20}
+              color={
+                canAskQuestion ? colors.onPrimary : colors.onSurfaceVariant
+              }
+            />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       {/* Model Selection Sheets */}
@@ -666,6 +970,11 @@ const styles = StyleSheet.create({
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   addDocButton: {
     flexDirection: 'row',

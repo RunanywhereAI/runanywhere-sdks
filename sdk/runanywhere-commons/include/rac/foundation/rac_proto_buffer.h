@@ -17,9 +17,6 @@
  *     rac_result_t, and error_message is optional owned text.
  *   - rac_proto_buffer_free() is idempotent for the same struct instance.
  *
- * Existing APIs that expose uint8_t** + size_t* remain source-compatible and
- * should allocate through rac_proto_buffer_copy_to_raw(); their scoped legacy
- * free functions should delegate to rac_proto_buffer_free_data().
  */
 
 #ifndef RAC_PROTO_BUFFER_H
@@ -106,7 +103,7 @@ RAC_API rac_result_t rac_proto_buffer_copy(const uint8_t* data, size_t size,
  * @brief Move owned data out of a success buffer.
  *
  * On success, *data_out owns the previous buffer->data allocation and must be
- * freed with rac_proto_buffer_free_data() or a delegating scoped free helper.
+ * freed with rac_proto_buffer_free_data().
  * The source buffer is reset to empty success. Error buffers are not moved and
  * return their status.
  */
@@ -129,17 +126,7 @@ RAC_API rac_result_t rac_proto_buffer_set_error(rac_proto_buffer_t* buffer, rac_
 RAC_API void rac_proto_buffer_free(rac_proto_buffer_t* buffer);
 
 /**
- * @brief Compatibility helper for legacy uint8_t** + size_t* C ABI functions.
- *
- * On success, *data_out owns the returned allocation and *size_out is the
- * meaningful byte count. Free with rac_proto_buffer_free_data() or the
- * legacy scoped free function that delegates to it.
- */
-RAC_API rac_result_t rac_proto_buffer_copy_to_raw(const uint8_t* data, size_t size,
-                                                  uint8_t** data_out, size_t* size_out);
-
-/**
- * @brief Free raw data returned by rac_proto_buffer_copy_to_raw().
+ * @brief Free raw data moved out with rac_proto_buffer_take_data().
  *
  * This is NULL-safe. It is not idempotent for a non-NULL raw pointer because
  * the function cannot clear the caller's pointer.

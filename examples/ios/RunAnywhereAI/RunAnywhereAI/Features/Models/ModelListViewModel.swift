@@ -96,6 +96,9 @@ class ModelListViewModel: ObservableObject {
                 print("iOS < 26 - Foundation Models not available")
             }
 
+            // QHexRT (Qualcomm Hexagon NPU) models can never run on Apple
+            // hardware — keep them out of every picker on this platform.
+            filteredModels = filteredModels.filter { $0.framework != .qhexrt }
             availableModels = filteredModels
             print("Loaded \(availableModels.count) models from registry")
 
@@ -158,11 +161,6 @@ class ModelListViewModel: ObservableObject {
         }
         #endif
         return false
-    }
-
-    /// Alias for loadModelsFromRegistry to match view calls
-    func loadModels() async {
-        await loadModelsFromRegistry()
     }
 
     @Published private(set) var isLoadingModel = false

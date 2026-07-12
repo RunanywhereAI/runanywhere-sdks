@@ -150,7 +150,6 @@ export const GENERATION_SETTINGS_KEYS = {
 export const APP_STORAGE_KEYS = {
   API_KEY: 'runanywhere_api_key',
   BASE_URL: 'runanywhere_base_url',
-  HF_TOKEN: 'runanywhere_hf_token',
   DEVICE_REGISTERED: 'com.runanywhere.sdk.deviceRegistered',
   TOOL_CALLING_ENABLED: 'toolCallingEnabled',
 } as const;

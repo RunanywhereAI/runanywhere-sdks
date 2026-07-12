@@ -4,7 +4,6 @@
 // Voice Pipeline for OpenClaw Hybrid Assistant
 // =============================================================================
 // Simplified pipeline - NO LLM:
-// - Wake Word Detection (openWakeWord)
 // - Voice Activity Detection (Silero VAD)
 // - Speech-to-Text (Parakeet TDT-CTC / NeMo CTC)
 // - Text-to-Speech (Piper)
@@ -28,11 +27,6 @@ namespace openclaw {
 // =============================================================================
 
 struct VoicePipelineConfig {
-    // Wake word settings
-    bool enable_wake_word = false;
-    std::string wake_word = "Hey Jarvis";
-    float wake_word_threshold = 0.5f;
-
     // VAD settings
     float vad_threshold = 0.5f;
     double silence_duration_sec = 1.5;
@@ -44,17 +38,13 @@ struct VoicePipelineConfig {
     double max_speech_duration_sec = 60.0; // Force-end speech after this long (prevents infinite buffering)
 
     // Callbacks
-    std::function<void(const std::string&, float)> on_wake_word;           // Wake word detected
     std::function<void(bool)> on_voice_activity;                           // Speech started/stopped
     std::function<void(const std::string&, bool)> on_transcription;        // ASR result
     std::function<void(const int16_t*, size_t, int, const std::atomic<bool>&)> on_audio_output;  // TTS audio (with cancel flag)
     std::function<void()> on_audio_stop;                                   // Force-stop ALSA playback immediately
-    std::function<void()> on_cancel_pending_responses;                     // Clear stale speak messages on barge-in
+    std::function<void()> on_cancel_pending_responses;                     // Clear stale speak messages after cancellation
     std::function<void(const std::string&)> on_error;                      // Error occurred
-    std::function<void()> on_speech_interrupted;                            // Wake word barge-in during TTS
-
     // Debug settings
-    bool debug_wakeword = false;
     bool debug_vad = false;
     bool debug_stt = false;
     bool debug_audio = false;   // Log mic input levels (RMS, peak) every ~1s
@@ -66,7 +56,6 @@ struct VoicePipelineConfig {
 
 enum class PipelineState {
     NOT_INITIALIZED,
-    WAITING_FOR_WAKE_WORD,
     LISTENING,
     PROCESSING_STT,
     SPEAKING,
@@ -135,31 +124,8 @@ private:
     struct AsyncTTSState;
     std::unique_ptr<AsyncTTSState> async_tts_;
 
-    // Internal methods
-    bool initialize_wakeword();
-    bool initialize_stt();
-    bool initialize_tts();
-    bool initialize_vad();
-
-    void process_wakeword(const float* samples, size_t num_samples);
     void process_vad(const float* samples, size_t num_samples, const int16_t* raw_samples);
     bool process_stt(const int16_t* samples, size_t num_samples);
 };
-
-// =============================================================================
-// Component Testers (for debugging individual components)
-// =============================================================================
-
-// Test wake word detection on a WAV file
-bool test_wakeword(const std::string& wav_path, float threshold = 0.5f);
-
-// Test VAD on a WAV file
-bool test_vad(const std::string& wav_path);
-
-// Test STT on a WAV file
-std::string test_stt(const std::string& wav_path);
-
-// Test TTS
-bool test_tts(const std::string& text, const std::string& output_path);
 
 } // namespace openclaw

@@ -364,19 +364,6 @@ RAC_API rac_bool_t rac_model_paths_is_model_path(const char* path);
  */
 RAC_API const char* rac_framework_raw_value(rac_inference_framework_t framework);
 
-/**
- * @brief Filename of the durable per-model manifest sidecar.
- *
- * Written by commons into `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
- * when a download completes (serialized `runanywhere.v1.ModelInfo` bytes with
- * volatile absolute paths stripped) and read back at cold launch to restore
- * registry entries that no catalog re-seeded. SDK/UI code listing model folder
- * contents should skip this file; artifact resolution already does.
- *
- * @return The constant sidecar filename (currently ".rac-manifest.binpb")
- */
-RAC_API const char* rac_model_folder_manifest_filename(void);
-
 #ifdef __cplusplus
 }
 #endif

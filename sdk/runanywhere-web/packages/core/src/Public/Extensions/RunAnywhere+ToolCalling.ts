@@ -41,6 +41,7 @@ import {
   ToolCallingSessionCreateRequest as ToolCallingSessionCreateRequestMessage,
   ToolCallingSessionEvent as ToolCallingSessionEventMessage,
   ToolCallingSessionStepWithResultRequest as ToolCallingSessionStepWithResultRequestMessage,
+  ToolCallFormatName,
   ToolChoiceMode,
   ToolParseRequest as ToolParseRequestMessage,
   ToolParseResult as ToolParseResultMessage,
@@ -64,14 +65,17 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import { SDKError as SDKErrorMessage } from '@runanywhere/proto-ts/errors';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
+import { wasmUint64ToSafeNumber } from '../../runtime/WasmInt64.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
-import { TextGeneration } from './RunAnywhere+TextGeneration';
+} from '../../runtime/EmscriptenModule.js';
+import { callEmscriptenAsyncNumber } from '../../runtime/EmscriptenAsync.js';
+import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('ToolCalling');
 
@@ -137,20 +141,16 @@ export type ToolExecutor = (
 const registeredTools = new Map<string, RegisteredTool>();
 
 /**
- * Swift parity: ToolCallingTypes.swift `maxToolCallCount` — an explicit
- * `maxToolCalls` wins over `maxIterations`; a non-positive value resolves to
- * the canonical default of 5.
+ * Resolve the canonical per-turn tool-call cap.
  */
 function maxToolCallCount(options: ToolCallingOptions): number {
-  const explicit = options.maxToolCalls !== undefined
-    ? options.maxToolCalls
-    : (options.maxIterations ?? 0);
+  const explicit = options.maxToolCalls ?? 0;
   return explicit > 0 ? explicit : 5;
 }
 
-/** Swift parity: `toolCallIdentifier` prefers `id`, then `callId`. */
+/** Canonical ID carried by ToolCall.id. */
 function toolCallIdentifier(toolCall: ToolCall): string {
-  return toolCall.id || toolCall.callId || '';
+  return toolCall.id;
 }
 
 function buildToolCallingOptions(
@@ -160,22 +160,17 @@ function buildToolCallingOptions(
   const overrides = options.toolCalling ?? {};
   return ToolCallingOptionsMessage.fromPartial({
     tools: overrides.tools ?? tools,
-    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
-    maxIterations: overrides.maxIterations ?? overrides.maxToolCalls ?? 5,
+    maxToolCalls: overrides.maxToolCalls ?? 5,
     autoExecute: overrides.autoExecute ?? true,
     temperature: overrides.temperature ?? options.temperature,
     maxTokens: overrides.maxTokens ?? options.maxTokens,
     systemPrompt: overrides.systemPrompt ?? options.systemPrompt,
     replaceSystemPrompt: overrides.replaceSystemPrompt ?? false,
     keepToolsAvailable: overrides.keepToolsAvailable ?? false,
-    formatHint: overrides.formatHint ?? '',
-    format: overrides.format,
-    customSystemPrompt: overrides.customSystemPrompt,
-    maxToolCalls: overrides.maxToolCalls,
+    format: overrides.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     toolChoice: overrides.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     forcedToolName: overrides.forcedToolName,
-    parallelToolCalls: overrides.parallelToolCalls ?? false,
-    requireJsonArguments: overrides.requireJsonArguments ?? true,
+    requireJsonArguments: overrides.requireJsonArguments ?? false,
   });
 }
 
@@ -186,18 +181,16 @@ function buildPromptOptions(
   return ToolCallingOptionsMessage.fromPartial({
     ...options,
     tools: options.tools ?? tools,
-    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
-    maxIterations: options.maxIterations ?? options.maxToolCalls ?? 5,
+    maxToolCalls: options.maxToolCalls ?? 5,
     autoExecute: options.autoExecute ?? true,
-    formatHint: options.formatHint ?? '',
+    format: options.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     toolChoice: options.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     // pass2-syn-006-followup-web: explicitly propagate forcedToolName so that
     // tool_choice=SPECIFIC reaches the commons parse/format/validate primitives
     // (and any future session/run-loop ABI). Spread alone is not sufficient
     // when callers pass undefined keys.
     forcedToolName: options.forcedToolName,
-    parallelToolCalls: options.parallelToolCalls ?? false,
-    requireJsonArguments: options.requireJsonArguments ?? true,
+    requireJsonArguments: options.requireJsonArguments ?? false,
   });
 }
 
@@ -396,7 +389,6 @@ function makeToolResult(params: {
     resultJson: jsonStringFromObject(params.result ?? {}),
     error: params.error,
     toolCallId: params.toolCallId,
-    callId: params.toolCallId,
     startedAtMs: params.startedAtMs,
     completedAtMs: Date.now(),
   });
@@ -431,10 +423,9 @@ function buildSessionCreateRequest(
     topP: llm?.topP ?? 1.0,
     systemPrompt: effectiveOptions.systemPrompt || llm?.systemPrompt || '',
     tools,
-    formatHint: effectiveOptions.formatHint ?? '',
-    // Swift parity: `UInt32(max(toolOptions.maxToolCallCount, 0))`
-    // (RunAnywhere+ToolCalling.swift:526) — never 0, defaults to 5.
-    maxIterations: Math.max(maxToolCallCount(effectiveOptions), 0),
+    format:
+      effectiveOptions.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+    maxToolCalls: Math.max(maxToolCallCount(effectiveOptions), 0),
     keepToolsAvailable: effectiveOptions.keepToolsAvailable ?? false,
     // `validate_calls` is `optional bool` on the proto. Leave it UNSET unless
     // the caller chose, so commons applies its documented default (true) —
@@ -458,6 +449,9 @@ function buildSessionCreateRequest(
     // (RunAnywhere+ToolCalling.swift:548).
     disableThinking:
       (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
+    autoExecute: effectiveOptions.autoExecute ?? true,
+    replaceSystemPrompt: effectiveOptions.replaceSystemPrompt ?? false,
+    requireJsonArguments: effectiveOptions.requireJsonArguments ?? false,
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
@@ -494,13 +488,13 @@ function decodeSessionEvent(
 }
 
 function encodeStepRequest(
-  sessionHandle: number,
+  sessionHandle: bigint,
   toolCallId: string,
   resultJson: string,
   error?: string,
 ): Uint8Array {
   const message = ToolCallingSessionStepWithResultRequestMessage.fromPartial({
-    sessionHandle,
+    sessionHandle: wasmUint64ToSafeNumber(sessionHandle, 'tool-calling session handle'),
     toolCallId,
     resultJson,
     error,
@@ -677,7 +671,7 @@ export const ToolCalling = {
    *
    * The TS side is now a thin event-pump driver — no manual parse loop, no
    * manual buildFollowupPrompt walk, no JS-side iteration cap. Every loop
-   * semantic (validation, max_iterations, format selection, validation policy
+   * semantic (validation, max_tool_calls, format selection, validation policy
    * on the W1 tool_choice=NONE fix) is owned by `tool_calling_run_loop.cpp` /
    * `tool_calling_session.cpp`.
    */
@@ -689,12 +683,11 @@ export const ToolCalling = {
     // pass3-syn-153: short-circuit when the AbortSignal is already aborted
     // BEFORE allocating the trampoline / handle slot or calling commons.
     // DOM AbortSignal does NOT re-fire the 'abort' event on a signal that is
-    // already aborted, and under WASM single-threaded execution the
-    // synchronous `_rac_tool_calling_session_create_proto` call runs an
+    // already aborted, and `_rac_tool_calling_session_create_proto` runs an
     // entire `run_generate_loop` (one full LLM generate, multi-second on
-    // realistic models) before returning. Catching the already-aborted case
-    // here mirrors Swift's eager `Task.checkCancellation()` pattern and
-    // saves the wasted generate cycle.
+    // realistic models) before its Asyncify-aware call resolves. Catching that
+    // state here mirrors Swift's eager `Task.checkCancellation()` pattern and
+    // avoids entering the Asyncify-backed generate cycle at all.
     if (extra.signal?.aborted) {
       throw SDKException.fromCode(
         -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
@@ -723,9 +716,30 @@ export const ToolCalling = {
     const bridge = new ProtoWasmBridge(module, logger);
     const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions, extra);
 
-    // Event queue: the C session callback fires synchronously inside
-    // session_create_proto / session_step_with_result_proto. We buffer events
-    // and drain them on the JS side between commons calls.
+    let sessionHandle = 0n;
+    let cancelDispatched = false;
+    const dispatchCancel = () => {
+      if (
+        sessionHandle !== 0n &&
+        !cancelDispatched &&
+        typeof module._rac_tool_calling_session_cancel_proto === 'function'
+      ) {
+        try {
+          module._rac_tool_calling_session_cancel_proto(sessionHandle);
+          cancelDispatched = true;
+        } catch (err) {
+          logger.warning(
+            `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    };
+
+    // Event queue: the C session callback fires before each awaited
+    // session_create_proto / session_step_with_result_proto invocation
+    // resolves. WebGPU may unwind either export through Asyncify, so the
+    // callback and request heap storage must remain live until the matching
+    // ccall({ async: true }) promise settles.
     const events: ToolCallingSessionEvent[] = [];
     // pass3-syn-152: latch the first decode failure so the drain loop can
     // surface a structured error (instead of falling through to the
@@ -740,45 +754,30 @@ export const ToolCalling = {
         decodeFailure = decoded.error;
       }
     }, 'viii');
-
-    // Reserve 8 bytes for the uint64 out-session-handle. Without WASM_BIGINT
-    // the WASM ABI returns uint64 via two i32s; we read low/high halves from
-    // the pointer.
-    const handlePtr = module._malloc(8);
-    if (!handlePtr) {
-      module.removeFunction(callbackPtr);
-      throw SDKException.backendNotAvailable(
-        'toolCalling.generateWithTools',
-        'failed to allocate session handle slot',
-      );
-    }
-    module.HEAPU32[handlePtr >>> 2] = 0;
-    module.HEAPU32[(handlePtr >>> 2) + 1] = 0;
-
-    let sessionHandle = 0;
-    // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
-    // The WASM module is single-threaded, so cancel fires after the current
-    // async tick returns to the event loop. It still lets us short-circuit
-    // multi-iteration loops between native calls.
-    const onAbort = () => {
-      if (
-        sessionHandle !== 0 &&
-        typeof module._rac_tool_calling_session_cancel_proto === 'function'
-      ) {
-        try {
-          module._rac_tool_calling_session_cancel_proto(sessionHandle);
-        } catch (err) {
-          logger.warning(
-            `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
+    const handleCallbackPtr = module.addFunction((handle: bigint /*, userData */) => {
+      sessionHandle = handle;
+      // If abort won the narrow window between the eager check and handle
+      // publication, wait until this callback returns before entering the C
+      // API again. Asyncify yields the initial generation back to the event
+      // loop, where this microtask can dispatch cancellation.
+      if (extra.signal?.aborted) {
+        queueMicrotask(dispatchCancel);
       }
+    }, 'vji');
+
+    // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
+    // Asyncify yields to the browser event loop while an awaited native call
+    // is in flight. Once commons has published the session handle, abort can
+    // therefore latch cancellation during a later step continuation;
+    // backend compute may use its own workers internally.
+    const onAbort = () => {
+      dispatchCancel();
     };
     extra.signal?.addEventListener('abort', onAbort);
     const cleanup = () => {
       extra.signal?.removeEventListener('abort', onAbort);
       try {
-        if (sessionHandle !== 0) {
+        if (sessionHandle !== 0n) {
           module._rac_tool_calling_session_destroy_proto!(sessionHandle);
         }
       } catch (err) {
@@ -786,13 +785,26 @@ export const ToolCalling = {
           `session_destroy_proto failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      module._free!(handlePtr);
       module.removeFunction!(callbackPtr);
+      module.removeFunction!(handleCallbackPtr);
     };
 
     try {
-      const createRc = bridge.withHeapBytes(requestBytes, (ptr, size) => (
-        module._rac_tool_calling_session_create_proto!(ptr, size, callbackPtr, 0, handlePtr)
+      const createRc = await bridge.withHeapBytesAsync(requestBytes, (ptr, size) => (
+        callEmscriptenAsyncNumber(
+          module,
+          'rac_tool_calling_session_create_proto',
+          ['number', 'number', 'number', 'number', 'number', 'number'],
+          [ptr, size, callbackPtr, 0, handleCallbackPtr, 0],
+          () => module._rac_tool_calling_session_create_proto!(
+            ptr,
+            size,
+            callbackPtr,
+            0,
+            handleCallbackPtr,
+            0,
+          ),
+        )
       ));
       if (createRc !== 0) {
         throw SDKException.fromCode(
@@ -801,24 +813,30 @@ export const ToolCalling = {
           `rc=${createRc}`,
         );
       }
-      const handleLow = module.HEAPU32[handlePtr >>> 2] ?? 0;
-      const handleHigh = module.HEAPU32[(handlePtr >>> 2) + 1] ?? 0;
-      // Session handles are sequential `uint64_t` counters starting at 1
-      // (tool_calling_session.cpp:104); they fit in 53 bits well into the
-      // future, so combining low/high as a JS Number is safe.
-      sessionHandle = handleLow + handleHigh * 0x100000000;
+      if (sessionHandle === 0n) {
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
+          'rac_tool_calling_session_create_proto failed',
+          'commons returned success without publishing a session handle',
+        );
+      }
       // pass2-syn-007: if the AbortSignal already fired before the session
       // handle was published, fan that cancel through to commons now.
       if (extra.signal?.aborted) {
         onAbort();
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+          'Tool-calling generation cancelled',
+          'AbortSignal fired while the initial tool-calling generation was in flight',
+        );
       }
 
       // Pump the event queue. Commons fires either:
       //  - final_result    -> done
       //  - error_bytes     -> error
       //  - tool_call       -> execute in TS, feed back via step_with_result_proto
-      // session_create / step_with_result are synchronous, so when they
-      // return the buffered events fully describe the next state.
+      // Once each awaited create/step call resolves, its buffered events fully
+      // describe the next session state.
       while (true) {
         const drained = events.splice(0, events.length);
         let pendingToolCall: ToolCall | null = null;
@@ -838,6 +856,13 @@ export const ToolCalling = {
           return finalResult;
         }
         if (errorBytes) {
+          let decodedError: ReturnType<typeof SDKErrorMessage.decode> | undefined;
+          try {
+            decodedError = SDKErrorMessage.decode(errorBytes);
+          } catch {
+            // Preserve the protocol-level fallback for malformed custom builds.
+          }
+          if (decodedError?.message) throw new SDKException(decodedError);
           throw SDKException.fromCode(
             -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
             'Tool-calling session failed',
@@ -845,10 +870,10 @@ export const ToolCalling = {
           );
         }
         if (!pendingToolCall) {
-          // pass3-syn-152: if the synchronous callback observed at least one
+          // pass3-syn-152: if the session callback observed at least one
           // proto-decode failure since the last drain, surface that as the
           // root cause — the "stalled" symptom is downstream of the dropped
-          // event. Without this, telemetry/Sentry would chase the C++
+          // event. Without this, telemetry would chase the C++
           // session state machine for what is actually a JS-side decode
           // break (e.g. a backwards-incompatible proto rev in a custom
           // build, or an addFunction wiring bug).
@@ -860,7 +885,7 @@ export const ToolCalling = {
             );
           }
           // No tool call and no final/error event — commons should always emit
-          // one of these terminal events at end of the synchronous step.
+          // one of these terminal events when the awaited native step resolves.
           // Treat as an internal protocol violation.
           throw SDKException.fromCode(
             -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
@@ -878,8 +903,14 @@ export const ToolCalling = {
           toolResult.resultJson ?? '',
           toolResult.success ? undefined : toolResult.error,
         );
-        const stepRc = bridge.withHeapBytes(stepBytes, (ptr, size) => (
-          module._rac_tool_calling_session_step_with_result_proto!(ptr, size)
+        const stepRc = await bridge.withHeapBytesAsync(stepBytes, (ptr, size) => (
+          callEmscriptenAsyncNumber(
+            module,
+            'rac_tool_calling_session_step_with_result_proto',
+            ['number', 'number'],
+            [ptr, size],
+            () => module._rac_tool_calling_session_step_with_result_proto!(ptr, size),
+          )
         ));
         if (stepRc !== 0) {
           throw SDKException.fromCode(

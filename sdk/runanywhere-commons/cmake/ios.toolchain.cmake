@@ -4,7 +4,6 @@
 # Usage:
 #   cmake -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
 #         -DIOS_PLATFORM=OS|SIMULATOR|SIMULATORARM64 \
-#         -DIOS_DEPLOYMENT_TARGET=13.0 \
 #         ..
 
 # Platform selection (must be set before project())
@@ -12,30 +11,18 @@ if(NOT DEFINED IOS_PLATFORM)
     set(IOS_PLATFORM "OS" CACHE STRING "iOS platform: OS, SIMULATOR, SIMULATORARM64")
 endif()
 
-# Deployment target
-# The VERSIONS file is the SINGLE SOURCE OF TRUTH for this value.
-# This can be set via:
-#   1. CMake variable: -DIOS_DEPLOYMENT_TARGET=13.0
-#   2. Environment variable (set by build scripts via: source scripts/load-versions.sh)
-#
-# IMPORTANT: Build scripts should always source load-versions.sh which exports
-# IOS_DEPLOYMENT_TARGET from VERSIONS file to the environment.
-if(NOT DEFINED IOS_DEPLOYMENT_TARGET)
-    if(DEFINED ENV{IOS_DEPLOYMENT_TARGET})
-        set(IOS_DEPLOYMENT_TARGET "$ENV{IOS_DEPLOYMENT_TARGET}" CACHE STRING "iOS deployment target version")
-    else()
-        # Fallback value - should match VERSIONS file (IOS_DEPLOYMENT_TARGET=13.0)
-        # This is only used if build scripts don't source load-versions.sh
-        message(WARNING "IOS_DEPLOYMENT_TARGET not set via environment. Using fallback value. "
-                       "Build scripts should source scripts/load-versions.sh to get version from VERSIONS file.")
-        set(IOS_DEPLOYMENT_TARGET "13.0" CACHE STRING "iOS deployment target version")
-    endif()
+# Read the deployment floor directly because toolchain files execute before
+# the project can add LoadVersions.cmake to CMAKE_MODULE_PATH.
+set(_RAC_VERSIONS_FILE "${CMAKE_CURRENT_LIST_DIR}/../VERSIONS")
+file(STRINGS "${_RAC_VERSIONS_FILE}" _RAC_IOS_VERSION_LINE
+     REGEX "^IOS_DEPLOYMENT_TARGET=[0-9]+\\.[0-9]+$")
+if(NOT _RAC_IOS_VERSION_LINE)
+    message(FATAL_ERROR "IOS_DEPLOYMENT_TARGET is missing from ${_RAC_VERSIONS_FILE}")
 endif()
-
-# Enable bitcode (deprecated in iOS 16, but still needed for older targets)
-if(NOT DEFINED IOS_ENABLE_BITCODE)
-    set(IOS_ENABLE_BITCODE OFF CACHE BOOL "Enable bitcode")
-endif()
+list(GET _RAC_IOS_VERSION_LINE 0 _RAC_IOS_VERSION_LINE)
+string(REGEX REPLACE "^[^=]+=" "" RAC_IOS_DEPLOYMENT_TARGET "${_RAC_IOS_VERSION_LINE}")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "${RAC_IOS_DEPLOYMENT_TARGET}" CACHE STRING
+    "Canonical iOS deployment target" FORCE)
 
 # Configure based on platform
 if(IOS_PLATFORM STREQUAL "OS")
@@ -61,9 +48,6 @@ else()
     message(FATAL_ERROR "Invalid IOS_PLATFORM: ${IOS_PLATFORM}")
 endif()
 
-# Set deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "${IOS_DEPLOYMENT_TARGET}")
-
 # Find SDK path
 execute_process(
     COMMAND xcrun --sdk ${CMAKE_OSX_SYSROOT} --show-sdk-path
@@ -77,7 +61,7 @@ endif()
 
 set(CMAKE_OSX_SYSROOT "${CMAKE_OSX_SYSROOT_PATH}")
 
-# Compiler flags (bitcode is deprecated in iOS 14+ and removed in iOS 16)
+# Compiler flags
 set(CMAKE_C_FLAGS_INIT "")
 set(CMAKE_CXX_FLAGS_INIT "")
 
@@ -116,9 +100,9 @@ execute_process(
 
 # Set minimum iOS version flag
 if(IOS_PLATFORM STREQUAL "SIMULATOR" OR IOS_PLATFORM STREQUAL "SIMULATORARM64")
-    set(IOS_MIN_VERSION_FLAG "-mios-simulator-version-min=${IOS_DEPLOYMENT_TARGET}")
+    set(IOS_MIN_VERSION_FLAG "-mios-simulator-version-min=${RAC_IOS_DEPLOYMENT_TARGET}")
 else()
-    set(IOS_MIN_VERSION_FLAG "-miphoneos-version-min=${IOS_DEPLOYMENT_TARGET}")
+    set(IOS_MIN_VERSION_FLAG "-miphoneos-version-min=${RAC_IOS_DEPLOYMENT_TARGET}")
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_INIT} ${IOS_MIN_VERSION_FLAG}" CACHE STRING "" FORCE)
@@ -141,5 +125,4 @@ message(STATUS "iOS Toolchain Configuration:")
 message(STATUS "  Platform: ${IOS_PLATFORM}")
 message(STATUS "  Architectures: ${CMAKE_OSX_ARCHITECTURES}")
 message(STATUS "  SDK: ${CMAKE_OSX_SYSROOT}")
-message(STATUS "  Deployment Target: ${IOS_DEPLOYMENT_TARGET}")
-message(STATUS "  Bitcode: ${IOS_ENABLE_BITCODE}")
+message(STATUS "  Deployment Target: ${RAC_IOS_DEPLOYMENT_TARGET}")

@@ -12,6 +12,15 @@
 # =============================================================================
 packages/*/ios/Frameworks/*.xcframework/
 packages/*/ios/Frameworks/*.xcframework.zip
+# Current package-owned CocoaPods/SwiftPM layout. These frameworks (including
+# their generated Headers trees) are staged only for local consumer validation;
+# published packages use the pinned remote-download/checksum contract.
+packages/*/ios/*/Frameworks/
+
+# MLX resource bundles/notices are generated from the checksum-pinned CocoaPods
+# payload. The package-specific .pubignore also keeps them out of pub.dev.
+packages/runanywhere_mlx/ios/runanywhere_mlx/Resources/
+packages/runanywhere_mlx/ios/runanywhere_mlx/ThirdPartyNotices/
 
 # =============================================================================
 # Native Binaries - Android JNI Libraries
@@ -51,6 +60,7 @@ packages/*/ios/Frameworks/LICENSE
 # =============================================================================
 packages/*/android/build/
 packages/*/ios/build/
+packages/*/ios/*/.build/
 packages/*/.dart_tool/
 packages/*/build/
 

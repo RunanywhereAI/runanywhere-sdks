@@ -170,14 +170,6 @@ extern const ::google::protobuf::internal::ClassDataFull StorageInfoResult_class
 #else
 extern const StorageInfoResultGlobalsTypeInternal StorageInfoResult_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
-class StoredModel;
-struct StoredModelGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern StoredModelGlobalsTypeInternal StoredModel_globals_;
-extern const ::google::protobuf::internal::ClassDataFull StoredModel_class_data_;
-#else
-extern const StoredModelGlobalsTypeInternal StoredModel_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
 }  // namespace v1
 }  // namespace runanywhere
 namespace google {
@@ -239,272 +231,6 @@ using ::google::protobuf::internal::generated_enum::AbslUnparseFlag;
 
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StoredModel final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.StoredModel) */ {
- public:
-  inline StoredModel() : StoredModel(nullptr) {}
-  ~StoredModel() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(StoredModel* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(StoredModel));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr StoredModel(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline StoredModel(const StoredModel& from) : StoredModel(nullptr, from) {}
-  inline StoredModel(StoredModel&& from) noexcept : StoredModel(nullptr, ::std::move(from)) {}
-  inline StoredModel& operator=(const StoredModel& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline StoredModel& operator=(StoredModel&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const StoredModel& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StoredModel>(&StoredModel_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 5;
-  friend void swap(StoredModel& a, StoredModel& b) { a.Swap(&b); }
-  inline void Swap(StoredModel* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(StoredModel* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] StoredModel* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<StoredModel>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const StoredModel& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const StoredModel& from) { StoredModel::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(StoredModel* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.StoredModel"; }
-
-  explicit StoredModel(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  StoredModel(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const StoredModel& from);
-  StoredModel(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, StoredModel&& from) noexcept
-      : StoredModel(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kModelIdFieldNumber = 1,
-    kNameFieldNumber = 2,
-    kLocalPathFieldNumber = 4,
-    kSizeBytesFieldNumber = 3,
-    kDownloadedAtMsFieldNumber = 5,
-  };
-  // string model_id = 1;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // string name = 2;
-  void clear_name() ;
-  [[nodiscard]] const ::std::string& name() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_name(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_name();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_name();
-  void set_allocated_name(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_name() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_name(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_name();
-
-  public:
-  // string local_path = 4;
-  void clear_local_path() ;
-  [[nodiscard]] const ::std::string& local_path() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_local_path(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_local_path();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_local_path();
-  void set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_local_path() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_local_path(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_local_path();
-
-  public:
-  // int64 size_bytes = 3;
-  void clear_size_bytes() ;
-  [[nodiscard]] ::int64_t size_bytes() const;
-  void set_size_bytes(::int64_t value);
-
-  private:
-  ::int64_t _internal_size_bytes() const;
-  void _internal_set_size_bytes(::int64_t value);
-
-  public:
-  // optional int64 downloaded_at_ms = 5;
-  [[nodiscard]] bool has_downloaded_at_ms()
-      const;
-  void clear_downloaded_at_ms() ;
-  [[nodiscard]] ::int64_t downloaded_at_ms() const;
-  void set_downloaded_at_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_downloaded_at_ms() const;
-  void _internal_set_downloaded_at_ms(::int64_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.StoredModel)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
-                          0, 57,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const StoredModel& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr name_;
-    ::google::protobuf::internal::ArenaStringPtr local_path_;
-    ::int64_t size_bytes_;
-    ::int64_t downloaded_at_ms_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_storage_5ftypes_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageInfoRequest final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.StorageInfoRequest) */ {
  public:
@@ -561,7 +287,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageInfoRequest final : public :
   [[nodiscard]] static const StorageInfoRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageInfoRequest>(&StorageInfoRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(StorageInfoRequest& a, StorageInfoRequest& b) { a.Swap(&b); }
   inline void Swap(StorageInfoRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -798,7 +524,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageDeleteResult final : public 
   [[nodiscard]] static const StorageDeleteResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageDeleteResult>(&StorageDeleteResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 14;
+  static constexpr int kIndexInFileMessages = 13;
   friend void swap(StorageDeleteResult& a, StorageDeleteResult& b) { a.Swap(&b); }
   inline void Swap(StorageDeleteResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1180,7 +906,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageDeletePlanRequest final : pu
   [[nodiscard]] static const StorageDeletePlanRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageDeletePlanRequest>(&StorageDeletePlanRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(StorageDeletePlanRequest& a, StorageDeletePlanRequest& b) { a.Swap(&b); }
   inline void Swap(StorageDeletePlanRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1458,7 +1184,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageDeleteCandidate final : publ
   [[nodiscard]] static const StorageDeleteCandidate& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageDeleteCandidate>(&StorageDeleteCandidate_globals_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(StorageDeleteCandidate& a, StorageDeleteCandidate& b) { a.Swap(&b); }
   inline void Swap(StorageDeleteCandidate* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1760,7 +1486,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageAvailabilityRequest final : 
   [[nodiscard]] static const StorageAvailabilityRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageAvailabilityRequest>(&StorageAvailabilityRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(StorageAvailabilityRequest& a, StorageAvailabilityRequest& b) { a.Swap(&b); }
   inline void Swap(StorageAvailabilityRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3291,7 +3017,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageDeletePlan final : public ::
   [[nodiscard]] static const StorageDeletePlan& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageDeletePlan>(&StorageDeletePlan_globals_);
   }
-  static constexpr int kIndexInFileMessages = 12;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(StorageDeletePlan& a, StorageDeletePlan& b) { a.Swap(&b); }
   inline void Swap(StorageDeletePlan* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3621,7 +3347,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageInfoResult final : public ::
   [[nodiscard]] static const StorageInfoResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageInfoResult>(&StorageInfoResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(StorageInfoResult& a, StorageInfoResult& b) { a.Swap(&b); }
   inline void Swap(StorageInfoResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3886,7 +3612,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageDeleteRequest final : public
   [[nodiscard]] static const StorageDeleteRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageDeleteRequest>(&StorageDeleteRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 13;
+  static constexpr int kIndexInFileMessages = 12;
   friend void swap(StorageDeleteRequest& a, StorageDeleteRequest& b) { a.Swap(&b); }
   inline void Swap(StorageDeleteRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4194,7 +3920,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED StorageAvailabilityResult final : p
   [[nodiscard]] static const StorageAvailabilityResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<StorageAvailabilityResult>(&StorageAvailabilityResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(StorageAvailabilityResult& a, StorageAvailabilityResult& b) { a.Swap(&b); }
   inline void Swap(StorageAvailabilityResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5313,254 +5039,6 @@ inline float StorageAvailability::_internal_required_to_available_ratio() const 
 inline void StorageAvailability::_internal_set_required_to_available_ratio(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.required_to_available_ratio_ = value;
-}
-
-// -------------------------------------------------------------------
-
-// StoredModel
-
-// string model_id = 1;
-inline void StoredModel::clear_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& StoredModel::model_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.StoredModel.model_id)
-  return _internal_model_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void StoredModel::set_model_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.StoredModel.model_id)
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::mutable_model_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_model_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StoredModel.model_id)
-  return _s;
-}
-inline const ::std::string& StoredModel::_internal_model_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.model_id_.Get();
-}
-inline void StoredModel::_internal_set_model_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::_internal_mutable_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.model_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE StoredModel::release_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.StoredModel.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.model_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void StoredModel::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.model_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StoredModel.model_id)
-}
-
-// string name = 2;
-inline void StoredModel::clear_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.name_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& StoredModel::name() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.StoredModel.name)
-  return _internal_name();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void StoredModel::set_name(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.StoredModel.name)
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::mutable_name()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_name();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StoredModel.name)
-  return _s;
-}
-inline const ::std::string& StoredModel::_internal_name() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.name_.Get();
-}
-inline void StoredModel::_internal_set_name(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.name_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::_internal_mutable_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.name_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE StoredModel::release_name() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.StoredModel.name)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.name_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.name_.Set("", GetArena());
-  }
-  return released;
-}
-inline void StoredModel::set_allocated_name(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.name_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.name_.IsDefault()) {
-    _impl_.name_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StoredModel.name)
-}
-
-// int64 size_bytes = 3;
-inline void StoredModel::clear_size_bytes() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.size_bytes_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::int64_t StoredModel::size_bytes() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.StoredModel.size_bytes)
-  return _internal_size_bytes();
-}
-inline void StoredModel::set_size_bytes(::int64_t value) {
-  _internal_set_size_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.StoredModel.size_bytes)
-}
-inline ::int64_t StoredModel::_internal_size_bytes() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.size_bytes_;
-}
-inline void StoredModel::_internal_set_size_bytes(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.size_bytes_ = value;
-}
-
-// string local_path = 4;
-inline void StoredModel::clear_local_path() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.local_path_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& StoredModel::local_path() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.StoredModel.local_path)
-  return _internal_local_path();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void StoredModel::set_local_path(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.local_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.StoredModel.local_path)
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::mutable_local_path()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_local_path();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.StoredModel.local_path)
-  return _s;
-}
-inline const ::std::string& StoredModel::_internal_local_path() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.local_path_.Get();
-}
-inline void StoredModel::_internal_set_local_path(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.local_path_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL StoredModel::_internal_mutable_local_path() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.local_path_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE StoredModel::release_local_path() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.StoredModel.local_path)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.local_path_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.local_path_.Set("", GetArena());
-  }
-  return released;
-}
-inline void StoredModel::set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.local_path_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.local_path_.IsDefault()) {
-    _impl_.local_path_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.StoredModel.local_path)
-}
-
-// optional int64 downloaded_at_ms = 5;
-inline bool StoredModel::has_downloaded_at_ms() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  return value;
-}
-inline void StoredModel::clear_downloaded_at_ms() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.downloaded_at_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline ::int64_t StoredModel::downloaded_at_ms() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.StoredModel.downloaded_at_ms)
-  return _internal_downloaded_at_ms();
-}
-inline void StoredModel::set_downloaded_at_ms(::int64_t value) {
-  _internal_set_downloaded_at_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.StoredModel.downloaded_at_ms)
-}
-inline ::int64_t StoredModel::_internal_downloaded_at_ms() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.downloaded_at_ms_;
-}
-inline void StoredModel::_internal_set_downloaded_at_ms(::int64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.downloaded_at_ms_ = value;
 }
 
 // -------------------------------------------------------------------

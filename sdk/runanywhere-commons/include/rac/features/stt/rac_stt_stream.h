@@ -16,8 +16,8 @@
  *      Each accepted frame produces zero or more `STTStreamEvent` proto
  *      bytes routed to the registered callback.
  *   4. SDK terminates the session via `rac_stt_stream_stop_proto()` (drain
- *      pending events) or `rac_stt_stream_cancel_proto()` (immediate
- *      teardown, no further events).
+ *      pending events) or `rac_stt_stream_cancel_proto()` (immediately
+ *      suppress new events, then drain already-accepted provider work).
  *
  * Lifetime: the buffer passed to the callback is valid only for the
  * duration of the callback invocation. Callers that retain bytes MUST
@@ -25,8 +25,8 @@
  * an arena-backed proto message across events.
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `SDK-facing default`.
- * The legacy struct callback path remains for backend smoke tests; SDKs
- * MUST migrate to this proto-byte stream ABI.
+ * `rac_stt_stream_callback_t` remains the backend-facing engine contract;
+ * SDK consumers use this proto-byte stream ABI.
  */
 
 #ifndef RAC_FEATURES_STT_RAC_STT_STREAM_H
@@ -64,6 +64,7 @@ typedef void (*rac_stt_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
  *
  * @retval RAC_SUCCESS                     Callback registered.
  * @retval RAC_ERROR_INVALID_HANDLE        @p handle is null or invalid.
+ * @retval RAC_ERROR_SERVICE_BUSY          Component lifecycle teardown is in progress.
  *
  * @warning user_data ownership and lifetime (cross-SDK
  *          contract — see rac_llm_stream.h for the canonical recipe). The C
@@ -110,7 +111,11 @@ RAC_API rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle);
  *        Callers freeing user_data passed into
  *        rac_stt_set_stream_proto_callback, or tearing down the STT
  *        component, should call this after the unset before freeing the
- *        user_data. Safe to call from any thread.
+ *        user_data. Safe to call from any thread, including re-entrantly from
+ *        a callback. A re-entrant call waits for every dispatch on other
+ *        threads but necessarily returns before callback frames already active
+ *        on the calling thread have unwound; user_data must remain alive until
+ *        those frames return.
  */
 RAC_API void rac_stt_proto_quiesce(void);
 
@@ -129,6 +134,7 @@ RAC_API void rac_stt_proto_quiesce(void);
  * @retval RAC_SUCCESS                     Session started.
  * @retval RAC_ERROR_INVALID_HANDLE        @p handle is null or invalid.
  * @retval RAC_ERROR_NULL_POINTER          @p out_session_id is null.
+ * @retval RAC_ERROR_SERVICE_BUSY          Component model lifecycle teardown is in progress.
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE Library was built without Protobuf.
  * @retval RAC_ERROR_NOT_IMPLEMENTED       Session backend not yet wired (stub).
  */
@@ -164,9 +170,17 @@ RAC_API rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id,
 RAC_API rac_result_t rac_stt_stream_stop_proto(uint64_t session_id);
 
 /**
- * @brief Cancel a streaming STT session immediately.
+ * @brief Cancel a streaming STT session and drain accepted provider work.
  *
- * Pending audio is dropped and no more events are delivered.
+ * Cancellation closes the session's dispatch gate immediately, so no new
+ * events are admitted and pending buffered audio is dropped. It does not
+ * interrupt a provider call that is already executing. If a feed or callback
+ * is in flight, this call waits for it to return before destroying the backend
+ * stream handle. When called outside the session's callback, no callback for
+ * the session is running after this function returns. If cancellation is
+ * requested re-entrantly from that session's own callback, it cannot wait for
+ * itself; cleanup is deferred until the callback and provider feed unwind.
+ * Both paths suppress all later events.
  */
 RAC_API rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id);
 

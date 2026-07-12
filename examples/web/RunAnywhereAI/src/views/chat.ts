@@ -10,8 +10,8 @@
  *   - Optional tool calling with the same three demo tools as iOS
  *     (get_weather / get_current_time / calculate) — iOS parity:
  *     ToolSettingsView.swift:32-139 + LLMViewModel+ToolCalling.swift.
- *   - Conversation persists to localStorage — minimal mirror of iOS
- *     ConversationStore semantics (save on update, restore on mount).
+ *   - IndexedDB conversation history mirrors the iOS ConversationStore:
+ *     save on update, restore on mount, and switch between prior chats.
  *
  * The toolbar model pill + "Get Started" overlay are built by
  * `components/model-selection.ts`. They expose the DOM ids the readiness
@@ -21,10 +21,13 @@
 
 import type { TabLifecycle } from '../app';
 import {
+  ChatMessageStatus,
+  MessageRole,
   ModelCategory,
   RunAnywhere,
+  ToolChoiceMode,
   ToolParameterType,
-  isSDKException,
+  type ChatMessage as SDKChatMessage,
   type ToolDefinition,
   type ToolValue,
 } from '@runanywhere/web';
@@ -32,6 +35,7 @@ import {
   buildGetStartedOverlay,
   onModelStateChange,
   openSheet,
+  refreshModelSelectionState,
   type OpenSheetOptions,
 } from '../components/model-selection';
 import { showToast } from '../components/dialogs';
@@ -40,11 +44,17 @@ import {
   answerDocumentAttachment,
   answerImageAttachment,
   canAnswerImageAttachment,
+  cancelActiveDocumentAttachmentAnswer,
   cancelActiveImageAttachmentAnswer,
   validateChatAttachmentFile,
 } from '../services/chat-attachments';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import {
+  ConversationsStore,
+  type StoredConversation,
+} from '../services/conversations-store';
+import { appLogger } from '../services/app-logger';
 
 interface ChatToolCallInfo {
   name: string;
@@ -76,11 +86,59 @@ interface ChatMessage {
   sources?: ChatSourceInfo[];
 }
 
+interface ConversationGenerationContext {
+  history: SDKChatMessage[];
+  conversationId?: string;
+}
+
 interface PendingAttachment {
   kind: 'image' | 'document';
   file: File;
   name: string;
   description: string;
+}
+
+type JsonObject = Readonly<Record<string, unknown>>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasOptionalString(value: JsonObject, key: string): boolean {
+  return value[key] === undefined || typeof value[key] === 'string';
+}
+
+function isChatToolCallInfo(value: unknown): value is ChatToolCallInfo {
+  return isJsonObject(value)
+    && typeof value.name === 'string'
+    && typeof value.argumentsJson === 'string'
+    && hasOptionalString(value, 'resultJson')
+    && hasOptionalString(value, 'error');
+}
+
+function isChatAttachmentInfo(value: unknown): value is ChatAttachmentInfo {
+  return isJsonObject(value)
+    && (value.kind === 'image' || value.kind === 'document')
+    && typeof value.name === 'string'
+    && hasOptionalString(value, 'detail');
+}
+
+function isChatSourceInfo(value: unknown): value is ChatSourceInfo {
+  return isJsonObject(value)
+    && typeof value.document === 'string'
+    && typeof value.text === 'string';
+}
+
+function isChatMessage(value: unknown): value is ChatMessage {
+  return isJsonObject(value)
+    && (value.role === 'user' || value.role === 'assistant')
+    && typeof value.content === 'string'
+    && (value.attachment === undefined || isChatAttachmentInfo(value.attachment))
+    && hasOptionalString(value, 'thinking')
+    && (value.toolCalls === undefined
+      || (Array.isArray(value.toolCalls) && value.toolCalls.every(isChatToolCallInfo)))
+    && (value.sources === undefined
+      || (Array.isArray(value.sources) && value.sources.every(isChatSourceInfo)));
 }
 
 // Chat's picker is scoped to LLMs — iOS parity:
@@ -98,10 +156,12 @@ const VLM_SHEET_OPTIONS: OpenSheetOptions = {
   ],
 };
 
-// Minimal localStorage-backed conversation persistence — mirrors iOS
-// ConversationStore (Core/Services/ConversationStore.swift) semantics at MVP
-// scope: one current conversation, saved on update, restored on mount.
-const CONVERSATION_STORAGE_KEY = 'runanywhere-chat-conversation';
+const CHAT_CAPABLE_MODEL_CATEGORIES: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  ModelCategory.MODEL_CATEGORY_VISION,
+];
+
 // iOS parity: ToolSettingsView.swift:23 persists "toolCallingEnabled".
 const TOOLS_ENABLED_STORAGE_KEY = 'runanywhere-tool-calling-enabled';
 
@@ -111,11 +171,12 @@ let isGenerating = false;
 let cancelGeneration: (() => void) | null = null;
 let toolsEnabled = false;
 let pendingAttachment: PendingAttachment | null = null;
+let conversationStorageWarningShown = false;
 
 export function initChatTab(el: HTMLElement): TabLifecycle {
   container = el;
 
-  messages = loadConversation();
+  messages = [];
   toolsEnabled = loadToolsEnabled();
 
   // Register the demo tools once at chat setup — iOS parity:
@@ -149,10 +210,6 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
               ${svgIcon('<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M8 6h8v9H8z"/>')}
               <span><strong>Live camera</strong><small>Look around with vision</small></span>
             </button>
-            <button type="button" data-action="advanced">
-              ${svgIcon('<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>')}
-              <span><strong>Advanced tools</strong><small>SDK demos and diagnostics</small></span>
-            </button>
           </div>
         </div>
         <button class="composer-icon-btn" id="chat-tools-btn" type="button" aria-label="Enable web and tools" title="Enable web and tools">
@@ -173,7 +230,11 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   // readiness probe's overlay visibility check works. The overlay is shown
   // whenever no model is loaded and hidden once a model enters the loaded
   // state.
-  container.appendChild(buildGetStartedOverlay(CHAT_SHEET_OPTIONS));
+  const getStartedOverlay = buildGetStartedOverlay(
+    CHAT_SHEET_OPTIONS,
+    CHAT_CAPABLE_MODEL_CATEGORIES,
+  );
+  container.appendChild(getStartedOverlay);
 
   const messagesEl = container.querySelector('#chat-messages') as HTMLElement;
   const inputEl = container.querySelector('#chat-input') as HTMLTextAreaElement;
@@ -188,6 +249,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const talkBtn = container.querySelector('#chat-talk-btn') as HTMLButtonElement;
   const listenerScope = new AbortController();
   const listenerOptions: AddEventListenerOptions = { signal: listenerScope.signal };
+  let pendingConversationAction: (() => Promise<void>) | null = null;
+  let conversationActionVersion = 0;
+  let conversationHydrated = false;
+  let conversationHydration: Promise<void> = Promise.resolve();
 
   const refreshToolsButton = () => {
     toolsBtn.classList.toggle('active', toolsEnabled);
@@ -230,13 +295,16 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     const hasInput = inputEl.value.trim().length > 0;
     const modelLoaded = isModelLoaded();
     const hasAttachment = pendingAttachment !== null;
-    sendBtn.disabled = !isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment));
+    sendBtn.disabled = !conversationHydrated
+      || (!isGenerating && ((!hasInput && !hasAttachment) || (!modelLoaded && !hasAttachment)));
     sendBtn.innerHTML = isGenerating
       ? svgIcon('<rect x="6" y="6" width="12" height="12" rx="2"/>')
       : svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>');
     // Tooltip clarifies why the button is disabled. The textbox stays
     // enabled so users may compose while a model is loading.
-    if (isGenerating) {
+    if (!conversationHydrated) {
+      sendBtn.title = 'Loading saved chats';
+    } else if (isGenerating) {
       sendBtn.title = 'Stop';
     } else if (!modelLoaded && !hasAttachment) {
       sendBtn.title = 'Load a model first';
@@ -248,7 +316,28 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     sendBtn.setAttribute('aria-label', isGenerating ? 'Stop generation' : 'Send message');
   };
 
-  inputEl.addEventListener('input', refreshSendButton, listenerOptions);
+  const autoGrowInput = () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = `${inputEl.scrollHeight}px`;
+  };
+  inputEl.addEventListener('input', () => {
+    refreshSendButton();
+    autoGrowInput();
+  }, listenerOptions);
+  // Copy action on assistant replies (delegated — the list re-renders often).
+  messagesEl.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-copy-idx]');
+    if (!button) return;
+    const message = messages[Number(button.dataset.copyIdx)];
+    if (!message?.content) return;
+    void navigator.clipboard.writeText(message.content).then(() => {
+      const label = button.querySelector('span');
+      if (label) {
+        label.textContent = 'Copied';
+        setTimeout(() => { label.textContent = 'Copy'; }, 1500);
+      }
+    }).catch(() => showToast('Could not copy to clipboard', 'warning', 2600));
+  }, listenerOptions);
   inputEl.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -320,18 +409,84 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     refreshSendButton();
   }, listenerOptions);
   talkBtn.addEventListener('click', () => navigateTo('voice'), listenerOptions);
-  const resetChat = () => {
-    if (cancelGeneration) cancelGeneration();
-    messages = [];
+  const showConversation = (nextMessages: ChatMessage[]) => {
+    messages = nextMessages;
+    getStartedOverlay.classList.toggle(
+      'chat-model-overlay--conversation-visible',
+      conversationSuppressesModelOverlay(nextMessages),
+    );
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
     pendingAttachment = null;
-    clearConversation();
     renderMessages(messagesEl);
     refreshAttachmentPill();
     refreshSendButton();
   };
+  const reportConversationStorageError = (error: unknown) => {
+    if (!conversationStorageWarningShown) {
+      conversationStorageWarningShown = true;
+      showToast('Saved chats are unavailable in this browser session.', 'warning', 4200);
+    }
+    appLogger.warning('[Chat] Conversation storage operation failed:', error);
+  };
+  const runConversationAction = (action: () => Promise<void>) => {
+    conversationActionVersion += 1;
+    if (isGenerating) {
+      pendingConversationAction = action;
+      cancelGeneration?.();
+      return;
+    }
+    void action().catch(reportConversationStorageError);
+  };
+  const runPendingConversationAction = () => {
+    const action = pendingConversationAction;
+    pendingConversationAction = null;
+    if (action) void action().catch(reportConversationStorageError);
+  };
+  const resetChat = () => runConversationAction(async () => {
+    await ConversationsStore.startNew();
+    showConversation([]);
+  });
+  const restoreSavedChat = (event: Event) => {
+    const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+    if (!conversationId) return;
+    runConversationAction(async () => {
+      const conversation = await ConversationsStore.setCurrent(conversationId);
+      if (!conversation) {
+        showToast('That saved chat is no longer available.', 'warning', 3200);
+        return;
+      }
+      showConversation(conversation.messages.filter(isChatMessage));
+    });
+  };
+  const deleteSavedChat = (event: Event) => {
+    const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+    if (!conversationId) return;
+    void ConversationsStore.getCurrent().then((current) => {
+      if (current?.id !== conversationId) {
+        return ConversationsStore.delete(conversationId).then(() => undefined);
+      }
+      runConversationAction(async () => {
+        await ConversationsStore.delete(conversationId);
+        showConversation([]);
+      });
+      return undefined;
+    }).catch(reportConversationStorageError);
+  };
   window.addEventListener('runanywhere:new-chat', resetChat, listenerOptions);
+  window.addEventListener('runanywhere:load-chat', restoreSavedChat, listenerOptions);
+  window.addEventListener('runanywhere:delete-chat', deleteSavedChat, listenerOptions);
 
   renderMessages(messagesEl);
+  const initialConversationVersion = conversationActionVersion;
+  conversationHydration = loadConversation().then((savedMessages) => {
+    if (conversationActionVersion === initialConversationVersion) {
+      showConversation(savedMessages);
+    }
+  }).catch(reportConversationStorageError).finally(() => {
+    conversationHydrated = true;
+    refreshSendButton();
+  });
 
   // Apply the initial disabled / tooltip state so the Send button reflects
   // "Load a model first" before any user interaction.
@@ -342,6 +497,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   const unsubscribeState = onModelStateChange(() => refreshSendButton());
 
   async function onSend(): Promise<void> {
+    await conversationHydration;
     const prompt = inputEl.value.trim();
     const attachment = pendingAttachment;
     if ((!prompt && !attachment) || isGenerating) return;
@@ -363,22 +519,36 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
 
     inputEl.value = '';
+    inputEl.style.height = 'auto';
     refreshSendButton();
 
+    const history = conversationHistoryForGeneration(messages);
     messages.push({ role: 'user', content: prompt });
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
     messages.push(assistantMsg);
-    saveConversation();
-    renderMessages(messagesEl);
-
     isGenerating = true;
     refreshSendButton();
+    const conversation = await saveConversation();
+    const generationContext: ConversationGenerationContext = {
+      history,
+      ...(conversation ? { conversationId: conversation.id } : {}),
+    };
+    renderMessages(messagesEl);
+    if (pendingConversationAction) {
+      assistantMsg.content = 'Cancelled.';
+      await saveConversation();
+      isGenerating = false;
+      refreshSendButton();
+      renderMessages(messagesEl);
+      runPendingConversationAction();
+      return;
+    }
 
     try {
       if (toolsEnabled) {
         await generateWithToolCalling(prompt, assistantMsg, messagesEl);
       } else {
-        await generateStreaming(prompt, assistantMsg, messagesEl);
+        await generateStreaming(prompt, assistantMsg, messagesEl, generationContext);
       }
     } catch (error) {
       assistantMsg.content = formatChatError(error);
@@ -386,8 +556,11 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     } finally {
       cancelGeneration = null;
       isGenerating = false;
-      saveConversation();
+      await saveConversation();
       refreshSendButton();
+      // Full re-render drops the streaming cursor and adds hover actions.
+      renderMessages(messagesEl);
+      runPendingConversationAction();
     }
   }
 
@@ -403,6 +576,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     }
 
     inputEl.value = '';
+    inputEl.style.height = 'auto';
     pendingAttachment = null;
     refreshAttachmentPill();
     refreshSendButton();
@@ -422,11 +596,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     };
     const assistantMsg: ChatMessage = { role: 'assistant', content: '' };
     messages.push(userMessage, assistantMsg);
-    saveConversation();
-    renderMessages(host);
-
     isGenerating = true;
     refreshSendButton();
+    await saveConversation();
+    renderMessages(host);
+    if (pendingConversationAction) {
+      assistantMsg.content = 'Cancelled.';
+      await saveConversation();
+      isGenerating = false;
+      refreshSendButton();
+      renderMessages(host);
+      runPendingConversationAction();
+      return;
+    }
     try {
       const settings = getGenerationSettings();
       const onProgress = ({ content }: { content: string }) => {
@@ -440,6 +622,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.thinking = answer.thinking;
         assistantMsg.sources = answer.sources;
       } else {
+        cancelGeneration = cancelActiveDocumentAttachmentAnswer;
         const answer = await answerDocumentAttachment(attachment.file, question, settings, onProgress);
         assistantMsg.content = answer.content;
         assistantMsg.thinking = answer.thinking;
@@ -447,13 +630,15 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
       renderLastMessage(host, assistantMsg);
     } catch (error) {
-      assistantMsg.content = formatChatError(error);
+      assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
       renderLastMessage(host, assistantMsg);
     } finally {
       cancelGeneration = null;
       isGenerating = false;
-      saveConversation();
+      await saveConversation();
       refreshSendButton();
+      renderMessages(host);
+      runPendingConversationAction();
     }
   }
 
@@ -471,10 +656,25 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   if (rootParent) disposeObserver.observe(rootParent, { childList: true });
 
   return {
+    onActivate: () => {
+      refreshModelSelectionState();
+      refreshSendButton();
+    },
     onDeactivate: () => {
       if (cancelGeneration) cancelGeneration();
     },
   };
+}
+
+/** Saved content stays readable even when no inference model is loaded. */
+export function conversationSuppressesModelOverlay(
+  conversationMessages: readonly unknown[],
+): boolean {
+  return conversationMessages.length > 0;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 // ---------------------------------------------------------------------------
@@ -509,11 +709,13 @@ async function generateStreaming(
   prompt: string,
   assistantMsg: ChatMessage,
   messagesEl: HTMLElement,
+  context: ConversationGenerationContext,
 ): Promise<void> {
   const options = buildGenerationOptions();
   const stream = await RunAnywhere.generateStream({
     prompt,
     ...options,
+    ...context,
   });
   cancelGeneration = stream.cancel;
 
@@ -530,11 +732,21 @@ async function generateStreaming(
   }
 
   const result = await stream.result;
-  // Prefer the structured thinkingContent from the final result when the
-  // backend separates it (same field iOS reads: result.thinkingContent).
-  if (result.thinkingContent) {
-    assistantMsg.thinking = result.thinkingContent;
-    assistantMsg.content = splitThinking(result.text || raw).content;
+  // Reconcile the terminal snapshot even when the model never leaves its
+  // reasoning phase. Keep hidden reasoning separate from the answer and make
+  // an exhausted/empty terminal state explicit instead of leaving the live
+  // "Thinking…" placeholder on screen indefinitely.
+  const terminal = splitThinking(result.text || raw);
+  assistantMsg.thinking = result.thinkingContent?.trim()
+    || terminal.thinking
+    || assistantMsg.thinking;
+  assistantMsg.content = terminal.content;
+  if (!assistantMsg.content) {
+    assistantMsg.content = result.finishReason === 'cancelled'
+      ? 'Cancelled.'
+      : result.finishReason === 'length'
+        ? 'The response limit was reached before a final answer. Increase Max tokens in Settings or turn off thinking, then try again.'
+        : 'The model finished without producing a final answer. Try again or turn off thinking.';
   }
   renderLastMessage(messagesEl, assistantMsg);
 }
@@ -552,14 +764,20 @@ async function generateWithToolCalling(
   const options = buildGenerationOptions();
   const controller = new AbortController();
   cancelGeneration = () => controller.abort();
+  const forcedToolName = explicitlyRequestedDemoTool(prompt);
 
-  const result = await RunAnywhere.generateWithTools(prompt, {}, {
+  const result = await RunAnywhere.generateWithTools(prompt, forcedToolName ? {
+    toolChoice: ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC,
+    forcedToolName,
+  } : {}, {
     signal: controller.signal,
     llmOptions: options,
   });
 
   const split = splitThinking(result.text);
-  assistantMsg.content = split.content;
+  assistantMsg.content = split.content || (result.toolCalls.length > 0
+    ? 'The tool completed, but the model did not provide a final answer.'
+    : 'The model did not produce a tool call or answer. Please try again.');
   assistantMsg.thinking = result.thinkingContent || split.thinking || undefined;
   if (result.toolCalls.length > 0) {
     assistantMsg.toolCalls = result.toolCalls.map((call) => {
@@ -576,6 +794,17 @@ async function generateWithToolCalling(
     });
   }
   renderLastMessage(messagesEl, assistantMsg);
+}
+
+const DEMO_TOOL_NAMES = ['calculate', 'get_current_time', 'get_weather'] as const;
+type DemoToolName = (typeof DEMO_TOOL_NAMES)[number];
+
+/** Honor an unambiguous, explicit tool-name request through the SDK's forced
+ * choice contract. Ordinary user language remains on automatic selection. */
+function explicitlyRequestedDemoTool(prompt: string): DemoToolName | null {
+  const requested = DEMO_TOOL_NAMES.filter((name) =>
+    new RegExp(`\\b${name}\\b`, 'i').test(prompt));
+  return requested.length === 1 ? requested[0]! : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -697,10 +926,11 @@ function toolValueString(value: ToolValue | undefined): string | null {
 async function fetchWeather(location: string): Promise<Record<string, ToolValue>> {
   const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=en&format=json`;
   const geoResponse = await fetch(geoUrl);
-  const geo = await geoResponse.json() as {
-    results?: Array<{ latitude: number; longitude: number; name?: string }>;
-  };
-  const first = geo.results?.[0];
+  if (!geoResponse.ok) {
+    return { error: tv(`Weather location lookup failed (${geoResponse.status})`) };
+  }
+  const geoPayload: unknown = await geoResponse.json();
+  const first = parseOpenMeteoLocation(geoPayload);
   if (!first) {
     return {
       error: tv(`Could not find location: ${location}`),
@@ -713,26 +943,87 @@ async function fetchWeather(location: string): Promise<Record<string, ToolValue>
     + '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m'
     + '&temperature_unit=fahrenheit&wind_speed_unit=mph';
   const weatherResponse = await fetch(weatherUrl);
-  const weather = await weatherResponse.json() as {
-    current?: {
-      temperature_2m?: number;
-      relative_humidity_2m?: number;
-      weather_code?: number;
-      wind_speed_10m?: number;
-    };
-  };
-  const current = weather.current;
+  if (!weatherResponse.ok) {
+    return { error: tv(`Weather forecast lookup failed (${weatherResponse.status})`) };
+  }
+  const weatherPayload: unknown = await weatherResponse.json();
+  const current = parseOpenMeteoCurrentWeather(weatherPayload);
   if (!current) {
     return { error: tv('Could not parse weather data') };
   }
 
   return {
     location: tv(first.name ?? location),
-    temperature: tv(current.temperature_2m ?? 0),
+    temperature: tv(current.temperature),
     unit: tv('fahrenheit'),
-    humidity: tv(current.relative_humidity_2m ?? 0),
-    wind_speed_mph: tv(current.wind_speed_10m ?? 0),
-    condition: tv(weatherCodeToCondition(current.weather_code ?? 0)),
+    humidity: tv(current.relativeHumidity),
+    wind_speed_mph: tv(current.windSpeed),
+    condition: tv(weatherCodeToCondition(current.weatherCode)),
+  };
+}
+
+interface OpenMeteoLocation {
+  latitude: number;
+  longitude: number;
+  name?: string;
+}
+
+interface OpenMeteoCurrentWeather {
+  temperature: number;
+  relativeHumidity: number;
+  weatherCode: number;
+  windSpeed: number;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function parseOpenMeteoLocation(payload: unknown): OpenMeteoLocation | null {
+  if (!isJsonObject(payload) || !Array.isArray(payload.results)) return null;
+
+  for (const candidate of payload.results) {
+    if (
+      !isJsonObject(candidate)
+      || !isFiniteNumber(candidate.latitude)
+      || candidate.latitude < -90
+      || candidate.latitude > 90
+      || !isFiniteNumber(candidate.longitude)
+      || candidate.longitude < -180
+      || candidate.longitude > 180
+      || (candidate.name !== undefined && typeof candidate.name !== 'string')
+    ) {
+      continue;
+    }
+    return {
+      latitude: candidate.latitude,
+      longitude: candidate.longitude,
+      ...(candidate.name !== undefined ? { name: candidate.name } : {}),
+    };
+  }
+  return null;
+}
+
+function parseOpenMeteoCurrentWeather(payload: unknown): OpenMeteoCurrentWeather | null {
+  if (!isJsonObject(payload) || !isJsonObject(payload.current)) return null;
+  const current = payload.current;
+  if (
+    !isFiniteNumber(current.temperature_2m)
+    || !isFiniteNumber(current.relative_humidity_2m)
+    || current.relative_humidity_2m < 0
+    || current.relative_humidity_2m > 100
+    || !isFiniteNumber(current.weather_code)
+    || !Number.isInteger(current.weather_code)
+    || !isFiniteNumber(current.wind_speed_10m)
+    || current.wind_speed_10m < 0
+  ) {
+    return null;
+  }
+  return {
+    temperature: current.temperature_2m,
+    relativeHumidity: current.relative_humidity_2m,
+    weatherCode: current.weather_code,
+    windSpeed: current.wind_speed_10m,
   };
 }
 
@@ -858,36 +1149,51 @@ function safeMathEvaluate(expression: string): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// Conversation persistence (localStorage; mirrors iOS ConversationStore at
-// MVP scope — Core/Services/ConversationStore.swift)
+// IndexedDB conversation history.
 // ---------------------------------------------------------------------------
 
-function loadConversation(): ChatMessage[] {
+/**
+ * Convert completed UI turns into the public proto chat shape accepted by
+ * `RunAnywhere.generateStream({ history, conversationId })`. The current user
+ * prompt is deliberately not included; callers snapshot history before they
+ * append that prompt to the visible conversation.
+ */
+export function conversationHistoryForGeneration(
+  conversationMessages: readonly unknown[],
+): SDKChatMessage[] {
+  return conversationMessages
+    .filter(isChatMessage)
+    .filter(({ content }) => content.trim().length > 0)
+    .map((message) => ({
+      id: '',
+      role: message.role === 'user'
+        ? MessageRole.MESSAGE_ROLE_USER
+        : MessageRole.MESSAGE_ROLE_ASSISTANT,
+      content: message.content,
+      timestampUs: 0,
+      toolCalls: [],
+      status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
+      metadata: {},
+      attachments: [],
+    }));
+}
+
+async function loadConversation(): Promise<ChatMessage[]> {
+  const conversation = await ConversationsStore.getCurrent();
+  return conversation?.messages.filter(isChatMessage) ?? [];
+}
+
+async function saveConversation(): Promise<StoredConversation | null> {
   try {
-    const saved = localStorage.getItem(CONVERSATION_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved) as { messages?: ChatMessage[] };
-    return Array.isArray(parsed.messages) ? parsed.messages : [];
-  } catch {
-    return [];
+    return await ConversationsStore.saveCurrent(messages);
+  } catch (error) {
+    if (!conversationStorageWarningShown) {
+      conversationStorageWarningShown = true;
+      showToast('This chat could not be saved to the local database.', 'warning', 4200);
+    }
+    appLogger.warning('[Chat] Conversation database write failed:', error);
+    return null;
   }
-}
-
-function saveConversation(): void {
-  try {
-    localStorage.setItem(
-      CONVERSATION_STORAGE_KEY,
-      JSON.stringify({ messages, updatedAt: Date.now() }),
-    );
-  } catch { /* storage may not be available */ }
-  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
-}
-
-function clearConversation(): void {
-  try {
-    localStorage.removeItem(CONVERSATION_STORAGE_KEY);
-  } catch { /* storage may not be available */ }
-  window.dispatchEvent(new CustomEvent('runanywhere:conversation-updated'));
 }
 
 function loadToolsEnabled(): boolean {
@@ -980,17 +1286,54 @@ function splitThinking(raw: string): { content: string; thinking: string } {
 // Rendering
 // ---------------------------------------------------------------------------
 
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'Working late?';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+const STARTER_PROMPTS: Array<{ label: string; prompt: string; icon: string }> = [
+  {
+    label: 'Draft a message',
+    prompt: 'Help me draft a short, friendly message to my team about shipping our next release this Friday.',
+    icon: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  },
+  {
+    label: 'Explain a topic',
+    prompt: 'Explain how on-device AI keeps my data private, in simple terms.',
+    icon: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  },
+  {
+    label: 'Compare options',
+    prompt: 'Help me compare two small local models for private chat.',
+    icon: '<path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M21 3l-7 7"/><path d="M3 3l7 7"/><path d="M16 21h5v-5"/><path d="M8 21H3v-5"/><path d="M21 21l-7-7"/><path d="M3 21l7-7"/>',
+  },
+  {
+    label: 'Make a checklist',
+    prompt: 'Draft a concise checklist for testing an on-device AI app.',
+    icon: '<path d="M3 17l2 2 4-4"/><path d="M3 7l2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  },
+];
+
 function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
       <div class="chat-empty-state">
-        <div class="empty-logo">RA</div>
-        <h3>Start a conversation</h3>
-        <p>Ask anything, attach a document or image, turn on web tools, or jump into Talk Mode.</p>
+        <div class="empty-logo">${svgIcon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M5 3l.8 2.2L8 6l-2.2.8L5 9l-.8-2.2L2 6l2.2-.8L5 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/>')}</div>
+        <h3>${greeting()}</h3>
+        <p>
+          AI inference runs on this device. Setup, model downloads, and
+          enabled web tools may contact the services identified by the app.
+        </p>
         <div class="suggestion-chips">
-          <button type="button" class="suggestion-chip" data-prompt="Summarize what RunAnywhere can do in one paragraph.">What can you do?</button>
-          <button type="button" class="suggestion-chip" data-prompt="Help me compare two small local models for private chat.">Compare models</button>
-          <button type="button" class="suggestion-chip" data-prompt="Draft a concise checklist for testing an on-device AI app.">Testing checklist</button>
+          ${STARTER_PROMPTS.map((starter) => `
+            <button type="button" class="suggestion-chip" data-prompt="${escapeHtml(starter.prompt)}">
+              ${svgIcon(starter.icon)}
+              <span>${starter.label}</span>
+            </button>
+          `).join('')}
         </div>
       </div>
     `;
@@ -1009,28 +1352,42 @@ function renderMessages(host: HTMLElement): void {
   host.innerHTML = messages.map((msg, idx) => `
     <div class="chat-message chat-message--${msg.role}" data-idx="${idx}">
       ${renderMessageBody(msg)}
+      ${renderMessageActions(msg, idx)}
     </div>
   `).join('');
 
   host.scrollTop = host.scrollHeight;
 }
 
+function renderMessageActions(msg: ChatMessage, idx: number): string {
+  if (msg.role !== 'assistant' || !msg.content) return '';
+  return `
+    <div class="chat-msg-actions">
+      <button type="button" class="chat-action-btn" data-copy-idx="${idx}" aria-label="Copy reply">
+        ${svgIcon('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>')}
+        <span>Copy</span>
+      </button>
+    </div>
+  `;
+}
+
 function renderLastMessage(host: HTMLElement, msg: ChatMessage): void {
   const last = host.lastElementChild;
   if (last) {
-    last.innerHTML = renderMessageBody(msg);
+    last.innerHTML = renderMessageBody(msg, isGenerating);
   }
   host.scrollTop = host.scrollHeight;
 }
 
-function renderMessageBody(msg: ChatMessage): string {
+function renderMessageBody(msg: ChatMessage, streaming = false): string {
   // Collapsible thinking section — iOS parity:
   // ChatMessageComponents.swift:128-181 (thinkingSection).
-  const thinkingSection = msg.role === 'assistant' && msg.thinking
+  const thinking = msg.thinking?.trim();
+  const thinkingSection = msg.role === 'assistant' && thinking
     ? `
       <details class="chat-thinking">
         <summary>Thinking</summary>
-        <pre class="chat-thinking-content">${escapeHtml(msg.thinking)}</pre>
+        <pre class="chat-thinking-content">${escapeHtml(thinking)}</pre>
       </details>
     `
     : '';
@@ -1079,11 +1436,16 @@ function renderMessageBody(msg: ChatMessage): string {
     `
     : '';
 
+  const cursor = streaming && msg.role === 'assistant'
+    ? '<span class="chat-cursor" aria-hidden="true"></span>'
+    : '';
   const body = msg.content
-    ? renderMarkdownLite(msg.content)
-    : (msg.thinking
-      ? '<span class="chat-bubble-typing">Thinking&hellip;</span>'
-      : '<span class="chat-bubble-typing">&hellip;</span>');
+    ? renderMarkdownLite(msg.content) + cursor
+    : (streaming
+      ? (thinking
+        ? `<span class="chat-bubble-typing">Thinking&hellip;</span>${cursor}`
+        : cursor || '<span class="chat-bubble-typing">&hellip;</span>')
+      : '<span class="chat-bubble-typing">No final answer was generated.</span>');
 
   return `${thinkingSection}${toolSection}<div class="chat-bubble">${attachmentSection}${body}${sourcesSection}</div>`;
 }
@@ -1099,18 +1461,15 @@ function renderMarkdownLite(text: string): string {
   // Fenced code blocks (tolerates an unterminated fence while streaming).
   let html = escaped.replace(/```[^\n`]*\n?([\s\S]*?)(?:```|$)/g, (_match, code: string) => {
     codeBlocks.push(`<pre class="chat-code"><code>${code.replace(/\n$/, '')}</code></pre>`);
-    return `\u0000${codeBlocks.length - 1}\u0000`;
+    return `\uE000${codeBlocks.length - 1}\uE000`;
   });
   html = html
     .replace(/`([^`\n]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
-  return html.replace(/\u0000(\d+)\u0000/g, (_match, i: string) => codeBlocks[Number(i)]);
+  return html.replace(/\uE000(\d+)\uE000/g, (_match, i: string) => codeBlocks[Number(i)]);
 }
 
-function formatChatError(error: unknown): string {
-  if (isSDKException(error)) {
-    return `Error: ${error.message}`;
-  }
+export function formatChatError(error: unknown): string {
   return `Error: ${formatError(error)}`;
 }

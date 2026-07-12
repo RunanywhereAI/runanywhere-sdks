@@ -16,7 +16,6 @@ import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
 import ai.runanywhere.proto.v1.StructuredOutputStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
 import com.runanywhere.sdk.foundation.bridge.extensions.defaults
-import com.runanywhere.sdk.foundation.bridge.extensions.toRALLMGenerateRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAJSONSchema

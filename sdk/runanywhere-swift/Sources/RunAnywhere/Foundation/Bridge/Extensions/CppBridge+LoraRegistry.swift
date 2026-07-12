@@ -29,14 +29,13 @@ extension CppBridge {
             }
         }
 
-        // Catalog operations are implemented in
-        // `Generated/ModalityProtoABI+Generated.swift` (proto-first APIs that
-        // take the registry handle explicitly). Callers fetch the handle via
-        // `requireHandle()` before invoking those methods.
+        // Low-level catalog operations are implemented in
+        // `Generated/ModalityProtoABI+Generated.swift`. The public actor methods
+        // below keep the non-Sendable registry pointer inside this actor.
 
         /// Resolves the registry handle, lazily reacquiring it from the
         /// commons global singleton if the initial fetch failed.
-        public func requireHandle() throws -> rac_lora_registry_handle_t {
+        private func requireHandle() throws -> rac_lora_registry_handle_t {
             if handle == nil {
                 handle = rac_get_lora_registry()
             }
@@ -44,6 +43,42 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "LoRA registry not initialized", category: .internal)
             }
             return handle
+        }
+
+        public func register(
+            _ request: RALoraAdapterCatalogEntry
+        ) throws -> RALoraAdapterCatalogEntry {
+            try register(handle: requireHandle(), request)
+        }
+
+        public func listCatalog(
+            _ request: RALoraAdapterCatalogListRequest
+        ) throws -> RALoraAdapterCatalogListResult {
+            try listCatalog(handle: requireHandle(), request)
+        }
+
+        public func queryCatalog(
+            _ request: RALoraAdapterCatalogQuery
+        ) throws -> RALoraAdapterCatalogListResult {
+            try queryCatalog(handle: requireHandle(), request)
+        }
+
+        public func getCatalogEntry(
+            _ request: RALoraAdapterCatalogGetRequest
+        ) throws -> RALoraAdapterCatalogGetResult {
+            try getCatalogEntry(handle: requireHandle(), request)
+        }
+
+        public func markDownloadCompleted(
+            _ request: RALoraAdapterDownloadCompletedRequest
+        ) throws -> RALoraAdapterDownloadCompletedResult {
+            try markDownloadCompleted(handle: requireHandle(), request)
+        }
+
+        public func importAdapter(
+            _ request: RALoraAdapterImportRequest
+        ) throws -> RALoraAdapterImportResult {
+            try importAdapter(handle: requireHandle(), request)
         }
     }
 }

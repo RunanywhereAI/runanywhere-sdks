@@ -54,22 +54,22 @@ class ChatMessage {
   /// Convert to the [ConversationStore] persistence model. Tool-call
   /// details are transient UI state and are not persisted (iOS parity).
   Message toStoreMessage() => Message(
-        id: id,
-        role: role,
-        content: content,
-        thinkingContent: thinkingContent,
-        timestamp: timestamp,
-        analytics: analytics,
-      );
+    id: id,
+    role: role,
+    content: content,
+    thinkingContent: thinkingContent,
+    timestamp: timestamp,
+    analytics: analytics,
+  );
 
   factory ChatMessage.fromStoreMessage(Message message) => ChatMessage(
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        thinkingContent: message.thinkingContent,
-        timestamp: message.timestamp,
-        analytics: message.analytics,
-      );
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinkingContent: message.thinkingContent,
+    timestamp: message.timestamp,
+    analytics: message.analytics,
+  );
 }
 
 /// ChatViewModel (mirroring iOS `LLMViewModel`).
@@ -80,7 +80,7 @@ class ChatMessage {
 /// pure [ListenableBuilder] consumer.
 class ChatViewModel extends ChangeNotifier {
   ChatViewModel({ConversationStore? store})
-      : _store = store ?? ConversationStore.shared;
+    : _store = store ?? ConversationStore.shared;
 
   final ConversationStore _store;
 
@@ -145,19 +145,17 @@ class ChatViewModel extends ChangeNotifier {
 
     // Model lifecycle flows through the SDK event bus (iOS parity:
     // LLMViewModel.subscribeToModelLifecycle).
-    _lifecycleSubscription =
-        sdk.RunAnywhere.events.modelLifecycle.listen((change) {
+    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen((
+      change,
+    ) {
       // iOS parity (LLMViewModel.handleModelLifecycle): only react to LLM
-      // component changes. The lifecycle echo published by currentModel()
-      // when nothing is loaded carries an unspecified component, so this
-      // also drops it.
+      // component changes and ignore lifecycle events for other modalities.
       if (change.component != sdk.SDKComponent.SDK_COMPONENT_LLM &&
           change.event.category != sdk.EventCategory.EVENT_CATEGORY_LLM) {
         return;
       }
-      // syncModelState() calls currentModel(), which itself re-publishes a
-      // lifecycle event. Re-sync only on an actual transition so that echo
-      // cannot feed back into an infinite query -> publish loop.
+      // Re-sync only on an actual transition; duplicate loaded/unloaded
+      // events carry no new snapshot state.
       final loaded = change.kind == sdk.ModelLifecycleChangeKind.loaded;
       if (loaded && change.modelId == _loadedModelId) return;
       if (!loaded && _loadedModelId == null) return;
@@ -247,7 +245,8 @@ class ChatViewModel extends ChangeNotifier {
       );
 
       final toolSettings = ToolSettingsViewModel.shared;
-      final useToolCalling = toolSettings.toolCallingEnabled &&
+      final useToolCalling =
+          toolSettings.toolCallingEnabled &&
           toolSettings.registeredTools.isNotEmpty;
 
       if (useToolCalling) {
@@ -323,10 +322,10 @@ class ChatViewModel extends ChangeNotifier {
     }
     final name = modelName.toLowerCase();
 
-    // LFM2-Tool models use Pythonic format:
+    // LFM2-Tool models use the LFM2 function-call format:
     // <|tool_call_start|>[func(args)]<|tool_call_end|>
     if (name.contains('lfm2') && name.contains('tool')) {
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2;
     }
 
     // Default JSON format for general-purpose models
@@ -353,7 +352,7 @@ class ChatViewModel extends ChangeNotifier {
       final result = await sdk.RunAnywhere.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
-          maxIterations: 3,
+          maxToolCalls: 3,
           autoExecute: true,
           format: format,
           maxTokens: maxTokens,
@@ -369,8 +368,9 @@ class ChatViewModel extends ChangeNotifier {
       ToolCallInfo? toolCallInfo;
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
-        final lastResult =
-            result.toolResults.isNotEmpty ? result.toolResults.last : null;
+        final lastResult = result.toolResults.isNotEmpty
+            ? result.toolResults.last
+            : null;
         final hasError = lastResult != null && lastResult.error.isNotEmpty;
         toolCallInfo = ToolCallInfo(
           toolName: lastCall.name,
@@ -421,13 +421,15 @@ class ChatViewModel extends ChangeNotifier {
         events: sdk.RunAnywhere.llm.generateStream(prompt, options),
         onToken: (aggregated) async {
           if (_timeToFirstToken == null && _generationStartTime != null) {
-            _timeToFirstToken = DateTime.now()
+            _timeToFirstToken =
+                DateTime.now()
                     .difference(_generationStartTime!)
                     .inMilliseconds /
                 1000.0;
           }
-          _messages[messageIndex] =
-              _messages[messageIndex].copyWith(content: aggregated);
+          _messages[messageIndex] = _messages[messageIndex].copyWith(
+            content: aggregated,
+          );
           notifyListeners();
         },
       );
@@ -448,8 +450,9 @@ class ChatViewModel extends ChangeNotifier {
 
       final finalMessage = _messages[messageIndex].copyWith(
         content: result.text,
-        thinkingContent:
-            result.thinkingContent.isNotEmpty ? result.thinkingContent : null,
+        thinkingContent: result.thinkingContent.isNotEmpty
+            ? result.thinkingContent
+            : null,
         analytics: analytics,
       );
       _messages[messageIndex] = finalMessage;
@@ -576,16 +579,10 @@ class ChatViewModel extends ChangeNotifier {
       final scale = adapter.hasDefaultScale() && adapter.defaultScale > 0
           ? adapter.defaultScale
           : 1.0;
-      final result = await sdk.RunAnywhere.lora.apply(
-        sdk.LoRAApplyRequest(
-          adapters: [
-            sdk.LoRAAdapterConfig(
-              adapterPath: localPath,
-              adapterId: adapter.id,
-              scale: scale,
-            ),
-          ],
-        ),
+      final result = await sdk.RunAnywhere.lora.applyCatalogAdapter(
+        adapter,
+        localPath: localPath,
+        scale: scale,
       );
       if (!result.success) {
         throw Exception(
@@ -650,14 +647,15 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   double _elapsedGenerationSeconds() => _generationStartTime != null
-      ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-          1000.0
+      ? DateTime.now().difference(_generationStartTime!).inMilliseconds / 1000.0
       : 0.0;
 
   void _persistMessage(ChatMessage message) {
     final conversation = _currentConversation;
     if (conversation == null) return;
-    _currentConversation =
-        _store.addMessage(message.toStoreMessage(), conversation);
+    _currentConversation = _store.addMessage(
+      message.toStoreMessage(),
+      conversation,
+    );
   }
 }

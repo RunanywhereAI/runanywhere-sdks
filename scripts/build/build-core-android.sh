@@ -29,19 +29,24 @@ KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs"
 KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
 KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
 KOTLIN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/jniLibs"
+KOTLIN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/src/main/assets/runanywhere/qhexrt/skels"
 RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
 RN_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/jniLibs"
+RN_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
+RN_QHEXRT_INCLUDE_DEST="${RN_QHEXRT_JNI_DEST}/include"
 
 # Flutter destinations.
 FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
 FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
 FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
 FLUTTER_QHEXRT_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/jniLibs"
+FLUTTER_QHEXRT_SKEL_ASSET_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/assets/runanywhere/qhexrt/skels"
 
 COMMONS_INCLUDE_SRC="${REPO_ROOT}/sdk/runanywhere-commons/include"
+QHEXRT_INCLUDE_SRC="${REPO_ROOT}/engines/qhexrt/include"
 SHERPA_ANDROID_JNI_SRC="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-android/jniLibs"
 
 if [ -z "${ANDROID_NDK_HOME:-}" ]; then
@@ -119,18 +124,28 @@ mkdir -p \
     "${KOTLIN_LLAMA_JNI_DEST}" \
     "${KOTLIN_ONNX_JNI_DEST}" \
     "${KOTLIN_QHEXRT_JNI_DEST}" \
+    "${KOTLIN_QHEXRT_SKEL_ASSET_DEST}" \
     "${RN_CORE_JNI_DEST}" \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
     "${RN_QHEXRT_JNI_DEST}" \
+    "${RN_QHEXRT_SKEL_ASSET_DEST}" \
     "${FLUTTER_CORE_JNI_DEST}" \
     "${FLUTTER_LLAMA_JNI_DEST}" \
     "${FLUTTER_ONNX_JNI_DEST}" \
-    "${FLUTTER_QHEXRT_JNI_DEST}"
+    "${FLUTTER_QHEXRT_JNI_DEST}" \
+    "${FLUTTER_QHEXRT_SKEL_ASSET_DEST}"
 
 rm -rf "${RN_CORE_INCLUDE_DEST}"
 mkdir -p "${RN_CORE_INCLUDE_DEST}"
 cp -R "${COMMONS_INCLUDE_SRC}/." "${RN_CORE_INCLUDE_DEST}/"
+
+# The RN QHexRT Nitro bridge compiles against the engine-owned public ABI.
+# Stage it with the private backend package rather than leaking QHexRT policy
+# headers into the generic @runanywhere/core include bundle.
+rm -rf "${RN_QHEXRT_INCLUDE_DEST}"
+mkdir -p "${RN_QHEXRT_INCLUDE_DEST}"
+cp -R "${QHEXRT_INCLUDE_SRC}/." "${RN_QHEXRT_INCLUDE_DEST}/"
 
 # Helper: copy `${1}` to every remaining argument, skipping the source silently
 # if it does not exist. Used to make engine-specific staging tolerant of
@@ -145,44 +160,112 @@ copy_if_exists() {
     fi
 }
 
+qairt_identity_matches() {
+    local manifest_path="$1"
+    local qairt_root="$2"
+    python3 - "${manifest_path}" "${qairt_root}" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+manifest_path, qairt_root = Path(sys.argv[1]), Path(sys.argv[2]).resolve(strict=True)
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+identity = manifest["build"]["qnn_sdk"]
+if set(identity) != {"metadata_file", "metadata_sha256"}:
+    raise SystemExit(1)
+name = identity["metadata_file"]
+if not isinstance(name, str) or not name or name in {".", ".."} or "/" in name or "\\" in name:
+    raise SystemExit(1)
+metadata = qairt_root / name
+if metadata.is_symlink() or not metadata.is_file():
+    raise SystemExit(1)
+actual = hashlib.sha256(metadata.read_bytes()).hexdigest()
+raise SystemExit(0 if actual == identity["metadata_sha256"] else 1)
+PY
+}
+
 find_qairt_root() {
+    local manifest_path="$1"
     local candidate
-    for candidate in \
-        "${QAIRT_ROOT:-}" \
-        "${QNN_SDK_ROOT:-}" \
-        "${QNN_ROOT:-}" \
-        "${REPO_ROOT}/../qairt/2.47.0.260601" ; do
-        [ -n "${candidate}" ] || continue
-        if [ -d "${candidate}/lib/aarch64-android" ]; then
+
+    # An explicitly selected SDK is authoritative. Fail closed instead of
+    # silently staging a different installed runtime when its identity drifts.
+    if [ -n "${QNN_SDK_ROOT:-}" ]; then
+        candidate="${QNN_SDK_ROOT}"
+        if [ -d "${candidate}/lib/aarch64-android" ] && \
+           qairt_identity_matches "${manifest_path}" "${candidate}"; then
             echo "${candidate}"
             return 0
         fi
+        echo "error: QNN_SDK_ROOT does not match the selected QHexRT build identity: ${candidate}" >&2
+        return 2
+    fi
+
+    for candidate in \
+        "${QAIRT_ROOT:-}" \
+        "${QNN_ROOT:-}" ; do
+        [ -n "${candidate}" ] || continue
+        if [ -d "${candidate}/lib/aarch64-android" ] && \
+           qairt_identity_matches "${manifest_path}" "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+        echo "error: explicit QAIRT root does not match the selected QHexRT build identity: ${candidate}" >&2
+        return 2
     done
 
-    local found
-    found="$(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r | head -1 || true)"
-    if [ -n "${found}" ]; then
-        dirname "$(dirname "${found}")"
+    candidate="${REPO_ROOT}/../qairt/2.47.0.260601"
+    if [ -d "${candidate}/lib/aarch64-android" ] && \
+       qairt_identity_matches "${manifest_path}" "${candidate}"; then
+        echo "${candidate}"
         return 0
     fi
 
+    local found
+    while IFS= read -r found; do
+        candidate="$(dirname "$(dirname "${found}")")"
+        if qairt_identity_matches "${manifest_path}" "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+    done < <(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r)
+
     return 1
+}
+
+validate_linked_qhexrt_outputs() {
+    local engine_lib="$1"
+    local jni_lib="$2"
+    if [ ! -f "${engine_lib}" ] || [ ! -f "${jni_lib}" ]; then
+        echo "error: selected QHexRT prebuilt but linked engine/JNI outputs are missing" >&2
+        return 1
+    fi
+    if ! grep -aFq "qhexrt:engine-available" "${engine_lib}"; then
+        echo "error: selected QHexRT prebuilt produced a stub/unlinked engine" >&2
+        return 1
+    fi
 }
 
 stage_qhexrt_qnn_runtime_libs() {
     local abi="$1"; shift
     local engine_lib="$1"; shift
+    local selected_prebuilt="$1"; shift
 
     [ "${abi}" = "arm64-v8a" ] || return 0
     [ -f "${engine_lib}" ] || return 0
 
     local engine_available=0
-    if strings "${engine_lib}" | grep -q "qhexrt:engine-available"; then
+    if grep -aFq "qhexrt:engine-available" "${engine_lib}"; then
         engine_available=1
     fi
+    # The shell/stub plugin is intentionally distributable without QAIRT. Do
+    # not let a sibling SDK installation make a stub build accidentally ship
+    # proprietary QNN host libraries or DSP skels.
+    [ "${engine_available}" -eq 1 ] || return 0
 
     local qairt_root
-    qairt_root="$(find_qairt_root || true)"
+    qairt_root="$(find_qairt_root "${selected_prebuilt}/qhexrt-prebuilt.json" || true)"
     if [ -z "${qairt_root}" ]; then
         if [ "${engine_available}" -eq 1 ]; then
             echo "error: QHexRT engine is linked, but QAIRT/QNN runtime libs were not found." >&2
@@ -192,8 +275,13 @@ stage_qhexrt_qnn_runtime_libs() {
         return 0
     fi
 
+    if ! qairt_identity_matches "${selected_prebuilt}/qhexrt-prebuilt.json" "${qairt_root}"; then
+        echo "error: selected QAIRT/QNN runtime changed after identity-aware discovery: ${qairt_root}" >&2
+        exit 1
+    fi
+
     local host_dir="${qairt_root}/lib/aarch64-android"
-    local qnn_libs=(
+    local qnn_host_libs=(
         "${host_dir}/libQnnHtp.so"
         "${host_dir}/libQnnHtpNetRunExtensions.so"
         "${host_dir}/libQnnHtpPrepare.so"
@@ -204,13 +292,15 @@ stage_qhexrt_qnn_runtime_libs() {
         "${host_dir}/libQnnHtpV79Stub.so"
         "${host_dir}/libQnnHtpV81CalculatorStub.so"
         "${host_dir}/libQnnHtpV81Stub.so"
+    )
+    local qnn_skel_libs=(
         "${qairt_root}/lib/hexagon-v75/unsigned/libQnnHtpV75Skel.so"
         "${qairt_root}/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so"
         "${qairt_root}/lib/hexagon-v81/unsigned/libQnnHtpV81Skel.so"
     )
 
     local src
-    for src in "${qnn_libs[@]}"; do
+    for src in "${qnn_host_libs[@]}" "${qnn_skel_libs[@]}"; do
         if [ ! -f "${src}" ]; then
             echo "error: required QHexRT QAIRT runtime lib is missing: ${src}" >&2
             exit 1
@@ -218,28 +308,54 @@ stage_qhexrt_qnn_runtime_libs() {
     done
 
     echo "  Staging QHexRT QAIRT runtime libs from ${qairt_root}"
-    for src in "${qnn_libs[@]}"; do
+    for src in "${qnn_host_libs[@]}"; do
         copy_if_exists "${src}" "$@"
+    done
+    local kotlin_skel_dest="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    local rn_skel_dest="${RN_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    local flutter_skel_dest="${FLUTTER_QHEXRT_SKEL_ASSET_DEST}/${abi}"
+    mkdir -p "${kotlin_skel_dest}" "${rn_skel_dest}" "${flutter_skel_dest}"
+    rm -f "${kotlin_skel_dest}"/*.so "${rn_skel_dest}"/*.so "${flutter_skel_dest}"/*.so
+    for src in "${qnn_skel_libs[@]}"; do
+        copy_if_exists "${src}" "${kotlin_skel_dest}" "${rn_skel_dest}" "${flutter_skel_dest}"
     done
 }
 
 validate_elf_16kb_alignment() {
     local so_file="$1"
+    local headers
     local align_hex
     local align_dec
     local failed=0
+    local load_count=0
 
+    if ! headers="$("${ANDROID_READELF}" -l "${so_file}" 2>/dev/null)"; then
+        echo "error: llvm-readelf could not inspect ${so_file}" >&2
+        return 1
+    fi
     while IFS= read -r align_hex; do
         [ -n "${align_hex}" ] || continue
         case "${align_hex}" in
-            0x*) align_dec=$((align_hex)) ;;
-            *) continue ;;
+            0x*)
+                load_count=$((load_count + 1))
+                align_dec=$((align_hex))
+                ;;
+            *)
+                echo "error: ${so_file} has malformed LOAD alignment ${align_hex}" >&2
+                failed=1
+                continue
+                ;;
         esac
         if [ "${align_dec}" -lt 16384 ]; then
             echo "error: ${so_file} has LOAD segment alignment ${align_hex}; expected >= 0x4000" >&2
             failed=1
         fi
-    done < <("${ANDROID_READELF}" -l "${so_file}" 2>/dev/null | awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')
+    done <<< "$(printf '%s\n' "${headers}" | awk '/^[[:space:]]*LOAD[[:space:]]/ {print $NF}')"
+
+    if [ "${load_count}" -eq 0 ]; then
+        echo "error: ${so_file} has no readable ELF LOAD segments" >&2
+        failed=1
+    fi
 
     return "${failed}"
 }
@@ -281,12 +397,34 @@ for ABI in "${ABIS[@]}"; do
     OMP_ARCH="$(ndk_omp_arch_for_abi "${ABI}")"
     echo "▶ ${ABI} via preset '${PRESET}'"
 
-    CMAKE_CONFIGURE_ARGS=("--preset" "${PRESET}")
-    if [ "${ABI}" = "arm64-v8a" ] && \
-       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/include/qhexrt/qhexrt_c.h" ] && \
-       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/lib/${ABI}/libqhexrt_core.a" ] && \
-       [ -f "${REPO_ROOT}/engines/qhexrt/prebuilt/lib/${ABI}/libqhexrt_host.a" ]; then
-        CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=ON")
+    # Make release artifacts independent of the developer/runner checkout.
+    # `__FILE__`, debug tables, and assertion strings otherwise preserve the
+    # absolute source root inside every AAR/npm/Flutter native payload.
+    PREFIX_MAP_FLAGS="-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks -ffile-prefix-map=${ANDROID_NDK_HOME}=/android-ndk -fmacro-prefix-map=${ANDROID_NDK_HOME}=/android-ndk -fdebug-prefix-map=${ANDROID_NDK_HOME}=/android-ndk"
+    CMAKE_CONFIGURE_ARGS=(
+        "--preset" "${PRESET}"
+        "-DCMAKE_C_FLAGS=${PREFIX_MAP_FLAGS}"
+        "-DCMAKE_CXX_FLAGS=${PREFIX_MAP_FLAGS}"
+        "-DRAC_INCLUDE_LOCAL_DEV_CONFIG=OFF"
+    )
+    QHEXRT_ENABLED=0
+    if [ "${ABI}" = "arm64-v8a" ]; then
+        QHEXRT_PREFLIGHT="${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py"
+        if QHEXRT_SELECTED="$(python3 "${QHEXRT_PREFLIGHT}" \
+            --prebuilt "${REPO_ROOT}/engines/qhexrt/prebuilt" \
+            --android-abi "${ABI}")"; then
+            QHEXRT_ENABLED=1
+            CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=ON" "-DQHEXRT_ROOT=${QHEXRT_SELECTED}")
+        else
+            QHEXRT_PREFLIGHT_STATUS=$?
+            if [ "${QHEXRT_PREFLIGHT_STATUS}" -ne 3 ]; then
+                echo "error: refusing Android build with an invalid selected QHexRT prebuilt" >&2
+                exit "${QHEXRT_PREFLIGHT_STATUS}"
+            fi
+            CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT")
+        fi
+    else
+        CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT")
     fi
     cmake "${CMAKE_CONFIGURE_ARGS[@]}"
     # Use CMake's generator-agnostic --parallel, CAPPED (repo resource
@@ -301,20 +439,33 @@ for ABI in "${ABIS[@]}"; do
     KOTLIN_LLAMA_DEST="${KOTLIN_LLAMA_JNI_DEST}/${ABI}"
     KOTLIN_ONNX_DEST="${KOTLIN_ONNX_JNI_DEST}/${ABI}"
     KOTLIN_QHEXRT_DEST="${KOTLIN_QHEXRT_JNI_DEST}/${ABI}"
+    KOTLIN_QHEXRT_SKEL_DEST="${KOTLIN_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
     RN_CORE_DEST="${RN_CORE_JNI_DEST}/${ABI}"
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
     RN_QHEXRT_DEST="${RN_QHEXRT_JNI_DEST}/${ABI}"
+    RN_QHEXRT_SKEL_DEST="${RN_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
     FLUTTER_CORE_DEST="${FLUTTER_CORE_JNI_DEST}/${ABI}"
     FLUTTER_LLAMA_DEST="${FLUTTER_LLAMA_JNI_DEST}/${ABI}"
     FLUTTER_ONNX_DEST="${FLUTTER_ONNX_JNI_DEST}/${ABI}"
     FLUTTER_QHEXRT_DEST="${FLUTTER_QHEXRT_JNI_DEST}/${ABI}"
+    FLUTTER_QHEXRT_SKEL_DEST="${FLUTTER_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
 
     mkdir -p \
-        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}"
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}"
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        mkdir -p \
+            "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}" \
+            "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
+    else
+        # QHexRT is ARM64-only. Do not leave empty/private package ABI roots or
+        # unrelated libc++ sidecars behind after building public non-ARM ABIs.
+        rm -rf \
+            "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}" \
+            "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
+    fi
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
@@ -326,6 +477,10 @@ for ABI in "${ABIS[@]}"; do
         "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so "${RN_QHEXRT_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
         "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_QHEXRT_DEST}"/*.so
+    rm -f \
+        "${KOTLIN_QHEXRT_SKEL_DEST}"/*.so \
+        "${RN_QHEXRT_SKEL_DEST}"/*.so \
+        "${FLUTTER_QHEXRT_SKEL_DEST}"/*.so
 
     # -------------------------------------------------------------------------
     # Locate artifacts produced by the CMake build.
@@ -347,9 +502,20 @@ for ABI in "${ABIS[@]}"; do
     LIB_LLAMA_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp_jni.so" -print -quit || true)"
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
     LIB_ONNX_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_onnx_jni.so"   -print -quit || true)"
-    LIB_QHEXRT="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt.so"       -print -quit || true)"
-    LIB_QHEXRT_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt_jni.so" -print -quit || true)"
-    LIB_RAG_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_rag_jni.so"     -print -quit || true)"
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        LIB_QHEXRT="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt.so"       -print -quit || true)"
+        LIB_QHEXRT_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_qhexrt_jni.so" -print -quit || true)"
+        validate_linked_qhexrt_outputs "${LIB_QHEXRT}" "${LIB_QHEXRT_JNI}"
+    else
+        # CMake does not delete outputs for targets disabled on reconfigure.
+        # Remove stale linked plugins so a reused build directory cannot be
+        # mistaken for this build's public/stub configuration.
+        find "${BUILD_DIR}" -maxdepth 6 -type f \
+            \( -name "librac_backend_qhexrt.so" -o -name "librac_backend_qhexrt_jni.so" \) \
+            -delete
+        LIB_QHEXRT=""
+        LIB_QHEXRT_JNI=""
+    fi
     # New Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
     LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
 
@@ -358,8 +524,6 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_COMMONS_JNI}" "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     # Cloud STT engine — co-located with librunanywhere_jni.so (its NEEDED dep).
     copy_if_exists "${LIB_CLOUD}"       "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
-    copy_if_exists "${LIB_RAG_JNI}"     "${KOTLIN_DEST}"
-
     # Engine plugin entry-point libs (runanywhere_<engine>.so) — routed to
     # the appropriate backend module's jniLibs, NOT to core. The core module
     # only ships librac_commons.so + librunanywhere_jni.so + the libc++/libomp
@@ -379,8 +543,11 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_ONNX_JNI}"  "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     copy_if_exists "${LIB_QHEXRT}"     "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
     copy_if_exists "${LIB_QHEXRT_JNI}" "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
-    stage_qhexrt_qnn_runtime_libs "${ABI}" "${LIB_QHEXRT}" \
-        "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        stage_qhexrt_qnn_runtime_libs "${ABI}" "${LIB_QHEXRT}" \
+            "${QHEXRT_SELECTED}" \
+            "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"
+    fi
     # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
     # it alongside the onnx plugin on every ONNX-enabled SDK package. Routed
     # to the Kotlin ONNX module (not core).
@@ -406,12 +573,15 @@ for ABI in "${ABIS[@]}"; do
     fi
     for dst in \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
-        "${KOTLIN_QHEXRT_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" ; do
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"
     done
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        for dst in "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"; do
+            cp -v "${LIBCXX_SHARED}" "${dst}/"
+        done
+    fi
 
     # Some engine builds (notably ORT/Sherpa variants) require libomp.so at
     # runtime. Ship a single copy from the core package so every app that

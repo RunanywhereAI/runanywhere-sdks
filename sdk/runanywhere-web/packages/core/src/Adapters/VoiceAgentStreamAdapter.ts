@@ -26,7 +26,7 @@ import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_serv
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../runtime/EmscriptenModule';
+} from '../runtime/EmscriptenModule.js';
 
 /**
  * Adapter that exposes the C++ proto-byte voice agent callback as a
@@ -34,7 +34,7 @@ import {
  *
  *   1. `new VoiceAgentStreamAdapter(handle, module?)` — WASM path. `handle`
  *      is an opaque pointer returned from the backend package's
- *      `_rac_voice_agent_create*` thunk. The optional `module` arg lets
+ *      `_rac_voice_agent_create_standalone` thunk. The optional `module` arg lets
  *      backend packages (e.g. `@runanywhere/web-llamacpp`) pass their own
  *      Emscripten module instance directly — the global `runanywhereModule`
  *      singleton is only used when no module is supplied (test harnesses

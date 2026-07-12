@@ -1,8 +1,8 @@
-/// MLX backend for RunAnywhere Flutter SDK.
+/// Apple MLX backend for the RunAnywhere Flutter SDK.
 ///
-/// The MLX implementation lives in the Swift `RunAnywhereMLX` product. This
-/// Dart package exposes the backend registration call and uses FFI to invoke
-/// the Swift runtime's exported C entrypoints on iOS/macOS.
+/// The native implementation is provided by the canonical Swift
+/// `RunAnywhereMLX` runtime. This package exposes only backend lifecycle
+/// registration; model registration and inference remain in the core SDK.
 library;
 
 export 'mlx.dart';

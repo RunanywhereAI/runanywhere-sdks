@@ -35,8 +35,8 @@
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_engine_ids.h"
+#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 namespace rac::core::model_lifecycle::detail {
@@ -320,6 +320,25 @@ install_loaded_entry(runanywhere::v1::SDKComponent component,
     detail::g_loaded[component] = std::move(entry);
     return displaced;
 }
+
+constexpr const char* kLoraAdapterModelIDPrefix = "lora-adapter:";
+constexpr const char* kLoraAdapterTag = "lora-adapter";
+constexpr const char* kLegacyLoraAdapterTag = "lora";
+
+bool is_lora_adapter_artifact(const runanywhere::v1::ModelInfo& model) {
+    if (model.id().rfind(kLoraAdapterModelIDPrefix, 0) == 0) {
+        return true;
+    }
+    if (!model.has_metadata()) {
+        return false;
+    }
+    for (const auto& tag : model.metadata().tags()) {
+        if (tag == kLoraAdapterTag || tag == kLegacyLoraAdapterTag) {
+            return true;
+        }
+    }
+    return false;
+}
 #endif  // RAC_HAVE_PROTOBUF
 }  // namespace
 
@@ -390,6 +409,20 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     rac_model_registry_proto_free(model_bytes);
     if (!parsed_model) {
         return detail::parse_error(out_result, "failed to parse registered ModelInfo");
+    }
+    if (is_lora_adapter_artifact(model)) {
+        const ModelCategory fail_category = detail::preferred_category_for(request, model);
+        const InferenceFramework fail_framework = detail::preferred_framework_for(request, model);
+        ModelLoadResult result = detail::make_load_result(
+            false, request.model_id(), fail_category, fail_framework, "", {}, 0,
+            "LoRA adapter artifacts cannot be loaded as base models; load a compatible base "
+            "LLM and apply the adapter through the LoRA API");
+        detail::publish_component_event(detail::component_for_category(fail_category),
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                        request.model_id(), &result, nullptr,
+                                        result.error_message().c_str());
+        return detail::copy_proto(result, out_result);
     }
 
     // Collapse the legacy
@@ -715,7 +748,6 @@ rac_result_t rac_model_lifecycle_current_model_proto(const uint8_t* request_prot
     namespace detail = rac::core::model_lifecycle::detail;
     using runanywhere::v1::CurrentModelRequest;
     using runanywhere::v1::CurrentModelResult;
-    using runanywhere::v1::SDKComponent;
 
     if (!detail::valid_bytes(request_proto_bytes, request_proto_size)) {
         return detail::parse_error(out_result, "CurrentModelRequest bytes are empty or too large");
@@ -727,7 +759,6 @@ rac_result_t rac_model_lifecycle_current_model_proto(const uint8_t* request_prot
     }
 
     CurrentModelResult result;
-    SDKComponent component = runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     {
         std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
         for (const auto& pair : detail::g_loaded) {
@@ -745,21 +776,12 @@ rac_result_t rac_model_lifecycle_current_model_proto(const uint8_t* request_prot
             result.set_resolved_path(pair.second->resolved_path);
             detail::add_artifacts_to_result(pair.second->resolved_artifacts,
                                             result.mutable_resolved_artifacts());
-            component = pair.second->component;
             break;
         }
     }
     if (result.model_id().empty()) {
         result.set_found(false);
     }
-    detail::publish_current_model_event(result, component);
-    detail::publish_component_event(
-        component,
-        result.model_id().empty() ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
-                                  : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
-        result.model_id().empty() ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
-                                  : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
-        result.model_id(), nullptr, nullptr, nullptr);
     return detail::copy_proto(result, out_result);
 #endif
 }

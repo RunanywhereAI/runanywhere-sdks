@@ -19,6 +19,42 @@ import Darwin
 import Foundation
 import os
 
+/// Monotonic lifetime state shared by synchronous initialization and async
+/// reset. A generation prevents a stale reset completion from reopening a
+/// newer SDK lifetime.
+struct SDKLifetimeGate: Sendable {
+    private(set) var generation: UInt64 = 0
+    private(set) var isResetInProgress = false
+
+    mutating func beginReset() -> UInt64? {
+        guard !isResetInProgress else { return nil }
+        generation &+= 1
+        isResetInProgress = true
+        return generation
+    }
+
+    @discardableResult
+    mutating func completeReset(generation completedGeneration: UInt64) -> Bool {
+        guard isResetInProgress, generation == completedGeneration else { return false }
+        isResetInProgress = false
+        return true
+    }
+
+    func requireInitializationAllowed() throws {
+        guard !isResetInProgress else {
+            throw SDKException(
+                code: .invalidState,
+                message: "SDK reset is in progress; retry initialization after reset completes",
+                category: .internal
+            )
+        }
+    }
+
+    func permitsCompletion(generation candidate: UInt64) -> Bool {
+        !isResetInProgress && generation == candidate
+    }
+}
+
 /// The RunAnywhere SDK - Single entry point for on-device AI
 public enum RunAnywhere {
 
@@ -32,6 +68,11 @@ public enum RunAnywhere {
         var hasCompletedHTTPSetup = false
         var httpSetupApplicable = true
         var servicesInitTask: Task<Void, Error>?
+        var httpRetryTask: Task<Void, Never>?
+        var httpRetryTaskID: UInt64?
+        var nextHTTPRetryTaskID: UInt64 = 0
+        var resetTask: Task<Void, Never>?
+        var lifetime = SDKLifetimeGate()
     }
 
     private static let state = OSAllocatedUnfairLock<SDKState>(initialState: SDKState())
@@ -79,7 +120,9 @@ public enum RunAnywhere {
     /// Device ID (Keychain-persisted, survives reinstalls)
     /// Resolved by commons via the device-identity chain
     /// (secure_get → vendor ID → freshly synthesized UUID).
-    public static var deviceId: String { CppBridge.Device.persistentId }
+    public static var deviceId: String {
+        get throws { try CppBridge.Device.persistentId }
+    }
 
     // MARK: - Event Access
 
@@ -107,17 +150,64 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
 
-        let taskToCancel = state.withLock { lockedState -> Task<Void, Error>? in
-            let task = lockedState.servicesInitTask
-            lockedState = SDKState()
-            return task
-        }
-        taskToCancel?.cancel()
-
-        await CppBridge.shutdown()
-        CppBridge.State.shutdown()
+        let task = await beginReset()
+        await task.value
 
         logger.info("SDK state reset completed")
+    }
+
+    /// Linearize reset with synchronous Phase 1 without blocking the caller's
+    /// actor. Concurrent reset callers share the same teardown task.
+    private static func beginReset() async -> Task<Void, Never> {
+        await withCheckedContinuation { continuation in
+            coreInitQueue.async {
+                let task = state.withLock { lockedState -> Task<Void, Never> in
+                    if let existingTask = lockedState.resetTask {
+                        return existingTask
+                    }
+
+                    guard let generation = lockedState.lifetime.beginReset() else {
+                        preconditionFailure("reset lifetime has no owning task")
+                    }
+
+                    let servicesTask = lockedState.servicesInitTask
+                    let httpRetryTask = lockedState.httpRetryTask
+                    lockedState.initParams = nil
+                    lockedState.currentEnvironment = nil
+                    lockedState.isInitialized = false
+                    lockedState.hasCompletedServicesInit = false
+                    lockedState.hasCompletedHTTPSetup = false
+                    lockedState.httpSetupApplicable = true
+                    lockedState.servicesInitTask = nil
+                    lockedState.httpRetryTask = nil
+                    lockedState.httpRetryTaskID = nil
+
+                    let resetTask = Task.detached(priority: .userInitiated) {
+                        servicesTask?.cancel()
+                        httpRetryTask?.cancel()
+                        if let servicesTask {
+                            _ = await servicesTask.result
+                        }
+                        if let httpRetryTask {
+                            await httpRetryTask.value
+                        }
+
+                        await CppBridge.shutdown()
+
+                        state.withLock { completedState in
+                            guard completedState.lifetime.completeReset(
+                                generation: generation
+                            ) else { return }
+                            let lifetime = completedState.lifetime
+                            completedState = SDKState(lifetime: lifetime)
+                        }
+                    }
+                    lockedState.resetTask = resetTask
+                    return resetTask
+                }
+                continuation.resume(returning: task)
+            }
+        }
     }
 
     // MARK: - SDK Initialization
@@ -161,7 +251,11 @@ public enum RunAnywhere {
     }
 
     private static func performCoreInitSerial(with params: SDKInitParams, startBackgroundServices: Bool) throws {
-        guard !isInitializedFlag else { return }
+        let alreadyInitialized = try state.withLock { lockedState -> Bool in
+            try lockedState.lifetime.requireInitializationAllowed()
+            return lockedState.isInitialized
+        }
+        guard !alreadyInitialized else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
 
@@ -173,14 +267,10 @@ public enum RunAnywhere {
             $0.hasCompletedHTTPSetup = false
             $0.httpSetupApplicable = true
             $0.servicesInitTask = nil
+            $0.httpRetryTask = nil
+            $0.httpRetryTaskID = nil
         }
         Logging.shared.applyEnvironmentConfiguration(params.environment)
-
-        // Bring up the core C++ bridges (platform adapter, events,
-        // telemetry, device callbacks). Must run before Phase 1 proto so
-        // every C++ log routes through SDKLogger and analytics callbacks
-        // are wired up.
-        CppBridge.initialize(environment: params.environment)
 
         // Lifecycle INITIALIZATION_STAGE_* events (incl. duration_ms) are
         // published once by commons from rac_sdk_init_phase1_proto; Swift no
@@ -188,6 +278,10 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Init")
 
         do {
+            // Bring up the core C++ bridges and durably resolve device identity
+            // before Phase 1 can consume it.
+            try CppBridge.initialize(environment: params.environment)
+
             // Configure C++ model-paths base directory before any
             // registerModel() calls so rac_model_registry_save() can
             // reconcile entries against on-disk folders inline.
@@ -200,21 +294,22 @@ public enum RunAnywhere {
             }
 
             // Phase 1 proto: validates inputs and runs rac_state_initialize.
+            let deviceId = try CppBridge.Device.persistentId
             try CppBridge.SdkInit.phase1(
                 environment: params.environment,
                 apiKey: params.apiKey,
                 baseURL: params.baseURL.absoluteString,
-                deviceId: CppBridge.Device.persistentId
+                deviceId: deviceId
             )
 
             // SDK config (rac_sdk_init) + Keychain auth-storage install.
             // Idempotent state re-init is harmless; this call also wires up
             // version/platform metadata that Phase 1 proto does not touch.
-            CppBridge.State.initialize(
+            try CppBridge.State.initialize(
                 environment: params.environment,
                 apiKey: params.apiKey,
                 baseURL: params.baseURL,
-                deviceId: CppBridge.Device.persistentId
+                deviceId: deviceId
             )
 
             state.withLock { $0.isInitialized = true }
@@ -244,6 +339,15 @@ public enum RunAnywhere {
 
         } catch {
             logger.error("Initialization failed: \(error.localizedDescription)")
+            // Phase 1 may have initialized native state and synchronous bridge
+            // services before a later validation or Keychain restore failed.
+            // Roll both layers back so a retry can use a different environment
+            // and reinstall auth storage instead of inheriting partial state.
+            // CppBridge.initialize() owns rollback for its own failure path;
+            // later Phase-1 failures arrive with the bridge still initialized.
+            if CppBridge.isInitialized {
+                CppBridge.rollbackInitialization()
+            }
             state.withLock {
                 $0.initParams = nil
                 $0.currentEnvironment = nil
@@ -252,6 +356,8 @@ public enum RunAnywhere {
                 $0.hasCompletedHTTPSetup = false
                 $0.httpSetupApplicable = true
                 $0.servicesInitTask = nil
+                $0.httpRetryTask = nil
+                $0.httpRetryTaskID = nil
             }
             throw error
         }
@@ -265,12 +371,20 @@ public enum RunAnywhere {
     public static func completeServicesInitialization() async throws {
         if hasCompletedServicesInit { return }
 
-        let task: Task<Void, Error> = state.withLock {
-            if let existingTask = $0.servicesInitTask {
+        let task: Task<Void, Error> = try state.withLock { lockedState in
+            try lockedState.lifetime.requireInitializationAllowed()
+            guard lockedState.isInitialized else {
+                throw SDKException(
+                    code: .notInitialized,
+                    message: "SDK not initialized",
+                    category: .internal
+                )
+            }
+            if let existingTask = lockedState.servicesInitTask {
                 return existingTask
             }
             let newTask = Task<Void, Error> { try await _performServicesInitialization() }
-            $0.servicesInitTask = newTask
+            lockedState.servicesInitTask = newTask
             return newTask
         }
 
@@ -327,7 +441,7 @@ public enum RunAnywhere {
         )
         let completedHTTPSetup = phase2Result.hasCompletedHTTPSetup_p || phase2Result.httpConfigured
         if !phase2Result.warning.isEmpty {
-            logger.info("Phase 2 warning: \(phase2Result.warning)")
+            logger.info("Phase 2 completed with a warning; details omitted")
         }
         if phase2Result.linkedModelsCount > 0 {
             logger.info("Phase 2 linked \(phase2Result.linkedModelsCount) assigned models")
@@ -368,25 +482,74 @@ public enum RunAnywhere {
     /// Retry HTTP/auth after an offline initialization. Commons performs the
     /// round-trip through the registered platform HTTP transport.
     private static func retryHTTPSetup() async {
-        guard currentEnvironment != nil else { return }
+        let operation: (id: UInt64, generation: UInt64, task: Task<Void, Never>)? =
+            state.withLock { lockedState in
+                guard !lockedState.lifetime.isResetInProgress,
+                      lockedState.isInitialized,
+                      lockedState.currentEnvironment != nil else {
+                    return nil
+                }
+                if let task = lockedState.httpRetryTask,
+                   let id = lockedState.httpRetryTaskID {
+                    return (id, lockedState.lifetime.generation, task)
+                }
+
+                lockedState.nextHTTPRetryTaskID &+= 1
+                let id = lockedState.nextHTTPRetryTaskID
+                let generation = lockedState.lifetime.generation
+                let task = Task.detached(priority: .userInitiated) {
+                    await performHTTPRetry(generation: generation)
+                }
+                lockedState.httpRetryTask = task
+                lockedState.httpRetryTaskID = id
+                return (id, generation, task)
+            }
+        guard let operation else { return }
+
+        await operation.task.value
+        state.withLock { lockedState in
+            guard lockedState.lifetime.permitsCompletion(generation: operation.generation),
+                  lockedState.httpRetryTaskID == operation.id else {
+                return
+            }
+            lockedState.httpRetryTask = nil
+            lockedState.httpRetryTaskID = nil
+        }
+    }
+
+    private static func performHTTPRetry(generation: UInt64) async {
+        guard !Task.isCancelled else { return }
+        let canStart = state.withLock { lockedState in
+            lockedState.lifetime.permitsCompletion(generation: generation) &&
+                lockedState.isInitialized && lockedState.currentEnvironment != nil
+        }
+        guard canStart else { return }
+
         let logger = SDKLogger(category: "RunAnywhere.HTTPRetry")
 
         let proto: RASdkInitResult
         do {
             proto = try CppBridge.SdkInit.retryHTTP()
         } catch {
-            logger.debug("HTTP retry proto failed: \(error.localizedDescription)")
+            logger.debug("HTTP retry failed")
             return
         }
 
+        guard !Task.isCancelled else { return }
         let completedHTTPSetup = proto.hasCompletedHTTPSetup_p || proto.httpConfigured
-        state.withLock {
-            $0.hasCompletedHTTPSetup = completedHTTPSetup
-            $0.httpSetupApplicable = proto.httpApplicable
+        let committed = state.withLock { lockedState -> Bool in
+            guard lockedState.lifetime.permitsCompletion(generation: generation),
+                  lockedState.isInitialized else {
+                return false
+            }
+            lockedState.hasCompletedHTTPSetup = completedHTTPSetup
+            lockedState.httpSetupApplicable = proto.httpApplicable
+            return true
         }
+        guard committed else { return }
 
         if !proto.warning.isEmpty {
-            logger.debug("HTTP retry warning: \(proto.warning)")
+            logger.debug("HTTP retry completed with a warning; details omitted")
         }
 
         if completedHTTPSetup {

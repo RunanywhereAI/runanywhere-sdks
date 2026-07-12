@@ -62,20 +62,6 @@ private enum VoiceAgentStateProtoABI {
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
-    typealias TurnEventCallback = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutableRawPointer?
-    ) -> Void
-
-    typealias ProcessTurnWithEvents = @convention(c) (
-        rac_voice_agent_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        TurnEventCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
-
     // Streaming raw-frame ingress: the core segments utterances and runs the
     // turn pipeline, returning a VoiceAgentResult inline when one completes.
     typealias FeedAudio = @convention(c) (
@@ -90,42 +76,14 @@ private enum VoiceAgentStateProtoABI {
     ) -> rac_result_t
 
     static let processTurnName = "rac_voice_agent_process_voice_turn_proto"
-    static let processTurnWithEventsName = "rac_voice_agent_process_turn_proto"
     static let feedAudioName = "rac_voice_agent_feed_audio_proto"
 
     static let processTurn = NativeProtoABI.load(processTurnName, as: ProcessTurn.self)
-    static let processTurnWithEvents = NativeProtoABI.load(
-        processTurnWithEventsName,
-        as: ProcessTurnWithEvents.self
-    )
     static let feedAudio = NativeProtoABI.load(feedAudioName, as: FeedAudio.self)
-}
-
-private final class VoiceTurnEventCollector: @unchecked Sendable {
-    let onEvent: @Sendable (RAVoiceEvent) -> Void
-
-    init(onEvent: @escaping @Sendable (RAVoiceEvent) -> Void) {
-        self.onEvent = onEvent
-    }
-}
-
-private func voiceAgentTurnEventCallback(
-    bytes: UnsafePointer<UInt8>?,
-    size: Int,
-    userData: UnsafeMutableRawPointer?
-) {
-    guard let userData, let bytes, size > 0 else { return }
-    let collector = Unmanaged<VoiceTurnEventCollector>.fromOpaque(userData).takeUnretainedValue()
-    let data = Data(bytes: bytes, count: size)
-    guard let event = try? RAVoiceEvent(serializedBytes: data) else { return }
-    collector.onEvent(event)
 }
 
 private enum VLMCustomProtoABI {
     typealias Process = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
@@ -144,18 +102,27 @@ private enum VLMCustomProtoABI {
         StreamCallback?,
         UnsafeMutableRawPointer?
     ) -> rac_result_t
-    typealias Cancel = @convention(c) (rac_handle_t?) -> rac_result_t
+    typealias Cancel = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
 
-    static let processName = "rac_vlm_process_proto"
+    static let processName = "rac_vlm_generate_proto"
     static let streamName = "rac_vlm_stream_proto"
-    static let cancelName = "rac_vlm_cancel_proto"
+    static let cancelName = "rac_vlm_cancel_lifecycle_proto"
 
     static let process = NativeProtoABI.load(processName, as: Process.self)
     static let stream = NativeProtoABI.load(streamName, as: Stream.self)
-    // Handle-scoped cancel used by `processStream`'s onTermination so
-    // that consumer cancellation tears down the in-flight native
-    // generation instead of letting it run to completion.
+    // Lifecycle cancel used by `processStream`'s onTermination so consumer
+    // cancellation tears down native generation instead of letting it run.
     static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
+}
+
+private func cancelLifecycleVLMGeneration() {
+    guard let cancel = VLMCustomProtoABI.cancel else { return }
+    var outBuffer = rac_proto_buffer_t()
+    rac_proto_buffer_init(&outBuffer)
+    defer { rac_proto_buffer_free(&outBuffer) }
+    _ = cancel(&outBuffer)
 }
 
 private enum RAGSessionProtoABI {
@@ -164,6 +131,12 @@ private enum RAGSessionProtoABI {
     static let destroyName = "rac_rag_session_destroy_proto"
 
     static let destroy = NativeProtoABI.load(destroyName, as: Destroy.self)
+}
+
+/// Retained VLM stream context released by the detached worker after the
+/// synchronous native stream call returns.
+private struct VLMStreamContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
 }
 
 // MARK: - Callback contexts
@@ -412,7 +385,7 @@ extension CppBridge.VAD {
             try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
                 samples.withUnsafeBufferPointer { sampleBuffer in
                     process(
-                        handle,
+                        handle.rawValue,
                         sampleBuffer.baseAddress,
                         samples.count,
                         optionBytes,
@@ -439,7 +412,7 @@ extension CppBridge.VAD {
         // captured closure). See comment record `mlt-001`.
         let previousPtr = swapActivityCallbackContextPtr(nil)
         if let previousPtr {
-            _ = setCallback(handle, nil, nil)
+            _ = setCallback(handle.rawValue, nil, nil)
             Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
                 .fromOpaque(previousPtr)
                 .release()
@@ -453,7 +426,7 @@ extension CppBridge.VAD {
         }
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
         let rc = setCallback(
-            handle,
+            handle.rawValue,
             { bytes, size, userData in
                 guard let userData else { return }
                 _ = Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
@@ -489,48 +462,8 @@ extension CppBridge.VoiceAgent {
             symbolName: VoiceAgentStateProtoABI.processTurnName
         ) { outBuffer in
             audioData.withUnsafeBytes { audio in
-                processTurn(handle, audio.baseAddress, audioData.count, outBuffer)
+                processTurn(handle.rawValue, audio.baseAddress, audioData.count, outBuffer)
             }
-        }
-    }
-
-    /// Drive one voice turn from serialized `RAVoiceAgentTurnRequest` bytes.
-    /// VoiceEvents fan out to the handle callback (and optional per-turn listener).
-    nonisolated static func processTurnProto(
-        handle: rac_voice_agent_handle_t,
-        request: RAVoiceAgentTurnRequest,
-        onTurnEvent: (@Sendable (RAVoiceEvent) -> Void)? = nil
-    ) throws -> rac_result_t {
-        let processTurn = try NativeProtoABI.require(
-            VoiceAgentStateProtoABI.processTurnWithEvents,
-            named: VoiceAgentStateProtoABI.processTurnWithEventsName
-        )
-        let requestData = try request.serializedData()
-
-        if let onTurnEvent {
-            let collector = VoiceTurnEventCollector(onEvent: onTurnEvent)
-            let collectorPtr = Unmanaged.passRetained(collector).toOpaque()
-            defer { Unmanaged<VoiceTurnEventCollector>.fromOpaque(collectorPtr).release() }
-
-            return requestData.withUnsafeBytes { requestBytes in
-                processTurn(
-                    handle,
-                    requestBytes.bindMemory(to: UInt8.self).baseAddress,
-                    requestData.count,
-                    voiceAgentTurnEventCallback,
-                    collectorPtr
-                )
-            }
-        }
-
-        return requestData.withUnsafeBytes { requestBytes in
-            processTurn(
-                handle,
-                requestBytes.bindMemory(to: UInt8.self).baseAddress,
-                requestData.count,
-                nil,
-                nil
-            )
         }
     }
 
@@ -591,27 +524,19 @@ extension CppBridge.VoiceAgent {
 
 extension CppBridge.VLM {
     public func process(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> RAVLMResult {
-        let handle = try await getHandle()
         let process = try NativeProtoABI.require(
             VLMCustomProtoABI.process,
             named: VLMCustomProtoABI.processName
         )
-        let imageData = try image.serializedData()
+        var request = RAVLMGenerationRequest()
+        request.images = [image]
+        request.options = options
         return try decodeBuffer(
             responseType: RAVLMResult.self,
             symbolName: VLMCustomProtoABI.processName
         ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
-                imageData.withUnsafeBytes { imageBytes in
-                    process(
-                        handle,
-                        imageBytes.bindMemory(to: UInt8.self).baseAddress,
-                        imageBytes.count,
-                        optionBytes,
-                        optionSize,
-                        outBuffer
-                    )
-                }
+            try NativeProtoABI.withSerializedBytes(request) { requestBytes, requestSize in
+                process(requestBytes, requestSize, outBuffer)
             }
         }
     }
@@ -625,7 +550,7 @@ extension CppBridge.VLM {
     /// threaded; `request.modelID` is left empty (commons only validates it
     /// against the loaded model when non-empty).
     public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> AsyncStream<RAVLMStreamEvent> {
-        let stream = try NativeProtoABI.require(
+        _ = try NativeProtoABI.require(
             VLMCustomProtoABI.stream,
             named: VLMCustomProtoABI.streamName
         )
@@ -640,7 +565,9 @@ extension CppBridge.VLM {
                 continuation: continuation,
                 category: "CppBridge.VLM.ProtoStream"
             )
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
+            let contextPtr = VLMStreamContextPointer(
+                rawValue: Unmanaged.passRetained(context).toOpaque()
+            )
 
             // Wire the AsyncStream cancellation BEFORE launching the
             // detached task. Consumer cancellation (`.cancelled`) now
@@ -648,9 +575,7 @@ extension CppBridge.VLM {
             // callback returns RAC_FALSE and stops yielding, and (b)
             // invokes the native VLM cancel symbol so the underlying
             // generation tears down instead of running to completion
-            // in the background. A nil handle routes the cancel to the
-            // lifecycle-owned VLM service (commons falls back to the
-            // lifecycle when the handle is 0). `.finished` means the
+            // in the background. `.finished` means the
             // detached task already drained the native call, so the
             // cancel symbol is intentionally skipped on that path. The
             // detached task's `release()` still balances `passRetained`
@@ -659,9 +584,7 @@ extension CppBridge.VLM {
                 switch termination {
                 case .cancelled:
                     context.cancel()
-                    if let cancel = VLMCustomProtoABI.cancel {
-                        _ = cancel(nil)
-                    }
+                    cancelLifecycleVLMGeneration()
                 case .finished:
                     break
                 @unknown default:
@@ -675,6 +598,13 @@ extension CppBridge.VLM {
             // `.cancelled`) still flips the context flag and fires the VLM
             // cancel symbol instead of decoding the whole response.
             Task.detached {
+                guard let stream = VLMCustomProtoABI.stream else {
+                    Unmanaged<ProtoStreamContext<RAVLMStreamEvent>>
+                        .fromOpaque(contextPtr.rawValue)
+                        .release()
+                    continuation.finish()
+                    return
+                }
                 let rc = await withTaskCancellationHandler {
                     requestData.withUnsafeBytes { requestRaw in
                         stream(
@@ -693,17 +623,15 @@ extension CppBridge.VLM {
                                 ctx.yield(bytes: bytes, size: size)
                                 return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
                             },
-                            contextPtr
+                            contextPtr.rawValue
                         )
                     }
                 } onCancel: {
                     context.cancel()
-                    if let cancel = VLMCustomProtoABI.cancel {
-                        _ = cancel(nil)
-                    }
+                    cancelLifecycleVLMGeneration()
                 }
                 Unmanaged<ProtoStreamContext<RAVLMStreamEvent>>
-                    .fromOpaque(contextPtr)
+                    .fromOpaque(contextPtr.rawValue)
                     .release()
                 // A non-success return code on a cancelled stream is
                 // expected (the native runtime bailed out); only log it

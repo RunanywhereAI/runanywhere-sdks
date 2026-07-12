@@ -17,9 +17,6 @@ import 'package:protobuf/protobuf.dart' as $pb;
 /// ---------------------------------------------------------------------------
 /// NPU chipset detected on the host device. Used to drive vendor-NPU
 /// model-download URL selection and runtime backend wiring.
-/// Sources pre-IDL:
-///   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
-/// Canonical superset (this file): vendor-grouped, vendor-agnostic.
 /// ---------------------------------------------------------------------------
 class NPUChip extends $pb.ProtobufEnum {
   static const NPUChip NPU_CHIP_UNSPECIFIED =

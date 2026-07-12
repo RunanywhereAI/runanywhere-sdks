@@ -460,66 +460,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   }
 
   /// -------------------------------------------------------------------
-  /// Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-  /// rac_wakeword_config_t).
-  /// -------------------------------------------------------------------
-  public var wakewordEnabled: Bool {
-    get {_storage._wakewordEnabled}
-    set {_uniqueStorage()._wakewordEnabled = newValue}
-  }
-
-  public var wakewordModelPath: String {
-    get {_storage._wakewordModelPath ?? String()}
-    set {_uniqueStorage()._wakewordModelPath = newValue}
-  }
-  /// Returns true if `wakewordModelPath` has been explicitly set.
-  public var hasWakewordModelPath: Bool {_storage._wakewordModelPath != nil}
-  /// Clears the value of `wakewordModelPath`. Subsequent reads from it will return its default value.
-  public mutating func clearWakewordModelPath() {_uniqueStorage()._wakewordModelPath = nil}
-
-  public var wakewordModelID: String {
-    get {_storage._wakewordModelID ?? String()}
-    set {_uniqueStorage()._wakewordModelID = newValue}
-  }
-  /// Returns true if `wakewordModelID` has been explicitly set.
-  public var hasWakewordModelID: Bool {_storage._wakewordModelID != nil}
-  /// Clears the value of `wakewordModelID`. Subsequent reads from it will return its default value.
-  public mutating func clearWakewordModelID() {_uniqueStorage()._wakewordModelID = nil}
-
-  public var wakewordPhrase: String {
-    get {_storage._wakewordPhrase ?? String()}
-    set {_uniqueStorage()._wakewordPhrase = newValue}
-  }
-  /// Returns true if `wakewordPhrase` has been explicitly set.
-  public var hasWakewordPhrase: Bool {_storage._wakewordPhrase != nil}
-  /// Clears the value of `wakewordPhrase`. Subsequent reads from it will return its default value.
-  public mutating func clearWakewordPhrase() {_uniqueStorage()._wakewordPhrase = nil}
-
-  /// default 0.5
-  public var wakewordThreshold: Float {
-    get {_storage._wakewordThreshold}
-    set {_uniqueStorage()._wakewordThreshold = newValue}
-  }
-
-  public var wakewordEmbeddingModelPath: String {
-    get {_storage._wakewordEmbeddingModelPath ?? String()}
-    set {_uniqueStorage()._wakewordEmbeddingModelPath = newValue}
-  }
-  /// Returns true if `wakewordEmbeddingModelPath` has been explicitly set.
-  public var hasWakewordEmbeddingModelPath: Bool {_storage._wakewordEmbeddingModelPath != nil}
-  /// Clears the value of `wakewordEmbeddingModelPath`. Subsequent reads from it will return its default value.
-  public mutating func clearWakewordEmbeddingModelPath() {_uniqueStorage()._wakewordEmbeddingModelPath = nil}
-
-  public var wakewordVadModelPath: String {
-    get {_storage._wakewordVadModelPath ?? String()}
-    set {_uniqueStorage()._wakewordVadModelPath = newValue}
-  }
-  /// Returns true if `wakewordVadModelPath` has been explicitly set.
-  public var hasWakewordVadModelPath: Bool {_storage._wakewordVadModelPath != nil}
-  /// Clears the value of `wakewordVadModelPath`. Subsequent reads from it will return its default value.
-  public mutating func clearWakewordVadModelPath() {_uniqueStorage()._wakewordVadModelPath = nil}
-
-  /// -------------------------------------------------------------------
   /// Session-behavior sub-config. Optional so the C ABI can be invoked
   /// without runtime-behavior overrides (engine defaults applied).
   /// -------------------------------------------------------------------
@@ -1043,7 +983,7 @@ nonisolated extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{3}wakeword_enabled\0\u{3}wakeword_model_path\0\u{3}wakeword_model_id\0\u{3}wakeword_phrase\0\u{3}wakeword_threshold\0\u{3}wakeword_embedding_model_path\0\u{3}wakeword_vad_model_path\0\u{3}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{4}\u{8}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{b}wakeword_enabled\0\u{b}wakeword_model_path\0\u{b}wakeword_model_id\0\u{b}wakeword_phrase\0\u{b}wakeword_threshold\0\u{b}wakeword_embedding_model_path\0\u{b}wakeword_vad_model_path\0\u{c}\u{d}\u{7}")
 
   fileprivate class _StorageClass {
     var _sttModelPath: String? = nil
@@ -1058,13 +998,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
     var _vadSampleRate: Int32 = 0
     var _vadFrameLength: Float = 0
     var _vadEnergyThreshold: Float = 0
-    var _wakewordEnabled: Bool = false
-    var _wakewordModelPath: String? = nil
-    var _wakewordModelID: String? = nil
-    var _wakewordPhrase: String? = nil
-    var _wakewordThreshold: Float = 0
-    var _wakewordEmbeddingModelPath: String? = nil
-    var _wakewordVadModelPath: String? = nil
     var _sessionConfig: RAVoiceSessionConfig? = nil
     var _audioPipelineConfig: RAAudioPipelineConfig? = nil
     var _sessionID: String? = nil
@@ -1091,13 +1024,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       _vadSampleRate = source._vadSampleRate
       _vadFrameLength = source._vadFrameLength
       _vadEnergyThreshold = source._vadEnergyThreshold
-      _wakewordEnabled = source._wakewordEnabled
-      _wakewordModelPath = source._wakewordModelPath
-      _wakewordModelID = source._wakewordModelID
-      _wakewordPhrase = source._wakewordPhrase
-      _wakewordThreshold = source._wakewordThreshold
-      _wakewordEmbeddingModelPath = source._wakewordEmbeddingModelPath
-      _wakewordVadModelPath = source._wakewordVadModelPath
       _sessionConfig = source._sessionConfig
       _audioPipelineConfig = source._audioPipelineConfig
       _sessionID = source._sessionID
@@ -1132,13 +1058,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._vadSampleRate) }()
         case 11: try { try decoder.decodeSingularFloatField(value: &_storage._vadFrameLength) }()
         case 12: try { try decoder.decodeSingularFloatField(value: &_storage._vadEnergyThreshold) }()
-        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._wakewordEnabled) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._wakewordModelPath) }()
-        case 15: try { try decoder.decodeSingularStringField(value: &_storage._wakewordModelID) }()
-        case 16: try { try decoder.decodeSingularStringField(value: &_storage._wakewordPhrase) }()
-        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._wakewordThreshold) }()
-        case 18: try { try decoder.decodeSingularStringField(value: &_storage._wakewordEmbeddingModelPath) }()
-        case 19: try { try decoder.decodeSingularStringField(value: &_storage._wakewordVadModelPath) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._sessionConfig) }()
         case 21: try { try decoder.decodeSingularMessageField(value: &_storage._audioPipelineConfig) }()
         case 22: try { try decoder.decodeSingularStringField(value: &_storage._sessionID) }()
@@ -1191,27 +1110,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       if _storage._vadEnergyThreshold.bitPattern != 0 {
         try visitor.visitSingularFloatField(value: _storage._vadEnergyThreshold, fieldNumber: 12)
       }
-      if _storage._wakewordEnabled != false {
-        try visitor.visitSingularBoolField(value: _storage._wakewordEnabled, fieldNumber: 13)
-      }
-      try { if let v = _storage._wakewordModelPath {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
-      } }()
-      try { if let v = _storage._wakewordModelID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 15)
-      } }()
-      try { if let v = _storage._wakewordPhrase {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
-      } }()
-      if _storage._wakewordThreshold.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._wakewordThreshold, fieldNumber: 17)
-      }
-      try { if let v = _storage._wakewordEmbeddingModelPath {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 18)
-      } }()
-      try { if let v = _storage._wakewordVadModelPath {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 19)
-      } }()
       try { if let v = _storage._sessionConfig {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
       } }()
@@ -1245,13 +1143,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         if _storage._vadSampleRate != rhs_storage._vadSampleRate {return false}
         if _storage._vadFrameLength != rhs_storage._vadFrameLength {return false}
         if _storage._vadEnergyThreshold != rhs_storage._vadEnergyThreshold {return false}
-        if _storage._wakewordEnabled != rhs_storage._wakewordEnabled {return false}
-        if _storage._wakewordModelPath != rhs_storage._wakewordModelPath {return false}
-        if _storage._wakewordModelID != rhs_storage._wakewordModelID {return false}
-        if _storage._wakewordPhrase != rhs_storage._wakewordPhrase {return false}
-        if _storage._wakewordThreshold != rhs_storage._wakewordThreshold {return false}
-        if _storage._wakewordEmbeddingModelPath != rhs_storage._wakewordEmbeddingModelPath {return false}
-        if _storage._wakewordVadModelPath != rhs_storage._wakewordVadModelPath {return false}
         if _storage._sessionConfig != rhs_storage._sessionConfig {return false}
         if _storage._audioPipelineConfig != rhs_storage._audioPipelineConfig {return false}
         if _storage._sessionID != rhs_storage._sessionID {return false}

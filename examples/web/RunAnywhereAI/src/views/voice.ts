@@ -9,7 +9,8 @@
  *   2. We probe `RunAnywhere.componentLifecycleSnapshot(SDK_COMPONENT_*)` for
  *      LLM / STT / TTS readiness. When all three are READY, the Start
  *      button enables.
- *   3. Start: capture mic at 16 kHz mono Float32 through `AudioCapture`,
+ *   3. Start: capture and endpoint 16 kHz mono audio through the SDK's
+ *      `VoiceAgentMicDriver`,
  *      register backend models via
  *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
  *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
@@ -19,10 +20,10 @@
  *        - `vad`                → speech-detected indicator
  *        - `userSaid`           → live transcript area
  *        - `assistantToken`     → streamed assistant response
- *        - `audio`              → push PCM bytes to `AudioPlayback`
+ *        - `audio`              → SDK mic driver gates capture through playback
  *        - `error`              → inline error banner
- *   5. Stop: cancel the event-consumer task, stop capture, dispose playback,
- *      and call `RunAnywhere.cleanupVoiceAgent()`.
+ *   5. Stop: cancel the event-consumer task, stop capture/playback through the
+ *      driver, and call `RunAnywhere.cleanupVoiceAgent()`.
  *
  * Backends (llamacpp + ONNX) are registered once at app init by `main.ts` —
  * this view assumes they exist and surfaces the SDK's typed error if a verb
@@ -32,27 +33,41 @@
 import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
-  AudioEncoding,
-  SDKComponent,
+  ModelCategory,
   TokenKind,
-  pcm16ToFloat32,
   VoiceEventPipelineState,
   VADStreamEventKind,
   type AssistantTokenEvent,
-  type AudioFrameEvent,
   type ErrorEvent,
   type StateChangeEvent,
   type UserSaidEvent,
   type VADEvent,
   type VoiceEvent,
 } from '@runanywhere/web';
-import {
-  AudioCapture,
-  AudioPlayback,
-} from '@runanywhere/web/browser';
-import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import { VoiceAgentMicDriver } from '@runanywhere/web/browser';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import { appLogger } from '../services/app-logger';
+import { getCatalog, type CatalogEntry } from '../services/model-catalog';
+import { detectDeviceCapabilities } from '../services/device-capabilities';
+import {
+  recommendVoicePipeline,
+  type VoicePipelineSelection,
+} from '../services/model-recommendation';
+import {
+  cleanModelName,
+  formatBytes,
+  formatFramework,
+  modalityEmoji,
+  modelDisplaySizeBytes,
+} from '../services/model-display';
+import {
+  ensureModelReady,
+  getModelStatus,
+  isModelLoaded,
+  onModelStateChange,
+  openSheet,
+} from '../components/model-selection';
 
 // ---------------------------------------------------------------------------
 // View state
@@ -71,20 +86,10 @@ type SessionState =
   | 'speaking'     // Playing back TTS response
   | 'error';       // Error state
 
-interface ComponentReadiness {
-  llmReady: boolean;
-  sttReady: boolean;
-  ttsReady: boolean;
-  llmModelId: string;
-  sttModelId: string;
-  ttsModelId: string;
-}
-
 let container: HTMLElement;
 let unmounted = false;
 
-let audioCapture: AudioCapture | null = null;
-let audioPlayback: AudioPlayback | null = null;
+let micDriver: VoiceAgentMicDriver | null = null;
 let eventConsumer: AbortController | null = null;
 let sessionState: SessionState = 'disconnected';
 let isSpeechDetected = false;
@@ -93,6 +98,44 @@ let assistantResponse = '';
 let lastError: string | null = null;
 let audioLevel = 0;
 let lastEventSummary = '';
+
+// Pre-selected best-for-device voice trio (+ VAD), computed once on first
+// activation. `null` until the async capability probe resolves.
+let voicePipeline: VoicePipelineSelection | null = null;
+let pipelineProbePending = false;
+let settingUpPipeline = false;
+let unsubscribeModelState: (() => void) | null = null;
+
+/** The ordered pipeline slots surfaced in the setup card. */
+interface PipelineSlot {
+  key: 'stt' | 'llm' | 'tts' | 'vad';
+  label: string;
+  category: ModelCategory;
+  entry: CatalogEntry | null;
+  /** VAD is optional — the SDK auto-loads it; we don't gate Start on it. */
+  optional: boolean;
+}
+
+function pipelineSlots(): PipelineSlot[] {
+  const p = voicePipeline;
+  return [
+    { key: 'stt', label: 'Speech-to-text', category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, entry: p?.stt ?? null, optional: false },
+    { key: 'llm', label: 'Chat model', category: ModelCategory.MODEL_CATEGORY_LANGUAGE, entry: p?.llm ?? null, optional: false },
+    { key: 'tts', label: 'Text-to-speech', category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, entry: p?.tts ?? null, optional: false },
+    { key: 'vad', label: 'Voice detection', category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION, entry: p?.vad ?? null, optional: true },
+  ];
+}
+
+/** Required (non-VAD) slots that have a resolved model entry. */
+function requiredSlots(): PipelineSlot[] {
+  return pipelineSlots().filter((slot) => !slot.optional && slot.entry);
+}
+
+/** Whether every required pipeline model is downloaded + loaded. */
+function pipelineReady(): boolean {
+  const required = requiredSlots();
+  return required.length === 3 && required.every((slot) => isModelLoaded(slot.entry!.id));
+}
 
 function isActiveState(state: SessionState): boolean {
   // iOS parity: VoiceAgentViewModel.swift:108-115 `isActive`.
@@ -109,49 +152,66 @@ function isActiveState(state: SessionState): boolean {
 export function initVoiceTab(el: HTMLElement): TabLifecycle {
   container = el;
   unmounted = false;
+  ensureVoicePipeline();
   renderView();
   return {
     onActivate: () => {
       unmounted = false;
+      ensureVoicePipeline();
+      if (!unsubscribeModelState) {
+        // Reflect download/load progress driven by the shared model registry.
+        unsubscribeModelState = onModelStateChange(() => scheduleRender());
+      }
       renderView();
     },
     onDeactivate: () => {
       unmounted = true;
+      unsubscribeModelState?.();
+      unsubscribeModelState = null;
       void stopSession({ silent: true });
     },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Readiness probing
-// ---------------------------------------------------------------------------
-
-function readReadiness(): ComponentReadiness {
-  return {
-    llmReady: isComponentReady(SDKComponent.SDK_COMPONENT_LLM),
-    sttReady: isComponentReady(SDKComponent.SDK_COMPONENT_STT),
-    ttsReady: isComponentReady(SDKComponent.SDK_COMPONENT_TTS),
-    llmModelId: componentModelId(SDKComponent.SDK_COMPONENT_LLM),
-    sttModelId: componentModelId(SDKComponent.SDK_COMPONENT_STT),
-    ttsModelId: componentModelId(SDKComponent.SDK_COMPONENT_TTS),
-  };
+/**
+ * Probe hardware once and derive the best-for-device voice trio (+ VAD). Cached
+ * for the session; re-renders when it resolves so the setup card fills in.
+ */
+function ensureVoicePipeline(): void {
+  if (voicePipeline || pipelineProbePending) return;
+  pipelineProbePending = true;
+  void detectDeviceCapabilities()
+    .then((caps) => {
+      voicePipeline = recommendVoicePipeline(caps.tier, caps.memoryBudgetBytes, getCatalog());
+    })
+    .catch((err) => {
+      appLogger.warning('[voice] pipeline recommendation failed', err);
+    })
+    .finally(() => {
+      pipelineProbePending = false;
+      if (!unmounted) renderView();
+    });
 }
 
-function isComponentReady(component: SDKComponent): boolean {
+/** Download + load every required pipeline model in sequence, then VAD. */
+async function setupPipeline(): Promise<void> {
+  if (settingUpPipeline) return;
+  settingUpPipeline = true;
+  renderView();
   try {
-    const snap = RunAnywhere.componentLifecycleSnapshot(component);
-    return snap?.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
-  } catch {
-    return false;
-  }
-}
-
-function componentModelId(component: SDKComponent): string {
-  try {
-    const snap = RunAnywhere.componentLifecycleSnapshot(component);
-    return snap?.modelId ?? '';
-  } catch {
-    return '';
+    // Required trio first so Start unlocks as early as possible, then the
+    // optional VAD (best-effort; the SDK also auto-loads it).
+    const ordered = pipelineSlots().filter((slot) => slot.entry);
+    for (const slot of ordered) {
+      const ok = await ensureModelReady(slot.entry!.id);
+      if (!ok && !slot.optional) {
+        // Surface the failure but keep going so the user sees which slot failed.
+        lastError = `Could not set up ${slot.label}. Tap it to try another model.`;
+      }
+    }
+  } finally {
+    settingUpPipeline = false;
+    if (!unmounted) renderView();
   }
 }
 
@@ -162,57 +222,29 @@ function componentModelId(component: SDKComponent): string {
 function renderView(): void {
   if (unmounted) return;
 
-  const readiness = readReadiness();
-  const allReady = readiness.llmReady && readiness.sttReady && readiness.ttsReady;
   const isActive = isActiveState(sessionState);
+  const allReady = pipelineReady();
 
   container.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">Voice</div>
+      <div class="toolbar-title">Voice AI</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="voice-refresh-btn">Refresh</button>
       </div>
     </div>
     <div class="scroll-area">
-      <div class="docs-section">
-        <h3>Pipeline models</h3>
-        <p class="text-secondary">Each slot is loaded through the canonical model
-        lifecycle. Open the indicated tab to download and load the model — the
-        voice agent reuses whatever is currently loaded in that component.</p>
-        <ul class="feature-unavailable__list">
-          <li>
-            <strong>LLM:</strong>
-            ${readiness.llmReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.llmModelId || '(default)')}</code>`
-              : '<span class="badge badge-grey">Not loaded</span> — load any chat model from the <em>Chat</em> tab'}
-          </li>
-          <li>
-            <strong>STT:</strong>
-            ${readiness.sttReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.sttModelId || '(default)')}</code>`
-              : '<span class="badge badge-grey">Not loaded</span> — load Whisper Tiny from the <em>Transcribe</em> tab'}
-          </li>
-          <li>
-            <strong>TTS:</strong>
-            ${readiness.ttsReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.ttsModelId || '(default)')}</code>`
-              : '<span class="badge badge-grey">Not loaded</span> — load Piper US Lessac from the <em>Speak</em> tab'}
-          </li>
-        </ul>
-      </div>
+      ${renderSetupCard(allReady)}
 
       <div class="docs-section">
-        <h3>Session</h3>
-        <p class="text-secondary">When all three models are loaded the agent
-        captures the microphone, dispatches each turn through
-        <code>RunAnywhere.streamVoiceAgent()</code>, and plays back the TTS
-        chunks via <code>AudioPlayback</code>.</p>
+        <h3>Conversation</h3>
+        <p class="text-secondary">Speak naturally — after setup, voice capture
+        and AI inference run in this browser.</p>
         <div class="toolbar-actions">
           <button
             class="btn btn-primary"
             id="voice-start-btn"
             ${allReady && !isActive ? '' : 'disabled'}
-          >${isActive ? 'Session active' : 'Start Voice Session'}</button>
+          >${isActive ? 'Conversation active' : 'Start conversation'}</button>
           <button
             class="btn btn-secondary"
             id="voice-stop-btn"
@@ -251,10 +283,138 @@ function renderView(): void {
   attachHandlers();
 }
 
+/**
+ * The single "Voice AI" setup card: the pre-selected trio (+ VAD) with
+ * per-component status/progress, one primary button that downloads + loads
+ * everything, and a subtle per-component "Change" affordance.
+ */
+function renderSetupCard(allReady: boolean): string {
+  if (!voicePipeline) {
+    return `
+      <div class="voice-setup">
+        <div class="voice-setup__head">
+          <div class="voice-setup__title">Setting up Voice AI…</div>
+          <div class="voice-setup__subtitle">Finding the best models for your device.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const slots = pipelineSlots().filter((slot) => slot.entry || !slot.optional);
+  const rows = slots.map(renderSlotRow).join('');
+
+  const primary = allReady
+    ? `<div class="voice-setup__ready"><span class="badge badge-green">Ready</span> Your voice assistant is set up.</div>`
+    : `<button class="btn btn-primary btn-lg" id="voice-setup-btn" ${settingUpPipeline ? 'disabled' : ''}>
+         ${settingUpPipeline ? 'Setting up…' : 'Set up Voice AI'}
+       </button>
+       <div class="voice-setup__note">Downloads &amp; loads all components. Voice inference runs offline afterward.</div>`;
+
+  return `
+    <div class="voice-setup">
+      <div class="voice-setup__head">
+        <div class="voice-setup__glyph">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+            <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+          </svg>
+        </div>
+        <div>
+          <div class="voice-setup__title">Voice AI</div>
+          <div class="voice-setup__subtitle">Talk to a fully on-device assistant — pre-tuned for your hardware.</div>
+        </div>
+      </div>
+      <div class="voice-setup__slots">${rows}</div>
+      <div class="voice-setup__actions">${primary}</div>
+    </div>
+  `;
+}
+
+/** One pipeline component row inside the setup card. */
+function renderSlotRow(slot: PipelineSlot): string {
+  const entry = slot.entry;
+  if (!entry) {
+    return `
+      <div class="voice-slot voice-slot--missing">
+        <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
+        <div class="voice-slot__body">
+          <div class="voice-slot__label">${escapeHtml(slot.label)}</div>
+          <div class="voice-slot__hint">No model available for this device.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const status = getModelStatus(entry.id);
+  const stateHtml = renderSlotState(status);
+  const changeBtn = `<button type="button" class="voice-slot__change" data-change="${slot.key}">Change</button>`;
+
+  return `
+    <div class="voice-slot voice-slot--${status.status}" data-slot="${slot.key}">
+      <div class="voice-slot__icon">${modalityEmoji(slot.category)}</div>
+      <div class="voice-slot__body">
+        <div class="voice-slot__label">${escapeHtml(slot.label)}${slot.optional ? ' <span class="voice-slot__opt">optional</span>' : ''}</div>
+        <div class="voice-slot__hint">
+          ${escapeHtml(cleanModelName(entry.name))}
+          · ${formatBytes(modelDisplaySizeBytes(entry))}
+          <span class="backend-pill">${escapeHtml(formatFramework(entry.framework))}</span>
+        </div>
+        ${status.status === 'downloading'
+          ? `<div class="progress-bar voice-slot__progress"><div class="progress-fill" style="width:${Math.round(status.progress * 100)}%"></div></div>`
+          : ''}
+      </div>
+      <div class="voice-slot__aside">
+        ${stateHtml}
+        ${changeBtn}
+      </div>
+    </div>
+  `;
+}
+
+function renderSlotState(status: ReturnType<typeof getModelStatus>): string {
+  switch (status.status) {
+    case 'loaded':
+      return '<span class="voice-slot__state voice-slot__state--ready">&#10003; Ready</span>';
+    case 'downloaded':
+      return '<span class="voice-slot__state">On device</span>';
+    case 'downloading':
+      return `<span class="voice-slot__state">${Math.round(status.progress * 100)}%</span>`;
+    case 'loading':
+      return '<span class="voice-slot__state">Loading…</span>';
+    case 'error':
+      return '<span class="voice-slot__state voice-slot__state--error">Failed</span>';
+    default:
+      return '<span class="voice-slot__state voice-slot__state--pending">Not set up</span>';
+  }
+}
+
 function attachHandlers(): void {
   container.querySelector('#voice-refresh-btn')?.addEventListener('click', () => renderView());
   container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
   container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
+  container.querySelector('#voice-setup-btn')?.addEventListener('click', () => void setupPipeline());
+  container.querySelectorAll<HTMLElement>('[data-change]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const slot = pipelineSlots().find((s) => s.key === el.dataset.change);
+      if (!slot) return;
+      openSheet({
+        title: `Choose ${slot.label}`,
+        filterCategories: [slot.category],
+        onModelReady: (entry) => updatePipelineSlot(slot.key, entry),
+      });
+    });
+  });
+}
+
+/** Replace one recommendation after the picker confirms the model is ready. */
+function updatePipelineSlot(
+  key: PipelineSlot['key'],
+  entry: CatalogEntry,
+): void {
+  if (!voicePipeline) return;
+  voicePipeline = { ...voicePipeline, [key]: entry };
+  lastError = null;
+  if (!unmounted) renderView();
 }
 
 // ---------------------------------------------------------------------------
@@ -278,26 +438,36 @@ async function startSession(): Promise<void> {
     // SDK owns the multi-step bootstrap (VAD auto-load + model composition).
     await RunAnywhere.initializeVoiceAgentWithLoadedModels();
 
-    // Start the microphone at the VAD-friendly 16 kHz mono Float32 rate.
-    audioCapture = new AudioCapture({ sampleRate: 16000, channels: 1 });
-    await audioCapture.start(undefined, (level) => {
-      audioLevel = level;
-      updateLevelBar();
-    });
-
-    // Prepare playback for TTS audio chunks. The actual sample rate is
-    // re-derived per `AudioFrameEvent.sampleRateHz`, but we seed at 22050
-    // (Piper default) so the first chunk plays without a context reset.
-    audioPlayback = new AudioPlayback({ sampleRate: 22050 });
-
-    sessionState = 'listening';
-    setEventSummary('Listening...');
-    renderView();
-
     // Start consuming the proto event stream. We track the consumer via an
     // `AbortController` so `stopSession()` can deterministically end it.
     eventConsumer = new AbortController();
     void consumeEvents(eventConsumer.signal);
+
+    // The browser-specific SDK driver owns microphone capture and utterance
+    // endpointing, then submits each completed utterance through the one-call
+    // `RunAnywhere.processVoiceTurn()` provider. The example only renders the
+    // resulting canonical VoiceEvents.
+    micDriver = new VoiceAgentMicDriver();
+    await micDriver.start({
+      onLevel: (level) => {
+        audioLevel = level;
+        updateLevelBar();
+      },
+      onPhase: (phase) => {
+        sessionState = phase === 'processing' ? 'processing' : 'listening';
+        if (phase === 'processing') isSpeechDetected = false;
+        scheduleRender();
+      },
+      onError: (error) => {
+        lastError = `Voice turn failed: ${formatError(error)}`;
+        sessionState = 'error';
+        scheduleRender();
+      },
+    });
+
+    sessionState = 'listening';
+    setEventSummary('Listening...');
+    renderView();
   } catch (err) {
     lastError = `Failed to start voice session: ${formatError(err)}`;
     sessionState = 'error';
@@ -313,14 +483,9 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   eventConsumer?.abort();
   eventConsumer = null;
 
-  if (audioCapture) {
-    try { audioCapture.stop(); } catch { /* ignore */ }
-    audioCapture = null;
-  }
-
-  if (audioPlayback) {
-    try { audioPlayback.dispose(); } catch { /* ignore */ }
-    audioPlayback = null;
+  if (micDriver) {
+    try { micDriver.stop(); } catch { /* ignore */ }
+    micDriver = null;
   }
 
   audioLevel = 0;
@@ -351,7 +516,16 @@ async function consumeEvents(signal: AbortSignal): Promise<void> {
     // Swift parity: `streamVoiceAgent()` finishes EMPTY when the agent is not
     // ready — no synthetic error events arrive on the iterator, so a stream
     // that ends right away simply returns the UI to the Ready state below.
-    const stream = RunAnywhere.streamVoiceAgent();
+    const stream = RunAnywhere.streamVoiceAgent({
+      eventFilter: '',
+      sessionId: 'web-voice-agent',
+      categories: [],
+      minSeverity: 0,
+      replayFromSeq: 0,
+      // The SDK mic driver plays the returned audio and keeps capture gated
+      // until playback completes, preventing speaker-to-mic feedback.
+      includeAudio: false,
+    }, signal);
     for await (const event of stream) {
       if (signal.aborted || unmounted) break;
       handleVoiceEvent(event);
@@ -390,9 +564,6 @@ function handleVoiceEvent(event: VoiceEvent): void {
   }
   if (event.assistantToken) {
     applyAssistantToken(event.assistantToken);
-  }
-  if (event.audio) {
-    void applyAudioFrame(event.audio);
   }
   if (event.error) {
     applyErrorEvent(event.error);
@@ -458,6 +629,7 @@ function applyVadEvent(vad: VADEvent): void {
 function applyUserSaid(userSaid: UserSaidEvent): void {
   // Partial hypotheses overwrite; finals stay until the next turn starts.
   userTranscript = userSaid.text;
+  if (userSaid.isFinal) assistantResponse = '';
 }
 
 function applyAssistantToken(token: AssistantTokenEvent): void {
@@ -470,20 +642,6 @@ function applyAssistantToken(token: AssistantTokenEvent): void {
   }
 }
 
-async function applyAudioFrame(frame: AudioFrameEvent): Promise<void> {
-  if (!frame.pcm || frame.pcm.byteLength === 0) return;
-  try {
-    const samples = decodePcm(frame);
-    const rate = frame.sampleRateHz || 22050;
-    audioPlayback = audioPlayback ?? new AudioPlayback({ sampleRate: rate });
-    // Fire-and-forget; subsequent chunks queue via the audio context.
-    void audioPlayback.play(samples, rate);
-  } catch (err) {
-    lastError = `Audio playback failed: ${formatError(err)}`;
-    scheduleRender();
-  }
-}
-
 function applyErrorEvent(err: ErrorEvent): void {
   if (err.message) {
     lastError = err.message;
@@ -493,20 +651,6 @@ function applyErrorEvent(err: ErrorEvent): void {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function decodePcm(frame: AudioFrameEvent): Float32Array {
-  // Copy into a fresh ArrayBuffer (the proto bytes may be a view into a
-  // larger heap buffer).
-  const copy = new Uint8Array(frame.pcm.byteLength);
-  copy.set(frame.pcm);
-  if (frame.encoding === AudioEncoding.AUDIO_ENCODING_PCM_S16_LE) {
-    // SDK-owned Int16→Float32 conversion (Swift parity:
-    // RunAnywhere.pcm16ToFloat32 — no app-side PCM math).
-    return pcm16ToFloat32(copy.buffer);
-  }
-  // Default to PCM-F32 little-endian (encoding 0 / unspecified or explicit).
-  return new Float32Array(copy.buffer);
-}
 
 function setEventSummary(text: string): void {
   lastEventSummary = text;

@@ -218,7 +218,9 @@ rac_result_t post_auth_json(rac_environment_t env, const char* endpoint, const c
     request.body_bytes = reinterpret_cast<const uint8_t*>(request_json);
     request.body_len = request_len;
     request.timeout_ms = rac_env_default_http_timeout_ms(env);
-    request.follow_redirects = RAC_TRUE;
+    // Auth/refresh requests carry API credentials and may carry refresh
+    // tokens in the JSON body. Never replay either across a redirect.
+    request.follow_redirects = RAC_FALSE;
 
     rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);
@@ -241,16 +243,23 @@ rac_result_t post_auth_json(rac_environment_t env, const char* endpoint, const c
     std::string body(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
     rac_http_response_free(&response);
 
-    return response_handler(body.c_str()) == 0 ? RAC_SUCCESS : RAC_ERROR_INVALID_RESPONSE;
+    return response_handler(body.c_str());
 }
 
 rac_result_t handle_authenticate_response_for_init(const char* json) {
-    return rac_auth_handle_authenticate_response(json) == 0 ? RAC_SUCCESS
-                                                            : RAC_ERROR_INVALID_RESPONSE;
+    const int result = rac_auth_handle_authenticate_response(json);
+    if (result == RAC_SUCCESS || result == RAC_ERROR_SECURE_STORAGE_FAILED) {
+        return static_cast<rac_result_t>(result);
+    }
+    return RAC_ERROR_INVALID_RESPONSE;
 }
 
 rac_result_t handle_refresh_response_for_init(const char* json) {
-    return rac_auth_handle_refresh_response(json) == 0 ? RAC_SUCCESS : RAC_ERROR_INVALID_RESPONSE;
+    const int result = rac_auth_handle_refresh_response(json);
+    if (result == RAC_SUCCESS || result == RAC_ERROR_SECURE_STORAGE_FAILED) {
+        return static_cast<rac_result_t>(result);
+    }
+    return RAC_ERROR_INVALID_RESPONSE;
 }
 
 rac_result_t perform_token_refresh(SdkInitResult* result);
@@ -285,7 +294,12 @@ rac_result_t perform_authentication(SdkInitResult* result) {
                         "Token refresh rejected (rc=%d), clearing auth state and "
                         "re-authenticating",
                         refresh_rc);
-        rac_auth_clear();
+        const rac_result_t clear_rc = rac_auth_clear();
+        if (clear_rc != RAC_SUCCESS) {
+            result->set_http_configured(false);
+            result->set_has_completed_http_setup(false);
+            return clear_rc;
+        }
     }
 
     const rac_environment_t env = rac_state_get_environment();
@@ -537,7 +551,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     // round-trip. Mirrors RunAnywhere.swift Phase 1 step 3 + 4.5. Persistence
     // of api_key/base_url to Keychain/Keystore stays on the platform side
     // (Swift's KeychainManager.storeSDKParams) because OS storage policies
-    // (kSecAttrAccessible* on Apple, EncryptedSharedPreferences on Android)
+    // (kSecAttrAccessible* on Apple, Android Keystore-backed storage on Android)
     // are platform-specific.
     const rac_result_t state_rc = rac_state_initialize(env, api_key.empty() ? "" : api_key.c_str(),
                                                        base_url.empty() ? "" : base_url.c_str(),
@@ -622,32 +636,37 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
 
     SdkInitResult result;
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
-    result.set_http_applicable(http_setup_applicable_for_state());
+    const bool http_applicable = http_setup_applicable_for_state();
+    result.set_http_applicable(http_applicable);
 
     // Step 1: Authenticate through the registered platform HTTP transport.
     // Development mode does not require auth; staging/production require
     // api_key/base_url from Phase 1. Failures stay non-fatal so cached/local
     // models remain available while offline.
-    const rac_result_t auth_rc = perform_authentication(&result);
-    if (auth_rc != RAC_SUCCESS) {
-        append_warning(&result, warning_from_code("auth setup deferred", auth_rc));
-    }
+    if (http_applicable) {
+        const rac_result_t auth_rc = perform_authentication(&result);
+        if (auth_rc != RAC_SUCCESS) {
+            append_warning(&result, warning_from_code("auth setup deferred", auth_rc));
+        }
 
-    // Step 2: Register device with backend if callbacks are wired and the
-    // current environment requires it. Failures are non-fatal — Swift logs a
-    // warning and continues so local/cached models stay accessible.
-    const rac_environment_t env = rac_state_get_environment();
-    const char* build_token =
-        request.build_token().empty() ? nullptr : request.build_token().c_str();
-    const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
-    const bool device_registered =
-        (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
-    result.set_device_registered(device_registered);
-    if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
-        dev_rc != RAC_ERROR_NOT_INITIALIZED) {
-        // Surface as a warning rather than aborting — matches Swift's
-        // "Device registration failed (non-critical)" branch.
-        append_warning(&result, warning_from_code("device registration deferred", dev_rc));
+        // Step 2: Register device only when a complete control-plane
+        // configuration exists. Credential-free local SDK use is not a failed
+        // registration attempt and must not emit an error-level platform log.
+        const rac_environment_t env = rac_state_get_environment();
+        const char* build_token =
+            request.build_token().empty() ? nullptr : request.build_token().c_str();
+        const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
+        const bool device_registered =
+            (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
+        result.set_device_registered(device_registered);
+        if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
+            dev_rc != RAC_ERROR_NOT_INITIALIZED) {
+            // Surface as a warning rather than aborting — matches Swift's
+            // "Device registration failed (non-critical)" branch.
+            append_warning(&result, warning_from_code("device registration deferred", dev_rc));
+        }
+    } else {
+        result.set_device_registered(rac_device_manager_is_registered() == RAC_TRUE);
     }
 
     // Step 3: Fetch model assignments (cached). When callbacks are not wired

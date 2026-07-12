@@ -6,10 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Build
-swift build
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build
 
 # Run tests
-swift test
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test
 
 # Lint
 swiftlint
@@ -38,7 +38,7 @@ Two `Package.swift` files exist:
 
 Products: `RunAnywhere` (all backends), `RunAnywhereCore` (core only), `RunAnywhereLlamaCPP`, `RunAnywhereONNX`.
 
-Platforms: iOS 17+, macOS 14+. Swift tools version 5.9.
+Platforms: iOS 17.5+, macOS 14.5+. Swift tools version 5.9.
 
 Three `.grpc.swift` files are excluded from compilation (require macOS 15/iOS 18).
 
@@ -203,10 +203,9 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | swift-crypto | Cryptographic operations |
 | Files (JohnSundell) | Filesystem abstractions |
 | DeviceKit | Device model identification |
-| sentry-cocoa | Error reporting (optional) |
 | ml-stable-diffusion | CoreML image generation |
 | swift-protobuf | Proto-generated type support |
 
 ## Unsupported Features
 
-Speaker diarization and wake-word detection are not yet available as SDK facades. The C ABI stubs exist in commons but are not exposed through the Swift SDK.
+Speaker diarization and wake-word detection are not yet available as SDK facades or executable Commons capabilities.

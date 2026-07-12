@@ -27,11 +27,12 @@ import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/
 import { SDKException } from '../../../../src/Foundation/SDKException';
 import {
   clearRunanywhereModule,
-  setRunanywhereModule,
+  registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
 import { StructuredOutput } from '../../../../src/Public/Extensions/RunAnywhere+StructuredOutput';
 import { extractStructuredOutput, generateStructuredStream } from '../../../../src/Public/Extensions/RunAnywhere+TextGeneration';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
 const PROTO_BUFFER_SIZE = 16;
 const OFF_DATA = 0;
@@ -197,7 +198,8 @@ function makeStructuredOutputModule(
       return 0;
     };
   }
-  return module as ModalityProtoModule & EmscriptenRunanywhereModule;
+  return installCurrentModelRegistryExports(module) as
+    ModalityProtoModule & EmscriptenRunanywhereModule;
 }
 
 function streamingTokenEvent(token: string, isFinal = false): ProtoLLMStreamEvent {
@@ -233,7 +235,7 @@ describe('extractStructuredOutput', () => {
         errorCode: 0,
       };
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm', 'structured-output'], module);
 
     const result = extractStructuredOutput(
       'prefix {"city":"San Francisco"} suffix',
@@ -275,7 +277,7 @@ describe('StructuredOutput facade prepare/validate', () => {
         });
       },
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['llm', 'structured-output'], module);
 
     const result = StructuredOutput.preparePrompt({
       requestId: 'req_1',
@@ -314,7 +316,7 @@ describe('StructuredOutput facade prepare/validate', () => {
         });
       },
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['llm', 'structured-output'], module);
 
     const result = StructuredOutput.validate(
       'prefix {"city":"San Francisco"} suffix',
@@ -335,7 +337,7 @@ describe('StructuredOutput facade prepare/validate', () => {
     const module = makeStructuredOutputModule({
       parse: () => StructuredOutputResult.fromPartial({ errorCode: 0 }),
     });
-    setRunanywhereModule(module);
+    registerWasmModule(['llm', 'structured-output'], module);
 
     expect(() => StructuredOutput.preparePrompt(
       'weather in SF',
@@ -392,7 +394,7 @@ describe('generateStructuredStream', () => {
         return 0;
       },
     );
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm', 'structured-output'], module);
 
     const events: ProtoStructuredOutputStreamEvent[] = [];
     for await (const event of generateStructuredStream(
@@ -408,13 +410,13 @@ describe('generateStructuredStream', () => {
     // RALLMTypes+CppBridge.swift:66-74 parity) and the Swift defaults
     // (RALLMTypes+CppBridge.swift:13-21) filling the unset knobs.
     expect(capturedGenerate?.prompt).toBe('weather in SF');
-    expect(capturedGenerate?.streamingEnabled).toBe(true);
-    expect(capturedGenerate?.jsonSchema).toBe('{"type":"object","required":["city"]}');
-    expect(capturedGenerate?.responseFormat).toBe('json_schema');
-    expect(capturedGenerate?.maxTokens).toBe(64);
-    expect(capturedGenerate?.temperature).toBeCloseTo(0.8);
-    expect(capturedGenerate?.topP).toBeCloseTo(1.0);
-    expect(capturedGenerate?.repetitionPenalty).toBeCloseTo(1.0);
+    expect(capturedGenerate?.options?.streamingEnabled).toBe(true);
+    expect(capturedGenerate?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(capturedGenerate?.options?.responseFormat).toBe('json_schema');
+    expect(capturedGenerate?.options?.maxTokens).toBe(64);
+    expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.8);
+    expect(capturedGenerate?.options?.topP).toBeCloseTo(1.0);
+    expect(capturedGenerate?.options?.repetitionPenalty).toBeCloseTo(1.0);
 
     // Three TOKEN events stream through before the terminal COMPLETED event;
     // `seq` is monotonically increasing across the whole stream.

@@ -29,6 +29,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -41,19 +42,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.permissions.openRunAnywhereAppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -61,6 +66,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /** Live mode: a back-camera preview that samples the latest frame every
@@ -77,6 +83,7 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
     val latestFrame = remember { AtomicReference<Bitmap?>(null) }
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val cameraProvider = remember { AtomicReference<ProcessCameraProvider?>(null) }
+    val cameraBindingActive = remember { AtomicBoolean(true) }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -101,51 +108,65 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
     // LIVE_INTERVAL_MS so the cadence stays responsive.
     LaunchedEffect(hasPermission, loadedModelId) {
         if (!hasPermission || loadedModelId == null) return@LaunchedEffect
-        while (isActive) {
-            val frame = latestFrame.get()
-            if (frame != null) {
-                analyzing = true
-                try {
-                    val path = withContext(Dispatchers.IO) {
-                        val file = File(context.cacheDir, "vlm_live.jpg")
-                        FileOutputStream(file).use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-                        file.absolutePath
+        try {
+            while (isActive) {
+                val frame = latestFrame.get()
+                if (frame != null) {
+                    analyzing = true
+                    try {
+                        val path = withContext(Dispatchers.IO) {
+                            val file = File(context.cacheDir, "vlm_live.jpg")
+                            FileOutputStream(file).use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                            file.absolutePath
+                        }
+                        val image = RAVLMImage.fromFilePath(path)
+                        // Honor the app-wide system prompt for persona, but keep a tight
+                        // token cap so each frame analyzes quickly.
+                        val s = SettingsRepository.settings
+                        val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.VLM)
+                        val opts = VisionGenerationPolicy.options(
+                            prompt = "Describe what you see in one sentence.",
+                            model = activeModel.model,
+                            mode = VisionAnswerMode.LIVE_CAPTION,
+                            userLimit = s.maxTokens,
+                            systemPrompt = s.systemPrompt,
+                        )
+                        // Non-streaming process(): some VLM engines complete the stream
+                        // path with 0 incremental tokens, which leaves the caption blank;
+                        // process() returns the full result text reliably.
+                        val result = withContext(Dispatchers.Default) {
+                            RunAnywhere.processImage(image, opts)
+                        }
+                        if (result.text.isNotBlank()) caption = result.text
+                        tps = String.format(Locale.US, "%.1f", result.tokens_per_second)
+                        error = null
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        error = e.message ?: "live inference failed"
+                    } finally {
+                        analyzing = false
                     }
-                    val image = RAVLMImage.fromFilePath(path)
-                    // Honor the app-wide system prompt for persona, but keep a tight
-                    // token cap so each frame analyzes quickly.
-                    val s = SettingsRepository.settings
-                    val opts = RAVLMGenerationOptions(
-                        prompt = "Describe what you see in one sentence.",
-                        max_tokens = minOf(s.maxTokens, 100),
-                        system_prompt = s.systemPrompt.ifBlank { null },
-                    )
-                    // Non-streaming process(): some VLM engines complete the stream
-                    // path with 0 incremental tokens, which leaves the caption blank;
-                    // process() returns the full result text reliably.
-                    val result = withContext(Dispatchers.Default) {
-                        RunAnywhere.processImage(image, opts)
-                    }
-                    if (result.text.isNotBlank()) caption = result.text
-                    tps = String.format(Locale.US, "%.1f", result.tokens_per_second)
-                    error = null
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    error = e.message ?: "live inference failed"
-                } finally {
-                    analyzing = false
                 }
+                delay(LIVE_INTERVAL_MS)
             }
-            delay(LIVE_INTERVAL_MS)
+        } finally {
+            // Leaving Live mode or switching its model must stop the native VLM
+            // request too. Cancelling only the coroutine leaves a blocking JNI
+            // inference in flight and makes the next screen/model fail as busy.
+            withContext(NonCancellable) {
+                runCatching { RunAnywhere.cancelVLMGeneration() }
+            }
         }
     }
 
     DisposableEffect(Unit) {
+        cameraBindingActive.set(true)
         onDispose {
             // Release the camera when leaving Live mode — without unbindAll() the
             // preview/analyzer stay bound to the screen's lifecycle and keep the
             // camera busy in the background.
+            cameraBindingActive.set(false)
             cameraProvider.getAndSet(null)?.unbindAll()
             analysisExecutor.shutdown()
         }
@@ -169,6 +190,9 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                     Button(onClick = { permLauncher.launch(Manifest.permission.CAMERA) }) {
                         Text("Grant camera permission")
                     }
+                    TextButton(onClick = context::openRunAnywhereAppSettings) {
+                        Text("Open app settings")
+                    }
                 }
             }
             return@Column
@@ -185,7 +209,15 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                 factory = { ctx ->
                     PreviewView(ctx).also { view ->
                         view.scaleType = PreviewView.ScaleType.FILL_CENTER
-                        bindCamera(ctx, lifecycleOwner, view, latestFrame, analysisExecutor, cameraProvider)
+                        bindCamera(
+                            ctx,
+                            lifecycleOwner,
+                            view,
+                            latestFrame,
+                            analysisExecutor,
+                            cameraProvider,
+                            cameraBindingActive,
+                        )
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -202,7 +234,7 @@ fun VisionLiveMode(loadedModelId: String?, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF34C759)))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(com.runanywhere.runanywhereai.ui.theme.primaryGreen))
                 Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
 
@@ -271,10 +303,12 @@ private fun bindCamera(
     latestFrame: AtomicReference<Bitmap?>,
     executor: java.util.concurrent.Executor,
     providerOut: AtomicReference<ProcessCameraProvider?>,
+    bindingActive: AtomicBoolean,
 ) {
     val future = ProcessCameraProvider.getInstance(context)
     future.addListener({
         val provider = future.get()
+        if (!bindingActive.get()) return@addListener
         val preview = Preview.Builder().build().also {
             it.setSurfaceProvider(previewView.surfaceProvider)
         }
@@ -299,6 +333,7 @@ private fun bindCamera(
                 }
             } }
         try {
+            if (!bindingActive.get()) return@addListener
             provider.unbindAll()
             provider.bindToLifecycle(
                 lifecycleOwner,
@@ -306,7 +341,14 @@ private fun bindCamera(
                 preview,
                 analysis,
             )
-            providerOut.set(provider)
+            if (bindingActive.get()) {
+                providerOut.set(provider)
+            } else {
+                // The provider future can complete after the composable leaves
+                // Live mode. Undo that late bind instead of retaining the camera
+                // until the enclosing activity is destroyed.
+                provider.unbind(preview, analysis)
+            }
         } catch (_: Exception) {
             // Camera unavailable (e.g. emulator without a camera) — preview stays black.
         }

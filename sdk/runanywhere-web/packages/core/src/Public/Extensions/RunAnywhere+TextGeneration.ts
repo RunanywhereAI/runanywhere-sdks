@@ -10,6 +10,7 @@
  */
 
 import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import type { ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
@@ -29,11 +30,11 @@ import {
   ModelCategory,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import type { LLMStreamingResult } from '../../types/index';
-import { AsyncQueue } from '../../Foundation/AsyncQueue';
-import { SDKException } from '../../Foundation/SDKException';
-import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import type { LLMStreamingResult } from '../../types/index.js';
+import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
@@ -41,6 +42,10 @@ export type { StructuredOutputResult, StructuredOutputStreamEvent };
 
 export type TextGenerationOptions = Partial<LLMGenerationOptions> & {
   prompt: string;
+  /** Alternating user/assistant entries retained for conversational turns. */
+  history?: ChatMessage[];
+  /** Stable conversation identifier for backends that maintain a prompt cache. */
+  conversationId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -74,50 +79,32 @@ function structuredOutputResponseFormat(
 
 function buildLLMGenerateRequest(
   prompt: string,
-  options: Partial<LLMGenerationOptions> = {},
+  options: Omit<TextGenerationOptions, 'prompt'> = {},
   streamingEnabled = false,
 ): LLMGenerateRequest {
-  return {
-    prompt,
-    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-    // (RALLMTypes+CppBridge.swift:13-21): maxTokens 100, temperature 0.8,
-    // topP 1.0, topK 0, repetitionPenalty 1.0.
+  const { history, conversationId, ...generationOptions } = options;
+  const canonicalOptions = LLMGenerationOptionsMessage.fromPartial({
+    ...generationOptions,
     maxTokens: options.maxTokens ?? 100,
     temperature: options.temperature ?? 0.8,
     topP: options.topP ?? 1.0,
     topK: options.topK ?? 0,
-    systemPrompt: options.systemPrompt ?? '',
-    emitThoughts: options.thinkingPattern != null,
     repetitionPenalty: options.repetitionPenalty ?? 1.0,
-    stopSequences: options.stopSequences ?? [],
     streamingEnabled,
-    preferredFramework: options.preferredFramework == null
-      ? ''
-      : String(options.preferredFramework),
-    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema ?? '',
-    executionTarget: options.executionTarget == null
-      ? ''
-      : String(options.executionTarget),
-    requestId: '',
-    modelId: '',
-    conversationId: '',
-    history: [],
-    seed: options.seed ?? 0,
-    frequencyPenalty: options.frequencyPenalty ?? 0,
-    presencePenalty: options.presencePenalty ?? 0,
-    minP: options.minP ?? 0,
-    // Swift parity (RALLMTypes+CppBridge.swift:66-74): grammar and
-    // responseFormat fall back to the structured-output configuration.
-    grammar: options.grammar ?? options.structuredOutput?.grammar ?? '',
+    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema,
+    grammar: options.grammar ?? options.structuredOutput?.grammar,
     responseFormat: options.responseFormat
       ?? structuredOutputResponseFormat(options.structuredOutput),
-    echoPrompt: options.echoPrompt ?? false,
-    nThreads: options.nThreads ?? 0,
-    // Canonical knob channel (llm_service.proto field 26): the inline scalar
-    // fields above are DEPRECATED; advanced knobs (disableThinking,
-    // thinkingPattern, …) only reach commons through `options.*`.
-    options: LLMGenerationOptionsMessage.fromPartial(options),
+  });
+  return {
+    prompt,
+    emitThoughts: options.thinkingPattern != null,
+    requestId: '',
+    modelId: '',
+    conversationId: conversationId ?? '',
+    history: history ?? [],
     metadata: {},
+    options: canonicalOptions,
   };
 }
 
@@ -135,11 +122,19 @@ function normalizeLLMGenerateRequest(
   streamingEnabled: boolean,
 ): LLMGenerateRequest {
   if (isLLMGenerateRequest(requestOrOptions)) {
-    // Proto-request overload — mirrors Swift `generate(_ request:)` /
-    // `generateStream(_ request:)` (RunAnywhere+TextGeneration.swift:43-87):
-    // bypass option-building and submit the request as-is, with only the
-    // streaming flag forced for the chosen entry point.
-    return { ...requestOrOptions, streamingEnabled };
+    const requestOptions = requestOrOptions.options;
+    return {
+      ...requestOrOptions,
+      options: LLMGenerationOptionsMessage.fromPartial({
+        maxTokens: requestOptions?.maxTokens ?? 100,
+        temperature: requestOptions?.temperature ?? 0.8,
+        topP: requestOptions?.topP ?? 1.0,
+        topK: requestOptions?.topK ?? 0,
+        repetitionPenalty: requestOptions?.repetitionPenalty ?? 1.0,
+        ...requestOptions,
+        streamingEnabled,
+      }),
+    };
   }
   return buildLLMGenerateRequest(requestOrOptions.prompt, requestOrOptions, streamingEnabled);
 }
@@ -303,7 +298,7 @@ async function generate(
   requestOrOptions: LLMGenerateRequest | TextGenerationOptions,
 ): Promise<LLMGenerationResult> {
   const adapter = requireProtoLLM('TextGeneration.generate');
-  const result = adapter.generate(normalizeLLMGenerateRequest(requestOrOptions, false));
+  const result = await adapter.generate(normalizeLLMGenerateRequest(requestOrOptions, false));
   if (!result) {
     throw SDKException.backendNotAvailable(
       'TextGeneration.generate',

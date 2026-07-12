@@ -43,8 +43,17 @@ class TTSManager(context: Context) {
                     pendingCallbacks.remove(id)?.invoke(true)
                 }
             }
-            @Deprecated("Deprecated in Java")
+
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
             override fun onError(utteranceId: String?) {
+                completeWithError(utteranceId)
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                completeWithError(utteranceId)
+            }
+
+            private fun completeWithError(utteranceId: String?) {
                 utteranceId?.let { id ->
                     pendingCallbacks.remove(id)?.invoke(false)
                 }

@@ -10,27 +10,15 @@
 
 // RunAnywhere IDL — cross-platform logging configuration + records.
 //
-// Every SDK hand-writes an identical LogLevel enum + LoggingConfiguration +
-// LogEntry, each commented "must match Swift". Several SDKs declare the level
-// enum two or three times:
-//   Swift   Infrastructure/Logging/SDKLogger.swift  (LogLevel, LoggingConfiguration, LogEntry)
-//   Kotlin  public/extensions/RunAnywhereLogging.kt (LogLevel) +
-//           infrastructure/logging/SDKLogger.kt (LogLevel, LoggingConfiguration, LogEntry) +
-//           foundation/bridge/CppBridgeModelRegistry.kt (LogLevel)
-//   Flutter foundation/logging/sdk_logger.dart (LogLevel) +
-//           runanywhere_logging.dart (LoggingConfiguration, LogEntry, LogLevelC) +
-//           basic_types.dart (RacLogLevel)
-//   RN      Foundation/Logging/Models/LogLevel.ts + LoggingConfiguration.ts
-//   Web     Foundation/Logging/* (LoggingConfiguration, LogLevel)
-// This file is the single source of truth that replaces all of them.
+// This file is the single source of truth for the structured logging types
+// consumed by every SDK. Platform loggers add only sink-specific behavior.
 //
 // LogLevel mirrors the C ABI `rac_log_level_t`
 // (sdk/runanywhere-commons/include/rac/core/rac_types.h:196) EXACTLY, so the
 // generated enum round-trips with the platform-adapter `log` callback
-// (rac_platform_adapter.h) without a translation table. NOTE: the SDKs'
-// hand-written public LogLevel enums currently use a 5-value debug=0..fault=4
-// numbering that does NOT match the C ABI (trace=0..fatal=5); they should
-// converge onto this canonical enum.
+// (rac_platform_adapter.h) without a translation table. Public SDK logging
+// APIs consume this canonical enum directly; platform-local adapters preserve
+// the same trace=0..fatal=5 numeric contract.
 
 import SwiftProtobuf
 
@@ -101,8 +89,7 @@ public nonisolated enum RALogLevel: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// SDK logging configuration. Union of the fields the per-SDK
-/// LoggingConfiguration structs carry today; per-environment presets
+/// SDK logging configuration. Per-environment presets
 /// (development/staging/production) stay in each SDK as factory helpers.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RALoggingConfiguration: Sendable {
@@ -124,9 +111,6 @@ public nonisolated struct RALoggingConfiguration: Sendable {
 
   /// Forward records to the remote logging pipeline.
   public var enableRemoteLogging: Bool = false
-
-  /// Forward error/fatal records to Sentry.
-  public var enableSentryLogging: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -185,7 +169,7 @@ nonisolated extension RALogLevel: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALoggingConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoggingConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}enable_local_logging\0\u{3}min_log_level\0\u{3}include_source_location\0\u{3}include_device_metadata\0\u{3}enable_remote_logging\0\u{3}enable_sentry_logging\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}enable_local_logging\0\u{3}min_log_level\0\u{3}include_source_location\0\u{3}include_device_metadata\0\u{3}enable_remote_logging\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -198,7 +182,6 @@ nonisolated extension RALoggingConfiguration: SwiftProtobuf.Message, SwiftProtob
       case 3: try { try decoder.decodeSingularBoolField(value: &self.includeSourceLocation) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.includeDeviceMetadata) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.enableRemoteLogging) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.enableSentryLogging) }()
       default: break
       }
     }
@@ -220,9 +203,6 @@ nonisolated extension RALoggingConfiguration: SwiftProtobuf.Message, SwiftProtob
     if self.enableRemoteLogging != false {
       try visitor.visitSingularBoolField(value: self.enableRemoteLogging, fieldNumber: 5)
     }
-    if self.enableSentryLogging != false {
-      try visitor.visitSingularBoolField(value: self.enableSentryLogging, fieldNumber: 6)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -232,7 +212,6 @@ nonisolated extension RALoggingConfiguration: SwiftProtobuf.Message, SwiftProtob
     if lhs.includeSourceLocation != rhs.includeSourceLocation {return false}
     if lhs.includeDeviceMetadata != rhs.includeDeviceMetadata {return false}
     if lhs.enableRemoteLogging != rhs.enableRemoteLogging {return false}
-    if lhs.enableSentryLogging != rhs.enableSentryLogging {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

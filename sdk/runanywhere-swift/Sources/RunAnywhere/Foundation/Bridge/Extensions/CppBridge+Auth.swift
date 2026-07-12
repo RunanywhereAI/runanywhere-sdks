@@ -23,7 +23,7 @@ extension CppBridge {
         /// and (because CppBridge.State.initialize wired up the Keychain
         /// secure-storage vtable) also deletes the persisted tokens.
         public static func clearAuth() throws {
-            rac_auth_clear()
+            try SDKException.throwIfError(rac_auth_clear())
             logger.info("Authentication cleared")
         }
 

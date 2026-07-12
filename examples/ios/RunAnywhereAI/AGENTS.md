@@ -42,7 +42,195 @@ idevicesyslog | grep "com.runanywhere"
 ```
 
 ### App Store Release
-See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/patch-framework-plist.sh` to fix `MinimumOSVersion` in ONNX Runtime / RACommons XCFrameworks before archiving.
+See `docs/RELEASE_INSTRUCTIONS.md` for the full App Store flow. The packaged
+XCFrameworks already declare the canonical iOS 17.5 deployment floor; release
+archives validate that metadata without post-build mutation.
+
+#### Required Native Symbol Release Gate
+
+Before uploading any iOS archive to TestFlight/App Store Connect, verify the
+archive still exports every Swift-facing native ABI symbol. This protects
+against Release stripping or stale XCFrameworks causing runtime startup errors
+such as:
+
+```text
+Native proto ABI is not exported by the linked RACommons binary: rac_sdk_init_phase1_proto
+```
+
+Release archives must preserve the RunAnywhere native ABI export surface:
+
+- `RunAnywhereExportedSymbols.txt` must contain `_rac_*` and `_ra_mlx_*`.
+- The Release app target must link with `-all_load`.
+- The Release app target must pass
+  `-Wl,-exported_symbols_list,$(SRCROOT)/RunAnywhereExportedSymbols.txt`.
+- The Release app target must use `STRIP_STYLE = non-global` so `dlsym` can
+  still find the required symbols after archive post-processing.
+- `RunAnywhereExportedSymbols.txt` must not be bundled into the app resources.
+
+From `examples/ios/RunAnywhereAI/`, use this release flow:
+
+```bash
+# 1. Build the final release inputs.
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -skipPackagePluginValidation \
+  -jobs "$(sysctl -n hw.logicalcpu)" \
+  build
+
+# 2. Archive directly into Xcode Organizer's archive folder.
+ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
+ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI-$(date +%Y%m%d-%H%M%S).xcarchive"
+mkdir -p "$ARCHIVE_DIR"
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$ARCHIVE" \
+  -allowProvisioningUpdates \
+  -skipPackagePluginValidation \
+  -jobs "$(sysctl -n hw.logicalcpu)" \
+  archive
+
+# 4. Open the archive in Xcode Organizer.
+open -a Xcode "$ARCHIVE"
+```
+
+After archiving, run the native symbol audit against the archived app binary:
+
+```bash
+APP="$ARCHIVE/Products/Applications/RunAnywhereAI.app"
+BIN="$APP/RunAnywhereAI"
+
+nm -gjU "$BIN" 2>/dev/null \
+  | rg '^_(rac|ra_mlx)_' \
+  | sed 's/^_//' \
+  | sort -u > /tmp/runanywhere_archive_exported_symbols.txt
+
+SRC_DIRS=(
+  ../../../sdk/runanywhere-swift/Sources/RunAnywhere
+  ../../../sdk/runanywhere-swift/Sources/LlamaCPPRuntime
+  ../../../sdk/runanywhere-swift/Sources/ONNXRuntime
+  ../../../sdk/runanywhere-swift/Sources/MLXRuntime
+)
+
+rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
+  | perl -ne 'while (/"((?:rac|ra_mlx)_[A-Za-z0-9_]+)"/g) { print "$1\n" }' \
+  | sort -u > /tmp/runanywhere_expected_swift_native_symbols.from_strings
+
+{
+  cat /tmp/runanywhere_expected_swift_native_symbols.from_strings
+  printf '%s\n' \
+    rac_proto_buffer_free \
+    rac_backend_llamacpp_register \
+    rac_backend_llamacpp_unregister \
+    rac_backend_onnx_register \
+    rac_backend_onnx_unregister \
+    rac_plugin_entry_sherpa \
+    rac_plugin_register \
+    rac_plugin_unregister \
+    rac_backend_mlx_register \
+    rac_backend_mlx_unregister \
+    rac_mlx_set_callbacks \
+    ra_mlx_register_runtime \
+    ra_mlx_runtime_is_available \
+    ra_mlx_runtime_is_registered \
+    ra_mlx_unregister_runtime
+} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.txt
+
+comm -23 \
+  /tmp/runanywhere_expected_swift_native_symbols.txt \
+  /tmp/runanywhere_archive_exported_symbols.txt \
+  > /tmp/runanywhere_missing_swift_native_symbols.txt
+
+test ! -s /tmp/runanywhere_missing_swift_native_symbols.txt
+```
+
+The final `test` command must pass. If it fails, inspect
+`/tmp/runanywhere_missing_swift_native_symbols.txt`, rebuild the native
+XCFrameworks, fix the Release linker/strip settings, and archive again before
+uploading.
+
+Also verify release configuration and secrets presence without printing secret
+values:
+
+```bash
+test -f "$APP/RunAnywhereLocalSecrets.plist"
+test -f "$APP/RunAnywhereConfig-Release.plist"
+test ! -e "$APP/RunAnywhereExportedSymbols.txt"
+```
+
+Upload from Xcode Organizer via **Validate App** then **Distribute App > App
+Store Connect > Upload**. If exporting from the command line, use the
+repository's App Store Connect export options plist when present:
+
+```bash
+xcodebuild -exportArchive \
+  -archivePath "$ARCHIVE" \
+  -exportPath "../../../build/archives/$(basename "$ARCHIVE" .xcarchive)-export" \
+  -exportOptionsPlist "../../../build/archives/ExportOptions-app-store-connect.plist" \
+  -allowProvisioningUpdates
+```
+
+#### Required macOS Release Gate
+
+The shared `RunAnywhereAI` target also ships as a native Mac app. Before every
+Mac App Store release:
+
+- Increment `CURRENT_PROJECT_VERSION`; do not reuse an uploaded build number.
+- Keep `MACOSX_DEPLOYMENT_TARGET = 14.5`, matching `Package.swift`.
+- Build and archive the Release configuration for
+  `generic/platform=macOS` with the host logical CPU count.
+- Require App Sandbox, the RunAnywhere app group, camera, microphone, outbound
+  network, and user-selected file entitlements.
+- Require Hardened Runtime in the macOS Release build.
+- Bundle `PrivacyInfo.xcprivacy`, `RunAnywhereLocalSecrets.plist`, and
+  `RunAnywhereConfig-Release.plist` without printing credential values.
+- Keep `RunAnywhereExportedSymbols.txt` out of the app resources and run the
+  platform-filtered Swift-facing native ABI audit against
+  `Contents/MacOS/RunAnywhereAI`. Every published Swift backend binary now
+  carries a macOS arm64 slice.
+- Verify `codesign`, `arm64`, the absence of quarantine metadata, and zero
+  missing `_rac_*` / `_ra_mlx_*` symbols before opening Organizer.
+
+Archive into Xcode Organizer's standard folder so it is visible immediately:
+
+```bash
+JOBS="$(sysctl -n hw.logicalcpu)"
+ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
+ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI macOS $(date +%Y-%m-%d\ %H.%M.%S).xcarchive"
+mkdir -p "$ARCHIVE_DIR"
+
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Release \
+  -destination 'generic/platform=macOS' \
+  -archivePath "$ARCHIVE" \
+  -allowProvisioningUpdates \
+  -skipPackagePluginValidation \
+  -jobs "$JOBS" \
+  archive
+
+open -a Xcode "$ARCHIVE"
+```
+
+For App Store media, review one to ten screenshots in their final upload order.
+Use `1320x2868` sRGB PNG/JPEG masters for the 6.9-inch iPhone family and
+`2880x1800` sRGB PNG/JPEG masters for macOS. The real app UI must remain the
+dominant content; branded framing and concise, factual feature copy are fine.
+For the current voice-first iPhone set, use authenticated simulator captures
+from llama.cpp LFM2 350M, Sherpa-ONNX Whisper Tiny, and Piper TTS. MLX may be
+listed as a supported runtime, but do not present it as tested evidence unless
+it was separately verified for that build. Until the llama.cpp XCFramework
+gains a macOS slice, Mac copy should describe the shared model catalog instead
+of claiming local llama.cpp execution.
+
+The complete iOS and macOS flow, archive checks, screenshot paths, and upload
+boundary are documented in `docs/RELEASE_INSTRUCTIONS.md`.
 
 ---
 
@@ -80,12 +268,15 @@ Three layers:
 
 ### SDK Initialization Gate
 The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. The boot sequence:
-1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, `ONNX.register(priority:100)`
+1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, Boolean-returning `MLX.register(priority:100)`, `ONNX.register(priority:100)`
 2. `RunAnywhere.initialize()` — core C++ bridge init
-3. `registerModulesAndModels()` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, LoRA
+3. `ModelCatalogBootstrap.registerAll(mlxRegistered:)` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, and LoRA while omitting every MLX row when registration failed
 4. `RunAnywhere.discoverDownloadedModels()` then `RunAnywhere.listModels()` (refresh registry)
 
 Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
+MLX execution requires a physical iOS device (or native macOS). The arm64 iOS
+Simulator build is for package, compile, link, and startup validation only;
+`MLX.register()` returns `false`, and the example does not seed MLX rows there.
 
 ### Cross-Platform Strategy
 The app targets iOS 17.5+ and macOS 14.5+ (matches `Package.swift` platform floor). Platform differences are handled via:
@@ -235,7 +426,7 @@ Real-time camera-based image description. `AVCaptureSession` with BGRA pixel for
 
 PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
-**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → `RunAnywhere.ragCreatePipeline(config:)` → `RunAnywhere.ragIngest(text:)` → user asks question → `RunAnywhere.ragQuery(question:)` → thinking content parsed via `ThinkingContentParser`
+**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → construct `RARAGDocument` with its typed `metadata` map → `RunAnywhere.ragCreatePipeline(config:)` → `RunAnywhere.ragIngest(_:)` → user asks question → `RunAnywhere.ragQuery(question:)` → thinking content parsed via `ThinkingContentParser`
 
 Path resolution handles multi-file embedding models (e.g., `all-minilm-l6-v2` with `model.onnx` + `vocab.txt`).
 
@@ -253,7 +444,12 @@ Deterministic performance testing across 4 modalities (LLM, STT, TTS, VLM). Each
 
 ### 11. Storage (`Features/Storage/`)
 
-`RunAnywhere.getStorageInfo()` → disk usage display. Per-model deletion via `RunAnywhere.deleteStoredModel()`. Cache/temp clearing via `RunAnywhere.clearCache()` / `RunAnywhere.cleanTempFiles()`.
+`RunAnywhere.getStorageInfo()` → disk usage display using
+`RAStorageInfo.models` / `RAModelStorageMetrics` directly. Rows cross-reference
+`ModelListViewModel` for display name and local path, and treat `lastUsedMs`
+only as last-used time. Per-model deletion uses `RunAnywhere.deleteModel()`.
+Cache/temp clearing uses `RunAnywhere.clearCache()` /
+`RunAnywhere.cleanTempFiles()`.
 
 ### 12. Settings (`Features/Settings/`)
 
@@ -372,7 +568,6 @@ All styling is centralized — no inline magic numbers or color literals in view
 | `scripts/build_and_run_ios_sample.sh` | End-to-end build+deploy (simulator/device/mac) with optional SDK rebuild |
 | `scripts/verify.sh` | Local gate: checks XCFrameworks exist, resolves packages, runs full xcodebuild |
 | `scripts/smoke.sh` | Fast preflight: greps source for SDK API call patterns (no compilation) |
-| `scripts/patch-framework-plist.sh` | Post-build: patches MinimumOSVersion in XCFramework plists for App Store |
 
 ---
 

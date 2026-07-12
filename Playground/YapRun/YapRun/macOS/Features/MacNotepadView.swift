@@ -14,7 +14,7 @@ struct MacNotepadView: View {
 
     var body: some View {
         ZStack {
-            AppColors.backgroundPrimaryDark.ignoresSafeArea()
+            AppColors.backgroundPrimary.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header

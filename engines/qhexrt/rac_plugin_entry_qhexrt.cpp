@@ -17,8 +17,8 @@
  */
 
 #include "qhexrt_backend.h"
-#include "common/rac_engine_unavailable.h"
 
+#include "common/rac_engine_unavailable.h"
 #include "rac/core/rac_error.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -31,6 +31,8 @@
 #endif
 
 #if RAC_QHEXRT_ROUTABLE
+#include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -81,6 +83,8 @@ extern const rac_llm_service_ops_t g_qhexrt_llm_ops;
 extern const rac_vlm_service_ops_t g_qhexrt_vlm_ops;
 extern const rac_stt_service_ops_t g_qhexrt_stt_ops;
 extern const rac_tts_service_ops_t g_qhexrt_tts_ops;
+extern const rac_embeddings_service_ops_t g_qhexrt_embeddings_ops;
+extern const rac_diffusion_service_ops_t g_qhexrt_diffusion_ops;
 
 // Advisory routing metadata (validated at register, NOT used for selection —
 // selection is plain priority order via rac_plugin_find).
@@ -89,13 +93,11 @@ static const rac_runtime_id_t k_qhexrt_runtimes[] = {RAC_RUNTIME_QNN};
 // QHexRT runs prebuilt QNN context binaries referenced by a JSON manifest.
 static const uint32_t k_qhexrt_formats[] = {RAC_MODEL_FORMAT_ID_QNN_CONTEXT};
 
-// One engine, four modalities: text (LLM), vision (VLM), speech-in (Whisper STT),
-// speech-out (MeloTTS).
+// One engine, six modalities. Diffusion is intentionally the existing image-generation
+// primitive: LaMa serves only its inpainting mode, with host preprocessing around one QNN graph.
 static const rac_primitive_t k_qhexrt_primitives[] = {
-    RAC_PRIMITIVE_GENERATE_TEXT,
-    RAC_PRIMITIVE_VLM,
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_VLM,   RAC_PRIMITIVE_TRANSCRIBE,
+    RAC_PRIMITIVE_SYNTHESIZE,    RAC_PRIMITIVE_EMBED, RAC_PRIMITIVE_DIFFUSION,
 };
 
 static const rac_engine_manifest_t k_qhexrt_manifest = {
@@ -128,13 +130,21 @@ static const rac_engine_vtable_t g_qhexrt_engine_vtable = {
     /* stt_ops          */ &g_qhexrt_stt_ops,
     /* tts_ops          */ &g_qhexrt_tts_ops,
     /* vad_ops          */ nullptr,
-    /* embedding_ops    */ nullptr,
+    /* embedding_ops    */ &g_qhexrt_embeddings_ops,
     /* vlm_ops          */ &g_qhexrt_vlm_ops,
-    /* diffusion_ops    */ nullptr,
+    /* diffusion_ops    */ &g_qhexrt_diffusion_ops,
 
     /* reserved_slot_0..9 */
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(qhexrt) {

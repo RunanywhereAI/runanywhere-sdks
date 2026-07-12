@@ -200,6 +200,7 @@ build_app() {
     local start_time=$(date +%s)
 
     cd "$APP_DIR"
+    export RUNANYWHERE_USE_LOCAL_NATIVES=1
 
     local DESTINATION
     case "$TARGET" in

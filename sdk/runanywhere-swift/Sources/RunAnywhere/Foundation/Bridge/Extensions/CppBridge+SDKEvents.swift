@@ -17,6 +17,7 @@ private enum SDKEventProtoABI {
     ) -> Void
     typealias Subscribe = @convention(c) (EventCallback?, UnsafeMutableRawPointer?) -> UInt64
     typealias Unsubscribe = @convention(c) (UInt64) -> Void
+    typealias Quiesce = @convention(c) () -> Void
     typealias Publish = @convention(c) (UnsafePointer<UInt8>?, Int) -> rac_result_t
     typealias Poll = @convention(c) (UnsafeMutablePointer<rac_proto_buffer_t>?) -> rac_result_t
     typealias PublishFailure = @convention(c) (
@@ -30,6 +31,7 @@ private enum SDKEventProtoABI {
 
     static let subscribe = NativeProtoABI.load("rac_sdk_event_subscribe", as: Subscribe.self)
     static let unsubscribe = NativeProtoABI.load("rac_sdk_event_unsubscribe", as: Unsubscribe.self)
+    static let quiesce = NativeProtoABI.load("rac_sdk_event_quiesce", as: Quiesce.self)
     static let publish = NativeProtoABI.load("rac_sdk_event_publish_proto", as: Publish.self)
     static let poll = NativeProtoABI.load("rac_sdk_event_poll", as: Poll.self)
     static let publishFailure = NativeProtoABI.load(
@@ -39,16 +41,16 @@ private enum SDKEventProtoABI {
     static let clearQueue = NativeProtoABI.load("rac_sdk_event_clear_queue", as: ClearQueue.self)
 }
 
-private final class SDKEventSubscriptionBox {
-    let handler: (RASDKEvent) -> Void
+private final class SDKEventSubscriptionBox: Sendable {
+    let handler: @Sendable (RASDKEvent) -> Void
 
-    init(handler: @escaping (RASDKEvent) -> Void) {
+    init(handler: @escaping @Sendable (RASDKEvent) -> Void) {
         self.handler = handler
     }
 }
 
 private let sdkEventSubscriptionPointers =
-    OSAllocatedUnfairLock<[UInt64: UnsafeMutableRawPointer]>(initialState: [:])
+    OSAllocatedUnfairLock<[UInt64: SDKEventSubscriptionPointer]>(initialState: [:])
 
 private func sdkEventProtoCallback(
     protoBytes: UnsafePointer<UInt8>?,
@@ -64,30 +66,44 @@ private func sdkEventProtoCallback(
 
 extension CppBridge.Events {
     @discardableResult
-    public static func subscribeSDKEvents(_ handler: @escaping (RASDKEvent) -> Void) -> UInt64 {
+    public static func subscribeSDKEvents(
+        _ handler: @escaping @Sendable (RASDKEvent) -> Void
+    ) -> UInt64 {
         guard let subscribe = SDKEventProtoABI.subscribe else { return 0 }
 
         let retained = Unmanaged.passRetained(SDKEventSubscriptionBox(handler: handler))
-        let opaque = retained.toOpaque()
-        let subscriptionId = subscribe(sdkEventProtoCallback, opaque)
+        let context = SDKEventSubscriptionPointer(rawValue: retained.toOpaque())
+        let subscriptionId = subscribe(sdkEventProtoCallback, context.rawValue)
         guard subscriptionId != 0 else {
             retained.release()
             return 0
         }
         sdkEventSubscriptionPointers.withLock {
-            $0[subscriptionId] = opaque
+            $0[subscriptionId] = context
         }
         return subscriptionId
     }
 
     public static func unsubscribeSDKEvents(_ subscriptionId: UInt64) {
-        SDKEventProtoABI.unsubscribe?(subscriptionId)
+        // Both symbols are required before retirement can begin. In particular,
+        // a stale native artifact without quiesce must retain the context rather
+        // than free user_data while a snapshotted callback may still use it.
+        guard let unsubscribe = SDKEventProtoABI.unsubscribe,
+              let quiesce = SDKEventProtoABI.quiesce else {
+            return
+        }
+        unsubscribe(subscriptionId)
 
-        let opaque = sdkEventSubscriptionPointers.withLock { pointers in
+        // Commons dispatches a subscription snapshot after dropping its mutex.
+        // Unsubscribe prevents new dispatch, then quiesce drains callbacks that
+        // already passed the alive check before the retained Swift box is freed.
+        quiesce()
+
+        let context = sdkEventSubscriptionPointers.withLock { pointers in
             pointers.removeValue(forKey: subscriptionId)
         }
-        if let opaque {
-            Unmanaged<SDKEventSubscriptionBox>.fromOpaque(opaque).release()
+        if let context {
+            Unmanaged<SDKEventSubscriptionBox>.fromOpaque(context.rawValue).release()
         }
     }
 
@@ -147,4 +163,10 @@ extension CppBridge.Events {
     public static func clearSDKEventQueue() {
         SDKEventProtoABI.clearQueue?()
     }
+}
+
+/// Retained SDK-event callback context. Commons guarantees unsubscribe is a
+/// quiescence point before the context is removed and released.
+private struct SDKEventSubscriptionPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
 }

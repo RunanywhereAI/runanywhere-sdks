@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
+    // Keep the module on the SDK's Kotlin 2.4.0 toolchain.
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
@@ -116,16 +117,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
-        }
-        getByName("test") {
-            java.srcDirs("src/test/kotlin")
-        }
+        jniLibs.keepDebugSymbols += "**/*.so"
     }
 
     publishing {
@@ -145,7 +137,6 @@ kotlin {
 dependencies {
     api(findProject(":runanywhere-kotlin") ?: project(":"))
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
@@ -154,7 +145,7 @@ dependencies {
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
-        ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
+        ?: rootProject.version.toString()
 
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
@@ -259,9 +250,7 @@ group =
         else -> "io.github.sanchitmonga22"
     }
 
-version = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
+version = rootProject.version
 
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
@@ -278,6 +267,9 @@ val signingPassword: String? =
 val signingKey: String? =
     System.getenv("GPG_SIGNING_KEY")
         ?: project.findProperty("signing.key") as String?
+val skipSigning: Boolean =
+    rootProject.findProperty("runanywhere.skipSigning")?.toString()?.toBoolean()
+        ?: false
 
 afterEvaluate {
     publishing {
@@ -296,8 +288,8 @@ afterEvaluate {
 
                     licenses {
                         license {
-                            name.set("The Apache License, Version 2.0")
-                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                            name.set("RunAnywhere License")
+                            url.set("https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE")
                             distribution.set("repo")
                         }
                     }
@@ -353,6 +345,7 @@ afterEvaluate {
 
 tasks.withType<Sign>().configureEach {
     onlyIf {
-        project.hasProperty("signing.gnupg.keyName") || signingKey != null
+        !skipSigning &&
+            (project.hasProperty("signing.gnupg.keyName") || signingKey != null)
     }
 }

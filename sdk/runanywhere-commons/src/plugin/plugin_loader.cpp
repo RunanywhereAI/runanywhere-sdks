@@ -105,7 +105,6 @@ struct DlGuard {
         return r;
     }
 };
-#endif
 
 /**
  * Derive the plugin entry-symbol name from a library path.
@@ -140,6 +139,7 @@ std::string entry_symbol_from_path(const char* path) {
         s.erase(0, std::strlen("runanywhere_"));
     return std::string("rac_plugin_entry_") + s;
 }
+#endif
 
 }  // namespace
 

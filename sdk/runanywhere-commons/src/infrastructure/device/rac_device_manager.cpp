@@ -81,8 +81,12 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks) {
-    return rac_device_manager_set_callbacks(callbacks);
+void rac_device_manager_clear_callbacks(void) {
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.callbacks = {};
+    state.callbacks_set = false;
+    RAC_LOG_INFO(LOG_CAT, "Device manager callbacks cleared");
 }
 
 rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const char* build_token) {
@@ -131,7 +135,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         emit_device_registration_failed(RAC_ERROR_INVALID_STATE, "Failed to get device ID");
         return RAC_ERROR_INVALID_STATE;
     }
-    RAC_LOG_INFO(LOG_CAT, "Device ID for registration: %s", device_id);
+    RAC_LOG_DEBUG(LOG_CAT, "Device identifier resolved for registration");
 
     // Step 3: Get device info
     rac_device_registration_info_t device_info = {};
@@ -171,8 +175,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         return RAC_ERROR_INVALID_STATE;
     }
     RAC_LOG_DEBUG(LOG_CAT, "Registration endpoint: %s", endpoint);
-    RAC_LOG_DEBUG(LOG_CAT, "Registration JSON payload (first 200 chars): %.200s",
-                  json_ptr ? json_ptr : "(null)");
+    RAC_LOG_DEBUG(LOG_CAT, "Registration payload prepared (%zu bytes)", json_len);
 
     // Step 7: Determine if auth is required (staging/production require auth)
     rac_bool_t requires_auth = (env != RAC_ENV_DEVELOPMENT) ? RAC_TRUE : RAC_FALSE;
@@ -187,6 +190,15 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
 
     // Step 9: Handle response
     if (result != RAC_SUCCESS || response.result != RAC_SUCCESS) {
+        const rac_result_t response_result = result != RAC_SUCCESS ? result : response.result;
+        if (response_result == RAC_ERROR_NOT_INITIALIZED) {
+            // Browser callbacks start a bounded fetch on the event loop and
+            // return this sentinel. The Web facade awaits it and invokes this
+            // operation once more with the prepared response; do not emit a
+            // false registration-failed event while that request is pending.
+            RAC_LOG_DEBUG(LOG_CAT, "Device registration request pending platform completion");
+            return response_result;
+        }
         std::string error_msg = "Device registration failed";
         if (response.error_message) {
             error_msg = error_msg + ": " + response.error_message;
@@ -195,7 +207,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         emit_device_registration_failed(result != RAC_SUCCESS ? result : response.result,
                                         response.error_message ? response.error_message
                                                                : "HTTP request failed");
-        return result != RAC_SUCCESS ? result : response.result;
+        return response_result;
     }
 
     // Step 10: Mark as registered
@@ -232,14 +244,27 @@ void rac_device_manager_clear_registration(void) {
 }
 
 const char* rac_device_manager_get_device_id(void) {
+    static thread_local std::string device_id_snapshot;
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
     if (!state.callbacks_set) {
+        device_id_snapshot.clear();
         return nullptr;
     }
 
-    return state.callbacks.get_device_id(state.callbacks.user_data);
+    const char* device_id = state.callbacks.get_device_id(state.callbacks.user_data);
+    if (device_id == nullptr) {
+        device_id_snapshot.clear();
+        return nullptr;
+    }
+
+    // The callback owns its returned buffer and platform teardown may release
+    // that storage as soon as this critical section ends. Snapshot it before
+    // unlocking so callers never observe callback-owned memory after return.
+    device_id_snapshot = device_id;
+    return device_id_snapshot.c_str();
 }
 
 }  // extern "C"

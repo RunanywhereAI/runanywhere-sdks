@@ -78,9 +78,7 @@ import { encodeProtoMessage } from '../../../services/ProtoWire';
 export interface RegisterModelInput {
   /**
    * Optional stable id. When omitted, commons' canonical
-   * `rac_register_model_from_url_proto` derives it from the URL; the local
-   * fallback (only hit when the native ABI is unavailable) uses the
-   * Kotlin-parity URL-tail derivation.
+   * `rac_register_model_from_url_proto` derives it from the URL.
    */
   id?: string;
   name: string;
@@ -165,7 +163,7 @@ export async function registerModel(
     source: ModelSource.MODEL_SOURCE_REMOTE,
     ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
-      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      ? { memoryRequiredBytes: memoryHint }
       : {}),
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
@@ -188,9 +186,8 @@ export async function registerModel(
 }
 
 /**
- * Kotlin-parity URL → id fallback. Mirrors `deriveModelIdFromUrl` in
- * `RunAnywhereStorage.kt:337-344` so an RN caller that omits `id` ends up
- * with the same id Kotlin's local fallback produces.
+ * URL-tail id derivation for archive registration, whose explicit ModelInfo
+ * request requires an id before it reaches the registry.
  */
 function deriveModelIdFromUrl(url: string, name: string): string {
   const tail = url.split('/').pop()?.split('?')[0]?.trim() ?? '';
@@ -302,7 +299,7 @@ export async function registerArchiveModel(
     supportsThinking: input.supportsThinking ?? false,
     supportsLora: input.supportsLora ?? false,
     ...(memoryHint !== undefined
-      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      ? { memoryRequiredBytes: memoryHint }
       : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
@@ -349,7 +346,6 @@ export async function registerMultiFileModel(
     ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
       ? {
           memoryRequiredBytes: input.memoryRequirement,
-          downloadSizeBytes: input.memoryRequirement,
         }
       : {}),
     files: input.files.map((file) => ({

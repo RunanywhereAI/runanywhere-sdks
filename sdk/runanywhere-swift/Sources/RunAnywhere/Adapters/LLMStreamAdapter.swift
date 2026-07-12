@@ -35,15 +35,6 @@ import CRACommons
 /// public `LLMStreamAdapter(handle:)` / `.stream()` shape is preserved.
 public typealias LLMStreamAdapter = HandleStreamAdapter<rac_handle_t, RALLMStreamEvent>
 
-private enum LLMStreamProtoABI {
-    typealias QuiesceFn = @convention(c) () -> Void
-
-    // `rac_llm_proto_quiesce` is absent from older RACommons binaries, so it
-    // is resolved dynamically (dlsym) rather than called directly; nil means
-    // the linked binary predates the symbol and teardown skips the quiesce.
-    static let quiesce = NativeProtoABI.load("rac_llm_proto_quiesce", as: QuiesceFn.self)
-}
-
 public extension HandleStreamAdapter where Handle == rac_handle_t, Event == RALLMStreamEvent {
 
     /// Wrap an existing LLM component handle as an event stream.
@@ -59,7 +50,7 @@ public extension HandleStreamAdapter where Handle == rac_handle_t, Event == RALL
             streamKey: "llm",
             register: { handle, cb, ud in rac_llm_set_stream_proto_callback(handle, cb, ud) },
             unregister: { handle in _ = rac_llm_unset_stream_proto_callback(handle) },
-            quiesce: { LLMStreamProtoABI.quiesce?() },
+            quiesce: { rac_llm_proto_quiesce() },
             isTerminalEvent: { $0.isFinal }
         )
     }

@@ -563,7 +563,7 @@ struct VoiceAssistantMainPreview: View {
 
                     Text(isListening ? "Listening..." : "Touch to interact")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(AppColors.statusGray)
                         .padding(.bottom, 16)
 
                     Button {
@@ -572,7 +572,7 @@ struct VoiceAssistantMainPreview: View {
                         ZStack {
                             if isListening {
                                 Circle()
-                                    .fill(Color.orange.opacity(0.25))
+                                    .fill(AppColors.primaryAccent.opacity(0.25))
                                     .frame(width: 80, height: 80)
                                     .blur(radius: 12)
                             }

@@ -4,10 +4,8 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
-  # Relaxed for local builds (host has 3.38.3 active).
-  # Canonical CI Flutter version is 3.44.0+ (P3 of dep-bump 2026-05-19).
-  flutter: '>=3.38.0 <4.0.0'
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -20,7 +18,7 @@ dependencies:
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
 
-  # RunAnywhere SDK - MLX Backend (Apple Metal)
+  # RunAnywhere SDK - Apple MLX Backend (iOS only)
   runanywhere_mlx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
 
@@ -34,11 +32,11 @@ dependencies:
   # Int64 proto scalars (LoRA catalog sizeBytes) — already transitive via
   # protobuf; declared directly because the app constructs proto messages.
   fixnum: ^1.1.1
-  flutter_markdown: ^0.6.18
-  permission_handler: ^11.1.0
+  flutter_markdown_plus: ^1.0.7
+  permission_handler: ^12.0.3
   shared_preferences: ^2.5.5
   # Secure storage (iOS Keychain, Android Keystore)
-  flutter_secure_storage: ^10.2.0
+  flutter_secure_storage: ^10.3.1
   # File system access
   path_provider: ^2.1.5
   # Device information — bumped 2026-05-19 (P10 dep-bump): aligned with
@@ -52,8 +50,6 @@ dependencies:
   url_launcher: ^6.2.0
   # HTTP client for API calls
   http: ^1.2.0
-  # Camera access for VLM
-  camera: ^0.11.0
   # Image picker for gallery photos
   image_picker: ^1.0.0
   # File picker for PDF/JSON document selection (RAG) — bumped 2026-05-19
@@ -89,11 +85,11 @@ dependency_overrides:
   # and `package_info_plus 10.x` both require win32 ^6.x. Win32 is a
   # mobile-no-op (this app targets iOS/Android only), so 6.x is safe.
   win32: ^6.2.0
-  # flutter_secure_storage 10.2.0 pulls in flutter_secure_storage_windows
+  # flutter_secure_storage 10.3.1 pulls in flutter_secure_storage_windows
   # 4.1.0 which hard-codes win32 ^5.5.4 — incompatible with the win32 6.x
-  # override above. 4.2.1 (latest) declares win32 ^6.0.1 and compiles on
+  # override above. 4.2.2 declares win32 ^6.0.1 and compiles on the
   # Android target. P10 dep-bump 2026-05-19.
-  flutter_secure_storage_windows: ^4.2.1
+  flutter_secure_storage_windows: ^4.2.2
 
 flutter:
   uses-material-design: true

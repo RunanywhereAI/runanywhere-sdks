@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <limits>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -47,6 +48,7 @@ static const char* LOG_CAT = "VLM.LlamaCPP";
 static constexpr int kDefaultMaxContextSize = 4096;
 static constexpr int kDefaultBatchSize = 512;
 static constexpr int kDefaultMaxTokens = 2048;
+static constexpr int32_t kTokenCapacityPadding = 16;
 
 // =============================================================================
 // INTERNAL BACKEND STATE
@@ -478,9 +480,9 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
 
                 size = llama_chat_apply_template(tmpl, messages, 2, true, nullptr, 0);
                 if (size > 0) {
-                    std::vector<char> buf(size + 1);
+                    std::vector<char> buf(static_cast<size_t>(size));
                     int32_t result =
-                        llama_chat_apply_template(tmpl, messages, 2, true, buf.data(), buf.size());
+                        llama_chat_apply_template(tmpl, messages, 2, true, buf.data(), size);
                     if (result > 0) {
                         std::string formatted(buf.data(), result);
                         RAC_LOG_DEBUG(LOG_CAT,
@@ -522,9 +524,9 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
 
                 size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
                 if (size > 0) {
-                    std::vector<char> buf(size + 1);
+                    std::vector<char> buf(static_cast<size_t>(size));
                     int32_t result =
-                        llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
+                        llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), size);
                     if (result > 0) {
                         std::string formatted(buf.data(), result);
                         RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
@@ -840,15 +842,39 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
                                                       custom_chat_template);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
-        std::vector<llama_token> tokens(full_prompt.size() + 16);
-        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(), tokens.data(),
-                                      tokens.size(), true, true);
-        if (n_tokens < 0) {
-            tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(), tokens.data(),
-                                      tokens.size(), true, true);
+        constexpr int32_t kMaxPromptLength =
+            std::numeric_limits<int32_t>::max() - kTokenCapacityPadding;
+        if (full_prompt.size() > static_cast<size_t>(kMaxPromptLength)) {
+            RAC_LOG_ERROR(LOG_CAT, "VLM prompt is too large to tokenize: %zu bytes",
+                          full_prompt.size());
+            rac_error_set_details("VLM prepare failed: prompt exceeds llama.cpp's int32 limit");
+            return RAC_ERROR_INVALID_ARGUMENT;
         }
-        tokens.resize(n_tokens);
+
+        const int32_t prompt_length = static_cast<int32_t>(full_prompt.size());
+        int32_t token_capacity = prompt_length + kTokenCapacityPadding;
+        std::vector<llama_token> tokens(static_cast<size_t>(token_capacity));
+        int32_t n_tokens = llama_tokenize(vocab, full_prompt.c_str(), prompt_length, tokens.data(),
+                                          token_capacity, true, true);
+        if (n_tokens < 0) {
+            if (n_tokens == std::numeric_limits<int32_t>::min()) {
+                RAC_LOG_ERROR(LOG_CAT, "Tokenization returned an invalid required capacity");
+                rac_error_set_details(
+                    "VLM prepare failed: tokenizer returned an invalid required capacity");
+                return RAC_ERROR_PROCESSING_FAILED;
+            }
+            token_capacity = -n_tokens;
+            tokens.resize(static_cast<size_t>(token_capacity));
+            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), prompt_length, tokens.data(),
+                                      token_capacity, true, true);
+        }
+        if (n_tokens < 0) {
+            RAC_LOG_ERROR(LOG_CAT, "Tokenization buffer retry failed: result=%d", n_tokens);
+            rac_error_set_details(
+                "VLM prepare failed: tokenizer rejected its requested buffer capacity");
+            return RAC_ERROR_PROCESSING_FAILED;
+        }
+        tokens.resize(static_cast<size_t>(n_tokens));
 
         LlamaBatchGuard batch_guard(llama_batch_init(n_tokens, 0, 1));
         llama_batch& batch = batch_guard.batch;

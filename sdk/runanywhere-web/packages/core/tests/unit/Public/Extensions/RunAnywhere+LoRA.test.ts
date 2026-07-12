@@ -57,7 +57,10 @@ describe('LoRA catalog proto facade', () => {
 
   it('routes catalog list/query/get/download-completion through generated proto bytes', async () => {
     const captured: CapturedCatalogCalls = {};
-    ModalityProtoAdapter.setDefaultModule(makeLoRACatalogModule(captured));
+    ModalityProtoAdapter.registerModuleCapabilities(
+      ['lora'],
+      makeLoRACatalogModule(captured),
+    );
     const entry = catalogEntry();
 
     await expect(LoRA.catalog.register(entry)).resolves.toMatchObject({
@@ -128,7 +131,7 @@ describe('LoRA catalog proto facade', () => {
   });
 
   it('reports typed unavailable when catalog exports are missing', async () => {
-    ModalityProtoAdapter.setDefaultModule(makeBaseProtoModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['lora'], makeBaseProtoModule());
 
     expect(LoRA.catalog.supportsNative()).toBe(false);
     expect(LoRA.catalog.missingExports()).toEqual(expect.arrayContaining([

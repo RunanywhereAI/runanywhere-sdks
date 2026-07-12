@@ -8,11 +8,7 @@
 
 #include "AuthBridge.hpp"
 
-#if __has_include("rac/infrastructure/network/rac_auth_manager.h")
 #include "rac/infrastructure/network/rac_auth_manager.h"
-#elif __has_include("rac_auth_manager.h")
-#include "rac_auth_manager.h"
-#endif
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)

@@ -21,7 +21,8 @@
  * it in.
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { redactResourceURL } from '../Foundation/BackendContract.js';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -159,8 +160,7 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + getOffset('get_memory_info'), this.callbacks.getMemoryInfo, '*');
     // http_download (async streaming slot). The C++ download orchestrator
     // prefers this slot on Emscripten (event-driven, non-blocking) so progress
-    // ticks live; without it, the synchronous FetchHttpTransport path buffers
-    // the whole body on the main thread and the UI freezes at 0% until 100%.
+    // ticks remain live while the browser fetch runs on the event loop.
     m.setValue(this.adapterPtr + getOffset('http_download'), this.callbacks.httpDownload, '*');
     m.setValue(this.adapterPtr + getOffset('http_download_cancel'), this.callbacks.httpDownloadCancel, '*');
     // extract_archive — native libarchive is compiled into WASM.
@@ -449,9 +449,8 @@ export class PlatformAdapter {
    * Async by contract: start the transfer, return RAC_OK immediately with a
    * task id, then stream bytes to MEMFS while calling progress_callback per
    * chunk and complete_callback at the end. Because it returns immediately and
-   * the fetch runs on the event loop, the main thread is never blocked — the
-   * C++ download orchestrator's poll loop sees live byte counts and the UI does
-   * not freeze (unlike the synchronous FetchHttpTransport fallback).
+   * the fetch runs on the event loop, the main thread is never blocked and the
+   * C++ download orchestrator's poll loop sees live byte counts.
    */
   private registerHttpDownload(): number {
     const m = this.m;
@@ -715,7 +714,11 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
     const aborted = controller.signal.aborted
       || (error instanceof DOMException && error.name === 'AbortError');
     if (!aborted) {
-      logger.warning(`http_download '${url}' failed: ${error instanceof Error ? error.message : String(error)}`);
+      logger.warning(
+        `http_download '${redactResourceURL(url)}' failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
     invokeCompleteCallback(
       m,

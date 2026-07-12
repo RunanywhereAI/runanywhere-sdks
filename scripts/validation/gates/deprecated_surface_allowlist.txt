@@ -1,101 +1,63 @@
-# Deprecated / Legacy Surface Allowlist
+# Deprecated / DTO / JSON Surface Allowlist
 #
-# Files listed here are known legacy surfaces that have not yet been migrated
-# to proto-generated types. The deprecated_surface_check.sh script will PASS
-# when only these files trigger violations, and FAIL when new ones appear.
-#
-# Format: one relative path per line (from repo root). Blank lines and lines
-# starting with '#' are ignored.
-#
-# When you migrate a file away from deprecated patterns, REMOVE it from this
-# list so it stays clean.
+# Every exception is category-scoped. A path-only entry would suppress every
+# scanner category for that file and is therefore prohibited. Entries below
+# are either current typed-value adapters or unavoidable external JSON/config
+# boundaries; they do not authorize deprecated declarations.
 
-# ============================================================================
-# Kotlin SDK — hand-written JSON bridges + proto helpers still pending the
-# proto-bytes migration. The SDK is single-target Android (src/main); it
-# migrated off KMP, so there is no jvmAndroidMain/commonMain/commonTest tree.
-# ============================================================================
-sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt
-sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/ToolCallingTypes.kt
-sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/RAG/RAGProtoHelpers.kt
-# Hybrid STT router (PR #502): Sarvam STT config is marshalled as a JSON string
-# to SarvamBridge.racSttSarvamCreateFromJson; pending a proto-bytes config ABI.
-sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/HybridRouterBridgeAdapter.kt
+# Kotlin typed JSON adapters and external cloud-provider payloads.
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/CloudSttProvider.kt|kotlin:org-json-usage
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/Cloud.kt|kotlin:org-json-usage
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt|kotlin:json-serialisation
 
-# ============================================================================
-# Swift SDK — hand-written *Types.swift DTO files
-# ============================================================================
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift
+# Swift public value types and typed JSON boundaries.
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:types-dto-file
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift|swift:types-dto-file
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift|swift:types-dto-file
+sdk/runanywhere-swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/CloudSttProvider.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/Cloud.swift|swift:json-bridge
 
-# Swift SDK — files using JSONDecoder/JSONEncoder in bridge code
-sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+PlatformAdapter.swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/StructuredOutputProto+Helpers.swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RAGProto+Helpers.swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift
+# React Native native bridges and typed JSON/proto adapters.
+sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Http.cpp|rn:cpp-json-bridge
+sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+PluginLoader.cpp|rn:cpp-json-bridge
+sdk/runanywhere-react-native/packages/core/src/Public/RunAnywhere.ts|rn:ts-json-serialisation
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+PluginLoader.ts|rn:ts-json-serialisation
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/LLM/RunAnywhere+ToolCalling.ts|rn:ts-json-serialisation
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts|rn:ts-json-serialisation
 
-# ============================================================================
-# React Native SDK — C++ JSON bridges + TS JSON serialisation
-# ============================================================================
-sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Voice.cpp
-sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Http.cpp
-sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore.cpp
-sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+PluginLoader.cpp
-sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+PluginLoader.ts
-sdk/runanywhere-react-native/packages/core/src/Public/RunAnywhere.ts
-sdk/runanywhere-react-native/packages/core/src/Public/Extensions/LLM/RunAnywhere+ToolCalling.ts
-sdk/runanywhere-react-native/packages/core/src/Public/Extensions/LLM/RunAnywhere+StructuredOutput.ts
-sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RAG/RunAnywhere+RAG.ts
+# Web typed JSON/proto adapters and external cloud-provider payloads.
+sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts|web:ts-json-serialisation
+sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSttProvider.ts|web:ts-json-serialisation
+sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/Cloud.ts|web:ts-json-serialisation
+sdk/runanywhere-web/packages/core/src/Adapters/ProtoAdapterTypes.ts|web:hand-written-types-ts
+sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts|web:hand-written-types-ts
 
-# ============================================================================
-# Web SDK — files with JSON.parse/JSON.stringify in bridge code
-# ============================================================================
-sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
-sdk/runanywhere-web/packages/core/tests/unit/Public/Extensions/RunAnywhere+ToolCalling.test.ts
-
-# Web SDK — hand-written TypeScript type files
-sdk/runanywhere-web/packages/core/src/Adapters/ProtoAdapterTypes.ts
-
-# ============================================================================
-# C++ Public API — rac_*_json functions in public headers
-# These are part of the stable C ABI and will be migrated to proto-bytes API.
-# ============================================================================
-sdk/runanywhere-commons/include/rac/core/rac_benchmark_log.h
-sdk/runanywhere-commons/include/rac/core/rac_benchmark_stats.h
-sdk/runanywhere-commons/include/rac/core/rac_structured_error.h
-sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h
-sdk/runanywhere-commons/include/rac/backends/rac_stt_onnx.h
-sdk/runanywhere-commons/include/rac/backends/rac_tts_onnx.h
-sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_component.h
-sdk/runanywhere-commons/include/rac/features/llm/rac_llm_component.h
-sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h
-sdk/runanywhere-commons/include/rac/features/llm/rac_llm_schema_to_json.h
-sdk/runanywhere-commons/include/rac/features/llm/rac_tool_calling.h
-sdk/runanywhere-commons/include/rac/features/rag/rac_rag.h
-sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h
-sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h
-sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_service.h
-sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h
-sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h
-sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_service.h
-sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h
-sdk/runanywhere-commons/include/rac/features/embeddings/rac_embeddings_service.h
-sdk/runanywhere-commons/include/rac/infrastructure/network/rac_api_types.h
-sdk/runanywhere-commons/include/rac/backends/rac_vlm_llamacpp.h
-sdk/runanywhere-commons/include/rac/features/tts/rac_tts_component.h
-sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h
-sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h
-sdk/runanywhere-commons/include/rac/plugin/rac_onnxrt_runtime_ep.h
-sdk/runanywhere-commons/include/rac/router/rac_route.h
-
-# ============================================================================
-# Hybrid / Cloud STT (engines/runtimes refactor, commit 7c3144994) — new
-# hand-written JSON bridges + cloud `config_json` ABI, pending proto migration.
-# ============================================================================
-sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/Cloud.swift
-sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
-sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts
-sdk/runanywhere-commons/include/rac/router/hybrid/rac_stt_hybrid_router.h
+# Current C ABI JSON/config boundaries. Backend/service vtables accept
+# engine-owned config JSON; SDK-facing feature calls use generated proto bytes.
+sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/features/llm/rac_tool_calling.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_schema_to_json.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:public-json-api
+sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/backends/rac_vlm_llamacpp.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/embeddings/rac_embeddings_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/tts/rac_tts_component.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/plugin/rac_onnxrt_runtime_ep.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/router/hybrid/rac_stt_hybrid_router.h|cpp:json-param-in-public-api

@@ -26,7 +26,7 @@
  *     The same `racommons-llamacpp.wasm` (or onnx variant) is instantiated
  *     a second time inside the worker — see DECISION-3 in the design doc.
  *     Accepting ~2× memory for streaming WASM is the explicit trade-off
- *     for live token delivery without rebuilding C++ with Asyncify.
+ *     for live token delivery from a separately instantiated backend module.
  *
  * Non-streaming exports stay on the main-thread `EmscriptenModule`
  * instance; only the four `_rac_*_stream_proto` exports below are
@@ -37,7 +37,8 @@
  * so they don't fit the request/response message pattern used here.
  */
 
-import { RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors';
+import { RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors.js';
+import { callEmscriptenAsyncNumber } from './EmscriptenAsync.js';
 
 // ---------------------------------------------------------------------------
 // Wire protocol — shared with `OffscreenRuntimeBridge` via `import type`.
@@ -103,6 +104,13 @@ export interface StreamWorkerModule {
   stringToUTF8?(str: string, ptr: number, maxBytesToWrite: number): number;
   addFunction(fn: (...args: number[]) => number | void, signature: string): number;
   removeFunction(ptr: number): void;
+  ccall?(
+    functionName: string,
+    returnType: string | null,
+    argumentTypes: string[],
+    arguments_: unknown[],
+    options?: { async?: boolean },
+  ): unknown;
 
   _rac_proto_buffer_init?(bufferPtr: number): void;
   _rac_proto_buffer_free?(bufferPtr: number): void;
@@ -143,7 +151,7 @@ export interface StreamWorkerModule {
     callbackPtr: number,
     userData: number,
   ): number | Promise<number>;
-  _rac_vlm_cancel_proto?(handle: number): number;
+  _rac_vlm_cancel_lifecycle_proto?(outEvent: number): number;
 }
 
 export type StreamModuleFactory = (wasmBytes: ArrayBuffer) => Promise<StreamWorkerModule>;
@@ -193,8 +201,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
    * best diagnostic noise and at worst a latent correctness bug once
    * any export becomes Asyncify-style interruptible.
    *
-   * `handle` is captured for VLM, which cancels per-instance via
-   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation requires a valid
+   * LLM and VLM lifecycle cancellation require a valid
    * `rac_proto_buffer_t*` output pointer — passing 0 (null) returns
    * `RAC_ERROR_NULL_POINTER` before the engine cancel ever runs.
    * STT/TTS have no cancel ABI yet — those entries are removed silently
@@ -248,16 +255,16 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
     return moduleRef.addFunction(trampoline, callbackReturnsBool ? 'iiii' : 'viii');
   };
 
-  const withHeapBytes = <T>(
+  const withHeapBytesAsync = async <T>(
     moduleRef: StreamWorkerModule,
     bytes: Uint8Array,
-    fn: (ptr: number, len: number) => T,
-  ): T => {
+    fn: (ptr: number, len: number) => T | Promise<T>,
+  ): Promise<T> => {
     const ptr = moduleRef._malloc(Math.max(bytes.byteLength, 1));
     if (!ptr) throw new Error('stream worker: heap allocation failed');
     try {
       moduleRef.HEAPU8.set(bytes, ptr);
-      return fn(ptr, bytes.byteLength);
+      return await fn(ptr, bytes.byteLength);
     } finally {
       moduleRef._free(ptr);
     }
@@ -364,9 +371,24 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
               break;
             }
             case 'stream.vlm.generate':
-              // Handle 0 routes the cancel to the lifecycle-owned VLM
-              // service (the typed stream ABI threads no handle).
-              mod._rac_vlm_cancel_proto?.(0);
+              if (
+                mod._rac_vlm_cancel_lifecycle_proto &&
+                mod._rac_wasm_sizeof_proto_buffer &&
+                mod._rac_proto_buffer_init &&
+                mod._rac_proto_buffer_free
+              ) {
+                const sz = mod._rac_wasm_sizeof_proto_buffer();
+                const bufPtr = mod._malloc(Math.max(sz, 1));
+                if (bufPtr) {
+                  try {
+                    mod._rac_proto_buffer_init(bufPtr);
+                    mod._rac_vlm_cancel_lifecycle_proto(bufPtr);
+                  } finally {
+                    mod._rac_proto_buffer_free(bufPtr);
+                    mod._free(bufPtr);
+                  }
+                }
+              }
               break;
             case 'stream.stt.transcribe':
             case 'stream.tts.synthesize':
@@ -384,8 +406,19 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_llm_generate_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-          return withHeapBytes(m, msg.requestBytes, (requestPtr, requestSize) =>
-            m._rac_llm_generate_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
+          return withHeapBytesAsync(m, msg.requestBytes, (requestPtr, requestSize) =>
+            callEmscriptenAsyncNumber(
+              m,
+              'rac_llm_generate_stream_proto',
+              ['number', 'number', 'number', 'number'],
+              [requestPtr, requestSize, callbackPtr, 0],
+              () => m._rac_llm_generate_stream_proto!(
+                requestPtr,
+                requestSize,
+                callbackPtr,
+                0,
+              ),
+            ),
           );
         });
         return;
@@ -395,8 +428,8 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_stt_component_transcribe_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-          return withHeapBytes(m, msg.audioBytes, (audioPtr, audioSize) =>
-            withHeapBytes(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
+          return withHeapBytesAsync(m, msg.audioBytes, (audioPtr, audioSize) =>
+            withHeapBytesAsync(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
               m._rac_stt_component_transcribe_stream_proto!(
                 msg.handle,
                 audioPtr,
@@ -413,12 +446,12 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       }
       case 'stream.tts.synthesize': {
         inflight.set(msg.requestId, { kind: 'stream.tts.synthesize' });
-        runWithCallback(msg.requestId, false, (callbackPtr) => {
+        runWithCallback(msg.requestId, false, async (callbackPtr) => {
           const m = mod!;
           if (!m._rac_tts_component_synthesize_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
           const textPtr = allocUtf8(m, msg.text);
           try {
-            return withHeapBytes(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
+            return await withHeapBytesAsync(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
               m._rac_tts_component_synthesize_stream_proto!(
                 msg.handle,
                 textPtr,
@@ -439,8 +472,14 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         runWithCallback(msg.requestId, true, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_vlm_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-          return withHeapBytes(m, msg.requestBytes, (requestPtr, requestSize) =>
-            m._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
+          return withHeapBytesAsync(m, msg.requestBytes, (requestPtr, requestSize) =>
+            callEmscriptenAsyncNumber(
+              m,
+              'rac_vlm_stream_proto',
+              ['number', 'number', 'number', 'number'],
+              [requestPtr, requestSize, callbackPtr, 0],
+              () => m._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
+            ),
           );
         });
         return;

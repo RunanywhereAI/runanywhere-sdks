@@ -7,6 +7,7 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/services/device_info_service.dart';
+import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
@@ -42,8 +43,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   /// exclusion) is the shared `ModelSelectionContext.includes` predicate,
   /// mirroring iOS `ModelSelectionSheet.availableModels`.
   List<ModelInfo> get _availableModels {
-    final models =
-        _viewModel.availableModels.where(widget.context.includes).toList();
+    final models = _viewModel.availableModels
+        .where(widget.context.includes)
+        .toList();
 
     // Sort: built-in models first (Foundation Models / System TTS), then
     // downloaded, then not downloaded. On-disk readiness is `localPath`; the
@@ -77,7 +79,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   }
 
   Future<void> _loadInitialData() async {
-    await _viewModel.loadModels();
+    await _viewModel.loadModelsFromRegistry();
+    await _viewModel.loadAvailableFrameworks();
   }
 
   @override
@@ -125,11 +128,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.separator(context),
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.separator(context))),
       ),
       child: Row(
         children: [
@@ -228,9 +227,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           else
             Text(
               value,
-              style: AppTypography.body(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.body(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
         ],
       ),
@@ -270,9 +269,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           child: Text(
             'All models run privately on your device. Larger models may '
             'provide better quality but use more memory.',
-            style: AppTypography.caption(context).copyWith(
-              color: AppColors.textSecondary(context),
-            ),
+            style: AppTypography.caption(
+              context,
+            ).copyWith(color: AppColors.textSecondary(context)),
           ),
         ),
       ],
@@ -300,16 +299,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
             children: [
               const CircularProgressIndicator(),
               const SizedBox(height: AppSpacing.xLarge),
-              Text(
-                'Loading Model',
-                style: AppTypography.headline(context),
-              ),
+              Text('Loading Model', style: AppTypography.headline(context)),
               const SizedBox(height: AppSpacing.smallMedium),
               Text(
                 _loadingProgress,
-                style: AppTypography.subheadline(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
+                style: AppTypography.subheadline(
+                  context,
+                ).copyWith(color: AppColors.textSecondary(context)),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -350,9 +346,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           const SizedBox(width: AppSpacing.mediumLarge),
           Text(
             message,
-            style: AppTypography.body(context).copyWith(
-              color: AppColors.textSecondary(context),
-            ),
+            style: AppTypography.body(
+              context,
+            ).copyWith(color: AppColors.textSecondary(context)),
           ),
         ],
       ),
@@ -369,9 +365,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
             const SizedBox(height: AppSpacing.mediumLarge),
             Text(
               'Loading available models...',
-              style: AppTypography.subheadline(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.subheadline(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           ],
         ),
@@ -410,8 +406,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       //    RunAnywhere.vlm.load, which is the only correct lifecycle here.
       final skipPreload =
           widget.context == ModelSelectionContext.ragEmbedding ||
-              widget.context == ModelSelectionContext.ragLLM ||
-              widget.context == ModelSelectionContext.vlm;
+          widget.context == ModelSelectionContext.ragLLM ||
+          widget.context == ModelSelectionContext.vlm;
 
       if (!skipPreload) {
         // Update view model selection state (loads the model into memory)
@@ -443,9 +439,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
       // Show error to user
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load model: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load model: $e')));
       }
     }
   }
@@ -481,13 +477,31 @@ class _FlatModelRow extends StatelessWidget {
           downloadProgress: downloadProgress,
           onSelectModel: onSelectModel,
           onDownload: () {
-            unawaited(
-              ModelListViewModel.shared.downloadModel(model, (_) {}),
-            );
+            unawaited(_downloadOrPrompt(context, model));
           },
         );
       },
     );
+  }
+
+  Future<void> _downloadOrPrompt(BuildContext context, ModelInfo model) async {
+    if (model.requiresHfAuth) {
+      final token = await HfTokenStore.load();
+      if (token.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Add a Hugging Face token in Settings to download private HNPU/QHexRT models.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    await ModelListViewModel.shared.downloadModel(model, (_) {});
   }
 }
 
@@ -568,9 +582,9 @@ class _FlatModelRowContent extends StatelessWidget {
                       Flexible(
                         child: Text(
                           model.name,
-                          style: AppTypography.subheadline(context).copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: AppTypography.subheadline(
+                            context,
+                          ).copyWith(fontWeight: FontWeight.w500),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -583,7 +597,8 @@ class _FlatModelRowContent extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: _frameworkColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(
-                              AppSpacing.cornerRadiusSmall),
+                            AppSpacing.cornerRadiusSmall,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -621,9 +636,9 @@ class _FlatModelRowContent extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           model.memoryRequired!.formattedFileSize,
-                          style: AppTypography.caption2(context).copyWith(
-                            color: AppColors.textSecondary(context),
-                          ),
+                          style: AppTypography.caption2(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary(context)),
                         ),
                         const SizedBox(width: AppSpacing.smallMedium),
                       ],
@@ -634,29 +649,26 @@ class _FlatModelRowContent extends StatelessWidget {
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            value:
-                                downloadProgress > 0 ? downloadProgress : null,
+                            value: downloadProgress > 0
+                                ? downloadProgress
+                                : null,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.xSmall),
                         Text(
                           '${(downloadProgress * 100).toInt()}%',
-                          style: AppTypography.caption2(context).copyWith(
-                            color: AppColors.textSecondary(context),
-                          ),
+                          style: AppTypography.caption2(
+                            context,
+                          ).copyWith(color: AppColors.textSecondary(context)),
                         ),
                       ] else ...[
-                        Icon(
-                          _statusIcon,
-                          size: 12,
-                          color: _statusColor,
-                        ),
+                        Icon(_statusIcon, size: 12, color: _statusColor),
                         const SizedBox(width: AppSpacing.xxSmall),
                         Text(
                           _statusText,
-                          style: AppTypography.caption2(context).copyWith(
-                            color: _statusColor,
-                          ),
+                          style: AppTypography.caption2(
+                            context,
+                          ).copyWith(color: _statusColor),
                         ),
                       ],
                       // Thinking support indicator
@@ -670,7 +682,8 @@ class _FlatModelRowContent extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.badgePurple,
                             borderRadius: BorderRadius.circular(
-                                AppSpacing.cornerRadiusSmall),
+                              AppSpacing.cornerRadiusSmall,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -683,9 +696,9 @@ class _FlatModelRowContent extends StatelessWidget {
                               const SizedBox(width: 2),
                               Text(
                                 'Smart',
-                                style: AppTypography.caption2(context).copyWith(
-                                  color: AppColors.primaryPurple,
-                                ),
+                                style: AppTypography.caption2(
+                                  context,
+                                ).copyWith(color: AppColors.primaryPurple),
                               ),
                             ],
                           ),

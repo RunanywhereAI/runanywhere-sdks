@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:ffi';
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_init.pb.dart';
@@ -16,7 +17,6 @@ import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/native/dart_bridge_model_assignment.dart';
 import 'package:runanywhere/native/dart_bridge_model_lifecycle.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
@@ -63,6 +63,7 @@ class DartBridge {
   static SDKEnvironment _environment =
       SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   static bool _isInitialized = false;
+  static bool _isShuttingDown = false;
   static bool _servicesInitialized = false;
   static DynamicLibrary? _lib;
 
@@ -75,10 +76,16 @@ class DartBridge {
   static SDKEnvironment get environment => _environment;
 
   /// Whether Phase 1 (core) initialization is complete
-  static bool get isInitialized => _isInitialized;
+  static bool get isInitialized => _isInitialized && !_isShuttingDown;
 
   /// Whether Phase 2 (services) initialization is complete
   static bool get servicesInitialized => _servicesInitialized;
+
+  /// Close the public facade immediately while an asynchronous reset drains
+  /// Phase 1/2 work. Native owners remain alive until [shutdown] runs.
+  static void beginShutdown() {
+    _isShuttingDown = true;
+  }
 
   /// Register the Phase-2 readiness hook. Called once by
   /// RunAnywhere.initializeWithParams so capability files can invoke
@@ -94,7 +101,7 @@ class DartBridge {
   /// [SDKException.notInitialized]; if the hook is not yet wired (very early
   /// call before initializeWithParams), returns immediately.
   static Future<void> ensureServicesReady() {
-    if (!_isInitialized) {
+    if (!isInitialized) {
       throw StateError('SDK not initialized');
     }
     final hook = _ensureServicesReadyHook;
@@ -137,6 +144,9 @@ class DartBridge {
     String baseURL = '',
     String deviceId = '',
   }) {
+    if (_isShuttingDown) {
+      throw StateError('SDK shutdown is in progress');
+    }
     if (_isInitialized) {
       _logger.debug('Already initialized, skipping');
       return;
@@ -159,6 +169,7 @@ class DartBridge {
     // Step 1: Load native library
     _lib = PlatformLoader.loadCommons();
     _logger.debug('Native library loaded');
+    PlatformLoader.tryLoadFlutterNativePortHelpers();
 
     // Step 2: Register platform adapter FIRST (file ops, logging, keychain)
     // C++ needs these callbacks before any other operations
@@ -174,8 +185,7 @@ class DartBridge {
     // Step 4: Initialize SDK with configuration (Phase 1 proto-based path)
     // Matches Swift: CppBridge.SdkInit.phase1(...) in
     // sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+SdkInit.swift
-    // Routes through rac_sdk_init_phase1_proto in commons; supersedes the
-    // legacy struct-based rac_sdk_init entry point.
+    // Routes through rac_sdk_init_phase1_proto in commons.
     try {
       DartBridgeSdkInit.phase1(
         SdkInitPhase1Request(
@@ -188,8 +198,8 @@ class DartBridge {
         ),
       );
       _logger.debug('SDK Phase 1 (proto) initialized');
-    } catch (e) {
-      _logger.error('SDK Phase 1 proto init failed: $e');
+    } catch (_) {
+      _logger.error('SDK Phase 1 proto init failed');
       rethrow;
     }
 
@@ -274,8 +284,8 @@ class DartBridge {
           baseURL: baseURL,
         );
         _logger.debug('HTTP transport configured');
-      } catch (e) {
-        _logger.warning('HTTP setup failed (offline?): $e');
+      } catch (_) {
+        _logger.warning('HTTP setup failed; SDK remains offline');
       }
     }
 
@@ -292,16 +302,6 @@ class DartBridge {
     // used by commons device/model discovery callbacks.
     await DartBridgePlatform.registerServices();
     _logger.debug('Platform services registered');
-
-    // Model assignment callbacks are legacy callback plumbing. Keep them
-    // available for explicit callers but disable auto-fetch because commons
-    // Phase 2 now owns assignment fetch through rac_http_transport.
-    await DartBridgeModelAssignment.register(
-      environment: _environment,
-      baseURL: baseURL,
-      autoFetch: false,
-    );
-    _logger.debug('Model assignment callbacks registered (autoFetch: false)');
 
     // Step 3: Install auth secure storage now that platform async caches are
     // ready. Commons Phase 1 already owns rac_state_initialize with the
@@ -339,13 +339,13 @@ class DartBridge {
           'discoveredOrphans': result.discoveredOrphans,
           'hasCompletedHttpSetup': result.hasCompletedHttpSetup,
           'durationMs': result.durationMs.toInt(),
-          if (result.hasWarning()) 'warning': result.warning,
+          'hasWarning': result.hasWarning(),
         },
       );
-    } catch (e) {
+    } catch (_) {
       // Non-fatal: services init may still succeed via the per-bridge
       // registrations below even when the C++ step-list reports an error.
-      _logger.warning('SDK Phase 2 proto error: $e');
+      _logger.warning('SDK Phase 2 proto failed');
     }
 
     // Flutter-only async bridge: commons Phase 2 owns device registration,
@@ -366,7 +366,7 @@ class DartBridge {
   ///
   /// Async because per-modality component destroy() paths must complete
   /// before Telemetry/Events teardown so commons-side handles created via
-  /// the lifecycle ABIs (and legacy `getHandle()`-based paths like
+  /// the lifecycle ABIs and current component-handle paths like
   /// TTS `listVoicesProto`, `synthesizeProto`, `synthesizeStreamProto`)
   /// do not leak across `RunAnywhere.reset()` -> `initialize()` cycles.
   ///
@@ -375,33 +375,106 @@ class DartBridge {
   /// destroys AI components (LLM -> STT -> TTS -> VAD -> VoiceAgent -> VLM)
   /// sequentially BEFORE Telemetry + Events teardown.
   static Future<void> shutdown() async {
-    if (!_isInitialized) {
-      _logger.debug('Not initialized, nothing to shutdown');
-      return;
+    final wasInitialized = _isInitialized;
+    final nativeTeardownRequired =
+        wasInitialized || _isShuttingDown || _lib != null;
+    _isShuttingDown = true;
+    _logger.debug(
+      wasInitialized
+          ? 'Shutting down DartBridge'
+          : 'Rolling back partial DartBridge state',
+    );
+
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    var nativeShutdownComplete = false;
+    var telemetryShutdownComplete = false;
+    void recordError(Object error, StackTrace stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
     }
 
-    _logger.debug('Shutting down DartBridge');
+    void runCleanup(void Function() cleanup) {
+      try {
+        cleanup();
+      } catch (error, stackTrace) {
+        recordError(error, stackTrace);
+      }
+    }
+
+    Future<void> runAsyncCleanup(Future<void> Function() cleanup) async {
+      try {
+        await cleanup();
+      } catch (error, stackTrace) {
+        recordError(error, stackTrace);
+      }
+    }
 
     // Destroy per-modality component handles FIRST so commons-side state
     // is released while Telemetry/Events are still wired (mirrors Swift's
     // CppBridge.shutdown() order at CppBridge.swift:181-186). Each destroy()
     // is best-effort and swallows its own errors internally.
-    DartBridgeLLM.shared.destroy();
-    DartBridgeSTT.shared.destroy();
-    DartBridgeTTS.shared.destroy();
-    DartBridgeVAD.shared.destroy();
-    DartBridgeVoiceAgent.shared.destroy();
-    DartBridgeVLM.shared.destroy();
+    if (wasInitialized) {
+      runCleanup(DartBridgeLLM.shared.destroy);
+      runCleanup(DartBridgeSTT.shared.destroy);
+      runCleanup(DartBridgeTTS.shared.destroy);
+      runCleanup(DartBridgeVAD.shared.destroy);
+      runCleanup(DartBridgeVoiceAgent.shared.destroy);
+      runCleanup(DartBridgeVLM.shared.destroy);
+    }
 
     // Shutdown in reverse order of initialization
-    DartBridgeTelemetry.shutdown();
-    DartBridgeEvents.unregister();
+    runCleanup(DartBridgeModelRegistry.instance.shutdown);
+    runCleanup(DartBridgeFileManager.unregister);
+    runCleanup(DartBridgeDevice.shutdown);
 
-    _isInitialized = false;
+    // Commons owns the canonical native teardown. Keep the event subscription
+    // plus telemetry, HTTP, and platform adapters alive until rac_shutdown has
+    // published its terminal lifecycle event and released every borrowed
+    // callback pointer.
+    runCleanup(() {
+      final invokedNativeShutdown = DartBridgeState.instance.shutdown(
+        requireNative: nativeTeardownRequired,
+      );
+      nativeShutdownComplete = invokedNativeShutdown || !nativeTeardownRequired;
+    });
+
+    // Every remaining owner depends on canonical native teardown. Telemetry in
+    // turn owns the final HTTP drain, so retain events, credentials, auth, and
+    // the platform adapter when either boundary fails; a later reset retries
+    // with the complete dependency chain still alive.
+    if (nativeShutdownComplete) {
+      await runAsyncCleanup(() async {
+        await DartBridgeTelemetry.shutdown();
+        telemetryShutdownComplete = true;
+      });
+    }
+    if (telemetryShutdownComplete) {
+      runCleanup(DartBridgeEvents.unregister);
+      runCleanup(DartBridgeHTTP.instance.shutdown);
+      runCleanup(HTTPClientAdapter.shared.shutdown);
+      runCleanup(DartBridgePlatform.unregister);
+      runCleanup(DartBridgeAuth.reset);
+    }
+
     _servicesInitialized = false;
     _ensureServicesReadyHook = null;
 
-    _logger.info('DartBridge shutdown complete');
+    if (firstError != null) {
+      _logger.error('DartBridge shutdown failed');
+      Error.throwWithStackTrace(firstError!, firstStackTrace!);
+    }
+
+    _isInitialized = false;
+    _isShuttingDown = false;
+    _environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+    _lib = null;
+
+    _logger.info(
+      wasInitialized
+          ? 'DartBridge shutdown complete'
+          : 'Partial DartBridge rollback complete',
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -430,9 +503,6 @@ class DartBridge {
   static DartBridgeLLM get llm => DartBridgeLLM.shared;
 
   /// Model assignment bridge
-  static DartBridgeModelAssignment get modelAssignment =>
-      DartBridgeModelAssignment.instance;
-
   /// Model paths bridge
   static DartBridgeModelPaths get modelPaths => DartBridgeModelPaths.instance;
 
@@ -512,8 +582,8 @@ class DartBridge {
             'rac_configure_logging',
           );
       configureLogging(logLevel);
-    } catch (e) {
-      _logger.warning('Failed to configure C++ logging: $e');
+    } catch (_) {
+      _logger.warning('Failed to configure C++ logging');
     }
   }
 

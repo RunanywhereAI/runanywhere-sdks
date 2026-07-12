@@ -1,30 +1,17 @@
-group 'ai.runanywhere.sdk.qhexrt'
-version '0.19.13'
-
-buildscript {
-    ext.kotlin_version = '1.9.10'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+group = 'ai.runanywhere.sdk.qhexrt'
+version = '0.20.0'
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
 
 android {
-    namespace 'ai.runanywhere.sdk.qhexrt'
-    compileSdk 36
+    namespace = 'ai.runanywhere.sdk.qhexrt'
+    compileSdk = 36
 
-    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.0.12077973"
+    ndkVersion = rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "28.2.13676358"
 
     defaultConfig {
-        minSdk 24
-        targetSdk 34
+        minSdk = 24
+        targetSdk = 36
         // QHexRT is Qualcomm-only (Snapdragon Hexagon NPU): arm64-v8a exclusively.
         ndk {
             abiFilters 'arm64-v8a'
@@ -32,23 +19,20 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = '1.8'
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
+            assets.srcDirs = ['src/main/assets']
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
         }
     }
 
@@ -60,19 +44,32 @@ android {
     }
 }
 
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
 }
 
-// The private QHexRT natives (librac_backend_qhexrt*.so + the libQnn* set)
-// are STAGED into src/main/jniLibs/arm64-v8a by scripts/stage-natives.sh,
-// not committed to git. Warn — don't fail — when they are absent: a stub
-// build without the natives is legitimate (the plugin reports the NPU as
-// unavailable at runtime).
+// Host/stub libraries are staged as JNI libraries. FastRPC DSP Skel.so files
+// are staged as assets, then copied to an app-private directory at runtime.
 def qhexrtJniLibsDir = file('src/main/jniLibs/arm64-v8a')
+def qhexrtSkelAssetsDir = file('src/main/assets/runanywhere/qhexrt/skels/arm64-v8a')
+def misplacedSkels = fileTree(qhexrtJniLibsDir) {
+    include 'libQnnHtpV*Skel.so'
+}.files
+if (!misplacedSkels.isEmpty()) {
+    throw new GradleException("[runanywhere_qhexrt] DSP Skel.so files must be staged under " +
+            "${qhexrtSkelAssetsDir}, not ${qhexrtJniLibsDir}: " +
+            misplacedSkels.collect { it.name }.sort().join(', '))
+}
 if (!qhexrtJniLibsDir.isDirectory() || (qhexrtJniLibsDir.list() ?: new String[0]).length == 0) {
     logger.warn("[runanywhere_qhexrt] WARNING: ${qhexrtJniLibsDir} is missing or empty — " +
             "the private QHexRT native libraries are not staged. Run " +
             "scripts/stage-natives.sh --natives-from <dir> to bundle them; without them " +
             "this is a stub build and the Hexagon NPU backend will be unavailable at runtime.")
+}
+if (!qhexrtSkelAssetsDir.isDirectory() ||
+        fileTree(qhexrtSkelAssetsDir) { include 'libQnnHtpV*Skel.so' }.files.isEmpty()) {
+    logger.warn("[runanywhere_qhexrt] WARNING: ${qhexrtSkelAssetsDir} has no DSP skels — " +
+            "run scripts/stage-natives.sh before using QHexRT inference.")
 }

@@ -22,6 +22,12 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
 // =============================================================================
 // Minimal test platform adapter
@@ -114,6 +120,150 @@ static TestResult test_init_shutdown() {
     return TEST_PASS();
 }
 
+static int test_auth_store(const char*, const char*, void*) {
+    return 0;
+}
+
+static int test_auth_retrieve(const char*, char*, size_t, void*) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+
+static int test_auth_delete(const char*, void*) {
+    return 0;
+}
+
+static void test_device_info(rac_device_registration_info_t*, void*) {}
+
+static const char* test_device_id(void*) {
+    return "123e4567-e89b-12d3-a456-426614174000";
+}
+
+static rac_bool_t test_device_registered(void*) {
+    return RAC_FALSE;
+}
+
+static void test_set_device_registered(rac_bool_t, void*) {}
+
+static rac_result_t test_device_http(const char*, const char*, rac_bool_t,
+                                     rac_device_http_response_t*, void*) {
+    return RAC_SUCCESS;
+}
+
+static TestResult test_shutdown_clears_all_commons_lifetime_state() {
+    ASSERT_EQ(rac_set_platform_adapter(&test_adapter), RAC_SUCCESS,
+              "direct platform adapter registration should succeed");
+    ASSERT_EQ(rac_state_initialize(RAC_ENV_PRODUCTION, "state-secret", "https://api.runanywhere.ai",
+                                   "123e4567-e89b-12d3-a456-426614174000"),
+              RAC_SUCCESS, "runtime state should initialize");
+
+    rac_sdk_config_t sdk_config = {};
+    sdk_config.environment = RAC_ENV_PRODUCTION;
+    sdk_config.api_key = "sdk-secret-key-1234567890";
+    sdk_config.base_url = "https://api.runanywhere.ai";
+    sdk_config.device_id = "123e4567-e89b-12d3-a456-426614174000";
+    sdk_config.platform = "test";
+    sdk_config.sdk_version = "0.20.0";
+    ASSERT_EQ(rac_sdk_init(&sdk_config), RAC_VALIDATION_OK,
+              "copied SDK configuration should initialize");
+
+    rac_secure_storage_t storage = {};
+    storage.store = test_auth_store;
+    storage.retrieve = test_auth_retrieve;
+    storage.delete_key = test_auth_delete;
+    rac_auth_init(&storage);
+
+    rac_device_callbacks_t device_callbacks = {};
+    device_callbacks.get_device_info = test_device_info;
+    device_callbacks.get_device_id = test_device_id;
+    device_callbacks.is_registered = test_device_registered;
+    device_callbacks.set_registered = test_set_device_registered;
+    device_callbacks.http_post = test_device_http;
+    ASSERT_EQ(rac_device_manager_set_callbacks(&device_callbacks), RAC_SUCCESS,
+              "device callbacks should install");
+
+    // This lifetime intentionally used rac_set_platform_adapter directly and
+    // never called rac_init. rac_shutdown must still own every state layer.
+    rac_shutdown();
+
+    ASSERT_TRUE(rac_get_platform_adapter() == nullptr,
+                "shutdown must release the borrowed platform adapter");
+    ASSERT_TRUE(!rac_state_is_initialized(), "shutdown must clear runtime state");
+    ASSERT_TRUE(!rac_sdk_is_initialized(), "shutdown must clear copied SDK configuration");
+    ASSERT_EQ(rac_auth_load_stored_tokens(), RAC_ERROR_NOT_SUPPORTED,
+              "shutdown must detach auth storage callbacks");
+    ASSERT_EQ(rac_device_manager_register_if_needed(RAC_ENV_PRODUCTION, nullptr),
+              RAC_ERROR_NOT_INITIALIZED, "shutdown must clear device callbacks");
+    return TEST_PASS();
+}
+
+struct ShutdownTelemetryCapture {
+    int request_count = 0;
+    std::string last_body;
+};
+
+static void capture_shutdown_telemetry(void* user_data, const char* /*endpoint*/,
+                                       const char* json_body, size_t json_length,
+                                       rac_bool_t /*requires_auth*/) {
+    auto* capture = static_cast<ShutdownTelemetryCapture*>(user_data);
+    if (capture == nullptr)
+        return;
+    capture->request_count += 1;
+    capture->last_body.assign(json_body ? json_body : "", json_body ? json_length : 0);
+}
+
+static rac_telemetry_manager_t* make_shutdown_telemetry_manager(ShutdownTelemetryCapture* capture) {
+    auto* manager =
+        rac_telemetry_manager_create(RAC_ENV_PRODUCTION, "shutdown-device", "test", "0.20.0");
+    if (manager != nullptr) {
+        rac_telemetry_manager_set_http_callback(manager, capture_shutdown_telemetry, capture);
+        rac_events_set_telemetry_sink(manager);
+    }
+    return manager;
+}
+
+static TestResult test_shutdown_flushes_terminal_telemetry_before_lifetime_clear() {
+    constexpr const char* kAuthResponse =
+        R"({"access_token":"shutdown-access","refresh_token":"shutdown-refresh","device_id":"shutdown-device","user_id":"shutdown-user","organization_id":"shutdown-org","token_type":"bearer","expires_in":3600})";
+
+    ShutdownTelemetryCapture state_capture;
+    rac_auth_init(nullptr);
+    ASSERT_EQ(rac_auth_handle_authenticate_response(kAuthResponse), RAC_SUCCESS,
+              "state lifetime must be authenticated before terminal flush");
+    auto* state_manager = make_shutdown_telemetry_manager(&state_capture);
+    ASSERT_TRUE(state_manager != nullptr, "state lifetime telemetry manager should initialize");
+    ASSERT_EQ(rac_state_initialize(RAC_ENV_PRODUCTION, "api-key", "https://example.invalid",
+                                   "shutdown-device"),
+              RAC_SUCCESS, "state lifetime should initialize");
+
+    rac_shutdown();
+    rac_events_set_telemetry_sink(nullptr);
+    rac_telemetry_manager_destroy(state_manager);
+
+    ASSERT_EQ(state_capture.request_count, 1,
+              "state shutdown must flush exactly one terminal telemetry batch");
+    ASSERT_TRUE(!state_capture.last_body.empty(),
+                "state shutdown terminal telemetry batch must carry a body");
+
+    ShutdownTelemetryCapture core_capture;
+    rac_auth_init(nullptr);
+    ASSERT_EQ(rac_auth_handle_authenticate_response(kAuthResponse), RAC_SUCCESS,
+              "core-only lifetime must be authenticated before terminal flush");
+    auto* core_manager = make_shutdown_telemetry_manager(&core_capture);
+    ASSERT_TRUE(core_manager != nullptr, "core lifetime telemetry manager should initialize");
+    rac_config_t config = make_test_config();
+    ASSERT_EQ(rac_init(&config), RAC_SUCCESS, "core-only lifetime should initialize");
+
+    rac_shutdown();
+    rac_events_set_telemetry_sink(nullptr);
+    rac_telemetry_manager_destroy(core_manager);
+
+    ASSERT_EQ(core_capture.request_count, 1,
+              "core-only shutdown must flush exactly one terminal telemetry batch");
+    ASSERT_TRUE(!core_capture.last_body.empty(),
+                "core-only shutdown terminal telemetry batch must carry a body");
+    return TEST_PASS();
+}
+
 // =============================================================================
 // Test: double init returns error
 // =============================================================================
@@ -184,7 +334,8 @@ static TestResult test_init_wrong_struct_size() {
     rac_result_t rc = rac_init(&config);
     ASSERT_EQ(rc, RAC_ERROR_ABI_VERSION_MISMATCH,
               "rac_init should reject a wrong struct_size with RAC_ERROR_ABI_VERSION_MISMATCH");
-    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_init must not initialize on struct_size mismatch");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE,
+              "rac_init must not initialize on struct_size mismatch");
     return TEST_PASS();
 }
 
@@ -418,6 +569,10 @@ int main(int argc, char** argv) {
         TestSuite suite("core");
 
         suite.add("init_shutdown", test_init_shutdown);
+        suite.add("shutdown_clears_all_commons_lifetime_state",
+                  test_shutdown_clears_all_commons_lifetime_state);
+        suite.add("shutdown_flushes_terminal_telemetry_before_lifetime_clear",
+                  test_shutdown_flushes_terminal_telemetry_before_lifetime_clear);
         suite.add("double_init", test_double_init);
         suite.add("get_version", test_get_version);
         suite.add("init_wrong_abi_version", test_init_wrong_abi_version);

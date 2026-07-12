@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 .yarn/cache/
 .yarn/install-state.gz
 

@@ -15,6 +15,7 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 import {
   DEFAULT_BASE_URL,
+  isUsableHTTPURL,
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
 import {
@@ -64,7 +65,11 @@ import { AudioConvert } from './Extensions/Audio/RunAnywhere+AudioConvert';
 import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
 import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
-import { SDKException } from '../Foundation/Errors/SDKException';
+import {
+  asSDKException,
+  sdkExceptionFromRcResult,
+  SDKException,
+} from '../Foundation/Errors/SDKException';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -77,41 +82,74 @@ let servicesInitPromise: Promise<void> | null = null;
 // In-flight Phase 1 promise shared across concurrent initialize() callers.
 // Mirrors Swift's `guard !isInitializedFlag else { return }` + Kotlin's `synchronized` guard.
 let initializingPromise: Promise<void> | null = null;
+// In-flight offline HTTP recovery. Reset joins this before native teardown so
+// retry cannot race credential/config release or rewrite a newer lifetime.
+let httpRetryPromise: Promise<void> | null = null;
+// Reset is a process-wide lifetime barrier: concurrent resets join it and new
+// initialization/services work waits until native destroy completes.
+let resetPromise: Promise<void> | null = null;
+let lifecycleGeneration = 0;
+// A failed native destroy leaves ownership uncertain. Keep the facade closed
+// until a later reset successfully completes teardown.
+let resetRequired = false;
 
-type NativePhase2Module = {
-  completeServicesInitialization?: () => Promise<unknown>;
-};
+function requireCurrentLifecycle(
+  generation: number,
+  operation: string
+): void {
+  if (generation !== lifecycleGeneration) {
+    throw SDKException.notInitialized(`SDK lifetime ended during ${operation}`);
+  }
+}
+
+async function awaitSettlement(promise: Promise<unknown> | null): Promise<void> {
+  if (!promise) return;
+  try {
+    await promise;
+  } catch {
+    // The originating caller owns the error; reset still must destroy any
+    // partially initialized native lifetime.
+  }
+}
 
 /**
  * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
  * HTTP-retry bridge. Mirrors Swift, which reads `hasCompletedHttpSetup ||
  * httpConfigured` and `httpApplicable` from the same proto.
  *
- * Returns `null` for the offline/deferred outcomes: an empty buffer (the
- * packaged commons lacks the symbol) or an unrecognized payload. A literal
- * `true` from a stale packaged native still resolving the legacy boolean is
- * preserved as fully-configured.
  */
-function decodeSdkInitResultPayload(
-  payload: unknown
-): { httpConfigured: boolean; httpApplicable: boolean } | null {
-  if (payload instanceof ArrayBuffer) {
-    if (payload.byteLength === 0) {
-      return null;
-    }
-    const decoded = SdkInitResult.decode(new Uint8Array(payload));
-    return {
-      httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
-      httpApplicable: decoded.httpApplicable,
-    };
+function decodeSdkInitResultPayload(payload: ArrayBuffer): {
+  httpConfigured: boolean;
+  httpApplicable: boolean;
+} {
+  if (payload.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('sdkInitResult');
   }
-  if (payload === true) {
-    return { httpConfigured: true, httpApplicable: true };
-  }
-  return null;
+  const decoded = SdkInitResult.decode(new Uint8Array(payload));
+  return {
+    httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
+    httpApplicable: decoded.httpApplicable,
+  };
 }
 
-function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
+const nativeRacResultPattern = /(?:^|\s)RAC_RESULT=(-?\d+)(?:\s|$)/;
+
+/** Convert a native bridge failure carrying RAC_RESULT into the canonical proto error. */
+async function asNativeSDKException(error: unknown): Promise<SDKException> {
+  if (error instanceof Error) {
+    const match = nativeRacResultPattern.exec(error.message);
+    if (match?.[1]) {
+      const rc = Number.parseInt(match[1], 10);
+      const mapped = await sdkExceptionFromRcResult(rc);
+      if (mapped) return mapped;
+    }
+  }
+  return asSDKException(error);
+}
+
+function mapSdkInitEnvironment(
+  environment: SDKEnvironment
+): SdkInitEnvironment {
   switch (environment) {
     case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
@@ -179,20 +217,56 @@ export const RunAnywhere = {
   // ============================================================================
 
   async initialize(options: SDKInitOptions = {}): Promise<void> {
+    const activeReset = resetPromise;
+    if (activeReset) await activeReset;
+    if (resetRequired) {
+      throw SDKException.notInitialized(
+        'Previous SDK teardown did not complete; call reset() again'
+      );
+    }
+
     // Idempotency guard — mirrors Swift `guard !isInitializedFlag else { return }`.
     if (initState.isCoreInitialized) return;
     // Re-entrancy guard — concurrent callers share the in-flight Phase 1 promise
     // instead of racing through init and double-emitting lifecycle events.
     if (initializingPromise) return initializingPromise;
 
+    const generation = lifecycleGeneration;
+
     initializingPromise = (async () => {
       try {
-        const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+        const environment =
+          options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
           : '';
-        const phase1Request: SdkInitPhase1RequestMessage = SdkInitPhase1Request.create();
+        const requiresCredentials =
+          environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
+          environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+        if (
+          !isUsableHTTPURL(effectiveBaseURL, {
+            requireHTTPS:
+              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+          })
+        ) {
+          throw SDKException.validationFailed({
+            fieldPath: 'SDKInitOptions.baseURL',
+            message:
+              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+                ? 'baseURL must be an absolute HTTPS URL without embedded credentials, query, or fragment'
+                : 'baseURL must be an absolute HTTP(S) URL without embedded credentials, query, or fragment',
+          });
+        }
+        if (requiresCredentials && !effectiveApiKey) {
+          throw SDKException.validationFailed({
+            fieldPath: 'SDKInitOptions.apiKey',
+            message:
+              'apiKey must be non-empty and must not be a placeholder outside development',
+          });
+        }
+        const phase1Request: SdkInitPhase1RequestMessage =
+          SdkInitPhase1Request.create();
         phase1Request.environment = mapSdkInitEnvironment(environment);
         phase1Request.apiKey = effectiveApiKey;
         phase1Request.baseUrl = effectiveBaseURL;
@@ -200,11 +274,14 @@ export const RunAnywhere = {
         phase1Request.platform = SDKConstants.platform;
         phase1Request.sdkVersion = SDKConstants.version;
 
-        const phase2Request: SdkInitPhase2RequestMessage = SdkInitPhase2Request.create();
+        const phase2Request: SdkInitPhase2RequestMessage =
+          SdkInitPhase2Request.create();
         phase2Request.buildToken = options.buildToken?.trim() ?? '';
-        phase2Request.forceRefreshAssignments = options.forceRefreshAssignments ?? false;
+        phase2Request.forceRefreshAssignments =
+          options.forceRefreshAssignments ?? false;
         phase2Request.flushTelemetry = options.flushTelemetry ?? true;
-        phase2Request.discoverDownloadedModels = options.discoverDownloadedModels ?? true;
+        phase2Request.discoverDownloadedModels =
+          options.discoverDownloadedModels ?? true;
         phase2Request.rescanLocalModels = options.rescanLocalModels ?? true;
 
         const initParams: SDKInitOptions = {
@@ -224,13 +301,20 @@ export const RunAnywhere = {
         try {
           await initializeNitroModulesGlobally();
         } catch (error) {
-          logger.warning('NitroModules global initialization failed', { error });
+          logger.warning('NitroModules global initialization failed', {
+            error,
+          });
         }
+
+        requireCurrentLifecycle(generation, 'initialization');
 
         if (!isNativeModuleAvailable()) {
           logger.warning('Native module not available');
           const nativeUnavailableError = SDKException.nativeModuleUnavailable();
-          initState = markInitializationFailed(initState, nativeUnavailableError);
+          initState = markInitializationFailed(
+            initState,
+            nativeUnavailableError
+          );
           throw nativeUnavailableError;
         }
 
@@ -255,17 +339,21 @@ export const RunAnywhere = {
 
           const initialized = await native.initialize(configJson);
           if (initialized === false) {
-            throw SDKException.notInitialized('Native SDK initialization failed');
+            throw SDKException.notInitialized(
+              'Native SDK initialization failed'
+            );
           }
 
-          initState = markCoreInitialized(initState, initParams, 'core');
+          requireCurrentLifecycle(generation, 'initialization');
+          initState = markCoreInitialized(initState, initParams);
 
           logger.info('SDK initialized successfully');
 
           // completeServicesInitialization() manages servicesInitPromise internally.
           // Do NOT wipe it here — an unconditional null would destroy any in-flight
           // Phase 2 promise from a concurrent ensureServicesReady caller.
-          void this.completeServicesInitialization().catch(err => {
+          void this.completeServicesInitialization().catch((err) => {
+            if (generation !== lifecycleGeneration) return;
             logger.warning(
               `Phase 2 services initialization failed (non-fatal): ${
                 err instanceof Error ? err.message : String(err)
@@ -273,10 +361,18 @@ export const RunAnywhere = {
             );
           });
         } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error);
-          logger.error(`SDK initialization failed: ${msg}`);
-          initState = markInitializationFailed(initState, error as Error);
-          throw error;
+          const sdkError = await asNativeSDKException(error);
+          if (generation === lifecycleGeneration) {
+            // Initialization failures can originate in auth/config transports.
+            // Log only structured non-secret identifiers; the full exception is
+            // returned to the caller and must not be copied into device logs.
+            logger.error('SDK initialization failed', {
+              errorCode: sdkError.code,
+              errorCategory: sdkError.category,
+            });
+            initState = markInitializationFailed(initState, sdkError);
+          }
+          throw sdkError;
         }
       } finally {
         initializingPromise = null;
@@ -286,18 +382,48 @@ export const RunAnywhere = {
     return initializingPromise;
   },
 
-  async reset(): Promise<void> {
-    // Clear local state BEFORE destroying native — mirrors Swift's order:
-    // clear flags first, then `await CppBridge.shutdown()`. This ensures any
-    // in-flight Phase 2 awaiter sees the reset state rather than hitting a
-    // dead bridge (RAC_ERROR_NOT_INITIALIZED).
+  reset(): Promise<void> {
+    if (resetPromise) return resetPromise;
+
+    const pendingInitialization = initializingPromise;
+    const pendingServicesInitialization = servicesInitPromise;
+    const pendingHTTPRetry = httpRetryPromise;
+    lifecycleGeneration += 1;
+    resetRequired = true;
+    // Close the facade synchronously. Generation guards prevent Phase 1,
+    // Phase 2, and HTTP recovery from reopening this lifetime while their
+    // native work settles.
     initState = resetState();
-    servicesInitPromise = null;
-    initializingPromise = null;
-    if (isNativeModuleAvailable()) {
-      const native = requireNativeModule();
-      await native.destroy();
-    }
+
+    const operation = (async () => {
+      // Never destroy native state underneath Phase 1/2. Both operations are
+      // invalidated by the generation bump above, so their late completions
+      // cannot reopen the facade while reset waits for them to settle.
+      await awaitSettlement(pendingInitialization);
+      await awaitSettlement(pendingServicesInitialization);
+      await awaitSettlement(pendingHTTPRetry);
+
+      initializingPromise = null;
+      servicesInitPromise = null;
+      httpRetryPromise = null;
+
+      if (isNativeModuleAvailable()) {
+        const native = requireNativeModule();
+        await native.destroy();
+      }
+      resetRequired = false;
+    })();
+
+    resetPromise = operation;
+    void operation.then(
+      () => {
+        if (resetPromise === operation) resetPromise = null;
+      },
+      () => {
+        if (resetPromise === operation) resetPromise = null;
+      }
+    );
+    return operation;
   },
 
   /**
@@ -317,6 +443,9 @@ export const RunAnywhere = {
    * Matches Swift: `RunAnywhere.completeServicesInitialization()`.
    */
   async completeServicesInitialization(): Promise<void> {
+    const activeReset = resetPromise;
+    if (activeReset) await activeReset;
+
     if (!initState.isCoreInitialized) {
       throw SDKException.notInitialized(
         'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
@@ -335,44 +464,52 @@ export const RunAnywhere = {
       throw SDKException.nativeModuleUnavailable();
     }
 
-    servicesInitPromise = (async () => {
+    const generation = lifecycleGeneration;
+    const operation = (async () => {
       const native = requireNativeModule();
-      const nativePhase2 = native as NativePhase2Module;
 
+      requireCurrentLifecycle(generation, 'services initialization');
       initState = markServicesInitializing(initState);
 
-      let phase2Result: unknown = undefined;
-      if (typeof nativePhase2.completeServicesInitialization === 'function') {
-        phase2Result = await nativePhase2.completeServicesInitialization.call(native);
-      } else {
-        const initialized = await native.isInitialized();
-        if (!initialized) {
-          throw SDKException.notInitialized('Native core is not initialized');
-        }
-        logger.debug('Native phase 2 bridge not available; core native init is already complete.');
-      }
+      const phase2Result = await native.completeServicesInitialization();
       const decoded = decodeSdkInitResultPayload(phase2Result);
-      const httpConfigured = decoded?.httpConfigured ?? false;
-      const httpApplicable = decoded?.httpApplicable ?? true;
+      const { httpConfigured, httpApplicable } = decoded;
 
-      initState = markServicesInitialized(initState, httpConfigured, httpApplicable);
+      requireCurrentLifecycle(generation, 'services initialization');
+      initState = markServicesInitialized(
+        initState,
+        httpConfigured,
+        httpApplicable
+      );
       if (httpConfigured) {
         logger.info('Services initialisation completed.');
       } else if (!httpApplicable) {
-        logger.info('Services initialisation completed (HTTP setup not applicable for this configuration).');
+        logger.info(
+          'Services initialisation completed (HTTP setup not applicable for this configuration).'
+        );
       } else {
-        logger.info('Services initialisation completed (HTTP/auth deferred — will retry on next online call).');
+        logger.info(
+          'Services initialisation completed (HTTP/auth deferred — will retry on next online call).'
+        );
       }
     })();
+    servicesInitPromise = operation;
 
     try {
-      await servicesInitPromise;
+      await operation;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`Services initialisation failed: ${msg}`);
-      throw error;
+      const sdkError = await asNativeSDKException(error);
+      if (generation === lifecycleGeneration) {
+        logger.error('Services initialisation failed', {
+          errorCode: sdkError.code,
+          errorCategory: sdkError.category,
+        });
+      }
+      throw sdkError;
     } finally {
-      servicesInitPromise = null;
+      if (servicesInitPromise === operation) {
+        servicesInitPromise = null;
+      }
     }
   },
 
@@ -481,24 +618,34 @@ export const RunAnywhere = {
   /**
    * Get device ID from native device state.
    *
-   * Matches Swift `RunAnywhere.deviceId: String` (sync property). RN
-   * returns `Promise<string>` because the value lives in
-   * Keychain/Keystore behind the Nitro async bridge; falls back to the
-   * persistent device UUID and finally `''` if neither is resolvable.
+   * Matches Swift's throwing `RunAnywhere.deviceId` property. RN returns a
+   * Promise because the value lives behind the Nitro async bridge and rejects
+   * if native identity cannot be resolved durably.
    */
   async getDeviceId(): Promise<string> {
-    if (!isNativeModuleAvailable()) return '';
+    if (!isNativeModuleAvailable()) {
+      throw SDKException.nativeModuleUnavailable();
+    }
     const native = requireNativeModule();
-    return (await native.getDeviceId()) || (await native.getPersistentDeviceUUID()) || '';
+    try {
+      const registeredDeviceId = await native.getDeviceId();
+      if (registeredDeviceId) return registeredDeviceId;
+
+      const persistentDeviceId = await native.getPersistentDeviceUUID();
+      if (!persistentDeviceId) {
+        throw SDKException.notInitialized('Persistent device identity');
+      }
+      return persistentDeviceId;
+    } catch (error) {
+      throw await asNativeSDKException(error);
+    }
   },
 
   /**
-   * Device ID (Keychain/Keystore-persisted, survives reinstalls).
+   * Device ID persisted in platform secure storage for the app installation.
    *
-   * RN-only property accessor — matches Swift's sync
-   * `RunAnywhere.deviceId: String` in semantics, but returns
-   * `Promise<string>` because RN resolves this through the Nitro async
-   * native bridge. Identical to calling `getDeviceId()`.
+   * RN-only property accessor — matches Swift's throwing device-ID getter,
+   * but returns `Promise<string>` through the Nitro async native bridge.
    */
   get deviceId(): Promise<string> {
     return this.getDeviceId();
@@ -511,7 +658,6 @@ export const RunAnywhere = {
   configureLogging: Logging.configureLogging,
   setLocalLoggingEnabled: Logging.setLocalLoggingEnabled,
   setLogLevel: Logging.setLogLevel,
-  setSentryLoggingEnabled: Logging.setSentryLoggingEnabled,
   addLogDestination: Logging.addLogDestination,
   setDebugMode: Logging.setDebugMode,
   flushLogs: Logging.flushLogs,
@@ -561,7 +707,8 @@ export const RunAnywhere = {
   // ============================================================================
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
-  initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
+  initializeVoiceAgentWithLoadedModels:
+    VoiceAgent.initializeVoiceAgentWithLoadedModels,
   defaultVADModelID: VoiceAgent.defaultVADModelID,
   ensureDefaultVAD: VoiceAgent.ensureDefaultVAD,
   getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
@@ -692,7 +839,6 @@ export const RunAnywhere = {
   currentModel: Lifecycle.currentModel,
   modelInfoForCategory: Lifecycle.modelInfoForCategory,
   componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
-
 };
 
 // ============================================================================
@@ -706,34 +852,57 @@ export const RunAnywhere = {
 // ============================================================================
 
 async function retryHTTPSetupInternal(): Promise<void> {
+  const activeReset = resetPromise;
+  if (activeReset) await activeReset;
+  if (resetRequired) {
+    throw SDKException.notInitialized(
+      'Previous SDK teardown did not complete; call reset() again'
+    );
+  }
+  if (httpRetryPromise) return httpRetryPromise;
   if (!isNativeModuleAvailable()) {
     return;
   }
-  const native = requireNativeModule();
-  logger.debug('Retrying HTTP/auth setup...');
-  try {
-    const retryResult: unknown = await native.retryHTTPSetupProto();
+
+  const generation = lifecycleGeneration;
+  const operation = (async () => {
+    requireCurrentLifecycle(generation, 'HTTP setup retry');
+    const native = requireNativeModule();
+    logger.debug('Retrying HTTP/auth setup...');
+
+    const retryResult = await native.retryHTTPSetupProto();
     const decoded = decodeSdkInitResultPayload(retryResult);
-    if (decoded) {
-      initState = markHTTPSetupResult(
-        initState,
-        decoded.httpConfigured,
-        decoded.httpApplicable
-      );
-      if (decoded.httpConfigured) {
-        logger.info('HTTP/Auth setup succeeded on retry.');
-      } else if (!decoded.httpApplicable) {
-        logger.info('HTTP setup not applicable for this configuration; retries stopped.');
-      }
-      return;
-    }
-    logger.debug('HTTP/Auth retry did not complete; commons reported deferred setup.');
-  } catch (error) {
-    logger.debug(
-      `HTTP/Auth retry failed (still offline?): ${
-        error instanceof Error ? error.message : String(error)
-      }`
+    requireCurrentLifecycle(generation, 'HTTP setup retry');
+    initState = markHTTPSetupResult(
+      initState,
+      decoded.httpConfigured,
+      decoded.httpApplicable
     );
+    if (decoded.httpConfigured) {
+      logger.info('HTTP/Auth setup succeeded on retry.');
+    } else if (!decoded.httpApplicable) {
+      logger.info(
+        'HTTP setup not applicable for this configuration; retries stopped.'
+      );
+    }
+  })();
+  httpRetryPromise = operation;
+
+  try {
+    await operation;
+  } catch (error) {
+    const sdkError = await asNativeSDKException(error);
+    if (generation === lifecycleGeneration) {
+      logger.debug('HTTP/Auth retry failed', {
+        errorCode: sdkError.code,
+        errorCategory: sdkError.category,
+      });
+    }
+    throw sdkError;
+  } finally {
+    if (httpRetryPromise === operation) {
+      httpRetryPromise = null;
+    }
   }
 }
 

@@ -27,7 +27,7 @@ public final class SystemTTSService: NSObject {
 
     // MARK: - Framework Identification
 
-    public nonisolated let inferenceFramework: InferenceFramework = .systemTTS
+    public nonisolated let inferenceFramework: InferenceFramework = .systemTts
 
     // MARK: - Properties
 
@@ -61,30 +61,32 @@ public final class SystemTTSService: NSObject {
     /// finishes. Throws `CancellationError` if playback is cancelled via
     /// `stop()`.
     public nonisolated func speak(text: String, options: RATTSOptions) async throws {
-        // Use Task.detached to completely break out of any async context
-        // This prevents AVFoundation's internal sync operations from conflicting with Swift concurrency
-        try await Task.detached { @MainActor [self] in
-            logger.info("Speaking: '\(text.prefix(50))...'")
+        try await withCheckedThrowingContinuation { continuation in
+            Task { @MainActor [self] in
+                do {
+                    logger.info("Speaking: '\(text.prefix(50))...'")
 
-            // The audio session may still be in .record mode from the Voice Agent's
-            // audio capture phase. Switch to .playback so AVSpeechSynthesizer can
-            // actually route audio to the speaker.
-            #if os(iOS) || os(tvOS)
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
-            try audioSession.setActive(true)
-            #endif
+                    // The audio session may still be in .record mode from the Voice Agent's
+                    // audio capture phase. Switch to .playback so AVSpeechSynthesizer can
+                    // actually route audio to the speaker.
+                    #if os(iOS) || os(tvOS)
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
+                    try audioSession.setActive(true)
+                    #endif
 
-            let utterance = createUtterance(text: text, options: options)
+                    let utterance = createUtterance(text: text, options: options)
 
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                // We're already on MainActor, so this is safe
-                speechCompletion = { result in
-                    continuation.resume(with: result)
+                    // The delegate completes this continuation when speech ends.
+                    speechCompletion = { result in
+                        continuation.resume(with: result)
+                    }
+                    synthesizer.speak(utterance)
+                } catch {
+                    continuation.resume(throwing: error)
                 }
-                synthesizer.speak(utterance)
             }
-        }.value
+        }
     }
 
     public func stop() {

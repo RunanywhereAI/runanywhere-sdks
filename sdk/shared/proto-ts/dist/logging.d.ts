@@ -21,8 +21,7 @@ export declare function logLevelFromJSON(object: any): LogLevel;
 export declare function logLevelToJSON(object: LogLevel): string;
 /**
  * ---------------------------------------------------------------------------
- * SDK logging configuration. Union of the fields the per-SDK
- * LoggingConfiguration structs carry today; per-environment presets
+ * SDK logging configuration. Per-environment presets
  * (development/staging/production) stay in each SDK as factory helpers.
  * ---------------------------------------------------------------------------
  */
@@ -37,8 +36,6 @@ export interface LoggingConfiguration {
     includeDeviceMetadata: boolean;
     /** Forward records to the remote logging pipeline. */
     enableRemoteLogging: boolean;
-    /** Forward error/fatal records to Sentry. */
-    enableSentryLogging: boolean;
 }
 /**
  * ---------------------------------------------------------------------------

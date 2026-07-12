@@ -28,7 +28,6 @@ private enum STTStreamSessionABI {
         UnsafeMutableRawPointer?
     ) -> rac_result_t
     typealias UnsetCallback = @convention(c) (rac_handle_t?) -> rac_result_t
-    typealias Quiesce = @convention(c) () -> Void
     typealias Start = @convention(c) (
         rac_handle_t?,
         UnsafePointer<UInt8>?,
@@ -50,7 +49,6 @@ private enum STTStreamSessionABI {
         "rac_stt_unset_stream_proto_callback",
         as: UnsetCallback.self
     )
-    static let quiesce = NativeProtoABI.load("rac_stt_proto_quiesce", as: Quiesce.self)
     static let start = NativeProtoABI.load("rac_stt_stream_start_proto", as: Start.self)
     static let feedAudio = NativeProtoABI.load(
         "rac_stt_stream_feed_audio_proto",
@@ -58,6 +56,28 @@ private enum STTStreamSessionABI {
     )
     static let stop = NativeProtoABI.load("rac_stt_stream_stop_proto", as: Finish.self)
     static let cancel = NativeProtoABI.load("rac_stt_stream_cancel_proto", as: Finish.self)
+
+    struct Functions {
+        let setCallback: SetCallback
+        let unsetCallback: UnsetCallback
+        let start: Start
+        let feedAudio: FeedAudio
+        let stop: Finish
+        let cancel: Finish
+    }
+
+    static func resolve() -> Functions? {
+        guard let setCallback, let unsetCallback, let start,
+              let feedAudio, let stop, let cancel else { return nil }
+        return Functions(
+            setCallback: setCallback,
+            unsetCallback: unsetCallback,
+            start: start,
+            feedAudio: feedAudio,
+            stop: stop,
+            cancel: cancel
+        )
+    }
 }
 
 private final class STTStreamSessionContext: @unchecked Sendable {
@@ -76,10 +96,6 @@ private final class STTStreamSessionContext: @unchecked Sendable {
 
     var isCancelled: Bool {
         state.withLock { $0.isCancelled }
-    }
-
-    var sessionId: UInt64 {
-        state.withLock { $0.sessionId }
     }
 
     func setSessionId(_ sessionId: UInt64) {
@@ -144,6 +160,11 @@ private let sttStreamSessionTrampoline: STTStreamSessionABI.Callback = { bytes, 
     context.yield(bytes: bytes, size: size)
 }
 
+/// Retained STT stream context released only after native callback quiescence.
+private struct STTStreamingContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
+}
+
 /// Audio pump for `CppBridge.STT.transcribeSessionStream` — verbatim
 /// extraction so the session-stream body stays within the lint body-length
 /// limit. Returns true when the session must be cancelled (task/stream
@@ -200,13 +221,6 @@ extension CppBridge {
 
         private init() {}
 
-        // MARK: - Handle Management
-
-        /// Get or create the STT component handle
-        public func getHandle() async throws -> rac_handle_t {
-            try await inner.getHandle()
-        }
-
         // MARK: - State
 
         /// Check if a model is loaded
@@ -221,7 +235,7 @@ extension CppBridge {
         public var supportsStreaming: Bool {
             get async {
                 guard let handle = await inner.existingHandle() else { return false }
-                return rac_stt_component_supports_streaming(handle) == RAC_TRUE
+                return rac_stt_component_supports_streaming(handle.rawValue) == RAC_TRUE
             }
         }
 
@@ -248,7 +262,7 @@ extension CppBridge {
             if framework != RAC_FRAMEWORK_UNKNOWN {
                 var config = RAC_STT_CONFIG_DEFAULT
                 config.preferred_framework = Int32(framework.rawValue)
-                let configResult = rac_stt_component_configure(handle, &config)
+                let configResult = rac_stt_component_configure(handle.rawValue, &config)
                 if configResult != RAC_SUCCESS {
                     logger.warning("Failed to configure STT framework: \(configResult)")
                 }
@@ -264,12 +278,7 @@ extension CppBridge {
             loadedModel: RACurrentModelResult
         ) async throws -> AsyncStream<RASTTPartialResult> {
             let handle = try await prepareStreamingHandle(from: loadedModel)
-            guard let setCallback = STTStreamSessionABI.setCallback,
-                  let unsetCallback = STTStreamSessionABI.unsetCallback,
-                  let start = STTStreamSessionABI.start,
-                  let feedAudio = STTStreamSessionABI.feedAudio,
-                  let stop = STTStreamSessionABI.stop,
-                  let cancel = STTStreamSessionABI.cancel else {
+            guard STTStreamSessionABI.resolve() != nil else {
                 throw SDKException(
                     code: .notSupported,
                     message: NativeProtoABI.missingSymbolMessage("rac_stt_stream_start_proto"),
@@ -280,17 +289,29 @@ extension CppBridge {
             let optionsData = try options.serializedData()
             return AsyncStream { continuation in
                 let context = STTStreamSessionContext(continuation)
-                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                let contextPtr = STTStreamingContextPointer(
+                    rawValue: Unmanaged.passRetained(context).toOpaque()
+                )
 
                 let task = Task.detached(priority: .userInitiated) {
+                    guard let functions = STTStreamSessionABI.resolve() else {
+                        context.yieldFailure("STT stream ABI became unavailable")
+                        Unmanaged<STTStreamSessionContext>.fromOpaque(contextPtr.rawValue).release()
+                        continuation.finish()
+                        return
+                    }
                     defer {
-                        _ = unsetCallback(handle)
-                        STTStreamSessionABI.quiesce?()
-                        Unmanaged<STTStreamSessionContext>.fromOpaque(contextPtr).release()
+                        _ = functions.unsetCallback(handle.rawValue)
+                        rac_stt_proto_quiesce()
+                        Unmanaged<STTStreamSessionContext>.fromOpaque(contextPtr.rawValue).release()
                         continuation.finish()
                     }
 
-                    let registerResult = setCallback(handle, sttStreamSessionTrampoline, contextPtr)
+                    let registerResult = functions.setCallback(
+                        handle.rawValue,
+                        sttStreamSessionTrampoline,
+                        contextPtr.rawValue
+                    )
                     guard registerResult == RAC_SUCCESS else {
                         context.yieldFailure("STT stream callback registration failed: \(registerResult)", code: registerResult)
                         return
@@ -298,8 +319,8 @@ extension CppBridge {
 
                     var sessionId: UInt64 = 0
                     let startResult = optionsData.withUnsafeBytes { rawBuffer in
-                        start(
-                            handle,
+                        functions.start(
+                            handle.rawValue,
                             rawBuffer.bindMemory(to: UInt8.self).baseAddress,
                             rawBuffer.count,
                             &sessionId
@@ -315,13 +336,13 @@ extension CppBridge {
                         audio,
                         sessionId: sessionId,
                         context: context,
-                        feedAudio: feedAudio
+                        feedAudio: functions.feedAudio
                     )
 
                     if shouldCancel || Task.isCancelled || context.isCancelled {
-                        _ = cancel(sessionId)
+                        _ = functions.cancel(sessionId)
                     } else {
-                        let stopResult = stop(sessionId)
+                        let stopResult = functions.stop(sessionId)
                         if stopResult != RAC_SUCCESS {
                             context.yieldFailure("STT stream stop failed: \(stopResult)", code: stopResult)
                         }
@@ -334,7 +355,7 @@ extension CppBridge {
                         task.cancel()
                         let sessionId = context.cancel()
                         if sessionId != 0 {
-                            _ = cancel(sessionId)
+                            _ = STTStreamSessionABI.cancel?(sessionId)
                         }
                     case .finished:
                         break
@@ -359,7 +380,9 @@ extension CppBridge {
             loadedModelId = nil
         }
 
-        private func prepareStreamingHandle(from snapshot: RACurrentModelResult) async throws -> rac_handle_t {
+        private func prepareStreamingHandle(
+            from snapshot: RACurrentModelResult
+        ) async throws -> ComponentHandle {
             guard snapshot.found else {
                 throw SDKException(code: .notInitialized, message: "STT model not loaded", category: .component)
             }
@@ -383,7 +406,7 @@ extension CppBridge {
             if framework != RAC_FRAMEWORK_UNKNOWN {
                 var config = RAC_STT_CONFIG_DEFAULT
                 config.preferred_framework = Int32(framework.rawValue)
-                let configResult = rac_stt_component_configure(handle, &config)
+                let configResult = rac_stt_component_configure(handle.rawValue, &config)
                 if configResult != RAC_SUCCESS {
                     logger.warning("Failed to configure STT streaming framework: \(configResult)")
                 }

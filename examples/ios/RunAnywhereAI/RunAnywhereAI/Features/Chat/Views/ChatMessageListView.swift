@@ -83,27 +83,44 @@ struct ChatMessageListView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: AppSpacing.xLarge) {
+        VStack(spacing: AppSpacing.large) {
             Spacer()
 
-            Image("runanywhere_logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 76, height: 76)
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                AppColors.primaryAccent.opacity(0.22),
+                                AppColors.primaryAccent.opacity(0.10)
+                            ],
+                            center: .topLeading,
+                            startRadius: 8,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 76, height: 76)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundColor(AppColors.primaryAccent)
+            }
+            .padding(.bottom, AppSpacing.small)
 
             VStack(spacing: 8) {
-                Text("Ask anything privately")
-                    .font(AppTypography.title2Semibold)
+                Text(emptyStateGreeting)
+                    .font(AppTypography.titleBold)
                     .foregroundColor(AppColors.textPrimary)
 
-                Text("Chat with local models, attach context, or switch into Talk mode when you want to speak.")
+                Text("Ask anything — everything runs privately on your device.")
                     .font(AppTypography.subheadline)
                     .foregroundColor(AppColors.textSecondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 360)
+                    .frame(maxWidth: 320)
             }
 
             starterPrompts
+                .padding(.top, AppSpacing.mediumLarge)
 
             Spacer()
         }
@@ -111,25 +128,45 @@ struct ChatMessageListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var emptyStateGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 0..<5: return "Working late?"
+        case 5..<12: return "Good morning"
+        case 12..<18: return "Good afternoon"
+        default: return "Good evening"
+        }
+    }
+
     private var starterPrompts: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: AppSpacing.mediumLarge) {
-                StarterPromptChip(title: "Explain", subtitle: "a complex topic simply") {
-                    viewModel.currentInput = "Explain a complex topic simply"
-                    isTextFieldFocused = true
-                }
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: AppSpacing.mediumLarge),
+                GridItem(.flexible(), spacing: AppSpacing.mediumLarge)
+            ],
+            spacing: AppSpacing.mediumLarge
+        ) {
+            StarterPromptChip(icon: "list.bullet.clipboard", title: "Plan", subtitle: "from messy notes") {
+                viewModel.currentInput = "Turn this messy list into a realistic plan with the top three priorities:"
+                isTextFieldFocused = true
+            }
 
-                StarterPromptChip(title: "Summarize", subtitle: "my notes or document") {
-                    viewModel.currentInput = "Summarize this clearly:"
-                    isTextFieldFocused = true
-                }
+            StarterPromptChip(icon: "pencil.line", title: "Rewrite", subtitle: "clear and warm") {
+                viewModel.currentInput = "Rewrite this so it is clear, warm, and concise:"
+                isTextFieldFocused = true
+            }
 
-                StarterPromptChip(title: "Draft", subtitle: "a polished response") {
-                    viewModel.currentInput = "Draft a polished response for:"
-                    isTextFieldFocused = true
-                }
+            StarterPromptChip(icon: "arrow.left.arrow.right", title: "Compare", subtitle: "weigh options") {
+                viewModel.currentInput = "Compare these options, explain the tradeoffs, and recommend one:"
+                isTextFieldFocused = true
+            }
+
+            StarterPromptChip(icon: "checklist", title: "Summarize", subtitle: "into next steps") {
+                viewModel.currentInput = "Summarize these notes into decisions, action items, and open questions:"
+                isTextFieldFocused = true
             }
         }
+        .frame(maxWidth: 440)
     }
 
     // MARK: - Message List
@@ -140,10 +177,16 @@ struct ChatMessageListView: View {
                 .id("top-spacer")
 
             ForEach(viewModel.messages) { message in
-                MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
-                    .id(message.id.uuidString)
-                    .transition(messageTransition)
-                    .animation(nil, value: message.content)
+                MessageBubbleView(
+                    message: message,
+                    isGenerating: viewModel.isGenerating,
+                    isStreamingTail: viewModel.isGenerating
+                        && message.role == .assistant
+                        && message.id == viewModel.messages.last?.id
+                )
+                .id(message.id.uuidString)
+                .transition(messageTransition)
+                .animation(nil, value: message.content)
             }
 
             if viewModel.isGenerating, viewModel.messages.last?.content.isEmpty == true {
@@ -223,8 +266,6 @@ struct ChatInputAreaView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Divider()
-
             HStack(spacing: 8) {
                 if settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
                     thinkingModeBadge
@@ -269,7 +310,7 @@ struct ChatInputAreaView: View {
                 .padding(.top, AppSpacing.small)
             }
 
-            HStack(spacing: AppSpacing.mediumLarge) {
+            HStack(spacing: AppSpacing.smallMedium) {
                 attachmentMenu
 
                 TextField(
@@ -279,6 +320,7 @@ struct ChatInputAreaView: View {
                 )
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
+                    .padding(.vertical, AppSpacing.smallMedium)
                     .focused($isTextFieldFocused)
                     .onSubmit {
                         onSend()
@@ -288,6 +330,7 @@ struct ChatInputAreaView: View {
                 toolToggleButton
 
                 Button {
+                    Haptics.light()
                     onComposerAction(.talk)
                 } label: {
                     ZStack {
@@ -302,25 +345,59 @@ struct ChatInputAreaView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Talk")
 
-                Button(action: onSend) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(AppTypography.system28)
-                        .foregroundColor(
-                            canSendCurrentTurn ? AppColors.primaryAccent : AppColors.statusGray
-                        )
-                }
-                .disabled(!canSendCurrentTurn)
-                .background {
-                    if #available(iOS 26.0, macOS 26.0, *) {
-                        Circle()
-                            .fill(.clear)
-                            .glassEffect(.regular.interactive())
-                    }
-                }
+                sendOrStopButton
             }
-            .padding(AppSpacing.large)
-            .background(AppColors.backgroundPrimary)
+            .padding(.horizontal, AppSpacing.regular)
+            .padding(.vertical, AppSpacing.smallMedium)
+            .background(
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusComposer)
+                    .fill(AppColors.backgroundPrimary)
+                    .shadow(color: AppColors.shadowMedium, radius: 10, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusComposer)
+                    .strokeBorder(
+                        isTextFieldFocused
+                            ? AppColors.primaryAccent.opacity(0.35)
+                            : AppColors.borderLight,
+                        lineWidth: isTextFieldFocused ? 1 : AppSpacing.strokeThin
+                    )
+            )
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.top, AppSpacing.small)
+            .padding(.bottom, AppSpacing.mediumLarge)
+            .background(AppColors.backgroundGrouped)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
+        }
+    }
+
+    /// Brand send button that morphs into a stop control while generating.
+    @ViewBuilder private var sendOrStopButton: some View {
+        if viewModel.isGenerating {
+            Button {
+                Haptics.light()
+                viewModel.stopGeneration()
+            } label: {
+                Image(systemName: "stop.circle.fill")
+                    .font(AppTypography.system28)
+                    .foregroundColor(AppColors.primaryAccent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Stop generating")
+        } else {
+            Button {
+                Haptics.light()
+                onSend()
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(AppTypography.system28)
+                    .foregroundColor(
+                        canSendCurrentTurn ? AppColors.primaryAccent : AppColors.statusGray
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSendCurrentTurn)
+            .accessibilityLabel("Send message")
         }
     }
 
@@ -579,28 +656,47 @@ private struct DocumentAttachmentPill: View {
 }
 
 private struct StarterPromptChip: View {
+    let icon: String
     let title: String
     let subtitle: String
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(AppTypography.subheadlineMedium)
-                    .foregroundColor(AppColors.textPrimary)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(1)
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(AppColors.primaryAccent)
+                    .frame(width: 20)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(AppTypography.subheadlineMedium)
+                        .foregroundColor(AppColors.textPrimary)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
             }
-            .frame(width: 160, alignment: .leading)
-            .padding(.horizontal, AppSpacing.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, AppSpacing.regular)
             .padding(.vertical, AppSpacing.mediumLarge)
-            .background(AppColors.backgroundPrimary)
-            .cornerRadius(AppSpacing.cornerRadiusRegular)
-            .shadow(color: AppColors.shadowLight, radius: 6, x: 0, y: 3)
+            .background(
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusCard)
+                    .fill(AppColors.backgroundPrimary)
+                    .shadow(color: AppColors.shadowLight, radius: 6, x: 0, y: 3)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusCard)
+                    .strokeBorder(AppColors.borderLight, lineWidth: AppSpacing.strokeThin)
+            )
         }
         .buttonStyle(.plain)
     }

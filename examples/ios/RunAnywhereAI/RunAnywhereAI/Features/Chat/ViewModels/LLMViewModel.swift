@@ -362,6 +362,31 @@ final class LLMViewModel {
         isLoadingLoRA = false
     }
 
+    func loadCatalogLoraAdapter(
+        _ adapter: RALoraAdapterCatalogEntry,
+        localPath: String? = nil,
+        scale: Float
+    ) async {
+        isLoadingLoRA = true
+        error = nil
+        do {
+            let result = try await RunAnywhere.lora.applyCatalogAdapter(
+                adapter,
+                localPath: localPath,
+                scale: scale
+            )
+            guard result.success else {
+                throw LLMError.custom(result.errorMessage)
+            }
+            loraAdapters = result.adapters
+            logger.info("LoRA catalog adapter loaded: \(adapter.id) (scale=\(scale))")
+        } catch {
+            logger.error("Failed to load LoRA catalog adapter: \(error)")
+            self.error = error
+        }
+        isLoadingLoRA = false
+    }
+
     func removeLoraAdapter(path: String) async {
         do {
             var request = RALoRARemoveRequest()
@@ -451,7 +476,7 @@ final class LLMViewModel {
                 throw LLMError.custom("LoRA adapter completion did not return a usable local path")
             }
             isLoadingLoRA = false
-            await loadLoraAdapter(path: localPath, scale: scale)
+            await loadCatalogLoraAdapter(entry, localPath: localPath, scale: scale)
         } catch {
             logger.error("Failed to load adapter \(adapter.id): \(error)")
             self.error = error
@@ -469,9 +494,12 @@ final class LLMViewModel {
             let imported = try await RunAnywhere.lora.importAdapter(from: url)
             if imported.matched, imported.hasEntry {
                 updateAvailableAdapter(imported.entry)
+                isLoadingLoRA = false
+                await loadCatalogLoraAdapter(imported.entry, localPath: imported.localPath, scale: scale)
+            } else {
+                isLoadingLoRA = false
+                await loadLoraAdapter(path: imported.localPath, scale: scale)
             }
-            isLoadingLoRA = false
-            await loadLoraAdapter(path: imported.localPath, scale: scale)
         } catch {
             logger.error("Failed to import LoRA adapter: \(error)")
             self.error = error

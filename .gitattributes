@@ -35,3 +35,6 @@ sdk/runanywhere-react-native/packages/*/nitrogen/generated/**  linguist-generate
 **/*.pbenum.dart  linguist-generated=true -diff
 **/*.pbserver.dart  linguist-generated=true -diff
 **/*.pb.swift  linguist-generated=true -diff
+
+# Preserve review-comment bodies byte-for-byte, including quoted blank lines.
+comments/PR_531_comments.md -whitespace

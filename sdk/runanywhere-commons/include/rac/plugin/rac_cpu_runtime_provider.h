@@ -51,13 +51,11 @@ typedef struct rac_cpu_runtime_provider {
      * advertises `RAC_RUNTIME_CAP_OWNED_OUTPUTS` because outputs can flow
      * back through a live V2 path.
      *
-     * When NULL the CPU runtime falls back to the legacy V1 shim: tensors
-     * are flattened into `rac_runtime_io_t` for `run_session`, then dtype /
-     * rank / byte counts are copied back. Ownership transfer and capacity
-     * tracking are only reachable via the V2 op.
+     * When NULL the CPU runtime adapts tensors through the provider's base
+     * `run_session` operation. Ownership transfer and capacity tracking are
+     * available only through this tensor-native operation.
      *
-     * MAY be NULL. Added after the initial ABI so existing providers keep
-     * working — the struct is zero-initialised by callers.
+     * MAY be NULL. The struct is zero-initialised by callers.
      */
     rac_result_t (*run_session_v2)(rac_runtime_session_t* session,
                                    const rac_runtime_tensor_t* inputs, size_t n_in,
@@ -78,9 +76,9 @@ RAC_API void rac_cpu_runtime_unregister_provider(const char* name);
 /**
  * Return the provider-owned session behind a CPU runtime session.
  *
- * This exists for staged migrations where legacy streaming / LoRA APIs still
- * need the engine-native handle while blocking generate moves through
- * rac_runtime_vtable_t::run_session.
+ * Streaming and LoRA remain engine-specific operations, so their adapters use
+ * this handle while blocking generation dispatches through
+ * `rac_runtime_vtable_t::run_session`.
  */
 RAC_API rac_result_t
 rac_cpu_runtime_get_provider_session(rac_runtime_session_t* session, const char** out_provider_name,

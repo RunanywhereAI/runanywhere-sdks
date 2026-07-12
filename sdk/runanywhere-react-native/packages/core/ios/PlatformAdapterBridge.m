@@ -6,6 +6,7 @@
  */
 
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 #import <UIKit/UIKit.h>
 #import "PlatformDownloadBridge.h"
 #import "PlatformAdapterBridge.h"  // own header: PlatformDirectoryEntry + PlatformAdapter_listDirectory decls
@@ -20,14 +21,13 @@
 @interface KeychainManager : NSObject
 + (KeychainManager * _Nonnull)shared;
 - (BOOL)set:(NSString * _Nonnull)value forKey:(NSString * _Nonnull)key;
-- (NSString * _Nullable)getForKey:(NSString * _Nonnull)key;
+- (NSString * _Nullable)getRequiredValueForKey:(NSString * _Nonnull)key
+                                         error:(NSError * _Nullable * _Nullable)error;
 - (BOOL)deleteForKey:(NSString * _Nonnull)key;
-- (BOOL)existsForKey:(NSString * _Nonnull)key;
 @end
 
 @interface PlatformAdapter : NSObject
 + (PlatformAdapter * _Nonnull)shared;
-- (NSString * _Nonnull)getPersistentDeviceUUID;
 - (NSString * _Nullable)getModelBaseDirectory;
 @end
 #endif
@@ -43,8 +43,12 @@
 // =============================================================================
 
 static const int RAC_SUCCESS = 0;
+static const int RAC_ERROR_NULL_POINTER = -260;
 static const int RAC_ERROR_INVALID_PARAMETER = -106;
 static const int RAC_ERROR_DOWNLOAD_FAILED = -153;
+static const int RAC_ERROR_FILE_NOT_FOUND = -183;
+static const int RAC_ERROR_OUT_OF_MEMORY = -221;
+static const int RAC_ERROR_SECURE_STORAGE_FAILED = -333;
 static const int RAC_ERROR_CANCELLED = -380;
 
 @interface RunAnywhereHttpDownloadTaskInfo : NSObject
@@ -265,7 +269,6 @@ bool PlatformAdapter_secureSet(const char* key, const char* value) {
 
         @try {
             BOOL result = [[KeychainManager shared] set:valueStr forKey:keyStr];
-            NSLog(@"[PlatformAdapterBridge] secureSet key=%@ result=%d", keyStr, result);
             return result;
         } @catch (NSException *exception) {
             NSLog(@"[PlatformAdapterBridge] secureSet exception: %@", exception);
@@ -278,13 +281,14 @@ bool PlatformAdapter_secureSet(const char* key, const char* value) {
  * Get a value from the Keychain
  * @param key The key to retrieve
  * @param outValue Pointer to store the result (must be freed by caller)
- * @return true if found
+ * @return RAC_SUCCESS if found, RAC_ERROR_FILE_NOT_FOUND for a clean miss,
+ *         or RAC_ERROR_SECURE_STORAGE_FAILED on Keychain/authentication errors
  */
-bool PlatformAdapter_secureGet(const char* key, char** outValue) {
+int PlatformAdapter_secureGet(const char* key, char** outValue) {
     @autoreleasepool {
         if (key == NULL || outValue == NULL) {
             NSLog(@"[PlatformAdapterBridge] secureGet: Invalid null key or outValue");
-            return false;
+            return RAC_ERROR_NULL_POINTER;
         }
 
         *outValue = NULL;
@@ -292,27 +296,32 @@ bool PlatformAdapter_secureGet(const char* key, char** outValue) {
         NSString* keyStr = [NSString stringWithUTF8String:key];
         if (keyStr == nil) {
             NSLog(@"[PlatformAdapterBridge] secureGet: Failed to create NSString for key");
-            return false;
+            return RAC_ERROR_SECURE_STORAGE_FAILED;
         }
 
         @try {
-            NSString* value = [[KeychainManager shared] getForKey:keyStr];
+            NSError* error = nil;
+            NSString* value = [[KeychainManager shared] getRequiredValueForKey:keyStr
+                                                                          error:&error];
             if (value == nil) {
-                NSLog(@"[PlatformAdapterBridge] secureGet key=%@ not found", keyStr);
-                return false;
+                if (error != nil && error.code == errSecItemNotFound) {
+                    return RAC_ERROR_FILE_NOT_FOUND;
+                }
+                NSLog(@"[PlatformAdapterBridge] secureGet failed with status=%ld",
+                      (long)error.code);
+                return RAC_ERROR_SECURE_STORAGE_FAILED;
             }
 
             const char* utf8Value = [value UTF8String];
             if (utf8Value == NULL) {
-                return false;
+                return RAC_ERROR_SECURE_STORAGE_FAILED;
             }
 
             *outValue = strdup(utf8Value);
-            NSLog(@"[PlatformAdapterBridge] secureGet key=%@ found", keyStr);
-            return *outValue != NULL;
+            return *outValue != NULL ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         } @catch (NSException *exception) {
             NSLog(@"[PlatformAdapterBridge] secureGet exception: %@", exception);
-            return false;
+            return RAC_ERROR_SECURE_STORAGE_FAILED;
         }
     }
 }
@@ -339,65 +348,6 @@ bool PlatformAdapter_secureDelete(const char* key) {
             return result;
         } @catch (NSException *exception) {
             NSLog(@"[PlatformAdapterBridge] secureDelete exception: %@", exception);
-            return false;
-        }
-    }
-}
-
-/**
- * Check if a key exists in the Keychain
- * @param key The key to check
- * @return true if exists
- */
-bool PlatformAdapter_secureExists(const char* key) {
-    @autoreleasepool {
-        if (key == NULL) {
-            return false;
-        }
-
-        NSString* keyStr = [NSString stringWithUTF8String:key];
-        if (keyStr == nil) {
-            return false;
-        }
-
-        @try {
-            return [[KeychainManager shared] existsForKey:keyStr];
-        } @catch (NSException *exception) {
-            return false;
-        }
-    }
-}
-
-/**
- * Get persistent device UUID (from Keychain or generate new)
- * @param outValue Pointer to store the UUID (must be freed by caller)
- * @return true if successful
- */
-bool PlatformAdapter_getPersistentDeviceUUID(char** outValue) {
-    @autoreleasepool {
-        if (outValue == NULL) {
-            return false;
-        }
-
-        *outValue = NULL;
-
-        @try {
-            NSString* uuid = [[PlatformAdapter shared] getPersistentDeviceUUID];
-            if (uuid == nil || uuid.length == 0) {
-                NSLog(@"[PlatformAdapterBridge] getPersistentDeviceUUID: Failed to get UUID");
-                return false;
-            }
-
-            const char* utf8Value = [uuid UTF8String];
-            if (utf8Value == NULL) {
-                return false;
-            }
-
-            *outValue = strdup(utf8Value);
-            NSLog(@"[PlatformAdapterBridge] getPersistentDeviceUUID: %@", uuid);
-            return *outValue != NULL;
-        } @catch (NSException *exception) {
-            NSLog(@"[PlatformAdapterBridge] getPersistentDeviceUUID exception: %@", exception);
             return false;
         }
     }

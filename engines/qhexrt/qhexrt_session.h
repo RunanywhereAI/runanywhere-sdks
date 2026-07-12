@@ -12,18 +12,31 @@
 #ifndef RUNANYWHERE_QHEXRT_SESSION_H
 #define RUNANYWHERE_QHEXRT_SESSION_H
 
+#include "qhexrt_request_cancellation.h"
+
 #include <atomic>
+#include <mutex>
+#include <string>
 
 #include "qhexrt/qhexrt_c.h"
 
 namespace qhexrt_engine {
 
-// One model + session per service instance. Sessions are NOT thread-safe, so a
-// single Session must not be driven concurrently — the SDK owns one per handle.
+// One model + session per service instance. QHexRT sessions are NOT thread-safe.
+// Every operation that reads or mutates `sess` must hold operation_mutex for the
+// complete operation, including copying session-owned output. Cancellation is
+// deliberately independent and remains an atomic, lock-free signal.
 struct Session {
+    std::mutex operation_mutex;
     qhx_model* model = nullptr;
     qhx_session* sess = nullptr;
     std::atomic<bool> cancel{false};
+    RequestCancellation llm_requests;
+    RequestCancellation vlm_requests;
+    RequestCancellation tts_requests;
+    RequestCancellation diffusion_requests;
+    std::string model_ref;
+    std::string scratch_dir;
 };
 
 // Acquire the process runtime, load `manifest_path`, create a session.

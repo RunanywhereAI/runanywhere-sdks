@@ -151,7 +151,7 @@ fi
 if [ "$CLEAN_BUILD" = true ]; then
     print_step "Cleaning previous builds..."
     rm -rf "${SCRIPT_DIR}/build"
-    rm -rf "${RAC_COMMONS_DIR}/build-linux-"*
+    rm -rf "${ROOT_DIR}/build/linux-release"
     rm -rf "${RAC_COMMONS_DIR}/dist/linux"
     print_success "Clean complete"
 fi
@@ -175,13 +175,12 @@ fi
 
 print_header "Step 2: Build runanywhere-commons"
 
-ARCH=$(uname -m)
-RAC_DIST="${RAC_COMMONS_DIR}/dist/linux/${ARCH}"
+RAC_DIST="${RAC_COMMONS_DIR}/dist/linux/lib"
 
 if [ -f "${RAC_DIST}/librac_commons.so" ] && [ "$CLEAN_BUILD" = false ]; then
     print_success "runanywhere-commons already built"
 else
-    "${RAC_COMMONS_DIR}/scripts/build-linux.sh" --shared
+    "${RAC_COMMONS_DIR}/scripts/build-linux.sh"
 fi
 
 # Verify libraries exist
@@ -198,10 +197,10 @@ print_success "runanywhere-commons libraries ready"
 print_header "Step 3: Download Models"
 
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
-if [ -d "${MODEL_DIR}/ONNX/silero-vad" ] && \
-   [ -d "${MODEL_DIR}/ONNX/whisper-tiny-en" ] && \
+if [ -d "${MODEL_DIR}/Sherpa/silero-vad" ] && \
+   [ -d "${MODEL_DIR}/Sherpa/whisper-tiny-en" ] && \
    [ -d "${MODEL_DIR}/LlamaCpp/qwen3-1.7b" ] && \
-   [ -d "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium" ] && \
+   [ -d "${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium" ] && \
    [ "$CLEAN_BUILD" = false ]; then
     print_success "Models already downloaded"
 else

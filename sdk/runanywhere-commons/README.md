@@ -137,22 +137,21 @@ rac_llm_llamacpp_generate_stream(handle, "Hello, world!", &options,
     token_callback, user_data);
 ```
 
-### ONNX Backend (via Sherpa-ONNX)
+### Sherpa-ONNX Backend
 - **Capabilities**: STT, TTS, VAD
 - **Model Format**: ONNX
 - **Supported Models**: Whisper, Zipformer, Paraformer (STT); VITS/Piper (TTS); Silero (VAD)
-- **Headers**: `rac_stt_onnx.h`, `rac_tts_onnx.h`, `rac_vad_onnx.h`
+- **Registration**: `rac/plugin/rac_plugin_entry_sherpa.h`
+- **Inference APIs**: generated-proto lifecycle/component APIs under `rac/features/{stt,tts,vad}`
 
 ```c
-// Create STT service
-rac_handle_t stt;
-rac_stt_onnx_create("/path/to/whisper", NULL, &stt);
-
-// Transcribe audio
-rac_stt_result_t result;
-rac_stt_onnx_transcribe(stt, audio_samples, num_samples, NULL, &result);
-printf("Transcription: %s\n", result.text);
+// Dynamic-linkage hosts explicitly register the speech engine, then load and
+// invoke models through the shared lifecycle APIs.
+rac_result_t rc = rac_backend_sherpa_register();
 ```
+
+The generic ONNX Runtime engine is separate and provides embeddings. It is
+registered through `rac/plugin/rac_plugin_entry_onnx.h`.
 
 ### Cloud STT Backend
 - **Capability**: STT (speech-to-text), online
@@ -239,6 +238,7 @@ rac_shutdown();
 | `RAC_BUILD_TESTS` | OFF | Build unit tests |
 | `RAC_BUILD_SHARED` | OFF | Build shared libraries (default: static) |
 | `RAC_BUILD_PLATFORM` | ON | Build platform backend (Apple FM, System TTS) |
+| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the ignored local development credentials; local development only, never packaging |
 | `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
 | `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
 | `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
@@ -249,39 +249,37 @@ rac_shutdown();
 
 #### iOS
 ```bash
-./scripts/build-ios.sh                    # Full build
-./scripts/build-ios.sh --skip-download    # Use cached dependencies
-./scripts/build-ios.sh --backend llamacpp # Specific backend only
-./scripts/build-ios.sh --package          # Create XCFramework ZIPs
+./scripts/build-ios.sh # Build the canonical Apple slice set and package every XCFramework
 ```
 
 #### Android
 ```bash
-./scripts/build-android.sh                     # All backends, all ABIs
-./scripts/build-android.sh llamacpp            # LlamaCPP only
-./scripts/build-android.sh onnx arm64-v8a      # Specific backend + ABI
-./scripts/build-android.sh --check             # Verify 16KB alignment
+./scripts/build-android.sh arm64-v8a
+./scripts/build-android.sh armeabi-v7a
+./scripts/build-android.sh x86_64
 ```
+
+Each invocation builds the complete public backend set for exactly one ABI,
+enforces the native-library validation gates (including 16 KB ELF alignment),
+and creates `dist/RACommons-android-<abi>-v<version>.zip` plus its checksum.
 
 ### Build Outputs
 
 #### iOS/macOS
 ```
-dist/
-├── RACommons.xcframework              # Core library
-├── RABackendLLAMACPP.xcframework      # LLM backend
-└── RABackendONNX.xcframework          # STT/TTS/VAD backend
+../runanywhere-swift/Binaries/
+├── RACommons.xcframework
+├── RABackendLLAMACPP.xcframework
+├── RABackendONNX.xcframework
+├── RABackendSherpa.xcframework
+└── RABackendMLX.xcframework
+
+dist/packages/<Framework>-ios-v<version>.zip
 ```
 
 #### Android
 ```
-dist/android/
-├── jni/{abi}/                         # JNI libraries
-│   ├── librac_commons_jni.so
-│   ├── librac_backend_llamacpp_jni.so
-│   └── librac_backend_onnx_jni.so
-└── onnx/{abi}/                        # ONNX runtime
-    └── libonnxruntime.so
+dist/RACommons-android-<abi>-v<version>.zip
 ```
 
 ---
@@ -365,30 +363,28 @@ void rac_tts_destroy(rac_handle_t handle);
 ### VAD Service
 
 ```c
-rac_result_t rac_vad_create(rac_handle_t* out_handle);
-rac_result_t rac_vad_component_start(rac_handle_t handle);
-rac_result_t rac_vad_component_stop(rac_handle_t handle);
-rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples,
-                                     size_t num_samples, rac_bool_t* out_is_speech);
-void rac_vad_destroy(rac_handle_t handle);
+rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_bytes,
+                                               size_t request_size,
+                                               rac_proto_buffer_t* out_result);
+rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result);
+rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_bytes,
+                                             size_t request_size,
+                                             rac_proto_buffer_t* out_result);
+rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
 ```
 
 ### Voice Agent
 
 ```c
 rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
-rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path, const char* model_id,
-                                            const char* model_name);
-rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path, const char* model_id,
-                                            const char* model_name);
-rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                            const char* voice_path, const char* voice_id,
-                                            const char* voice_name);
-rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
-                                                const void* audio_data, size_t audio_size,
-                                                rac_voice_agent_result_t* out_result);
+rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
+                                              const uint8_t* config_bytes,
+                                              size_t config_size,
+                                              rac_proto_buffer_t* out_result);
+rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
+                                                      const void* audio_data,
+                                                      size_t audio_size,
+                                                      rac_proto_buffer_t* out_result);
 void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 ```
 
@@ -450,12 +446,13 @@ typedef struct rac_platform_adapter {
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| **llama.cpp** | b7650 | LLM inference engine |
-| **Sherpa-ONNX** | 1.12.18+ | STT/TTS/VAD via ONNX Runtime |
-| **ONNX Runtime** | 1.17.1+ | Neural network inference |
-| **nlohmann/json** | 3.11.3 | JSON parsing |
-| **libarchive** | 3.8.1 | ZIP / tar.gz / tar.bz2 model archive extraction |
-| **libcurl** | system or curl-7_88_1 | Native HTTP transport behind `rac_http_client_*`. System package preferred; `FetchContent` fallback builds a static copy with platform-native TLS (SecureTransport on Apple, SChannel on Windows, OpenSSL elsewhere). |
+| **llama.cpp** | b9959 | LLM inference engine |
+| **Sherpa-ONNX** | 1.13.2 | STT/TTS/VAD via ONNX Runtime |
+| **ONNX Runtime** | Platform pin in `VERSIONS` | Neural network inference |
+| **Protobuf / Abseil** | 35.1 / 20260107.1 | Namespace-isolated wire runtime |
+| **nlohmann/json** | 3.12.0 | JSON parsing |
+| **libarchive** | 3.8.7 | ZIP / tar.gz / tar.bz2 model archive extraction |
+| **HTTP transport** | Platform adapter | URLSession, OkHttp, browser fetch, or the host-provided transport; commons does not bundle a TLS stack. |
 
 ### Binary Outputs
 
@@ -472,12 +469,15 @@ typedef struct rac_platform_adapter {
 All versions are centralized in the `VERSIONS` file:
 
 ```bash
-PROJECT_VERSION=1.0.0
-IOS_DEPLOYMENT_TARGET=13.0
+PROJECT_VERSION=0.20.0
+IOS_DEPLOYMENT_TARGET=17.5
+MACOS_DEPLOYMENT_TARGET=14.5
 ANDROID_MIN_SDK=24
-ONNX_VERSION_IOS=1.17.1
-SHERPA_ONNX_VERSION_IOS=1.12.18
-LLAMACPP_VERSION=b7650
+ONNX_VERSION_IOS=1.24.3
+SHERPA_ONNX_VERSION_IOS=1.13.2
+LLAMACPP_VERSION=b9959
+PROTOBUF_VERSION=35.1
+ABSEIL_VERSION=20260107.1
 ```
 
 Load versions in scripts:
@@ -489,7 +489,7 @@ echo "Using llama.cpp version: $LLAMACPP_VERSION"
 Load versions in CMake:
 ```cmake
 include(LoadVersions)
-message(STATUS "ONNX Runtime version: ${ONNX_VERSION_IOS}")
+message(STATUS "ONNX Runtime version: ${RAC_ONNX_VERSION_IOS}")
 ```
 
 ---

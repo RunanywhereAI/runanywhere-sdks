@@ -61,6 +61,8 @@
 // INTERNAL STRUCTURES
 // =============================================================================
 
+static constexpr float kDefaultModelVadThreshold = 0.5f;
+
 struct rac_vad_component {
     /** Energy VAD service handle (built-in fallback) */
     rac_energy_vad_handle_t vad_service;
@@ -76,6 +78,11 @@ struct rac_vad_component {
 
     /** Configuration */
     rac_vad_config_t config;
+
+    /** Threshold reported for the active model detector. Kept separate from
+     *  the energy fallback configuration so model tuning does not silently
+     *  change fallback behavior after unload. */
+    float model_threshold;
 
     /** Activity callback */
     rac_vad_activity_callback_fn activity_callback;
@@ -100,6 +107,7 @@ struct rac_vad_component {
           model_service(nullptr),
           is_model_loaded(false),
           loaded_model_id(nullptr),
+          model_threshold(kDefaultModelVadThreshold),
           activity_callback(nullptr),
           activity_user_data(nullptr),
           audio_callback(nullptr),
@@ -751,11 +759,16 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    if (!component->is_initialized || !component->vad_service) {
-        return RAC_ERROR_NOT_INITIALIZED;
+    rac_result_t result = RAC_ERROR_NOT_INITIALIZED;
+    if (component->is_model_loaded) {
+        result = RAC_SUCCESS;
+        if (component->model_service && component->model_service->ops &&
+            component->model_service->ops->start) {
+            result = component->model_service->ops->start(component->model_service->impl);
+        }
+    } else if (component->is_initialized && component->vad_service) {
+        result = rac_energy_vad_start(component->vad_service);
     }
-
-    rac_result_t result = rac_energy_vad_start(component->vad_service);
 
     if (result == RAC_SUCCESS) {
         const bool was_running = component->is_running;
@@ -780,11 +793,15 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    if (!component->vad_service) {
-        return RAC_SUCCESS;  // Already stopped
+    rac_result_t result = RAC_SUCCESS;
+    if (component->is_model_loaded) {
+        if (component->model_service && component->model_service->ops &&
+            component->model_service->ops->stop) {
+            result = component->model_service->ops->stop(component->model_service->impl);
+        }
+    } else if (component->vad_service) {
+        result = rac_energy_vad_stop(component->vad_service);
     }
-
-    rac_result_t result = rac_energy_vad_stop(component->vad_service);
 
     if (result == RAC_SUCCESS) {
         const bool was_running = component->is_running;
@@ -812,11 +829,15 @@ extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
     // New session → restart the per-utterance accumulator (segment count etc.).
     forget_vad_utterance_state(component);
 
-    if (!component->vad_service) {
-        return RAC_ERROR_NOT_INITIALIZED;
+    if (component->is_model_loaded) {
+        if (component->model_service && component->model_service->ops &&
+            component->model_service->ops->reset) {
+            return component->model_service->ops->reset(component->model_service->impl);
+        }
+        return RAC_SUCCESS;
     }
-
-    return rac_energy_vad_reset(component->vad_service);
+    return component->vad_service ? rac_energy_vad_reset(component->vad_service)
+                                  : RAC_ERROR_NOT_INITIALIZED;
 }
 
 // =============================================================================
@@ -872,6 +893,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
 
     component->model_service = service;
     component->is_model_loaded = true;
+    component->model_threshold = kDefaultModelVadThreshold;
     component->loaded_model_id = model_id ? strdup(model_id) : nullptr;
 
     // Start the model-based VAD. If start fails, roll back so `is_model_loaded`
@@ -993,12 +1015,18 @@ extern "C" rac_bool_t rac_vad_component_is_speech_active(rac_handle_t handle) {
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    if (!component->vad_service) {
+    if (component->is_model_loaded) {
+        if (component->model_service && component->model_service->ops &&
+            component->model_service->ops->is_speech_active) {
+            return component->model_service->ops->is_speech_active(component->model_service->impl);
+        }
         return RAC_FALSE;
     }
 
     rac_bool_t is_active = RAC_FALSE;
-    rac_energy_vad_is_speech_active(component->vad_service, &is_active);
+    if (component->vad_service) {
+        rac_energy_vad_is_speech_active(component->vad_service, &is_active);
+    }
     return is_active;
 }
 
@@ -1008,6 +1036,10 @@ extern "C" float rac_vad_component_get_energy_threshold(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (component->is_model_loaded) {
+        return component->model_threshold;
+    }
 
     if (!component->vad_service) {
         return component->config.energy_threshold;
@@ -1029,24 +1061,39 @@ extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t hand
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
-    // Warning for edge cases
-    if (threshold < 0.002f) {
-        RAC_LOG_WARNING("VAD.Component",
-                        "Threshold is very low (< 0.002) and may cause false positives");
-    }
-    if (threshold > 0.1f) {
-        RAC_LOG_WARNING("VAD.Component", "Threshold is very high (> 0.1) and may miss speech");
-    }
-
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    component->config.energy_threshold = threshold;
-
-    if (component->vad_service) {
-        return rac_energy_vad_set_threshold(component->vad_service, threshold);
+    if (!component->is_model_loaded) {
+        if (threshold < 0.002f) {
+            RAC_LOG_WARNING("VAD.Component",
+                            "Threshold is very low (< 0.002) and may cause false positives");
+        }
+        if (threshold > 0.1f) {
+            RAC_LOG_WARNING("VAD.Component", "Threshold is very high (> 0.1) and may miss speech");
+        }
     }
 
+    if (component->is_model_loaded) {
+        if (component->model_service && component->model_service->ops &&
+            component->model_service->ops->set_threshold) {
+            const rac_result_t result = component->model_service->ops->set_threshold(
+                component->model_service->impl, threshold);
+            if (result == RAC_SUCCESS) {
+                component->model_threshold = threshold;
+            }
+            return result;
+        }
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    if (component->vad_service) {
+        const rac_result_t result = rac_energy_vad_set_threshold(component->vad_service, threshold);
+        if (result != RAC_SUCCESS) {
+            return result;
+        }
+    }
+    component->config.energy_threshold = threshold;
     return RAC_SUCCESS;
 }
 
@@ -1207,8 +1254,11 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
         std::lock_guard<std::mutex> lock(component->mtx);
         sample_rate = component->config.sample_rate > 0 ? component->config.sample_rate
                                                         : RAC_VAD_DEFAULT_SAMPLE_RATE;
-        threshold = component->config.energy_threshold > 0.0f ? component->config.energy_threshold
-                                                              : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        threshold = component->is_model_loaded
+                        ? component->model_threshold
+                        : (component->config.energy_threshold > 0.0f
+                               ? component->config.energy_threshold
+                               : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
     }
 
     const bool has_override = options.threshold() > 0.0f;
@@ -1226,10 +1276,16 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
         auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(handle);
-        (void)rac_vad_component_set_energy_threshold(handle, options.threshold());
-        threshold = options.threshold();
-        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
-        (void)rac_vad_component_set_energy_threshold(handle, original_threshold);
+        rc = rac_vad_component_set_energy_threshold(handle, options.threshold());
+        if (rc == RAC_SUCCESS) {
+            threshold = options.threshold();
+            rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
+            const rac_result_t restore_rc =
+                rac_vad_component_set_energy_threshold(handle, original_threshold);
+            if (rc == RAC_SUCCESS) {
+                rc = restore_rc;
+            }
+        }
     } else {
         rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
     }

@@ -324,7 +324,7 @@ class RunAnywhereDownloads {
   Stream<DownloadProgress>        start(String modelId);
   Future<void>                    cancel(String modelId);
   Future<void>                    delete(String modelId);
-  Future<List<StoredModel>>       list();
+  Future<List<ModelStorageMetrics>> list();
   Future<StorageInfo>             getStorageInfo();
 }
 ```
@@ -390,6 +390,18 @@ LLM + VLM via GGUF / llama.cpp.
 await LlamaCpp.register();   // registers llamacpp + llamacpp_vlm vtables
 ```
 
+### `MLX` — `package:runanywhere_mlx/runanywhere_mlx.dart`
+
+Apple MLX LLM, VLM, embeddings, STT, and TTS on physical iOS 17.5 or newer
+devices. The arm64 simulator slice supports package, compile, link, and startup
+validation only. The Flutter package links the canonical Swift
+`RunAnywhereMLX` runtime; all model and inference APIs continue to flow through
+the core SDK.
+
+```dart
+final registered = await MLX.register();
+```
+
 ### `Onnx` — `package:runanywhere_onnx/runanywhere_onnx.dart`
 
 STT (Whisper / Zipformer / Paraformer), TTS (Piper / VITS), VAD (Silero) via Sherpa-ONNX.
@@ -424,7 +436,7 @@ All public API types are protobuf-generated from `idl/*.proto`. They live under
 | Type | Proto enum values |
 |------|-------------------|
 | `SDKEnvironment` | `SDK_ENVIRONMENT_DEVELOPMENT`, `SDK_ENVIRONMENT_STAGING`, `SDK_ENVIRONMENT_PRODUCTION` |
-| `InferenceFramework` | `INFERENCE_FRAMEWORK_LLAMA_CPP`, `INFERENCE_FRAMEWORK_SHERPA`, `INFERENCE_FRAMEWORK_ONNX`, `INFERENCE_FRAMEWORK_SYSTEM_TTS`, ... |
+| `InferenceFramework` | `INFERENCE_FRAMEWORK_LLAMA_CPP`, `INFERENCE_FRAMEWORK_MLX`, `INFERENCE_FRAMEWORK_SHERPA`, `INFERENCE_FRAMEWORK_ONNX`, `INFERENCE_FRAMEWORK_SYSTEM_TTS`, ... |
 | `ModelCategory` | `MODEL_CATEGORY_LANGUAGE`, `MODEL_CATEGORY_SPEECH_RECOGNITION`, `MODEL_CATEGORY_SPEECH_SYNTHESIS`, `MODEL_CATEGORY_MULTIMODAL`, `MODEL_CATEGORY_EMBEDDING`, `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION`, ... |
 | `DownloadStage` | `DOWNLOAD_STAGE_UNSPECIFIED`, `DOWNLOAD_STAGE_DOWNLOADING`, `DOWNLOAD_STAGE_EXTRACTING`, `DOWNLOAD_STAGE_COMPLETED` |
 | `ArchiveType` | `ARCHIVE_TYPE_NONE`, `ARCHIVE_TYPE_TAR_GZ`, `ARCHIVE_TYPE_TAR_BZ2`, `ARCHIVE_TYPE_ZIP` |
@@ -515,6 +527,7 @@ Backend modules each export their own `register()`:
 
 ```dart
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 ```
 
@@ -522,10 +535,10 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 ## Versioning
 
-- Canonical SDK version: `RunAnywhere.version` (currently `0.19.13`).
+- Canonical SDK version: `RunAnywhere.version` (currently `0.20.0`).
 - Native commons version: vendored `RACommons` build (`0.1.6`).
 - llama.cpp engine: `b7199`.
-- ONNX Runtime: `1.23.2`.
+- ONNX Runtime: `1.24.3`.
 
 All four Flutter packages share the same version, bumped together via the
 root `scripts/release/sync-versions.sh`.

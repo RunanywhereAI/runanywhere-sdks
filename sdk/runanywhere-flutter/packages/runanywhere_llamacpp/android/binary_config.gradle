@@ -1,8 +1,10 @@
+def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
+
 // =============================================================================
 // BINARY CONFIGURATION FOR RUNANYWHERE FLUTTER SDK - ANDROID (LlamaCPP Package)
 // =============================================================================
 // This file controls whether to use local or remote native libraries (.so files).
-// Similar to Swift Package.swift's testLocal flag.
+// Mirrors the explicit local-native opt-in used by the other SDKs.
 //
 // Set to `true` to use local binaries from android/src/main/jniLibs/
 // Set to `false` to download binaries from GitHub releases (production mode)
@@ -12,7 +14,8 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.19.13"
+    fallbackCoreVersion = "0.20.0"
+    coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : fallbackCoreVersion
 
     // =============================================================================
     // Remote binary URLs
@@ -20,10 +23,14 @@ ext {
     // =============================================================================
     binariesGitHubOrg = "RunanywhereAI"
     binariesRepo = "runanywhere-sdks"
-    binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
+    binariesBaseUrl = project.findProperty("runanywhere.releaseBaseUrl")?.toString()
+        ?: "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    llamacppAndroidUrl = "${binariesBaseUrl}/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+    androidAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+    llamacppAndroidUrls = androidAbis.collectEntries { abi ->
+        [(abi): "${binariesBaseUrl}/v${coreVersion}/RACommons-android-${abi}-v${coreVersion}.zip"]
+    }
 
     // Helper method to check if local libs exist.
     // The engines CMake may emit either `librac_backend_llamacpp.so` (always)
@@ -60,10 +67,8 @@ ext {
     } else {
         useLocalNatives = checkLocalLibsExist()
     }
-    testLocal = useLocalNatives  // legacy alias
-
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->
-        return !testLocal
+        return !useLocalNatives
     }
 }

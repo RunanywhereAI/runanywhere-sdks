@@ -4,47 +4,16 @@
  *
  * Ergonomic helpers for canonical Embeddings proto types.
  *
- * Mirrors Swift `EmbeddingsProto+Helpers.swift`. Pure Kotlin math —
- * no JNI or platform dependencies.
+ * defaults() / validate() live in generated/convenience/RAConvenience.kt,
+ * emitted from the canonical IDL annotations. This file contains only
+ * Kotlin-specific computed helpers.
  */
 
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.EmbeddingVector
-import ai.runanywhere.proto.v1.EmbeddingsConfiguration
-import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsResult
 import kotlin.math.sqrt
-
-// MARK: - EmbeddingsConfiguration
-
-/**
- * Default embeddings component configuration mirroring Swift
- * `RAEmbeddingsConfiguration.defaults(...)`.
- */
-fun EmbeddingsConfiguration.Companion.defaults(
-    modelId: String,
-    embeddingDimension: Int = 384,
-    maxSequenceLength: Int = 512,
-    normalize: Boolean = true,
-): EmbeddingsConfiguration =
-    EmbeddingsConfiguration(
-        model_id = modelId,
-        embedding_dimension = embeddingDimension,
-        max_sequence_length = maxSequenceLength,
-        normalize = normalize,
-    )
-
-// MARK: - EmbeddingsOptions
-
-/**
- * Default per-call embeddings options mirroring Swift
- * `RAEmbeddingsOptions.defaults(normalize:)`.
- */
-fun EmbeddingsOptions.Companion.defaults(normalize: Boolean = true): EmbeddingsOptions =
-    EmbeddingsOptions(
-        normalize = normalize,
-    )
 
 // MARK: - EmbeddingVector math
 

@@ -67,7 +67,7 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the VAD component handle
-        public func getHandle() async throws -> rac_handle_t {
+        func getHandle() async throws -> ComponentHandle {
             try await inner.getHandle()
         }
 
@@ -77,7 +77,7 @@ extension CppBridge {
         public var isInitialized: Bool {
             get async {
                 guard let handle = await inner.existingHandle() else { return false }
-                return rac_vad_component_is_initialized(handle) == RAC_TRUE
+                return rac_vad_component_is_initialized(handle.rawValue) == RAC_TRUE
             }
         }
 
@@ -116,7 +116,7 @@ extension CppBridge {
         /// Unload the current VAD model (reverts to energy-based VAD)
         public func unloadModel() async {
             guard let handle = await inner.existingHandle() else { return }
-            rac_vad_component_unload(handle)
+            rac_vad_component_unload(handle.rawValue)
             loadedModelId = nil
             await inner.markAssetLoaded(nil)
             logger.info("VAD model unloaded")
@@ -156,7 +156,7 @@ extension CppBridge {
         /// Cleanup VAD
         public func cleanup() async {
             guard let handle = await inner.existingHandle() else { return }
-            rac_vad_component_cleanup(handle)
+            rac_vad_component_cleanup(handle.rawValue)
             logger.info("VAD cleaned up")
         }
 
@@ -175,7 +175,7 @@ extension CppBridge {
             let ctxPtr = activityCallbackContextPtr
             activityCallbackContextPtr = nil
             if let handle = await inner.existingHandle(), ctxPtr != nil {
-                _ = rac_vad_component_set_activity_proto_callback(handle, nil, nil)
+                _ = rac_vad_component_set_activity_proto_callback(handle.rawValue, nil, nil)
             }
             await inner.destroy()
             if let ptr = ctxPtr {

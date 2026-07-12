@@ -1,12 +1,13 @@
 /**
  * RunAnywhereQHexRT Nitrogen Spec
  *
- * QHexRT (Qualcomm Hexagon NPU) backend registration + NPU capability probe.
+ * QHexRT (Qualcomm Hexagon NPU) backend registration, capability probe, and
+ * device-aware catalog adapter.
  *
  * Public lifecycle, generation, VLM, STT, and TTS APIs live in
  * @runanywhere/core and route through commons proto/lifecycle bridges. This
- * backend package only registers the native provider and exposes a pre-flight
- * NPU probe so the app can warn unsupported devices before loading a model.
+ * backend package registers the native provider and transports capability and
+ * catalog calls into the engine-owned QHexRT policy facade.
  *
  * NOTE: After editing this file, run `yarn qhexrt:nitrogen` (nitro-codegen) to
  * regenerate the bridge code under `nitrogen/generated/`. Those files are
@@ -24,10 +25,9 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * QHexRT is Qualcomm-only (Snapdragon Hexagon NPU); the package ships
  * arm64-v8a Android binaries exclusively.
  */
-export interface RunAnywhereQHexRT
-  extends HybridObject<{
-    android: 'c++';
-  }> {
+export interface RunAnywhereQHexRT extends HybridObject<{
+  android: 'c++';
+}> {
   /**
    * Register the QHexRT backend with the C++ service registry.
    * Calls rac_backend_qhexrt_register(); the single call covers LLM, VLM,
@@ -50,11 +50,27 @@ export interface RunAnywhereQHexRT
 
   /**
    * Pre-flight probe of the device's Qualcomm Hexagon NPU capability.
-   * Calls rac_npu_probe_proto() in commons; does NOT load QNN or the engine.
+   * Calls rac_qhexrt_probe_proto() in the QHexRT engine; does NOT load QNN.
    * @returns serialized `runanywhere.v1.NpuCapability` proto bytes — decode
    *   with `NpuCapability.decode()` from
    *   `@runanywhere/proto-ts/hardware_profile`. An empty buffer means the
    *   probe is unavailable on this device/build.
    */
   probeNpuProto(): Promise<ArrayBuffer>;
+
+  /** True when `arch` is in QHexRT's native device-validated support set. */
+  isArchitectureSupported(arch: number): boolean;
+
+  /** Match native product policy for `modelId` against `arch`. */
+  modelSupportsArchitecture(modelId: string, arch: number): boolean;
+
+  /** Whether native product policy marks `modelId` HF-authenticated. */
+  modelRequiresHfAuth(modelId: string): boolean;
+
+  /**
+   * Register a serialized `RegisterModelFromUrlRequest` only when native
+   * product policy allows it on this device. Returns serialized `ModelInfo`,
+   * or an empty buffer for a normal ineligible/private-without-token outcome.
+   */
+  catalogRegisterModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 }

@@ -65,43 +65,33 @@ set_target_properties(onnxruntime PROPERTIES
 message(STATUS "[RunAnywhereONNX] Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
 
 # =============================================================================
-# Sherpa ONNX libraries (optional but typically present)
+# Sherpa ONNX libraries (required by the package's speech contract)
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-c-api.so")
-    add_library(sherpa_onnx_c_api SHARED IMPORTED)
-    set_target_properties(sherpa_onnx_c_api PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-c-api.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-endif()
-if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so")
-    add_library(sherpa_onnx_cxx_api SHARED IMPORTED)
-    set_target_properties(sherpa_onnx_cxx_api PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-endif()
-if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
-    add_library(sherpa_onnx_jni SHARED IMPORTED)
-    set_target_properties(sherpa_onnx_jni PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-endif()
-# B-RN-10-001 fix: link rac_backend_sherpa so the dynamic linker emits an NEEDED
-# entry for librac_backend_sherpa.so and loads it before librunanywhereonnx.so
-# resolves rac_backend_sherpa_register at runtime. The .so used to auto-register
-# via a ctor; that ctor was removed upstream (rac_plugin_entry_sherpa.h) and
-# replaced with the explicit rac_backend_sherpa_register() call in
-# HybridRunAnywhereONNX.cpp::registerBackend.
-if(EXISTS "${JNILIB_DIR}/librac_backend_sherpa.so")
-    add_library(rac_backend_sherpa SHARED IMPORTED)
-    set_target_properties(rac_backend_sherpa PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_sherpa.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-    message(STATUS "[RunAnywhereONNX] Found rac_backend_sherpa at ${JNILIB_DIR}/librac_backend_sherpa.so")
-endif()
+foreach(_required_sherpa_lib
+    libsherpa-onnx-c-api.so
+    libsherpa-onnx-jni.so
+    librac_backend_sherpa.so)
+    if(NOT EXISTS "${JNILIB_DIR}/${_required_sherpa_lib}")
+        message(FATAL_ERROR "[RunAnywhereONNX] Required Sherpa library not found: ${JNILIB_DIR}/${_required_sherpa_lib}")
+    endif()
+endforeach()
+
+add_library(sherpa_onnx_c_api SHARED IMPORTED)
+set_target_properties(sherpa_onnx_c_api PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-c-api.so"
+    IMPORTED_NO_SONAME TRUE
+)
+add_library(sherpa_onnx_jni SHARED IMPORTED)
+set_target_properties(sherpa_onnx_jni PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
+    IMPORTED_NO_SONAME TRUE
+)
+add_library(rac_backend_sherpa SHARED IMPORTED)
+set_target_properties(rac_backend_sherpa PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_sherpa.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found required Sherpa native libraries")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
@@ -192,22 +182,11 @@ target_link_libraries(
     onnxruntime
 )
 
-# Also link sherpa-onnx libraries if available
-if(TARGET sherpa_onnx_c_api)
-    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_c_api)
-endif()
-if(TARGET sherpa_onnx_cxx_api)
-    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_cxx_api)
-endif()
-if(TARGET sherpa_onnx_jni)
-    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
-endif()
-# B-RN-10-001: link rac_backend_sherpa so the dynamic linker loads it alongside
-# librunanywhereonnx.so; rac_backend_sherpa_register() is called explicitly in
-# HybridRunAnywhereONNX.cpp::registerBackend (the old ctor was removed upstream).
-if(TARGET rac_backend_sherpa)
-    target_link_libraries(${PACKAGE_NAME} rac_backend_sherpa)
-endif()
+target_link_libraries(
+    ${PACKAGE_NAME}
+    sherpa_onnx_c_api
+    sherpa_onnx_jni
+    rac_backend_sherpa)
 
 # HAS_ONNX is always defined since ONNX backend is required
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1 ORT_API_VERSION=17)

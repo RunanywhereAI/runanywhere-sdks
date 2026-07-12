@@ -19,7 +19,14 @@
  * (e.g. lazily applying the preferred mode the first time a model loads).
  */
 
-import { SDKLogger } from './SDKLogger';
+import { SDKLogger } from './SDKLogger.js';
+import { EventBus } from './EventBus.js';
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import type {
+  InferenceFramework,
+  ModelCategory,
+  ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
 
 const logger = new SDKLogger('Runtime');
 
@@ -39,23 +46,33 @@ export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
  *   - `'main'`   — force the main-thread path even when a Worker factory
  *                  is registered. Useful for debugging perf regressions.
  *
- * See `docs/STREAM_DELIVERY_DESIGN.md` for the architectural framing.
  */
 export type StreamingMode = 'auto' | 'worker' | 'main';
 
 /**
  * Function installed by a backend (typically the llamacpp bridge) to perform
- * the acceleration switch. Should be idempotent.
+ * the acceleration switch. Should be idempotent and must report the mode it
+ * actually loaded through `setActiveAccelerationMode(...)` before resolving.
  */
 export type RuntimeAccelerationSwitcher = (mode: 'cpu' | 'webgpu') => Promise<void>;
-export type RuntimeModelLoadPreparation = (context: {
-  request: unknown;
-  model: unknown | null;
-}) => Promise<void>;
-export type RuntimeModelLoadFailureRecovery = (context: {
-  request: unknown;
+export interface RuntimeModelLoadRequest {
+  modelId: string;
+  category?: ModelCategory;
+  framework?: InferenceFramework;
+}
+export interface RuntimeModelLoadContext {
+  request: RuntimeModelLoadRequest;
+  model: ModelInfo | null;
+}
+export interface RuntimeModelLoadFailureContext extends RuntimeModelLoadContext {
   error: unknown;
-}) => Promise<boolean>;
+}
+export type RuntimeModelLoadPreparation = (
+  context: RuntimeModelLoadContext,
+) => Promise<void>;
+export type RuntimeModelLoadFailureRecovery = (
+  context: RuntimeModelLoadFailureContext,
+) => Promise<boolean>;
 
 let _preferred: RuntimeAccelerationMode = 'auto';
 let _activeMode: 'cpu' | 'webgpu' | null = null;
@@ -101,7 +118,10 @@ export const Runtime = {
       return;
     }
     await _switcher(mode);
-    _activeMode = mode;
+    // The requested mode is only a preference. A backend may resolve WebGPU
+    // to CPU after capability detection or fallback, and the switcher reports
+    // that actual result via setActiveAccelerationMode(). Never overwrite it
+    // with the request after the switch completes.
   },
 
   /**
@@ -134,17 +154,22 @@ export function setAccelerationSwitcher(fn: RuntimeAccelerationSwitcher | null):
  * `Runtime.active` reflects reality.
  */
 export function setActiveAccelerationMode(mode: 'cpu' | 'webgpu' | null): void {
+  if (_activeMode === mode) return;
   _activeMode = mode;
+  if (mode !== null) {
+    EventBus.shared.publish(
+      'sdk.accelerationMode',
+      EventCategory.EVENT_CATEGORY_HARDWARE,
+      { mode },
+    );
+  }
 }
 
 export function setModelLoadPreparation(fn: RuntimeModelLoadPreparation | null): void {
   _modelLoadPreparation = fn;
 }
 
-export async function prepareModelLoad(context: {
-  request: unknown;
-  model: unknown | null;
-}): Promise<void> {
+export async function prepareModelLoad(context: RuntimeModelLoadContext): Promise<void> {
   if (!_modelLoadPreparation) return;
   try {
     await _modelLoadPreparation(context);
@@ -159,10 +184,9 @@ export function setModelLoadFailureRecovery(fn: RuntimeModelLoadFailureRecovery 
   _modelLoadFailureRecovery = fn;
 }
 
-export async function recoverModelLoadFailure(context: {
-  request: unknown;
-  error: unknown;
-}): Promise<boolean> {
+export async function recoverModelLoadFailure(
+  context: RuntimeModelLoadFailureContext,
+): Promise<boolean> {
   if (!_modelLoadFailureRecovery) return false;
   try {
     return await _modelLoadFailureRecovery(context);

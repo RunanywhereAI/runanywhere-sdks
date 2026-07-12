@@ -28,11 +28,6 @@ fun RunAnywhere.setLogLevel(level: LogLevel) {
     Logging.setMinLogLevel(level)
 }
 
-/** Enable or disable Sentry error tracking. */
-fun RunAnywhere.setSentryLoggingEnabled(enabled: Boolean) {
-    Logging.setSentryLoggingEnabled(enabled)
-}
-
 /** Add a custom log destination. */
 fun RunAnywhere.addLogDestination(destination: LogDestination) {
     Logging.addDestinationSync(destination)

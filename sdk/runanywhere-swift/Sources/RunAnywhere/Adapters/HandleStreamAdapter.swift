@@ -39,6 +39,7 @@
 //          streamKey: "llm",
 //          register: { h, cb, ud in rac_llm_set_stream_proto_callback(h, cb, ud) },
 //          unregister: { h in _ = rac_llm_unset_stream_proto_callback(h) },
+//          quiesce: { rac_llm_proto_quiesce() },
 //          isTerminalEvent: { $0.isFinal }
 //      )
 //      for await event in adapter.stream() { ... }
@@ -80,8 +81,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     /// retained `Unmanaged` context is released, closing the use-after-free
     /// window where a dispatcher that copied the callback slot before
     /// `unregister` ran is still inside the trampoline with the about-to-be
-    /// freed context. Optional: omit when the C ABI exposes no quiesce
-    /// symbol (e.g. an older RACommons binary).
+    /// freed context.
     public typealias Quiesce = @Sendable () -> Void
 
     /// Predicate that classifies an event as terminal. When supplied
@@ -91,13 +91,16 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
 
     // MARK: - Per-handle fan-out
 
-    private final class HandleFanOut: HandleStreamFanOutEntry {
+    /// The native handle and retained C callback context are immutable or
+    /// protected by `state`. Teardown quiesces the C dispatcher before the
+    /// context is released, so no unchecked value is concurrently accessed.
+    private final class HandleFanOut: HandleStreamFanOutEntry, @unchecked Sendable {
         // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.
         private let handle: Handle
         private let storeKey: HandleStreamStoreKey
         private let register: Register
         private let unregister: Unregister
-        private let quiesce: Quiesce?
+        private let quiesce: Quiesce
         private let isTerminalEvent: IsTerminalEvent?
         private let state = OSAllocatedUnfairLock<HandleFanOutState<Event>>(
             initialState: HandleFanOutState<Event>()
@@ -108,7 +111,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             storeKey: HandleStreamStoreKey,
             register: @escaping Register,
             unregister: @escaping Unregister,
-            quiesce: Quiesce?,
+            quiesce: @escaping Quiesce,
             isTerminalEvent: IsTerminalEvent?
         ) {
             self.handle = handle
@@ -182,7 +185,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         private func install() -> Bool {
-            let userPtr = Unmanaged.passRetained(self).toOpaque()
+            let userPtr = HandleStreamContextPointer(
+                rawValue: Unmanaged.passRetained(self).toOpaque()
+            )
 
             // The trampoline must be a `@convention(c)` closure with no
             // generic-parameter captures (Swift compiler restriction).
@@ -197,7 +202,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 fanOut.deliverBytes(bytesPtr, bytesLen)
             }
 
-            let result = register(handle, trampoline, userPtr)
+            let result = register(handle, trampoline, userPtr.rawValue)
 
             if result != RAC_SUCCESS {
                 // Roll back: drop every continuation that joined the
@@ -215,7 +220,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 for continuation in pending {
                     continuation.finish()
                 }
-                Unmanaged<HandleFanOut>.fromOpaque(userPtr).release()
+                Unmanaged<HandleFanOut>.fromOpaque(userPtr.rawValue).release()
                 return false
             }
 
@@ -292,7 +297,10 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             // will ever arrive to finish a consumer's `for await`. We
             // finish them explicitly below. This mirrors Kotlin
             // `forceTearDown`, which closes every snapshotted collector.
-            let teardown: (ptr: UnsafeMutableRawPointer?, continuations: [AsyncStream<Event>.Continuation]) =
+            let teardown: (
+                ptr: HandleStreamContextPointer?,
+                continuations: [AsyncStream<Event>.Continuation]
+            ) =
                 state.withLock { lockedState in
                     let continuations = Array(lockedState.continuations.values)
                     lockedState.continuations.removeAll()
@@ -317,8 +325,8 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 // synchronously-fired final byte can re-enter broadcast()
                 // safely.
                 unregister(handle)
-                quiesce?()
-                Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
+                quiesce()
+                Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease.rawValue).release()
             }
             HandleStreamAdapter.removeFanOut(for: storeKey)
 
@@ -333,8 +341,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     // MARK: - Static fan-out registry
 
     // Global because Swift forbids generic stored statics. The single
-    // swiftlint:disable:next avoid_any_object
-    // `[StoreKey: AnyObject]` lock backs every instantiation of this
+    // `[StoreKey: HandleStreamFanOutEntry]` lock backs every instantiation of this
     // generic. `streamKey` partitions the dictionary so two
     // specialisations cannot collide even if their `Handle.hashValue`
     // happens to match. The composite key embeds the handle as
@@ -342,8 +349,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     // distinct native handles whose hashes happen to coincide are
     // routed to different fan-out entries instead of aliasing onto
     // one shared registration.
-    // swiftlint:disable:next avoid_any_object
-    private static var fanOuts: OSAllocatedUnfairLock<[HandleStreamStoreKey: AnyObject]> {
+    private static var fanOuts: OSAllocatedUnfairLock<[HandleStreamStoreKey: any HandleStreamFanOutEntry]> {
         HandleStreamAdapterRegistry.shared.fanOuts
     }
 
@@ -352,24 +358,24 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         streamKey: String,
         register: @escaping Register,
         unregister: @escaping Unregister,
-        quiesce: Quiesce?,
+        quiesce: @escaping Quiesce,
         isTerminalEvent: IsTerminalEvent?
     ) -> HandleFanOut {
         let key = HandleStreamStoreKey(streamKey: streamKey, handle: AnyHashable(handle))
-        return fanOuts.withLock { dict in
+        let candidate = HandleFanOut(
+            handle: handle,
+            storeKey: key,
+            register: register,
+            unregister: unregister,
+            quiesce: quiesce,
+            isTerminalEvent: isTerminalEvent
+        )
+        return fanOuts.withLockUnchecked { dict in
             if let existing = dict[key] as? HandleFanOut {
                 return existing
             }
-            let fanOut = HandleFanOut(
-                handle: handle,
-                storeKey: key,
-                register: register,
-                unregister: unregister,
-                quiesce: quiesce,
-                isTerminalEvent: isTerminalEvent
-            )
-            dict[key] = fanOut
-            return fanOut
+            dict[key] = candidate
+            return candidate
         }
     }
 
@@ -383,7 +389,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     private let streamKey: String
     private let register: Register
     private let unregister: Unregister
-    private let quiesce: Quiesce?
+    private let quiesce: Quiesce
     private let isTerminalEvent: IsTerminalEvent?
 
     // MARK: - Init
@@ -402,12 +408,11 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     ///     `{ h, cb, ud in rac_llm_set_stream_proto_callback(h, cb, ud) }`.
     ///   - unregister: Closure that removes the trampoline; e.g.
     ///     `{ h in _ = rac_llm_unset_stream_proto_callback(h) }`.
-    ///   - quiesce: Optional closure that spin-waits until every
+    ///   - quiesce: Closure that spin-waits until every
     ///     in-flight C dispatch of the trampoline has returned; e.g.
     ///     `{ rac_llm_proto_quiesce() }`. Invoked during teardown between
     ///     `unregister` and releasing the retained context to close the
-    ///     use-after-free window. Omit when the linked C ABI exposes no
-    ///     quiesce symbol.
+    ///     use-after-free window.
     ///   - isTerminalEvent: Optional predicate that classifies an
     ///     event as terminal. When non-nil and an event satisfies it,
     ///     every continuation is finished and the C registration is
@@ -418,7 +423,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         streamKey: String,
         register: @escaping Register,
         unregister: @escaping Unregister,
-        quiesce: Quiesce? = nil,
+        quiesce: @escaping Quiesce,
         isTerminalEvent: IsTerminalEvent? = nil
     ) {
         self.handle = handle
@@ -451,8 +456,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 return
             }
 
+            let terminationEntry: any HandleStreamFanOutEntry = fanOut
             continuation.onTermination = { @Sendable _ in
-                fanOut.detach(id)
+                terminationEntry.detach(id)
             }
         }
     }
@@ -463,23 +469,22 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     /// cancellation should rely on `for-await break`.
     public func tearDown() {
         let key = HandleStreamStoreKey(streamKey: streamKey, handle: AnyHashable(handle))
-        let fanOut = Self.fanOuts.withLock { $0[key] as? HandleFanOut }
+        let fanOut = Self.fanOuts.withLockUnchecked { $0[key] as? HandleFanOut }
         fanOut?.tearDown()
     }
 }
 
 // MARK: - Non-generic supporting types
 
-// swiftlint:disable avoid_any_object
 /// Type-erased entry point invoked from the `@convention(c)`
 /// trampoline. Concrete `HandleFanOut` instances conform; dispatching
 /// through this protocol breaks the generic-parameter capture that
 /// would otherwise prevent the trampoline from being expressible as a
 /// C function pointer.
-private protocol HandleStreamFanOutEntry: AnyObject {
+private protocol HandleStreamFanOutEntry: AnyObject, Sendable { // swiftlint:disable:this avoid_any_object
     func deliverBytes(_ bytesPtr: UnsafePointer<UInt8>?, _ bytesLen: Int)
+    func detach(_ id: UUID)
 }
-// swiftlint:enable avoid_any_object
 
 /// Composite key partitioning the global fan-out store. The
 /// `streamKey` distinguishes adapters that share the same `Handle`
@@ -489,7 +494,11 @@ private protocol HandleStreamFanOutEntry: AnyObject {
 /// rather than a bare `hashValue: Int` so two distinct native handles
 /// whose hashes happen to collide are routed to different fan-out
 /// entries instead of aliasing onto the same registration.
-private struct HandleStreamStoreKey: Hashable, Sendable {
+/// `AnyHashable` is immutable here and is only read while the registry lock is
+/// held. Its unavailable `Sendable` conformance reflects arbitrary boxed
+/// values; this adapter accepts the risk explicitly because the handle itself
+/// is never mutated through the key.
+private struct HandleStreamStoreKey: Hashable, @unchecked Sendable {
     // periphery:ignore
     let streamKey: String
     // periphery:ignore
@@ -517,10 +526,19 @@ private enum HandleFanOutAttachRole {
 /// Mutable state guarded by `HandleFanOut`'s `OSAllocatedUnfairLock`.
 /// Lifted to file scope so the nested-type depth limit imposed by
 /// SwiftLint's `nesting` rule is respected.
-private struct HandleFanOutState<Event: Message> {
+/// All fields are exclusively accessed through `HandleFanOut.state`. The raw
+/// context is a retained `Unmanaged` token whose release is serialized with C
+/// callback quiescence.
+private struct HandleFanOutState<Event: Message>: @unchecked Sendable {
     var continuations: [UUID: AsyncStream<Event>.Continuation] = [:]
-    var userPtr: UnsafeMutableRawPointer?
+    var userPtr: HandleStreamContextPointer?
     var installation: HandleFanOutInstallation = .notInstalled
+}
+
+/// Retained context passed through a C callback. Its lifetime is owned by the
+/// fan-out and externally synchronized by unregister + quiesce.
+private struct HandleStreamContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
 }
 
 /// Holds the lock that backs every `HandleStreamAdapter` instantiation.
@@ -529,8 +547,7 @@ private struct HandleFanOutState<Event: Message> {
 /// specialisation's entries disjoint inside the shared dictionary.
 private final class HandleStreamAdapterRegistry: @unchecked Sendable {
     static let shared = HandleStreamAdapterRegistry()
-    // swiftlint:disable:next avoid_any_object
-    let fanOuts = OSAllocatedUnfairLock<[HandleStreamStoreKey: AnyObject]>(initialState: [:])
+    let fanOuts = OSAllocatedUnfairLock<[HandleStreamStoreKey: any HandleStreamFanOutEntry]>(initialState: [:])
 
     private init() {}
 }

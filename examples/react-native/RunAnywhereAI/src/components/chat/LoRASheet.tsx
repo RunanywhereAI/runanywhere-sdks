@@ -25,8 +25,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { BottomSheet, BottomSheetScrollView } from '../ui/BottomSheet';
 import { RunAnywhere } from '@runanywhere/core';
 import {
-  LoRAAdapterConfig,
-  LoRAApplyRequest,
   LoRARemoveRequest,
   LoraAdapterCatalogQuery,
   type LoRAAdapterInfo,
@@ -136,17 +134,10 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
           entry.isDownloaded && entry.localPath
             ? entry.localPath
             : await RunAnywhere.lora.download(entry);
-        const result = await RunAnywhere.lora.apply(
-          LoRAApplyRequest.fromPartial({
-            adapters: [
-              LoRAAdapterConfig.fromPartial({
-                adapterPath: localPath,
-                adapterId: entry.id,
-                scale,
-              }),
-            ],
-          })
-        );
+        const result = await RunAnywhere.lora.applyCatalogAdapter(entry, {
+          localPath,
+          scale,
+        });
         if (!result.success) {
           throw new Error(result.errorMessage || 'LoRA apply failed');
         }

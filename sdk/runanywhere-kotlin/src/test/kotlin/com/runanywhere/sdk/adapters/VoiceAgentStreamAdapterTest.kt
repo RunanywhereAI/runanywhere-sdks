@@ -36,6 +36,7 @@ class VoiceAgentStreamAdapterTest {
     private class FakeBridge : VoiceAgentStreamAdapter.NativeBridge {
         val registerCount = AtomicInteger(0)
         val unregisterCount = AtomicInteger(0)
+        val quiesceCount = AtomicInteger(0)
         val capturedCallback = AtomicReference<((ByteArray) -> Unit)?>(null)
         var nextCallbackId: Long = 1L
 
@@ -48,6 +49,10 @@ class VoiceAgentStreamAdapterTest {
         override fun unregisterCallback(handle: Long, callbackId: Long) {
             unregisterCount.incrementAndGet()
             capturedCallback.set(null)
+        }
+
+        override fun quiesce() {
+            quiesceCount.incrementAndGet()
         }
     }
 
@@ -147,5 +152,6 @@ class VoiceAgentStreamAdapterTest {
             val torn = waitFor { bridge.unregisterCount.get() == 1 }
             assertTrue("unregister must fire exactly once after last detach", torn)
             assertEquals(1, bridge.unregisterCount.get().toLong())
+            assertEquals(1, bridge.quiesceCount.get().toLong())
         }
 }

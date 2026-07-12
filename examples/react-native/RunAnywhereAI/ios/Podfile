@@ -9,7 +9,7 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 # RunAnywhere SDK follows the Swift source-of-truth minimum.
-platform :ios, '17.0'
+platform :ios, '17.5'
 prepare_react_native_project!
 
 # react-native-permissions setup
@@ -69,7 +69,7 @@ target 'RunAnywhereAI' do
     # Force all pods to use the Swift source-of-truth deployment target.
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.5'
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
       end
     end

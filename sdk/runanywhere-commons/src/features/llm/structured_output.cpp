@@ -20,6 +20,7 @@
 
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/structured_output_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -614,8 +615,8 @@ static rac_result_t structured_result_from_text(const std::string& raw_text,
     size_t thinking_len = 0;
     (void)rac_llm_extract_thinking_with_tags(
         raw_text.c_str(), thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
-        &response_len, &thinking, &thinking_len);
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response, &response_len,
+        &thinking, &thinking_len);
     const std::string parse_text = response ? std::string(response, response_len) : raw_text;
 
     rac_structured_output_parse_result_t parsed{};
@@ -807,9 +808,8 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
     ctx->terminal_sent = true;
 
     runanywhere::v1::StructuredOutputResult result;
-    rac_result_t result_rc =
-        structured_result_from_text(ctx->raw_text, ctx->config, &result, ctx->thinking_open_tag,
-                                    ctx->thinking_close_tag);
+    rac_result_t result_rc = structured_result_from_text(
+        ctx->raw_text, ctx->config, &result, ctx->thinking_open_tag, ctx->thinking_close_tag);
     // Treat INVALID_FORMAT/VALIDATION_FAILED as typed semantic outcomes carried
     // by the StructuredOutputResult envelope, not as transport errors. Only
     // ABI/IO failures (null args, OOM, serialization) emit an ERROR event with
@@ -1041,8 +1041,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
         return RAC_SUCCESS;
     }
 
-    // Log the text that couldn't be parsed
-    RAC_LOG_ERROR("StructuredOutput", saw_candidate ? "JSON candidate failed to parse"
+    RAC_LOG_DEBUG("StructuredOutput", saw_candidate ? "JSON candidate failed to parse"
                                                     : "No valid JSON found in the response");
     return RAC_ERROR_INVALID_FORMAT;
 }

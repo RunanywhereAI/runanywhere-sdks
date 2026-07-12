@@ -231,9 +231,9 @@ typedef struct rac_platform_adapter {
      *     RAC_ERROR_SECURE_STORAGE_FAILED (or another non-RAC_SUCCESS,
      *     non-RAC_ERROR_FILE_NOT_FOUND code).
      *   - Returning RAC_ERROR_NOT_FOUND, RAC_ERROR_SECURE_STORAGE_FAILED, or
-     *     any other code for the not-found case is a contract violation —
-     *     commons will conservatively treat all non-RAC_SUCCESS results as
-     *     "miss" today, but future consumers may rely on the discrimination.
+     *     any other code for the not-found case is a contract violation.
+     *     Commons propagates every non-miss failure and will not synthesize a
+     *     replacement identity after a real storage error.
      *
      * @param key Key name
      * @param out_value Output value (caller must free with rac_free); only
@@ -558,20 +558,6 @@ RAC_API rac_result_t rac_http_download(const char* url, const char* destination_
  * @return RAC_SUCCESS if cancelled, error code otherwise
  */
 RAC_API rac_result_t rac_http_download_cancel(const char* task_id);
-
-/**
- * Extract an archive using the platform adapter.
- * Returns RAC_ERROR_NOT_SUPPORTED if extract_archive callback is NULL.
- *
- * @param archive_path Path to archive
- * @param destination_dir Where to extract
- * @param progress_callback Progress callback (can be NULL)
- * @param callback_user_data User data for callback
- * @return RAC_SUCCESS if extracted, error code otherwise
- */
-RAC_API rac_result_t rac_extract_archive(const char* archive_path, const char* destination_dir,
-                                         rac_extract_progress_callback_fn progress_callback,
-                                         void* callback_user_data);
 
 #ifdef __cplusplus
 }

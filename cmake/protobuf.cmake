@@ -32,7 +32,16 @@ include(LoadVersions OPTIONAL)
 set(RAC_PROTOBUF_EXACT_VERSION "${RAC_PROTOBUF_VERSION}" CACHE STRING
     "Exact Protobuf source version matching checked-in generated C++ sources.")
 
-find_package(Protobuf ${RAC_PROTOBUF_EXACT_VERSION} EXACT CONFIG QUIET)
+# Namespace isolation requires compiling the runtime with the same namespace
+# rewrite as RunAnywhere's generated sources. An already-built system package
+# cannot satisfy that contract, so do not pre-register its imported targets;
+# rac_commons will fetch the exact pinned sources instead.
+if(RAC_ISOLATE_PROTOBUF_NAMESPACE)
+    set(Protobuf_FOUND FALSE)
+    message(STATUS "Protobuf: system probe skipped (private namespace isolation enabled)")
+else()
+    find_package(Protobuf ${RAC_PROTOBUF_EXACT_VERSION} EXACT CONFIG QUIET)
+endif()
 
 # SHARED-build consumers of proto-generated .pb.cc.o files
 # (rac_voice_event_abi.cpp, pipeline.pb.cc, etc.) need absl symbols at
@@ -43,7 +52,9 @@ find_package(Protobuf ${RAC_PROTOBUF_EXACT_VERSION} EXACT CONFIG QUIET)
 # actually exist — older absl (Ubuntu 22.04 ships 20210324) is missing
 # absl::log, so linking it unconditionally produces "Target ... links to
 # absl::log but the target was not found".
-find_package(absl QUIET CONFIG)
+if(NOT RAC_ISOLATE_PROTOBUF_NAMESPACE)
+    find_package(absl QUIET CONFIG)
+endif()
 set(RAC_ABSL_LIBS "")
 if(absl_FOUND)
     foreach(_rac_absl_component
@@ -64,6 +75,8 @@ if(Protobuf_FOUND)
     message(STATUS "Protobuf: found ${Protobuf_VERSION} (${Protobuf_LIBRARIES})")
 else()
     set(RAC_HAVE_PROTOBUF FALSE)
-    message(STATUS "Protobuf: no exact ${RAC_PROTOBUF_EXACT_VERSION} CONFIG package found — "
-                   "rac_commons may vendor the pinned runtime if protobuf is enabled.")
+    if(NOT RAC_ISOLATE_PROTOBUF_NAMESPACE)
+        message(STATUS "Protobuf: no exact ${RAC_PROTOBUF_EXACT_VERSION} CONFIG package found — "
+                       "rac_commons may vendor the pinned runtime if protobuf is enabled.")
+    endif()
 endif()

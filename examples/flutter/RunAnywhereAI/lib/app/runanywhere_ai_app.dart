@@ -31,7 +31,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   bool _isSDKInitialized = false;
   bool _isInitializing = true;
   String? _initializationError;
-  static bool _mlxRegistered = false;
 
   @override
   void initState() {
@@ -155,6 +154,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   static bool _backendsRegistered = false;
+  static bool _mlxRegistered = false;
 
   Future<void> _registerBackends() async {
     if (_backendsRegistered) {
@@ -164,6 +164,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
     LlamaCpp.register();
 
+    _mlxRegistered = await MLX.register();
+    debugPrint(
+      _mlxRegistered
+          ? '✅ Apple MLX backend registered (LLM + VLM + Embeddings + STT + TTS)'
+          : 'ℹ️ Apple MLX backend unavailable on this target',
+    );
+
     try {
       await Onnx.register();
       debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
@@ -171,28 +178,16 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('⚠️ ONNX backend not available: $e');
     }
 
-    try {
-      _mlxRegistered = await MLX.register();
-      if (_mlxRegistered) {
-        debugPrint(
-          '✅ MLX backend registered (LLM + VLM + STT + TTS + Embeddings)',
-        );
-      } else {
-        debugPrint(
-          'ℹ️ MLX backend not available (Apple MLX runtime not linked)',
-        );
-      }
-    } catch (e) {
-      _mlxRegistered = false;
-      debugPrint('⚠️ MLX backend not available: $e');
-    }
-
     // QHexRT (Qualcomm Hexagon NPU). Safe no-op on non-Snapdragon / non-Android;
     // register() rejects internally on unsupported parts.
     if (QHexRT.isAvailable) {
       try {
-        await QHexRT.register();
-        debugPrint('✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)');
+        final registered = await QHexRT.register();
+        debugPrint(
+          registered
+              ? '✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)'
+              : 'ℹ️ QHexRT NPU backend registration was rejected',
+        );
       } catch (e) {
         debugPrint('⚠️ QHexRT backend not available: $e');
       }

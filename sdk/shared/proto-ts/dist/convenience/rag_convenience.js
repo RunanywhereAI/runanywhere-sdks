@@ -13,13 +13,13 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
+exports.validateRAGQueryOptions = exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
     llmModelId: '',
     topK: 5,
-    similarityThreshold: 0.3,
+    similarityThreshold: 0.0,
     chunkSize: 512,
     chunkOverlap: 64,
     persistIndex: false,
@@ -30,7 +30,7 @@ const validateRAGConfiguration = (m) => {
     if (m.topK !== undefined && (m.topK < 1)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.top_k',
-            message: `top_k must be in >= 1 (got ${m.topK})`,
+            message: `top_k must be >= 1 (got ${m.topK})`,
         });
     }
     if (m.similarityThreshold !== undefined && (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
@@ -42,13 +42,13 @@ const validateRAGConfiguration = (m) => {
     if (m.chunkSize !== undefined && (m.chunkSize < 1)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.chunk_size',
-            message: `chunk_size must be in >= 1 (got ${m.chunkSize})`,
+            message: `chunk_size must be >= 1 (got ${m.chunkSize})`,
         });
     }
     if (m.chunkOverlap !== undefined && (m.chunkOverlap < 0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.chunk_overlap',
-            message: `chunk_overlap must be in >= 0 (got ${m.chunkOverlap})`,
+            message: `chunk_overlap must be >= 0 (got ${m.chunkOverlap})`,
         });
     }
 };
@@ -60,8 +60,18 @@ const rAGQueryOptionsDefaults = () => ({
     topP: 1.0,
     topK: 0,
     retrievalTopK: 0,
-    similarityThreshold: 0,
     stream: false,
     disableThinking: false,
+    enableMultiQuery: false,
+    multiQueryCount: 3,
 });
 exports.rAGQueryOptionsDefaults = rAGQueryOptionsDefaults;
+const validateRAGQueryOptions = (m) => {
+    if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGQueryOptions.multi_query_count',
+            message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
+        });
+    }
+};
+exports.validateRAGQueryOptions = validateRAGQueryOptions;

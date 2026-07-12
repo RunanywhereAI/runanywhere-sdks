@@ -2,7 +2,7 @@
  * LoggingManager.ts
  *
  * Central logging service: routes log entries to registered destinations
- * (console, Sentry, custom) based on the current `LoggingConfiguration`.
+ * based on the current `LoggingConfiguration`.
  *
  * Mirrors the `Logging` class in
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift`.
@@ -14,7 +14,6 @@ import {
   getConfigurationForEnvironment,
 } from '../Models/LoggingConfiguration';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import { SentryDestination } from '../Destinations/SentryDestination';
 
 export interface LogEntry {
   level: LogLevel;
@@ -98,11 +97,6 @@ export class LoggingManager {
     } else if (!this.destinations.has(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
-    if (!this.config.enableSentryLogging) {
-      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
-    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
-      this.addDestination(new SentryDestination());
-    }
   }
 
   public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
@@ -120,19 +114,6 @@ export class LoggingManager {
 
   public setMinLogLevel(level: LogLevel): void {
     this.config.minLogLevel = level;
-  }
-
-  public setSentryLoggingEnabled(enabled: boolean): void {
-    this.config.enableSentryLogging = enabled;
-    if (!enabled) {
-      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
-    } else if (!this.destinations.has(SentryDestination.DESTINATION_ID)) {
-      // Swift parity: setupSentryLogging() adds the destination on enable
-      // (SDKLogger.swift:104-106, 221-225). The app supplies the Sentry
-      // instance later via `SentryDestination.initialize(...)` /
-      // `addDestination`; until then the destination reports unavailable.
-      this.addDestination(new SentryDestination());
-    }
   }
 
   public addDestination(destination: LogDestination): void {
@@ -154,15 +135,14 @@ export class LoggingManager {
     metadata?: Record<string, unknown>
   ): void {
     if (level < this.config.minLogLevel) return;
-    // Note: no global enableLocalLogging/enableSentryLogging early-return —
-    // those flags govern the console/Sentry destinations' presence in the
-    // map; app-registered custom destinations keep receiving entries
-    // (Swift parity: SDKLogger.swift routes to `destinations` directly).
+    // Note: no global enableLocalLogging early-return; that flag governs the
+    // console destination's presence in the map. App-registered custom
+    // destinations keep receiving entries after severity filtering.
 
     const entry: LogEntry = {
       level,
       category,
-      message,
+      message: sanitizeLogMessage(message),
       metadata: sanitizeMetadata(metadata),
       timestamp: new Date(),
     };
@@ -227,6 +207,32 @@ const SENSITIVE_SUBSTRINGS = [
   'credential',
 ] as const;
 
+/**
+ * Secret-bearing assignments commonly found in HTTP errors, provider errors,
+ * and serialized diagnostic fragments. The label/delimiter is retained so a
+ * log remains actionable while only its value is removed.
+ */
+const SENSITIVE_ASSIGNMENT_PATTERN = /(\b(?:api[-_ ]?key|authorization|access[-_ ]?token|refresh[-_ ]?token|id[-_ ]?token|token|password|secret|credential)\b\s*["']?\s*[:=]\s*)(?:["'][^"'\r\n]*["']|(?:Bearer|Basic)\s+[^\s"',;)\]}]+|[^\s"',;&)\]}]+)/gi;
+const AUTH_SCHEME_PATTERN = /\b(Bearer|Basic)\s+[^\s"',;)\]}]+/gi;
+const SECRET_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{8,}\b/g;
+const URL_USERINFO_PATTERN = /(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
+
+/**
+ * Redact secrets embedded in free-form log messages.
+ *
+ * Metadata-key redaction alone is insufficient because native/provider errors
+ * often arrive as interpolated strings. Keep the surrounding operation, URL
+ * path, and field label so diagnostics remain useful without retaining the
+ * credential value.
+ */
+export function sanitizeLogMessage(message: string): string {
+  return message
+    .replace(URL_USERINFO_PATTERN, '$1[REDACTED]@')
+    .replace(SENSITIVE_ASSIGNMENT_PATTERN, '$1[REDACTED]')
+    .replace(AUTH_SCHEME_PATTERN, '$1 [REDACTED]')
+    .replace(SECRET_KEY_PATTERN, '[REDACTED-KEY]');
+}
+
 function shouldRedact(key: string): boolean {
   const lowered = key.toLowerCase();
   return SENSITIVE_SUBSTRINGS.some((needle) => lowered.includes(needle));
@@ -244,11 +250,18 @@ function sanitizeMetadata(
   for (const [key, value] of Object.entries(metadata)) {
     if (shouldRedact(key)) {
       sanitized[key] = '[REDACTED]';
-    } else if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      sanitized[key] = sanitizeMetadata(value as Record<string, unknown>) ?? {};
     } else {
-      sanitized[key] = value;
+      sanitized[key] = sanitizeMetadataValue(value);
     }
   }
   return sanitized;
+}
+
+function sanitizeMetadataValue(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeLogMessage(value);
+  if (Array.isArray(value)) return value.map((entry) => sanitizeMetadataValue(entry));
+  if (value !== null && typeof value === 'object') {
+    return sanitizeMetadata(value as Record<string, unknown>) ?? {};
+  }
+  return value;
 }

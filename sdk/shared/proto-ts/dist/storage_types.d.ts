@@ -4,9 +4,6 @@ export declare const protobufPackage = "runanywhere.v1";
  * ---------------------------------------------------------------------------
  * NPU chipset detected on the host device. Used to drive vendor-NPU
  * model-download URL selection and runtime backend wiring.
- * Sources pre-IDL:
- *   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
- * Canonical superset (this file): vendor-grouped, vendor-agnostic.
  * ---------------------------------------------------------------------------
  */
 export declare enum NPUChip {
@@ -72,10 +69,8 @@ export interface AppStorageInfo {
  * model_types.proto. This avoids circular embeds and keeps the wire payload
  * for storage queries small.
  *
- * `last_used_ms` (epoch ms, optional) preserves the field that lived on the
- * older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
- * other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
- * LRU eviction without another type round-trip.
+ * `last_used_ms` supports LRU presentation and eviction without another type
+ * round-trip.
  *
  * Sources pre-IDL: see header drift table.
  * ---------------------------------------------------------------------------
@@ -123,25 +118,6 @@ export interface StorageAvailability {
     recommendation?: string | undefined;
     shortfallBytes: number;
     requiredToAvailableRatio: number;
-}
-/**
- * ---------------------------------------------------------------------------
- * Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
- * surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
- * flattens to the columns those SDKs actually exposed via computed
- * properties (id, name, size, local path, downloaded-at), so RN / Web can
- * emit the same shape without round-tripping through `ModelInfo`.
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
-export interface StoredModel {
-    modelId: string;
-    name: string;
-    sizeBytes: number;
-    localPath: string;
-    /** Unix epoch ms of download completion */
-    downloadedAtMs?: number | undefined;
 }
 export interface StorageInfoRequest {
     includeDevice: boolean;
@@ -226,7 +202,6 @@ export declare const AppStorageInfo: MessageFns<AppStorageInfo>;
 export declare const ModelStorageMetrics: MessageFns<ModelStorageMetrics>;
 export declare const StorageInfo: MessageFns<StorageInfo>;
 export declare const StorageAvailability: MessageFns<StorageAvailability>;
-export declare const StoredModel: MessageFns<StoredModel>;
 export declare const StorageInfoRequest: MessageFns<StorageInfoRequest>;
 export declare const StorageInfoResult: MessageFns<StorageInfoResult>;
 export declare const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest>;

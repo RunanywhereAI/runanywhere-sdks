@@ -53,10 +53,11 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
             // tokens/sec from the event sequence directly.
             let warmupStart = Date()
-            var warmupRequest = RALLMGenerateRequest()
-            warmupRequest.prompt = "Hello"
-            warmupRequest.maxTokens = 5
-            warmupRequest.temperature = 0.0
+            var warmupOptions = RALLMGenerationOptions.defaults()
+            warmupOptions.maxTokens = 5
+            warmupOptions.temperature = 0.0
+            warmupOptions.streamingEnabled = true
+            let warmupRequest = warmupOptions.toRALLMGenerateRequest(prompt: "Hello")
             let warmupEvents = try await RunAnywhere.generateStream(warmupRequest)
             for await event in warmupEvents where event.isFinal { break }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
@@ -70,11 +71,12 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
                 + "covering perceptrons, activation functions, backpropagation, gradient descent, "
                 + "loss functions, convolutional layers, recurrent layers, transformers, attention "
                 + "mechanisms, and training procedures. Be as thorough as possible."
-            var benchRequest = RALLMGenerateRequest()
-            benchRequest.prompt = prompt
-            benchRequest.maxTokens = Int32(maxTokens)
-            benchRequest.temperature = 0.0
-            benchRequest.systemPrompt = systemPrompt
+            var benchOptions = RALLMGenerationOptions.defaults()
+            benchOptions.maxTokens = Int32(maxTokens)
+            benchOptions.temperature = 0.0
+            benchOptions.systemPrompt = systemPrompt
+            benchOptions.streamingEnabled = true
+            let benchRequest = benchOptions.toRALLMGenerateRequest(prompt: prompt)
             let benchEvents = try await RunAnywhere.generateStream(benchRequest)
 
             let result = await RunAnywhere.aggregateStream(prompt: prompt, events: benchEvents)

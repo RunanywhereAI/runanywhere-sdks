@@ -2,16 +2,17 @@ import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
-import { SDKLogger } from '../Foundation/SDKLogger';
-import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm.js';
 
 const logger = new SDKLogger('SDKEventStreamAdapter');
 
 export interface SDKEventStreamModule extends ProtoWasmModule {
   addFunction?(fn: (...args: number[]) => number | void, signature: string): number;
   removeFunction?(ptr: number): void;
-  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): number | bigint;
-  _rac_sdk_event_unsubscribe?(subscriptionId: number | bigint): void;
+  _rac_sdk_event_subscribe?(callbackPtr: number, userData: number): bigint;
+  _rac_sdk_event_unsubscribe?(subscriptionId: bigint): void;
+  _rac_sdk_event_quiesce?(): void;
   _rac_sdk_event_publish_proto?(protoBytes: number, protoSize: number): number;
   _rac_sdk_event_poll?(outEvent: number): number;
   _rac_sdk_event_publish_failure?(
@@ -52,7 +53,11 @@ export class SDKEventStreamAdapter {
 
   subscribe(handler: SDKEventHandler): SDKEventUnsubscribe | null {
     const mod = this.module;
-    if (!this.ensureExports('subscribe', ['_rac_sdk_event_subscribe'])) return null;
+    if (!this.ensureExports('subscribe', [
+      '_rac_sdk_event_subscribe',
+      '_rac_sdk_event_unsubscribe',
+      '_rac_sdk_event_quiesce',
+    ])) return null;
     if (!mod.addFunction || !mod.removeFunction || !mod.HEAPU8) {
       logger.warning('subscribe: module missing addFunction/removeFunction/HEAPU8');
       return null;
@@ -60,8 +65,15 @@ export class SDKEventStreamAdapter {
 
     const callbackPtr = mod.addFunction((bytesPtr: number, size: number) => {
       if (!bytesPtr || size <= 0) return;
-      const bytes = mod.HEAPU8!.slice(bytesPtr, bytesPtr + size);
-      handler(SDKEvent.decode(bytes));
+      try {
+        const bytes = mod.HEAPU8!.slice(bytesPtr, bytesPtr + size);
+        handler(SDKEvent.decode(bytes));
+      } catch {
+        // Never unwind a decoder or consumer exception through the Emscripten
+        // callback frame: Commons must always regain control and release its
+        // in-flight dispatch guard. Keep diagnostics free of event/error data.
+        logger.warning('SDKEvent callback failed');
+      }
     }, 'viii');
 
     const subscriptionId = mod._rac_sdk_event_subscribe!(callbackPtr, 0);
@@ -74,7 +86,8 @@ export class SDKEventStreamAdapter {
     const key = subscriptionKey(subscriptionId);
     this.callbackPtrs.set(key, callbackPtr);
     return () => {
-      mod._rac_sdk_event_unsubscribe?.(subscriptionId);
+      mod._rac_sdk_event_unsubscribe!(subscriptionId);
+      mod._rac_sdk_event_quiesce!();
       const storedPtr = this.callbackPtrs.get(key);
       if (storedPtr) {
         mod.removeFunction?.(storedPtr);
@@ -145,6 +158,7 @@ export class SDKEventStreamAdapter {
     const required: Array<keyof SDKEventStreamModule> = [
       '_rac_sdk_event_subscribe',
       '_rac_sdk_event_unsubscribe',
+      '_rac_sdk_event_quiesce',
       '_rac_sdk_event_publish_proto',
       '_rac_sdk_event_poll',
       '_rac_sdk_event_publish_failure',
@@ -171,10 +185,10 @@ export class SDKEventStreamAdapter {
   }
 }
 
-function isZeroSubscription(subscriptionId: number | bigint): boolean {
-  return typeof subscriptionId === 'bigint' ? subscriptionId === 0n : subscriptionId === 0;
+function isZeroSubscription(subscriptionId: bigint): boolean {
+  return subscriptionId === 0n;
 }
 
-function subscriptionKey(subscriptionId: number | bigint): string {
-  return typeof subscriptionId === 'bigint' ? subscriptionId.toString() : String(subscriptionId);
+function subscriptionKey(subscriptionId: bigint): string {
+  return subscriptionId.toString();
 }

@@ -61,7 +61,8 @@ public class NpuCapability(
   )
   public val hexagon_arch: HexagonArch = HexagonArch.HEXAGON_ARCH_UNKNOWN,
   /**
-   * True iff hexagon_arch is in the QHexRT-supported set (v75+ today).
+   * True iff hexagon_arch is in the device-validated QHexRT-supported set
+   * (v75, v79, or v81 today).
    */
   @field:WireField(
     tag = 4,
@@ -72,7 +73,7 @@ public class NpuCapability(
   )
   public val qhexrt_supported: Boolean = false,
   /**
-   * rac_hexagon_arch_name(): "v68" ... "v81", "unknown". Materialized so
+   * rac_qhexrt_arch_name(): "v68" ... "v81", "unknown". Materialized so
    * SDKs never re-derive the display name from the enum.
    */
   @field:WireField(

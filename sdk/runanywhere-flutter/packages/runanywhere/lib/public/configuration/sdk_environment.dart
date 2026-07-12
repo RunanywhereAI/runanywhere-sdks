@@ -25,10 +25,13 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     }
   }
 
-  /// Invoke a `rac_env_*` predicate; falls back to [fallback] when the
-  /// commons binary predates the export.
-  bool _envPredicate(bool Function(int)? fn, {required bool fallback}) =>
-      fn == null ? fallback : fn(_cEnvironment);
+  /// Invoke a required `rac_env_*` predicate from commons.
+  bool _envPredicate(bool Function(int)? fn, {required String symbol}) {
+    if (fn == null) {
+      throw UnsupportedError('$symbol is unavailable');
+    }
+    return fn(_cEnvironment);
+  }
 
   String get description {
     switch (this) {
@@ -46,22 +49,21 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   /// Check if this is a production environment (uses C++). Mirrors Swift
   /// `isProduction` (SDKEnvironment.swift:73).
   bool get isProduction => _envPredicate(
-        RacNative.bindings.rac_env_is_production,
-        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-      );
+    RacNative.bindings.rac_env_is_production,
+    symbol: 'rac_env_is_production',
+  );
 
   /// Check if this is a testing environment (uses C++).
   bool get isTesting => _envPredicate(
-        RacNative.bindings.rac_env_is_testing,
-        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
-            this == SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-      );
+    RacNative.bindings.rac_env_is_testing,
+    symbol: 'rac_env_is_testing',
+  );
 
   /// Check if this environment requires a valid backend URL (uses C++).
   bool get requiresBackendURL => _envPredicate(
-        RacNative.bindings.rac_env_requires_backend_url,
-        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      );
+    RacNative.bindings.rac_env_requires_backend_url,
+    symbol: 'rac_env_requires_backend_url',
+  );
 
   bool get isCompatibleWithCurrentBuild {
     switch (this) {
@@ -105,31 +107,28 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   /// Should send telemetry data (production only) — uses C++. Mirrors Swift
   /// `shouldSendTelemetry` (SDKEnvironment.swift:121).
   bool get shouldSendTelemetry => _envPredicate(
-        RacNative.bindings.rac_env_should_send_telemetry,
-        fallback: this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-      );
+    RacNative.bindings.rac_env_should_send_telemetry,
+    symbol: 'rac_env_should_send_telemetry',
+  );
 
   /// Should sync with backend (non-development) — uses C++.
   bool get shouldSyncWithBackend => _envPredicate(
-        RacNative.bindings.rac_env_should_sync_with_backend,
-        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      );
+    RacNative.bindings.rac_env_should_sync_with_backend,
+    symbol: 'rac_env_should_sync_with_backend',
+  );
 
   /// Requires API authentication (non-development) — uses C++.
   bool get requiresAuthentication => _envPredicate(
-        RacNative.bindings.rac_env_requires_auth,
-        fallback: this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      );
+    RacNative.bindings.rac_env_requires_auth,
+    symbol: 'rac_env_requires_auth',
+  );
 }
 
 class SupabaseConfig {
   final Uri projectURL;
   final String anonKey;
 
-  SupabaseConfig({
-    required this.projectURL,
-    required this.anonKey,
-  });
+  SupabaseConfig({required this.projectURL, required this.anonKey});
 
   static SupabaseConfig? configuration(SDKEnvironment environment) {
     switch (environment) {
@@ -189,6 +188,7 @@ class SDKInitParams {
     if (!result.isValid) {
       throw SDKException.validationFailed(
         DartBridgeEnvironment.instance.getValidationErrorMessage(result),
+        fieldPath: 'SDKInitParams',
       );
     }
   }
@@ -215,7 +215,8 @@ class SDKInitParams {
     );
     return SDKInitParams(
       apiKey: apiKey,
-      baseURL: supabaseConfig?.projectURL ??
+      baseURL:
+          supabaseConfig?.projectURL ??
           Uri.parse('https://dev.runanywhere.local'),
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     );

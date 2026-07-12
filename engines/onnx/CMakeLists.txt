@@ -81,15 +81,10 @@ message(STATUS "Configuring ONNX backend...")
 include(FetchContent)
 include(LoadVersions)
 
-# Fetch nlohmann_json for JSON parsing
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
-
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_TAG        v${RAC_NLOHMANN_JSON_VERSION}
     GIT_SHALLOW    TRUE
 )
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -234,7 +229,7 @@ elseif(RAC_PLATFORM_IOS)
     )
     # CoreML framework remains linked for runtime packaging; ORT API usage is
     # centralized in runtimes/onnxrt.
-    message(STATUS "ONNX Backend: CoreML EP enabled for iOS")
+    message(STATUS "ONNX Backend: CoreML framework linked for iOS (EP availability probed by onnxrt runtime)")
 
 elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_onnx PRIVATE log)
@@ -253,7 +248,7 @@ elseif(RAC_PLATFORM_MACOS)
     )
     # CoreML framework remains linked for runtime packaging; ORT API usage is
     # centralized in runtimes/onnxrt.
-    message(STATUS "ONNX Backend: CoreML EP enabled for macOS")
+    message(STATUS "ONNX Backend: CoreML framework linked for macOS (EP availability probed by onnxrt runtime)")
 
 elseif(RAC_PLATFORM_LINUX)
     target_link_libraries(rac_backend_onnx PUBLIC pthread dl)
@@ -301,11 +296,11 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
     )
 
     # Propagate the linked ONNX Runtime version so nativeGetVersion() no longer
-    # returns a stale hard-coded literal. Android ships ONNX_VERSION_ANDROID from
+    # returns a stale hard-coded literal. Android ships RAC_ONNX_VERSION_ANDROID from
     # the central VERSIONS file.
-    if(DEFINED ONNX_VERSION_ANDROID AND NOT "${ONNX_VERSION_ANDROID}" STREQUAL "")
+    if(DEFINED RAC_ONNX_VERSION_ANDROID AND NOT "${RAC_ONNX_VERSION_ANDROID}" STREQUAL "")
         target_compile_definitions(rac_backend_onnx_jni PRIVATE
-            RAC_ONNXRUNTIME_VERSION="${ONNX_VERSION_ANDROID}")
+            RAC_ONNXRUNTIME_VERSION="${RAC_ONNX_VERSION_ANDROID}")
     endif()
 
     target_compile_options(rac_backend_onnx_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
@@ -319,6 +314,6 @@ endif()
 
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
-message(STATUS "  Speech compatibility shims: owned by engines/sherpa")
+message(STATUS "  Speech services: owned by engines/sherpa")
 message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

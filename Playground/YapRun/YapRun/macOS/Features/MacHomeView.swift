@@ -28,7 +28,7 @@ struct MacHomeView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
         }
-        .background(AppColors.backgroundPrimaryDark)
+        .background(AppColors.backgroundPrimary)
         .task { await viewModel.refresh() }
         .sheet(isPresented: $viewModel.showAddModelSheet) {
             AddModelURLSheet(isPresented: $viewModel.showAddModelSheet) { url, name in

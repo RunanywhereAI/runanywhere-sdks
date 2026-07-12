@@ -44,7 +44,7 @@ object ONNX {
     const val version = "2.0.0"
 
     /** ONNX Runtime library version (underlying C library) */
-    const val onnxRuntimeVersion = "1.23.2"
+    const val onnxRuntimeVersion = "1.24.3"
 
     /** Human-readable module name (ONNX). */
     const val moduleName: String = "ONNX"

@@ -29,11 +29,14 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
@@ -145,7 +148,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
     ensureServicesReady()
     val states =
         CppBridgeVoiceAgent.initialize(
-            CppBridgeVoiceAgent.getRawHandle(),
+            CppBridgeVoiceAgent.getHandle(),
             config,
         )
     voiceAgentLogger.info("Voice agent initialized from RAVoiceAgentComposeConfig: ready=${states.ready}")
@@ -154,7 +157,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
     if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
-    return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
+    return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getHandle())
 }
 
 /**
@@ -272,7 +275,12 @@ fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
             try {
                 emitAll(VoiceAgentStreamAdapter(handle).stream())
             } finally {
-                driver.cancel()
+                // Cancellation of a coroutine blocked in JNI is cooperative:
+                // wait for the active feed/turn to return and for the driver's
+                // finally block to stop AudioRecord before this stream is
+                // considered closed. This prevents a retained Talk screen from
+                // continuing to feed the shared STT model after navigation.
+                withContext(NonCancellable) { driver.cancelAndJoin() }
             }
         }
     }

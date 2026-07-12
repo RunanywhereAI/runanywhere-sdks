@@ -30,10 +30,12 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -45,15 +47,17 @@
 namespace {
 
 constexpr const char* kTag = "ToolCallingRunLoop";
-constexpr uint32_t kDefaultMaxIterations = 5;
+constexpr uint32_t kDefaultMaxToolCalls = 5;
 
 // per-loop cancellation state. Allocated on the heap, owned by
 // a per-process registry keyed by an opaque handle published to the host via
-// rac_tool_calling_run_loop_with_handle_proto. The cancel function is
+// rac_tool_calling_run_loop_proto. The cancel function is
 // thread-safe relative to the run loop (uses a separate active_ref_mu).
 struct LoopCancelState {
     std::mutex active_ref_mu;
     rac::llm::LifecycleLlmRef* active_ref = nullptr;
+    bool generation_started = false;  // guarded by active_ref_mu
+    std::recursive_mutex side_effect_admission_mu;
     std::atomic<bool> cancel_requested{false};
 };
 
@@ -104,8 +108,11 @@ int64_t now_ms() {
 // tool_calling_session.cpp but without the state-machine plumbing.
 struct LoopContext {
     std::string user_prompt;
-    std::string format_hint;
-    uint32_t max_iterations = kDefaultMaxIterations;
+    runanywhere::v1::ToolCallFormatName format = runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
+    uint32_t max_tool_calls = kDefaultMaxToolCalls;
+    bool auto_execute = true;
+    bool replace_system_prompt = false;
+    bool require_json_arguments = false;
     bool keep_tools_available = false;
     bool validate_calls = true;
     rac::llm::tool_calling::GenerationState generation;
@@ -122,10 +129,78 @@ struct LoopContext {
     runanywhere::v1::ToolCallingOptions tool_options;
 };
 
+// A caller-provided forced_tool_name is an explicit routing instruction. Raw
+// user text is never promoted to SPECIFIC here: merely mentioning a tool name
+// (including in a negation, quotation, or documentation question) must retain
+// AUTO semantics and must not authorize a side effect.
+bool apply_explicit_tool_choice(LoopContext* ctx, std::string* out_error) {
+    if (!ctx) {
+        return false;
+    }
+
+    // NONE is an authorization veto. Discard a contradictory forced name so
+    // every downstream prompt/parse/validation snapshot sees one unambiguous
+    // policy.
+    if (ctx->has_tool_choice && ctx->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+        ctx->forced_tool_name.clear();
+        return true;
+    }
+
+    // A non-empty forced name is itself an explicit SPECIFIC choice, even
+    // when callers omit tool_choice (or accidentally leave it AUTO/REQUIRED).
+    if (!ctx->forced_tool_name.empty()) {
+        ctx->has_tool_choice = true;
+        ctx->tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+    }
+
+    if (!ctx->has_tool_choice || ctx->tool_choice != runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
+        return true;
+    }
+    if (ctx->forced_tool_name.empty()) {
+        if (out_error) {
+            *out_error = "tool_choice=SPECIFIC requires a non-empty forced_tool_name";
+        }
+        return false;
+    }
+    for (const auto& tool : ctx->tool_options.tools()) {
+        if (tool.name() == ctx->forced_tool_name) {
+            return true;
+        }
+    }
+    if (out_error) {
+        *out_error =
+            "tool_choice=SPECIFIC target is not present in request.tools: " + ctx->forced_tool_name;
+    }
+    return false;
+}
+
+bool tool_choice_requires_call(const LoopContext& ctx) {
+    return ctx.has_tool_choice && (ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED ||
+                                   ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+}
+
+std::string missing_required_tool_call_error(const LoopContext& ctx) {
+    return ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC
+               ? "tool_choice=SPECIFIC requires a tool call"
+               : "tool_choice=REQUIRED requires a tool call";
+}
+
+std::string tool_choice_policy_error(const LoopContext& ctx,
+                                     const runanywhere::v1::ToolCall& tool_call) {
+    if (ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+        return "Tool calls are disabled by tool_choice=NONE";
+    }
+    if (ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+        tool_call.name() != ctx.forced_tool_name) {
+        return "Tool call must use tool_choice=SPECIFIC target: " + ctx.forced_tool_name;
+    }
+    return {};
+}
+
 runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ctx) {
     runanywhere::v1::ToolCallingOptions options = ctx.tool_options;
-    options.set_format_hint(ctx.format_hint);
-    options.set_max_iterations(static_cast<int32_t>(ctx.max_iterations));
+    options.set_format(ctx.format);
+    options.set_max_tool_calls(static_cast<int32_t>(ctx.max_tool_calls));
     options.set_keep_tools_available(ctx.keep_tools_available);
     if (ctx.generation.max_tokens > 0) {
         options.set_max_tokens(ctx.generation.max_tokens);
@@ -147,7 +222,9 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     if (!ctx.forced_tool_name.empty()) {
         options.set_forced_tool_name(ctx.forced_tool_name);
     }
-    options.set_auto_execute(true);
+    options.set_auto_execute(ctx.auto_execute);
+    options.set_replace_system_prompt(ctx.replace_system_prompt);
+    options.set_require_json_arguments(ctx.require_json_arguments);
     return options;
 }
 
@@ -274,29 +351,15 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 
 }  // namespace
 
-// internal helper that owns the full run-loop body. Both the
-// pointer-shape (rac_tool_calling_run_loop_with_handle_proto) and the
-// callback-shape (rac_tool_calling_run_loop_with_handle_and_cb_proto) entry
-// points funnel through this helper. The handle is allocated FIRST — before
-// any LLM work — and published two ways:
-//   1. *out_run_loop_handle (when non-null) — for hosts that observe the
-//      handle from the SAME thread that called the run-loop.
-//   2. on_handle_published(handle, on_handle_user_data) (when non-null) —
-//      fired synchronously the moment the handle is minted so hosts can fan
-//      the value into a thread-safe sink (Swift HandleBox, Kotlin
-//      CompletableDeferred, RN JS-thread callback, Flutter Completer, Web
-//      synchronous capture) BEFORE the first generate iteration runs.
-static rac_result_t
-run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
-              rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
-              rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
-              void* on_handle_user_data, uint64_t* out_run_loop_handle,
-              rac_proto_buffer_t* out_result) {
-    if (!on_execute || !out_result) {
+// The handle is allocated before any LLM work and published synchronously so
+// hosts can fan it into a thread-safe cancellation sink before generation.
+static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
+                                  rac_tool_execute_callback_fn on_execute,
+                                  void* on_execute_user_data,
+                                  rac_tool_calling_handle_published_callback_fn on_handle_published,
+                                  void* on_handle_user_data, rac_proto_buffer_t* out_result) {
+    if (!on_execute || !on_handle_published || !out_result) {
         return RAC_ERROR_NULL_POINTER;
-    }
-    if (out_run_loop_handle) {
-        *out_run_loop_handle = 0;
     }
 
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -321,9 +384,6 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     // guard unregisters on every return path.
     auto cancel_state = std::make_shared<LoopCancelState>();
     uint64_t handle = register_loop_state(cancel_state);
-    if (out_run_loop_handle) {
-        *out_run_loop_handle = handle;
-    }
     struct HandleScope {
         uint64_t handle;
         ~HandleScope() { unregister_loop_state(handle); }
@@ -333,12 +393,9 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     // The callback runs on this thread, with the handle already registered
     // in the loop_registry, so a concurrent cancel from another thread
     // (e.g. Swift withTaskCancellationHandler) will land on the live state.
-    if (on_handle_published) {
-        on_handle_published(handle, on_handle_user_data);
-    }
+    on_handle_published(handle, on_handle_user_data);
 
-    // Reuse the existing ToolCallingSessionCreateRequest as the input shape
-    // (identical fields: prompt, tools, max_iterations, format_hint, etc.).
+    // Reuse ToolCallingSessionCreateRequest as the input shape.
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     if (in_size > 0 && !request.ParseFromArray(in_request_bytes, static_cast<int>(in_size))) {
         emit_failure(out_result, RAC_ERROR_DECODING_ERROR,
@@ -356,14 +413,18 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     ctx.generation.temperature = request.temperature();
     ctx.generation.top_p = request.top_p();
     ctx.generation.system_prompt = request.system_prompt();
-    ctx.format_hint =
-        request.format_hint().empty() ? std::string("default") : request.format_hint();
-    ctx.max_iterations =
-        request.max_iterations() == 0 ? kDefaultMaxIterations : request.max_iterations();
+    ctx.format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
+                     ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
+                     : request.format();
+    ctx.max_tool_calls =
+        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
+    ctx.auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
+    ctx.replace_system_prompt = request.replace_system_prompt();
+    ctx.require_json_arguments = request.require_json_arguments();
     ctx.keep_tools_available = request.keep_tools_available();
     ctx.generation.disable_thinking = request.disable_thinking();
     // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
-    // The field is `optional bool` so we can preserve the historical default
+    // The field is `optional bool` so we can preserve the documented default
     // (validate=true) when the caller did not set it, while still letting hosts
     // that delegate validation/authorization to their executor opt out by
     // explicitly setting validate_calls=false.
@@ -382,6 +443,11 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
+    std::string tool_choice_error;
+    if (!apply_explicit_tool_choice(&ctx, &tool_choice_error)) {
+        emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, tool_choice_error);
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     runanywhere::v1::ToolCallingResult final_result;
     std::string current_prompt = format_prompt_proto(ctx, /*tool_results=*/{});
@@ -393,17 +459,37 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     bool is_complete = false;
     std::string final_text;
 
-    while (iteration < ctx.max_iterations) {
+    const auto finish_cancelled = [&]() -> rac_result_t {
+        rac::llm::tool_calling::set_display_text_and_thinking(&final_result, final_text,
+                                                              ctx.generation);
+        final_result.set_is_complete(false);
+        final_result.set_iterations_used(static_cast<int32_t>(iteration));
+        final_result.set_error_code(RAC_ERROR_CANCELLED);
+        final_result.set_error_message("LLM generation cancelled");
+        std::vector<uint8_t> bytes;
+        serialize(final_result, &bytes);
+        rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
+        return RAC_ERROR_CANCELLED;
+    };
+
+    // One telemetry row per tool-calling request; inner iterations are PUBLIC-only.
+    rac::llm::tool_calling::ToolLoopTelemetryScope loop_telemetry;
+
+    while (true) {
         iteration++;
-        RAC_LOG_DEBUG(kTag, "iteration %u/%u", iteration, ctx.max_iterations);
+        RAC_LOG_DEBUG(kTag, "generation iteration %u; tool calls %d/%u", iteration,
+                      final_result.tool_calls_size(), ctx.max_tool_calls);
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
+        auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
+            ctx.generation, iteration, ctx.has_tool_choice, ctx.tool_choice, ctx.format);
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &cancel_state->active_ref_mu, &cancel_state->active_ref,
-            &cancel_state->cancel_requested};
-        if (!rac::llm::tool_calling::run_generate_once(
-                ctx.generation, cancel_binding, current_prompt, &response, &rc)) {
+            &cancel_state->cancel_requested, &cancel_state->generation_started};
+        if (!rac::llm::tool_calling::run_generate_once(step_generation, cancel_binding,
+                                                       current_prompt, &response, &rc,
+                                                       &loop_telemetry.agg)) {
             // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as
@@ -423,6 +509,15 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
             return report_rc;
         }
+        // Preserve the thinking-tag lookup cached by run_generate_once without
+        // leaking the decision-only sampling/token overrides into synthesis.
+        ctx.generation.thinking_tags_resolved = step_generation.thinking_tags_resolved;
+        ctx.generation.thinking_open_tag = std::move(step_generation.thinking_open_tag);
+        ctx.generation.thinking_close_tag = std::move(step_generation.thinking_close_tag);
+
+        if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+            return finish_cancelled();
+        }
 
         std::string clean_text;
         runanywhere::v1::ToolCall parsed_call;
@@ -430,8 +525,51 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         final_text = clean_text;
 
         if (!has_call) {
+            if (final_result.tool_calls_size() == 0 && tool_choice_requires_call(ctx)) {
+                const std::string msg = missing_required_tool_call_error(ctx);
+                final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+                final_result.set_error_message(msg);
+                is_complete = false;
+                break;
+            }
             RAC_LOG_DEBUG(kTag, "no tool call; loop complete after iter %u", iteration);
             is_complete = true;
+            break;
+        }
+
+        if (static_cast<uint32_t>(final_result.tool_calls_size()) >= ctx.max_tool_calls) {
+            constexpr const char* kLimitMessage =
+                "model requested another tool after max_tool_calls was reached";
+            final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+            final_result.set_error_message(kLimitMessage);
+            is_complete = false;
+            break;
+        }
+        if (final_result.tool_calls_size() > 0 && !ctx.keep_tools_available) {
+            constexpr const char* kToolsUnavailableMessage =
+                "model requested another tool after tools were removed";
+            final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+            final_result.set_error_message(kToolsUnavailableMessage);
+            is_complete = false;
+            break;
+        }
+
+        // Tool-choice policy is an authorization constraint, not optional
+        // schema validation. It must run even when validate_calls=false.
+        const std::string policy_error = tool_choice_policy_error(ctx, parsed_call);
+        if (!policy_error.empty()) {
+            runanywhere::v1::ToolResult failed;
+            failed.set_tool_call_id(parsed_call.id());
+            failed.set_name(parsed_call.name());
+            failed.set_error(policy_error);
+            failed.set_success(false);
+            failed.set_started_at_ms(now_ms());
+            failed.set_completed_at_ms(now_ms());
+            *final_result.add_tool_calls() = parsed_call;
+            *final_result.add_tool_results() = failed;
+            is_complete = false;
+            final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+            final_result.set_error_message(policy_error);
             break;
         }
 
@@ -447,7 +585,6 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
                 }
                 runanywhere::v1::ToolResult failed;
                 failed.set_tool_call_id(parsed_call.id());
-                failed.set_call_id(parsed_call.id());
                 failed.set_name(parsed_call.name());
                 failed.set_error(msg);
                 failed.set_success(false);
@@ -465,6 +602,12 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             }
         }
 
+        if (!ctx.auto_execute) {
+            *final_result.add_tool_calls() = parsed_call;
+            is_complete = false;
+            break;
+        }
+
         // Synchronous tool execution via host callback.
         std::vector<uint8_t> call_bytes;
         if (!serialize(parsed_call, &call_bytes)) {
@@ -475,32 +618,51 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 
         rac_proto_buffer_t exec_out;
         rac_proto_buffer_init(&exec_out);
-        rac_result_t exec_rc = on_execute(call_bytes.empty() ? nullptr : call_bytes.data(),
-                                          call_bytes.size(), &exec_out, on_execute_user_data);
+        rac_result_t exec_rc = RAC_SUCCESS;
+        {
+            std::lock_guard<std::recursive_mutex> admission_guard(
+                cancel_state->side_effect_admission_mu);
+            if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+                return finish_cancelled();
+            }
+            exec_rc = on_execute(call_bytes.empty() ? nullptr : call_bytes.data(),
+                                 call_bytes.size(), &exec_out, on_execute_user_data);
+        }
 
         runanywhere::v1::ToolResult tool_result;
-        if (exec_rc == RAC_SUCCESS && exec_out.data && exec_out.size > 0) {
-            (void)tool_result.ParseFromArray(exec_out.data, static_cast<int>(exec_out.size));
+        std::string executor_error;
+        if (exec_rc == RAC_SUCCESS && exec_out.status != RAC_SUCCESS) {
+            exec_rc = exec_out.status;
+            executor_error = exec_out.error_message ? exec_out.error_message
+                                                    : "tool executor returned an error buffer";
+        } else if (exec_rc == RAC_SUCCESS && (!exec_out.data || exec_out.size == 0)) {
+            exec_rc = RAC_ERROR_DECODING_ERROR;
+            executor_error = "tool executor returned an empty ToolResult";
+        } else if (exec_rc == RAC_SUCCESS &&
+                   !tool_result.ParseFromArray(exec_out.data, static_cast<int>(exec_out.size))) {
+            exec_rc = RAC_ERROR_DECODING_ERROR;
+            executor_error = "tool executor returned malformed ToolResult bytes";
+        } else if (exec_rc == RAC_SUCCESS && !tool_result.tool_call_id().empty() &&
+                   tool_result.tool_call_id() != parsed_call.id()) {
+            exec_rc = RAC_ERROR_VALIDATION_FAILED;
+            executor_error = "tool executor returned a mismatched tool_call_id";
+        } else if (exec_rc == RAC_SUCCESS && !tool_result.name().empty() &&
+                   tool_result.name() != parsed_call.name()) {
+            exec_rc = RAC_ERROR_VALIDATION_FAILED;
+            executor_error = "tool executor returned a mismatched tool name";
         }
-        // Always populate identifiers / fallback success state on the
-        // returned result so the follow-up prompt formatter has stable input.
-        if (tool_result.tool_call_id().empty()) {
-            tool_result.set_tool_call_id(parsed_call.id());
-        }
-        if (tool_result.call_id().empty()) {
-            tool_result.set_call_id(parsed_call.id());
-        }
-        if (tool_result.name().empty()) {
-            tool_result.set_name(parsed_call.name());
-        }
+
         if (exec_rc != RAC_SUCCESS) {
-            tool_result.set_success(false);
-            std::string err_msg = "tool executor returned error";
-            if (exec_out.error_message) {
-                err_msg = exec_out.error_message;
+            if (executor_error.empty()) {
+                executor_error = exec_out.error_message ? exec_out.error_message
+                                                        : "tool executor returned an error";
             }
-            tool_result.set_error(err_msg);
+            tool_result.Clear();
+            tool_result.set_success(false);
+            tool_result.set_error(executor_error);
         }
+        tool_result.set_tool_call_id(parsed_call.id());
+        tool_result.set_name(parsed_call.name());
         if (tool_result.started_at_ms() == 0)
             tool_result.set_started_at_ms(now_ms());
         if (tool_result.completed_at_ms() == 0)
@@ -519,20 +681,22 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         }
 
         // Build follow-up prompt from the executed tool result.
-        std::vector<runanywhere::v1::ToolResult> trs{tool_result};
-        std::string follow = format_prompt_proto(ctx, trs);
+        std::vector<runanywhere::v1::ToolResult> trs;
+        trs.reserve(static_cast<size_t>(final_result.tool_results_size()));
+        for (const auto& recorded_result : final_result.tool_results()) {
+            trs.push_back(recorded_result);
+        }
+        LoopContext followup_ctx = ctx;
+        if (static_cast<uint32_t>(final_result.tool_calls_size()) >= ctx.max_tool_calls) {
+            followup_ctx.keep_tools_available = false;
+        }
+        std::string follow = format_prompt_proto(followup_ctx, trs);
         current_prompt = follow.empty() ? ctx.user_prompt : follow;
-    }
-
-    if (iteration >= ctx.max_iterations && !is_complete) {
-        // Mirror the session API: max_iterations is a hard cap and we report
-        // is_complete=true (the conversation is done as far as the loop is
-        // concerned), matching tool_calling_session.cpp's run_generate_loop.
-        is_complete = true;
     }
 
     rac::llm::tool_calling::set_display_text_and_thinking(&final_result, final_text,
                                                           ctx.generation);
+    rac::llm::tool_calling::ensure_web_search_attribution(&final_result);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
 
@@ -545,46 +709,13 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
 #endif
 }
 
-// Public entry: pointer-shape (handle written into out_run_loop_handle).
-// Hosts that observe the handle from the same thread that called the loop
-// use this. SDKs that need cross-thread publication should prefer
-// rac_tool_calling_run_loop_with_handle_and_cb_proto below.
-extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
-    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
-    return run_loop_impl(in_request_bytes, in_size, on_execute, user_data,
-                         /*on_handle_published=*/nullptr,
-                         /*on_handle_user_data=*/nullptr, out_run_loop_handle, out_result);
-}
-
-// callback-shape entry — fires on_handle_published(handle, ud)
-// SYNCHRONOUSLY the moment a cancellable handle is minted, BEFORE the first
-// generate iteration runs. This lets Swift/Kotlin/Flutter/RN/Web SDKs route
-// the handle into a thread-safe sink (HandleBox, CompletableDeferred,
-// Completer, JS callback, synchronous capture) without racing the worker
-// thread that owns the run-loop. The pointer-shape out_run_loop_handle is
-// still populated so legacy hosts that observe both have a stable contract.
-extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
-    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* on_execute_user_data,
-    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
-    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t
+rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes, size_t in_size,
+                                rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+                                rac_tool_calling_handle_published_callback_fn on_handle_published,
+                                void* on_handle_user_data, rac_proto_buffer_t* out_result) {
     return run_loop_impl(in_request_bytes, in_size, on_execute, on_execute_user_data,
-                         on_handle_published, on_handle_user_data, out_run_loop_handle, out_result);
-}
-
-// Legacy ABI wrapper — preserves the original signature. Discards the handle
-// out-parameter for hosts that don't need cancellation (the in-flight loop
-// state is still registered / unregistered behind the scenes).
-extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes,
-                                                        size_t in_size,
-                                                        rac_tool_execute_callback_fn on_execute,
-                                                        void* user_data,
-                                                        rac_proto_buffer_t* out_result) {
-    uint64_t discarded = 0;
-    return run_loop_impl(in_request_bytes, in_size, on_execute, user_data,
-                         /*on_handle_published=*/nullptr,
-                         /*on_handle_user_data=*/nullptr, &discarded, out_result);
+                         on_handle_published, on_handle_user_data, out_result);
 }
 
 extern "C" rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop_handle) {
@@ -600,10 +731,16 @@ extern "C" rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop
         // the normal race-loser path. Return success.
         return RAC_SUCCESS;
     }
-    state->cancel_requested.store(true, std::memory_order_release);
+    {
+        std::lock_guard<std::recursive_mutex> admission_guard(state->side_effect_admission_mu);
+        state->cancel_requested.store(true, std::memory_order_release);
+    }
     std::lock_guard<std::mutex> guard(state->active_ref_mu);
     if (state->active_ref) {
         rac::llm::request_lifecycle_llm_cancel(state->active_ref);
+        if (state->generation_started && state->active_ref->ops && state->active_ref->ops->cancel) {
+            (void)state->active_ref->ops->cancel(state->active_ref->impl);
+        }
     }
     return RAC_SUCCESS;
 #endif

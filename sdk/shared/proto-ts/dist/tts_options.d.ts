@@ -133,8 +133,6 @@ export interface TTSOptions {
      * depending on model convention.
      */
     speakerId: number;
-    /** Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate. */
-    speed: number;
     /** Optional style/emotion hint for voices that support style transfer. */
     style?: string | undefined;
 }

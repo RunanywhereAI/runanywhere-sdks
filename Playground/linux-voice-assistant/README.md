@@ -2,15 +2,12 @@
 
 A complete on-device voice AI pipeline for Linux (Raspberry Pi 5, x86_64, ARM64). All inference runs locally — no cloud, no API keys.
 
-**Pipeline:** Wake Word -> VAD -> STT -> LLM -> TTS
+**Pipeline:** VAD -> STT -> LLM -> TTS
 
 ## Architecture
 
 ```text
 Microphone (ALSA)
-    │
-    ▼
-Wake Word Detection (openWakeWord / "Hey Jarvis")  [optional]
     │
     ▼
 Voice Activity Detection (Silero VAD)
@@ -19,7 +16,7 @@ Voice Activity Detection (Silero VAD)
 Speech-to-Text (Whisper Tiny EN)
     │
     ▼
-Large Language Model (Qwen2.5 0.5B Q4)
+Large Language Model (Qwen3 1.7B Q8)
     │
     ▼
 Text-to-Speech (Piper Lessac Medium)
@@ -68,8 +65,6 @@ linux-voice-assistant/
 # 2. Run the voice assistant
 ./build/voice-assistant
 
-# With wake word detection:
-./build/voice-assistant --wakeword
 ```
 
 ### Manual Build
@@ -80,7 +75,7 @@ cd ../../sdk/runanywhere-commons
 ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons
-./scripts/build-linux.sh --shared
+./scripts/build-linux.sh
 
 # Step 3: Download models
 cd ../../Playground/linux-voice-assistant
@@ -99,11 +94,10 @@ cmake --build . -j$(nproc)
 
 | Component | Model | Size | Framework |
 |-----------|-------|------|-----------|
-| VAD | Silero VAD | ~2 MB | ONNX |
-| STT | Whisper Tiny EN | ~150 MB | ONNX (Sherpa) |
-| LLM | Qwen2.5 0.5B Q4 | ~500 MB | llama.cpp |
-| TTS | Piper Lessac Medium | ~65 MB | ONNX (Sherpa) |
-| Wake Word | openWakeWord "Hey Jarvis" | ~20 MB | ONNX |
+| VAD | Silero VAD | ~2 MB | Sherpa-ONNX |
+| STT | Whisper Tiny EN | ~150 MB | Sherpa-ONNX |
+| LLM | Qwen3 1.7B Q8 | ~1.83 GB | llama.cpp |
+| TTS | Piper Lessac Medium | ~65 MB | Sherpa-ONNX |
 
 Download models:
 
@@ -111,23 +105,16 @@ Download models:
 # Required models (VAD, STT, LLM, TTS)
 ./scripts/download-models.sh
 
-# Optional: Wake word model
-./scripts/download-models.sh --wakeword
-
-# Select a different LLM:
-./scripts/download-models.sh --model qwen3-1.7b
-./scripts/download-models.sh --model llama-3.2-3b
-./scripts/download-models.sh --model qwen3-4b
+# Download an additional LLM bundle:
+./scripts/download-models.sh --llm llama-3.2-3b
+./scripts/download-models.sh --llm qwen3-4b
 ```
 
 ## Usage
 
 ```bash
-# Basic usage (always listening)
+# Basic usage
 ./build/voice-assistant
-
-# With wake word ("Hey Jarvis" to activate)
-./build/voice-assistant --wakeword
 
 # Select audio devices
 ./build/voice-assistant --list-devices
@@ -151,11 +138,10 @@ Download models:
 - Underrun recovery
 
 ### Voice Pipeline (`src/pipeline/voice_pipeline`)
-- **Wake Word Detection** — openWakeWord ONNX with "Hey Jarvis" model
 - **Voice Activity Detection** — Silero VAD with silence timeout (1.5s)
-- **Speech-to-Text** — Whisper Tiny EN via `rac_voice_agent_transcribe`
-- **LLM Response** — Local inference via `rac_voice_agent_process_voice_turn`
-- **Text-to-Speech** — Piper neural TTS via `rac_voice_agent_synthesize_speech`
+- **Speech-to-Text** — Whisper Tiny EN via `rac_stt_component_transcribe`
+- **LLM Response** — Local inference via `rac_llm_component_generate`
+- **Text-to-Speech** — Piper neural TTS via `rac_tts_component_synthesize`
 
 ### Model Config (`src/config/model_config`)
 - Hardcoded model IDs and paths for predictable behavior
@@ -170,7 +156,6 @@ Download models:
 
 **"Models are missing"**
 - Run `./scripts/download-models.sh` to download all required models
-- For wake word: `./scripts/download-models.sh --wakeword`
 
 **No audio output**
 - Check volume: `alsamixer`

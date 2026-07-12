@@ -38,7 +38,6 @@ import Security
     // MARK: - Properties
 
     private let serviceName = "com.runanywhere.sdk"
-    private let deviceUUIDKey = "com.runanywhere.sdk.device.uuid"
 
     // MARK: - Initialization
 
@@ -78,18 +77,23 @@ import Security
         return status == errSecSuccess
     }
 
-    /// Retrieve a value from the keychain.
-    @objc public func get(forKey key: String) -> String? {
+    /// Retrieve a required value while preserving the Keychain status for the
+    /// C bridge. `errSecItemNotFound` is the clean-miss signal; every other
+    /// status is a real secure-storage failure.
+    @objc(getRequiredValueForKey:error:)
+    public func getRequiredValue(forKey key: String) throws -> String {
         var query = baseQuery(forKey: key)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-        guard status == errSecSuccess,
-              let data = dataTypeRef as? Data,
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
+        guard let data = dataTypeRef as? Data,
               let value = String(data: data, encoding: .utf8) else {
-            return nil
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(errSecDecode))
         }
         return value
     }
@@ -100,20 +104,4 @@ import Security
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
-    /// Check whether a key exists in the keychain.
-    @objc public func exists(forKey key: String) -> Bool {
-        return get(forKey: key) != nil
-    }
-
-    // MARK: - Device UUID Convenience
-
-    /// Store device UUID.
-    @objc public func storeDeviceUUID(_ uuid: String) -> Bool {
-        return set(uuid, forKey: deviceUUIDKey)
-    }
-
-    /// Retrieve device UUID.
-    @objc public func retrieveDeviceUUID() -> String? {
-        return get(forKey: deviceUUIDKey)
-    }
 }

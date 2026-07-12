@@ -48,7 +48,11 @@ bool parse_proto_buffer(rac_proto_buffer_t* buffer, Message* message, std::strin
 template <typename Message>
 std::string serialize(const Message& message) {
     std::string bytes;
-    message.SerializeToString(&bytes);
+    // protobuf 35.x marks SerializeToString [[nodiscard]]; consume the result
+    // (proto3 serialization does not fail in practice — guard anyway).
+    if (!message.SerializeToString(&bytes)) {
+        bytes.clear();
+    }
     return bytes;
 }
 

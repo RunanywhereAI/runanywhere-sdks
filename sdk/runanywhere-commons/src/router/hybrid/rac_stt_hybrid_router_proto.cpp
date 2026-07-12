@@ -70,14 +70,13 @@ void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
 #else  // RAC_HAVE_PROTOBUF
 
 #include "hybrid_router.pb.h"
+#include "sdk_events.pb.h"
 
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#include "sdk_events.pb.h"
 
 #include "infrastructure/events/sdk_event_publish.h"
 #include "rac/core/rac_audio_utils.h"
@@ -397,8 +396,8 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
     // Hybrid STT bypasses the lifecycle-proto path, so emit telemetry here.
     emit_hybrid_stt_telemetry(result, meta, transcribe_rc, options.language, options.sample_rate);
 
-    const rac_result_t encode_rc = build_response_bytes(
-        result, meta, transcribe_rc, out_response_bytes, out_response_size);
+    const rac_result_t encode_rc =
+        build_response_bytes(result, meta, transcribe_rc, out_response_bytes, out_response_size);
     rac_stt_result_free(&result);
     if (encode_rc != RAC_SUCCESS) {
         return encode_rc;

@@ -67,7 +67,8 @@ static constexpr int kRepeatPenaltyWindow = 64;  // Last-N tokens for repetition
 
 // Buffer sizes
 static constexpr size_t kChatTemplateBufSize = 2048;
-static constexpr size_t kFormattedPromptBufSize = 256 * 1024;
+// llama_chat_apply_template takes a signed 32-bit output capacity.
+static constexpr int32_t kFormattedPromptBufSize = 256 * 1024;
 
 }  // namespace
 
@@ -428,14 +429,23 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
 #if defined(__EMSCRIPTEN__)
     // common_fit_params probes
     // llama_max_devices() (16 on WASM) and never returns within practical
-    // timeouts on CPU WASM. Skip fit on Emscripten; ctx sizing falls through
-    // to max_default_context_ after model load (see below).
+    // timeouts on CPU WASM. Skip fit on Emscripten and choose the default from
+    // the artifact that was actually compiled: WebGPU offloads every eligible
+    // layer, while the separately-built CPU artifact keeps all layers on CPU.
+#if defined(GGML_USE_WEBGPU)
+    RAC_LOG_INFO("LLM.LlamaCpp",
+                 "Emscripten: skipping common_fit_params (WASM device probe "
+                 "hang); using WebGPU defaults (n_gpu_layers=-1, n_ctx cap=%d)",
+                 max_default_context_);
+    model_params.n_gpu_layers = -1;
+#else
     RAC_LOG_INFO("LLM.LlamaCpp",
                  "Emscripten: skipping common_fit_params (WASM device probe "
                  "hang); using conservative CPU defaults (n_gpu_layers=0, "
                  "n_ctx cap=%d)",
                  max_default_context_);
     model_params.n_gpu_layers = 0;
+#endif
     if (ctx_params.n_ctx == 0) {
         ctx_params.n_ctx = static_cast<uint32_t>(max_default_context_);
     }
@@ -740,7 +750,8 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     int32_t result = -1;
     try {
         result = llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                           add_assistant_token, formatted.data(), formatted.size());
+                                           add_assistant_token, formatted.data(),
+                                           kFormattedPromptBufSize);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "llama_chat_apply_template threw exception: %s", e.what());
         result = -1;
@@ -762,12 +773,15 @@ std::string LlamaCppTextGeneration::apply_chat_template(
         return fallback;
     }
 
-    if (result > (int32_t)formatted.size()) {
-        formatted.resize(result + 1024);
+    if (result > kFormattedPromptBufSize) {
+        // The API returns the exact required size as int32_t. Reuse that value
+        // as the retry capacity so no size_t-to-int32_t narrowing is needed.
+        const int32_t retry_capacity = result;
+        formatted.resize(static_cast<size_t>(retry_capacity));
         try {
             result =
                 llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                          add_assistant_token, formatted.data(), formatted.size());
+                                          add_assistant_token, formatted.data(), retry_capacity);
         } catch (...) {
             RAC_LOG_ERROR("LLM.LlamaCpp", "llama_chat_apply_template threw exception on retry");
             result = -1;
@@ -790,7 +804,7 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     }
 
     if (result > 0) {
-        formatted.resize(result);
+        formatted.resize(static_cast<size_t>(result));
     }
 
     return formatted;

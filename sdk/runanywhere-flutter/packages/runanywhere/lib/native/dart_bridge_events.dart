@@ -37,17 +37,18 @@ class DartBridgeEvents {
 
     NativeCallable<RacSdkEventCallbackNative>? callback;
     try {
-      final subscribe = RacNative.bindings.rac_sdk_event_subscribe;
-      if (subscribe == null) {
-        _logger.warning('SDKEvent proto subscription ABI is unavailable');
-        _isRegistered = true;
-        return;
-      }
+      // RacBindings resolves subscribe, unsubscribe, and quiesce as one
+      // required ABI set before a callback is allocated. A stale native
+      // artifact therefore cannot create a subscription it cannot retire.
+      final bindings = RacNative.bindings;
 
       callback = NativeCallable<RacSdkEventCallbackNative>.listener(
         _sdkEventCallback,
       );
-      final subscriptionId = subscribe(callback.nativeFunction, nullptr);
+      final subscriptionId = bindings.rac_sdk_event_subscribe(
+        callback.nativeFunction,
+        nullptr,
+      );
       if (subscriptionId == 0) {
         callback.close();
         _logger.warning('SDKEvent proto subscription returned no handle');
@@ -60,9 +61,9 @@ class DartBridgeEvents {
       _subscriptionId = subscriptionId;
       _isRegistered = true;
       _logger.debug('SDKEvent proto callback registered');
-    } catch (e) {
+    } catch (_) {
       callback?.close();
-      _logger.warning('SDKEvent proto registration failed: $e');
+      _logger.warning('SDKEvent proto registration failed');
       _isRegistered = true;
     }
   }
@@ -70,26 +71,36 @@ class DartBridgeEvents {
   static void unregister() {
     if (!_isRegistered) return;
 
+    final callback = _eventCallback;
+    final subscriptionId = _subscriptionId;
+    if (callback == null || subscriptionId == 0) {
+      _eventCallback = null;
+      _subscriptionId = 0;
+      _isRegistered = false;
+      return;
+    }
+
     try {
-      final unsubscribe = RacNative.bindings.rac_sdk_event_unsubscribe;
-      if (unsubscribe != null && _subscriptionId != 0) {
-        unsubscribe(_subscriptionId);
-      }
+      final bindings = RacNative.bindings;
+      bindings.rac_sdk_event_unsubscribe(subscriptionId);
       // Commons dispatches subscriber callbacks after releasing its mutex, so
       // unsubscribe alone does not guarantee no publisher thread is mid-call
       // into our NativeCallable. Drain in-flight callbacks per the documented
       // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
       // close) before closing the callable, mirroring the Swift/Kotlin/RN
       // event bridges and avoiding a use-after-free onto the closing isolate.
-      RacNative.bindings.rac_sdk_event_quiesce?.call();
-    } catch (e) {
-      _logger.debug('SDKEvent proto unregistration failed: $e');
-    } finally {
-      _eventCallback?.close();
-      _eventCallback = null;
-      _subscriptionId = 0;
-      _isRegistered = false;
+      bindings.rac_sdk_event_quiesce();
+      callback.close();
+    } catch (_) {
+      // Fail closed: retain the callable and subscription id so a later reset
+      // can retry retirement without leaving Commons with a dangling pointer.
+      _logger.debug('SDKEvent proto unregistration failed');
+      return;
     }
+
+    _eventCallback = null;
+    _subscriptionId = 0;
+    _isRegistered = false;
   }
 
   StreamSubscription<event_pb.SDKEvent> subscribe(
@@ -124,11 +135,12 @@ class DartBridgeEvents {
       if (code != RacResultCode.success || out.ref.data == nullptr) {
         return null;
       }
-      final bytes =
-          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      final bytes = out.ref.data
+          .asTypedList(out.ref.size)
+          .toList(growable: false);
       return event_pb.SDKEvent.fromBuffer(bytes);
-    } catch (e) {
-      _logger.debug('rac_sdk_event_poll error: $e');
+    } catch (_) {
+      _logger.debug('rac_sdk_event_poll failed');
       return null;
     } finally {
       bindings.rac_proto_buffer_free(out);
@@ -148,8 +160,8 @@ class DartBridgeEvents {
       );
       fn();
       return true;
-    } catch (e) {
-      _logger.debug('rac_sdk_event_clear_queue unavailable: $e');
+    } catch (_) {
+      _logger.debug('rac_sdk_event_clear_queue unavailable');
       return false;
     }
   }
@@ -249,11 +261,12 @@ void _sdkEventCallback(
         return;
       }
       try {
-        final bytes =
-            out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+        final bytes = out.ref.data
+            .asTypedList(out.ref.size)
+            .toList(growable: false);
         DartBridgeEvents.instance.emit(event_pb.SDKEvent.fromBuffer(bytes));
-      } catch (e) {
-        SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent: $e');
+      } catch (_) {
+        SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent');
       }
     } finally {
       bindings.rac_proto_buffer_free(out);

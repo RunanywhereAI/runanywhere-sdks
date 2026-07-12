@@ -305,9 +305,6 @@ public nonisolated struct RATTSOptions: Sendable {
   /// depending on model convention.
   public var speakerID: Int32 = 0
 
-  /// Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate.
-  public var speed: Float = 0
-
   /// Optional style/emotion hint for voices that support style transfer.
   public var style: String {
     get {_style ?? String()}
@@ -881,7 +878,7 @@ nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{1}speed\0\u{1}style\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{2}\u{2}style\0\u{c}\u{a}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -898,7 +895,6 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 7: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.speakerID) }()
-      case 10: try { try decoder.decodeSingularFloatField(value: &self.speed) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._style) }()
       default: break
       }
@@ -937,9 +933,6 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.speakerID != 0 {
       try visitor.visitSingularInt32Field(value: self.speakerID, fieldNumber: 9)
     }
-    if self.speed.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.speed, fieldNumber: 10)
-    }
     try { if let v = self._style {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
     } }()
@@ -956,7 +949,6 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs.audioFormat != rhs.audioFormat {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.speakerID != rhs.speakerID {return false}
-    if lhs.speed != rhs.speed {return false}
     if lhs._style != rhs._style {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

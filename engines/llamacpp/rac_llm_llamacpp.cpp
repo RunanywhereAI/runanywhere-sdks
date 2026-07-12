@@ -96,6 +96,27 @@ void apply_extended_sampling_options(const rac_llm_options_t* options,
     if (options->grammar != nullptr && options->grammar[0] != '\0') {
         request->grammar = options->grammar;
     }
+
+    // Multi-turn history: rac_llm_options_t.history is alternating user/assistant
+    // strings (chronological, excluding system prompt + current prompt). Render
+    // it into the chat message list so the model sees prior turns. The current
+    // prompt is appended as the final user message because build_prompt() prefers
+    // `messages` over the raw `prompt` when messages is non-empty.
+    if (options->history != nullptr && options->n_history > 0) {
+        request->messages.reserve(static_cast<size_t>(options->n_history) + 1);
+        int32_t accepted_history_entries = 0;
+        for (int32_t i = 0; i < options->n_history; ++i) {
+            if (options->history[i] == nullptr) {
+                continue;
+            }
+            const char* role = (accepted_history_entries % 2 == 0) ? "user" : "assistant";
+            request->messages.emplace_back(role, options->history[i]);
+            ++accepted_history_entries;
+        }
+        if (!request->prompt.empty()) {
+            request->messages.emplace_back("user", request->prompt);
+        }
+    }
 }
 
 }  // namespace

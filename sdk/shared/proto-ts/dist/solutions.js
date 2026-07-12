@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: solutions.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TimeSeriesConfig = exports.ToolSpec = exports.AgentLoopConfig = exports.WakeWordConfig = exports.RAGConfig = exports.VoiceAgentConfig = exports.SolutionHandle = exports.SolutionConfig = exports.VectorStore = exports.AudioSource = exports.SolutionType = exports.protobufPackage = void 0;
+exports.TimeSeriesConfig = exports.ToolSpec = exports.AgentLoopConfig = exports.RAGConfig = exports.VoiceAgentConfig = exports.SolutionHandle = exports.SolutionConfig = exports.VectorStore = exports.AudioSource = exports.SolutionType = exports.protobufPackage = void 0;
 exports.solutionTypeFromJSON = solutionTypeFromJSON;
 exports.solutionTypeToJSON = solutionTypeToJSON;
 exports.audioSourceFromJSON = audioSourceFromJSON;
@@ -28,7 +28,6 @@ var SolutionType;
     SolutionType[SolutionType["SOLUTION_TYPE_UNSPECIFIED"] = 0] = "SOLUTION_TYPE_UNSPECIFIED";
     SolutionType[SolutionType["SOLUTION_TYPE_VOICE_AGENT"] = 1] = "SOLUTION_TYPE_VOICE_AGENT";
     SolutionType[SolutionType["SOLUTION_TYPE_RAG"] = 2] = "SOLUTION_TYPE_RAG";
-    SolutionType[SolutionType["SOLUTION_TYPE_WAKEWORD"] = 3] = "SOLUTION_TYPE_WAKEWORD";
     SolutionType[SolutionType["SOLUTION_TYPE_TIME_SERIES"] = 4] = "SOLUTION_TYPE_TIME_SERIES";
     SolutionType[SolutionType["SOLUTION_TYPE_AGENT_LOOP"] = 5] = "SOLUTION_TYPE_AGENT_LOOP";
     SolutionType[SolutionType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
@@ -44,9 +43,6 @@ function solutionTypeFromJSON(object) {
         case 2:
         case "SOLUTION_TYPE_RAG":
             return SolutionType.SOLUTION_TYPE_RAG;
-        case 3:
-        case "SOLUTION_TYPE_WAKEWORD":
-            return SolutionType.SOLUTION_TYPE_WAKEWORD;
         case 4:
         case "SOLUTION_TYPE_TIME_SERIES":
             return SolutionType.SOLUTION_TYPE_TIME_SERIES;
@@ -67,8 +63,6 @@ function solutionTypeToJSON(object) {
             return "SOLUTION_TYPE_VOICE_AGENT";
         case SolutionType.SOLUTION_TYPE_RAG:
             return "SOLUTION_TYPE_RAG";
-        case SolutionType.SOLUTION_TYPE_WAKEWORD:
-            return "SOLUTION_TYPE_WAKEWORD";
         case SolutionType.SOLUTION_TYPE_TIME_SERIES:
             return "SOLUTION_TYPE_TIME_SERIES";
         case SolutionType.SOLUTION_TYPE_AGENT_LOOP:
@@ -164,7 +158,7 @@ function vectorStoreToJSON(object) {
     }
 }
 function createBaseSolutionConfig() {
-    return { voiceAgent: undefined, rag: undefined, wakeWord: undefined, agentLoop: undefined, timeSeries: undefined };
+    return { voiceAgent: undefined, rag: undefined, agentLoop: undefined, timeSeries: undefined };
 }
 exports.SolutionConfig = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -173,9 +167,6 @@ exports.SolutionConfig = {
         }
         if (message.rag !== undefined) {
             exports.RAGConfig.encode(message.rag, writer.uint32(18).fork()).join();
-        }
-        if (message.wakeWord !== undefined) {
-            exports.WakeWordConfig.encode(message.wakeWord, writer.uint32(26).fork()).join();
         }
         if (message.agentLoop !== undefined) {
             exports.AgentLoopConfig.encode(message.agentLoop, writer.uint32(34).fork()).join();
@@ -204,13 +195,6 @@ exports.SolutionConfig = {
                         break;
                     }
                     message.rag = exports.RAGConfig.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.wakeWord = exports.WakeWordConfig.decode(reader, reader.uint32());
                     continue;
                 }
                 case 4: {
@@ -243,11 +227,6 @@ exports.SolutionConfig = {
                     ? exports.VoiceAgentConfig.fromJSON(object.voice_agent)
                     : undefined,
             rag: isSet(object.rag) ? exports.RAGConfig.fromJSON(object.rag) : undefined,
-            wakeWord: isSet(object.wakeWord)
-                ? exports.WakeWordConfig.fromJSON(object.wakeWord)
-                : isSet(object.wake_word)
-                    ? exports.WakeWordConfig.fromJSON(object.wake_word)
-                    : undefined,
             agentLoop: isSet(object.agentLoop)
                 ? exports.AgentLoopConfig.fromJSON(object.agentLoop)
                 : isSet(object.agent_loop)
@@ -268,9 +247,6 @@ exports.SolutionConfig = {
         if (message.rag !== undefined) {
             obj.rag = exports.RAGConfig.toJSON(message.rag);
         }
-        if (message.wakeWord !== undefined) {
-            obj.wakeWord = exports.WakeWordConfig.toJSON(message.wakeWord);
-        }
         if (message.agentLoop !== undefined) {
             obj.agentLoop = exports.AgentLoopConfig.toJSON(message.agentLoop);
         }
@@ -288,9 +264,6 @@ exports.SolutionConfig = {
             ? exports.VoiceAgentConfig.fromPartial(object.voiceAgent)
             : undefined;
         message.rag = (object.rag !== undefined && object.rag !== null) ? exports.RAGConfig.fromPartial(object.rag) : undefined;
-        message.wakeWord = (object.wakeWord !== undefined && object.wakeWord !== null)
-            ? exports.WakeWordConfig.fromPartial(object.wakeWord)
-            : undefined;
         message.agentLoop = (object.agentLoop !== undefined && object.agentLoop !== null)
             ? exports.AgentLoopConfig.fromPartial(object.agentLoop)
             : undefined;
@@ -1060,150 +1033,6 @@ exports.RAGConfig = {
         message.bm25B = object.bm25B ?? 0;
         message.rrfK = object.rrfK ?? 0;
         message.promptTemplate = object.promptTemplate ?? "";
-        message.typeKind = object.typeKind ?? undefined;
-        return message;
-    },
-};
-function createBaseWakeWordConfig() {
-    return { modelId: "", keyword: "", threshold: 0, preRollMs: 0, sampleRateHz: 0, typeKind: undefined };
-}
-exports.WakeWordConfig = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.modelId !== "") {
-            writer.uint32(10).string(message.modelId);
-        }
-        if (message.keyword !== "") {
-            writer.uint32(18).string(message.keyword);
-        }
-        if (message.threshold !== 0) {
-            writer.uint32(29).float(message.threshold);
-        }
-        if (message.preRollMs !== 0) {
-            writer.uint32(32).int32(message.preRollMs);
-        }
-        if (message.sampleRateHz !== 0) {
-            writer.uint32(40).int32(message.sampleRateHz);
-        }
-        if (message.typeKind !== undefined) {
-            writer.uint32(48).int32(message.typeKind);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseWakeWordConfig();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.keyword = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 29) {
-                        break;
-                    }
-                    message.threshold = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.preRollMs = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.sampleRateHz = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.typeKind = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            keyword: isSet(object.keyword) ? globalThis.String(object.keyword) : "",
-            threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
-            preRollMs: isSet(object.preRollMs)
-                ? globalThis.Number(object.preRollMs)
-                : isSet(object.pre_roll_ms)
-                    ? globalThis.Number(object.pre_roll_ms)
-                    : 0,
-            sampleRateHz: isSet(object.sampleRateHz)
-                ? globalThis.Number(object.sampleRateHz)
-                : isSet(object.sample_rate_hz)
-                    ? globalThis.Number(object.sample_rate_hz)
-                    : 0,
-            typeKind: isSet(object.typeKind)
-                ? solutionTypeFromJSON(object.typeKind)
-                : isSet(object.type_kind)
-                    ? solutionTypeFromJSON(object.type_kind)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.keyword !== "") {
-            obj.keyword = message.keyword;
-        }
-        if (message.threshold !== 0) {
-            obj.threshold = message.threshold;
-        }
-        if (message.preRollMs !== 0) {
-            obj.preRollMs = Math.round(message.preRollMs);
-        }
-        if (message.sampleRateHz !== 0) {
-            obj.sampleRateHz = Math.round(message.sampleRateHz);
-        }
-        if (message.typeKind !== undefined) {
-            obj.typeKind = solutionTypeToJSON(message.typeKind);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.WakeWordConfig.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseWakeWordConfig();
-        message.modelId = object.modelId ?? "";
-        message.keyword = object.keyword ?? "";
-        message.threshold = object.threshold ?? 0;
-        message.preRollMs = object.preRollMs ?? 0;
-        message.sampleRateHz = object.sampleRateHz ?? 0;
         message.typeKind = object.typeKind ?? undefined;
         return message;
     },

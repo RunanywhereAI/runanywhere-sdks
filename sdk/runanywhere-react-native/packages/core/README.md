@@ -20,6 +20,7 @@ Core SDK for RunAnywhere React Native. Foundation package providing the public A
 
 This package is **required** for all RunAnywhere functionality. Additional capabilities are provided by:
 - `@runanywhere/llamacpp` — LLM text generation (GGUF models)
+- `@runanywhere/mlx` — Apple MLX inference (LLM, VLM, speech, embeddings)
 - `@runanywhere/onnx` — Speech-to-Text and Text-to-Speech
 
 ---
@@ -243,14 +244,16 @@ RunAnywhere.registerTool(
 #### Generate with Tools
 
 ```typescript
+import { ToolCallFormatName } from '@runanywhere/proto-ts/tool_calling';
+
 const result = await RunAnywhere.generateWithTools(
   'What is the weather in San Francisco?',
   {
     autoExecute: true,         // Automatically execute tool calls
-    maxIterations: 3,          // Max tool invocations per turn
+    maxToolCalls: 3,           // Max tool invocations per turn
     temperature: 0.7,
     maxTokens: 512,
-    formatHint: 'default',     // 'default' or 'lfm2' for Liquid AI models
+    format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     keepToolsAvailable: false, // Remove tools after first call
   }
 );
@@ -470,7 +473,7 @@ for stable observability.
 import { SDKLogger, LogLevel } from '@runanywhere/core/internal';
 
 // Set global log level
-RunAnywhere.setLogLevel(LogLevel.Debug);
+RunAnywhere.setLogLevel(LogLevel.LOG_LEVEL_DEBUG);
 
 // Create custom logger
 const logger = new SDKLogger('MyModule');
@@ -631,7 +634,7 @@ This package includes native bindings via Nitrogen/Nitro for:
 
 - **RACommons** — Core C++ infrastructure
 - **PlatformAdapter** — Platform-specific implementations
-- **SecureStorage** — Keychain (iOS) / EncryptedSharedPreferences (Android)
+- **SecureStorage** — Keychain (iOS) / Android Keystore-backed storage (Android)
 - **SDKLogger** — Native logging
 - **AudioDecoder** — Audio file decoding
 
@@ -652,10 +655,11 @@ Native libraries (`librac_commons.so`, `librunanywhere_jni.so`) are staged into
 - [Main SDK README](../../README.md) — Full SDK documentation
 - [API Reference](../../Docs/Documentation.md) — Complete API docs
 - [@runanywhere/llamacpp](../llamacpp/README.md) — LLM backend
+- [@runanywhere/mlx](../mlx/README.md) — Apple MLX backend
 - [@runanywhere/onnx](../onnx/README.md) — STT/TTS backend
 
 ---
 
 ## License
 
-MIT License
+RunAnywhere License. See [LICENSE](LICENSE) for details.

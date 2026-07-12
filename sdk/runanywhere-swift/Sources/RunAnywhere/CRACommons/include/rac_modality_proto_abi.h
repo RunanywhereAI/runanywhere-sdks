@@ -2,8 +2,8 @@
  * @file rac_modality_proto_abi.h
  * @brief Optional generated-proto modality ABI declarations.
  *
- * Swift resolves these symbols with dlsym so older RACommons binaries can
- * report an explicit unsupported-symbol error instead of hard-linking.
+ * Swift resolves optional modality capabilities with dlsym so unavailable
+ * features report an explicit unsupported-symbol error.
  */
 
 #ifndef RAC_MODALITY_PROTO_ABI_H
@@ -113,12 +113,10 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(
     rac_proto_buffer_t* out_result);
 
 // VLM proto ABI.
-RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle,
-                                           const uint8_t* image_proto_bytes,
-                                           size_t image_proto_size,
-                                           const uint8_t* options_proto_bytes,
-                                           size_t options_proto_size,
-                                           rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_vlm_generate_proto(
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 // Typed stream ABI: serialized runanywhere.v1.VLMGenerationRequest in,
 // serialized runanywhere.v1.VLMStreamEvent per callback. Lifecycle-owned
 // model — no handle, no out-result buffer.
@@ -127,7 +125,6 @@ RAC_API rac_result_t rac_vlm_stream_proto(
     size_t request_proto_size,
     rac_modality_proto_control_callback_fn callback,
     void* user_data);
-RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
 RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event);
 
 // Embeddings proto ABI.

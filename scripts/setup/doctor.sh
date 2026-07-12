@@ -131,9 +131,14 @@ NODE_OK=0; NODE_VER=""
 if have node; then
     NODE_VER=$(run_to 3 node -v | sed 's/^v//')
     NODE_MAJOR=$(echo "${NODE_VER}" | cut -d. -f1)
-    [ -n "${NODE_MAJOR}" ] && [ "${NODE_MAJOR}" -ge 20 ] 2>/dev/null && NODE_OK=1
+    NODE_MINOR=$(echo "${NODE_VER}" | cut -d. -f2)
+    if { [ "${NODE_MAJOR}" -eq 20 ] && [ "${NODE_MINOR}" -ge 19 ]; } 2>/dev/null ||
+       { [ "${NODE_MAJOR}" -eq 22 ] && [ "${NODE_MINOR}" -ge 12 ]; } 2>/dev/null ||
+       { [ "${NODE_MAJOR}" -gt 22 ]; } 2>/dev/null; then
+        NODE_OK=1
+    fi
 fi
-bool_row "Node ≥20" "${NODE_OK}" "${NODE_VER}" "install Node 20 or newer"
+bool_row "Node 20.19+ / 22.12+" "${NODE_OK}" "${NODE_VER}" "required by Vite 8"
 
 YARN_OK=0; YARN_VER=""
 if have yarn; then YARN_VER=$(run_to 3 yarn -v); YARN_OK=1; fi

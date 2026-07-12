@@ -8,7 +8,6 @@
 #
 # Options:
 #   --force        Re-download all models even if they exist
-#   --wakeword     Also download wake word detection models
 #   --llm <model>  Specify which LLM to download (default: qwen3-1.7b)
 #   --all-llms     Download all available LLM models
 #   --list-llms    List available LLM models
@@ -24,10 +23,6 @@
 #   - qwen3-1.7b     (~1.83GB) - Good balance (DEFAULT)
 #   - llama-3.2-3b   (~2.0GB)  - Meta's efficient model
 #   - qwen3-4b       (~2.5GB)  - Best quality, needs 8GB Pi
-#
-# Optional Wake Word Models:
-#   - openWakeWord Embedding (~15MB) - Feature extraction
-#   - Hey Jarvis Model (~5MB) - Wake word detection
 # =============================================================================
 
 set -e
@@ -115,7 +110,6 @@ MODEL_ORDER="qwen3-0.6b lfm-1.2b qwen3-1.7b llama-3.2-3b qwen3-4b"
 
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 FORCE_DOWNLOAD=false
-DOWNLOAD_WAKEWORD=false
 SELECTED_LLM="${DEFAULT_LLM}"
 DOWNLOAD_ALL_LLMS=false
 
@@ -151,10 +145,6 @@ while [[ "$#" -gt 0 ]]; do
             FORCE_DOWNLOAD=true
             shift
             ;;
-        --wakeword)
-            DOWNLOAD_WAKEWORD=true
-            shift
-            ;;
         --llm)
             if [ -z "$2" ] || [[ "$2" == --* ]]; then
                 print_error "Missing model name after --llm"
@@ -182,7 +172,6 @@ while [[ "$#" -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --force        Re-download all models even if they exist"
-            echo "  --wakeword     Also download wake word detection models"
             echo "  --llm <model>  Specify which LLM to download (default: ${DEFAULT_LLM})"
             echo "  --all-llms     Download all available LLM models"
             echo "  --list-llms    List available LLM models"
@@ -199,7 +188,6 @@ done
 print_header "Downloading Voice Assistant Models"
 echo "Model directory: ${MODEL_DIR}"
 echo "Force download: ${FORCE_DOWNLOAD}"
-echo "Wake word models: ${DOWNLOAD_WAKEWORD}"
 if [ "${DOWNLOAD_ALL_LLMS}" = true ]; then
     echo "LLM models: ALL"
 else
@@ -207,14 +195,14 @@ else
 fi
 
 # Create base directories
-mkdir -p "${MODEL_DIR}/ONNX"
+mkdir -p "${MODEL_DIR}/Sherpa"
 mkdir -p "${MODEL_DIR}/LlamaCpp"
 
 # =============================================================================
 # 1. Silero VAD (~2MB)
 # =============================================================================
 
-VAD_DIR="${MODEL_DIR}/ONNX/silero-vad"
+VAD_DIR="${MODEL_DIR}/Sherpa/silero-vad"
 VAD_FILE="${VAD_DIR}/silero_vad.onnx"
 
 print_step "Downloading Silero VAD..."
@@ -232,7 +220,7 @@ fi
 # 2. Whisper Tiny English (~150MB via Sherpa-ONNX)
 # =============================================================================
 
-STT_DIR="${MODEL_DIR}/ONNX/whisper-tiny-en"
+STT_DIR="${MODEL_DIR}/Sherpa/whisper-tiny-en"
 STT_FILE="${STT_DIR}/whisper-tiny.en-encoder.onnx"
 
 print_step "Downloading Whisper Tiny English..."
@@ -261,7 +249,7 @@ fi
 # 3. VITS Piper English US Lessac (~65MB)
 # =============================================================================
 
-TTS_DIR="${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
+TTS_DIR="${MODEL_DIR}/Sherpa/vits-piper-en_US-lessac-medium"
 TTS_FILE="${TTS_DIR}/en_US-lessac-medium.onnx"
 
 print_step "Downloading VITS Piper English US (Lessac)..."
@@ -330,53 +318,6 @@ else
 fi
 
 # =============================================================================
-# 5. Wake Word Models (optional)
-# =============================================================================
-
-if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
-    print_header "Downloading Wake Word Models"
-
-    WAKEWORD_DIR="${MODEL_DIR}/ONNX/openwakeword"
-    mkdir -p "${WAKEWORD_DIR}"
-
-    # Download embedding model (shared backbone)
-    EMBEDDING_FILE="${WAKEWORD_DIR}/embedding_model.onnx"
-    print_step "Downloading openWakeWord embedding model..."
-    if [ -f "${EMBEDDING_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_success "openWakeWord embedding model already exists, skipping"
-    else
-        curl -L --progress-bar -o "${EMBEDDING_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/embedding_model.onnx"
-        print_success "openWakeWord embedding model downloaded"
-    fi
-
-    # Download melspectrogram model
-    MELSPEC_FILE="${WAKEWORD_DIR}/melspectrogram.onnx"
-    print_step "Downloading melspectrogram model..."
-    if [ -f "${MELSPEC_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_success "Melspectrogram model already exists, skipping"
-    else
-        curl -L --progress-bar -o "${MELSPEC_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/melspectrogram.onnx"
-        print_success "Melspectrogram model downloaded"
-    fi
-
-    # Download Hey Jarvis model
-    WAKEWORD_MODEL_DIR="${MODEL_DIR}/ONNX/hey-jarvis"
-    JARVIS_FILE="${WAKEWORD_MODEL_DIR}/hey_jarvis_v0.1.onnx"
-    mkdir -p "${WAKEWORD_MODEL_DIR}"
-
-    print_step "Downloading Hey Jarvis wake word model..."
-    if [ -f "${JARVIS_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
-        print_success "Hey Jarvis wake word model already exists, skipping"
-    else
-        curl -L --progress-bar -o "${JARVIS_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/hey_jarvis_v0.1.onnx"
-        print_success "Hey Jarvis wake word model downloaded"
-    fi
-fi
-
-# =============================================================================
 # Summary
 # =============================================================================
 
@@ -411,13 +352,6 @@ for model_dir in "${MODEL_DIR}/LlamaCpp/"*/; do
     fi
 done
 
-if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
-    echo ""
-    echo "Wake Word (openWakeWord):"
-    ls -lh "${MODEL_DIR}/ONNX/openwakeword"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
-    ls -lh "${MODEL_DIR}/ONNX/hey-jarvis"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
-fi
-
 echo ""
 
 # Calculate total size
@@ -445,10 +379,4 @@ else
     echo "To download additional LLMs, run:"
     echo "  ./download-models.sh --llm <model-id>"
     echo "  ./download-models.sh --list-llms     # See available models"
-fi
-
-if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
-    echo ""
-    echo "Wake word models downloaded. To enable, run:"
-    echo "  ./voice-assistant --wakeword"
 fi

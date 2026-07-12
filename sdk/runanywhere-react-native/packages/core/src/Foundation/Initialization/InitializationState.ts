@@ -62,11 +62,6 @@ export interface InitializationState {
   initParams: SDKInitOptions | null;
 
   /**
-   * Backend type in use (e.g., 'llamacpp', 'onnx')
-   */
-  backendType: string | null;
-
-  /**
    * Error if initialization failed
    */
   error: Error | null;
@@ -94,7 +89,6 @@ export function createInitialState(): InitializationState {
     httpSetupApplicable: true,
     environment: null,
     initParams: null,
-    backendType: null,
     error: null,
     coreInitTimestamp: null,
     servicesInitTimestamp: null,
@@ -106,8 +100,7 @@ export function createInitialState(): InitializationState {
  */
 export function markCoreInitialized(
   state: InitializationState,
-  params: SDKInitOptions,
-  backendType: string | null
+  params: SDKInitOptions
 ): InitializationState {
   return {
     ...state,
@@ -115,7 +108,6 @@ export function markCoreInitialized(
     isCoreInitialized: true,
     environment: params.environment ?? null,
     initParams: params,
-    backendType,
     coreInitTimestamp: Date.now(),
     error: null,
   };

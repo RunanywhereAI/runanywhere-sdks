@@ -3,11 +3,11 @@
 //
 //  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
 //  `argumentsJson` / `resultJson` (oneof tree), and tight RA*
-//  convenience inits/getters consumed by the example app or SDK internals.
+//  convenience initializers/getters consumed by the example app or SDK internals.
 //
 //  The recursive ToolValue <-> JSON walk now lives in commons behind
 //  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
-//  no longer hand-rolls it. Public API shape is preserved.
+//  no longer hand-rolls it.
 //
 
 import CRACommons
@@ -72,7 +72,7 @@ public extension RAToolValue {
         ) else { return nil }
         guard pretty else { return wrapper.json }
         // Pretty-print is a presentation concern; let Foundation render the
-        // already-canonical JSON text to preserve the legacy public API.
+        // already-canonical JSON text.
         guard let data = wrapper.json.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let pretty = try? JSONSerialization.data(
@@ -148,24 +148,9 @@ public extension RAToolDefinition {
 public extension RAToolCallingOptions {
     static func defaults() -> RAToolCallingOptions {
         var output = RAToolCallingOptions()
-        output.maxIterations = 5; output.maxToolCalls = 5; output.autoExecute = true
-        output.format = .json; output.formatHint = "default"
+        output.maxToolCalls = 5
+        output.autoExecute = true
+        output.format = .json
         return output
-    }
-}
-
-extension RAToolCallingOptions {
-    var maxToolCallCount: Int {
-        let explicit = hasMaxToolCalls ? maxToolCalls : maxIterations
-        return Int(explicit > 0 ? explicit : 5)
-    }
-
-    var resolvedFormatName: String {
-        // Delegate the proto-enum -> hint-string mapping to commons so every SDK
-        // shares one source of truth (rac_tool_call_format_hint_from_format_name).
-        if hasFormat {
-            return String(cString: rac_tool_call_format_hint_from_format_name(Int32(format.rawValue)))
-        }
-        return formatHint.isEmpty ? "default" : formatHint
     }
 }

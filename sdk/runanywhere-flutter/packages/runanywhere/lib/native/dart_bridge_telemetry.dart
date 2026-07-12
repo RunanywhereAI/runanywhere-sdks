@@ -44,6 +44,8 @@ class DartBridgeTelemetry {
   static SDKEnvironment? _environment;
   static Pointer<Void>? _managerPtr;
   static NativeCallable<Void Function(Pointer<Void>)>? _httpWakeup;
+  static final Set<Future<void>> _inFlightHttpRequests = {};
+  static bool _acceptingHttpRequests = false;
 
   // ============================================================================
   // Lifecycle
@@ -71,8 +73,8 @@ class DartBridgeTelemetry {
             >('rac_telemetry_manager_flush');
         flushFn(_managerPtr!);
         _logger.debug('Telemetry flushed');
-      } catch (e) {
-        _logger.debug('flush error: $e');
+      } catch (_) {
+        _logger.debug('Telemetry flush failed');
       }
     }
   }
@@ -98,8 +100,8 @@ class DartBridgeTelemetry {
         deviceId,
       );
       _logger.debug('Telemetry sink attached in Phase 1');
-    } catch (e) {
-      _logger.debug('Phase-1 telemetry attach failed: $e');
+    } catch (_) {
+      _logger.debug('Phase-1 telemetry attach failed');
     }
   }
 
@@ -154,6 +156,7 @@ class DartBridgeTelemetry {
         return;
       }
       _managerPtr = ptr;
+      _acceptingHttpRequests = true;
       // Register the HTTP wake-up + attach the sink so the router feeds events
       // into the manager (queued until Phase-2 flush).
       _registerHttpCallback();
@@ -219,42 +222,75 @@ class DartBridgeTelemetry {
 
       _isInitialized = true;
       _logger.debug('Telemetry manager initialized');
-    } catch (e, stack) {
-      _logger.debug(
-        'Telemetry initialization error: $e',
-        metadata: {'stack': stack.toString()},
-      );
+    } catch (_) {
+      _logger.debug('Telemetry initialization failed');
       _isInitialized = true; // Avoid retry loops
     }
   }
 
   /// Shutdown telemetry manager
-  static void shutdown() {
-    if (!_isInitialized || _managerPtr == null) return;
-
+  static Future<void> shutdown() async {
+    final managerPtr = _managerPtr;
+    if (managerPtr == null) {
+      _isInitialized = false;
+      _environment = null;
+      _acceptingHttpRequests = false;
+      return;
+    }
+    var managerDestroyed = false;
     try {
       final lib = PlatformLoader.loadCommons();
 
       // Detach the telemetry sink first so the C++ router stops feeding events
-      // into a manager we are about to destroy.
-      _setTelemetrySink(nullptr);
+      // into a manager we are about to destroy. This is a strict ownership
+      // boundary: on failure the pointer and wake-up callable stay alive so a
+      // fail-closed reset retry can quiesce them safely.
+      _setTelemetrySink(nullptr, requireSuccess: true);
 
-      // Close the cross-isolate wake-up callable.
-      _httpWakeup?.close();
-      _httpWakeup = null;
+      try {
+        // Flush synchronously, then drain the manager-owned queue directly.
+        // NativeCallable.listener wake-ups are asynchronous, so closing the
+        // callable immediately after flush would otherwise drop the terminal
+        // shutdown batch.
+        final flush = lib
+            .lookupFunction<
+              Int32 Function(Pointer<Void>),
+              int Function(Pointer<Void>)
+            >('rac_telemetry_manager_flush');
+        flush(managerPtr);
+      } catch (_) {
+        _logger.debug('Telemetry flush failed during shutdown');
+      }
+      drainHttpQueue();
+      _acceptingHttpRequests = false;
+
+      // No later SDK lifetime may reuse HTTP credentials while an older
+      // telemetry request is still running. Requests swallow their own
+      // transport errors, so this join is deterministic.
+      while (_inFlightHttpRequests.isNotEmpty) {
+        await Future.wait(List<Future<void>>.of(_inFlightHttpRequests));
+      }
 
       final destroy = lib
           .lookupFunction<
             Void Function(Pointer<Void>),
             void Function(Pointer<Void>)
           >('rac_telemetry_manager_destroy');
-
-      destroy(_managerPtr!);
-      _managerPtr = null;
-      _isInitialized = false;
+      destroy(managerPtr);
+      managerDestroyed = true;
       _logger.debug('Telemetry manager shutdown');
-    } catch (e) {
-      _logger.debug('Telemetry shutdown error: $e');
+    } catch (_) {
+      _logger.error('Telemetry shutdown failed');
+      rethrow;
+    } finally {
+      if (managerDestroyed) {
+        if (_managerPtr == managerPtr) _managerPtr = null;
+        _isInitialized = false;
+        _environment = null;
+        _acceptingHttpRequests = false;
+        _httpWakeup?.close();
+        _httpWakeup = null;
+      }
     }
   }
 
@@ -262,7 +298,10 @@ class DartBridgeTelemetry {
   /// router's telemetry sink. Matches how the other one-shot C functions are
   /// looked up in this file. The C signature is
   /// `void rac_events_set_telemetry_sink(void* telemetry_manager)`.
-  static void _setTelemetrySink(Pointer<Void> manager) {
+  static void _setTelemetrySink(
+    Pointer<Void> manager, {
+    bool requireSuccess = false,
+  }) {
     try {
       final lib = PlatformLoader.loadCommons();
       final setSink = lib
@@ -274,8 +313,9 @@ class DartBridgeTelemetry {
       _logger.debug(
         'Telemetry sink ${manager == nullptr ? "detached" : "attached"}',
       );
-    } catch (e) {
-      _logger.debug('Failed to set telemetry sink: $e');
+    } catch (_) {
+      _logger.debug('Failed to update telemetry sink');
+      if (requireSuccess) rethrow;
     }
   }
 
@@ -314,8 +354,8 @@ class DartBridgeTelemetry {
       _httpWakeup = wakeup;
       setWakeup(_managerPtr!, wakeup.nativeFunction, nullptr);
       _logger.debug('Telemetry HTTP wake-up registered');
-    } catch (e) {
-      _logger.debug('Failed to register HTTP wake-up: $e');
+    } catch (_) {
+      _logger.debug('Failed to register telemetry HTTP wake-up');
     }
   }
 
@@ -324,7 +364,7 @@ class DartBridgeTelemetry {
   /// [u8 requiresAuth][u32 LE endpointLen][endpoint][json].
   static void drainHttpQueue() {
     final managerPtr = _managerPtr;
-    if (managerPtr == null) return;
+    if (managerPtr == null || !_acceptingHttpRequests) return;
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -354,14 +394,20 @@ class DartBridgeTelemetry {
               bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
           final endpoint = utf8.decode(bytes.sublist(5, 5 + endpointLen));
           final body = utf8.decode(bytes.sublist(5 + endpointLen));
-          unawaited(_sendTelemetryHttp(endpoint, body, requiresAuth));
+          late final Future<void> request;
+          request = _sendTelemetryHttp(
+            endpoint,
+            body,
+            requiresAuth,
+          ).whenComplete(() => _inFlightHttpRequests.remove(request));
+          _inFlightHttpRequests.add(request);
         } finally {
           bindings.rac_proto_buffer_free(out);
           calloc.free(out);
         }
       }
-    } catch (e) {
-      _logger.debug('Telemetry HTTP queue drain error: $e');
+    } catch (_) {
+      _logger.debug('Telemetry HTTP queue drain failed');
     }
   }
 
@@ -424,16 +470,11 @@ Future<void> _sendTelemetryHttp(
 
     if (response.isSuccess) {
       DartBridgeTelemetry._logger.info(
-        'Telemetry POST $endpoint -> ${response.statusCode} OK',
+        'Telemetry POST succeeded with status ${response.statusCode}',
       );
     } else {
-      // Surface the real reason — commons only logs the error string, and a
-      // non-2xx carries its detail in the body (e.g. a 422 extra="forbid"
-      // field, a 404 missing endpoint). Truncated to keep logs readable.
-      final detail = response.body;
       DartBridgeTelemetry._logger.warning(
-        'Telemetry POST $endpoint -> ${response.statusCode}: '
-        '${detail.length > 400 ? detail.substring(0, 400) : detail}',
+        'Telemetry POST failed with status ${response.statusCode}',
       );
     }
 
@@ -442,8 +483,8 @@ Future<void> _sendTelemetryHttp(
       response.body,
       response.isSuccess ? null : 'HTTP ${response.statusCode}',
     );
-  } catch (e) {
-    _notifyHttpComplete(false, null, e.toString());
+  } catch (_) {
+    _notifyHttpComplete(false, null, 'Telemetry transport failed');
   }
 }
 

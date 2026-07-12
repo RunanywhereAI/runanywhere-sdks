@@ -123,7 +123,16 @@ class VoiceComponentViewModelBase: ObservableObject {
                         || change.event.category == self.eventCategory else { return }
                     switch change.kind {
                     case .loaded:
-                        self.applyCurrentModelSnapshot(reason: "loaded")
+                        guard !change.modelID.isEmpty else {
+                            self.logger.debug("Ignoring loaded lifecycle event without model id")
+                            return
+                        }
+                        let previousModelId = self.selectedModelId
+                        let model = self.resolveLoadedModel(change.modelID)
+                        self.applyLoadedModel(model)
+                        if previousModelId != model.id {
+                            self.logger.info("Voice component model loaded: \(model.id)")
+                        }
                     case .unloaded:
                         self.clearLoadedModel()
                         self.logger.info("Voice component model unloaded")
@@ -141,9 +150,8 @@ class VoiceComponentViewModelBase: ObservableObject {
 
     /// Resolve the current model for this modality via the SDK snapshot and
     /// apply it to published state. Shared by `checkInitialModelState()` (cold
-    /// start) and the lifecycle-loaded sink — the lifecycle change only
-    /// carries `modelID`/`kind`, so the full `RAModelInfo` is re-resolved
-    /// through `RunAnywhere.currentModel` rather than passed from the event.
+    /// start). Lifecycle-loaded events resolve from the event's model id to
+    /// avoid a current-model query feeding back into the lifecycle stream.
     func applyCurrentModelSnapshot(reason: String) {
         var request = RACurrentModelRequest()
         request.category = modelCategory
@@ -158,6 +166,17 @@ class VoiceComponentViewModelBase: ObservableObject {
         }
         applyLoadedModel(model)
         logger.info("Voice component model \(reason): \(model.id)")
+    }
+
+    /// Resolve the full model metadata for a lifecycle event without calling
+    /// back into the SDK current-model API from inside the event handler.
+    func resolveLoadedModel(_ modelId: String) -> RAModelInfo {
+        if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+            return matchingModel
+        }
+        var model = RAModelInfo()
+        model.id = modelId
+        return model
     }
 
     /// Apply a model resolved at startup (or via an event) to published state.

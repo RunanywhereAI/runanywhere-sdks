@@ -173,8 +173,8 @@ extension CppBridge {
 
                 let box = DownloadProtoProgressBox(continuation: continuation)
                 let retained = Unmanaged.passRetained(box)
-                let opaque = retained.toOpaque()
-                let status = setProgressCallback(downloadProtoProgressCallback, opaque)
+                let context = DownloadProtoContextPointer(rawValue: retained.toOpaque())
+                let status = setProgressCallback(downloadProtoProgressCallback, context.rawValue)
 
                 guard status == RAC_SUCCESS else {
                     retained.release()
@@ -193,9 +193,15 @@ extension CppBridge {
                     // callback (which would dereference `userData`) has
                     // returned. The subsequent `Unmanaged.release()` is safe.
                     _ = setProgressCallback(nil, nil)
-                    Unmanaged<DownloadProtoProgressBox>.fromOpaque(opaque).release()
+                    Unmanaged<DownloadProtoProgressBox>.fromOpaque(context.rawValue).release()
                 }
             }
         }
     }
+}
+
+/// Retained callback context released only after the native unregister call
+/// has synchronously quiesced the progress dispatcher.
+private struct DownloadProtoContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
 }

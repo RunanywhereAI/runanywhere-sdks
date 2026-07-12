@@ -4,8 +4,8 @@
  * Top-level Web LoRA API backed by the generated proto-byte C ABI.
  */
 
-import { LoRAProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
+import { LoRAProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import type {
   LoRAAdapterConfig,
   LoRAApplyRequest,
@@ -28,12 +28,12 @@ import {
   type LoraAdapterImportResult,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
-import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
 import {
   getAllRegisteredModules,
   getModuleForCapability,
   tryRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 import {
   InferenceFramework,
   ModelCategory,
@@ -44,7 +44,7 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 
 export type {
   LoRAAdapterConfig,
@@ -122,6 +122,42 @@ export async function applyLoraAdapters(
     'LoRA.apply',
     requireAdapter('LoRA.apply').apply(request),
   );
+}
+
+/**
+ * Apply one registered catalog adapter to the current LLM session.
+ *
+ * Preserves the catalog entry id in the generated config so commons can
+ * validate registered catalog adapters against the loaded base model.
+ */
+export async function applyLoraCatalogAdapter(
+  entry: LoraAdapterCatalogEntry,
+  options: {
+    localPath?: string;
+    scale?: number;
+    replaceExisting?: boolean;
+  } = {},
+): Promise<LoRAApplyResult> {
+  const adapterPath = options.localPath || entry.localPath || '';
+  if (!adapterPath) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+      `LoRA catalog adapter '${entry.id}' has no local path`,
+    );
+  }
+  return applyLoraAdapters({
+    requestId: '',
+    adapters: [
+      {
+        adapterPath,
+        adapterId: entry.id || undefined,
+        scale: options.scale ?? (entry.defaultScale > 0 ? entry.defaultScale : 1.0),
+        metadata: {},
+        targetModules: [],
+      },
+    ],
+    replaceExisting: options.replaceExisting ?? false,
+  });
 }
 
 export async function removeLoraAdapters(
@@ -387,7 +423,6 @@ function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
     framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
     downloadUrl: entry.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    description: entry.description,
     singleFile: {
       requiredPatterns: [artifactFilename],
       expectedFiles,
@@ -441,7 +476,7 @@ export async function downloadLoraAdapter(
   // Dynamic import: RunAnywhere.ts statically imports this module, so the
   // facade (which owns the canonical downloadModel plan/start/poll/OPFS
   // orchestration) is reached lazily to avoid a circular module-eval.
-  const { RunAnywhere } = await import('../RunAnywhere');
+  const { RunAnywhere } = await import('../RunAnywhere.js');
   const finalProgress = await RunAnywhere.downloadModel({
     modelId: artifact.id,
     model: artifact,
@@ -485,6 +520,7 @@ export const LoRA = {
   supportsNativeCatalog: supportsNativeLoRACatalog,
   missingCatalogExports: missingLoRACatalogExports,
   apply: applyLoraAdapters,
+  applyCatalogAdapter: applyLoraCatalogAdapter,
   remove: removeLoraAdapters,
   list: listLoraAdapters,
   state: getLoraState,

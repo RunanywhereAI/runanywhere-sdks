@@ -12,9 +12,9 @@
  * transitions to downloaded inside the canonical layout, a serialized
  * ModelInfo is written to
  *   {base_dir}/RunAnywhere/Models/{framework}/{modelId}/<manifest>
- * (filename from rac_model_folder_manifest_filename(), currently
- * ".rac-manifest.binpb"). At cold launch the discover/refresh paths read the
- * sidecars back and re-register entries that no consumer re-seeded, after
+ * (the private `.rac-manifest.binpb` sidecar). At cold launch the
+ * discover/refresh paths read the sidecars back and re-register entries that
+ * no consumer re-seeded, after
  * validating the folder is complete. Volatile absolute paths are stripped on
  * write and re-derived on restore, so the sidecar survives iOS
  * container-UUID changes and RUNANYWHERE_HOME moves unchanged.
@@ -25,6 +25,7 @@
  * one implementation for every modality and every consumer.
  */
 
+#include "model_manifest_internal.h"
 #include "model_registry_internal.h"
 
 #include <cstring>
@@ -33,12 +34,12 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "infrastructure/rac_path_safety_internal.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -49,7 +50,7 @@ namespace {
 constexpr const char* LOG_CAT = "ModelRegistryManifest";
 
 std::string manifest_path_for_folder(const std::string& folder) {
-    return folder + "/" + rac_model_folder_manifest_filename();
+    return folder + "/" + rac::infra::model_manifest::kFilename;
 }
 
 bool read_file_bytes(const std::string& path, std::string* out) {
@@ -58,6 +59,39 @@ bool read_file_bytes(const std::string& path, std::string* out) {
         return false;
     }
     out->assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    return true;
+}
+
+bool ends_with_ci(const std::string& value, const char* suffix) {
+    if (suffix == nullptr) {
+        return false;
+    }
+    const size_t suffix_len = std::strlen(suffix);
+    if (value.size() < suffix_len) {
+        return false;
+    }
+    for (size_t i = 0; i < suffix_len; ++i) {
+        char a = value[value.size() - suffix_len + i];
+        char b = suffix[i];
+        if (a >= 'A' && a <= 'Z')
+            a = static_cast<char>(a + ('a' - 'A'));
+        if (b >= 'A' && b <= 'Z')
+            b = static_cast<char>(b + ('a' - 'A'));
+        if (a != b) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool should_skip_exact_size_check(const rac_model_info_t* model,
+                                  const rac_model_file_descriptor_t& descriptor, const char* name) {
+    if (model == nullptr || model->framework != RAC_FRAMEWORK_QHEXRT || name == nullptr) {
+        return false;
+    }
+    if (!ends_with_ci(name, ".json")) {
+        return false;
+    }
     return true;
 }
 
@@ -141,6 +175,9 @@ bool model_folder_is_complete_struct(const rac_model_info_t* model, const std::s
             const fs::path on_disk = fs::path(folder) / name;
             if (!fs::exists(on_disk, ec)) {
                 continue;  // absence is the resolver's call (required vs optional)
+            }
+            if (should_skip_exact_size_check(model, descriptor, name)) {
+                continue;
             }
             const auto actual = fs::file_size(on_disk, ec);
             if (!ec && static_cast<int64_t>(actual) != descriptor.size_bytes) {
@@ -328,7 +365,7 @@ bool try_restore_model_manifest_by_id(rac_model_registry_handle_t handle,
             continue;
         }
         const fs::path folder = framework_dir.path() / model_id;
-        if (!fs::exists(folder / rac_model_folder_manifest_filename(), ec)) {
+        if (!fs::exists(folder / rac::infra::model_manifest::kFilename, ec)) {
             continue;
         }
         return restore_manifest_folder(handle, folder.generic_string(), model_id);
@@ -402,12 +439,12 @@ int32_t restore_models_from_folder_manifests(rac_model_registry_handle_t handle)
 #endif  // RAC_HAVE_PROTOBUF
 
 // =============================================================================
-// PUBLIC API
+// PRIVATE CROSS-TU API
 // =============================================================================
 
-extern "C" rac_result_t
-rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,
-                                           const char* model_id) {
+namespace rac::infra::model_manifest {
+
+rac_result_t persist(rac_model_registry_handle_t handle, const char* model_id) {
 #ifndef RAC_HAVE_PROTOBUF
     (void)handle;
     (void)model_id;
@@ -448,3 +485,5 @@ rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,
     return RAC_SUCCESS;
 #endif
 }
+
+}  // namespace rac::infra::model_manifest

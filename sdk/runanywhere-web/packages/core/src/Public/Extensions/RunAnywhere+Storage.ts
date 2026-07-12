@@ -33,10 +33,10 @@ import type {
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
 import { StorageDeleteRequest as StorageDeleteRequestMessage } from '@runanywhere/proto-ts/storage_types';
-import { SDKException } from '../../Foundation/SDKException';
-import { StorageAdapter } from '../../Adapters/StorageAdapter';
-import { ModelRegistry } from './RunAnywhere+ModelRegistry';
-import { categoryRequiresContextLength } from '../../types/ModelTypes+Artifacts';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { StorageAdapter } from '../../Adapters/StorageAdapter.js';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
+import { categoryRequiresContextLength } from '../../types/ModelTypes+Artifacts.js';
 
 function requireNativeStorage(operation: string): StorageAdapter {
   const adapter = StorageAdapter.tryDefault();
@@ -122,8 +122,8 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
       return result;
     },
 
-    delete(request: StorageDeleteRequest): StorageDeleteResult {
-      const result = requireNativeStorage('storage.delete').delete(request);
+    async delete(request: StorageDeleteRequest): Promise<StorageDeleteResult> {
+      const result = await requireNativeStorage('storage.delete').delete(request);
       if (!result) {
         throw SDKException.backendNotAvailable('storage.delete', 'Native storage analyzer returned no result.');
       }
@@ -137,7 +137,7 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
      * Convenience over `delete` with the canonical flag set — mirrors Swift
      * `RunAnywhere.deleteModel(_:)`.
      */
-    deleteModel(modelId: string): StorageDeleteResult {
+    deleteModel(modelId: string): Promise<StorageDeleteResult> {
       return this.delete(
         StorageDeleteRequestMessage.fromPartial({
           modelIds: [modelId],
@@ -304,7 +304,13 @@ function buildSingleFileModelInfo(
       ?? (categoryRequiresContextLength(category) ? 2048 : 0),
     supportsThinking: options.supportsThinking ?? false,
     supportsLora: options.supportsLora ?? false,
-    description: options.description ?? '',
+    metadata: {
+      description: options.description ?? '',
+      author: '',
+      license: '',
+      tags: [],
+      version: '',
+    },
     source: options.source ?? ModelSource.MODEL_SOURCE_REMOTE,
     createdAtUnixMs: now,
     updatedAtUnixMs: now,
@@ -339,7 +345,13 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
       ?? (categoryRequiresContextLength(category) ? 2048 : 0),
     supportsThinking: options.supportsThinking ?? false,
     supportsLora: options.supportsLora ?? false,
-    description: options.description ?? '',
+    metadata: {
+      description: options.description ?? '',
+      author: '',
+      license: '',
+      tags: [],
+      version: '',
+    },
     source: options.source ?? ModelSource.MODEL_SOURCE_REMOTE,
     createdAtUnixMs: now,
     updatedAtUnixMs: now,

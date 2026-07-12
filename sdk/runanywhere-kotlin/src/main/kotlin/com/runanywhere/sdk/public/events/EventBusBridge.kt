@@ -14,68 +14,72 @@ package com.runanywhere.sdk.public.events
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import java.util.concurrent.atomic.AtomicLong
 
 private val logger = SDKLogger("EventBusBridge")
 
-/**
- * Active native subscription id (rac_sdk_event_subscribe handle). Held
- * atomically so [startNativeSubscription] / [stopNativeSubscription] can
- * be called from any thread without coarse locking. Zero means no
- * subscription is currently active.
- */
-private val nativeSubscriptionId = AtomicLong(0L)
+internal class NativeSubscriptionLifecycle(
+    private val subscribe: () -> Long,
+    private val unsubscribe: (Long) -> Unit,
+) {
+    private val lock = Any()
+    private var subscriptionId = 0L
+
+    fun start(): Boolean =
+        synchronized(lock) {
+            if (subscriptionId != 0L) return@synchronized false
+            val newSubscriptionId = subscribe()
+            if (newSubscriptionId == 0L) return@synchronized false
+            subscriptionId = newSubscriptionId
+            true
+        }
+
+    fun stop(): Boolean =
+        synchronized(lock) {
+            if (subscriptionId == 0L) return@synchronized false
+            unsubscribe(subscriptionId)
+            // Keep ownership when unsubscribe throws so shutdown can retry.
+            subscriptionId = 0L
+            true
+        }
+}
+
+private val nativeSubscriptionLifecycle =
+    NativeSubscriptionLifecycle(
+        subscribe = {
+            // The native callback fires on a JNI thread; MutableSharedFlow.tryEmit
+            // is non-suspending, so this never blocks the publisher.
+            CppBridgeSDKEventStream.subscribe { event -> EventBus.emitFromNative(event) }
+        },
+        unsubscribe = CppBridgeSDKEventStream::unsubscribe,
+    )
 
 internal fun startNativeSubscription() {
-    // Idempotent: if a subscription already exists, leave it in place.
-    if (nativeSubscriptionId.get() != 0L) {
-        return
-    }
-
-    val subscriptionId =
-        try {
-            // The native callback fires on a JNI thread; we hop straight
-            // into MutableSharedFlow.tryEmit (non-suspending) so we never
-            // block the caller.
-            CppBridgeSDKEventStream.subscribe { event ->
-                EventBus.emitFromNative(event)
-            }
-        } catch (e: UnsatisfiedLinkError) {
-            logger.warn("Native SDK event subscription unavailable: ${e.message}")
-            0L
-        } catch (e: Throwable) {
-            logger.warn("Native SDK event subscription failed: ${e.message}")
-            0L
+    try {
+        if (nativeSubscriptionLifecycle.start()) {
+            logger.debug("Native SDK event subscription started")
         }
-
-    if (subscriptionId != 0L) {
-        // Lost-race protection: if another thread won and already stored
-        // a subscription, immediately tear ours back down to avoid
-        // duplicate native subscriptions.
-        if (!nativeSubscriptionId.compareAndSet(0L, subscriptionId)) {
-            try {
-                CppBridgeSDKEventStream.unsubscribe(subscriptionId)
-            } catch (_: Throwable) {
-                // Best-effort cleanup; swallow.
-            }
-        } else {
-            logger.debug("Native SDK event subscription started (id=$subscriptionId)")
-        }
+    } catch (_: UnsatisfiedLinkError) {
+        logger.warn("Native SDK event subscription unavailable")
+    } catch (_: Throwable) {
+        logger.warn("Native SDK event subscription failed")
     }
 }
 
-internal fun stopNativeSubscription() {
-    val subscriptionId = nativeSubscriptionId.getAndSet(0L)
-    if (subscriptionId == 0L) {
-        return
-    }
+internal fun stopNativeSubscription(
+    lifecycle: NativeSubscriptionLifecycle = nativeSubscriptionLifecycle,
+): Boolean {
     try {
-        CppBridgeSDKEventStream.unsubscribe(subscriptionId)
-        logger.debug("Native SDK event subscription stopped (id=$subscriptionId)")
-    } catch (e: UnsatisfiedLinkError) {
-        // Native lib already torn down; nothing to do.
-    } catch (e: Throwable) {
-        logger.warn("Native SDK event unsubscribe failed: ${e.message}")
+        val stopped = lifecycle.stop()
+        if (stopped) {
+            logger.debug("Native SDK event subscription stopped")
+        }
+        return stopped
+    } catch (error: Throwable) {
+        // A thrown unsubscribe leaves NativeSubscriptionLifecycle owning the
+        // id. Propagate so CppBridge keeps shutdown retry-required; swallowing
+        // here would make the next start silently reuse a retired lifetime.
+        logger.warn("Native SDK event unsubscribe failed")
+        throw error
     }
 }
 
@@ -84,8 +88,8 @@ internal fun publishToNative(event: SDKEvent): Boolean {
         CppBridgeSDKEventStream.publish(event) == 0
     } catch (_: UnsatisfiedLinkError) {
         false
-    } catch (e: Throwable) {
-        logger.warn("Native SDK event publish failed: ${e.message}")
+    } catch (_: Throwable) {
+        logger.warn("Native SDK event publish failed")
         false
     }
 }

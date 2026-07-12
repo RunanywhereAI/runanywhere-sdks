@@ -16,7 +16,9 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-commons/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
+      - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
   push:
     # Include long-lived integration branches so a
@@ -30,7 +32,9 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-commons/VERSIONS'
       - 'scripts/setup/setup-toolchain.sh'
+      - '.github/actions/setup-toolchain/action.yml'
       - '.github/workflows/idl-drift-check.yml'
 
 permissions:
@@ -50,23 +54,19 @@ jobs:
     # Subsequent runs hit the actions/cache restore path and finish fast.
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache Homebrew
-        uses: actions/cache@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
         with:
-          path: |
-            /usr/local/Homebrew
-            /opt/homebrew
-            ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/setup-toolchain.sh') }}
+          platform: node
 
       - name: Install protoc + swift-protobuf (Homebrew)
         run: |
+          set -euo pipefail
           brew install protobuf swift-protobuf
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
+          set -euo pipefail
           # grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
           # Fail loud if the install does not produce protoc-gen-grpc-swift —
           # silently skipping previously let Swift gRPC drift through CI.
@@ -84,13 +84,14 @@ jobs:
           fi
 
       - name: Set up JDK 17 (runtime for wire-compiler)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ env.JAVA_VERSION }}
 
       - name: Install wire-compiler (Square Wire — Kotlin proto codegen)
         run: |
+          set -euo pipefail
           # IMPORTANT: Homebrew's `wire` formula is the Wire *messaging app*
           # (wire.com), NOT Square's protobuf compiler. The previous
           # `brew install wire` therefore never produced a `wire-compiler`
@@ -107,11 +108,20 @@ jobs:
           echo "wire-compiler version (pinned): ${WIRE_VERSION}"
           JAR_URL="https://repo1.maven.org/maven2/com/squareup/wire/wire-compiler/${WIRE_VERSION}/wire-compiler-${WIRE_VERSION}-jar-with-dependencies.jar"
           mkdir -p "$HOME/.local/bin"
-          curl -fsSL -o "$HOME/.local/bin/wire-compiler.jar" "$JAR_URL"
+          curl --fail --show-error --location \
+            --retry 5 --retry-all-errors --retry-delay 2 \
+            -o "$HOME/.local/bin/wire-compiler.jar" "$JAR_URL"
+          # The generated wrapper must expand HOME and argv when it runs,
+          # not while this workflow step writes it.
+          # shellcheck disable=SC2016
           printf '#!/usr/bin/env bash\nexec java -jar "$HOME/.local/bin/wire-compiler.jar" "$@"\n' > "$HOME/.local/bin/wire-compiler"
           chmod +x "$HOME/.local/bin/wire-compiler"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          if ! java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 | grep -qiE "usage|wire|proto|out"; then
+          # Wire 5.5.1 has no --help/--version flag and intentionally exits 1
+          # without generation arguments. Probe its exact diagnostic without
+          # letting pipefail turn that expected exit into a false install error.
+          WIRE_PROBE="$(java -jar "$HOME/.local/bin/wire-compiler.jar" 2>&1 || true)"
+          if ! grep -Fq 'Nothing to do! Specify --java_out=' <<<"$WIRE_PROBE"; then
             echo "::error::wire-compiler not runnable after Maven download (${JAR_URL})"
             exit 1
           fi
@@ -132,7 +142,9 @@ jobs:
         # (single source of truth for IDL codegen toolchain). Bump there first
         # — this workflow mirrors that pin.
         run: |
-          dart pub global activate protoc_plugin 25.0.0
+          set -euo pipefail
+          PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          dart pub global activate protoc_plugin "$PROTOC_GEN_DART_VERSION"
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
@@ -140,7 +152,9 @@ jobs:
         # (single source of truth). Major-bumped to 2.x; generated TS still
         # parses under tsc 5.9 strict.
         run: |
-          npm install -g ts-proto@2.11.8 protobufjs
+          set -euo pipefail
+          TS_PROTO_VERSION="$(grep -E '^TS_PROTO_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          npm install -g "ts-proto@${TS_PROTO_VERSION}" protobufjs
 
       - name: Install Python protobuf + pyyaml runtime
         # idl/codegen/generate_*_convenience.py drivers import
@@ -148,6 +162,7 @@ jobs:
         # ABI generator parses YAML schemas, so the system Python
         # needs both packages available before generate_all.sh runs.
         run: |
+          set -euo pipefail
           PYTHON_PROTOBUF_VERSION="$(grep -E '^PYTHON_PROTOBUF_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
           # python3 is REQUIRED in CI. generate_all.sh soft-skips every
           # convenience + modality-ABI generator with a warning (exit 0) when
@@ -161,6 +176,7 @@ jobs:
 
       - name: Dump toolchain versions (debug)
         run: |
+          set -euo pipefail
           echo "protoc: $(protoc --version)"
           echo "protoc-gen-swift: $(protoc-gen-swift --version 2>/dev/null || echo 'not present')"
           echo "protoc-gen-grpc-swift: $(protoc-gen-grpc-swift --version 2>/dev/null || echo 'not present')"
@@ -180,6 +196,7 @@ jobs:
 
       - name: Build shared TypeScript proto package
         run: |
+          set -euo pipefail
           cd sdk/shared/proto-ts
           # `--workspaces=false` so npm doesn't walk up into the repo-root
           # Yarn workspace (which uses `workspace:*` deps that npm can't
@@ -189,8 +206,12 @@ jobs:
 
       - name: Fail on drift
         run: |
-          if ! git diff --exit-code --stat; then
+          set -euo pipefail
+          status="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$status" ]; then
             echo "::error::IDL-generated code is out of sync with .proto sources."
+            git diff --stat
+            printf '%s\n' "$status"
             echo ""
             echo "To fix locally:"
             echo "  ./scripts/setup/setup-toolchain.sh"

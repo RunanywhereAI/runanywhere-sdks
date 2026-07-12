@@ -62,7 +62,7 @@ public enum class InferenceFramework(
   INFERENCE_FRAMEWORK_NONE(21),
   INFERENCE_FRAMEWORK_UNKNOWN(22),
   /**
-   * Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+   * Sherpa-ONNX speech engine (STT/TTS/VAD)
    */
   INFERENCE_FRAMEWORK_SHERPA(23),
   /**

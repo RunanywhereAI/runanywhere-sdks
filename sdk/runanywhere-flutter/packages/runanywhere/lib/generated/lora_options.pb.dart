@@ -24,8 +24,8 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 /// `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
 /// adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
 /// quantized bases). `adapter_id` is optional and, when present, links the
-/// runtime config back to a `LoraAdapterCatalogEntry.id` — none of the current
-/// SDK shapes carry it, so it is encoded as a `proto3 optional` field.
+/// runtime config back to a registered `LoraAdapterCatalogEntry.id`. Catalog
+/// helper APIs should preserve it; raw path-only adapters may omit it.
 /// ---------------------------------------------------------------------------
 class LoRAAdapterConfig extends $pb.GeneratedMessage {
   factory LoRAAdapterConfig({

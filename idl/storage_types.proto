@@ -1,10 +1,7 @@
 // RunAnywhere IDL — storage / device-capacity / model-on-disk types.
 //
-// Every message and enum below is the *union* of cases currently declared by
-// hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift between the per-language storage definitions is what motivated this
-// schema. Every SDK consumes
-// generated output; nothing is hand-written.
+// Every SDK consumes these canonical generated types. Storage metrics keep
+// model metadata and on-disk accounting together across platforms.
 //
 // Pre-IDL drift table (canonicalized by this file):
 //
@@ -32,10 +29,7 @@
 //   Swift   StorageTypes.swift:66         (model:ModelInfo + sizeOnDisk:Int64)
 //   Kotlin  StorageTypes.kt:66            (model:ModelInfo + sizeOnDisk:Long)
 //   Dart    storage_types.dart:95         (model:ModelInfo + sizeOnDisk:int)
-//   Older Kotlin models/storage/StorageInfo.kt:122 (StoredModel had a `lastUsed:Instant?`
-//                                          field — fold that into this canonical type)
 //   RN      RunAnywhere+Storage.ts        (no per-model breakdown — only modelCount)
-//   Web     types/models.ts:163 (StoredModel: id, name, sizeOnDisk, downloadedAt, lastUsed)
 //
 //   ── StorageAvailability ────────────────────────────────────────────────────
 //   Swift   StorageTypes.swift:175        (isAvailable, requiredSpace,
@@ -43,9 +37,6 @@
 //                                          recommendation:String?)
 //   Kotlin  StorageTypes.kt:178           (matches Swift)
 //   Dart    storage_types.dart:262        (matches Swift)
-//   Older Kotlin models/storage/StorageInfo.kt:140 (enum HEALTHY/LOW/CRITICAL/FULL)
-//                                          ← drift: same name, totally different shape;
-//                                          canonical struct shape wins.
 //   RN / Web (no equivalent type pre-IDL)
 //
 //   ── NPUChip ───────────────────────────────────────────────────────────────
@@ -72,9 +63,6 @@ option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/
 // ---------------------------------------------------------------------------
 // NPU chipset detected on the host device. Used to drive vendor-NPU
 // model-download URL selection and runtime backend wiring.
-// Sources pre-IDL:
-//   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
-// Canonical superset (this file): vendor-grouped, vendor-agnostic.
 // ---------------------------------------------------------------------------
 enum NPUChip {
     NPU_CHIP_UNSPECIFIED         = 0;
@@ -126,10 +114,8 @@ message AppStorageInfo {
 // model_types.proto. This avoids circular embeds and keeps the wire payload
 // for storage queries small.
 //
-// `last_used_ms` (epoch ms, optional) preserves the field that lived on the
-// older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
-// other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
-// LRU eviction without another type round-trip.
+// `last_used_ms` supports LRU presentation and eviction without another type
+// round-trip.
 //
 // Sources pre-IDL: see header drift table.
 // ---------------------------------------------------------------------------
@@ -173,23 +159,6 @@ message StorageAvailability {
     optional string recommendation   = 5;
     int64           shortfall_bytes  = 6;
     float           required_to_available_ratio = 7;
-}
-
-// ---------------------------------------------------------------------------
-// Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
-// surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
-// flattens to the columns those SDKs actually exposed via computed
-// properties (id, name, size, local path, downloaded-at), so RN / Web can
-// emit the same shape without round-tripping through `ModelInfo`.
-//
-// Sources pre-IDL: see header drift table.
-// ---------------------------------------------------------------------------
-message StoredModel {
-    string         model_id        = 1;
-    string         name            = 2;
-    int64          size_bytes      = 3;
-    string         local_path      = 4;
-    optional int64 downloaded_at_ms = 5;   // Unix epoch ms of download completion
 }
 
 // ---------------------------------------------------------------------------

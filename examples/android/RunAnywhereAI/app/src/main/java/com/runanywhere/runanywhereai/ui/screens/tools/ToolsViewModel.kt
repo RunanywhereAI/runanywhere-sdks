@@ -5,7 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.BuildConfig
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentPolicy
+import com.runanywhere.runanywhereai.data.settings.WebSearchConsentState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
@@ -17,7 +20,17 @@ import kotlinx.coroutines.launch
 // boot (BuiltInTools), so this screen only reads the registry.
 class ToolsViewModel : ViewModel() {
 
-    val toolCallingEnabled: Boolean get() = SettingsRepository.settings.toolCallingEnabled
+    val toolCallingEnabled: Boolean
+        get() = WebSearchConsentPolicy.permitsTransfer(
+            WebSearchConsentState(
+                toolsEnabled = SettingsRepository.settings.toolCallingEnabled,
+                acceptedScope = SettingsRepository.settings.webSearchConsentScope,
+                currentScope = WebSearchConsentPolicy.routeFor(BuildConfig.WEB_SEARCH_URL)?.scope,
+            ),
+        )
+
+    var showWebSearchDisclosure by mutableStateOf(false)
+        private set
 
     var tools by mutableStateOf<List<RAToolDefinition>>(emptyList())
         private set
@@ -30,5 +43,20 @@ class ToolsViewModel : ViewModel() {
         }
     }
 
-    fun setEnabled(value: Boolean) = SettingsRepository.setToolCallingEnabled(value)
+    fun setEnabled(value: Boolean) {
+        if (value) {
+            showWebSearchDisclosure = true
+        } else {
+            SettingsRepository.setWebToolsTransferEnabled(false)
+        }
+    }
+
+    fun acceptWebSearchDisclosure() {
+        SettingsRepository.setWebToolsTransferEnabled(true)
+        showWebSearchDisclosure = false
+    }
+
+    fun dismissWebSearchDisclosure() {
+        showWebSearchDisclosure = false
+    }
 }

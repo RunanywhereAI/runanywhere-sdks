@@ -16,9 +16,7 @@ void main() {
       'runanywhere_embeddings.dart',
     ]) {
       test('$file loads through commons lifecycle', () {
-        final source = File(
-          'lib/public/capabilities/$file',
-        ).readAsStringSync();
+        final source = File('lib/public/capabilities/$file').readAsStringSync();
 
         expect(source, contains('RunAnywhereModelLifecycle.shared.load'));
         expect(source, contains('RunAnywhereModelLifecycle.shared.unload'));
@@ -43,12 +41,8 @@ void main() {
         'runanywhere_tts.dart': [
           'DartBridgeTTS.shared.synthesizeLifecycleProto',
         ],
-        'runanywhere_vad.dart': [
-          'DartBridgeVAD.shared.processLifecycleProto',
-        ],
-        'runanywhere_diffusion.dart': [
-          'DartBridgeDiffusion.generateProto',
-        ],
+        'runanywhere_vad.dart': ['DartBridgeVAD.shared.processLifecycleProto'],
+        'runanywhere_diffusion.dart': ['DartBridgeDiffusion.generateProto'],
         'runanywhere_embeddings.dart': [
           'DartBridgeEmbeddings.shared.embedBatch',
         ],
@@ -115,32 +109,47 @@ void main() {
           'lib/public/capabilities/${entry.key}',
         ).readAsStringSync();
         for (final needle in entry.value) {
-          expect(source, isNot(contains(needle)),
-              reason: '${entry.key} still references $needle');
+          expect(
+            source,
+            isNot(contains(needle)),
+            reason: '${entry.key} still references $needle',
+          );
         }
       }
     });
 
-    test('native diffusion and embeddings bridges no longer hold handles', () {
+    test('native diffusion and embeddings bridges use lifecycle APIs', () {
       final diffusion = File(
         'lib/native/dart_bridge_diffusion.dart',
       ).readAsStringSync();
       final embeddings = File(
         'lib/native/dart_bridge_embeddings.dart',
       ).readAsStringSync();
+      final bindings = File(
+        'lib/core/native/rac_native.dart',
+      ).readAsStringSync();
 
       for (final source in [diffusion, embeddings]) {
         expect(source, isNot(contains('RacHandle')));
-        expect(source, isNot(contains('Pointer<')));
-        expect(source, isNot(contains('calloc')));
         expect(source, isNot(contains('_handle')));
         expect(source, isNot(contains('loadModel(')));
         expect(source, isNot(contains('resolveModelFilePath')));
       }
 
       expect(diffusion, contains('rac_diffusion_generate_lifecycle_proto'));
+      expect(diffusion, isNot(contains('rac_diffusion_create')));
+      expect(diffusion, isNot(contains('rac_diffusion_destroy')));
+      expect(diffusion, isNot(contains('rac_diffusion_generate_proto')));
       expect(
-          embeddings, contains('rac_embeddings_embed_batch_lifecycle_proto'));
+        embeddings,
+        contains('rac_embeddings_embed_batch_lifecycle_proto'),
+      );
+      expect(embeddings, isNot(contains('rac_embeddings_create')));
+      expect(embeddings, isNot(contains('rac_embeddings_destroy')));
+      expect(embeddings, isNot(contains('rac_embeddings_embed_batch_proto')));
+      expect(bindings, contains("'rac_embeddings_create_proto'"));
+      expect(bindings, isNot(contains("'rac_embeddings_create'")));
+      expect(bindings, isNot(contains("'rac_embeddings_create_with_config'")));
     });
 
     test('native STT and TTS path load wrappers were removed', () {
@@ -176,9 +185,7 @@ void main() {
       final source = File(
         'lib/public/capabilities/runanywhere_vlm.dart',
       ).readAsStringSync();
-      final bridge = File(
-        'lib/native/dart_bridge_vlm.dart',
-      ).readAsStringSync();
+      final bridge = File('lib/native/dart_bridge_vlm.dart').readAsStringSync();
 
       expect(source, contains('RunAnywhereModelLifecycle.shared.load'));
       expect(source, contains('componentSnapshot'));
@@ -211,33 +218,35 @@ void main() {
       expect(bridge, isNot(contains('String? mmprojPath')));
     });
 
-    test('lifecycle artifact helpers resolve primary and projector by role',
-        () {
-      final artifacts = [
-        ModelFileDescriptor(
-          role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-          localPath: '/models/llava/model.gguf',
-        ),
-        ModelFileDescriptor(
-          role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
-          localPath: '/models/llava/projector.gguf',
-        ),
-      ];
-      final load = ModelLoadResult(resolvedArtifacts: artifacts);
-      final current = CurrentModelResult(resolvedArtifacts: artifacts);
+    test(
+      'lifecycle artifact helpers resolve primary and projector by role',
+      () {
+        final artifacts = [
+          ModelFileDescriptor(
+            role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+            localPath: '/models/llava/model.gguf',
+          ),
+          ModelFileDescriptor(
+            role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+            localPath: '/models/llava/projector.gguf',
+          ),
+        ];
+        final load = ModelLoadResult(resolvedArtifacts: artifacts);
+        final current = CurrentModelResult(resolvedArtifacts: artifacts);
 
-      expect(load.resolvedPrimaryModelPath, '/models/llava/model.gguf');
-      expect(
-        load.resolvedModelFilePath(
-          ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
-        ),
-        '/models/llava/projector.gguf',
-      );
-      expect(
-        current.requireResolvedArtifactPaths().visionProjectorPath,
-        '/models/llava/projector.gguf',
-      );
-    });
+        expect(load.resolvedPrimaryModelPath, '/models/llava/model.gguf');
+        expect(
+          load.resolvedModelFilePath(
+            ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+          ),
+          '/models/llava/projector.gguf',
+        );
+        expect(
+          current.requireResolvedArtifactPaths().visionProjectorPath,
+          '/models/llava/projector.gguf',
+        );
+      },
+    );
 
     test('VLM no longer exposes explicit path loading', () {
       final source = File(
@@ -265,9 +274,7 @@ void main() {
       final source = File(
         'lib/public/capabilities/runanywhere_vlm.dart',
       ).readAsStringSync();
-      final bridge = File(
-        'lib/native/dart_bridge_vlm.dart',
-      ).readAsStringSync();
+      final bridge = File('lib/native/dart_bridge_vlm.dart').readAsStringSync();
 
       expect(source, contains('Stream<VLMStreamEvent> processImageStream'));
       expect(source, contains('processImageStreamProto'));

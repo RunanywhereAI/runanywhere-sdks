@@ -9,6 +9,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include "model_manifest_internal.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -155,7 +157,7 @@ static bool should_skip_model_entry(const fs::path& path) {
         return true;
     if (name == "__MACOSX" || name == ".DS_Store")
         return true;
-    if (name == rac_model_folder_manifest_filename())
+    if (name == rac::infra::model_manifest::kFilename)
         return true;  // registry metadata sidecar, never a model artifact
     if (name.size() >= 2 && name[0] == '.' && name[1] == '_')
         return true;
@@ -247,8 +249,9 @@ static bool is_common_non_model_root_file(const fs::path& path) {
                                "changelog.txt", "changelog.md"})) {
         return true;
     }
-    return has_extension(path, "md") || has_extension(path, "txt") || has_extension(path, "sha256") ||
-           has_extension(path, "sha256sum") || has_extension(path, "jsonl");
+    return has_extension(path, "md") || has_extension(path, "txt") ||
+           has_extension(path, "sha256") || has_extension(path, "sha256sum") ||
+           has_extension(path, "jsonl");
 }
 
 static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
@@ -337,8 +340,8 @@ rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_pr
         *out_role_proto = RAC_MODEL_FILE_ROLE_CONFIG;
         return RAC_SUCCESS;
     }
-    if (has_extension(fs::path(name), "py") || name_equals_any(name, {"readme.md", "license.md",
-                                                                      "trainer_state.json"})) {
+    if (has_extension(fs::path(name), "py") ||
+        name_equals_any(name, {"readme.md", "license.md", "trainer_state.json"})) {
         *out_role_proto = RAC_MODEL_FILE_ROLE_COMPANION;
         return RAC_SUCCESS;
     }
@@ -876,14 +879,6 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
     }
 }
 
-const char* rac_model_folder_manifest_filename(void) {
-    // Durable per-model registry sidecar written into the canonical model
-    // folder on download completion (see model_registry_manifest.cpp). Dotted
-    // so casual folder listings de-emphasize it; skipped by artifact scans via
-    // should_skip_model_entry above.
-    return ".rac-manifest.binpb";
-}
-
 // =============================================================================
 // BASE DIRECTORIES
 // =============================================================================
@@ -1362,9 +1357,9 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // under {Models}/{framework}/{id}/ will be parsed as direct
     // {Models}/{id}/ entries and model-id extraction will collapse to the
     // framework name (observed previously for Sherpa which was missing here).
-    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",
-                                "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
-                                "CoreML",    "QHexRT",     "None",     "Unknown"};
+    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "MLX",    "FoundationModels",
+                                "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML", "QHexRT",
+                                "None",      "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;

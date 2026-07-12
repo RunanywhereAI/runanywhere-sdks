@@ -147,16 +147,14 @@ echo "=== Downloading Sherpa-ONNX ==="
 ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
 
 echo "=== Building runanywhere-commons ==="
-./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+./sdk/runanywhere-commons/scripts/build-linux.sh
 
 echo "=== Downloading models ==="
 cd Playground/openclaw-hybrid-assistant
 ./scripts/download-models.sh
-./scripts/download-models.sh --wakeword
 
 echo "=== Generating test audio ==="
-chmod +x ./scripts/generate-test-audio.sh
-./scripts/generate-test-audio.sh
+./tests/scripts/generate-test-audio.sh
 
 echo "=== Building ==="
 mkdir -p build
@@ -166,7 +164,7 @@ cmake --build . -j\$(nproc)
 cd ..
 
 echo "=== Running tests ==="
-export LD_LIBRARY_PATH="${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/\$(uname -m):${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/lib:${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH"
 ./build/test-components --run-all
 EOF
 
@@ -200,12 +198,11 @@ test_with_orbstack() {
 
         echo '=== Building ==='
         ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
-        ./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+        ./sdk/runanywhere-commons/scripts/build-linux.sh
 
         cd Playground/openclaw-hybrid-assistant
         ./scripts/download-models.sh
-        ./scripts/download-models.sh --wakeword
-        ./scripts/generate-test-audio.sh
+        ./tests/scripts/generate-test-audio.sh
 
         mkdir -p build && cd build
         cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -213,7 +210,7 @@ test_with_orbstack() {
         cd ..
 
         echo '=== Running tests ==='
-        export LD_LIBRARY_PATH='${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/\$(uname -m):${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH'
+        export LD_LIBRARY_PATH='${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/lib:${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH'
         ./build/test-components --run-all
     "
 

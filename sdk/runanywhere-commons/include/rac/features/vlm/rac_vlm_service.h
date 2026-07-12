@@ -8,11 +8,10 @@
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
  *   - rac_vlm_service_ops_t and rac_vlm_service_t: `internal`.
- *   - Proto-byte APIs (rac_vlm_process_proto,
- *     rac_vlm_generate_proto, rac_vlm_stream_proto,
- *     rac_vlm_cancel_proto, rac_vlm_cancel_lifecycle_proto):
- *     `SDK-facing default` over runanywhere.v1.VLMImage /
- *     VLMGenerationOptions / VLMResult / VLMStreamEvent / SDKEvent bytes.
+ *   - Proto-byte APIs (rac_vlm_generate_proto, rac_vlm_stream_proto,
+ *     rac_vlm_cancel_lifecycle_proto): `SDK-facing default` over
+ *     runanywhere.v1.VLMGenerationRequest / VLMResult / VLMStreamEvent /
+ *     SDKEvent bytes.
  *   - Struct APIs (rac_vlm_create, initialize, process, process_stream,
  *     get_info, cancel, cleanup, destroy, result_free): `delete after
  *     SDK migration` for SDK callers; keep only as backend smoke-test
@@ -179,19 +178,6 @@ RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t*
                                      rac_vlm_result_t* out_result);
 
 /**
- * @brief Process an image with serialized generated proto inputs.
- *
- * image_proto_bytes must encode runanywhere.v1.VLMImage and
- * options_proto_bytes must encode runanywhere.v1.VLMGenerationOptions. The
- * result buffer receives serialized runanywhere.v1.VLMResult bytes.
- */
-RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
-                                           size_t image_proto_size,
-                                           const uint8_t* options_proto_bytes,
-                                           size_t options_proto_size,
-                                           rac_proto_buffer_t* out_result);
-
-/**
  * @brief Process an image with streaming response
  *
  * @param handle Service handle
@@ -222,11 +208,6 @@ RAC_API rac_result_t rac_vlm_get_info(rac_handle_t handle, rac_vlm_info_t* out_i
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
-
-/**
- * @brief Cancel VLM generation and emit canonical cancellation events.
- */
-RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
 
 // =============================================================================
 // GENERATED-PROTO VLM ABI - lifecycle-owned model state

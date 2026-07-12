@@ -140,7 +140,8 @@ public enum Cloud {
         if let languageCode { entry.languageCode = languageCode }
         if let baseURL { entry.baseURL = baseURL }
         if let timeoutMs { entry.timeoutMs = Int32(timeoutMs) }
-        registry.withLock { $0[id] = entry }
+        let registeredEntry = entry
+        registry.withLock { $0[id] = registeredEntry }
     }
 
     /// Look up a previously registered model by id.

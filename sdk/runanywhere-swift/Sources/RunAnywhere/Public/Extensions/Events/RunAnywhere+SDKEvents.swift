@@ -14,7 +14,9 @@ import CRACommons
 /// retained rather than removed as dead code.
 public extension RunAnywhere {
     @discardableResult
-    static func subscribeSDKEvents(_ handler: @escaping (RASDKEvent) -> Void) -> UInt64 {
+    static func subscribeSDKEvents(
+        _ handler: @escaping @Sendable (RASDKEvent) -> Void
+    ) -> UInt64 {
         CppBridge.Events.subscribeSDKEvents(handler)
     }
 

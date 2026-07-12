@@ -163,7 +163,7 @@ RunAnywhere.events.eventsOfPayload { it.generation }.collect { ... }
 Two optional backend modules in `modules/`:
 
 - **`runanywhere-core-llamacpp`** — LLM backend. Single file (`LlamaCPP.kt`) calling `rac_backend_llamacpp_register()`. Bundles `librac_backend_llamacpp_jni.so`.
-- **`runanywhere-core-onnx`** — STT/TTS/VAD backend. Single file (`ONNX.kt`) calling `rac_backend_onnx_register()`. Bundles sherpa-onnx and ONNX Runtime `.so` files.
+- **`runanywhere-core-onnx`** — co-distributed generic ONNX + Sherpa speech backends. `ONNX.kt` explicitly registers both engines and the module bundles their native `.so` files.
 
 Both follow the same pattern: thin Android-library sub-modules that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
 
@@ -207,4 +207,4 @@ Most tests can run without JNI loaded (they test Kotlin-layer logic). Tests requ
 - **`pr-build.yml`** — Triggered on PRs to `main` and pushes to `main`/`feat/v2-architecture`. Builds C++ from source, then runs `./gradlew assembleDebug`.
 - **`release.yml`** — Triggered by `v*.*.*` tags. Matrix-builds native libs for 4 ABIs, stages into `src/main/jniLibs/`, runs `assembleRelease`, uploads artifacts with SHA256 checksums.
 - **`idl-drift-check.yml`** — Monitors `generated/` directory. Regenerates proto bindings and fails on any `git diff`.
-- **`scripts/package-sdk.sh`** — CI packaging script. Accepts `--natives-from PATH` for pre-staged `.so` files, builds all targets, outputs to `dist/sdk-kotlin/` with checksums.
+- **`scripts/package-sdk.sh`** — CI packaging script. Accepts `--natives-from PATH` for pre-staged `.so` files and emits one deterministic local Maven repository ZIP containing the exact core/LlamaCPP/ONNX AAR, POM, Gradle module metadata, and sources publications.

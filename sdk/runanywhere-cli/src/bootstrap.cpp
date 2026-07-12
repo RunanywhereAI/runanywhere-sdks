@@ -23,7 +23,7 @@
 #include "rac/backends/rac_llm_llamacpp.h"
 #endif
 #if defined(RCLI_HAS_ONNX)
-#include "rac/backends/rac_vad_onnx.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 #endif
 #if defined(RCLI_HAS_SHERPA)
 #include "rac/plugin/rac_plugin_entry_sherpa.h"

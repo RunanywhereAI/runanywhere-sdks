@@ -1,12 +1,4 @@
-// swift-tools-version: 5.9
-// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
-// version forces Swift 6 language mode on all targets, which turns several
-// pre-existing patterns in the SDK (mutable static registration flags,
-// closure-captured locals in AVAudioConverter / URLSession callbacks,
-// etc.) into hard build errors. Migrating those requires non-trivial
-// source changes (sendable globals, actor isolation) that are out of
-// scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
-// Re-attempt once the Swift 6 strict-concurrency migration lands.
+// swift-tools-version: 6.2
 import PackageDescription
 import Foundation
 
@@ -79,8 +71,6 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
         // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
-        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
-        .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
         // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
@@ -169,7 +159,6 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",
@@ -195,6 +184,9 @@ let package = Package(
                 // Solutions facade.
                 "Generated/router.pb.swift",
                 "Generated/diffusion_options.pb.swift",
+            ],
+            resources: [
+                .process("PrivacyInfo.xcprivacy"),
             ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE"),
@@ -305,7 +297,8 @@ let package = Package(
                 "RunAnywhere",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
-            path: "Tests/RunAnywhereTests"
+            path: "Tests/RunAnywhereTests",
+            exclude: ["Fixtures"]
         ),
 
         // -------------------------------------------------------------------

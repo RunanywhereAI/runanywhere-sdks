@@ -170,16 +170,9 @@ export interface DiffusionTokenizerSource {
  *   Web    — n/a (config is implicit in the llamacpp service ctor)
  *   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
  *
- * Drift note: Swift/Kotlin/RN also carry `model_id`, `preferred_framework`,
- * and `reduce_memory` fields. Those belong on the more general component
- * configuration carried by ModelInfo / framework selection elsewhere in
- * this IDL package; this message intentionally narrows to the four
- * diffusion-specific knobs called out by the v1 spec.
- * `max_memory_mb` here is the new generalization of pre-IDL `reduce_memory`
- * (a bool) — backends interpret 0 as "no cap / engine default" and any
- * positive value as a hard MB ceiling. SDKs translating pre-IDL
- * `reduceMemory == true` should set this to the backend's documented
- * reduced-memory threshold; `reduceMemory == false` ⇒ 0.
+ * `max_memory_mb` is the single portable working-set control; backends
+ * interpret 0 as "no cap / engine default" and a positive value as a hard
+ * MiB ceiling.
  * ---------------------------------------------------------------------------
  */
 export interface DiffusionConfiguration {
@@ -200,18 +193,12 @@ export interface DiffusionConfiguration {
     enableSafetyChecker: boolean;
     /**
      * Maximum working-set memory the diffusion runtime is allowed to use,
-     * in MiB. 0 = no cap (engine default). Generalizes the pre-IDL
-     * `reduceMemory` bool flag.
+     * in MiB. 0 = no cap (engine default).
      */
     maxMemoryMb: number;
     /** C ABI / SDK component fields that identify and route the component. */
     modelId?: string | undefined;
     preferredFramework?: InferenceFramework | undefined;
-    /**
-     * Legacy low-memory boolean. Backends may translate true to an internal
-     * memory cap when max_memory_mb is unset.
-     */
-    reduceMemory: boolean;
 }
 /**
  * ---------------------------------------------------------------------------

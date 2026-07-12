@@ -166,9 +166,11 @@ class RunAnywhereLLM {
     final modelId = currentModelId;
 
     try {
-      final effectiveRequest = LLMGenerateRequest()
-        ..mergeFromMessage(request)
-        ..streamingEnabled = false;
+      final effectiveRequest = request.deepCopy();
+      effectiveRequest.options = _canonicalOptions(
+        request.hasOptions() ? request.options : null,
+        streaming: false,
+      );
       final result = await _generateProto(effectiveRequest);
 
       final endTime = DateTime.now();
@@ -209,9 +211,11 @@ class RunAnywhereLLM {
 
     // No "model loaded" pre-flight here — Swift has none; commons surfaces
     // a structured error when no model is loaded.
-    final effectiveRequest = LLMGenerateRequest()
-      ..mergeFromMessage(request)
-      ..streamingEnabled = true;
+    final effectiveRequest = request.deepCopy();
+    effectiveRequest.options = _canonicalOptions(
+      request.hasOptions() ? request.options : null,
+      streaming: true,
+    );
     return _generateStreamProto(effectiveRequest);
   }
 
@@ -224,49 +228,23 @@ class RunAnywhereLLM {
     LLMGenerationOptions? options, {
     bool streaming = false,
   }) {
-    final opts = options ?? LLMGenerationOptions();
-    final Iterable<Object?> rawStopSequences =
-        opts.stopSequences as Iterable<Object?>;
-    final List<String> stopSequences = rawStopSequences
-        .map((Object? sequence) => sequence?.toString() ?? '')
-        .toList(growable: false);
-    final requestOptions = LLMGenerationOptions(
-      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : null,
-      temperature: opts.hasTemperature() ? opts.temperature : null,
-      topP: opts.hasTopP() ? opts.topP : null,
-      topK: opts.hasTopK() ? opts.topK : null,
-      repetitionPenalty:
-          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : null,
-      stopSequences: stopSequences,
-      streamingEnabled:
-          opts.hasStreamingEnabled() ? opts.streamingEnabled : null,
-      preferredFramework:
-          opts.hasPreferredFramework() ? opts.preferredFramework : null,
-      systemPrompt: opts.hasSystemPrompt() ? opts.systemPrompt : null,
-      jsonSchema: opts.hasJsonSchema() ? opts.jsonSchema : null,
-      thinkingPattern: opts.hasThinkingPattern() ? opts.thinkingPattern : null,
-      executionTarget: opts.hasExecutionTarget() ? opts.executionTarget : null,
-      structuredOutput:
-          opts.hasStructuredOutput() ? opts.structuredOutput : null,
-      enableRealTimeTracking:
-          opts.hasEnableRealTimeTracking() ? opts.enableRealTimeTracking : null,
-      seed: opts.hasSeed() ? opts.seed : null,
-      frequencyPenalty:
-          opts.hasFrequencyPenalty() ? opts.frequencyPenalty : null,
-      presencePenalty: opts.hasPresencePenalty() ? opts.presencePenalty : null,
-      repeatLastN: opts.hasRepeatLastN() ? opts.repeatLastN : null,
-      minP: opts.hasMinP() ? opts.minP : null,
-      grammar: opts.hasGrammar() ? opts.grammar : null,
-      responseFormat: opts.hasResponseFormat() ? opts.responseFormat : null,
-      echoPrompt: opts.hasEchoPrompt() ? opts.echoPrompt : null,
-      nThreads: opts.hasNThreads() ? opts.nThreads : null,
-      toolCalling: opts.hasToolCalling() ? opts.toolCalling : null,
-      disableThinking: opts.hasDisableThinking() ? opts.disableThinking : null,
+    final requestOptions = _canonicalOptions(options, streaming: streaming);
+    return LLMGenerateRequest(
+      prompt: prompt,
+      emitThoughts: requestOptions.hasThinkingPattern(),
+      options: requestOptions,
     );
+  }
+
+  LLMGenerationOptions _canonicalOptions(
+    LLMGenerationOptions? options, {
+    required bool streaming,
+  }) {
+    final requestOptions = (options ?? LLMGenerationOptions()).deepCopy();
     if (!requestOptions.hasMaxTokens() || requestOptions.maxTokens <= 0) {
       requestOptions.maxTokens = 100;
     }
-    if (!requestOptions.hasTemperature() || requestOptions.temperature <= 0) {
+    if (!requestOptions.hasTemperature()) {
       requestOptions.temperature = 0.8;
     }
     if (!requestOptions.hasTopP() || requestOptions.topP <= 0) {
@@ -276,59 +254,11 @@ class RunAnywhereLLM {
         requestOptions.repetitionPenalty <= 0) {
       requestOptions.repetitionPenalty = 1.0;
     }
-    requestOptions.streamingEnabled = streaming || opts.streamingEnabled;
+    requestOptions.streamingEnabled = streaming;
     // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
     // (RALLMTypes+CppBridge.swift:13-21): maxTokens=100, temperature=0.8,
     // topP=1.0, topK=0, repetitionPenalty=1.0.
-    return LLMGenerateRequest(
-      prompt: prompt,
-      maxTokens: requestOptions.maxTokens,
-      temperature: requestOptions.temperature,
-      topP: requestOptions.topP,
-      topK: requestOptions.hasTopK() ? requestOptions.topK : 0,
-      repetitionPenalty: requestOptions.repetitionPenalty,
-      stopSequences: stopSequences,
-      systemPrompt:
-          requestOptions.hasSystemPrompt() ? requestOptions.systemPrompt : null,
-      emitThoughts: requestOptions.hasThinkingPattern(),
-      streamingEnabled: requestOptions.streamingEnabled,
-      preferredFramework: requestOptions.hasPreferredFramework()
-          ? requestOptions.preferredFramework.toString()
-          : null,
-      jsonSchema: _jsonSchemaForOptions(requestOptions),
-      executionTarget: requestOptions.hasExecutionTarget()
-          ? requestOptions.executionTarget.toString()
-          : null,
-      seed: requestOptions.hasSeed() ? requestOptions.seed : null,
-      frequencyPenalty: requestOptions.hasFrequencyPenalty()
-          ? requestOptions.frequencyPenalty
-          : null,
-      presencePenalty: requestOptions.hasPresencePenalty()
-          ? requestOptions.presencePenalty
-          : null,
-      minP: requestOptions.hasMinP() ? requestOptions.minP : null,
-      grammar: requestOptions.hasGrammar() ? requestOptions.grammar : null,
-      responseFormat: requestOptions.hasResponseFormat()
-          ? requestOptions.responseFormat
-          : null,
-      echoPrompt:
-          requestOptions.hasEchoPrompt() ? requestOptions.echoPrompt : null,
-      nThreads: requestOptions.hasNThreads() ? requestOptions.nThreads : null,
-      options: requestOptions,
-    );
-  }
-
-  String? _jsonSchemaForOptions(LLMGenerationOptions opts) {
-    if (opts.hasStructuredOutput()) {
-      final structured = opts.structuredOutput;
-      if (structured.hasJsonSchema() && structured.jsonSchema.isNotEmpty) {
-        return structured.jsonSchema;
-      }
-      if (structured.hasSchema() && structured.schema.rawJson.isNotEmpty) {
-        return structured.schema.rawJson;
-      }
-    }
-    return opts.hasJsonSchema() ? opts.jsonSchema : null;
+    return requestOptions;
   }
 
   /// Cancel any in-flight LLM generation.
@@ -341,8 +271,9 @@ class RunAnywhereLLM {
     try {
       _cancelProto();
     } catch (e) {
-      SDKLogger('RunAnywhere.cancelGeneration')
-          .warning('cancelGeneration failed: $e');
+      SDKLogger(
+        'RunAnywhere.cancelGeneration',
+      ).warning('cancelGeneration failed: $e');
     }
   }
 
@@ -387,7 +318,8 @@ class RunAnywhereLLM {
       } catch (e) {
         if (!controller.isClosed) {
           controller.addError(
-              e is SDKException ? e : SDKException.generationFailed('$e'));
+            e is SDKException ? e : SDKException.generationFailed('$e'),
+          );
           await controller.close();
         }
         return;

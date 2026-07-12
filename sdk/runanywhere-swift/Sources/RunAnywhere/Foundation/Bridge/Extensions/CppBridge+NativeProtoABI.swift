@@ -17,21 +17,10 @@ enum NativeProtoABI {
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
-    /// Request-less GET ABI shape: returns raw bytes via a pair of out-pointers
-    /// owned by the C side and freed via a domain-specific `BytesFree` symbol.
-    /// Used by domains (e.g. Hardware) whose C ABI predates `rac_proto_buffer_t`.
-    typealias GetBytes = @convention(c) (
-        UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
-        UnsafeMutablePointer<Int>?
-    ) -> rac_result_t
-    typealias BytesFree = @convention(c) (UnsafeMutablePointer<UInt8>?) -> Void
-
     static let unavailableMessage = "Native proto ABI is not exported by the linked RACommons binary"
 
-    private static let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
-
     static func load<T>(_ symbolName: String, as _: T.Type) -> T? {
-        guard let symbol = dlsym(defaultHandle, symbolName) else {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), symbolName) else {
             return nil
         }
         return unsafeBitCast(symbol, to: T.self)
@@ -122,47 +111,6 @@ enum NativeProtoABI {
             throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)
-    }
-
-    /// Request-less GET helper for the legacy `(out_bytes, out_size) -> rac_result_t`
-    /// ABI shape. Decodes the returned bytes into `responseType` and frees them via
-    /// the domain-specific `freeBytes` symbol. Supersedes per-domain `invokeBytes`
-    /// helpers (see `gaps/gaps/simplification/swift-bridge-duplication.md` §1
-    /// Pattern A).
-    static func getBytes<Response: Message>(
-        symbol: GetBytes?,
-        symbolName: String,
-        freeBytes: BytesFree?,
-        freeBytesName: String,
-        responseType: Response.Type
-    ) throws -> Response {
-        guard let symbol else {
-            throw SDKException(
-                code: .notSupported,
-                message: missingSymbolMessage(symbolName),
-                category: .internal
-            )
-        }
-        guard let free = freeBytes else {
-            throw SDKException(
-                code: .notSupported,
-                message: missingSymbolMessage(freeBytesName),
-                category: .internal
-            )
-        }
-
-        var bytesPtr: UnsafeMutablePointer<UInt8>?
-        var byteCount = 0
-        let status = symbol(&bytesPtr, &byteCount)
-        guard status == RAC_SUCCESS, let bytesPtr else {
-            throw SDKException(
-                code: .processingFailed,
-                message: "Native proto request failed: \(symbolName) rc=\(status)",
-                category: .internal
-            )
-        }
-        defer { free(bytesPtr) }
-        return try responseType.init(serializedBytes: Data(bytes: bytesPtr, count: byteCount))
     }
 
     // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`

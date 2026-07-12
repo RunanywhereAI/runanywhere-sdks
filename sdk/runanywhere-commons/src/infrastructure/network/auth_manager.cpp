@@ -85,10 +85,11 @@ static void publish_auth_success_event(const rac_auth_response_t* response, bool
     }
 }
 
-static void publish_auth_failure_event(const char* message, bool refresh) {
-    rac::events::publish_auth_failed(RAC_ERROR_AUTHENTICATION_FAILED,
-                                     message ? message : "Authentication failed", "runanywhere",
-                                     "sdk", refresh ? "auth.refresh" : "auth.authenticate");
+static void publish_auth_failure_event(const char* message, bool refresh,
+                                       rac_result_t code = RAC_ERROR_AUTHENTICATION_FAILED) {
+    rac::events::publish_auth_failed(code, message ? message : "Authentication failed",
+                                     "runanywhere", "sdk",
+                                     refresh ? "auth.refresh" : "auth.authenticate");
 }
 
 // Caller must hold g_auth_mutex. Mirrors rac_auth_is_authenticated() without
@@ -102,44 +103,48 @@ static bool is_authenticated_locked() {
 // handle_auth_response() can persist atomically without releasing the lock.
 static int save_tokens_locked() {
     if (!g_storage_available) {
-        return 0;
+        return RAC_SUCCESS;
     }
 
-    int result = 0;
+    int result = RAC_SUCCESS;
 
-    if (g_auth_state.access_token) {
-        if (g_storage.store(RAC_KEY_ACCESS_TOKEN, g_auth_state.access_token, g_storage.context) !=
-            0) {
-            result = -1;
+    // Persist an exact snapshot, including removal of optional values omitted
+    // by a later refresh response. Otherwise a future process launch could
+    // restore stale device/user/organization identity from an older response.
+    const auto persist = [&](const char* key, const char* value) {
+        const int operation_result = value ? g_storage.store(key, value, g_storage.context)
+                                           : g_storage.delete_key(key, g_storage.context);
+        if (operation_result != 0) {
+            result = RAC_ERROR_SECURE_STORAGE_FAILED;
         }
+    };
+    persist(RAC_KEY_ACCESS_TOKEN, g_auth_state.access_token);
+    persist(RAC_KEY_REFRESH_TOKEN, g_auth_state.refresh_token);
+    persist(RAC_KEY_DEVICE_ID, g_auth_state.device_id);
+    persist(RAC_KEY_USER_ID, g_auth_state.user_id);
+    persist(RAC_KEY_ORGANIZATION_ID, g_auth_state.organization_id);
+
+    return result;
+}
+
+// Caller must hold g_auth_mutex. Every key is attempted even after a failure
+// so logout and rollback cannot leave avoidable credential fragments behind.
+static rac_result_t delete_stored_auth_locked() {
+    if (!g_storage_available) {
+        return RAC_SUCCESS;
     }
 
-    if (g_auth_state.refresh_token) {
-        if (g_storage.store(RAC_KEY_REFRESH_TOKEN, g_auth_state.refresh_token, g_storage.context) !=
-            0) {
-            result = -1;
+    rac_result_t result = RAC_SUCCESS;
+    const auto delete_key = [&](const char* key) {
+        if (g_storage.delete_key(key, g_storage.context) != 0) {
+            result = RAC_ERROR_SECURE_STORAGE_FAILED;
         }
-    }
-
-    if (g_auth_state.device_id) {
-        if (g_storage.store(RAC_KEY_DEVICE_ID, g_auth_state.device_id, g_storage.context) != 0) {
-            result = -1;
-        }
-    }
-
-    if (g_auth_state.user_id) {
-        if (g_storage.store(RAC_KEY_USER_ID, g_auth_state.user_id, g_storage.context) != 0) {
-            result = -1;
-        }
-    }
-
-    if (g_auth_state.organization_id) {
-        if (g_storage.store(RAC_KEY_ORGANIZATION_ID, g_auth_state.organization_id,
-                            g_storage.context) != 0) {
-            result = -1;
-        }
-    }
-
+    };
+    delete_key(RAC_KEY_ACCESS_TOKEN);
+    delete_key(RAC_KEY_REFRESH_TOKEN);
+    delete_key(RAC_KEY_DEVICE_ID);
+    delete_key(RAC_KEY_USER_ID);
+    delete_key(RAC_KEY_ORGANIZATION_ID);
     return result;
 }
 
@@ -345,21 +350,33 @@ static int handle_auth_response(const char* json, bool refresh) {
         // Save to secure storage atomically while still holding the lock so
         // we cannot race a concurrent rac_auth_clear() between the in-memory
         // update and the persisted copy.
-        if (result == 0) {
-            save_tokens_locked();
+        if (result == RAC_SUCCESS) {
+            result = save_tokens_locked();
+            if (result != RAC_SUCCESS) {
+                // A partial durable write is not authenticated state. Fail
+                // closed, clear process memory, and best-effort delete every
+                // auth key before returning the persistence failure.
+                reset_auth_state_locked();
+                (void)delete_stored_auth_locked();
+            }
         }
     }
 
     // Publish events outside the lock (lock-copy-dispatch) — subscribers may
     // re-enter auth APIs (e.g. to log token state) so holding the mutex would
     // deadlock.
-    if (result == 0) {
+    if (result == RAC_SUCCESS) {
         publish_auth_success_event(&response, refresh);
         // A token is now available — drain telemetry batches deferred by the
         // pre-auth flush gate (see rac_telemetry_manager_flush).
         rac_events_flush_telemetry_sink();
     } else {
-        publish_auth_failure_event("Failed to update authentication state", refresh);
+        if (result == RAC_ERROR_SECURE_STORAGE_FAILED) {
+            publish_auth_failure_event("Failed to persist authentication state", refresh,
+                                       RAC_ERROR_SECURE_STORAGE_FAILED);
+        } else {
+            publish_auth_failure_event("Failed to update authentication state", refresh);
+        }
     }
 
     rac_auth_response_free(&response);
@@ -407,20 +424,13 @@ int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh) {
     return 0;
 }
 
-void rac_auth_clear(void) {
+rac_result_t rac_auth_clear(void) {
     std::lock_guard<std::mutex> lock(g_auth_mutex);
 
     // Clear in-memory state
     reset_auth_state_locked();
 
-    // Clear secure storage
-    if (g_storage_available) {
-        g_storage.delete_key(RAC_KEY_ACCESS_TOKEN, g_storage.context);
-        g_storage.delete_key(RAC_KEY_REFRESH_TOKEN, g_storage.context);
-        g_storage.delete_key(RAC_KEY_DEVICE_ID, g_storage.context);
-        g_storage.delete_key(RAC_KEY_USER_ID, g_storage.context);
-        g_storage.delete_key(RAC_KEY_ORGANIZATION_ID, g_storage.context);
-    }
+    return delete_stored_auth_locked();
 }
 
 // =============================================================================
@@ -431,55 +441,84 @@ int rac_auth_load_stored_tokens(void) {
     std::lock_guard<std::mutex> lock(g_auth_mutex);
 
     if (!g_storage_available) {
-        return -1;
+        return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    char buffer[2048];
+    char* loaded_access_token = nullptr;
+    char* loaded_refresh_token = nullptr;
+    char* loaded_device_id = nullptr;
+    char* loaded_user_id = nullptr;
+    char* loaded_organization_id = nullptr;
 
-    // Load access token
-    if (g_storage.retrieve(RAC_KEY_ACCESS_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.access_token);
-        g_auth_state.access_token = rac_strdup(buffer);
-    } else {
-        return -1;  // No stored token
+    const auto free_loaded = [&]() {
+        free(loaded_access_token);
+        free(loaded_refresh_token);
+        free(loaded_device_id);
+        free(loaded_user_id);
+        free(loaded_organization_id);
+    };
+
+    const auto retrieve = [&](const char* key, bool required, char** out_value) -> int {
+        char buffer[2048] = {};
+        const int result = g_storage.retrieve(key, buffer, sizeof(buffer), g_storage.context);
+
+        if (result > 0) {
+            if (static_cast<size_t>(result) >= sizeof(buffer)) {
+                memset(buffer, 0, sizeof(buffer));
+                return RAC_ERROR_BUFFER_TOO_SMALL;
+            }
+            if (buffer[0] == '\0') {
+                memset(buffer, 0, sizeof(buffer));
+                return RAC_ERROR_SECURE_STORAGE_FAILED;
+            }
+
+            *out_value = rac_strdup(buffer);
+            memset(buffer, 0, sizeof(buffer));
+            return *out_value != nullptr ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+        }
+
+        memset(buffer, 0, sizeof(buffer));
+        if (result == RAC_ERROR_FILE_NOT_FOUND) {
+            return required ? RAC_ERROR_FILE_NOT_FOUND : RAC_SUCCESS;
+        }
+        if (result == 0) {
+            return RAC_ERROR_SECURE_STORAGE_FAILED;
+        }
+        return result;
+    };
+
+    int result = retrieve(RAC_KEY_ACCESS_TOKEN, true, &loaded_access_token);
+    if (result == RAC_SUCCESS) {
+        result = retrieve(RAC_KEY_REFRESH_TOKEN, false, &loaded_refresh_token);
+    }
+    if (result == RAC_SUCCESS) {
+        result = retrieve(RAC_KEY_DEVICE_ID, false, &loaded_device_id);
+    }
+    if (result == RAC_SUCCESS) {
+        result = retrieve(RAC_KEY_USER_ID, false, &loaded_user_id);
+    }
+    if (result == RAC_SUCCESS) {
+        result = retrieve(RAC_KEY_ORGANIZATION_ID, false, &loaded_organization_id);
+    }
+    if (result != RAC_SUCCESS) {
+        free_loaded();
+        return result;
     }
 
-    // Load refresh token
-    if (g_storage.retrieve(RAC_KEY_REFRESH_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.refresh_token);
-        g_auth_state.refresh_token = rac_strdup(buffer);
-    }
+    // Commit only after every read succeeds or cleanly misses. A transient
+    // failure on one optional item must not replace an already-valid in-memory
+    // auth state with a partially restored one.
+    free_auth_state_strings_locked();
+    g_auth_state.access_token = loaded_access_token;
+    g_auth_state.refresh_token = loaded_refresh_token;
+    g_auth_state.device_id = loaded_device_id;
+    g_auth_state.user_id = loaded_user_id;
+    g_auth_state.organization_id = loaded_organization_id;
+    g_auth_state.is_authenticated = true;
+    // Token expiry is unknown when loading, so it will trigger refresh on first use.
+    g_auth_state.token_expires_at = 0;
 
-    // Load device ID
-    if (g_storage.retrieve(RAC_KEY_DEVICE_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.device_id);
-        g_auth_state.device_id = rac_strdup(buffer);
-    }
-
-    // Load user ID (optional)
-    if (g_storage.retrieve(RAC_KEY_USER_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.user_id);
-        g_auth_state.user_id = rac_strdup(buffer);
-    }
-
-    // Load organization ID
-    if (g_storage.retrieve(RAC_KEY_ORGANIZATION_ID, buffer, sizeof(buffer), g_storage.context) >
-        0) {
-        free(g_auth_state.organization_id);
-        g_auth_state.organization_id = rac_strdup(buffer);
-    }
-
-    // Mark as authenticated if we have tokens
-    if (g_auth_state.access_token && g_auth_state.access_token[0] != '\0') {
-        g_auth_state.is_authenticated = true;
-        // Token expiry is unknown when loading, so it will trigger refresh on first use
-        g_auth_state.token_expires_at = 0;
-    }
-
-    // Clear sensitive data from stack buffer
-    memset(buffer, 0, sizeof(buffer));
-
-    return 0;
+    return RAC_SUCCESS;
 }
 
 int rac_auth_save_tokens(void) {

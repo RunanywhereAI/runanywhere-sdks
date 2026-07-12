@@ -1,5 +1,5 @@
 // AES-GCM key for encrypting localStorage metadata (device-ID-equivalent
-// parity with iOS Keychain / Android EncryptedSharedPrefs). The key is
+// parity with iOS Keychain / Android Keystore-backed storage). The key is
 // non-exportable and lives in IndexedDB so it is origin-scoped and survives
 // page reloads without ever appearing in application-layer JS memory as raw
 // bytes.

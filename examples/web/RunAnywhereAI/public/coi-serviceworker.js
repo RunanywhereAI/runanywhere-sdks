@@ -43,8 +43,12 @@ self.addEventListener('fetch', (event) => {
     return;
   } else {
     // Cross-origin requests: re-fetch and inject CORP header
+    // Clone the complete Request so Range/conditional headers used by
+    // resumable model downloads survive the isolation fallback. Rebuilding
+    // from request.url alone silently turns every resume into a full fetch.
+    const isolatedRequest = new Request(request, { credentials: 'omit' });
     event.respondWith(
-      fetch(request.url, { mode: 'cors', credentials: 'omit' })
+      fetch(isolatedRequest)
         .then((response) => {
           const headers = new Headers(response.headers);
           headers.set('Cross-Origin-Resource-Policy', 'cross-origin');

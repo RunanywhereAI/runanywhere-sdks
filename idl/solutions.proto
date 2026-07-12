@@ -23,10 +23,11 @@ message SolutionConfig {
     oneof config {
         VoiceAgentConfig voice_agent = 1;
         RAGConfig        rag         = 2;
-        WakeWordConfig   wake_word   = 3;
         AgentLoopConfig  agent_loop  = 4;
         TimeSeriesConfig time_series = 5;
     }
+    reserved 3;
+    reserved "wake_word";
 }
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,8 @@ enum SolutionType {
     SOLUTION_TYPE_UNSPECIFIED = 0;
     SOLUTION_TYPE_VOICE_AGENT = 1;
     SOLUTION_TYPE_RAG         = 2;
-    SOLUTION_TYPE_WAKEWORD    = 3;
+    reserved 3;
+    reserved "SOLUTION_TYPE_WAKEWORD";
     SOLUTION_TYPE_TIME_SERIES = 4;
     SOLUTION_TYPE_AGENT_LOOP  = 5;
 }
@@ -58,7 +60,7 @@ message SolutionHandle {
     // instance. Used as the lookup key for lifecycle calls.
     string handle_id        = 1;
     // String discriminator for the solution kind, e.g. "voice_agent",
-    // "rag", "wakeword", "time_series", "agent_loop". Free-form for
+    // "rag", "time_series", "agent_loop". Free-form for
     // forward-compat with future solutions; canonical values match the
     // `SolutionType` enum names lower-cased.
     string solution_type    = 2;
@@ -157,20 +159,6 @@ enum VectorStore {
     VECTOR_STORE_UNSPECIFIED = 0;
     VECTOR_STORE_USEARCH     = 1;  // default, in-process HNSW
     VECTOR_STORE_PGVECTOR    = 2;  // remote, server deployments only
-}
-
-// ---------------------------------------------------------------------------
-// Wake word — always-on listener that emits a pulse on keyword detection.
-// ---------------------------------------------------------------------------
-message WakeWordConfig {
-    string model_id = 1;           // e.g. "hey-mycroft-v1", "kws-zipformer-gigaspeech"
-    string keyword  = 2;           // Phrase to detect
-    float  threshold = 3;          // 0.0..1.0, engine-dependent
-    int32  pre_roll_ms = 4;        // How much audio to emit before the trigger
-    int32  sample_rate_hz = 5;     // default 16000
-
-    // Optional explicit solution-kind tag. See `SolutionType`.
-    optional SolutionType type_kind = 6;
 }
 
 // ---------------------------------------------------------------------------

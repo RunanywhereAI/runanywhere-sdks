@@ -15,8 +15,8 @@
 namespace {
 
 std::mutex g_token_mutex;
-std::string g_token;      // explicit token from rac_http_hf_token_set
-bool g_token_set = false; // true once set() was called (even with empty/clear)
+std::string g_token;       // explicit token from rac_http_hf_token_set
+bool g_token_set = false;  // true once set() was called (even with empty/clear)
 
 // HF_TOKEN environment fallback, captured once on first use so a plain env
 // var works with no call-site change (mirrors the retired OkHttp behavior).
@@ -48,9 +48,8 @@ std::string current_token() {
 bool iequals(const std::string& a, const char* b) {
     size_t i = 0;
     for (; i < a.size(); ++i) {
-        if (b[i] == '\0' ||
-            std::tolower(static_cast<unsigned char>(a[i])) !=
-                std::tolower(static_cast<unsigned char>(b[i]))) {
+        if (b[i] == '\0' || std::tolower(static_cast<unsigned char>(a[i])) !=
+                                std::tolower(static_cast<unsigned char>(b[i]))) {
             return false;
         }
     }
@@ -123,4 +122,8 @@ extern "C" void rac_http_hf_token_set(const char* token) {
         // set(NULL) fully resets to the default (env-fallback) state.
         g_token_set = false;
     }
+}
+
+extern "C" rac_bool_t rac_http_hf_token_is_configured(void) {
+    return current_token().empty() ? RAC_FALSE : RAC_TRUE;
 }

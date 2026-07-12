@@ -7,7 +7,6 @@
 // - VAD (Silero)
 // - STT (Parakeet TDT-CTC 110M - NeMo CTC, ~126MB, int8 quantized)
 // - TTS (Piper Lessac Medium - ~61MB, 22050Hz, natural male voice)
-// - Wake Word (openWakeWord - optional)
 // =============================================================================
 
 #include <string>
@@ -34,10 +33,6 @@ constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";  // Piper
 constexpr const char* STT_MODEL_ID_WHISPER = "whisper-tiny-en";
 constexpr const char* TTS_MODEL_ID_KOKORO = "kokoro-en-v0_19";
 
-// Wake word models (optional)
-constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
-constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
-
 // =============================================================================
 // Model File Names
 // =============================================================================
@@ -45,11 +40,6 @@ constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
 constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
 constexpr const char* STT_MODEL_FILE = "";  // Directory-based (Parakeet has model.int8.onnx + tokens.txt)
 constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";  // Piper model file
-
-// Wake word model files
-constexpr const char* WAKEWORD_MODEL_FILE = "hey_jarvis_v0.1.onnx";
-constexpr const char* WAKEWORD_EMBEDDING_FILE = "embedding_model.onnx";
-constexpr const char* WAKEWORD_MELSPEC_FILE = "melspectrogram.onnx";
 
 // =============================================================================
 // Model Configuration
@@ -74,7 +64,7 @@ inline const ModelConfig REQUIRED_MODELS[] = {
         .filename = VAD_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_AUDIO,
         .format = RAC_MODEL_FORMAT_ONNX,
-        .framework = RAC_FRAMEWORK_ONNX,
+        .framework = RAC_FRAMEWORK_SHERPA,
         .memory_required = 10 * 1024 * 1024
     },
     // STT Model (Parakeet TDT-CTC 110M - NeMo CTC, int8 quantized)
@@ -84,7 +74,7 @@ inline const ModelConfig REQUIRED_MODELS[] = {
         .filename = STT_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_RECOGNITION,
         .format = RAC_MODEL_FORMAT_ONNX,
-        .framework = RAC_FRAMEWORK_ONNX,
+        .framework = RAC_FRAMEWORK_SHERPA,
         .memory_required = 126 * 1024 * 1024  // ~126MB int8 quantized
     },
     // TTS Model (Piper Lessac Medium - VITS, 22050Hz, natural male voice)
@@ -94,35 +84,12 @@ inline const ModelConfig REQUIRED_MODELS[] = {
         .filename = TTS_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS,
         .format = RAC_MODEL_FORMAT_ONNX,
-        .framework = RAC_FRAMEWORK_ONNX,
+        .framework = RAC_FRAMEWORK_SHERPA,
         .memory_required = 65 * 1024 * 1024  // ~61MB model + espeak-ng-data
     }
 };
 
-// Wake word models (optional)
-inline const ModelConfig WAKEWORD_MODELS[] = {
-    {
-        .id = WAKEWORD_MODEL_ID,
-        .name = "Hey Jarvis Wake Word",
-        .filename = WAKEWORD_MODEL_FILE,
-        .category = RAC_MODEL_CATEGORY_AUDIO,
-        .format = RAC_MODEL_FORMAT_ONNX,
-        .framework = RAC_FRAMEWORK_ONNX,
-        .memory_required = 5 * 1024 * 1024
-    },
-    {
-        .id = WAKEWORD_EMBEDDING_ID,
-        .name = "openWakeWord Embedding",
-        .filename = WAKEWORD_EMBEDDING_FILE,
-        .category = RAC_MODEL_CATEGORY_AUDIO,
-        .format = RAC_MODEL_FORMAT_ONNX,
-        .framework = RAC_FRAMEWORK_ONNX,
-        .memory_required = 15 * 1024 * 1024
-    }
-};
-
 constexpr size_t NUM_REQUIRED_MODELS = sizeof(REQUIRED_MODELS) / sizeof(REQUIRED_MODELS[0]);
-constexpr size_t NUM_WAKEWORD_MODELS = sizeof(WAKEWORD_MODELS) / sizeof(WAKEWORD_MODELS[0]);
 
 // =============================================================================
 // Path Resolution
@@ -145,6 +112,8 @@ inline bool init_model_system() {
 
 inline const char* get_framework_subdir(rac_inference_framework_t framework) {
     switch (framework) {
+        case RAC_FRAMEWORK_SHERPA:
+            return "Sherpa";
         case RAC_FRAMEWORK_ONNX:
             return "ONNX";
         case RAC_FRAMEWORK_LLAMACPP:
@@ -177,19 +146,6 @@ inline std::string get_stt_model_path() {
 
 inline std::string get_tts_model_path() {
     return get_model_path(REQUIRED_MODELS[2]);
-}
-
-inline std::string get_wakeword_model_path() {
-    return get_model_path(WAKEWORD_MODELS[0]);
-}
-
-inline std::string get_wakeword_embedding_path() {
-    return get_model_path(WAKEWORD_MODELS[1]);
-}
-
-inline std::string get_wakeword_melspec_path() {
-    std::string base_dir = get_base_dir();
-    return base_dir + "/Models/ONNX/" + WAKEWORD_EMBEDDING_ID + "/" + WAKEWORD_MELSPEC_FILE;
 }
 
 inline std::string get_earcon_path() {
@@ -226,16 +182,7 @@ inline bool are_all_models_available() {
     return true;
 }
 
-inline bool are_wakeword_models_available() {
-    for (size_t i = 0; i < NUM_WAKEWORD_MODELS; ++i) {
-        if (!is_model_available(WAKEWORD_MODELS[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
-inline void print_model_status(bool include_wakeword = false) {
+inline void print_model_status() {
     printf("Required Models (NO LLM):\n");
     for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
         const ModelConfig& model = REQUIRED_MODELS[i];
@@ -246,21 +193,6 @@ inline void print_model_status(bool include_wakeword = false) {
                model.id);
         if (!available) {
             printf("       Expected at: %s\n", get_model_path(model).c_str());
-        }
-    }
-
-    if (include_wakeword) {
-        printf("\nWake Word Models (optional):\n");
-        for (size_t i = 0; i < NUM_WAKEWORD_MODELS; ++i) {
-            const ModelConfig& model = WAKEWORD_MODELS[i];
-            bool available = is_model_available(model);
-            printf("  [%s] %s (%s)\n",
-                   available ? "OK" : "MISSING",
-                   model.name,
-                   model.id);
-            if (!available) {
-                printf("       Expected at: %s\n", get_model_path(model).c_str());
-            }
         }
     }
 }

@@ -46,10 +46,8 @@ private enum RegistryProtoABI {
     ) -> rac_result_t
     typealias FreeProto = @convention(c) (UnsafeMutablePointer<UInt8>?) -> Void
 
-    private static let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2)
-
     private static func load<T>(_ symbolName: String, as _: T.Type) -> T? {
-        guard let symbol = dlsym(defaultHandle, symbolName) else {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), symbolName) else {
             return nil
         }
         return unsafeBitCast(symbol, to: T.self)
@@ -115,6 +113,12 @@ private enum RegistryProtoABI {
 // MARK: - ModelRegistry Bridge
 
 extension CppBridge {
+
+    /// Global model-registry pointer owned by commons for the process lifetime.
+    /// The wrapper is the only representation allowed across actor boundaries.
+    struct ModelRegistryHandle: @unchecked Sendable {
+        let rawValue: rac_model_registry_handle_t
+    }
 
     /// Model registry bridge
     /// Wraps C++ rac_model_registry.h functions for in-memory model storage

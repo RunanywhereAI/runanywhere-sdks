@@ -23,6 +23,11 @@ description = "Railway production/staging app URL"
 regex = '''https?://[a-zA-Z0-9\-]+\.up\.railway\.app'''
 keywords = ["railway.app"]
 
+[[rules.allowlists]]
+description = "Public RunAnywhere control-plane endpoint"
+regexTarget = "match"
+regexes = ['''https://runanywhere-backend-production\.up\.railway\.app''']
+
 [[rules]]
 id = "supabase-url"
 description = "Supabase project URL (non-placeholder)"
@@ -46,12 +51,6 @@ paths = [
     '''\.gitleaks\.toml$''',
     '''AGENTS\.md$''',
     '''\.cursor/plans/.*\.plan\.md$''',
-    '''thoughts/.*\.md$''',
-]
-
-commits = [
-    "4315847341588d462f2b8ee07458117b1f9b7478",
-    "a3f9b289d5240055e472c59aaaea2e4c87efcd50",
 ]
 
 regexTarget = "line"

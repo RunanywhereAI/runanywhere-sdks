@@ -698,16 +698,16 @@ extension ChatInterfaceView {
 
     @MainActor
     private func hydrateDefaultDocumentModels() async {
-        await ModelListViewModel.shared.loadModels()
+        await ModelListViewModel.shared.loadModelsFromRegistry()
 
         if selectedDocumentEmbeddingModel == nil {
-            selectedDocumentEmbeddingModel = ModelListViewModel.shared.availableModels.first(where: {
+            selectedDocumentEmbeddingModel = ModelListViewModel.shared.availableModels.first {
                 $0.category == .embedding
                     && $0.framework == .onnx
                     && !$0.id.hasSuffix("-vocab")
                     && !$0.id.hasSuffix("-tokenizer")
                     && $0.isAvailableForUse
-            })
+            }
         }
 
         if selectedDocumentAnswerModel == nil {
@@ -719,11 +719,11 @@ extension ChatInterfaceView {
                 return
             }
 
-            selectedDocumentAnswerModel = ModelListViewModel.shared.availableModels.first(where: {
+            selectedDocumentAnswerModel = ModelListViewModel.shared.availableModels.first {
                 $0.category == .language
                     && $0.framework == .llamaCpp
                     && $0.isAvailableForUse
-            })
+            }
         }
     }
 }

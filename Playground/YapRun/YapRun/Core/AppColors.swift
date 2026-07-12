@@ -64,9 +64,4 @@ struct AppColors {
     static let overlayMedium = Color.primary.opacity(0.12)
     static let overlayThick  = Color.primary.opacity(0.15)
 
-    // Legacy aliases (kept to minimize churn, map to adaptive versions)
-    static let backgroundPrimaryDark = backgroundPrimary
-    static let backgroundSecondaryDark = backgroundSecondary
-    static let backgroundTertiaryDark = backgroundTertiary
-    static let backgroundGray5Dark = backgroundGray5
 }

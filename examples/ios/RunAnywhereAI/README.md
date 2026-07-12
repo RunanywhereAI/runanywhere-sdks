@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/Platform-macOS%2014.5%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.5+" />
   <img src="https://img.shields.io/badge/Swift-5.9%2B-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+" />
   <img src="https://img.shields.io/badge/SwiftUI-Modern%20UI-0D96F6?style=flat-square&logo=swift&logoColor=white" alt="SwiftUI" />
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
 **A production-ready reference app demonstrating the [RunAnywhere Swift SDK](../../../sdk/runanywhere-swift/) capabilities for on-device AI.** This app showcases how to build privacy-first, offline-capable AI features with LLM chat, speech-to-text, text-to-speech, and a complete voice assistant pipeline—all running locally on your device.
@@ -30,7 +30,7 @@
 
 Prerequisites:
 
-- Xcode 15+ with iOS 17.5+ simulator runtimes and command line tools selected.
+- Xcode 26+ with Swift 6.2, iOS 17.5+ simulator runtimes, and command line tools selected.
 - Swift 5.9+.
 - CMake and Ninja for root native artifact generation.
 - Enough disk for XCFramework output and downloaded AI models.
@@ -46,7 +46,7 @@ cd ../../..
 cd examples/ios/RunAnywhereAI
 
 # Resolve local Swift package dependencies.
-swift package resolve
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve
 xcodebuild \
   -project RunAnywhereAI.xcodeproj \
   -scheme RunAnywhereAI \
@@ -260,7 +260,7 @@ RunAnywhereAI/
 
 ### Prerequisites
 
-- **Xcode** 15.0 or later
+- **Xcode** 26 or later with Swift 6.2
 - **iOS** 17.5+ / **macOS** 14.5+
 - **Swift** 5.9+
 - **Device/Simulator** with Apple Silicon (recommended: physical device for best performance)
@@ -343,7 +343,7 @@ struct RunAnywhereAIApp: App {
 ```swift
 // Download with progress tracking
 for try await progress in RunAnywhere.downloadModel("smollm2-360m-q8_0") {
-    print("Download: \(Int(progress.percentage * 100))%")
+    print("Download: \(Int(Double(progress.overallProgress) * 100))%")
 }
 
 // Load into memory
@@ -643,7 +643,7 @@ git push origin feature/your-feature
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see [LICENSE](../../../LICENSE) for details.
+This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../../LICENSE) for details.
 
 ---
 

@@ -4,7 +4,8 @@
  * Proto-byte model lifecycle bindings backed by runanywhere-commons.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
+#include "rac/core/rac_model_lifecycle.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 namespace margelo::nitro::runanywhere {
 
@@ -32,41 +33,37 @@ std::shared_ptr<ArrayBuffer> emptyLifecycleProtoBuffer() {
     return ArrayBuffer::allocate(0);
 }
 
+using LifecycleProtoFn = decltype(&rac_model_lifecycle_unload_proto);
+
 std::shared_ptr<ArrayBuffer> copyLifecycleProtoBuffer(rac_proto_buffer_t& protoBuffer) {
     if (protoBuffer.status != RAC_SUCCESS) {
         if (protoBuffer.error_message) {
             LOGE("lifecycle proto error: %s", protoBuffer.error_message);
         }
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyLifecycleProtoBuffer();
     }
 
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyLifecycleProtoBuffer();
     }
 
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
 std::shared_ptr<ArrayBuffer> callLifecycleProto(const std::vector<uint8_t>& requestBytes,
-                                                const char* symbolName,
+                                                LifecycleProtoFn fn,
                                                 const char* operation) {
-    auto fn = proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        return emptyLifecycleProtoBuffer();
-    }
-
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     const uint8_t* requestData = requestBytes.empty() ? nullptr : requestBytes.data();
     rac_result_t rc = fn(requestData, requestBytes.size(), &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         return emptyLifecycleProtoBuffer();
     }
     return copyLifecycleProtoBuffer(out);
@@ -86,24 +83,16 @@ HybridRunAnywhereCore::modelLifecycleLoadProto(
         }
 
         rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
+        rac_proto_buffer_init(&out);
         const uint8_t* requestData = bytes.empty() ? nullptr : bytes.data();
-        auto loadProto =
-            proto_compat::symbol<proto_compat::ModelLifecycleLoadProtoFn>(
-                "rac_model_lifecycle_load_proto");
-        if (!loadProto) {
-            LOGE("modelLifecycleLoadProto: rac_model_lifecycle_load_proto unavailable");
-            return emptyLifecycleProtoBuffer();
-        }
-
-        rac_result_t rc = loadProto(
+        rac_result_t rc = rac_model_lifecycle_load_proto(
             registryHandle,
             requestData,
             bytes.size(),
             &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("modelLifecycleLoadProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
+            rac_proto_buffer_free(&out);
             return emptyLifecycleProtoBuffer();
         }
         return copyLifecycleProtoBuffer(out);
@@ -117,7 +106,7 @@ HybridRunAnywhereCore::modelLifecycleUnloadProto(
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callLifecycleProto(
             bytes,
-            "rac_model_lifecycle_unload_proto",
+            rac_model_lifecycle_unload_proto,
             "modelLifecycleUnloadProto");
     });
 }
@@ -128,7 +117,7 @@ HybridRunAnywhereCore::currentModelProto(const std::shared_ptr<ArrayBuffer>& req
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callLifecycleProto(
             bytes,
-            "rac_model_lifecycle_current_model_proto",
+            rac_model_lifecycle_current_model_proto,
             "currentModelProto");
     });
 }
@@ -137,21 +126,13 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::componentLifecycleSnapshotProto(double component) {
     return Promise<std::shared_ptr<ArrayBuffer>>::async([component]() {
         rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        auto snapshotProto =
-            proto_compat::symbol<proto_compat::ComponentLifecycleSnapshotProtoFn>(
-                "rac_component_lifecycle_snapshot_proto");
-        if (!snapshotProto) {
-            LOGE("componentLifecycleSnapshotProto: rac_component_lifecycle_snapshot_proto unavailable");
-            return emptyLifecycleProtoBuffer();
-        }
-
-        rac_result_t rc = snapshotProto(
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_component_lifecycle_snapshot_proto(
             static_cast<uint32_t>(component),
             &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("componentLifecycleSnapshotProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
+            rac_proto_buffer_free(&out);
             return emptyLifecycleProtoBuffer();
         }
         return copyLifecycleProtoBuffer(out);

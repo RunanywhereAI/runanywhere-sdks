@@ -14,7 +14,11 @@
 // the generated one (which additionally carries enableRemoteLogging /
 // includeSourceLocation / includeDeviceMetadata); the console logger only acts
 // on the three fields it supported before and ignores the rest.
-import { LogLevel, type LoggingConfiguration } from '@runanywhere/proto-ts/logging';
+import {
+  LogLevel,
+  LoggingConfiguration as LoggingConfigurationProto,
+  type LoggingConfiguration,
+} from '@runanywhere/proto-ts/logging';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 export { LogLevel };
@@ -30,32 +34,29 @@ export function loggingConfigurationForEnvironment(
 ): LoggingConfiguration {
   switch (environment) {
     case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return {
+      return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: true,
         minLogLevel: LogLevel.LOG_LEVEL_INFO,
         includeSourceLocation: false,
         includeDeviceMetadata: true,
         enableRemoteLogging: false,
-        enableSentryLogging: false,
-      };
+      });
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-      return {
+      return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: false,
         minLogLevel: LogLevel.LOG_LEVEL_WARNING,
         includeSourceLocation: false,
         includeDeviceMetadata: true,
         enableRemoteLogging: false,
-        enableSentryLogging: false,
-      };
+      });
     default:
-      return {
+      return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: true,
         minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
         includeSourceLocation: false,
         includeDeviceMetadata: false,
         enableRemoteLogging: false,
-        enableSentryLogging: true,
-      };
+      });
   }
 }
 
@@ -88,8 +89,6 @@ export interface LogDestination {
 export class SDKLogger {
   private static _level: LogLevel = LogLevel.LOG_LEVEL_INFO;
   private static _enabled = true;
-  // Reserved configuration surface (proto LoggingConfiguration parity); the Web SDK ships no Sentry destination by design.
-  private static _sentryEnabled = false;
   private static _extraDestinations: Map<string, LogDestination> = new Map();
 
   private readonly category: string;
@@ -122,7 +121,6 @@ export class SDKLogger {
   static configure(config: LoggingConfiguration): void {
     SDKLogger._enabled = config.enableLocalLogging;
     SDKLogger._level = config.minLogLevel;
-    SDKLogger._sentryEnabled = config.enableSentryLogging;
   }
 
   /**
@@ -141,11 +139,6 @@ export class SDKLogger {
   /** Set minimum log level. Mirrors Swift `Logging.shared.setMinLogLevel(_:)`. */
   static setMinLogLevel(level: LogLevel): void {
     SDKLogger._level = level;
-  }
-
-  /** Enable or disable Sentry error forwarding. Mirrors Swift `Logging.shared.setSentryLoggingEnabled(_:)`. */
-  static setSentryLoggingEnabled(enabled: boolean): void {
-    SDKLogger._sentryEnabled = enabled;
   }
 
   /** Register a custom log destination. Mirrors Swift `Logging.shared.addDestination(_:)`. */
@@ -192,7 +185,7 @@ export class SDKLogger {
   }
 
   private log(level: LogLevel, message: string): void {
-    const shouldLog = SDKLogger._enabled || SDKLogger._sentryEnabled;
+    const shouldLog = SDKLogger._enabled || SDKLogger._extraDestinations.size > 0;
     if (level < SDKLogger._level || !shouldLog) {
       return;
     }

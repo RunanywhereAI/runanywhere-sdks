@@ -98,3 +98,7 @@ weight.bin
 */weight.bin
 **/*.mlpackage/Data/com.apple.CoreML/weight.bin
 *.mlmodelc/coremldata.bin
+
+# Local release credentials. This file can be bundled by local release builds,
+# but must never be committed.
+RunAnywhereAI/Resources/RunAnywhereLocalSecrets.plist

@@ -20,7 +20,7 @@ A runtime fills two distinct roles. This is the key clarifying contract, documen
 
 ### 1. Capability role — MANDATORY
 
-Identity + `init` + `destroy` + `device_info` + `capabilities`. **Every runtime MUST implement these** so the engine router can do hardware-aware selection ("what device is this, and what can it do?"). A *capability-only* runtime stops here and leaves the session-execution slots `NULL`.
+Identity + `init` + `destroy` + `device_info` + `capabilities`. **Every runtime MUST implement these** so callers and diagnostics can determine what device is present and what it can do. A *capability-only* runtime stops here and leaves the session-execution slots `NULL`.
 
 - `init()` returns 0 to accept; non-zero **silently rejects** the runtime (e.g. Metal on Linux, Core ML on an OS too old to run a graph). `init`/`destroy` MUST be non-NULL (pass a no-op `destroy` if there's nothing to tear down).
 - `device_info()` fills `rac_runtime_device_info_t` (device class, stable `device_id`, display name, memory bytes).
@@ -41,14 +41,14 @@ Quoting the flag definition at `rac_runtime_vtable.h:132-140`:
  *  `create_session` / `run_session` / `destroy_session` (+ buffer ops) and can
  *  actually run inference, not merely describe hardware. Runtimes that fill
  *  those vtable slots MUST set this bit in `capabilities()`; capability-only
- *  runtimes (which leave the session slots NULL) MUST NOT. The engine router
- *  uses this flag to tell "can this runtime host a session?" apart from "this
+ *  runtimes (which leave the session slots NULL) MUST NOT. Callers use this
+ *  flag to tell "can this runtime host a session?" apart from "this
  *  runtime exists and reports device_info/capabilities". See the two-role note
  *  on `rac_runtime_vtable` below. */
 #define RAC_RUNTIME_CAP_SESSION_EXECUTION (1ull << 10)
 ```
 
-The router thus distinguishes **"this runtime is registered (device present)"** from **"this runtime can host a session."** A capability-only runtime that left the bit set, or a session runtime that cleared it, would mislead routing.
+Callers can thus distinguish **"this runtime is registered (device present)"** from **"this runtime can host a session."** A capability-only runtime that left the bit set, or a session runtime that cleared it, would misreport its execution surface.
 
 ---
 
@@ -70,13 +70,13 @@ The ABI boundary is `sdk/runanywhere-commons/include/rac/plugin/rac_runtime_vtab
 
 ### ABI versioning (`rac_runtime_vtable.h:45-75`)
 
-- Runtime ABI is **independent** of `RAC_PLUGIN_API_VERSION` (engines). Current = `RAC_RUNTIME_ABI_VERSION_V2` (`2u`).
+- Runtime ABI is **independent** of `RAC_PLUGIN_API_VERSION` (engines). The only supported value is `RAC_RUNTIME_ABI_VERSION` (`2u`).
 - The registry accepts **ABI v2 only**. A v1-only vtable (missing the `reserved_slot_0` v2 extension) is **hard-rejected** with `RAC_ERROR_ABI_VERSION_MISMATCH`. `metadata.abi_version` must equal `RAC_RUNTIME_ABI_VERSION` exactly.
 - The v2 extension `rac_runtime_vtable_v2_t` (`rac_runtime_vtable.h:291-318`) hangs off `reserved_slot_0` and carries `run_session_v2` + device-aware buffer ops (`alloc_buffer`/`buffer_info`/`map_buffer`/`unmap_buffer`/`copy_buffer`) + `release_tensor`. Probe it via the inline `rac_runtime_vtable_get_v2()`. Capability-only runtimes may ship a v2 table with every op slot NULL; **onnxrt leaves `reserved_slot_0` itself NULL** since it offers no session role.
 
 ### The registry (`rac_runtime_registry.h`)
 
-`rac_runtime_register()` validation order (`rac_runtime_registry.h:31-48`): NULL checks → `abi_version` match → v2 extension required → `init()` returns 0 → dedup by `metadata.id` (a new vtable replaces an existing one **iff** priority `>=` incumbent, else `RAC_ERROR_PLUGIN_DUPLICATE` and the incoming `destroy()` is called to unwind its `init()`). Lookups: `rac_runtime_get_by_id`, `rac_runtime_is_registered` / `rac_runtime_is_available` (router pre-flight), `rac_runtime_list`, `rac_runtime_count`.
+`rac_runtime_register()` validation order (`rac_runtime_registry.h:31-48`): NULL checks → `abi_version` match → v2 extension required → `init()` returns 0 → dedup by `metadata.id` (a new vtable replaces an existing one **iff** priority `>=` incumbent, else `RAC_ERROR_PLUGIN_DUPLICATE` and the incoming `destroy()` is called to unwind its `init()`). Lookups: `rac_runtime_get_by_id`, `rac_runtime_is_registered` / `rac_runtime_is_available`, `rac_runtime_list`, `rac_runtime_count`.
 
 ### Registration: `RAC_STATIC_RUNTIME_REGISTER` + the CPU bootstrap special-case
 
@@ -91,7 +91,7 @@ Most runtimes self-register with `RAC_STATIC_RUNTIME_REGISTER(<name>)` (`rac_run
 | Runtime | Dir | Session role? | `CAP_SESSION_EXECUTION` | Real consumer(s) | How it's used | Status |
 |---------|-----|--------------|------------------------|------------------|---------------|--------|
 | **cpu** | `runtimes/cpu/` | **Yes (the only one)** | **Set** | `llamacpp` (LLM/VLM); any engine registering a CPU provider | Provider registry: engines register a `rac_cpu_runtime_provider_t`; `cpu_create_session`/`cpu_run_session` delegate to it. Folded into `rac_commons` (OBJECT lib). | **Live, core** |
-| **onnxrt** | `runtimes/onnxrt/` | No (slots NULL) | **Not set** | `onnx` engine **only** | Engines call the C++ `runanywhere::runtime::onnxrt::Session` class (`Session::create`/`run`) directly; the vtable half exists to satisfy the router's "runtime registered" gate. Links real `onnxruntime`. | **Live (library), one consumer** |
+| **onnxrt** | `runtimes/onnxrt/` | No (slots NULL) | **Not set** | `onnx` engine **only** | Engines call the C++ `runanywhere::runtime::onnxrt::Session` class (`Session::create`/`run`) directly; the vtable half publishes runtime capability and availability. Links real `onnxruntime`. | **Live (library), one consumer** |
 | **coreml** | `runtimes/coreml/` | No (slots NULL) | **Not set** | `coreml` engine (diffusion) | Engine calls Core ML **loader helpers** (`rac_coreml_load_model_in_dir`, `rac_coreml_default_model_configuration`, `rac_coreml_find_resource_dir`) + the `rac_coreml_runtime_require_available` anchor. Apple-only. | **Live (loader helpers)** |
 
 Priorities (`metadata.priority`): coreml `90`, onnxrt `80`, cpu `0`. (Used only for same-`id` dedup, not engine selection.)
@@ -102,7 +102,7 @@ The vtable/registrar machinery is uniform across all three runtimes, but **how m
 
 - **cpu** — the **only** runtime that hosts a session. It is a **dispatch/session-ownership indirection**, not a compute kernel: `cpu_create_session` looks up a registered `rac_cpu_runtime_provider_t` and forwards to it; the actual math is the engine's bundled library (for `llamacpp`, that's llama.cpp/ggml). Real consumer today: **llamacpp**, which registers `k_llamacpp_cpu_provider` and routes its LLM path through the CPU session (`engines/llamacpp/rac_backend_llamacpp_register.cpp:116`, `:402`). The provider registry deliberately keeps `rac_commons` from linking against any engine.
 
-- **onnxrt** — **used by exactly one engine: `onnx`.** Its value is the C++ `Session` class (`runtimes/onnxrt/rac_runtime_onnxrt.cpp:335-631`), the **only** place raw ONNX Runtime headers (`<onnxruntime_c_api.h>`) are included across commons/engines. The `onnx` engine reaches ORT through `Session::create`/`Session::run` in `engines/onnx/onnx_embedding_provider.cpp:789,823` (`EMBED` primitive), and **hard-requires** the runtime — `engines/onnx/CMakeLists.txt:154-155` is a `FATAL_ERROR` if `rac_runtime_onnxrt` is absent. The C **vtable/registrar half is capability-only** (session slots NULL); it exists mainly so `rac_runtime_is_registered(RAC_RUNTIME_ONNXRT)` returns true for the `onnx` engine's router gate, anchored by `rac_onnxrt_runtime_require_available` (`rac_runtime_onnxrt.cpp:799-811`). It also exposes the execution-provider config surface (`rac_onnxrt_runtime_enable_execution_provider` — CoreML EP wired on Apple, others stubbed).
+- **onnxrt** — **used by exactly one engine: `onnx`.** Its value is the C++ `Session` class (`runtimes/onnxrt/rac_runtime_onnxrt.cpp:335-631`), the **only** place raw ONNX Runtime headers (`<onnxruntime_c_api.h>`) are included across commons/engines. The `onnx` engine reaches ORT through `Session::create`/`Session::run` in `engines/onnx/onnx_embedding_provider.cpp:789,823` (`EMBED` primitive), and **hard-requires** the runtime — `engines/onnx/CMakeLists.txt:154-155` is a `FATAL_ERROR` if `rac_runtime_onnxrt` is absent. The C **vtable/registrar half is capability-only** (session slots NULL); it publishes ONNX Runtime availability and is retained by `rac_onnxrt_runtime_require_available` (`rac_runtime_onnxrt.cpp:799-811`). It also exposes the execution-provider config surface (`rac_onnxrt_runtime_enable_execution_provider` — CoreML EP wired on Apple, others stubbed).
 
   > **`sherpa` does NOT use this runtime.** This is the most common misconception. The `sherpa` engine declares **`RAC_RUNTIME_CPU`** in `k_sherpa_runtimes[]` (`engines/sherpa/rac_plugin_entry_sherpa.cpp:47-48`), links the **sherpa-onnx** library + **raw `onnxruntime`** as static archives (`engines/sherpa/CMakeLists.txt:370-373`), and calls the sherpa-onnx C API directly. Its sources contain **zero** references to `runtime::onnxrt` / `rac_runtime_onnxrt`. So `onnxrt` = a thin ORT wrapper used by **one** engine (`onnx`); sherpa reaches ONNX Runtime transitively through sherpa-onnx, never through `runtimes/onnxrt`.
 
@@ -133,7 +133,7 @@ Mechanics:
 - An engine fills a `rac_cpu_runtime_provider_t` (name, primitive, formats, `create_session`/`run_session`/`destroy_session`, optional V2-native `run_session_v2`) and calls `rac_cpu_runtime_register_provider()` at registration; `rac_cpu_runtime_unregister_provider(name)` on teardown. Strings/format arrays must outlive the registration (copied by value). See `engines/llamacpp/rac_backend_llamacpp_register.cpp:116,402,406`.
 - `cpu_create_session` (`cpu/rac_runtime_cpu.cpp:239`) validates the primitive range, requires a model path **or** blob, then `find_by_desc()` picks the matching provider and forwards. The CPU runtime wraps the provider's session in a magic-tagged `CpuRuntimeSession` (`kCpuSessionMagic`); `cpu_run_session` (`:279`) forwards to `provider.run_session`.
 - `cpu_capabilities` (`cpu/rac_runtime_cpu.cpp:181`) is **dynamic**: it rebuilds the supported-primitive list from whichever providers are currently registered (so STT/TTS/VAD/EMBED/RERANK/VLM/DIFFUSION can plug in without a CPU-runtime rebuild). The flags — including `RAC_RUNTIME_CAP_SESSION_EXECUTION` — are unconditional; `RAC_RUNTIME_CAP_OWNED_OUTPUTS` is added only when some provider implements `run_session_v2` (the V1 shim can't transport output ownership).
-- `rac_cpu_runtime_get_provider_session` (`:615`) exposes the provider-owned handle for staged migrations where legacy streaming/LoRA APIs still need the engine-native session.
+- `rac_cpu_runtime_get_provider_session` (`:615`) exposes the provider-owned handle used by engine-specific streaming and LoRA operations.
 
 Net: even the one session-hosting runtime is a **dispatch layer** — it owns the session lifecycle and the buffer ops, but the compute is the engine's bundled library.
 
@@ -143,7 +143,7 @@ Net: even the one session-hosting runtime is a **dispatch layer** — it owns th
 
 An engine declares which device runtimes it needs in its manifest's `runtimes[]` array (`rac_engine_manifest_t.runtimes` / `runtimes_count`). Three patterns describe how engines relate to runtimes — **kept consistent with [`engines/AGENTS.md`](../engines/AGENTS.md)**:
 
-**Pattern 1 — Engine bundles its own runtime.** The engine ships the compute internally and declares the device(s) it can target as **hints**. `llamacpp` bundles llama.cpp/ggml and declares `RAC_RUNTIME_CPU` always, plus `RAC_RUNTIME_METAL` / `RAC_RUNTIME_CUDA` / `RAC_RUNTIME_VULKAN` **only when the linked ggml was actually compiled with that backend** (`#if defined(GGML_USE_METAL|CUDA|VULKAN)`, `engines/llamacpp/rac_plugin_entry_llamacpp.cpp:83-94,120-121`). For session ownership it registers a **CPU provider** (Pattern above). Declaring a runtime it can't honor would make the router a liar.
+**Pattern 1 — Engine bundles its own runtime.** The engine ships the compute internally and declares the device(s) it can target as **hints**. `llamacpp` bundles llama.cpp/ggml and declares `RAC_RUNTIME_CPU` always, plus `RAC_RUNTIME_METAL` / `RAC_RUNTIME_CUDA` / `RAC_RUNTIME_VULKAN` **only when the linked ggml was actually compiled with that backend** (`#if defined(GGML_USE_METAL|CUDA|VULKAN)`, `engines/llamacpp/rac_plugin_entry_llamacpp.cpp:83-94,120-121`). For session ownership it registers a **CPU provider** (Pattern above). Declaring a runtime it cannot honor would make capability metadata misleading.
 
 **Pattern 2 — Engine uses a separate runtime as a library.** The engine declares the runtime and calls into the runtime's C++/helper API. `onnx` declares `RAC_RUNTIME_ONNXRT` (`engines/onnx/rac_plugin_entry_onnx.cpp:44,77`) and drives ORT via `runtime::onnxrt::Session`. **This is the runtime as a shared library, not a session host.**
 
@@ -151,11 +151,11 @@ An engine declares which device runtimes it needs in its manifest's `runtimes[]`
 
 ### THE RULE
 
-> An engine declares a runtime in `runtimes[]` **iff** its execution depends on that device. The router treats a **declared-but-unregistered** runtime as a **hard reject** — an engine whose declared L1 runtimes are *all* unregistered cannot execute regardless of pinning.
+> An engine declares a runtime in `runtimes[]` **iff** its execution depends on that device.
 
-Enforcement: `sdk/runanywhere-commons/src/router/rac_engine_router.cpp` (`has_registered_declared_runtime` at `:174`, the hard-reject at `:223,234`) and the C wrapper `rac_route.cpp:25-59`, which promotes the rejection to `RAC_ERROR_RUNTIME_UNAVAILABLE` (marker `"no registered runtime satisfies"`). Descriptor-only legacy engines (`metadata.runtimes == NULL`) stay routable. The router awards `+40` runtime-compat when a declared runtime is registered.
+Runtime declarations are currently advisory metadata. Engine selection is plain priority order through `rac_plugin_find()`, or an explicit identity pin through `rac_plugin_find_for_engine()`; it does not score or reject candidates based on runtime registration. Engines still must keep this metadata truthful for capability reporting and future routing policy.
 
-**The thing to internalize:** declaring a runtime ⇒ "I need this device present (registered)." It does **not** mean the runtime executes the session. **Only `cpu` actually executes sessions; `onnxrt`/`coreml` provide a library / loader-helpers.**
+**The thing to internalize:** declaring a runtime describes the device an engine depends on; it does **not** currently gate selection or mean the runtime executes the session. **Only `cpu` actually executes sessions; `onnxrt`/`coreml` provide a library / loader-helpers.**
 
 ---
 
@@ -167,7 +167,7 @@ Adding a runtime is uncommon — most new device support arrives via an engine's
 2. **Create `runtimes/<name>/`** with `CMakeLists.txt` + `rac_runtime_<name>.cpp` (`.mm` for Apple frameworks). Fill a `rac_runtime_vtable_t` in `.rodata`: `metadata` (`abi_version = RAC_RUNTIME_ABI_VERSION`, a `rac_runtime_id_t`, `name`, `priority`, formats, devices), mandatory `init`/`destroy`/`device_info`/`capabilities`, session slots only if applicable, and a v2 extension on `reserved_slot_0` (NULL-filled if capability-only, or omit the slot entirely as `onnxrt` does).
 3. **Register.** Define the entry with `RAC_RUNTIME_ENTRY_DEF(<name>)` and add `RAC_STATIC_RUNTIME_REGISTER(<name>);` at namespace scope. (Only the always-on CPU runtime is bootstrapped explicitly by the registry instead.) Add an `rac_<name>_runtime_require_available()` keep-alive anchor if engines need to force-retain the registrar TU under dead-symbol stripping.
 4. **Wire the build.** Append `add_subdirectory(<name>)` in `runtimes/CMakeLists.txt` (guard Apple-only runtimes with `if(NOT APPLE) return() endif()`), behind a `RAC_RUNTIME_<NAME>` option.
-5. **Connect a consumer.** A new `rac_runtime_id_t` value goes in `rac_primitive.h`. An engine opts in by adding the id to its manifest `runtimes[]` (Pattern 1/2/3). Remember the router's hard-reject rule: only declare a runtime the engine truly depends on, and make sure it actually registers on the target host.
+5. **Connect a consumer.** A new `rac_runtime_id_t` value goes in `rac_primitive.h`. An engine opts in by adding the id to its manifest `runtimes[]` (Pattern 1/2/3). Only declare a runtime the engine truly depends on, and make sure it actually registers on the target host.
 
 ---
 

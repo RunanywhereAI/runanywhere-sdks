@@ -64,7 +64,7 @@ struct ModelStatusBanner: View {
                 // Model loaded state
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(AppColors.statusGreen)
                         .font(.system(size: 14, weight: .semibold))
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -97,7 +97,7 @@ struct ModelStatusBanner: View {
                 // No model state
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.statusOrange)
 
                     Text("No model selected")
                         .font(.subheadline)
@@ -126,7 +126,7 @@ struct ModelStatusBanner: View {
         #else
         .background(Color(NSColor.controlBackgroundColor))
         #endif
-        .cornerRadius(12)
+        .cornerRadius(AppSpacing.cornerRadiusXLarge)
     }
 
     /// Streaming mode indicator badge
@@ -137,12 +137,12 @@ struct ModelStatusBanner: View {
             Text(supportsStreaming ? "Streaming" : "Batch")
                 .font(.system(size: 9, weight: .medium))
         }
-        .foregroundColor(supportsStreaming ? .green : .orange)
+        .foregroundColor(supportsStreaming ? AppColors.statusGreen : AppColors.statusOrange)
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
         .background(
             Capsule()
-                .fill(supportsStreaming ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                .fill(supportsStreaming ? AppColors.statusGreen.opacity(0.15) : AppColors.statusOrange.opacity(0.15))
         )
     }
 
@@ -159,10 +159,10 @@ struct ModelStatusBanner: View {
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return .teal
-        case .onnx: return .purple
+        case .mlx: return AppColors.primaryBlue
+        case .onnx: return AppColors.primaryPurple
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }
@@ -229,7 +229,7 @@ struct ModelRequiredOverlay: View {
                         .frame(width: 120, height: 120)
 
                     Image(systemName: modalityIcon)
-                        .font(.system(size: 48))
+                        .font(AppTypography.system48)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [modalityColor, modalityColor.opacity(0.7)],
@@ -326,12 +326,12 @@ struct ModelRequiredOverlay: View {
     private var modalityColor: Color {
         switch modality {
         case .llm: return AppColors.primaryAccent
-        case .stt: return .green
+        case .stt: return AppColors.statusGreen
         case .tts: return AppColors.primaryPurple
         case .vad: return .cyan
         case .voice: return AppColors.primaryAccent
-        case .vlm: return .orange
-        case .ragEmbedding: return .teal
+        case .vlm: return AppColors.primaryAccent
+        case .ragEmbedding: return AppColors.primaryBlue
         case .ragLLM: return AppColors.primaryAccent
         }
     }
@@ -359,288 +359,6 @@ struct ModelRequiredOverlay: View {
         case .vlm: return "Choose a vision model to understand photos and the live camera."
         case .ragEmbedding: return "Select an embedding model to convert documents into searchable vectors."
         case .ragLLM: return "Select a language model to generate answers from your documents."
-        }
-    }
-}
-
-// MARK: - Voice Pipeline Setup View
-
-/// A setup view specifically for Voice Assistant which requires 3 models
-struct VoicePipelineSetupView: View {
-    @Binding var sttModel: SelectedModelInfo?
-    @Binding var llmModel: SelectedModelInfo?
-    @Binding var ttsModel: SelectedModelInfo?
-
-    // Model loading states from SDK lifecycle tracker
-    var sttLoadState: ModelLoadState = .notLoaded
-    var llmLoadState: ModelLoadState = .notLoaded
-    var ttsLoadState: ModelLoadState = .notLoaded
-
-    let onSelectSTT: () -> Void
-    let onSelectLLM: () -> Void
-    let onSelectTTS: () -> Void
-    let onStartVoice: () -> Void
-
-    var allModelsReady: Bool {
-        sttModel != nil && llmModel != nil && ttsModel != nil
-    }
-
-    var allModelsLoaded: Bool {
-        sttLoadState.isLoaded && llmLoadState.isLoaded && ttsLoadState.isLoaded
-    }
-
-    var body: some View {
-        VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 8) {
-                Image(systemName: "mic.circle.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(AppColors.primaryAccent)
-
-                Text("Voice Assistant Setup")
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Text("Voice requires 3 models to work together")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.top, 20)
-
-            // Model cards with load state
-            VStack(spacing: 16) {
-                // STT Model
-                ModelSetupCard(
-                    step: 1,
-                    title: "Speech Recognition",
-                    subtitle: "Converts your voice to text",
-                    icon: "waveform",
-                    color: .green,
-                    selectedFramework: sttModel?.framework,
-                    selectedModel: sttModel?.name,
-                    loadState: sttLoadState,
-                    onSelect: onSelectSTT
-                )
-
-                // LLM Model
-                ModelSetupCard(
-                    step: 2,
-                    title: "Language Model",
-                    subtitle: "Processes and responds to your input",
-                    icon: "brain",
-                    color: AppColors.primaryAccent,
-                    selectedFramework: llmModel?.framework,
-                    selectedModel: llmModel?.name,
-                    loadState: llmLoadState,
-                    onSelect: onSelectLLM
-                )
-
-                // TTS Model
-                ModelSetupCard(
-                    step: 3,
-                    title: "Text to Speech",
-                    subtitle: "Converts responses to audio",
-                    icon: "speaker.wave.2",
-                    color: .purple,
-                    selectedFramework: ttsModel?.framework,
-                    selectedModel: ttsModel?.name,
-                    loadState: ttsLoadState,
-                    onSelect: onSelectTTS
-                )
-            }
-            .padding(.horizontal)
-
-            Spacer()
-
-            // Start button - enabled only when all models are loaded
-            Button(action: onStartVoice) {
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.fill")
-                    Text("Start Voice Assistant")
-                }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.primaryAccent)
-            .disabled(!allModelsLoaded)
-            .padding(.horizontal)
-            .padding(.bottom, 20)
-
-            // Status message
-            if !allModelsReady {
-                Text("Select all 3 models to continue")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 10)
-            } else if !allModelsLoaded {
-                Text("Waiting for models to load...")
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                    .padding(.bottom, 10)
-            } else {
-                Text("All models loaded and ready!")
-                    .font(.caption)
-                    .foregroundColor(.green)
-                    .padding(.bottom, 10)
-            }
-        }
-    }
-}
-
-// MARK: - Model Setup Card (for Voice Pipeline)
-
-struct ModelSetupCard: View {
-    let step: Int
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    let selectedFramework: InferenceFramework?
-    let selectedModel: String?
-    var loadState: ModelLoadState = .notLoaded
-    let onSelect: () -> Void
-
-    var isConfigured: Bool {
-        selectedFramework != nil && selectedModel != nil
-    }
-
-    var isLoaded: Bool {
-        loadState.isLoaded
-    }
-
-    var isLoading: Bool {
-        loadState.isLoading
-    }
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 16) {
-                // Step indicator with loading/loaded state
-                ZStack {
-                    Circle()
-                        .fill(stepIndicatorColor)
-                        .frame(width: 36, height: 36)
-
-                    if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else if isLoaded {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    } else if isConfigured {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                    } else {
-                        Text("\(step)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.gray)
-                    }
-                }
-
-                // Content
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: icon)
-                            .foregroundColor(color)
-                        Text(title)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                    }
-
-                    if let model = selectedModel {
-                        HStack(spacing: 4) {
-                            Text(model)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-
-                            if isLoaded {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.green)
-                            } else if isLoading {
-                                Text("Loading...")
-                                    .font(.caption2)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                    } else {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                // Action / Status
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                } else if isLoaded {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Loaded")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-                } else if isConfigured {
-                    Text("Change")
-                        .font(.caption)
-                        .foregroundColor(AppColors.primaryAccent)
-                } else {
-                    HStack(spacing: 4) {
-                        Text("Select")
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(AppColors.primaryAccent)
-                }
-            }
-            .padding(16)
-            #if os(iOS)
-            .background(Color(.secondarySystemBackground))
-            #else
-            .background(Color(NSColor.controlBackgroundColor))
-            #endif
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(borderColor, lineWidth: 2)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var stepIndicatorColor: Color {
-        if isLoading {
-            return .orange
-        } else if isLoaded {
-            return .green
-        } else if isConfigured {
-            return color
-        } else {
-            return Color.gray.opacity(0.2)
-        }
-    }
-
-    private var borderColor: Color {
-        if isLoaded {
-            return .green.opacity(0.5)
-        } else if isLoading {
-            return .orange.opacity(0.5)
-        } else if isConfigured {
-            return color.opacity(0.5)
-        } else {
-            return .clear
         }
     }
 }
@@ -679,17 +397,17 @@ struct CompactModelIndicator: View {
             .padding(.vertical, 6)
             .background(framework != nil ? AppColors.primaryAccent.opacity(0.1) : AppColors.primaryAccent.opacity(0.2))
             .foregroundColor(AppColors.primaryAccent)
-            .cornerRadius(8)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
         }
     }
 
     private func frameworkColor(for framework: InferenceFramework) -> Color {
         switch framework {
         case .llamaCpp: return AppColors.primaryAccent
-        case .mlx: return .teal
-        case .onnx: return .purple
+        case .mlx: return AppColors.primaryBlue
+        case .onnx: return AppColors.primaryPurple
         case .foundationModels: return .primary
-        default: return .gray
+        default: return AppColors.statusGray
         }
     }
 }

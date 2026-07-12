@@ -3,8 +3,8 @@
  *
  * Environment presets for the generated `LoggingConfiguration` from
  * `@runanywhere/proto-ts/logging`. The wire shape (enableLocalLogging,
- * minLogLevel, includeSourceLocation, includeDeviceMetadata,
- * enableRemoteLogging, enableSentryLogging) is shared across SDKs; this file
+ * minLogLevel, includeSourceLocation, includeDeviceMetadata, enableRemoteLogging)
+ * is shared across SDKs; this file
  * only supplies the per-environment defaults. Fields not set here fall back to
  * the proto defaults via `fromPartial`.
  */
@@ -18,19 +18,16 @@ export type { LoggingConfiguration };
 const DEVELOPMENT: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: true,
   minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
-  enableSentryLogging: true,
 });
 
 const STAGING: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: true,
   minLogLevel: LogLevel.LOG_LEVEL_INFO,
-  enableSentryLogging: false,
 });
 
 const PRODUCTION: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: false,
   minLogLevel: LogLevel.LOG_LEVEL_WARNING,
-  enableSentryLogging: false,
 });
 
 export function getConfigurationForEnvironment(

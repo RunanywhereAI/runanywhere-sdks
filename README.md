@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://github.com/RunanywhereAI/runanywhere-sdks/stargazers"><img src="https://img.shields.io/github/stars/RunanywhereAI/runanywhere-sdks?style=flat-square" alt="GitHub Stars" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" /></a>
   <a href="https://docs.runanywhere.ai"><img src="https://img.shields.io/badge/Docs-docs.runanywhere.ai-000000?style=flat-square" alt="Documentation" /></a>
   <a href="https://huggingface.co/runanywhere/models"><img src="https://img.shields.io/badge/Models-Hugging%20Face-FFD21E?style=flat-square" alt="Hugging Face Models" /></a>
   <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
@@ -363,8 +363,8 @@ Real-world projects built with RunAnywhere. Each ships as a standalone app you c
 - **[Android Use Agent](Playground/android-use-agent/)**: an on-device autonomous Android agent that reads the screen and controls the phone with an on-device LLM. [Benchmarks](Playground/android-use-agent/ASSESSMENT.md).
 - **[On-Device Browser Agent](Playground/on-device-browser-agent/)**: a Chrome extension that automates browser tasks on-device with WebLLM and WebGPU.
 - **[Swift Starter App](Playground/swift-starter-app/)**: a SwiftUI app with LLM chat, speech-to-text, text-to-speech, and a full voice pipeline.
-- **[Linux Voice Assistant](Playground/linux-voice-assistant/)**: an on-device voice pipeline (wake word, VAD, STT, LLM, TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64.
-- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)**: on-device wake word, VAD, STT, and TTS with cloud LLM reasoning and barge-in.
+- **[Linux Voice Assistant](Playground/linux-voice-assistant/)**: an on-device voice pipeline (VAD, STT, LLM, TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64.
+- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)**: on-device VAD, STT, and TTS with cloud LLM reasoning.
 
 ---
 
@@ -437,4 +437,5 @@ open RunAnywhereAI.xcodeproj
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE) for details.
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).
+See [LICENSE](LICENSE) for details.

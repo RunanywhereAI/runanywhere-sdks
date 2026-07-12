@@ -3,7 +3,7 @@
  *
  * Chat is the primary product surface. SDK showcase features stay available
  * behind a drawer, composer actions, and the Advanced hub so the example keeps
- * its power without presenting an 11-tab developer console on first launch.
+ * its power without presenting a twelve-panel developer console on first launch.
  */
 
 import { ModelCategory } from '@runanywhere/web';
@@ -23,6 +23,8 @@ import {
   openSheet,
   type OpenSheetOptions,
 } from './components/model-selection';
+import { appLogger } from './services/app-logger';
+import { ConversationsStore, type StoredConversation } from './services/conversations-store';
 
 // ---------------------------------------------------------------------------
 // Tab Lifecycle
@@ -124,12 +126,50 @@ const ICONS = {
   advanced: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/>',
   stack: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   gauge: '<path d="M12 14l4-4"/><path d="M4.93 19.07A10 10 0 1 1 19.07 19.07"/><path d="M12 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+
+const THEME_STORAGE_KEY = 'runanywhere-theme';
+const THEME_COLORS = { dark: '#191817', light: '#FCFBFA' } as const;
+
+type ThemeName = 'dark' | 'light';
+
+function effectiveTheme(): ThemeName {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit === 'light' || explicit === 'dark') return explicit;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(theme: ThemeName): void {
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  } catch { /* storage may not be available */ }
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', THEME_COLORS[theme]);
+  refreshThemeButton();
+}
+
+function refreshThemeButton(): void {
+  const button = document.getElementById('consumer-theme-btn');
+  if (!button) return;
+  const theme = effectiveTheme();
+  button.innerHTML = icon(theme === 'dark' ? ICONS.sun : ICONS.moon);
+  const label = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+}
 
 function navSections(): NavSection[] {
   return [
     {
-      title: 'RunAnywhere',
+      title: '',
       items: [
         navTab('assistant', 'Assistant', 'Private chat with local models', ICONS.sparkles, 'chat'),
         {
@@ -141,14 +181,6 @@ function navSections(): NavSection[] {
           action: () => openSheet(CHAT_SHEET_OPTIONS),
         },
         navTab('downloads', 'Manage downloads', 'Models, cache, and local files', ICONS.storage, 'storage'),
-      ],
-    },
-    {
-      title: 'Ask With',
-      items: [
-        navTab('documents', 'Documents', 'Ask with sources from files', ICONS.file, 'documents'),
-        navTab('images', 'Images & Live', 'Photo and camera understanding', ICONS.image, 'vision'),
-        navTab('talk', 'Talk Mode', 'Voice assistant mode', ICONS.mic, 'voice'),
       ],
     },
     {
@@ -190,7 +222,7 @@ export function buildAppShell(): void {
         ${icon(ICONS.menu)}
       </button>
       <div class="consumer-brand" aria-label="RunAnywhere">
-        <span class="consumer-brand__mark">RA</span>
+        <img class="consumer-brand__mark" src="/runanywhere-logo.svg" alt="" />
         <span class="consumer-brand__name">RunAnywhere</span>
       </div>
     </div>
@@ -199,6 +231,7 @@ export function buildAppShell(): void {
       <button type="button" class="shell-icon-btn" id="consumer-new-chat-btn" aria-label="New chat" title="New chat">
         ${icon(ICONS.newChat)}
       </button>
+      <button type="button" class="shell-icon-btn" id="consumer-theme-btn" aria-label="Switch theme" title="Switch theme"></button>
       <button type="button" class="shell-icon-btn" id="consumer-settings-btn" aria-label="Settings" title="Settings">
         ${icon(ICONS.settings)}
       </button>
@@ -227,10 +260,7 @@ export function buildAppShell(): void {
     </button>
     <div class="consumer-recents">
       <div class="consumer-section-title">Recent</div>
-      <button type="button" class="consumer-recent-row" id="consumer-current-chat-btn">
-        <span class="consumer-recent-row__title" id="consumer-current-chat-title">Current chat</span>
-        <span class="consumer-recent-row__meta" id="consumer-current-chat-meta">Stored locally</span>
-      </button>
+      <div class="consumer-recent-list" id="consumer-conversation-list"></div>
     </div>
     <nav class="tab-bar consumer-nav" id="consumer-nav" aria-label="Main navigation"></nav>
   `;
@@ -271,7 +301,7 @@ export function buildAppShell(): void {
   wireShellActions();
   initializePanels();
   switchTabById('chat');
-  refreshCurrentChatSummary();
+  void refreshConversationList();
 }
 
 function renderNav(): void {
@@ -280,7 +310,7 @@ function renderNav(): void {
 
   nav.innerHTML = navSections().map((section) => `
     <div class="consumer-nav-section">
-      <div class="consumer-section-title">${section.title}</div>
+      ${section.title ? `<div class="consumer-section-title">${section.title}</div>` : ''}
       ${section.items.map((item) => `
         <button
           type="button"
@@ -316,6 +346,11 @@ function renderNav(): void {
 }
 
 function wireShellActions(): void {
+  refreshThemeButton();
+  document.getElementById('consumer-theme-btn')?.addEventListener('click', () => {
+    applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
+  });
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', refreshThemeButton);
   document.getElementById('consumer-menu-btn')?.addEventListener('click', openDrawer);
   document.getElementById('consumer-close-drawer-btn')?.addEventListener('click', closeDrawer);
   document.getElementById('consumer-drawer-scrim')?.addEventListener('click', closeDrawer);
@@ -325,16 +360,14 @@ function wireShellActions(): void {
     startNewChat();
     closeDrawer();
   });
-  document.getElementById('consumer-current-chat-btn')?.addEventListener('click', () => {
-    switchTabById('chat');
-    closeDrawer();
-  });
 
   window.addEventListener('runanywhere:navigate', (event) => {
     const tabId = (event as CustomEvent<{ tab: TabId }>).detail?.tab;
     if (tabId) switchTabById(tabId);
   });
-  window.addEventListener('runanywhere:conversation-updated', refreshCurrentChatSummary);
+  ConversationsStore.onChange(() => {
+    void refreshConversationList();
+  });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && drawerOpen) closeDrawer();
   });
@@ -371,7 +404,6 @@ function setMobileDrawerAria(hidden: boolean): void {
 function startNewChat(): void {
   window.dispatchEvent(new CustomEvent('runanywhere:new-chat'));
   switchTabById('chat');
-  refreshCurrentChatSummary();
 }
 
 function switchTabById(tabId: TabId): void {
@@ -389,7 +421,7 @@ function switchTab(index: number): void {
     try {
       tabLifecycles[previousId]?.onDeactivate?.();
     } catch (err) {
-      console.warn(`[App] Panel ${previousId} onDeactivate error:`, err);
+      appLogger.warning(`[App] Panel ${previousId} onDeactivate error:`, err);
     }
   }
 
@@ -406,36 +438,100 @@ function switchTab(index: number): void {
     try {
       tabLifecycles[activeId]?.onActivate?.();
     } catch (err) {
-      console.warn(`[App] Panel ${activeId} onActivate error:`, err);
+      appLogger.warning(`[App] Panel ${activeId} onActivate error:`, err);
     }
   }
 }
 
-function refreshCurrentChatSummary(): void {
-  const titleEl = document.getElementById('consumer-current-chat-title');
-  const metaEl = document.getElementById('consumer-current-chat-meta');
-  if (!titleEl || !metaEl) return;
-
+async function refreshConversationList(): Promise<void> {
+  const list = document.getElementById('consumer-conversation-list');
+  if (!list) return;
+  let conversations: StoredConversation[];
+  let current: StoredConversation | null;
   try {
-    const saved = localStorage.getItem('runanywhere-chat-conversation');
-    if (!saved) {
-      titleEl.textContent = 'No saved chats yet';
-      metaEl.textContent = 'Start a private local conversation';
-      return;
-    }
-    const parsed = JSON.parse(saved) as {
-      updatedAt?: number;
-      messages?: Array<{ role?: string; content?: string }>;
-    };
-    const firstUser = parsed.messages?.find((message) => message.role === 'user' && message.content?.trim());
-    titleEl.textContent = firstUser?.content?.trim().slice(0, 56) || 'Current chat';
-    metaEl.textContent = parsed.updatedAt
-      ? `Saved ${new Date(parsed.updatedAt).toLocaleDateString()}`
-      : 'Stored locally';
-  } catch {
-    titleEl.textContent = 'Current chat';
-    metaEl.textContent = 'Stored locally';
+    [conversations, current] = await Promise.all([
+      ConversationsStore.getConversations(),
+      ConversationsStore.getCurrent(),
+    ]);
+  } catch (error) {
+    list.replaceChildren();
+    const unavailable = document.createElement('p');
+    unavailable.className = 'consumer-recents__empty';
+    unavailable.textContent = 'Saved chats unavailable';
+    list.appendChild(unavailable);
+    appLogger.warning('[App] Could not load saved chats:', error);
+    return;
   }
+  list.replaceChildren();
+  const currentId = current?.id ?? null;
+  if (conversations.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'consumer-recents__empty';
+    empty.textContent = 'No saved chats yet';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const conversation of conversations) {
+    list.appendChild(buildConversationRow(conversation, conversation.id === currentId));
+  }
+}
+
+function buildConversationRow(
+  conversation: StoredConversation,
+  isCurrent: boolean,
+): HTMLElement {
+  const entry = document.createElement('div');
+  entry.className = `consumer-recent-entry${isCurrent ? ' active' : ''}`;
+
+  const openButton = document.createElement('button');
+  openButton.type = 'button';
+  openButton.className = 'consumer-recent-row';
+  openButton.setAttribute('aria-label', `Open saved chat: ${conversation.title}`);
+
+  const title = document.createElement('span');
+  title.className = 'consumer-recent-row__title';
+  title.textContent = conversation.title;
+  const meta = document.createElement('span');
+  meta.className = 'consumer-recent-row__meta';
+  const messageLabel = conversation.messages.length === 1 ? 'message' : 'messages';
+  meta.textContent = `${conversation.messages.length} ${messageLabel} · ${formatSavedDate(conversation.updatedAt)}`;
+  openButton.append(title, meta);
+  openButton.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('runanywhere:load-chat', {
+      detail: { conversationId: conversation.id },
+    }));
+    switchTabById('chat');
+    closeDrawer();
+  });
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'consumer-recent-delete';
+  deleteButton.setAttribute('aria-label', `Delete saved chat: ${conversation.title}`);
+  deleteButton.textContent = '\u00d7';
+  deleteButton.addEventListener('click', () => {
+    void ConversationsStore.getCurrent().then((current) => {
+      window.dispatchEvent(new CustomEvent('runanywhere:delete-chat', {
+        detail: { conversationId: conversation.id },
+      }));
+      if (current?.id === conversation.id) switchTabById('chat');
+    }).catch((error) => {
+      appLogger.warning('[App] Could not delete saved chat:', error);
+    });
+  });
+
+  entry.append(openButton, deleteButton);
+  return entry;
+}
+
+function formatSavedDate(timestamp: number): string {
+  const saved = new Date(timestamp);
+  const today = new Date();
+  if (saved.toDateString() === today.toDateString()) {
+    return saved.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  return saved.toLocaleDateString();
 }
 
 function initAdvancedHub(el: HTMLElement): TabLifecycle {
@@ -446,6 +542,7 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
     subtitle: string;
   }> = [
     { tab: 'voice', icon: ICONS.mic, title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
+    { tab: 'documents', icon: ICONS.file, title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
     { tab: 'transcribe', icon: ICONS.waveform, title: 'Transcribe', subtitle: 'Speech-to-text utility' },
     { tab: 'speak', icon: ICONS.speaker, title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
     { tab: 'vad', icon: ICONS.waveform, title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
@@ -466,18 +563,15 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Assistant Modes</div>
-        <button type="button" class="advanced-row" data-advanced-target="voice">
-          <span class="advanced-row__icon">${icon(ICONS.mic)}</span>
-          <span><strong>Talk Mode</strong><small>Full STT + LLM + TTS voice assistant</small></span>
-        </button>
+        ${hubItems.slice(0, 2).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Voice Utilities</div>
-        ${hubItems.slice(1, 4).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(2, 5).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Management</div>
-        ${hubItems.slice(4).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(5).map((item) => advancedRow(item)).join('')}
       </section>
     </div>
   `;

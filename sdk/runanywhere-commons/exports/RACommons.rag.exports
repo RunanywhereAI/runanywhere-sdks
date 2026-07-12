@@ -19,6 +19,7 @@
 
 # rac_rag_* proto-byte ABI (commons-side RAG pipeline entry points).
 _rac_rag_clear_proto
+_rac_rag_cancel_proto
 _rac_rag_ingest_proto
 _rac_rag_query_proto
 _rac_rag_session_create_proto

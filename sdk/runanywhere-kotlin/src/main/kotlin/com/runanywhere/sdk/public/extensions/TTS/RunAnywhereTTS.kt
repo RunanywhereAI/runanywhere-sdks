@@ -18,6 +18,7 @@ import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
@@ -120,11 +121,10 @@ fun RunAnywhere.synthesizeStream(
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     CppBridgeTTS.synthesizeStream(text, options) { output ->
-                        if (cancelled.get() || isClosedForSend) {
+                        if (cancelled.get()) {
                             false
                         } else {
-                            trySend(output)
-                            true
+                            trySend(output).isSuccess
                         }
                     }
                 } catch (t: Throwable) {

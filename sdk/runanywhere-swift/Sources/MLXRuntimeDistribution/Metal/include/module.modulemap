@@ -1,0 +1,4 @@
+framework module RunAnywhereMLXMetal {
+    umbrella header "RunAnywhereMLXMetal.h"
+    export *
+}

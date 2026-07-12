@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <ranges>
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -172,6 +173,7 @@ runanywhere::v1::ModelInfo build_test_llm(const std::string& id, const std::stri
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
     model.set_local_path("/tmp/" + id + ".gguf");
+    model.set_supports_lora(true);
     model.set_is_downloaded(true);
     model.set_is_available(true);
     return model;
@@ -184,6 +186,16 @@ bool register_test_llm(rac_model_registry_handle_t registry,
         return false;
     return rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
                                              bytes.size()) == RAC_SUCCESS;
+}
+
+bool register_test_lora_adapter(const std::string& adapter_id, const std::string& model_id) {
+    const char* compatible_models[] = {model_id.c_str()};
+    rac_lora_entry_t entry{};
+    entry.id = const_cast<char*>(adapter_id.c_str());
+    entry.name = const_cast<char*>(adapter_id.c_str());
+    entry.compatible_model_ids = const_cast<char**>(compatible_models);
+    entry.compatible_model_count = 1;
+    return rac_lora_registry_register(rac_get_lora_registry(), &entry) == RAC_SUCCESS;
 }
 
 bool lifecycle_load(rac_model_registry_handle_t registry, const std::string& model_id) {
@@ -250,6 +262,10 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "lifecycle lora plugin registers");
     CHECK(register_test_llm(registry, build_test_llm("lifecycle.lora", "Lifecycle LoRA")),
           "lifecycle.lora model registers");
+    CHECK(register_test_lora_adapter("primary", "lifecycle.lora"),
+          "primary adapter registers for lifecycle.lora");
+    CHECK(register_test_lora_adapter("secondary", "lifecycle.lora"),
+          "secondary adapter registers for lifecycle.lora");
     CHECK(lifecycle_load(registry, "lifecycle.lora"), "lifecycle service loads lifecycle.lora");
 
     runanywhere::v1::LoRAApplyRequest apply;
@@ -347,6 +363,8 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "unload-revert plugin registers");
     CHECK(register_test_llm(registry, build_test_llm("unload.lora", "Unload LoRA")),
           "unload.lora model registers");
+    CHECK(register_test_lora_adapter("temp", "unload.lora"),
+          "temp adapter registers for unload.lora");
     CHECK(lifecycle_load(registry, "unload.lora"), "lifecycle loads unload.lora");
 
     runanywhere::v1::LoRAApplyRequest apply;
@@ -552,6 +570,8 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "double-clear plugin registers");
     CHECK(register_test_llm(registry, build_test_llm("double.clear", "Double Clear")),
           "double.clear model registers");
+    CHECK(register_test_lora_adapter("only", "double.clear"),
+          "only adapter registers for double.clear");
     CHECK(lifecycle_load(registry, "double.clear"), "lifecycle loads double.clear");
 
     // Apply one adapter so we have non-empty state to clear.

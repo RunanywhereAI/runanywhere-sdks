@@ -27,8 +27,8 @@ Add both the core SDK and this backend to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.19.13
-  runanywhere_llamacpp: ^0.19.13
+  runanywhere: ^0.20.0
+  runanywhere_llamacpp: ^0.20.0
 ```
 
 Then run:
@@ -45,7 +45,7 @@ flutter pub get
 
 | Platform | Minimum Version | Acceleration |
 |----------|-----------------|--------------|
-| iOS      | 17.0+           | Metal GPU    |
+| iOS      | 17.5+           | Metal GPU    |
 | Android  | API 24+         | NEON SIMD    |
 
 ---

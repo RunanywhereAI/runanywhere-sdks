@@ -7,14 +7,16 @@
  *
  * QHexRT is a PRIVATE, closed-source C++ runtime that runs prebuilt QNN context
  * binaries on Snapdragon Hexagon NPUs (HTP). QHexRT is the RunAnywhere-owned
- * NPU runtime (LLM today; VLM / TTS / ASR on the roadmap).
+ * NPU runtime routed today for LLM, VLM, ASR/STT, TTS, embeddings, and image
+ * restoration/inpaint workloads.
  *
  * ### How this plugin stays private
  *
  * The QHexRT source never enters this repo. The SDK consumes a prebuilt static
  * archive (`libqhexrt_core.a` + `libqhexrt_host.a`) plus a single ABI-stable C
  * header (`qhexrt/qhexrt_c.h`) discovered through `QHEXRT_ROOT` (defaults to
- * `engines/qhexrt/prebuilt/`, which is gitignored). The archive is linked
+ * the atomically selected `engines/qhexrt/prebuilt/current`, which is
+ * gitignored). The archives are linked
  * *into* the plugin `.so` so there is no separately-shippable QHexRT binary and
  * the runtime symbols are internal to the carrier library.
  *
@@ -25,7 +27,8 @@
  *     with RAC_ERROR_BACKEND_UNAVAILABLE; no QHexRT header/lib is needed.
  *   - Engine IS available (internal / authorized): `RAC_QHEXRT_ENGINE_AVAILABLE=1`
  *     with the prebuilt archive present. The plugin links QHexRT and publishes
- *     a routable vtable exposing RAC_PRIMITIVE_GENERATE_TEXT.
+ *     a routable vtable exposing the supported text, vision, speech, embedding,
+ *     and image-generation/restoration primitives.
  *
  * ### QHexRT C ABI brief (from qhexrt/qhexrt_c.h — present only in linked builds)
  *
@@ -37,7 +40,7 @@
  * No C++ types or exceptions cross that boundary; every error is a qhx_status.
  */
 
-#include "rac/core/rac_error.h"
+#include "rac/qhexrt/rac_qhexrt.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,7 +3,7 @@
 **LLM inference backend for the RunAnywhere Kotlin SDK** — powered by [llama.cpp](https://github.com/ggerganov/llama.cpp) for on-device text generation.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.runanywhere.sdk/runanywhere-core-llamacpp?label=Maven%20Central)](https://search.maven.org/artifact/com.runanywhere.sdk/runanywhere-core-llamacpp)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: RunAnywhere](https://img.shields.io/badge/License-RunAnywhere-blue.svg)](../../../../LICENSE)
 [![Platform: Android](https://img.shields.io/badge/Platform-Android%207.0%2B-green)](https://developer.android.com)
 
 ---
@@ -262,7 +262,8 @@ RunAnywhere.registerModel(
 
 ## License
 
-Apache 2.0. See [LICENSE](../../../../LICENSE).
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).
+See [LICENSE](../../../../LICENSE).
 
 This module includes:
 - **llama.cpp** — MIT License

@@ -7,8 +7,9 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/memory_platform_types.dart';
@@ -19,6 +20,9 @@ import 'package:runanywhere/native/types/memory_platform_types.dart';
 
 /// Exceptional return value for file operations that return Int32
 const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
+
+/// A Dart exception is a real storage failure, never a clean cache miss.
+const int _exceptionalReturnSecureStorage = -333;
 
 /// Exceptional return value for bool operations
 const int _exceptionalReturnFalse = 0;
@@ -78,13 +82,6 @@ class DartBridgePlatform {
   /// CRITICAL: Must be kept alive to prevent garbage collection
   static NativeCallable<RacLogCallbackNative>? _loggerCallable;
 
-  /// Secure storage for keychain operations
-  // ignore: unused_field
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-  );
-
   // ---------------------------------------------------------------------------
   // Platform Services (Foundation Models + System TTS/STT) state
   // ---------------------------------------------------------------------------
@@ -110,6 +107,9 @@ class DartBridgePlatform {
 
     try {
       final lib = PlatformLoader.loadCommons();
+      // Resolve the platform helper before giving commons any secure-storage
+      // callback pointers. Missing helper symbols are an initialization error.
+      DartBridgeSecureStorage.instance;
 
       // Allocate the platform adapter struct
       _adapterPtr = calloc<RacPlatformAdapterStruct>();
@@ -150,19 +150,19 @@ class DartBridgePlatform {
             _exceptionalReturnInt32,
           );
 
-      // Secure storage (async operations - need special handling)
+      // Synchronous platform-native secure storage.
       adapter.ref.secureGet = Pointer.fromFunction<RacSecureGetCallbackNative>(
         _platformSecureGetCallback,
-        _exceptionalReturnInt32,
+        _exceptionalReturnSecureStorage,
       );
       adapter.ref.secureSet = Pointer.fromFunction<RacSecureSetCallbackNative>(
         _platformSecureSetCallback,
-        _exceptionalReturnInt32,
+        _exceptionalReturnSecureStorage,
       );
       adapter.ref.secureDelete =
           Pointer.fromFunction<RacSecureDeleteCallbackNative>(
             _platformSecureDeleteCallback,
-            _exceptionalReturnInt32,
+            _exceptionalReturnSecureStorage,
           );
 
       // Clock — intentionally null. C++ falls back to std::chrono::system_clock
@@ -242,48 +242,36 @@ class DartBridgePlatform {
         );
         calloc.free(adapter);
         _adapterPtr = null;
-        return;
+        SDKException.throwIfError(result);
+        throw StateError('Platform adapter registration failed (rc=$result)');
       }
 
       _isRegistered = true;
       _logger.debug('Platform adapter registered successfully');
 
-      // Warm the synchronous secure-storage cache that backs secureGet.
-      // flutter_secure_storage is async-only, but the FFI secure_get
-      // trampoline must return synchronously, so commons reads through the
-      // in-memory cache. Kick the load off here (Phase 1 entry) and await it
-      // in registerServices() so the cache is populated before any C++
-      // secure_get (e.g. rac_device_get_or_create_persistent_id). Without
-      // this warm, every cold-start secure_get misses and commons mints a
-      // fresh device UUID, breaking device-id continuity.
-      unawaited(loadSecureStorageCache());
-
       // Note: We don't free the adapter here as C++ holds a reference to it
       // It will be valid for the lifetime of the application
-    } catch (e, stack) {
-      _logger.error(
-        'Exception registering platform adapter',
-        metadata: {'error': e.toString(), 'stack': stack.toString()},
-      );
+    } catch (_) {
+      _logger.error('Platform adapter registration failed');
+      rethrow;
     }
   }
 
   /// Unregister platform adapter (called during shutdown).
   static void unregister() {
-    if (!_isRegistered) return;
+    // DartBridge invokes this only after canonical rac_shutdown returned and
+    // Commons released its borrowed adapter pointer.
+    _loggerCallable?.close();
+    _loggerCallable = null;
 
-    // Note: We can't actually unregister from C++ since it holds a pointer
-    // Just mark as unregistered
+    final adapter = _adapterPtr;
+    if (adapter != null) {
+      calloc.free(adapter);
+      _adapterPtr = null;
+    }
+
     _isRegistered = false;
-
-    // Close the logger callable to release resources
-    // Note: Only do this during true shutdown - C++ may still try to log
-    // We keep it alive during normal operation
-    // _loggerCallable?.close();
-    // _loggerCallable = null;
-
-    // Don't free _adapterPtr - C++ may still reference it
-    // It will be cleaned up on process exit
+    _servicesRegistered = false;
   }
 
   /// Check if the adapter is registered.
@@ -301,11 +289,6 @@ class DartBridgePlatform {
   /// Foundation Models / System TTS / System STT availability checks.
   static Future<void> registerServices() async {
     if (_servicesRegistered) return;
-
-    // Guarantee the secure-storage cache is loaded before Phase 2 drives the
-    // commons step-list (device registration walks secure_get). register()
-    // starts this load; awaiting here closes the race for the async phase.
-    await loadSecureStorageCache();
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -337,12 +320,12 @@ class DartBridgePlatform {
 
       _servicesRegistered = true;
       _logger.debug('Platform services registered');
-    } catch (e) {
+    } catch (_) {
       // librac_commons.so may not export
       // rac_platform_services_register_availability_callback in some
       // configurations (B-FL-1-002). Log at warning so it's visible in
       // non-debug builds, then mark as registered to avoid retry.
-      _logger.warning('Platform services registration not available: $e');
+      _logger.warning('Platform services registration not available');
       _servicesRegistered = true;
     }
   }
@@ -562,55 +545,6 @@ int _platformFileDeleteCallback(Pointer<Utf8> path, Pointer<Void> userData) {
   }
 }
 
-/// Secure storage cache for synchronous access
-/// Note: flutter_secure_storage is async, so we cache values
-final Map<String, String> _secureStorageCache = {};
-
-/// In-flight async cache load, so concurrent callers (register +
-/// registerServices) await the same future instead of issuing two readAll()s.
-Future<void>? _secureStorageCacheLoad;
-
-/// Pending fire-and-forget persistence operations. [drainPendingSecureWrites]
-/// awaits these so a shutdown path can flush before the process exits,
-/// otherwise a force-quit between the cache update and the async write would
-/// silently drop the last secure_set/secure_delete (e.g. an auth token).
-final Set<Future<void>> _pendingSecureWrites = {};
-
-/// Load secure storage cache (called during platform-adapter registration).
-/// Idempotent: returns the same in-flight future on concurrent calls and a
-/// completed future once loaded.
-Future<void> loadSecureStorageCache() {
-  return _secureStorageCacheLoad ??= () async {
-    try {
-      const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-      );
-      final all = await storage.readAll();
-      _secureStorageCache.addAll(all);
-    } catch (_) {
-      // Ignore errors - cache will be empty
-    }
-  }();
-}
-
-/// Await all in-flight secure-storage persistence operations. Callers on the
-/// shutdown path should await this so the last secure_set/secure_delete is
-/// durably written before the process exits.
-Future<void> drainPendingSecureWrites() async {
-  while (_pendingSecureWrites.isNotEmpty) {
-    await Future.wait(_pendingSecureWrites.toList());
-  }
-}
-
-/// Track a fire-and-forget persistence future so [drainPendingSecureWrites]
-/// can flush it on shutdown, then self-remove once it settles.
-void _trackPendingSecureWrite(Future<void> op) {
-  late final Future<void> tracked;
-  tracked = op.whenComplete(() => _pendingSecureWrites.remove(tracked));
-  _pendingSecureWrites.add(tracked);
-}
-
 /// Secure get callback
 int _platformSecureGetCallback(
   Pointer<Utf8> key,
@@ -623,15 +557,10 @@ int _platformSecureGetCallback(
 
   try {
     final keyString = key.toDartString();
-    final value = _secureStorageCache[keyString];
-
-    if (value == null) {
-      // Contract: clean miss MUST return RAC_ERROR_FILE_NOT_FOUND so commons
-      // (e.g. rac_device_get_or_create_persistent_id) can distinguish a
-      // benign cache miss from a real keychain failure. See
-      // sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h.
-      return RacResultCode.errorFileNotFound;
-    }
+    final result = DartBridgeSecureStorage.instance.retrieve(keyString);
+    if (result.status <= 0) return result.status;
+    final value = result.value;
+    if (value == null || value.isEmpty) return RacResultCode.errorFileNotFound;
 
     // Allocate and copy string
     final cString = value.toNativeUtf8();
@@ -655,36 +584,9 @@ int _platformSecureSetCallback(
   }
 
   try {
-    final keyString = key.toDartString();
-    final valueString = value.toDartString();
-
-    // Update cache immediately for sync access
-    _secureStorageCache[keyString] = valueString;
-
-    // Schedule async write; tracked so drainPendingSecureWrites() can flush
-    // it on shutdown before a force-quit drops it.
-    _trackPendingSecureWrite(_writeSecureStorage(keyString, valueString));
-
-    return RacResultCode.success;
+    return DartBridgeSecureStorage.instance.storePointers(key, value);
   } catch (_) {
-    return RacResultCode.errorStorageError;
-  }
-}
-
-/// Async write to secure storage. Surfaces failures via a warning so a
-/// persist error is observable instead of silently dropped (the in-memory
-/// cache stays authoritative for the running process either way).
-Future<void> _writeSecureStorage(String key, String value) async {
-  try {
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-    );
-    await storage.write(key: key, value: value);
-  } catch (e) {
-    SDKLogger(
-      'DartBridge.Platform',
-    ).warning('Secure storage write failed; value held in cache only: $e');
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 
@@ -695,31 +597,9 @@ int _platformSecureDeleteCallback(Pointer<Utf8> key, Pointer<Void> userData) {
   }
 
   try {
-    final keyString = key.toDartString();
-
-    // Remove from cache
-    _secureStorageCache.remove(keyString);
-
-    // Schedule async delete; tracked so drainPendingSecureWrites() can flush
-    // it on shutdown before a force-quit drops it.
-    _trackPendingSecureWrite(_deleteSecureStorage(keyString));
-
-    return RacResultCode.success;
+    return DartBridgeSecureStorage.instance.deletePointer(key);
   } catch (_) {
-    return RacResultCode.errorStorageError;
-  }
-}
-
-/// Async delete from secure storage
-Future<void> _deleteSecureStorage(String key) async {
-  try {
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-    );
-    await storage.delete(key: key);
-  } catch (_) {
-    // Ignore errors
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 
@@ -901,7 +781,7 @@ int _platformFileListDirectoryCallback(
 
     if (skipped > 0) {
       SDKLogger('PlatformAdapter').warning(
-        'Skipped $skipped directory entries in $pathString: name longer '
+        'Skipped $skipped directory entries: name longer '
         'than $RAC_DIRECTORY_ENTRY_NAME_MAX bytes (truncation contract).',
       );
     }
@@ -930,8 +810,8 @@ int _platformFileListDirectoryCallback(
     }
     inOutCount.value = count;
     return RacResultCode.success;
-  } catch (e) {
-    SDKLogger('PlatformAdapter').warning('file_list_directory failed: $e');
+  } catch (_) {
+    SDKLogger('PlatformAdapter').warning('file_list_directory failed');
     return RacResultCode.errorFileReadFailed;
   }
 }

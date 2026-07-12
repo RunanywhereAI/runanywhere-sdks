@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/web",
-  "version": "0.19.13",
-  "description": "RunAnywhere Web SDK - Core infrastructure for on-device AI in the browser (pure TypeScript)",
+  "version": "0.20.0",
+  "description": "RunAnywhere Web SDK - Backend-neutral browser infrastructure with the RACommons WebAssembly core",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -16,6 +16,10 @@
       "types": "./dist/types/internal.d.ts",
       "import": "./dist/internal.js"
     },
+    "./backend": {
+      "types": "./dist/types/backend.d.ts",
+      "import": "./dist/backend.js"
+    },
     "./browser": {
       "types": "./dist/types/browser.d.ts",
       "import": "./dist/browser.js"
@@ -26,10 +30,11 @@
     "dist",
     "wasm/racommons.js",
     "wasm/racommons.wasm",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc && cp src/Infrastructure/AudioCaptureProcessor.js dist/Infrastructure/AudioCaptureProcessor.js",
     "dev": "tsc --watch",
     "lint": "eslint src tests --max-warnings 0",
     "lint:ts": "tsc --noEmit",
@@ -39,7 +44,8 @@
     "test": "vitest run",
     "test:e2e": "npm run build && (cd ../../../../examples/web/RunAnywhereAI && npm run build)",
     "clean": "rm -rf dist",
-    "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1); test -f wasm/racommons.js || (echo 'ERROR: wasm/racommons.js missing. Run npm run build:wasm -- --core from sdk/runanywhere-web.' && exit 1); test -f wasm/racommons.wasm || (echo 'ERROR: wasm/racommons.wasm missing. Run npm run build:wasm -- --core from sdk/runanywhere-web.' && exit 1)"
+    "verify:package": "node ../../scripts/verify-package.mjs wasm/racommons.js wasm/racommons.wasm",
+    "prepack": "npm run build && npm run verify:package"
   },
   "keywords": [
     "runanywhere",
@@ -55,7 +61,7 @@
     "inference"
   ],
   "author": "RunAnywhere AI",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
@@ -69,10 +75,11 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "dependencies": {
-    "@runanywhere/proto-ts": "^0.19.13",
+    "@bufbuild/protobuf": "^2.12.1",
+    "@runanywhere/proto-ts": "^0.20.0",
     "long": "^5.3.2",
     "protobufjs": "^7.5.8"
   },

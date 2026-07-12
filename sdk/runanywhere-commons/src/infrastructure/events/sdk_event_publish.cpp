@@ -12,6 +12,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <mutex>
@@ -27,16 +28,67 @@ namespace rac::events {
 
 namespace {
 
-// Active telemetry sink for the destination router. Registered by SDKs via
-// rac_events_set_telemetry_sink; fed by route() when an event's destination
-// includes the TELEMETRY bit. Guarded by a mutex (registration is rare).
-std::mutex& telemetry_sink_mutex() {
-    static std::mutex m;
-    return m;
+// Active telemetry sink for the destination router. Calls take a short-lived
+// lease before dropping the mutex; detach first blocks new leases, then waits
+// for existing track/flush calls to finish before the platform destroys the
+// borrowed manager. A separate registration mutex serializes replacements
+// without holding the state mutex across platform HTTP callbacks.
+struct TelemetrySinkState {
+    std::mutex mutex;
+    std::condition_variable quiesced;
+    rac_telemetry_manager_t* sink = nullptr;
+    size_t in_flight = 0;
+};
+
+TelemetrySinkState& telemetry_sink_state() {
+    static TelemetrySinkState state;
+    return state;
 }
-rac_telemetry_manager_t*& telemetry_sink() {
-    static rac_telemetry_manager_t* sink = nullptr;
-    return sink;
+
+std::mutex& telemetry_sink_registration_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+class TelemetrySinkLease {
+   public:
+    TelemetrySinkLease() = default;
+    TelemetrySinkLease(TelemetrySinkState* state, rac_telemetry_manager_t* sink)
+        : state_(state), sink_(sink) {}
+    TelemetrySinkLease(const TelemetrySinkLease&) = delete;
+    TelemetrySinkLease& operator=(const TelemetrySinkLease&) = delete;
+    TelemetrySinkLease(TelemetrySinkLease&& other) noexcept
+        : state_(other.state_), sink_(other.sink_) {
+        other.state_ = nullptr;
+        other.sink_ = nullptr;
+    }
+    TelemetrySinkLease& operator=(TelemetrySinkLease&&) = delete;
+
+    ~TelemetrySinkLease() {
+        if (state_ == nullptr)
+            return;
+        std::lock_guard<std::mutex> lock(state_->mutex);
+        if (--state_->in_flight == 0) {
+            state_->quiesced.notify_all();
+        }
+    }
+
+    explicit operator bool() const { return sink_ != nullptr; }
+    rac_telemetry_manager_t* get() const { return sink_; }
+
+   private:
+    TelemetrySinkState* state_ = nullptr;
+    rac_telemetry_manager_t* sink_ = nullptr;
+};
+
+TelemetrySinkLease acquire_telemetry_sink() {
+    auto& state = telemetry_sink_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    if (state.sink == nullptr) {
+        return {};
+    }
+    ++state.in_flight;
+    return TelemetrySinkLease(&state, state.sink);
 }
 
 uint64_t current_time_ms() {
@@ -113,13 +165,9 @@ void route(const runanywhere::v1::SDKEvent& event, const uint8_t* serialized_byt
     // TELEMETRY sink: feed the registered telemetry manager directly from the
     // serialized proto. The manager extracts every metric per oneof case.
     if (dest & static_cast<int32_t>(runanywhere::v1::EVENT_DESTINATION_TELEMETRY)) {
-        rac_telemetry_manager_t* sink = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(telemetry_sink_mutex());
-            sink = telemetry_sink();
-        }
-        if (sink != nullptr && serialized_bytes != nullptr) {
-            rac_telemetry_manager_track_proto(sink, serialized_bytes, serialized_size);
+        auto sink = acquire_telemetry_sink();
+        if (sink && serialized_bytes != nullptr) {
+            rac_telemetry_manager_track_proto(sink.get(), serialized_bytes, serialized_size);
         }
     }
 
@@ -205,20 +253,28 @@ rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
 // C ABI: telemetry sink registration for the destination router.
 // ---------------------------------------------------------------------------
 extern "C" void rac_events_set_telemetry_sink(void* telemetry_manager) {
-    std::lock_guard<std::mutex> lock(rac::events::telemetry_sink_mutex());
-    rac::events::telemetry_sink() = static_cast<rac_telemetry_manager_t*>(telemetry_manager);
+    std::lock_guard<std::mutex> registration_lock(rac::events::telemetry_sink_registration_mutex());
+    auto& state = rac::events::telemetry_sink_state();
+    std::unique_lock<std::mutex> state_lock(state.mutex);
+    auto* replacement = static_cast<rac_telemetry_manager_t*>(telemetry_manager);
+    if (state.sink == replacement) {
+        return;
+    }
+
+    // Publishing nullptr blocks new leases. Existing users release their lease
+    // after track/flush and wake this waiter; only then may the platform destroy
+    // the old borrowed manager.
+    state.sink = nullptr;
+    state.quiesced.wait(state_lock, [&state] { return state.in_flight == 0; });
+    state.sink = replacement;
 }
 
 extern "C" rac_result_t rac_events_flush_telemetry_sink(void) {
-    rac_telemetry_manager_t* sink = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(rac::events::telemetry_sink_mutex());
-        sink = rac::events::telemetry_sink();
-    }
-    if (sink == nullptr) {
+    auto sink = rac::events::acquire_telemetry_sink();
+    if (!sink) {
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
-    return rac_telemetry_manager_flush(sink);
+    return rac_telemetry_manager_flush(sink.get());
 }
 
 #else  // !RAC_HAVE_PROTOBUF

@@ -20,7 +20,8 @@
 #            $QHEXRT_ROOT/include/qhexrt/qhexrt_c.h
 #            $QHEXRT_ROOT/lib/<abi>/libqhexrt_core.a
 #            $QHEXRT_ROOT/lib/<abi>/libqhexrt_host.a
-#        (defaults to engines/qhexrt/prebuilt/, which is gitignored).
+#        (defaults to the atomically selected engines/qhexrt/prebuilt/current,
+#        whose immutable versions are gitignored).
 #      - RAC_QHEXRT_ENGINE_AVAILABLE=1; qhexrt_llm_ops.cpp compiles against the
 #        private header and the archive links INTO the plugin .so (no separately
 #        shippable QHexRT binary; runtime symbols stay internal to the carrier).
@@ -40,13 +41,190 @@ message(STATUS "Configuring QHexRT (Qualcomm Hexagon NPU) backend...")
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
+function(_qhexrt_require_json_keys json_variable label expected_csv)
+    set(_json "${${json_variable}}")
+    string(JSON _count ERROR_VARIABLE _error LENGTH "${_json}" ${ARGN})
+    if(NOT _error STREQUAL "NOTFOUND")
+        message(FATAL_ERROR "Invalid QHexRT JSON object ${label}: ${_error}")
+    endif()
+    set(_actual "")
+    if(_count GREATER 0)
+        math(EXPR _last "${_count} - 1")
+        foreach(_index RANGE 0 ${_last})
+            string(JSON _key MEMBER "${_json}" ${ARGN} ${_index})
+            list(APPEND _actual "${_key}")
+        endforeach()
+    endif()
+    string(REPLACE "," ";" _expected "${expected_csv}")
+    list(SORT _actual)
+    list(SORT _expected)
+    if(NOT "${_actual}" STREQUAL "${_expected}")
+        message(FATAL_ERROR
+            "QHexRT JSON object ${label} has wrong keys: actual=${_actual} expected=${_expected}")
+    endif()
+endfunction()
+
+# The receipt's C ABI version is provenance and a breaking-line guard, not a
+# feature gate. QHexRT has kept additive, size-versioned extensions on ABI 1.0,
+# so validate the exact header surface this adapter consumes instead of
+# inventing a minimum minor version that the producer does not publish.
+function(_qhexrt_validate_header_surface include_dir abi_major abi_minor)
+    include(CheckCSourceCompiles)
+    set(CMAKE_REQUIRED_INCLUDES "${include_dir}")
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    unset(RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE CACHE)
+    check_c_source_compiles("
+#include <qhexrt/qhexrt_c.h>
+
+#if !defined(QHX_ABI_VERSION_MAJOR) || !defined(QHX_ABI_VERSION_MINOR)
+#error QHexRT header omits its C ABI identity
+#endif
+#if QHX_ABI_VERSION_MAJOR != ${abi_major} || QHX_ABI_VERSION_MINOR != ${abi_minor}
+#error QHexRT header C ABI identity differs from the staged receipt
+#endif
+
+static qhx_status (*const require_generate_ex)(
+    qhx_session*, const qhx_inputs*, const qhx_gen_cfg*,
+    const qhx_generate_options*, qhx_token_cb, void*, qhx_output*) = qhx_generate_ex;
+static void (*const require_generate_options_default)(qhx_generate_options*) =
+    qhx_generate_options_default;
+static void (*const require_session_cancel)(qhx_session*) = qhx_session_cancel;
+
+int qhexrt_header_surface_probe(void) {
+    qhx_inputs inputs = {0};
+    qhx_output output = {0};
+    qhx_generate_options options = {0};
+
+    inputs.mask_path = 0;
+    output.embedding = 0;
+    output.n_embedding = 0;
+    output.image = 0;
+    output.img_h = output.img_w = output.img_c = 0;
+    options.struct_size = sizeof(options);
+    options.disable_thinking = 0;
+    options.should_cancel = 0;
+    options.should_cancel_user = 0;
+
+    return require_generate_ex == 0 || require_generate_options_default == 0 ||
+           require_session_cancel == 0 || inputs.mask_path != 0 ||
+           output.embedding != 0 || output.image != 0 || options.struct_size == 0;
+}
+" RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE)
+    if(NOT RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE)
+        message(FATAL_ERROR
+            "QHexRT header does not provide the ABI surface required by the SDK adapter")
+    endif()
+    unset(RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE CACHE)
+endfunction()
+
+function(_qhexrt_require_archive_symbols archive)
+    if(NOT CMAKE_NM OR NOT EXISTS "${CMAKE_NM}")
+        message(FATAL_ERROR "CMAKE_NM is required to validate the QHexRT archive ABI")
+    endif()
+
+    execute_process(
+        COMMAND "${CMAKE_NM}" --defined-only --extern-only "${archive}"
+        RESULT_VARIABLE _qhexrt_nm_status
+        OUTPUT_VARIABLE _qhexrt_nm_output
+        ERROR_QUIET)
+    if(NOT _qhexrt_nm_status EQUAL 0)
+        execute_process(
+            COMMAND "${CMAKE_NM}" -g "${archive}"
+            RESULT_VARIABLE _qhexrt_nm_status
+            OUTPUT_VARIABLE _qhexrt_nm_output
+            ERROR_VARIABLE _qhexrt_nm_error)
+    endif()
+    if(NOT _qhexrt_nm_status EQUAL 0)
+        message(FATAL_ERROR "Unable to inspect QHexRT archive symbols: ${_qhexrt_nm_error}")
+    endif()
+
+    string(REPLACE "\r\n" "\n" _qhexrt_nm_output "${_qhexrt_nm_output}")
+    string(REPLACE "\n" ";" _qhexrt_nm_lines "${_qhexrt_nm_output}")
+    foreach(_qhexrt_required_symbol IN ITEMS
+        qhx_runtime_create qhx_runtime_free qhx_runtime_device
+        qhx_model_load qhx_model_free
+        qhx_session_create qhx_session_free qhx_session_reset qhx_session_cancel
+        qhx_gen_cfg_default qhx_generate_options_default
+        qhx_generate qhx_generate_ex qhx_status_str qhx_version)
+        set(_qhexrt_symbol_defined FALSE)
+        foreach(_qhexrt_nm_line IN LISTS _qhexrt_nm_lines)
+            if(_qhexrt_nm_line MATCHES
+               "[ \t]([A-Za-z?])[ \t]+${_qhexrt_required_symbol}$" AND
+               NOT CMAKE_MATCH_1 MATCHES "[uU?]")
+                set(_qhexrt_symbol_defined TRUE)
+                break()
+            endif()
+        endforeach()
+        if(NOT _qhexrt_symbol_defined)
+            message(FATAL_ERROR
+                "QHexRT core archive omits required defined symbol: ${_qhexrt_required_symbol}")
+        endif()
+    endforeach()
+endfunction()
+
 get_filename_component(RAC_COMMONS_ROOT_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 # Prebuilt QHexRT tree. Default to the gitignored in-tree staging dir so an
-# authorized checkout that dropped the archive there "just works".
+# authorized checkout that ran QHexRT's verified staging script "just works".
+# The script publishes immutable versions and atomically switches `current`;
+# resolving it here prevents a later switch from mixing inputs in one build.
+set(_qhexrt_root_explicit FALSE)
 if(NOT DEFINED QHEXRT_ROOT)
-    set(QHEXRT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt")
+    set(QHEXRT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/current")
+else()
+    set(_qhexrt_root_explicit TRUE)
+endif()
+set(_qhexrt_root_selected FALSE)
+if(_qhexrt_root_explicit OR EXISTS "${QHEXRT_ROOT}" OR IS_SYMLINK "${QHEXRT_ROOT}")
+    set(_qhexrt_root_selected TRUE)
+endif()
+if(NOT _qhexrt_root_explicit AND EXISTS "${QHEXRT_ROOT}" AND NOT IS_SYMLINK "${QHEXRT_ROOT}")
+    message(FATAL_ERROR "Default QHexRT prebuilt/current must be an atomic symlink")
+endif()
+if(NOT _qhexrt_root_explicit AND IS_SYMLINK "${QHEXRT_ROOT}")
+    file(READ_SYMLINK "${QHEXRT_ROOT}" _qhexrt_current_target)
+    get_filename_component(_qhexrt_current_name "${_qhexrt_current_target}" NAME)
+    string(LENGTH "${_qhexrt_current_name}" _qhexrt_current_name_length)
+    if(NOT _qhexrt_current_target MATCHES "^versions/[0-9a-f]+$" OR
+       NOT _qhexrt_current_name_length EQUAL 64)
+        message(FATAL_ERROR "QHexRT current must directly name versions/<64-hex-receipt>")
+    endif()
+    get_filename_component(_qhexrt_current_parent "${QHEXRT_ROOT}" DIRECTORY)
+    set(_qhexrt_selected_entry "${_qhexrt_current_parent}/${_qhexrt_current_target}")
+    if(IS_SYMLINK "${_qhexrt_selected_entry}" OR NOT IS_DIRECTORY "${_qhexrt_selected_entry}")
+        message(FATAL_ERROR "QHexRT current target must be a real immutable version directory")
+    endif()
+endif()
+if(IS_SYMLINK "${QHEXRT_ROOT}" AND NOT EXISTS "${QHEXRT_ROOT}")
+    message(FATAL_ERROR "QHexRT current prebuilt symlink is broken: ${QHEXRT_ROOT}")
+endif()
+if(_qhexrt_root_explicit AND NOT EXISTS "${QHEXRT_ROOT}")
+    message(FATAL_ERROR "Explicit QHEXRT_ROOT does not exist: ${QHEXRT_ROOT}")
+endif()
+if(NOT _qhexrt_root_explicit AND NOT _qhexrt_root_selected)
+    get_filename_component(_qhexrt_prebuilt_parent "${QHEXRT_ROOT}" DIRECTORY)
+    if(EXISTS "${_qhexrt_prebuilt_parent}/include" OR IS_SYMLINK "${_qhexrt_prebuilt_parent}/include" OR
+       EXISTS "${_qhexrt_prebuilt_parent}/lib" OR IS_SYMLINK "${_qhexrt_prebuilt_parent}/lib" OR
+       EXISTS "${_qhexrt_prebuilt_parent}/qhexrt-prebuilt.json" OR
+       IS_SYMLINK "${_qhexrt_prebuilt_parent}/qhexrt-prebuilt.json")
+        message(FATAL_ERROR
+            "Legacy QHexRT prebuilt payload exists without current; rerun stage_prebuilt_for_sdk.sh")
+    endif()
+endif()
+if(EXISTS "${QHEXRT_ROOT}")
+    file(REAL_PATH "${QHEXRT_ROOT}" QHEXRT_ROOT)
+endif()
+if(NOT _qhexrt_root_explicit AND _qhexrt_root_selected)
+    set(_qhexrt_versions "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/versions")
+    if(IS_SYMLINK "${_qhexrt_versions}" OR NOT IS_DIRECTORY "${_qhexrt_versions}")
+        message(FATAL_ERROR "QHexRT prebuilt/versions must be a real directory")
+    endif()
+    file(REAL_PATH "${_qhexrt_versions}" _qhexrt_versions_real)
+    get_filename_component(_qhexrt_selected_parent "${QHEXRT_ROOT}" DIRECTORY)
+    if(NOT _qhexrt_selected_parent STREQUAL _qhexrt_versions_real)
+        message(FATAL_ERROR "QHexRT current must select a direct child of prebuilt/versions")
+    endif()
 endif()
 
 # ABI subdir under QHEXRT_ROOT/lib (arm64-v8a is the shipped Snapdragon target).
@@ -57,27 +235,192 @@ endif()
 
 set(QHEXRT_SOURCES
     rac_plugin_entry_qhexrt.cpp
-    rac_backend_qhexrt_register.cpp)
+    rac_backend_qhexrt_register.cpp
+    qhexrt_device_capability.cpp
+    qhexrt_model_catalog.cpp)
 set(QHEXRT_LINK_LIBS "")
 set(QHEXRT_COMPILE_DEFS RAC_QHEXRT_BUILDING)
 set(QHEXRT_INCLUDE_DIRS
     ${RAC_COMMONS_ROOT_DIR}/include
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/..)  # engines/ — for engines/common/rac_engine_unavailable.h
 
-# Discover the prebuilt archive + private header. All three must be present to
-# claim the engine available; a partial tree falls back to the stub. Explicit
+# QHexRT exposes existing generated messages only as serialized byte buffers.
+# The C++ generated/runtime dependencies stay private to the engine build.
+if(RAC_PROTOBUF_RUNTIME_ENABLED)
+    list(APPEND QHEXRT_INCLUDE_DIRS
+        ${RAC_COMMONS_ROOT_DIR}/src/generated/proto)
+    list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_HAVE_PROTOBUF=1)
+    if(TARGET protobuf::libprotobuf)
+        list(APPEND QHEXRT_LINK_LIBS protobuf::libprotobuf)
+    elseif(Protobuf_LIBRARIES)
+        list(APPEND QHEXRT_LINK_LIBS ${Protobuf_LIBRARIES})
+        list(APPEND QHEXRT_INCLUDE_DIRS ${Protobuf_INCLUDE_DIRS})
+    endif()
+endif()
+
+# Discover the prebuilt archive + private header. Once a current/explicit root
+# is selected, all payloads must be present and valid; only a wholly absent
+# default current selection builds the public stub. Explicit
 # paths (not find_library): the Android NDK toolchain re-roots find_library
 # PATHS under the sysroot (CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY), which would
 # never see this out-of-sysroot prebuilt tree.
 set(QHEXRT_CORE_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_core.a")
 set(QHEXRT_HOST_LIB "${QHEXRT_ROOT}/lib/${_qhexrt_abi}/libqhexrt_host.a")
+set(QHEXRT_HEADER "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
+set(QHEXRT_IDENTITY_MANIFEST "${QHEXRT_ROOT}/qhexrt-prebuilt.json")
+set(QHEXRT_BUILD_RECEIPT "${QHEXRT_ROOT}/qhexrt-build-receipt.json")
+set(_qhexrt_prebuilt_valid FALSE)
 
-if(RAC_PLATFORM_ANDROID AND EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOST_LIB}" AND
-   EXISTS "${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
+if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
+    if(NOT EXISTS "${QHEXRT_CORE_LIB}" OR NOT EXISTS "${QHEXRT_HOST_LIB}" OR
+       NOT EXISTS "${QHEXRT_HEADER}" OR NOT EXISTS "${QHEXRT_IDENTITY_MANIFEST}" OR
+       NOT EXISTS "${QHEXRT_BUILD_RECEIPT}")
+        message(FATAL_ERROR "Partial QHexRT prebuilt under ${QHEXRT_ROOT}; refusing a mixed/unfinished payload")
+    endif()
+    foreach(_qhexrt_no_symlink IN ITEMS
+        "${QHEXRT_ROOT}/include"
+        "${QHEXRT_ROOT}/include/qhexrt"
+        "${QHEXRT_HEADER}"
+        "${QHEXRT_ROOT}/lib"
+        "${QHEXRT_ROOT}/lib/${_qhexrt_abi}"
+        "${QHEXRT_CORE_LIB}"
+        "${QHEXRT_HOST_LIB}"
+        "${QHEXRT_IDENTITY_MANIFEST}"
+        "${QHEXRT_BUILD_RECEIPT}")
+        if(IS_SYMLINK "${_qhexrt_no_symlink}")
+            message(FATAL_ERROR "QHexRT selected prebuilt contains a symlink: ${_qhexrt_no_symlink}")
+        endif()
+    endforeach()
+    file(READ "${QHEXRT_IDENTITY_MANIFEST}" _qhexrt_identity_json)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest"
+        "android_abi,build,build_receipt_sha256,c_abi,files,qhexrt_version,schema,source")
+    string(JSON _qhexrt_identity_schema ERROR_VARIABLE _qhexrt_json_error
+        GET "${_qhexrt_identity_json}" schema)
+    if(NOT _qhexrt_json_error STREQUAL "NOTFOUND" OR
+       NOT _qhexrt_identity_schema STREQUAL "qhexrt-prebuilt/v2")
+        message(FATAL_ERROR "Invalid QHexRT identity manifest schema: ${_qhexrt_json_error}")
+    endif()
+    string(JSON _qhexrt_manifest_abi GET "${_qhexrt_identity_json}" android_abi)
+    if(NOT _qhexrt_manifest_abi STREQUAL _qhexrt_abi)
+        message(FATAL_ERROR
+            "QHexRT prebuilt ABI mismatch: manifest=${_qhexrt_manifest_abi} build=${_qhexrt_abi}")
+    endif()
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.c_abi" "major,minor" c_abi)
+    string(JSON _qhexrt_abi_major_type TYPE "${_qhexrt_identity_json}" c_abi major)
+    string(JSON _qhexrt_abi_minor_type TYPE "${_qhexrt_identity_json}" c_abi minor)
+    string(JSON _qhexrt_abi_major GET "${_qhexrt_identity_json}" c_abi major)
+    string(JSON _qhexrt_abi_minor GET "${_qhexrt_identity_json}" c_abi minor)
+    if(NOT _qhexrt_abi_major_type STREQUAL "NUMBER" OR
+       NOT _qhexrt_abi_minor_type STREQUAL "NUMBER" OR
+       NOT _qhexrt_abi_major STREQUAL "1" OR
+       NOT _qhexrt_abi_minor MATCHES "^[0-9]+$")
+        message(FATAL_ERROR "QHexRT prebuilt has an incompatible C ABI object")
+    endif()
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.source"
+        "git_dirty,git_sha,state_sha256" source)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build"
+        "android_abi,archive_evidence,build_type,cmake_cache_sha256,cmake_system,compiler,ndk,qnn_sdk" build)
+    string(JSON _qhexrt_build_abi GET "${_qhexrt_identity_json}" build android_abi)
+    if(NOT _qhexrt_build_abi STREQUAL _qhexrt_abi)
+        message(FATAL_ERROR "QHexRT receipt build ABI does not match selected Android ABI")
+    endif()
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.cmake_system"
+        "crosscompiling,name,processor,state_file_sha256" build cmake_system)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.compiler"
+        "id,sha256,state_file_sha256,version,version_output_sha256" build compiler)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.ndk"
+        "metadata_file,metadata_sha256" build ndk)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.qnn_sdk"
+        "metadata_file,metadata_sha256" build qnn_sdk)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence"
+        "core,host,llvm_ar_sha256,llvm_readelf_sha256" build archive_evidence)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence.core"
+        "member_count" build archive_evidence core)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.build.archive_evidence.host"
+        "member_count" build archive_evidence host)
+    _qhexrt_require_json_keys(_qhexrt_identity_json "manifest.files"
+        "include/qhexrt/qhexrt_c.h,lib/${_qhexrt_abi}/libqhexrt_core.a,lib/${_qhexrt_abi}/libqhexrt_host.a" files)
+    string(JSON _qhexrt_receipt_sha ERROR_VARIABLE _qhexrt_receipt_error
+        GET "${_qhexrt_identity_json}" build_receipt_sha256)
+    string(LENGTH "${_qhexrt_receipt_sha}" _qhexrt_receipt_sha_length)
+    get_filename_component(_qhexrt_version_name "${QHEXRT_ROOT}" NAME)
+    if(NOT _qhexrt_receipt_error STREQUAL "NOTFOUND" OR
+       NOT _qhexrt_receipt_sha MATCHES "^[0-9a-f]+$" OR
+       NOT _qhexrt_receipt_sha_length EQUAL 64 OR
+       NOT _qhexrt_version_name STREQUAL _qhexrt_receipt_sha)
+        message(FATAL_ERROR "QHexRT prebuilt version directory does not match its build receipt identity")
+    endif()
+    file(SHA256 "${QHEXRT_BUILD_RECEIPT}" _qhexrt_actual_receipt_sha)
+    if(NOT _qhexrt_actual_receipt_sha STREQUAL _qhexrt_receipt_sha)
+        message(FATAL_ERROR "QHexRT sanitized build receipt hash does not match the selected version")
+    endif()
+    file(READ "${QHEXRT_BUILD_RECEIPT}" _qhexrt_receipt_json)
+    _qhexrt_require_json_keys(_qhexrt_receipt_json "sanitized receipt"
+        "artifacts,build,c_abi,qhexrt_version,schema,source")
+    string(JSON _qhexrt_receipt_schema ERROR_VARIABLE _qhexrt_receipt_schema_error
+        GET "${_qhexrt_receipt_json}" schema)
+    if(NOT _qhexrt_receipt_schema_error STREQUAL "NOTFOUND" OR
+       NOT _qhexrt_receipt_schema STREQUAL "qhexrt-build-receipt/v1")
+        message(FATAL_ERROR "Invalid QHexRT sanitized build receipt schema")
+    endif()
+    foreach(_qhexrt_receipt_field IN ITEMS qhexrt_version c_abi source build)
+        string(JSON _qhexrt_from_receipt GET "${_qhexrt_receipt_json}" "${_qhexrt_receipt_field}")
+        string(JSON _qhexrt_from_manifest GET "${_qhexrt_identity_json}" "${_qhexrt_receipt_field}")
+        if(NOT _qhexrt_from_receipt STREQUAL _qhexrt_from_manifest)
+            message(FATAL_ERROR
+                "QHexRT manifest field ${_qhexrt_receipt_field} does not derive from sanitized receipt")
+        endif()
+    endforeach()
+    string(JSON _qhexrt_from_receipt GET "${_qhexrt_receipt_json}" artifacts)
+    string(JSON _qhexrt_from_manifest GET "${_qhexrt_identity_json}" files)
+    if(NOT _qhexrt_from_receipt STREQUAL _qhexrt_from_manifest)
+        message(FATAL_ERROR "QHexRT manifest file inventory does not derive from sanitized receipt")
+    endif()
+    foreach(_qhexrt_relative IN ITEMS
+        "include/qhexrt/qhexrt_c.h"
+        "lib/${_qhexrt_abi}/libqhexrt_core.a"
+        "lib/${_qhexrt_abi}/libqhexrt_host.a")
+        set(_qhexrt_path "${QHEXRT_ROOT}/${_qhexrt_relative}")
+        _qhexrt_require_json_keys(_qhexrt_identity_json
+            "manifest.files.${_qhexrt_relative}" "sha256,size_bytes" files "${_qhexrt_relative}")
+        string(JSON _qhexrt_expected_sha ERROR_VARIABLE _qhexrt_sha_error
+            GET "${_qhexrt_identity_json}" files "${_qhexrt_relative}" sha256)
+        string(JSON _qhexrt_expected_size ERROR_VARIABLE _qhexrt_size_error
+            GET "${_qhexrt_identity_json}" files "${_qhexrt_relative}" size_bytes)
+        if(NOT _qhexrt_sha_error STREQUAL "NOTFOUND" OR
+           NOT _qhexrt_size_error STREQUAL "NOTFOUND")
+            message(FATAL_ERROR "QHexRT manifest omits identity for ${_qhexrt_relative}")
+        endif()
+        string(JSON _qhexrt_sha_type TYPE "${_qhexrt_identity_json}" files "${_qhexrt_relative}" sha256)
+        string(JSON _qhexrt_size_type TYPE "${_qhexrt_identity_json}" files "${_qhexrt_relative}" size_bytes)
+        string(LENGTH "${_qhexrt_expected_sha}" _qhexrt_expected_sha_length)
+        if(NOT _qhexrt_sha_type STREQUAL "STRING" OR
+           NOT _qhexrt_size_type STREQUAL "NUMBER" OR
+           NOT _qhexrt_expected_sha MATCHES "^[0-9a-f]+$" OR
+           NOT _qhexrt_expected_sha_length EQUAL 64 OR
+           NOT _qhexrt_expected_size MATCHES "^[0-9]+$" OR
+           _qhexrt_expected_size LESS_EQUAL 0)
+            message(FATAL_ERROR "QHexRT manifest has invalid file identity for ${_qhexrt_relative}")
+        endif()
+        file(SHA256 "${_qhexrt_path}" _qhexrt_actual_sha)
+        file(SIZE "${_qhexrt_path}" _qhexrt_actual_size)
+        if(NOT _qhexrt_actual_sha STREQUAL _qhexrt_expected_sha OR
+           NOT _qhexrt_actual_size EQUAL _qhexrt_expected_size)
+            message(FATAL_ERROR "QHexRT prebuilt identity mismatch for ${_qhexrt_relative}")
+        endif()
+    endforeach()
+    _qhexrt_validate_header_surface(
+        "${QHEXRT_ROOT}/include" "${_qhexrt_abi_major}" "${_qhexrt_abi_minor}")
+    _qhexrt_require_archive_symbols("${QHEXRT_CORE_LIB}")
+    set(_qhexrt_prebuilt_valid TRUE)
+endif()
+
+if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
     set(RAC_QHEXRT_ENGINE_AVAILABLE 1)
     message(STATUS "  QHexRT engine discovered:")
-    message(STATUS "    header: ${QHEXRT_ROOT}/include/qhexrt/qhexrt_c.h")
+    message(STATUS "    header: ${QHEXRT_HEADER}")
     message(STATUS "    core:   ${QHEXRT_CORE_LIB}")
     message(STATUS "    host:   ${QHEXRT_HOST_LIB}")
 
@@ -86,7 +429,9 @@ if(RAC_PLATFORM_ANDROID AND EXISTS "${QHEXRT_CORE_LIB}" AND EXISTS "${QHEXRT_HOS
         qhexrt_llm_ops.cpp
         qhexrt_vlm_ops.cpp
         qhexrt_stt_ops.cpp
-        qhexrt_tts_ops.cpp)
+        qhexrt_tts_ops.cpp
+        qhexrt_embeddings_ops.cpp
+        qhexrt_diffusion_ops.cpp)
     list(APPEND QHEXRT_INCLUDE_DIRS "${QHEXRT_ROOT}/include")
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=1)
 
@@ -141,7 +486,7 @@ endif()
 #
 # Standalone JNI carrier the Kotlin runanywhere-core-qhexrt module loads. Owns
 # JNI_OnLoad; nativeRegister calls rac_backend_qhexrt_register(); nativeProbeNpu
-# calls rac_npu_probe() (resolved at runtime from librac_commons.so). Builds in
+# calls the engine-owned rac_qhexrt_probe_proto(). Builds in
 # both stub and linked modes; in stub mode register reports BACKEND_UNAVAILABLE.
 # =============================================================================
 if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
@@ -166,7 +511,10 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
         ${_QHEXRT_NDK_SYSROOT_INCLUDE}
         ${_QHEXRT_NDK_SYSROOT_INCLUDE}/android
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${RAC_COMMONS_ROOT_DIR}/include)
+    target_compile_definitions(rac_backend_qhexrt_jni PRIVATE
+        RAC_QHEXRT_VERSION="${RAC_VERSION}")
     target_link_libraries(rac_backend_qhexrt_jni PRIVATE rac_backend_qhexrt log)
     target_compile_options(rac_backend_qhexrt_jni PRIVATE
         -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)

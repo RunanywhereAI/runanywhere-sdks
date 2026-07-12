@@ -6,12 +6,14 @@
 #include "rag_pipeline_graph.h"
 
 #include "bm25_index.h"
+#include "rag_fusion.h"
+#include "rag_rerank.h"
 #include "vector_store_usearch.h"
 
 #include <algorithm>
+#include <cctype>
 #include <exception>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 #include "rac/core/rac_logger.h"
@@ -31,84 +33,63 @@ namespace {
 // implementation so the graph path matches retrieval semantics 1:1.
 // ---------------------------------------------------------------------------
 
-std::vector<SearchResult>
-fuse_results(const std::vector<SearchResult>& dense_results,
-             const std::vector<std::pair<std::string, float>>& bm25_results,
-             const VectorStoreUSearch* vector_store, size_t top_k) {
-    static constexpr float kRRFConstant = 60.0f;
-    static constexpr float kMaxRRFScore = 2.0f / 61.0f;
-
-    if (bm25_results.empty())
-        return dense_results;
-
-    const size_t missing_rank = top_k + 1;
-
-    std::unordered_map<std::string, float> rrf_scores;
-    for (size_t i = 0; i < dense_results.size(); ++i) {
-        rrf_scores[dense_results[i].id] += 1.0f / (kRRFConstant + static_cast<float>(i + 1));
+// Embed a single query string; returns an empty vector on failure.
+std::vector<float> embed_one(rac_handle_t embeddings_handle, const std::string& text) {
+    rac_embeddings_result_t er = {};
+    const rac_result_t st = rac_embeddings_embed(embeddings_handle, text.c_str(), nullptr, &er);
+    std::vector<float> v;
+    if (st == RAC_SUCCESS && er.num_embeddings > 0 && er.embeddings) {
+        v.assign(er.embeddings[0].data, er.embeddings[0].data + er.embeddings[0].dimension);
     }
-    for (size_t i = 0; i < bm25_results.size(); ++i) {
-        rrf_scores[bm25_results[i].first] += 1.0f / (kRRFConstant + static_cast<float>(i + 1));
+    rac_embeddings_result_free(&er);
+    return v;
+}
+
+// True when a chunk's document_id (ingest metadata) starts with `prefix`.
+bool chunk_matches_scope(const VectorStoreUSearch* vstore, const std::string& id,
+                         const std::string& prefix) {
+    const auto chunk = vstore->get_chunk(id);
+    if (!chunk)
+        return false;
+    const auto it = chunk->metadata.find("document_id");
+    if (it == chunk->metadata.end() || !it->is_string())
+        return false;
+    const std::string doc = it->get<std::string>();
+    return doc.size() >= prefix.size() && doc.compare(0, prefix.size(), prefix) == 0;
+}
+
+// Multi-query expansion: ask the answer LLM to rewrite the query into `count`
+// alternative phrasings (port of ToolNeuron RagQueryRewriter). Returns [] on any
+// failure so the caller falls back to the single original query.
+std::vector<std::string> generate_query_variants(rac_handle_t llm_handle, const std::string& query,
+                                                 size_t count) {
+    std::vector<std::string> out;
+    if (!llm_handle || query.empty() || count == 0)
+        return out;
+
+    const std::string prompt =
+        "Rewrite the user's search query into " + std::to_string(count) +
+        " distinct alternative phrasings that capture the same intent but use different words. "
+        "Output exactly " +
+        std::to_string(count) +
+        " lines, each starting with '- '. No numbering, no commentary.\n\nQuery: " + query +
+        "\n\nVariants:\n";
+
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+    opts.temperature = 0.0f;
+    opts.max_tokens = static_cast<int32_t>(std::min<size_t>(96, count * 24 + 24));
+    opts.disable_thinking = RAC_TRUE;
+    opts.system_prompt = nullptr;
+
+    rac_llm_result_t r = {};
+    if (rac_llm_generate(llm_handle, prompt.c_str(), &opts, &r) != RAC_SUCCESS || !r.text) {
+        rac_llm_result_free(&r);
+        return out;
     }
+    const std::string text(r.text);
+    rac_llm_result_free(&r);
 
-    const float missing_score = 1.0f / (kRRFConstant + static_cast<float>(missing_rank));
-
-    std::unordered_set<std::string> dense_ids;
-    for (const auto& r : dense_results)
-        dense_ids.insert(r.id);
-    std::unordered_set<std::string> bm25_ids;
-    for (const auto& r : bm25_results)
-        bm25_ids.insert(r.first);
-
-    for (auto& [id, score] : rrf_scores) {
-        if (dense_ids.find(id) == dense_ids.end())
-            score += missing_score;
-        if (bm25_ids.find(id) == bm25_ids.end())
-            score += missing_score;
-    }
-
-    std::unordered_map<std::string, const SearchResult*> dense_map;
-    for (const auto& r : dense_results)
-        dense_map[r.id] = &r;
-
-    std::vector<std::pair<std::string, float>> sorted_ids;
-    sorted_ids.reserve(rrf_scores.size());
-    for (const auto& [id, score] : rrf_scores)
-        sorted_ids.emplace_back(id, score);
-    std::sort(sorted_ids.begin(), sorted_ids.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
-    if (sorted_ids.size() > top_k)
-        sorted_ids.resize(top_k);
-
-    std::vector<SearchResult> fused;
-    fused.reserve(sorted_ids.size());
-    for (const auto& [id, rrf_score] : sorted_ids) {
-        float normalized = rrf_score / kMaxRRFScore;
-        normalized = std::min(1.0f, std::max(0.0f, normalized));
-
-        auto dense_it = dense_map.find(id);
-        if (dense_it != dense_map.end()) {
-            SearchResult result = *(dense_it->second);
-            result.score = normalized;
-            result.similarity = normalized;
-            fused.push_back(std::move(result));
-        } else {
-            SearchResult result;
-            result.id = id;
-            result.chunk_id = id;
-            result.score = normalized;
-            result.similarity = normalized;
-            if (vector_store) {
-                auto chunk = vector_store->get_chunk(id);
-                if (chunk) {
-                    result.text = chunk->text;
-                    result.metadata = chunk->metadata;
-                }
-            }
-            fused.push_back(std::move(result));
-        }
-    }
-    return fused;
+    return parse_query_variants(text, query, count);
 }
 
 std::string build_context(const std::vector<SearchResult>& results, size_t max_context_tokens) {
@@ -164,6 +145,8 @@ std::string format_prompt(const std::string& query, const std::string& context,
 struct LLMStreamCtx {
     std::string* accumulated_answer;
     const RAGTokenSink* on_token;
+    const std::atomic<bool>* cancel_requested;
+    std::atomic<bool>* consumer_stop_requested;
 };
 
 rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
@@ -171,12 +154,23 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
     if (!token || !ctx)
         return RAC_TRUE;
 
+    if (ctx->cancel_requested && ctx->cancel_requested->load(std::memory_order_acquire)) {
+        return RAC_FALSE;
+    }
+    if (ctx->consumer_stop_requested &&
+        ctx->consumer_stop_requested->load(std::memory_order_acquire)) {
+        return RAC_FALSE;
+    }
+
     const std::string s(token);
     ctx->accumulated_answer->append(s);
 
     if (ctx->on_token && *ctx->on_token) {
         const bool keep_going = (*ctx->on_token)(s);
         if (!keep_going) {
+            if (ctx->consumer_stop_requested) {
+                ctx->consumer_stop_requested->store(true, std::memory_order_release);
+            }
             return RAC_FALSE;
         }
     }
@@ -198,6 +192,12 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         return RAC_ERROR_INVALID_STATE;
     }
 
+    const auto cancelled = [&inputs]() {
+        return inputs.cancel_requested && inputs.cancel_requested->load(std::memory_order_acquire);
+    };
+    if (cancelled())
+        return RAC_ERROR_CANCELLED;
+
     const std::string question = inputs.question;
     const rac_handle_t embeddings_handle = inputs.embeddings_service;
     const rac_handle_t llm_handle = inputs.llm_service;
@@ -214,39 +214,81 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         llm_options.system_prompt = sys_prompt.c_str();
     }
 
-    rac_embeddings_result_t embedding_result = {};
-    rac_result_t status =
-        rac_embeddings_embed(embeddings_handle, question.c_str(), nullptr, &embedding_result);
-    if (status != RAC_SUCCESS || embedding_result.num_embeddings == 0 ||
-        !embedding_result.embeddings) {
-        LOGE("RAG embed failed (%d)", status);
-        rac_embeddings_result_free(&embedding_result);
-        out_result.status = (status != RAC_SUCCESS) ? status : RAC_ERROR_PROCESSING_FAILED;
-        return out_result.status;
+    // Query set: the original question plus, when enabled, LLM-generated
+    // rewrites (multi-query expansion).
+    std::vector<std::string> queries;
+    queries.push_back(question);
+    if (inputs.enable_multi_query) {
+        auto variants = generate_query_variants(llm_handle, question, inputs.multi_query_count);
+        if (cancelled())
+            return RAC_ERROR_CANCELLED;
+        LOGI("RAG multi-query: %zu variants", variants.size());
+        for (auto& v : variants)
+            queries.push_back(std::move(v));
     }
 
-    std::vector<float> query_embedding(embedding_result.embeddings[0].data,
-                                       embedding_result.embeddings[0].data +
-                                           embedding_result.embeddings[0].dimension);
-    rac_embeddings_result_free(&embedding_result);
-
-    if (query_embedding.size() != embed_dim) {
-        LOGE("RAG embed dim mismatch (%zu vs %zu)", query_embedding.size(), embed_dim);
-        out_result.status = RAC_ERROR_PROCESSING_FAILED;
-        return out_result.status;
-    }
+    // Under a scope filter, fetch a wider candidate pool per query so enough
+    // survive the document_id-prefix filter to still fill top_k.
+    const bool scoped = !inputs.scope_prefix.empty();
+    const size_t fetch_k = scoped ? std::min<size_t>(top_k * 8, 200) : top_k;
 
     std::vector<SearchResult> results;
+    rac_result_t status = RAC_SUCCESS;
     try {
-        auto dense_results = vstore->search(query_embedding, top_k, sim_thresh);
-        std::vector<std::pair<std::string, float>> bm25_results;
-        if (bm25) {
-            bm25_results = bm25->search(question, top_k);
-        }
+        std::vector<std::vector<std::string>> rankings;
+        bool embedded_any = false;
+        for (size_t qi = 0; qi < queries.size(); ++qi) {
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
+            const std::string& q = queries[qi];
+            const std::vector<float> emb = embed_one(embeddings_handle, q);
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
+            if (emb.size() != embed_dim) {
+                // The original query MUST embed; variants may be skipped.
+                if (qi == 0) {
+                    LOGE("RAG embed failed/dim mismatch for primary query");
+                    out_result.status = RAC_ERROR_PROCESSING_FAILED;
+                    return out_result.status;
+                }
+                continue;
+            }
+            embedded_any = true;
 
-        results = fuse_results(dense_results, bm25_results, vstore, top_k);
-        LOGI("RAG retrieve: %zu dense, %zu bm25, %zu fused", dense_results.size(),
-             bm25_results.size(), results.size());
+            auto dense = vstore->search(emb, fetch_k, sim_thresh);
+            LOGI("RAG dense: query %zu -> %zu candidates (sim_thresh=%.3f)", qi, dense.size(),
+                 sim_thresh);
+            std::vector<std::string> dense_ids;
+            for (const auto& d : dense) {
+                if (!scoped || chunk_matches_scope(vstore, d.id, inputs.scope_prefix))
+                    dense_ids.push_back(d.id);
+            }
+            if (!dense_ids.empty())
+                rankings.push_back(std::move(dense_ids));
+
+            if (bm25) {
+                const auto bm = bm25->search(q, fetch_k);
+                std::vector<std::string> bm_ids;
+                for (const auto& [id, score] : bm) {
+                    (void)score;
+                    if (!scoped || chunk_matches_scope(vstore, id, inputs.scope_prefix))
+                        bm_ids.push_back(id);
+                }
+                if (!bm_ids.empty())
+                    rankings.push_back(std::move(bm_ids));
+            }
+        }
+        (void)embedded_any;
+
+        results = fuse_rankings(rankings, vstore, top_k);
+        LOGI("RAG retrieve: %zu queries, %zu rankings, %zu fused%s", queries.size(),
+             rankings.size(), results.size(), scoped ? " (scoped)" : "");
+
+        if (inputs.rerank) {
+            rerank_llm_pointwise(llm_handle, question, llm_options, results);
+            if (cancelled())
+                return RAC_ERROR_CANCELLED;
+        }
     } catch (const std::exception& e) {
         LOGE("RAG retrieve failed: %s", e.what());
         out_result.status = RAC_ERROR_PROCESSING_FAILED;
@@ -266,9 +308,22 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
          out_result.assembled_context.size(), out_result.sources.size());
 
     if (!prompt.empty()) {
-        LLMStreamCtx ctx{&out_result.answer, &on_token};
+        if (cancelled())
+            return RAC_ERROR_CANCELLED;
+        std::atomic<bool> consumer_stop_requested{false};
+        LLMStreamCtx ctx{&out_result.answer, &on_token, inputs.cancel_requested,
+                         &consumer_stop_requested};
         status = rac_llm_generate_stream(llm_handle, prompt.c_str(), &llm_options,
                                          llm_stream_trampoline, &ctx);
+        // Callback-stop semantics differ by provider: one backend may report
+        // inference failure while another treats the consumer stop as success.
+        // The request-owned latch is the portable source of truth, so normalize
+        // a delivered cancellation before interpreting the provider status or
+        // exposing a partial answer as successful.
+        if (cancelled() || consumer_stop_requested.load(std::memory_order_acquire)) {
+            out_result.status = RAC_ERROR_CANCELLED;
+            return out_result.status;
+        }
         if (status != RAC_SUCCESS) {
             LOGE("RAG LLM generate_stream failed (%d)", status);
             out_result.status = status;

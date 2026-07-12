@@ -93,8 +93,8 @@ parse_registry() {
 
 # Extract `^x.y.z` / `x.y.z` pins from a package pubspec's top-level
 # `dependencies:` / `dev_dependencies:` blocks. Returns `name<TAB>version`.
-# Used as the source-of-truth registry when the (deprecated)
-# `melos.dependencies:` block is absent — see pass2-syn-121.
+# Used as the source-of-truth registry because dependency declarations live in
+# each package rather than in the workspace-level Melos configuration.
 parse_package_registry() {
   awk '
     BEGIN { in_deps = 0 }
@@ -190,7 +190,7 @@ scan_package_pins() {
 }
 
 for pubspec in "${PUBSPEC_TARGETS[@]}"; do
-  rel="${pubspec#${REPO_ROOT}/}"
+  rel="${pubspec#"${REPO_ROOT}"/}"
 
   # Skip the source of truth itself (both the workspace root and the
   # packages/runanywhere pubspec when the latter acts as the registry).
@@ -225,6 +225,76 @@ for pubspec in "${PUBSPEC_TARGETS[@]}"; do
     DRIFT_COUNT=$((DRIFT_COUNT + 1))
     WARN_COUNT=$((WARN_COUNT + 1))
   done <<< "${pins}"
+done
+
+# --- Android plugin/toolchain drift -----------------------------------------
+version_value() {
+  local key="$1"
+  awk -F= -v key="${key}" '$1 == key { print $2; exit }' \
+    "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+}
+
+expect_literal() {
+  local file="$1"
+  local literal="$2"
+  if ! grep -Fq -- "${literal}" "${REPO_ROOT}/${file}"; then
+    printf "::warning file=%s::missing canonical Flutter toolchain literal: %s\n" \
+      "${file}" "${literal}" >&2
+    DRIFT_COUNT=$((DRIFT_COUNT + 1))
+    WARN_COUNT=$((WARN_COUNT + 1))
+  fi
+}
+
+flutter_gradle="$(version_value FLUTTER_GRADLE_VERSION)"
+flutter_agp="$(version_value FLUTTER_AGP_VERSION)"
+flutter_kotlin="$(version_value FLUTTER_KOTLIN_VERSION)"
+flutter_compile_sdk="$(version_value FLUTTER_ANDROID_COMPILE_SDK)"
+flutter_target_sdk="$(version_value FLUTTER_ANDROID_TARGET_SDK)"
+flutter_ndk="$(version_value FLUTTER_NDK_VERSION)"
+
+expect_literal "examples/flutter/RunAnywhereAI/android/gradle/wrapper/gradle-wrapper.properties" \
+  "gradle-${flutter_gradle}-all.zip"
+expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+  "id \"com.android.application\" version \"${flutter_agp}\" apply false"
+expect_literal "examples/flutter/RunAnywhereAI/android/settings.gradle" \
+  "id \"org.jetbrains.kotlin.android\" version \"${flutter_kotlin}\" apply false"
+
+flutter_owned_gradle_files=(
+  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"
+)
+for gradle_file in "${flutter_owned_gradle_files[@]}"; do
+  if grep -Eq '(^|[[:space:]"'"'"'])((kotlin-android)|(org\.jetbrains\.kotlin\.android))([[:space:]"'"'"']|$)|kotlinOptions' \
+      "${REPO_ROOT}/${gradle_file}"; then
+    printf "::warning file=%s::legacy Kotlin Gradle Plugin or kotlinOptions remains\n" \
+      "${gradle_file}" >&2
+    DRIFT_COUNT=$((DRIFT_COUNT + 1))
+    WARN_COUNT=$((WARN_COUNT + 1))
+  fi
+done
+
+flutter_android_builds=(
+  "sdk/runanywhere-flutter/packages/runanywhere/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle"
+  "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle"
+  "examples/flutter/RunAnywhereAI/android/app/build.gradle"
+)
+for build_file in "${flutter_android_builds[@]}"; do
+  expect_literal "${build_file}" "compileSdk = ${flutter_compile_sdk}"
+  expect_literal "${build_file}" "targetSdk = ${flutter_target_sdk}"
+  expect_literal "${build_file}" "JavaVersion.VERSION_17"
+  expect_literal "${build_file}" "${flutter_ndk}"
+  if grep -Eq 'VERSION_1_8|compileSdk[[:space:]]+34|targetSdk[[:space:]]+34|27\.0\.12077973|kotlinOptions' \
+      "${REPO_ROOT}/${build_file}"; then
+    printf "::warning file=%s::obsolete Flutter Android toolchain/API literal remains\n" \
+      "${build_file}" >&2
+    DRIFT_COUNT=$((DRIFT_COUNT + 1))
+    WARN_COUNT=$((WARN_COUNT + 1))
+  fi
 done
 
 printf "\n"

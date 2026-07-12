@@ -3,7 +3,7 @@ import {
   SDKEventStreamAdapter,
   type SDKEventHandler,
   type SDKEventUnsubscribe,
-} from '../../Adapters/SDKEventStreamAdapter';
+} from '../../Adapters/SDKEventStreamAdapter.js';
 
 function requireAdapter(): SDKEventStreamAdapter {
   const adapter = SDKEventStreamAdapter.tryDefault();

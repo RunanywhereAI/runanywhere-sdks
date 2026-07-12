@@ -27,6 +27,7 @@ import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { CloudSttBackendConfig } from '@runanywhere/proto-ts/hybrid_router';
 import { DEFAULT_CLOUD_PROVIDER } from './HybridModel';
+import { isJsonObject } from '../../../services/JSONValidation';
 
 const logger = new SDKLogger('CloudSTT');
 
@@ -106,26 +107,29 @@ const registeredProviders = new Set<string>();
 let pluginRegistered = false;
 
 /** Decode commons' snake_case config JSON into the typed request config. */
-function decodeProviderConfig(
+export function decodeCloudSttProviderConfigJSON(
   configJson: string
 ): CloudSttProviderRequest['config'] {
+  let raw: unknown;
   try {
-    const raw = JSON.parse(configJson) as Record<string, unknown>;
-    return {
-      ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
-      ...(typeof raw.api_key === 'string' ? { apiKey: raw.api_key } : {}),
-      ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
-      ...(typeof raw.base_url === 'string' ? { baseUrl: raw.base_url } : {}),
-      ...(typeof raw.language_code === 'string'
-        ? { languageCode: raw.language_code }
-        : {}),
-      ...(typeof raw.timeout_ms === 'number'
-        ? { timeoutMs: raw.timeout_ms }
-        : {}),
-    };
+    raw = JSON.parse(configJson);
   } catch {
     return {};
   }
+  if (!isJsonObject(raw)) return {};
+
+  return {
+    ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
+    ...(typeof raw.api_key === 'string' ? { apiKey: raw.api_key } : {}),
+    ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
+    ...(typeof raw.base_url === 'string' ? { baseUrl: raw.base_url } : {}),
+    ...(typeof raw.language_code === 'string'
+      ? { languageCode: raw.language_code }
+      : {}),
+    ...(typeof raw.timeout_ms === 'number' && Number.isFinite(raw.timeout_ms)
+      ? { timeoutMs: raw.timeout_ms }
+      : {}),
+  };
 }
 
 /**
@@ -262,7 +266,7 @@ export const CloudSTT = {
       async (configJson, audioBytes, audioFormat) => {
         try {
           const result = await handler({
-            config: decodeProviderConfig(configJson),
+            config: decodeCloudSttProviderConfigJSON(configJson),
             audio: audioBytes,
             audioFormat,
           });

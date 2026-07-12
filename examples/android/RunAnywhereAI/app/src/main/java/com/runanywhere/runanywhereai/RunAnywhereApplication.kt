@@ -10,36 +10,40 @@ import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.tools.BuiltInTools
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.runanywhereai.util.RACLogTelemetry
 import com.runanywhere.sdk.core.onnx.ONNX
-import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.setDebugMode
+import com.runanywhere.sdk.public.extensions.setLocalLoggingEnabled
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 
 class RunAnywhereApplication : Application() {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val setupInProgress = AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
 
+        RACLogTelemetry.install()
         GlobalState.warmUp()
         ConversationRepository.initialize(applicationContext)
         SettingsRepository.initialize(applicationContext)
         CloudProviderRepository.initialize(applicationContext)
         BenchmarkStore.initialize(applicationContext)
-        appScope.launch(Dispatchers.IO) {
-            ConversationRepository.refresh()
-            runSdkSetup()
-        }
+        appScope.launch(Dispatchers.IO) { ConversationRepository.refresh() }
+        // Match iOS startup: initialize immediately with the full diagnostics
+        // tier when a production control-plane configuration is available.
+        appScope.launch(Dispatchers.IO) { runSdkSetup() }
     }
 
     fun retrySdkSetup() {
@@ -50,6 +54,7 @@ class RunAnywhereApplication : Application() {
     }
 
     private suspend fun runSdkSetup() {
+        if (GlobalState.ready || !setupInProgress.compareAndSet(false, true)) return
         try {
             setupSDK()
             GlobalState.markReady()
@@ -58,6 +63,8 @@ class RunAnywhereApplication : Application() {
         } catch (e: Throwable) {
             RACLog.e("SDK setup failed", e)
             GlobalState.markInitFailed(e.message ?: e.javaClass.simpleName)
+        } finally {
+            setupInProgress.set(false)
         }
     }
 
@@ -65,38 +72,50 @@ class RunAnywhereApplication : Application() {
         RACLog.i("RAC SDK Setup initialization... Recording Time")
         val startTime = System.currentTimeMillis()
 
-        //Starting Setup Work
-        AndroidPlatformContext.initialize(this@RunAnywhereApplication)
         // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery for QHexRT/QNN) is set
         // automatically by the engine before its first runtime create — no app glue needed.
-        // Register backends with the C++ registry BEFORE initialize(): once initialize() runs,
-        // a concurrent caller can hit loadModel() while only the platform backend is registered
-        // and fail with -422 "No provider could handle the request" (same ordering as iOS).
+        // Register the CPU backends with the C++ registry before initialize(): once initialize()
+        // runs, a concurrent caller can hit loadModel() while only the platform backend is
+        // registered and fail with -422 "No provider could handle the request" (same ordering
+        // as iOS). QHexRT is registered below because its skel installer needs the application
+        // Context installed by the public RunAnywhere.initialize(context = ...) overload.
         LlamaCPP.register()
         ONNX.register()
-        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
-        // unsupported parts, so this is a safe no-op on parts older than v75.
-        QHexRT.register()
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
-        val environment =
-            if (hasBackendConfig) {
-                SDKEnvironment.SDK_ENVIRONMENT_STAGING
-            } else {
-                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-            }
+        val environment = if (hasBackendConfig) {
+            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+        } else {
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+        }
         RunAnywhere.initialize(
-            apiKey = BuildConfig.RUNANYWHERE_API_KEY,
-            baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
-            // Use staging only when local.properties provides a real backend
-            // config. Empty debug defaults boot in development/offline mode.
+            context = this@RunAnywhereApplication,
+            apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {
+                environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+            },
+            baseURL = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
+                environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+            },
+            // Configured app builds always use the full production diagnostics tier.
+            // Unconfigured local builds retain the SDK development fallback.
             environment = environment,
         )
+        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on parts outside
+        // the device-validated V75/V79/V81 set. RunAnywhere initialization must happen first so
+        // the module can extract its DSP skels through the SDK-owned application Context.
+        QHexRT.register()
+        RACLogTelemetry.markSDKInitialized()
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device
         // issues (voice/STT/VLM) undiagnosable.
-        if (BuildConfig.DEBUG) RunAnywhere.setDebugMode(true)
+        if (BuildConfig.DEBUG) {
+            RunAnywhere.setDebugMode(true)
+        } else {
+            // Release diagnostics are sent through the configured control
+            // plane; user/device metadata must not also be written to logcat.
+            RunAnywhere.setLocalLoggingEnabled(false)
+        }
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         // Re-apply the persisted HuggingFace token (Settings screen) so private
         // model repos (e.g. gated NPU bundles) download across app restarts.

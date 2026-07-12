@@ -9,43 +9,8 @@
 //   - RAGResult          (full query result: answer + chunks + timings)
 //   - RAGStatistics      (index-level counters)
 //
-// Pre-IDL drift table (motivation for this schema):
-//
-//   RAGConfiguration:
-//     Swift   RAGTypes.swift:15        (11 fields, similarityThreshold default 0.12,
-//                                        chunkSize 180, chunkOverlap 30, topK 3)
-//     Kotlin  RAGTypes.kt:19           (11 fields, similarityThreshold default 0.15f,
-//                                        chunkSize 512, chunkOverlap 50, topK 3)
-//     Dart    rag_types.dart:13        (11 fields, similarityThreshold default 0.15,
-//                                        chunkSize 180, chunkOverlap 30, topK 10)
-//     RN      RAGTypes.ts:9            (11 fields, all numerics optional)
-//     Web     RAGTypes.ts:6            (11 fields, copy of RN)
-//
-//   RAGQueryOptions:
-//     Swift / Kotlin / Dart / RN / Web all define the same 6-field shape with
-//     consistent defaults (maxTokens 512, temperature 0.7, topP 0.9, topK 40).
-//
-//   RAGSearchResult:
-//     Swift / Kotlin / Dart       — metadataJSON as a single optional string
-//     RN / Web                    — metadataJson (lowercase j) optional string
-//     Note: pre-IDL all SDKs encoded metadata as a JSON *string*. The proto
-//     canonicalizes to map<string,string> so consumers don't all re-parse JSON
-//     and source_document is hoisted to a first-class field.
-//
-//   RAGResult:
-//     Swift / Kotlin / Dart       — timing fields are double (ms, fractional)
-//     RN / Web                    — timing fields are number
-//     Note: proto canonicalizes timings to int64 millis (matches the C ABI
-//     rac_rag_result_t which already uses fixed millis at the boundary).
-//
-//   RAGStatistics:
-//     Dart    rag_types.dart:241      ({statsJson} only — JSON blob)
-//     RN      RAGTypes.ts:59          ({documentCount, chunkCount, vectorStoreSize, statsJson})
-//     Web     RAGTypes.ts:45          (copy of RN)
-//     Swift / Kotlin                  — not yet defined pre-IDL
-//     Note: proto canonicalizes to typed counters (indexed_documents,
-//     indexed_chunks, total_tokens_indexed, last_updated_ms, index_path) so
-//     the JSON-blob escape hatch isn't needed.
+// All SDKs consume these generated messages directly so configuration,
+// metadata, results, and statistics have one portable shape.
 
 syntax = "proto3";
 
@@ -99,12 +64,14 @@ message RAGConfiguration {
     // score are discarded before being passed to the LLM as context.
     // Optional so callers can distinguish "unset" from explicit 0.0
     // (accept-everything) without losing the canonical default.
-    // Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-    // cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-    // so a 0.7 floor filters out every match and retrieval returns nothing
-    // (validated by generated SDK helpers and commons session creation).
+    // Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+    // produce cosine similarities that rarely exceed ~0.5 even for relevant
+    // chunks, and chunking a document lowers each chunk's similarity further, so
+    // any positive floor filters out real matches — a multi-chunk document then
+    // retrieves nothing and the answer model reports "no information". top_k
+    // bounds the result count instead of a similarity floor.
     optional float similarity_threshold  = 5 [
-        (runanywhere.v1.rac_default) = "0.3",
+        (runanywhere.v1.rac_default) = "0.0",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
@@ -155,10 +122,7 @@ message RAGDocument {
     // Plain text content to chunk/embed.
     string text = 2;
 
-    // Tag 3 reserved — previously `optional string metadata_json` (legacy).
-    // Deleted in favour of the typed `metadata` map below.
     reserved 3;
-    reserved "metadata_json";
 
     // Typed metadata map for generated-proto callers.
     map<string, string> metadata = 4;
@@ -202,13 +166,32 @@ message RAGQueryOptions {
 
     // Retrieval overrides. 0/unset = use RAGConfiguration defaults.
     int32 retrieval_top_k        = 7;
-    float similarity_threshold   = 8;
+    // Per-query similarity floor. `optional` so an explicit 0.0 (accept
+    // everything) is distinguishable from "unset" and can override a positive
+    // session-level default; unset falls back to RAGConfiguration.
+    optional float similarity_threshold = 8;
     bool  stream                 = 9;
 
     // When true, suppress the answer model's thinking phase (maps to
     // LLMGenerationOptions.disable_thinking so commons prepends the no-think
     // directive instead of the app injecting "/no_think"). Default false.
     bool  disable_thinking       = 10;
+
+    // Multi-query expansion: when true, the answer LLM rewrites the question
+    // into `multi_query_count` variants; retrieval runs for the original plus
+    // each variant and the rankings are RRF-fused before rerank. Falls back to
+    // a single query if expansion yields nothing.
+    bool  enable_multi_query     = 11;
+    optional int32 multi_query_count = 12 [
+        (runanywhere.v1.rac_default) = "3",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 8
+    ];
+
+    // Scoped retrieval: when set, only chunks whose document id begins with
+    // this prefix are eligible (e.g. a chat/collection namespace). Unset =
+    // search the whole index.
+    optional string scope_prefix = 13;
 }
 
 message RAGQueryRequest {
@@ -235,14 +218,10 @@ message RAGSearchResult {
     optional string source_document = 4;
 
     // Free-form metadata associated with the chunk (e.g. page number, section,
-    // ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-    // canonicalized here as a typed map so consumers don't re-parse.
+    // ingestion timestamp).
     map<string, string> metadata = 5;
 
-    // Tag 6 reserved — previously `optional string metadata_json` (legacy).
-    // Deleted in favour of the typed `metadata` map above.
     reserved 6;
-    reserved "metadata_json";
 
     int32 rank = 7;
     int32 start_offset = 8;

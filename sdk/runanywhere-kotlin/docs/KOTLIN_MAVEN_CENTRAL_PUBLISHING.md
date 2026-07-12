@@ -4,33 +4,41 @@
 
 ## Published Artifacts
 
-Each AAR is **self-contained** with only its own native libraries. Zero duplicates across AARs.
+Each AAR is self-contained with its declared component libraries. The Android
+runtime sidecar `libc++_shared.so` is intentionally present in every backend
+AAR; all three copies come from the same NDK runtime for a given ABI.
 
 | Artifact | Native Libs | Description |
 |----------|-------------|-------------|
-| `io.github.sanchitmonga22:runanywhere-sdk-android` | 4 per ABI | Core SDK: `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
-| `io.github.sanchitmonga22:runanywhere-llamacpp-android` | 2 per ABI | LLM backend (with VLM): `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so` |
-| `io.github.sanchitmonga22:runanywhere-onnx-android` | 6 per ABI | STT/TTS/VAD: `librac_backend_onnx*.so`, `libonnxruntime.so`, `libsherpa-onnx-*.so` |
+| `io.github.sanchitmonga22:runanywhere-sdk-android` | 5 per ABI | Core SDK and cloud backend |
+| `io.github.sanchitmonga22:runanywhere-llamacpp-android` | 4 per ABI | LlamaCPP LLM/VLM backend |
+| `io.github.sanchitmonga22:runanywhere-onnx-android` | 9 per ABI | ONNX and Sherpa STT/TTS/VAD backends |
 | `io.github.sanchitmonga22:runanywhere-sdk` | - | KMP metadata |
 | `io.github.sanchitmonga22:runanywhere-llamacpp` | - | KMP metadata |
 | `io.github.sanchitmonga22:runanywhere-onnx` | - | KMP metadata |
 
-With 3 ABIs (arm64-v8a, armeabi-v7a, x86_64): SDK=12, LlamaCPP=6, ONNX=18 = **36 total .so files**.
+With three ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`), the Maven bundle
+contains 15 core, 12 LlamaCPP, and 27 ONNX/Sherpa entries: **54 `.so` entries**.
 
 ---
 
 ## Native Library Packaging Architecture
 
-Each module downloads and bundles **only its own** backend `.so` files. No `pickFirsts` needed.
+The canonical native release has one exact tree per ABI. `package-sdk.sh`
+validates that tree, rejects undeclared or private QHexRT/QNN inputs, and routes
+each component into its owning AAR.
 
 ```
 runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runanywhere-onnx-android AAR
   jni/{abi}/                           jni/{abi}/                           jni/{abi}/
-    librac_commons.so                    librac_backend_llamacpp.so           librac_backend_onnx.so
-    librunanywhere_jni.so                librac_backend_llamacpp_jni.so       librac_backend_onnx_jni.so
-    libc++_shared.so                                                          libonnxruntime.so
-    libomp.so                                                                 libsherpa-onnx-c-api.so
-                                                                              libsherpa-onnx-cxx-api.so
+    libc++_shared.so                     libc++_shared.so                      libc++_shared.so
+    libomp.so                            librac_backend_llamacpp.so            libonnxruntime.so
+    librac_backend_cloud.so              librac_backend_llamacpp_jni.so        librac_backend_onnx.so
+    librac_commons.so                    librunanywhere_llamacpp.so            librac_backend_onnx_jni.so
+    librunanywhere_jni.so                                                     librac_backend_sherpa.so
+                                                                              librunanywhere_onnx.so
+                                                                              librunanywhere_sherpa.so
+                                                                              libsherpa-onnx-c-api.so
                                                                               libsherpa-onnx-jni.so
 ```
 
@@ -38,16 +46,16 @@ runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runany
 
 | Mode | Trigger | What happens |
 |------|---------|-------------|
-| **Remote** (`testLocal=false`) | Default for CI/publishing | Each module's `downloadJniLibs` task downloads its own package from GitHub releases |
-| **Local** (`testLocal=true`) | `build-kotlin.sh --setup` | Script builds C++ from source and copies to each module's `src/main/jniLibs/` |
+| **Released natives** | Existing GitHub release | Pass the three `RACommons-android-{abi}-v{version}.zip` files to `package-sdk.sh --natives-from` |
+| **Local source build** | Latest C++ is required | Build one ABI at a time with `build-android.sh`, extract the same canonical trees, then call `package-sdk.sh --natives-from` |
 
-**Remote download mapping:**
+**Canonical archive mapping:**
 
-| Module | Downloads | Keeps only |
-|--------|-----------|------------|
-| Root SDK | `RACommons-android-{abi}-v{ver}.zip` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
-| LlamaCPP | `RABackendLLAMACPP-android-{abi}-v{ver}.zip` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so` |
-| ONNX | `RABackendONNX-android-{abi}-v{ver}.zip` | `librac_backend_onnx*.so`, `libonnxruntime.so`, `libsherpa-onnx-*.so` |
+| Archive subtree | Maven artifact |
+|-----------------|----------------|
+| `{abi}/jni` | `runanywhere-sdk-android` |
+| `{abi}/llamacpp` | `runanywhere-llamacpp-android` |
+| `{abi}/onnx` | `runanywhere-onnx-android` |
 
 ---
 
@@ -91,72 +99,85 @@ signing.gnupg.keyName=YOUR_GPG_KEY_ID
 signing.gnupg.passphrase=YOUR_GPG_PASSPHRASE
 ```
 
-### 3. Option A: Publish with pre-built native libs (remote download)
+### 3. Option A: Publish with released native archives
 
-Use a GitHub release that has per-ABI Android binaries (e.g., `v0.17.5`):
+Use a GitHub release that contains all three canonical Android archives:
 
 ```bash
-cd sdk/runanywhere-kotlin
+# Run from the repository root.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
 
-# Clean all jniLibs
-rm -rf src/main/jniLibs
-rm -rf modules/runanywhere-core-llamacpp/src/main/jniLibs
-rm -rf modules/runanywhere-core-onnx/src/main/jniLibs
-
-# Set version and publish (each module downloads its own libs)
 export SDK_VERSION=0.20.6
+export NATIVE_VERSION=0.20.6
+export ANDROID_HOME="$HOME/Library/Android/sdk"
 export MAVEN_CENTRAL_USERNAME="<USERNAME>"
 export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
-export ANDROID_HOME="$HOME/Library/Android/sdk"
 
+NATIVE_ARCHIVES="$(mktemp -d)"
+for ABI in arm64-v8a armeabi-v7a x86_64; do
+  NAME="RACommons-android-${ABI}-v${NATIVE_VERSION}.zip"
+  URL="https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v${NATIVE_VERSION}"
+  curl -fL "$URL/$NAME" -o "$NATIVE_ARCHIVES/$NAME"
+  curl -fL "$URL/$NAME.sha256" -o "$NATIVE_ARCHIVES/$NAME.sha256"
+  (cd "$NATIVE_ARCHIVES" && shasum -a 256 -c "$NAME.sha256")
+done
+
+bash sdk/runanywhere-kotlin/scripts/package-sdk.sh \
+  --mode local \
+  --natives-from "$NATIVE_ARCHIVES"
+
+cd sdk/runanywhere-kotlin
 ./gradlew clean publishAllPublicationsToMavenCentralRepository \
-  -Prunanywhere.useLocalNatives=false \
-  -Prunanywhere.nativeLibVersion=0.17.5 \
+  -Prunanywhere.useLocalNatives=true \
+  -x buildLocalJniLibs \
   --no-daemon
 ```
 
 ### 3. Option B: Publish with locally-built native libs (VLM/latest C++)
 
-Build native libs from source first, then publish:
+Build the canonical native archives from source, validate their checksums,
+extract the exact component trees, and let the package contract stage them:
 
 ```bash
-# 1. Build C++ native libs (all backends, all ABIs)
-cd sdk/runanywhere-commons
+# Run from the repository root.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+export SDK_VERSION=0.20.6
+export RAC_RELEASE_VERSION="$SDK_VERSION"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
 export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.3.13750724"
-./scripts/build-android.sh all arm64-v8a,armeabi-v7a,x86_64
 
-# 2. Distribute libs to each module's jniLibs (self-contained)
-cd ../runanywhere-kotlin
+DIST="$REPO_ROOT/sdk/runanywhere-commons/dist"
+NATIVE_ROOT="$DIST/public-android-natives"
+rm -rf "$NATIVE_ROOT"
+mkdir -p "$NATIVE_ROOT"
+
 for ABI in arm64-v8a armeabi-v7a x86_64; do
-  # Root SDK: commons only
-  mkdir -p src/main/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/commons/$ABI/librac_commons.so src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/librunanywhere_jni.so src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/libc++_shared.so src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/libomp.so src/main/jniLibs/$ABI/
-
-  # LlamaCPP module: backend only
-  mkdir -p modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp.so modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp_jni.so modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI/
-
-  # ONNX module: backend only
-  mkdir -p modules/runanywhere-core-onnx/src/main/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx_jni.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libonnxruntime.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-c-api.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-cxx-api.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-jni.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  bash sdk/runanywhere-commons/scripts/build-android.sh "$ABI"
+  ARCHIVE="$DIST/RACommons-android-${ABI}-v${SDK_VERSION}.zip"
+  (
+    cd "$DIST"
+    shasum -a 256 -c "$(basename "$ARCHIVE").sha256"
+  )
+  unzip -q "$ARCHIVE" -d "$NATIVE_ROOT"
 done
 
-# 3. Publish
-export SDK_VERSION=0.20.6
+# Build and validate the exact public Maven bundle, and stage those validated
+# natives into the three Kotlin modules.
+bash sdk/runanywhere-kotlin/scripts/package-sdk.sh \
+  --mode local \
+  --natives-from "$NATIVE_ROOT"
+
+# Publish the same staged inputs.
 export MAVEN_CENTRAL_USERNAME="<USERNAME>"
 export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
 
+cd sdk/runanywhere-kotlin
 ./gradlew clean publishAllPublicationsToMavenCentralRepository \
   -Prunanywhere.useLocalNatives=true \
+  -x buildLocalJniLibs \
   --no-daemon
 ```
 
@@ -261,7 +282,6 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 | Duplicate `.so` across AARs | Stale files in module `jniLibs/`. Delete and rebuild. Check `.gitignore` covers `src/main/jniLibs/`. |
 | Staging repo "No objects found" | Drop the stale repo and re-upload |
 | OSSRH staging never auto-closes | Manually close/release via staging API |
-| `Unresolved reference 'json'` (JVM) | `org.json:json:20240303` is in `jvmAndroidMain` dependencies |
 
 ---
 

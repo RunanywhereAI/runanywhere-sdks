@@ -1,25 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# build-ios.sh — package-local compatibility wrapper.
+# Canonical Apple release build and packaging entry point.
 #
-# The original per-package iOS/macOS build entry
-# point was deleted in favour of repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh,
-# but `.github/workflows/release.yml` (native_ios job) and the
-# README/CLAUDE.md docs continue to invoke this path. This shim restores
-# the workflow contract by:
-#
-#   1. Forwarding the legacy CLI flags (--backend / --release /
-#      --include-macos / --package — accepted but currently ignored, since
-#      build-core-xcframework.sh always builds the canonical Apple slice
-#      set) to the repo-root xcframework build.
-#   2. Packaging the resulting `.xcframework` bundles into the versioned
+# Builds the canonical Apple slice set through
+# sdk/runanywhere-swift/scripts/build-core-xcframework.sh, then packages the
+# resulting `.xcframework` bundles into the versioned
 #      `sdk/runanywhere-commons/dist/packages/<Framework>-ios-v<version>.zip`
 #      (+ .sha256) that release.yml uploads and `publish` asserts on.
-#
-# This wrapper exists so we can collapse the legacy CLI without forcing a
-# release-CI rewrite in the same change. Long-term, callers should migrate
-# to invoking sdk/runanywhere-swift/scripts/build-core-xcframework.sh directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,11 +18,10 @@ if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: build-ios.sh only runs on macOS" >&2
     exit 1
 fi
-
-# Forward (and discard) the legacy flag surface — build-core-xcframework.sh
-# does not parse them today but we accept them so the workflow command
-# remains byte-identical.
-LEGACY_ARGS=("$@")
+if [ "$#" -ne 0 ]; then
+    echo "usage: build-ios.sh" >&2
+    exit 2
+fi
 
 XCFRAMEWORK_SCRIPT="${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 if [ ! -x "${XCFRAMEWORK_SCRIPT}" ]; then
@@ -43,7 +30,8 @@ if [ ! -x "${XCFRAMEWORK_SCRIPT}" ]; then
 fi
 
 echo "▶ Delegating iOS/macOS xcframework build to sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
-echo "  legacy args (forwarded for log fidelity, ignored by repo-root script): ${LEGACY_ARGS[*]:-<none>}"
+# Keep Apple static archives free of per-build member timestamps.
+export ZERO_AR_DATE=1
 "${XCFRAMEWORK_SCRIPT}"
 
 # Stage the produced xcframeworks into dist/packages/ as the versioned release
@@ -51,6 +39,8 @@ echo "  legacy args (forwarded for log fidelity, ignored by repo-root script): $
 # step, sync-checksums.sh, and the Package.swift binary targets all expect.
 # Version: RAC_RELEASE_VERSION (the release tag, passed by release.yml) or the
 # canonical PROJECT_VERSION from VERSIONS for standalone/local runs.
+# The sourced path is resolved from this script at runtime.
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/load-versions.sh" >/dev/null
 VERSION="${RAC_RELEASE_VERSION:-${PROJECT_VERSION}}"
 
@@ -64,19 +54,44 @@ if [ ! -d "${SRC_DIR}" ]; then
     exit 1
 fi
 
-shopt -s nullglob
-xcframeworks=("${SRC_DIR}"/*.xcframework)
-if [ "${#xcframeworks[@]}" -eq 0 ]; then
-    echo "error: no .xcframework bundles produced under ${SRC_DIR}" >&2
-    exit 1
-fi
+# Keep the public release surface explicit. Globbing this directory could
+# accidentally publish a stale or private XCFramework left by a local build.
+xcframework_names=(
+    RACommons
+    RABackendLLAMACPP
+    RABackendONNX
+    RABackendSherpa
+    RABackendMLX
+    RunAnywhereMLXRuntime
+    RunAnywhereMLXMetal
+)
 
-for fw in "${xcframeworks[@]}"; do
-    fw_name="$(basename "${fw}")"
+for framework_name in "${xcframework_names[@]}"; do
+    fw_name="${framework_name}.xcframework"
+    fw="${SRC_DIR}/${fw_name}"
+    if [ ! -d "${fw}" ]; then
+        echo "error: required public XCFramework not found: ${fw}" >&2
+        exit 1
+    fi
     zip_path="${DEST_DIR}/${fw_name%.xcframework}-ios-v${VERSION}.zip"
     echo "▶ Packaging ${fw_name} → ${zip_path}"
-    (cd "${SRC_DIR}" && zip -ry "${zip_path}" "${fw_name}")
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-xcframework-zip.sh" \
+        "${fw}" "${zip_path}"
 done
+
+# Hub/Crypto Bundle.module payloads and attribution notices are not a SwiftPM
+# binary target. Keep them in their own archive so each binary-target ZIP
+# contains exactly one XCFramework and passes SwiftPM artifact validation.
+mlx_resources="${SRC_DIR}/RunAnywhereMLXRuntimeResources"
+if [ ! -d "${mlx_resources}" ]; then
+    echo "error: MLX runtime resource payload not found: ${mlx_resources}" >&2
+    exit 1
+fi
+mlx_resources_zip="${DEST_DIR}/RunAnywhereMLXResources-ios-v${VERSION}.zip"
+echo "▶ Packaging MLX resources → ${mlx_resources_zip}"
+"${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-directory-zip.sh" \
+    "${mlx_resources}" "${mlx_resources_zip}"
 (cd "${DEST_DIR}" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done)
 
-echo "✓ build-ios.sh complete; staged $(ls -1 "${DEST_DIR}"/*.zip 2>/dev/null | wc -l | tr -d ' ') versioned archive(s) under ${DEST_DIR}"
+archive_count=$((${#xcframework_names[@]} + 1))
+echo "✓ build-ios.sh complete; staged ${archive_count} versioned archive(s) under ${DEST_DIR}"

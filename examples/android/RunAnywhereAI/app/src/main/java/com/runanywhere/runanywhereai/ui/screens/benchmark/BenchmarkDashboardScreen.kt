@@ -100,6 +100,25 @@ fun BenchmarkDashboardScreen(
             }
         }
 
+        vm.message?.let { message ->
+            item {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(dimens.radiusMd),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = vm::clearMessage),
+                ) {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(dimens.spacingMd),
+                    )
+                }
+            }
+        }
+
         if (vm.history.isNotEmpty()) {
             item {
                 Text("History", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

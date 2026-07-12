@@ -47,8 +47,7 @@ int run_lora_import(const GlobalOptions &options, const std::string &file) {
 
   v1::LoraAdapterImportRequest request;
   request.set_source_path(file);
-  std::string request_bytes;
-  request.SerializeToString(&request_bytes);
+  const std::string request_bytes = proto::serialize(request);
 
   rac_proto_buffer_t out_buffer;
   rac_proto_buffer_init(&out_buffer);
@@ -97,8 +96,7 @@ int run_lora_list(const GlobalOptions &options) {
   }
 
   v1::LoraAdapterCatalogListRequest request;
-  std::string request_bytes;
-  request.SerializeToString(&request_bytes);
+  const std::string request_bytes = proto::serialize(request);
 
   rac_proto_buffer_t out_buffer;
   rac_proto_buffer_init(&out_buffer);

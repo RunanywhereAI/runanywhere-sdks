@@ -28,12 +28,6 @@ extension RunAnywhere {
         Logging.shared.setMinLogLevel(level)
     }
 
-    /// Enable or disable Sentry error tracking
-    /// - Parameter enabled: Whether to enable Sentry logging
-    public static func setSentryLoggingEnabled(_ enabled: Bool) {
-        Logging.shared.setSentryLoggingEnabled(enabled)
-    }
-
     /// Add a custom log destination
     /// - Parameter destination: The destination to add
     public static func addLogDestination(_ destination: LogDestination) {

@@ -37,9 +37,13 @@ import os
 public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDelegate, @unchecked Sendable {
     private let logger = SDKLogger(category: "AudioPlayback")
 
-    private struct State {
+    /// AVFoundation objects and one-shot callbacks are accessed only while the
+    /// enclosing unfair lock is held. They are never transferred to another
+    /// owner; `withLockUnchecked` is used only to invoke the non-Sendable Apple
+    /// objects after taking a strong snapshot.
+    private struct State: @unchecked Sendable {
         var audioPlayer: AVAudioPlayer?
-        var playbackCompletion: ((Bool) -> Void)?
+        var playbackCompletion: (@Sendable (Bool) -> Void)?
         var playbackContinuation: CheckedContinuation<Void, Error>?
         var progressTimer: Timer?
     }
@@ -88,7 +92,7 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
     /// - Parameters:
     ///   - audioData: WAV audio data to play
     ///   - completion: Called when playback finishes (true = success, false = error/interrupted)
-    public func play(_ audioData: Data, completion: @escaping (Bool) -> Void) {
+    public func play(_ audioData: Data, completion: @escaping @Sendable (Bool) -> Void) {
         guard !audioData.isEmpty else {
             logger.warning("Empty audio data, skipping playback")
             completion(false)
@@ -108,7 +112,7 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
 
     /// Stop current playback
     public func stop() {
-        let player = lock.withLock { $0.audioPlayer }
+        let player = lock.withLockUnchecked { $0.audioPlayer }
         guard let player else { return }
 
         player.stop()
@@ -119,13 +123,13 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
     /// Pause current playback
     public func pause() {
         guard isPlaying else { return }
-        lock.withLock { $0.audioPlayer }?.pause()
+        lock.withLockUnchecked { $0.audioPlayer }?.pause()
         logger.info("Playback paused")
     }
 
     /// Resume paused playback
     public func resume() {
-        guard let player = lock.withLock({ $0.audioPlayer }), !player.isPlaying else { return }
+        guard let player = lock.withLockUnchecked({ $0.audioPlayer }), !player.isPlaying else { return }
         player.play()
         logger.info("Playback resumed")
     }
@@ -147,7 +151,7 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
         let player = try AVAudioPlayer(data: audioData)
         player.delegate = self
         player.prepareToPlay()
-        lock.withLock { $0.audioPlayer = player }
+        lock.withLockUnchecked { $0.audioPlayer = player }
 
         duration = player.duration
         currentTime = 0.0
@@ -183,19 +187,22 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
 
     private func startProgressTimer() {
         let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self, let player = self.lock.withLock({ $0.audioPlayer }) else { return }
+            guard let self,
+                  let playbackTime = self.lock.withLockUnchecked({ $0.audioPlayer?.currentTime }) else {
+                return
+            }
             DispatchQueue.main.async {
-                self.currentTime = player.currentTime
+                self.currentTime = playbackTime
             }
         }
-        lock.withLock { state in
+        lock.withLockUnchecked { state in
             state.progressTimer?.invalidate()
             state.progressTimer = timer
         }
     }
 
     private func stopProgressTimer() {
-        lock.withLock { state in
+        lock.withLockUnchecked { state in
             state.progressTimer?.invalidate()
             state.progressTimer = nil
         }
@@ -215,7 +222,8 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
         // Atomically take ownership of the one-shot callbacks and clear the
         // player, then invoke the callbacks outside the lock so user code never
         // runs while the lock is held.
-        let (continuation, completion) = lock.withLock { state -> (CheckedContinuation<Void, Error>?, ((Bool) -> Void)?) in
+        let (continuation, completion) = lock.withLock { state
+            -> (CheckedContinuation<Void, Error>?, (@Sendable (Bool) -> Void)?) in
             let taken = (state.playbackContinuation, state.playbackCompletion)
             state.playbackContinuation = nil
             state.playbackCompletion = nil

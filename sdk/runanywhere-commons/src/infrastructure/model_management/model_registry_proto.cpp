@@ -20,6 +20,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/model_management/rac_platform_capabilities.h"
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
@@ -30,6 +31,14 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 // -----------------------------------------------------------------------------
 
 namespace {
+
+// Platform capability boundary: models whose inference framework can never
+// run on this platform (e.g. Apple-only MLX on Android, Android-only QHexRT
+// on iOS/Web) are hidden from every list/query surface. Registration,
+// get-by-id, and download paths are intentionally NOT filtered.
+bool model_visible_on_platform(const ModelInfo& model) {
+    return rac_framework_supported_on_platform(static_cast<int32_t>(model.framework())) == RAC_TRUE;
+}
 
 std::string lowercase_copy(const std::string& input) {
     std::string out;
@@ -51,7 +60,6 @@ bool model_matches_search_text(const ModelInfo& model, const std::string& needle
 
     if (contains_text_case_insensitive(model.id(), needle_lower) ||
         contains_text_case_insensitive(model.name(), needle_lower) ||
-        contains_text_case_insensitive(model.description(), needle_lower) ||
         contains_text_case_insensitive(model.download_url(), needle_lower) ||
         contains_text_case_insensitive(model.local_path(), needle_lower) ||
         contains_text_case_insensitive(model.checksum_sha256(), needle_lower) ||
@@ -230,7 +238,7 @@ void append_query_results_locked(rac_model_registry_handle_t handle, const Model
     for (const auto& pair : handle->models) {
         ModelInfo snapshot = model_snapshot_locked(handle, pair.first, pair.second);
         normalize_model_registry_state(&snapshot);
-        if (model_matches_query(snapshot, query)) {
+        if (model_visible_on_platform(snapshot) && model_matches_query(snapshot, query)) {
             matches.push_back(std::move(snapshot));
         }
     }
@@ -250,6 +258,9 @@ std::vector<ModelInfo> collect_model_snapshots_locked(rac_model_registry_handle_
     for (const auto& pair : handle->models) {
         ModelInfo snapshot = model_snapshot_locked(handle, pair.first, pair.second);
         normalize_model_registry_state(&snapshot);
+        if (!model_visible_on_platform(snapshot)) {
+            continue;
+        }
         models.push_back(std::move(snapshot));
     }
     return models;
@@ -321,6 +332,16 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     rac_result_t parse_rc = parse_model_info_bytes(proto_bytes, proto_size, &proto_model);
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
+    }
+
+    // Registration is allowed regardless of platform capability, but the
+    // model will be hidden from list/query results (see
+    // rac_platform_capabilities.h).
+    if (!model_visible_on_platform(proto_model)) {
+        RAC_LOG_DEBUG("ModelRegistry",
+                      "Model '%s' uses framework %d which is unsupported on this platform; "
+                      "it will be hidden from list results",
+                      proto_model.id().c_str(), static_cast<int>(proto_model.framework()));
     }
 
     // Merge-not-replace: when re-registering an existing model_id (catalog
@@ -482,6 +503,9 @@ rac_result_t rac_model_registry_list_proto(rac_model_registry_handle_t handle,
         std::lock_guard<std::mutex> lock(handle->mutex);
         for (const auto& pair : handle->models) {
             ModelInfo snapshot = model_snapshot_locked(handle, pair.first, pair.second);
+            if (!model_visible_on_platform(snapshot)) {
+                continue;
+            }
             list.add_models()->Swap(&snapshot);
         }
     }

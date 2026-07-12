@@ -8,12 +8,29 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
+    "typecheck:installed": "tsc --noEmit -p tsconfig.installed-sdk.json",
+    "test": "vitest run",
+    "release:vendor": "npm --prefix ../../../sdk/runanywhere-web run vendor:wasm:speech",
+    "release:wasm": "npm run release:vendor && npm --prefix ../../../sdk/runanywhere-web run build:wasm:all",
+    "release:verify": "bash scripts/release.sh verify dist",
+    "release:build": "npm run release:wasm && npm run build && npm run release:verify",
+    "release:deploy": "bash scripts/release.sh deploy",
     "sync-solutions": "node scripts/sync-solutions.mjs"
   },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "devDependencies": {
-    "@bufbuild/protobuf": "^2.12.0",
+    "@bufbuild/protobuf": "^2.12.1",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.10.0",
+    "eslint": "^9.39.4",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.9.3",
-    "vite": "^6.4.2"
+    "typescript-eslint": "^8.59.3",
+    "vite": "^8.1.4",
+    "vitest": "^3.2.4"
   }
 }

@@ -180,6 +180,45 @@ async function apply(request: LoRAApplyRequest): Promise<LoRAApplyResult> {
 }
 
 /**
+ * Apply one registered catalog adapter to the current logical LLM session.
+ *
+ * Preserves the catalog entry id in the generated config so commons can
+ * validate registered catalog adapters against the loaded base model.
+ */
+async function applyCatalogAdapter(
+  entry: LoraAdapterCatalogEntry,
+  options?: {
+    localPath?: string;
+    scale?: number;
+    replaceExisting?: boolean;
+  }
+): Promise<LoRAApplyResult> {
+  const adapterPath = options?.localPath || entry.localPath || '';
+  if (!adapterPath) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+      `LoRA catalog adapter '${entry.id}' has no local path`,
+      { category: ErrorCategory.ERROR_CATEGORY_INTERNAL }
+    );
+  }
+
+  const scale =
+    options?.scale ?? (entry.defaultScale > 0 ? entry.defaultScale : 1.0);
+  return apply(
+    LoRAApplyRequestMessage.fromPartial({
+      adapters: [
+        LoRAAdapterConfigMessage.fromPartial({
+          adapterPath,
+          adapterId: entry.id || undefined,
+          scale,
+        }),
+      ],
+      replaceExisting: options?.replaceExisting ?? false,
+    })
+  );
+}
+
+/**
  * Remove named/path adapters, or clear all adapters when `clearAll` is true.
  */
 async function remove(request: LoRARemoveRequest): Promise<LoRAState> {
@@ -340,7 +379,9 @@ async function markImportCompleted(
  * record + manifest persistence, and catalog completion for matched entries.
  * Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
  */
-async function importAdapter(sourcePath: string): Promise<LoraAdapterImportResult> {
+async function importAdapter(
+  sourcePath: string
+): Promise<LoraAdapterImportResult> {
   requireInitialized();
   const native = ensureNative();
   return decodeRequired(
@@ -411,8 +452,7 @@ function loraArtifactModelID(entry: LoraAdapterCatalogEntry): string {
  */
 function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
   const urlTail = entry.url.split('/').pop() ?? entry.url;
-  const artifactFilename =
-    entry.filename || urlTail.split('?')[0] || urlTail;
+  const artifactFilename = entry.filename || urlTail.split('?')[0] || urlTail;
 
   const descriptor = {
     role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
@@ -443,7 +483,6 @@ function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
     framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
     downloadUrl: entry.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    description: entry.description,
     singleFile: {
       requiredPatterns: [artifactFilename],
       expectedFiles,
@@ -526,6 +565,7 @@ async function download(
 
 export const lora = {
   apply,
+  applyCatalogAdapter,
   remove,
   list,
   state,

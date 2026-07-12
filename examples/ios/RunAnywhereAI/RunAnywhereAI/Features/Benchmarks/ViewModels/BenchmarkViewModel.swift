@@ -40,7 +40,7 @@ final class BenchmarkViewModel {
     var availableModels: [BenchmarkCategory: [RAModelInfo]] = [:]
 
     /// Which model IDs the user has selected for benchmarking.
-    /// Empty means "all models" (backwards-compatible default).
+    /// Starts empty and is populated from the downloaded-model registry.
     var selectedModelIds: Set<String> = []
 
     // MARK: - Private

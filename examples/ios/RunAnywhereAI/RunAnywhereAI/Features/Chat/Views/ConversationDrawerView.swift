@@ -2,9 +2,10 @@
 //  ConversationDrawerView.swift
 //  RunAnywhereAI
 //
-//  Lightweight consumer drawer for recents, search, settings, and new chat.
+//  Lightweight consumer drawer for chat creation, search, and settings.
 //
 
+import Foundation
 import SwiftUI
 
 struct ConversationDrawerView: View {
@@ -26,10 +27,22 @@ struct ConversationDrawerView: View {
     var body: some View {
         VStack(spacing: 0) {
             drawerHeader
+            newChatButton
             searchField
-            settingsButton
+
+            Text("Recent")
+                .font(AppTypography.caption2Bold)
+                .foregroundColor(AppColors.textSecondary)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.top, AppSpacing.smallMedium)
+
             conversationList
-            bottomActions
+
+            Divider()
+
+            settingsRow
         }
         .background(AppColors.backgroundPrimary)
         .alert("Delete Conversation?", isPresented: $showingDeleteConfirmation) {
@@ -75,6 +88,58 @@ struct ConversationDrawerView: View {
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
+    private var newChatButton: some View {
+        Button {
+            Haptics.light()
+            onCreateConversation()
+        } label: {
+            HStack(spacing: AppSpacing.smallMedium) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("New chat")
+                    .font(AppTypography.subheadlineSemibold)
+            }
+            .foregroundColor(AppColors.textWhite)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(
+                Capsule()
+                    .fill(AppColors.primaryAccent)
+                    .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 6, x: 0, y: 3)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, AppSpacing.large)
+        .padding(.bottom, AppSpacing.mediumLarge)
+    }
+
+    private var settingsRow: some View {
+        Button {
+            Haptics.light()
+            onOpenSettings()
+        } label: {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(AppColors.textSecondary)
+
+                Text("Settings")
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundColor(AppColors.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.regular)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var searchField: some View {
         HStack(spacing: AppSpacing.smallMedium) {
             Image(systemName: "magnifyingglass")
@@ -104,36 +169,6 @@ struct ConversationDrawerView: View {
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
-    private var settingsButton: some View {
-        Button(action: onOpenSettings) {
-            HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(AppColors.primaryAccent)
-                    .frame(width: 28, height: 28)
-                    .background(AppColors.primaryAccent.opacity(0.12))
-                    .cornerRadius(AppSpacing.cornerRadiusMedium)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Settings")
-                        .font(AppTypography.subheadlineMedium)
-                        .foregroundColor(AppColors.textPrimary)
-                    Text("Personalization, models, privacy")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-            .padding(.horizontal, AppSpacing.large)
-            .padding(.vertical, AppSpacing.mediumLarge)
-        }
-        .buttonStyle(.plain)
-    }
-
     private var conversationList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: AppSpacing.xSmall) {
@@ -145,6 +180,7 @@ struct ConversationDrawerView: View {
                             conversation: conversation,
                             isSelected: store.currentConversation?.id == conversation.id
                         ) {
+                            Haptics.selection()
                             onSelectConversation(conversation)
                         } onDelete: {
                             conversationToDelete = conversation
@@ -175,30 +211,6 @@ struct ConversationDrawerView: View {
         .padding(.vertical, AppSpacing.xxxLarge)
     }
 
-    private var bottomActions: some View {
-        VStack(spacing: AppSpacing.smallMedium) {
-            Divider()
-
-            Button(action: onCreateConversation) {
-                HStack {
-                    Image(systemName: "square.and.pencil")
-                    Text("New Chat")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(AppTypography.caption)
-                }
-                .font(AppTypography.subheadlineMedium)
-                .foregroundColor(AppColors.textWhite)
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
-                .background(AppColors.primaryAccent)
-                .cornerRadius(AppSpacing.cornerRadiusRegular)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, AppSpacing.large)
-            .padding(.bottom, AppSpacing.large)
-        }
-    }
 }
 
 private struct DrawerConversationRow: View {

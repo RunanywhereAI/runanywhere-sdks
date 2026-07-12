@@ -10,7 +10,7 @@
 #   3. An IMPORTED `sherpa_onnx` GLOBAL target so this engine can link
 #      Sherpa-ONNX without re-implementing prebuilt discovery.
 #
-# The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
+# The runtime source for STT/TTS/VAD lives here;
 # engines/onnx keeps only generic ONNX Runtime services and embeddings.
 # =============================================================================
 
@@ -112,14 +112,10 @@ message(STATUS "Configuring Sherpa-ONNX backend...")
 include(FetchContent)
 include(LoadVersions)
 
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
-
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_TAG        v${RAC_NLOHMANN_JSON_VERSION}
     GIT_SHALLOW    TRUE
 )
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -382,16 +378,13 @@ else()
     list(APPEND SHERPA_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=0)
 endif()
 
-# Per-token confidence (ys_log_probs) is only present in the confidence-patched
-# sherpa-onnx fork the Android prebuilt is built from (SHERPA_ONNX_REPO_ANDROID).
-# The stock upstream prebuilt the iOS/macOS pod-archive ships (and any platform
-# pinned to an unpatched release — see SHERPA_ONNX_VERSION_IOS in VERSIONS) has
-# no such field on SherpaOnnxOfflineRecognizerResult. Probe the actual header so
-# sherpa_backend.cpp computes the confidence cascade signal where the field
-# exists and degrades to NaN ("no quality signal", which the hybrid router
-# already treats as accept-primary) where it does not — keeping one source tree
-# buildable against both forks.
-set(SHERPA_HAS_YS_LOG_PROBS 0)
+# ys_log_probs is part of the upstream SherpaOnnxOfflineRecognizerResult C API,
+# but decoder implementations decide whether to populate it. The pinned Android
+# build patches Whisper to emit count-matched probabilities; stock upstream
+# Whisper leaves the pointer null even though the field compiles. This probe is
+# therefore only an older-header compatibility check, not a runtime capability
+# check. sherpa_backend.cpp still handles a null pointer as "no quality signal".
+set(SHERPA_HEADER_HAS_YS_LOG_PROBS 0)
 if(SHERPA_ONNX_AVAILABLE AND DEFINED SHERPA_HEADER_PATH)
     include(CheckStructHasMember)
     set(CMAKE_REQUIRED_INCLUDES "${SHERPA_HEADER_PATH}")
@@ -404,10 +397,11 @@ if(SHERPA_ONNX_AVAILABLE AND DEFINED SHERPA_HEADER_PATH)
     )
     unset(CMAKE_REQUIRED_INCLUDES)
     if(SHERPA_RESULT_HAS_YS_LOG_PROBS)
-        set(SHERPA_HAS_YS_LOG_PROBS 1)
+        set(SHERPA_HEADER_HAS_YS_LOG_PROBS 1)
     endif()
 endif()
-list(APPEND SHERPA_COMPILE_DEFS SHERPA_HAS_YS_LOG_PROBS=${SHERPA_HAS_YS_LOG_PROBS})
+list(APPEND SHERPA_COMPILE_DEFS
+    SHERPA_HEADER_HAS_YS_LOG_PROBS=${SHERPA_HEADER_HAS_YS_LOG_PROBS})
 
 rac_add_engine_plugin(sherpa
     TARGET_NAME         rac_backend_sherpa

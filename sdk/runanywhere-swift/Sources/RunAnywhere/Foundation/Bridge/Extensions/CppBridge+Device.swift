@@ -20,7 +20,7 @@ extension CppBridge {
 
         // MARK: - Callback Storage (must persist for C++ to call)
 
-        private static var callbacksRegistered = false
+        private static let callbacksRegistered = OSAllocatedUnfairLock(initialState: false)
 
         /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
         private static let deviceInfoStrings =
@@ -32,9 +32,8 @@ extension CppBridge {
 
         // MARK: - Persistent Device ID Cache
 
-        /// In-process cache of the persistent device id resolved by commons.
-        /// Commons also caches internally — this Swift cache avoids paying
-        /// the C ABI round-trip on hot paths (telemetry, auth, device-info).
+        /// Last identity validated against durable storage. Synchronous C
+        /// callbacks borrow this value after Phase 1 resolves it.
         /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
         private static let cachedPersistentId =
             OSAllocatedUnfairLock<String?>(initialState: nil)
@@ -46,44 +45,39 @@ extension CppBridge {
         ///   2. get_vendor_id callback (UIDevice.identifierForVendor on iOS)
         ///   3. freshly synthesized RFC-4122 v4 UUID (then persisted)
         ///
-        /// On the rare resolver failure (e.g. before the platform adapter is
-        /// registered) we synthesize a one-shot UUID locally so callers always
-        /// receive a stable, non-empty string for the SDK lifetime.
+        /// Resolution fails closed: identities are cached only after commons
+        /// confirms the value was durably persisted.
         public static var persistentId: String {
-            if let cached = cachedPersistentId.withLock({ $0 }) {
-                return cached
-            }
-
-            let resolved = resolvePersistentId()
-
-            return cachedPersistentId.withLock { current in
-                if let existing = current { return existing }
-                current = resolved
+            get throws {
+                let resolved = try resolvePersistentId()
+                cachedPersistentId.withLock { $0 = resolved }
                 return resolved
             }
         }
 
-        // swiftlint:disable:next no_apple_logger
-        private static let fallbackLogger = Logger(subsystem: "com.runanywhere", category: "CppBridge.Device")
+        /// The already-validated identity used by synchronous C callbacks.
+        static var resolvedPersistentId: String? {
+            cachedPersistentId.withLock { $0 }
+        }
 
-        private static func resolvePersistentId() -> String {
+        private static func resolvePersistentId() throws -> String {
             let bufferSize = Int(RAC_DEVICE_ID_BUFFER_MIN_SIZE)
             var buffer = [CChar](repeating: 0, count: bufferSize)
             let result = buffer.withUnsafeMutableBufferPointer { ptr -> rac_result_t in
                 guard let base = ptr.baseAddress else { return RAC_ERROR_NULL_POINTER }
                 return rac_device_get_or_create_persistent_id(base, bufferSize)
             }
+            try SDKException.throwIfError(result)
 
-            if result == RAC_SUCCESS {
-                return String(cString: buffer)
+            let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+            guard let value = String(bytes: bytes, encoding: .utf8), !value.isEmpty else {
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Persistent device ID resolver returned an empty value",
+                    category: .internal
+                )
             }
-
-            // Fallback: commons resolver unavailable (e.g. platform adapter
-            // not yet registered). Synthesize a UUID so callers never see an
-            // empty string. This is non-persistent for this run only.
-            // Use os.Logger directly — SDKLogger would recurse via DeviceInfo.current.
-            fallbackLogger.warning("rac_device_get_or_create_persistent_id failed (result=\(result)); using transient UUID")
-            return UUID().uuidString
+            return value
         }
 
         // MARK: - Public API
@@ -91,22 +85,27 @@ extension CppBridge {
         // Register callbacks with C++ device manager.
         // Must be called during SDK initialization.
         // swiftlint:disable:next function_body_length
-        public static func register() {
-            guard !callbacksRegistered else { return }
+        public static func register() throws {
+            let shouldRegister = callbacksRegistered.withLock { registered in
+                guard !registered else { return false }
+                registered = true
+                return true
+            }
+            guard shouldRegister else { return }
 
             var callbacks = rac_device_callbacks_t()
 
             // Get device info callback - populates all fields needed by backend
             callbacks.get_device_info = { outInfo, _ in
-                guard let outInfo = outInfo else { return }
+                guard let outInfo = outInfo,
+                      let deviceId = CppBridge.Device.resolvedPersistentId else { return }
 
                 let deviceInfo = DeviceInfoFactory.current
-                let deviceId = CppBridge.Device.persistentId
 
                 // Commons reads these `const char*` fields after this callback
                 // returns, so back them with strdup'd storage that outlives the
                 // call. The previous fill is freed before this one is staged.
-                CppBridge.Device.deviceInfoStrings.withLock { store in
+                CppBridge.Device.deviceInfoStrings.withLockUnchecked { store in
                     store.reset()
 
                     // Required fields (backend schema)
@@ -138,8 +137,8 @@ extension CppBridge {
 
             // Get device ID callback
             callbacks.get_device_id = { _ in
-                let deviceId = CppBridge.Device.persistentId
-                return CppBridge.Device.deviceIdString.withLock { store in
+                guard let deviceId = CppBridge.Device.resolvedPersistentId else { return nil }
+                return CppBridge.Device.deviceIdString.withLockUnchecked { store in
                     store.reset()
                     return store.dup(deviceId)
                 }
@@ -186,20 +185,16 @@ extension CppBridge {
                 )
 
                 Task.detached {
-                    var payload = DeviceHTTPResult.failure(
-                        result: RAC_ERROR_NETWORK_ERROR,
-                        message: "Device registration HTTP request failed"
-                    )
-                    defer {
-                        resultBox.withLock { $0 = payload }
-                        semaphore.signal()
-                    }
+                    let payload: DeviceHTTPResult
                     do {
                         guard let jsonData = jsonStr.data(using: .utf8) else {
-                            payload = .failure(
-                                result: RAC_ERROR_INVALID_ARGUMENT,
-                                message: "Invalid JSON data"
-                            )
+                            resultBox.withLock {
+                                $0 = .failure(
+                                    result: RAC_ERROR_INVALID_ARGUMENT,
+                                    message: "Invalid JSON data"
+                                )
+                            }
+                            semaphore.signal()
                             return
                         }
 
@@ -219,6 +214,8 @@ extension CppBridge {
                             message: error.localizedDescription
                         )
                     }
+                    resultBox.withLock { $0 = payload }
+                    semaphore.signal()
                 }
 
                 let payload: DeviceHTTPResult
@@ -239,11 +236,23 @@ extension CppBridge {
 
             let setResult = rac_device_manager_set_callbacks(&callbacks)
             if setResult == RAC_SUCCESS {
-                callbacksRegistered = true
                 SDKLogger(category: "CppBridge.Device").debug("Device manager callbacks registered")
             } else {
+                callbacksRegistered.withLock { $0 = false }
                 SDKLogger(category: "CppBridge.Device").error("Failed to register device manager callbacks: \(setResult)")
+                try SDKException.throwIfError(setResult)
             }
+        }
+
+        /// Quiesce native callbacks and clear all process-local identity state.
+        /// Keychain data and the device-registration flag remain durable.
+        static func unregister() {
+            rac_device_manager_clear_callbacks()
+            callbacksRegistered.withLock { $0 = false }
+            cachedPersistentId.withLock { $0 = nil }
+            deviceInfoStrings.withLockUnchecked { $0.reset() }
+            deviceIdString.withLockUnchecked { $0.reset() }
+            httpResponseStrings.withLockUnchecked { $0.reset() }
         }
 
         /// Populate `rac_device_http_response_t`. Commons reads `response_body`
@@ -258,7 +267,7 @@ extension CppBridge {
             body: String?,
             error: String?
         ) {
-            httpResponseStrings.withLock { store in
+            httpResponseStrings.withLockUnchecked { store in
                 store.reset()
                 outResponse.pointee.result = result
                 outResponse.pointee.status_code = statusCode
@@ -309,7 +318,10 @@ extension CppBridge {
 /// `(NSString).utf8String` is only valid until the autorelease pool drains;
 /// these copies survive the callback and are freed when the next fill calls
 /// `reset()`, bounding the lifetime to one outstanding generation.
-private final class DeviceCStringStore {
+/// The stores are private and every access is serialized by their enclosing
+/// `OSAllocatedUnfairLock`; the pointers never escape except as borrowed C ABI
+/// string storage with the documented generation lifetime.
+private final class DeviceCStringStore: @unchecked Sendable {
     private var buffers: [UnsafeMutablePointer<CChar>] = []
 
     /// Duplicate `value` into long-lived storage and return a pointer valid

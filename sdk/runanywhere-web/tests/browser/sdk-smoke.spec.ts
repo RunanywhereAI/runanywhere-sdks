@@ -135,7 +135,10 @@ test.describe('Web SDK smoke test', () => {
       // at ERROR ("base URL is not configured"); the SDK's Phase 2 already
       // downgrades it to a deferred-fetch warning, so it is expected noise
       // in development — same on iOS, where commons emits the same line.
-      !err.includes('model assignment base URL is not configured'),
+      !err.includes('model assignment base URL is not configured') &&
+      // Device registration follows the same credential-less development
+      // path and deliberately reports that its configuration is incomplete.
+      !err.includes('Device registration requires a matching base URL and API key'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
   });

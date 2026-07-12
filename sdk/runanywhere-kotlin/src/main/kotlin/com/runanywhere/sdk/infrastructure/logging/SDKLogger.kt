@@ -28,31 +28,28 @@ import kotlinx.coroutines.sync.withLock
 // production factories live here.
 
 internal object LoggingConfigurationPresets {
-    /** Development: console + debug level, Sentry on, no device metadata. */
+    /** Development: console + debug level, no device metadata. */
     val development =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_DEBUG,
             include_device_metadata = false,
-            enable_sentry_logging = true,
         )
 
-    /** Staging: console + info level, device metadata on, Sentry off. */
+    /** Staging: console + info level, device metadata on. */
     val staging =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_INFO,
             include_device_metadata = true,
-            enable_sentry_logging = false,
         )
 
-    /** Production: warning+ only, console off, device metadata on, Sentry off. */
+    /** Production: warning+ only, console off, device metadata on. */
     val production =
         LoggingConfiguration(
             enable_local_logging = false,
             min_log_level = LogLevel.LOG_LEVEL_WARNING,
             include_device_metadata = true,
-            enable_sentry_logging = false,
         )
 
     fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
@@ -119,18 +116,10 @@ object Logging {
     // Configuration
 
     /**
-     * Configure the logging system. Sentry enable/disable transitions trigger
-     * the platform setup/teardown hooks, mirroring Swift `Logging.configure`.
+     * Configure the logging system.
      */
     fun configure(config: LoggingConfiguration) {
-        val oldConfig = _configuration
         _configuration = config
-
-        if (config.enable_sentry_logging && !oldConfig.enable_sentry_logging) {
-            sentrySetupHook?.invoke()
-        } else if (!config.enable_sentry_logging && oldConfig.enable_sentry_logging) {
-            sentryTeardownHook?.invoke()
-        }
     }
 
     /**
@@ -167,28 +156,6 @@ object Logging {
     fun setIncludeDeviceMetadata(include: Boolean) {
         _configuration = _configuration.copy(include_device_metadata = include)
     }
-
-    /**
-     * Set whether Sentry logging is enabled.
-     * When enabled, warning+ logs are sent to Sentry for error tracking.
-     */
-    fun setSentryLoggingEnabled(enabled: Boolean) {
-        configure(_configuration.copy(enable_sentry_logging = enabled))
-    }
-
-    /**
-     * Hook for platform-specific Sentry setup.
-     * Set by the platform layer (jvmAndroidMain) during initialization.
-     */
-    var sentrySetupHook: (() -> Unit)? = null
-        internal set
-
-    /**
-     * Hook for platform-specific Sentry teardown.
-     * Set by the platform layer (jvmAndroidMain) during shutdown.
-     */
-    var sentryTeardownHook: (() -> Unit)? = null
-        internal set
 
     /**
      * Hook for delegating metadata redaction policy to the canonical C++

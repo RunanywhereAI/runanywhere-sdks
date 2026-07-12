@@ -226,8 +226,10 @@ typedef enum rac_model_format {
 // =============================================================================
 
 /**
- * @brief Supported inference frameworks/runtimes.
- * Mirrors Swift's InferenceFramework enum.
+ * @brief C ABI inference framework identifiers.
+ *
+ * Numeric values map to the platform bridge contract; public SDK APIs use the
+ * canonical protobuf enum and convert at the C boundary.
  */
 typedef enum rac_inference_framework {
     RAC_FRAMEWORK_ONNX = 0,              /**< ONNX Runtime */
@@ -239,10 +241,11 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
-    // Values 9-11 intentionally retired — leave the gaps stable.
-    RAC_FRAMEWORK_SHERPA = 12,  /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
-    RAC_FRAMEWORK_QHEXRT = 13,  /**< QHexRT (Qualcomm Hexagon NPU runtime) */
-    RAC_FRAMEWORK_UNKNOWN = 99  /**< Unknown framework */
+    // Value 9 (WHISPERKIT_COREML) is retired.
+    // Value 11 (GENIE) is retired.
+    RAC_FRAMEWORK_SHERPA = 12, /**< Sherpa-ONNX speech engine (STT/TTS/VAD) */
+    RAC_FRAMEWORK_QHEXRT = 13, /**< QHexRT (Qualcomm Hexagon NPU runtime) */
+    RAC_FRAMEWORK_UNKNOWN = 99 /**< Unknown framework */
 } rac_inference_framework_t;
 
 // =============================================================================
@@ -1179,8 +1182,7 @@ RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_b
 // Commons-owned accessors that derive cross-SDK display state from a
 // serialized `runanywhere.v1.ModelInfo`. Centralizes the model-naming
 // heuristics that examples-flutter, examples-ios, examples-android, and
-// examples-react-native were each duplicating. Companion tool-call accessor lives in
-// `rac/features/llm/rac_tool_calling.h` (`rac_tool_call_format_from_model_info_proto`).
+// examples-react-native were each duplicating.
 
 /**
  * @brief Estimate the parameter count (in billions) of a model from its

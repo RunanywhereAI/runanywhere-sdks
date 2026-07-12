@@ -1,5 +1,5 @@
 import { Colors } from '../theme/colors';
-import { RunAnywhere } from '@runanywhere/core';
+import { QHexRT } from '@runanywhere/qhexrt';
 import type { IconName } from '../theme/system/icons';
 import {
   InferenceFramework,
@@ -9,12 +9,6 @@ import {
 
 export const DEFAULT_INFERENCE_FRAMEWORK =
   InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED;
-
-// Display-name table lives in the SDK (`RunAnywhere.formatFramework`),
-// proxying the canonical `rac_framework_display_name` C ABI in
-// runanywhere-commons. Re-export for backward compatibility with the
-// existing view code that imported `getFrameworkDisplayName` from here.
-export const getFrameworkDisplayName = RunAnywhere.formatFramework;
 
 export const getFrameworkColor = (
   framework?: InferenceFramework | null
@@ -149,8 +143,26 @@ export const isModelCompatibleWithFramework = (
   framework: InferenceFramework
 ): boolean => getModelFrameworks(model).includes(framework);
 
+const privateHfTags = new Set([
+  'private',
+  'requires-hf-auth',
+  'hf-auth',
+  'huggingface-auth',
+  'hugging-face-auth',
+]);
+
+export const modelRequiresHfAuth = (model: ModelInfo): boolean => {
+  const tags = model.metadata?.tags?.map((tag) => tag.toLowerCase()) ?? [];
+  return (
+    tags.some((tag) => privateHfTags.has(tag)) ||
+    (getPrimaryFramework(model) ===
+      InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+      QHexRT.modelRequiresHfAuth(model.id))
+  );
+};
+
 export const getModelDownloadSizeBytes = (model: ModelInfo): number =>
-  model.downloadSizeBytes || 0;
+  model.downloadSizeBytes || model.memoryRequiredBytes || 0;
 
 export const getModelFormatLabel = (format?: ModelFormat | null): string => {
   switch (format) {

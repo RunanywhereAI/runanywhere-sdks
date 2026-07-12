@@ -66,8 +66,8 @@ public extension RunAnywhere {
 
         var internalOptions = options ?? RALLMGenerationOptions.defaults()
         internalOptions.structuredOutput = .defaults(schema: schema)
-        var request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
-        request.streamingEnabled = true
+        internalOptions.streamingEnabled = true
+        let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
 
         return AsyncThrowingStream { continuation in
             let task = Task {
@@ -99,31 +99,12 @@ public extension RunAnywhere {
                     continuation.finish(throwing: error)
                 }
             }
-            // Manual cancellation fallback (pass3-syn-058):
-            // The inner `generateStream` AsyncStream does NOT yet wire its
-            // own `onCancel` to `rac_llm_cancel_proto` — the proto-ABI
-            // codegen template still omits the `onCancel:` argument on the
-            // LLM builder (see Generated/ModalityProtoABI+Generated.swift
-            // around lines 308-329). Until the generator is fixed (tracked
-            // by pass3-syn-059 / pass3-syn-061), this block manually
-            // invokes `cancelGeneration()` on consumer cancellation so
-            // view-model deinit, navigation away, or a parent
-            // `Task.cancel()` always tears down the native LLM.
-            //
-            // IMPORTANT: switch on `termination` and only fire the native
-            // cancel on `.cancelled`. `.finished` means the producer Task
-            // above already called `continuation.finish()` after the
-            // terminal `.completed` event (or `.finish(throwing:)` after an
-            // error) — calling `cancelGeneration()` there would invoke
-            // `rac_llm_cancel_proto` on the lifecycle LLM handle and race
-            // with any follow-up `RunAnywhere.generate(...)` the caller
-            // kicks off immediately after the stream completes. See the
-            // canonical pattern in CppBridge+ModalityProtoABI.swift.
+            // Cancelling this wrapper task drops the inner generated stream;
+            // its canonical onCancel hook invokes rac_llm_cancel_proto.
             continuation.onTermination = { termination in
                 switch termination {
                 case .cancelled:
                     task.cancel()
-                    Task { await RunAnywhere.cancelGeneration() }
                 case .finished:
                     break
                 @unknown default:
@@ -150,8 +131,8 @@ public extension RunAnywhere {
             }
             if prep.hasSystemPrompt { internalOptions.systemPrompt = prep.systemPrompt }
         }
-        var request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
-        request.streamingEnabled = false
+        internalOptions.streamingEnabled = false
+        let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generate(request)
     }
 

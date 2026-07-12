@@ -24,7 +24,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -36,17 +35,8 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
- * pass3-syn-025: the inline scalar fields below historically existed to avoid
- * importing llm_options.proto. The cycle-avoidance rationale no longer holds
- * (sdk_events.proto has no transitive dependency on llm_options.proto), so
- * idl-005 introduces the canonical `LLMGenerationOptions options` embedded
- * message at field 26. The inline scalar fields are RETAINED for wire-format
- * backwards compatibility but are deprecated; new code SHOULD populate
- * `options.*` and consumers SHOULD prefer `options.*` when set (falling back
- * to the inline fields for legacy callers). The companion fix for
- * VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
- * proto carries tts_model_id but not tts_voice_id" issue) lives in
- * idl/solutions.proto where VoiceAgentConfig is declared.
+ * Generation settings live exclusively in `options`. Reserved field numbers
+ * prevent unsafe wire reuse.
  */
 public class LLMGenerateRequest(
   @field:WireField(
@@ -56,50 +46,6 @@ public class LLMGenerateRequest(
     schemaIndex = 0,
   )
   public val prompt: String = "",
-  @Deprecated(message = "max_tokens is deprecated")
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxTokens",
-    schemaIndex = 1,
-  )
-  public val max_tokens: Int = 0,
-  @Deprecated(message = "temperature is deprecated")
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
-  )
-  public val temperature: Float = 0f,
-  @Deprecated(message = "top_p is deprecated")
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "topP",
-    schemaIndex = 3,
-  )
-  public val top_p: Float = 0f,
-  @Deprecated(message = "top_k is deprecated")
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "topK",
-    schemaIndex = 4,
-  )
-  public val top_k: Int = 0,
-  @Deprecated(message = "system_prompt is deprecated")
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "systemPrompt",
-    schemaIndex = 5,
-  )
-  public val system_prompt: String = "",
   /**
    * chain-of-thought tokens emit as TokenKind.THOUGHT
    */
@@ -108,79 +54,15 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "emitThoughts",
-    schemaIndex = 6,
+    schemaIndex = 1,
   )
   public val emit_thoughts: Boolean = false,
-  /**
-   * Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
-   *
-   * Streaming gaps below remain intentional: a streaming consumer that
-   * requires these advanced knobs MUST set them on `options.*` rather than
-   * inline (no inline duplicate exists):
-   *   - thinking_pattern (LLMGenerationOptions field 11)
-   *   - structured_output (LLMGenerationOptions field 13)
-   *   - enable_real_time_tracking (LLMGenerationOptions field 14)
-   *   - repeat_last_n (LLMGenerationOptions field 18)
-   *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
-   *     is not yet supported on the LLM.Generate rpc; tool sessions must
-   *     use the non-streaming generation path with LLMGenerationOptions.
-   * Note the inline `preferred_framework` (field 11) and `execution_target`
-   * (field 13) are degraded to `string` for backwards compatibility;
-   * `options.preferred_framework` and `options.execution_target` carry the
-   * canonical InferenceFramework / ExecutionTarget enums.
-   */
-  @Deprecated(message = "repetition_penalty is deprecated")
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "repetitionPenalty",
-    schemaIndex = 7,
-  )
-  public val repetition_penalty: Float = 0f,
-  stop_sequences: List<String> = emptyList(),
-  @Deprecated(message = "streaming_enabled is deprecated")
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "streamingEnabled",
-    schemaIndex = 9,
-  )
-  public val streaming_enabled: Boolean = false,
-  @Deprecated(message = "preferred_framework is deprecated")
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "preferredFramework",
-    schemaIndex = 10,
-  )
-  public val preferred_framework: String = "",
-  @Deprecated(message = "json_schema is deprecated")
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "jsonSchema",
-    schemaIndex = 11,
-  )
-  public val json_schema: String = "",
-  @Deprecated(message = "execution_target is deprecated")
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "executionTarget",
-    schemaIndex = 12,
-  )
-  public val execution_target: String = "",
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 13,
+    schemaIndex = 2,
   )
   public val request_id: String = "",
   @field:WireField(
@@ -188,7 +70,7 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 14,
+    schemaIndex = 3,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -196,116 +78,35 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "conversationId",
-    schemaIndex = 15,
+    schemaIndex = 4,
   )
   public val conversation_id: String = "",
-  @Deprecated(message = "seed is deprecated")
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 16,
-  )
-  public val seed: Long = 0L,
-  @Deprecated(message = "frequency_penalty is deprecated")
-  @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "frequencyPenalty",
-    schemaIndex = 17,
-  )
-  public val frequency_penalty: Float = 0f,
-  @Deprecated(message = "presence_penalty is deprecated")
-  @field:WireField(
-    tag = 19,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "presencePenalty",
-    schemaIndex = 18,
-  )
-  public val presence_penalty: Float = 0f,
-  @Deprecated(message = "min_p is deprecated")
-  @field:WireField(
-    tag = 20,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "minP",
-    schemaIndex = 19,
-  )
-  public val min_p: Float = 0f,
-  @Deprecated(message = "grammar is deprecated")
-  @field:WireField(
-    tag = 21,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 20,
-  )
-  public val grammar: String = "",
-  @Deprecated(message = "response_format is deprecated")
-  @field:WireField(
-    tag = 22,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "responseFormat",
-    schemaIndex = 21,
-  )
-  public val response_format: String = "",
-  @Deprecated(message = "echo_prompt is deprecated")
-  @field:WireField(
-    tag = 23,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "echoPrompt",
-    schemaIndex = 22,
-  )
-  public val echo_prompt: Boolean = false,
-  @Deprecated(message = "n_threads is deprecated")
-  @field:WireField(
-    tag = 24,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "nThreads",
-    schemaIndex = 23,
-  )
-  public val n_threads: Int = 0,
   metadata: Map<String, String> = emptyMap(),
   /**
-   * idl-005: canonical generation options. When set, consumers SHOULD use
-   * the values here in preference to the legacy inline scalar fields above.
-   * The wire schema retains the inline fields to avoid breaking existing
-   * serialized requests; new callers should only populate `options`.
+   * Canonical generation settings. When absent, commons applies its SDK
+   * defaults; callers that need explicit controls populate this message.
    */
   @field:WireField(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
-    schemaIndex = 25,
+    schemaIndex = 6,
   )
   public val options: LLMGenerationOptions? = null,
   history: List<ChatMessage> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
-  @Deprecated(message = "stop_sequences is deprecated")
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "stopSequences",
-    schemaIndex = 8,
-  )
-  public val stop_sequences: List<String> = immutableCopyOf("stop_sequences", stop_sequences)
-
   @field:WireField(
     tag = 25,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 24,
+    schemaIndex = 5,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   /**
-   * idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
-   * stays the live user turn, and `system_prompt`, which stays separate).
+   * Prior conversation turns (excludes the current `prompt`, which
+   * stays the live user turn, and `options.system_prompt`, which stays
+   * separate).
    * Alternating user/assistant ChatMessages in chronological order. An engine
    * that owns its chat template renders {system_prompt, history, prompt} from
    * its model's markers; engines that don't simply ignore this field.
@@ -314,7 +115,7 @@ public class LLMGenerateRequest(
     tag = 27,
     adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 26,
+    schemaIndex = 7,
   )
   public val history: List<ChatMessage> = immutableCopyOf("history", history)
 
@@ -329,29 +130,10 @@ public class LLMGenerateRequest(
     if (other !is LLMGenerateRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (prompt != other.prompt) return false
-    if (max_tokens != other.max_tokens) return false
-    if (temperature != other.temperature) return false
-    if (top_p != other.top_p) return false
-    if (top_k != other.top_k) return false
-    if (system_prompt != other.system_prompt) return false
     if (emit_thoughts != other.emit_thoughts) return false
-    if (repetition_penalty != other.repetition_penalty) return false
-    if (stop_sequences != other.stop_sequences) return false
-    if (streaming_enabled != other.streaming_enabled) return false
-    if (preferred_framework != other.preferred_framework) return false
-    if (json_schema != other.json_schema) return false
-    if (execution_target != other.execution_target) return false
     if (request_id != other.request_id) return false
     if (model_id != other.model_id) return false
     if (conversation_id != other.conversation_id) return false
-    if (seed != other.seed) return false
-    if (frequency_penalty != other.frequency_penalty) return false
-    if (presence_penalty != other.presence_penalty) return false
-    if (min_p != other.min_p) return false
-    if (grammar != other.grammar) return false
-    if (response_format != other.response_format) return false
-    if (echo_prompt != other.echo_prompt) return false
-    if (n_threads != other.n_threads) return false
     if (metadata != other.metadata) return false
     if (options != other.options) return false
     if (history != other.history) return false
@@ -363,29 +145,10 @@ public class LLMGenerateRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + prompt.hashCode()
-      result = result * 37 + max_tokens.hashCode()
-      result = result * 37 + temperature.hashCode()
-      result = result * 37 + top_p.hashCode()
-      result = result * 37 + top_k.hashCode()
-      result = result * 37 + system_prompt.hashCode()
       result = result * 37 + emit_thoughts.hashCode()
-      result = result * 37 + repetition_penalty.hashCode()
-      result = result * 37 + stop_sequences.hashCode()
-      result = result * 37 + streaming_enabled.hashCode()
-      result = result * 37 + preferred_framework.hashCode()
-      result = result * 37 + json_schema.hashCode()
-      result = result * 37 + execution_target.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + conversation_id.hashCode()
-      result = result * 37 + seed.hashCode()
-      result = result * 37 + frequency_penalty.hashCode()
-      result = result * 37 + presence_penalty.hashCode()
-      result = result * 37 + min_p.hashCode()
-      result = result * 37 + grammar.hashCode()
-      result = result * 37 + response_format.hashCode()
-      result = result * 37 + echo_prompt.hashCode()
-      result = result * 37 + n_threads.hashCode()
       result = result * 37 + metadata.hashCode()
       result = result * 37 + (options?.hashCode() ?: 0)
       result = result * 37 + history.hashCode()
@@ -397,29 +160,10 @@ public class LLMGenerateRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """prompt=${sanitize(prompt)}"""
-    result += """max_tokens=$max_tokens"""
-    result += """temperature=$temperature"""
-    result += """top_p=$top_p"""
-    result += """top_k=$top_k"""
-    result += """system_prompt=${sanitize(system_prompt)}"""
     result += """emit_thoughts=$emit_thoughts"""
-    result += """repetition_penalty=$repetition_penalty"""
-    if (stop_sequences.isNotEmpty()) result += """stop_sequences=${sanitize(stop_sequences)}"""
-    result += """streaming_enabled=$streaming_enabled"""
-    result += """preferred_framework=${sanitize(preferred_framework)}"""
-    result += """json_schema=${sanitize(json_schema)}"""
-    result += """execution_target=${sanitize(execution_target)}"""
     result += """request_id=${sanitize(request_id)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """conversation_id=${sanitize(conversation_id)}"""
-    result += """seed=$seed"""
-    result += """frequency_penalty=$frequency_penalty"""
-    result += """presence_penalty=$presence_penalty"""
-    result += """min_p=$min_p"""
-    result += """grammar=${sanitize(grammar)}"""
-    result += """response_format=${sanitize(response_format)}"""
-    result += """echo_prompt=$echo_prompt"""
-    result += """n_threads=$n_threads"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (options != null) result += """options=$options"""
     if (history.isNotEmpty()) result += """history=$history"""
@@ -428,34 +172,15 @@ public class LLMGenerateRequest(
 
   public fun copy(
     prompt: String = this.prompt,
-    max_tokens: Int = this.max_tokens,
-    temperature: Float = this.temperature,
-    top_p: Float = this.top_p,
-    top_k: Int = this.top_k,
-    system_prompt: String = this.system_prompt,
     emit_thoughts: Boolean = this.emit_thoughts,
-    repetition_penalty: Float = this.repetition_penalty,
-    stop_sequences: List<String> = this.stop_sequences,
-    streaming_enabled: Boolean = this.streaming_enabled,
-    preferred_framework: String = this.preferred_framework,
-    json_schema: String = this.json_schema,
-    execution_target: String = this.execution_target,
     request_id: String = this.request_id,
     model_id: String = this.model_id,
     conversation_id: String = this.conversation_id,
-    seed: Long = this.seed,
-    frequency_penalty: Float = this.frequency_penalty,
-    presence_penalty: Float = this.presence_penalty,
-    min_p: Float = this.min_p,
-    grammar: String = this.grammar,
-    response_format: String = this.response_format,
-    echo_prompt: Boolean = this.echo_prompt,
-    n_threads: Int = this.n_threads,
     metadata: Map<String, String> = this.metadata,
     options: LLMGenerationOptions? = this.options,
     history: List<ChatMessage> = this.history,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k, system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id, seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt, n_threads, metadata, options, history, unknownFields)
+  ): LLMGenerateRequest = LLMGenerateRequest(prompt, emit_thoughts, request_id, model_id, conversation_id, metadata, options, history, unknownFields)
 
   public companion object {
     @JvmField
@@ -476,39 +201,8 @@ public class LLMGenerateRequest(
         if (value.prompt != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.top_p)
-        }
-        if (value.top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.top_k)
-        }
-        if (value.system_prompt != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.system_prompt)
-        }
         if (value.emit_thoughts != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.emit_thoughts)
-        }
-        if (!value.repetition_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.repetition_penalty)
-        }
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(9, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.streaming_enabled)
-        }
-        if (value.preferred_framework != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.preferred_framework)
-        }
-        if (value.json_schema != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.json_schema)
-        }
-        if (value.execution_target != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.execution_target)
         }
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.request_id)
@@ -518,30 +212,6 @@ public class LLMGenerateRequest(
         }
         if (value.conversation_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.conversation_id)
-        }
-        if (value.seed != 0L) {
-          size += ProtoAdapter.INT64.encodedSizeWithTag(17, value.seed)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(18, value.frequency_penalty)
-        }
-        if (!value.presence_penalty.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(19, value.presence_penalty)
-        }
-        if (!value.min_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(20, value.min_p)
-        }
-        if (value.grammar != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(21, value.grammar)
-        }
-        if (value.response_format != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.response_format)
-        }
-        if (value.echo_prompt != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(23, value.echo_prompt)
-        }
-        if (value.n_threads != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(24, value.n_threads)
         }
         size += metadataAdapter.encodedSizeWithTag(25, value.metadata)
         size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(26, value.options)
@@ -553,39 +223,8 @@ public class LLMGenerateRequest(
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.top_p)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
-        }
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.system_prompt)
-        }
         if (value.emit_thoughts != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.emit_thoughts)
-        }
-        if (!value.repetition_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.repetition_penalty)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.streaming_enabled)
-        }
-        if (value.preferred_framework != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.preferred_framework)
-        }
-        if (value.json_schema != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.json_schema)
-        }
-        if (value.execution_target != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.execution_target)
         }
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
@@ -595,30 +234,6 @@ public class LLMGenerateRequest(
         }
         if (value.conversation_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 16, value.conversation_id)
-        }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 17, value.seed)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 18, value.frequency_penalty)
-        }
-        if (!value.presence_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.presence_penalty)
-        }
-        if (!value.min_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 20, value.min_p)
-        }
-        if (value.grammar != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.grammar)
-        }
-        if (value.response_format != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.response_format)
-        }
-        if (value.echo_prompt != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 23, value.echo_prompt)
-        }
-        if (value.n_threads != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
         }
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
@@ -631,30 +246,6 @@ public class LLMGenerateRequest(
         ChatMessage.ADAPTER.asRepeated().encodeWithTag(writer, 27, value.history)
         LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
-        if (value.n_threads != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
-        }
-        if (value.echo_prompt != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 23, value.echo_prompt)
-        }
-        if (value.response_format != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 22, value.response_format)
-        }
-        if (value.grammar != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 21, value.grammar)
-        }
-        if (!value.min_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 20, value.min_p)
-        }
-        if (!value.presence_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 19, value.presence_penalty)
-        }
-        if (!value.frequency_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 18, value.frequency_penalty)
-        }
-        if (value.seed != 0L) {
-          ProtoAdapter.INT64.encodeWithTag(writer, 17, value.seed)
-        }
         if (value.conversation_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 16, value.conversation_id)
         }
@@ -664,39 +255,8 @@ public class LLMGenerateRequest(
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
         }
-        if (value.execution_target != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.execution_target)
-        }
-        if (value.json_schema != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.json_schema)
-        }
-        if (value.preferred_framework != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.preferred_framework)
-        }
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.streaming_enabled)
-        }
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 9, value.stop_sequences)
-        if (!value.repetition_penalty.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.repetition_penalty)
-        }
         if (value.emit_thoughts != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.emit_thoughts)
-        }
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.system_prompt)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.top_p)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.temperature)
-        }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_tokens)
         }
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
@@ -705,58 +265,20 @@ public class LLMGenerateRequest(
 
       override fun decode(reader: ProtoReader): LLMGenerateRequest {
         var prompt: String = ""
-        var max_tokens: Int = 0
-        var temperature: Float = 0f
-        var top_p: Float = 0f
-        var top_k: Int = 0
-        var system_prompt: String = ""
         var emit_thoughts: Boolean = false
-        var repetition_penalty: Float = 0f
-        val stop_sequences = mutableListOf<String>()
-        var streaming_enabled: Boolean = false
-        var preferred_framework: String = ""
-        var json_schema: String = ""
-        var execution_target: String = ""
         var request_id: String = ""
         var model_id: String = ""
         var conversation_id: String = ""
-        var seed: Long = 0L
-        var frequency_penalty: Float = 0f
-        var presence_penalty: Float = 0f
-        var min_p: Float = 0f
-        var grammar: String = ""
-        var response_format: String = ""
-        var echo_prompt: Boolean = false
-        var n_threads: Int = 0
         val metadata = mutableMapOf<String, String>()
         var options: LLMGenerationOptions? = null
         val history = mutableListOf<ChatMessage>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
-            2 -> max_tokens = ProtoAdapter.INT32.decode(reader)
-            3 -> temperature = ProtoAdapter.FLOAT.decode(reader)
-            4 -> top_p = ProtoAdapter.FLOAT.decode(reader)
-            5 -> top_k = ProtoAdapter.INT32.decode(reader)
-            6 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             7 -> emit_thoughts = ProtoAdapter.BOOL.decode(reader)
-            8 -> repetition_penalty = ProtoAdapter.FLOAT.decode(reader)
-            9 -> stop_sequences.add(ProtoAdapter.STRING.decode(reader))
-            10 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
-            11 -> preferred_framework = ProtoAdapter.STRING.decode(reader)
-            12 -> json_schema = ProtoAdapter.STRING.decode(reader)
-            13 -> execution_target = ProtoAdapter.STRING.decode(reader)
             14 -> request_id = ProtoAdapter.STRING.decode(reader)
             15 -> model_id = ProtoAdapter.STRING.decode(reader)
             16 -> conversation_id = ProtoAdapter.STRING.decode(reader)
-            17 -> seed = ProtoAdapter.INT64.decode(reader)
-            18 -> frequency_penalty = ProtoAdapter.FLOAT.decode(reader)
-            19 -> presence_penalty = ProtoAdapter.FLOAT.decode(reader)
-            20 -> min_p = ProtoAdapter.FLOAT.decode(reader)
-            21 -> grammar = ProtoAdapter.STRING.decode(reader)
-            22 -> response_format = ProtoAdapter.STRING.decode(reader)
-            23 -> echo_prompt = ProtoAdapter.BOOL.decode(reader)
-            24 -> n_threads = ProtoAdapter.INT32.decode(reader)
             25 -> metadata.putAll(metadataAdapter.decode(reader))
             26 -> options = LLMGenerationOptions.ADAPTER.decode(reader)
             27 -> history.add(ChatMessage.ADAPTER.decode(reader))
@@ -765,29 +287,10 @@ public class LLMGenerateRequest(
         }
         return LLMGenerateRequest(
           prompt = prompt,
-          max_tokens = max_tokens,
-          temperature = temperature,
-          top_p = top_p,
-          top_k = top_k,
-          system_prompt = system_prompt,
           emit_thoughts = emit_thoughts,
-          repetition_penalty = repetition_penalty,
-          stop_sequences = stop_sequences,
-          streaming_enabled = streaming_enabled,
-          preferred_framework = preferred_framework,
-          json_schema = json_schema,
-          execution_target = execution_target,
           request_id = request_id,
           model_id = model_id,
           conversation_id = conversation_id,
-          seed = seed,
-          frequency_penalty = frequency_penalty,
-          presence_penalty = presence_penalty,
-          min_p = min_p,
-          grammar = grammar,
-          response_format = response_format,
-          echo_prompt = echo_prompt,
-          n_threads = n_threads,
           metadata = metadata,
           options = options,
           history = history,

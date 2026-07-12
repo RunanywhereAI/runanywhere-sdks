@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
+import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelListViewModel (mirroring iOS ModelListViewModel.swift)
@@ -51,12 +52,18 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       final sdkModels = await sdk.RunAnywhere.models.available();
 
-      _availableModels = sdkModels;
+      // Native device-aware QHexRT registration is authoritative. Older app
+      // versions may have left generic logical HNPU rows in the persistent
+      // registry; retain only the exact IDs returned by native registration.
+      _availableModels = sdkModels
+          .where(QHexRTModelCatalog.isVisibleForNativeCatalog)
+          .toList(growable: false);
 
       debugPrint('Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
-            '  - ${model.name} (${model.category.displayName}) [${model.backendFramework.displayName}] ready: ${model.isReadyOnDevice}');
+          '  - ${model.name} (${model.category.displayName}) [${model.backendFramework.displayName}] ready: ${model.isReadyOnDevice}',
+        );
       }
     } catch (e) {
       debugPrint('Failed to load models from SDK: $e');
@@ -80,19 +87,14 @@ class ModelListViewModel extends ChangeNotifier {
       }
       _availableFrameworks = frameworks.toList();
       debugPrint(
-          'Available frameworks: ${_availableFrameworks.map((f) => f.displayName).join(", ")}');
+        'Available frameworks: ${_availableFrameworks.map((f) => f.displayName).join(", ")}',
+      );
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load frameworks: $e');
       _availableFrameworks = [];
       notifyListeners();
     }
-  }
-
-  /// Alias for loadModelsFromRegistry
-  Future<void> loadModels() async {
-    await loadModelsFromRegistry();
-    await loadAvailableFrameworks();
   }
 
   /// Set current model

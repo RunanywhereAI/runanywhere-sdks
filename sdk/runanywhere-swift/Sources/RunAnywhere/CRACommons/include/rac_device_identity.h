@@ -3,7 +3,7 @@
  * @brief Persistent device-identity resolution.
  *
  * Centralizes the chain that every platform SDK previously reimplemented:
- *   Keychain / EncryptedSharedPreferences / localStorage cache
+ *   Keychain / Android Keystore-backed storage / localStorage cache
  *     -> platform vendor ID (e.g. UIDevice.identifierForVendor on iOS)
  *     -> freshly synthesized RFC-4122 v4 UUID
  *
@@ -45,9 +45,9 @@ extern "C" {
  * @p out_size MUST be >= RAC_DEVICE_ID_BUFFER_MIN_SIZE; smaller buffers are
  * rejected before any platform-adapter callbacks are invoked.
  *
- * Concurrent calls are serialized internally; once a value has been resolved
- * the result is cached for the SDK lifetime so repeated callers observe the
- * same identifier without paying the secure-storage / vendor-ID cost again.
+ * Concurrent calls are serialized internally. Every call revalidates durable
+ * storage so a Keychain/Keystore failure or adapter reconfiguration cannot be
+ * hidden by process-local state.
  *
  * @param out      Caller-provided output buffer.
  * @param out_size Capacity of @p out, must be >= RAC_DEVICE_ID_BUFFER_MIN_SIZE.
@@ -57,13 +57,6 @@ extern "C" {
  *         or another error code propagated from the platform adapter.
  */
 RAC_API rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size);
-
-/**
- * Test-only: clears the in-process cache so the resolution chain is re-walked
- * on the next call. Does NOT touch secure storage. Exposed so unit tests can
- * validate each branch of the chain in isolation.
- */
-RAC_API void rac_device_identity_reset_cache_for_testing(void);
 
 #ifdef __cplusplus
 }

@@ -12,12 +12,44 @@
 #define RAC_FEATURES_VOICE_AGENT_VOICE_AGENT_INTERNAL_H
 
 #include <atomic>
+#include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "rac/core/rac_types.h"
+
+/// Voice-assistant LLM turn defaults (commons). The voice pipeline feeds these
+/// to every LLM turn so replies are short, spoken, and context-aware instead of
+/// the model's raw default (which rambles / emits markdown for a raw transcript).
+/// Internal — no proto/ABI surface.
+inline constexpr const char* kVoiceAgentSystemPrompt =
+    "You are a helpful voice assistant. Respond in one or two short, natural, "
+    "spoken sentences. Be direct, warm, and conversational. Do not use markdown, "
+    "bullet points, code blocks, or emoji. If you are unsure or lack the "
+    "information, say so briefly instead of guessing.";
+/// Spoken replies should be short. Ninety-six tokens is enough for the one or
+/// two sentences requested above without leaving a long hidden-reasoning
+/// runway on thinking-capable models.
+inline constexpr int32_t kVoiceAgentMaxTokens = 96;
+/// Greedy decoding keeps a spoken turn stable and avoids sampling a verbose
+/// continuation. A positive seed is also supplied for backends that still
+/// construct a sampler when temperature is zero.
+inline constexpr float kVoiceAgentTemperature = 0.0f;
+inline constexpr int32_t kVoiceAgentTopK = 1;
+inline constexpr int64_t kVoiceAgentSeed = 1;
+inline constexpr const char* kVoiceAgentEmptyResponseMessage =
+    "LLM generated no speakable response";
+/// Retained flattened history entries (user+assistant), i.e. the most recent
+/// N/2 turns.
+inline constexpr size_t kVoiceAgentMaxHistoryEntries = 20;
+
+struct VoiceConversationTurn {
+    std::string user_text;
+    std::string assistant_text;
+};
 
 /// Energy-VAD utterance segmenter state for the streaming
 /// `rac_voice_agent_feed_audio_proto` ingress path. The SDK feeds raw mic
@@ -44,6 +76,34 @@ struct rac_voice_agent_feed_state {
     std::mutex mutex;
 };
 
+/// Stage owned by the currently executing voice turn. Cancellation reads this
+/// under `rac_voice_agent_turn_cancellation_state::mutex` so it only forwards
+/// an interrupt to the modality that belongs to the matching turn.
+enum class rac_voice_agent_turn_stage {
+    none,
+    vad,
+    stt,
+    llm,
+    tts,
+};
+
+/// Request-scoped cancellation state for `rac_voice_agent_process_turn_proto`.
+///
+/// A cancelled request id is retained until its turn scope exits. This keeps a
+/// cancel that wins the race with worker-isolate startup from being lost, while
+/// a later turn with a different request id never inherits stale cancellation.
+/// The set is bounded for callers that cancel an id which never starts.
+struct rac_voice_agent_turn_cancellation_state {
+    std::mutex mutex;
+    std::condition_variable interrupt_finished;
+    std::unordered_set<std::string> cancelled_request_ids;
+    std::deque<std::string> cancellation_order;
+    std::string active_request_id;
+    std::string interrupt_request_id;
+    rac_voice_agent_turn_stage active_stage{rac_voice_agent_turn_stage::none};
+    bool backend_started{false};
+};
+
 struct rac_voice_agent {
     /// Set true when initialize* has run successfully. Atomic so
     /// `is_ready()` checks don't need the mutex.
@@ -53,11 +113,6 @@ struct rac_voice_agent {
     /// (e.g. `detect_speech`) to drain before tearing the agent down.
     std::atomic<bool> is_shutting_down{false};
     std::atomic<int> in_flight{0};
-
-    /// True when the agent created its own component handles via
-    /// `rac_voice_agent_create_standalone()`. The destructor frees them
-    /// in reverse creation order.
-    bool owns_components{false};
 
     rac_handle_t llm_handle{nullptr};
     rac_handle_t stt_handle{nullptr};
@@ -69,6 +124,19 @@ struct rac_voice_agent {
 
     /// Streaming-ingress segmenter state (rac_voice_agent_feed_audio_proto).
     rac_voice_agent_feed_state feed;
+
+    /// Lock-independent, request-scoped turn cancellation. This must remain
+    /// separate from `mutex`: the executing turn holds `mutex` across the
+    /// blocking STT -> LLM -> TTS pipeline, while another thread must be able
+    /// to request cancellation immediately.
+    rac_voice_agent_turn_cancellation_state turn_cancellation;
+
+    /// Multi-turn conversation history for the LLM in chronological order
+    /// (excludes the system prompt + current turn). Flattened into
+    /// rac_llm_options_t.history as alternating user/assistant strings so the
+    /// agent remembers context across turns. Bounded to the last
+    /// kVoiceAgentMaxHistoryEntries flattened entries. Guarded by `mutex`.
+    std::vector<VoiceConversationTurn> conversation_history;
 };
 
 #endif  // RAC_FEATURES_VOICE_AGENT_VOICE_AGENT_INTERNAL_H

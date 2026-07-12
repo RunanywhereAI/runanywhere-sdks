@@ -56,10 +56,10 @@ struct rac_tts_component {
     rac_tts_options_t default_options;
     std::mutex mtx;
 
-    /** Resolved inference framework (defaults to ONNX, the primary TTS backend) */
+    /** Resolved inference framework (defaults to the Sherpa speech backend) */
     rac_inference_framework_t actual_framework;
 
-    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_ONNX) {
+    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_SHERPA) {
         // Initialize with defaults - matches rac_tts_types.h rac_tts_config_t
         config = RAC_TTS_CONFIG_DEFAULT;
 
@@ -196,14 +196,16 @@ void fill_tts_output(const rac_tts_result_t& result, const char* text, const cha
     metadata->set_audio_duration_ms(result.duration_ms);
 }
 
-void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind, int64_t duration_ms,
-                             rac_result_t error_code = RAC_SUCCESS) {
+void publish_tts_voice_event(
+    runanywhere::v1::VoiceEventKind kind, int64_t duration_ms,
+    rac_result_t error_code = RAC_SUCCESS,
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_id(generate_uuid_v4());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
     event.set_component(runanywhere::v1::SDK_COMPONENT_TTS);
-    event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_destination(destination);
     event.set_source("cpp");
     event.set_operation_id("tts.synthesize");
     event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
@@ -336,7 +338,7 @@ extern "C" rac_result_t rac_tts_component_configure(rac_handle_t handle,
     component->config = *config;
 
     // Resolve actual framework: if caller explicitly set one (not -1=auto), use it;
-    // otherwise keep the default (RAC_FRAMEWORK_ONNX for TTS components)
+    // otherwise keep the default (RAC_FRAMEWORK_SHERPA for TTS components)
     if (config->preferred_framework >= 0 &&
         config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
         component->actual_framework =
@@ -949,10 +951,15 @@ extern "C" rac_result_t rac_tts_component_synthesize_proto(rac_handle_t handle, 
 
     rac_tts_options_t options = options_from_proto(proto_options, RAC_TTS_OPTIONS_DEFAULT);
     rac_tts_result_t result = {};
-    publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED, 0);
+    // PUBLIC only: rac_tts_component_synthesize (called below) emits the
+    // full-metrics started/completed/failed telemetry rows; wrapper-level
+    // events would double-count every synthesis (same fix as the STT wrapper).
+    publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED, 0, RAC_SUCCESS,
+                            runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     rac_result_t rc = rac_tts_component_synthesize(handle, text, &options, &result);
     if (rc != RAC_SUCCESS) {
-        publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc);
+        publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc,
+                                runanywhere::v1::EVENT_DESTINATION_PUBLIC);
         (void)rac_sdk_event_publish_failure(rc, "TTS synthesis failed", "tts", "synthesize",
                                             RAC_TRUE);
         return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
@@ -961,7 +968,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_proto(rac_handle_t handle, 
     runanywhere::v1::TTSOutput output;
     fill_tts_output(result, text, voice_id, options, &output);
     publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED,
-                            result.duration_ms);
+                            result.duration_ms, RAC_SUCCESS,
+                            runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     rac_tts_result_free(&result);
     return copy_proto_message(output, out_result);
 #endif
@@ -1040,10 +1048,13 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
         }
     };
 
-    publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED, 0);
+    // PUBLIC only: rac_tts_component_synthesize_stream emits the telemetry rows.
+    publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED, 0, RAC_SUCCESS,
+                            runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     rac_result_t rc = rac_tts_component_synthesize_stream(handle, text, &options, bridge, &context);
     if (rc != RAC_SUCCESS) {
-        publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc);
+        publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc,
+                                runanywhere::v1::EVENT_DESTINATION_PUBLIC);
         (void)rac_sdk_event_publish_failure(rc, "TTS streaming synthesis failed", "tts",
                                             "synthesizeStream", RAC_TRUE);
     }
@@ -1182,11 +1193,10 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
 
-    publish_tts_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED,
-                                synthesis_id.c_str(), ref.model_id, char_count,
-                                static_cast<int64_t>(raw.duration_ms),
-                                static_cast<int32_t>(raw.audio_size), processing_ms,
-                                static_cast<int32_t>(raw.sample_rate), nullptr, ref.framework_name);
+    publish_tts_lifecycle_event(
+        runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED, synthesis_id.c_str(), ref.model_id,
+        char_count, static_cast<int64_t>(raw.duration_ms), static_cast<int32_t>(raw.audio_size),
+        processing_ms, static_cast<int32_t>(raw.sample_rate), nullptr, ref.framework_name);
 
     runanywhere::v1::TTSOutput output;
     if (!rac::foundation::rac_tts_result_to_proto(&raw, &output)) {

@@ -42,15 +42,17 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
-#include <vector>
-#include <mutex>
-#include <memory>
-#include <thread>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <cstdio>
 #include <cstring>
+#include <dirent.h>
+#include <memory>
+#include <mutex>
+#include <sys/stat.h>
+#include <thread>
+#include <vector>
 
 // Platform-specific headers for memory usage
 #if defined(__APPLE__)
@@ -418,6 +420,18 @@ struct NativeHttpResult {
     std::vector<std::pair<std::string, std::string>> headers;
 };
 
+bool isSensitiveRequestHeader(const std::string &name) {
+  std::string normalized(name.size(), '\0');
+  std::transform(name.begin(), name.end(), normalized.begin(),
+                 [](unsigned char character) {
+                   return static_cast<char>(std::tolower(character));
+                 });
+  return normalized == "authorization" || normalized == "proxy-authorization" ||
+         normalized == "apikey" || normalized == "x-api-key" ||
+         normalized == "x-auth-token" || normalized == "x-access-token" ||
+         normalized == "cookie";
+}
+
 // Execute a blocking HTTP request via rac_http_client_*. Throws std::runtime_error
 // on transport-level failure (DNS / TLS / timeout). 4xx/5xx responses are
 // returned through NativeHttpResult so callers can decide how to handle them.
@@ -457,7 +471,11 @@ NativeHttpResult performNativeHttpRequest(
     req.body_bytes = body.empty() ? nullptr : reinterpret_cast<const uint8_t*>(body.data());
     req.body_len = body.size();
     req.timeout_ms = timeoutMs > 0 ? timeoutMs : 30000;
-    req.follow_redirects = RAC_TRUE;
+    const bool hasSensitiveHeaders =
+        std::any_of(headers.begin(), headers.end(), [](const auto &header) {
+          return isSensitiveRequestHeader(header.first);
+        });
+    req.follow_redirects = hasSensitiveHeaders ? RAC_FALSE : RAC_TRUE;
     req.expected_checksum_hex = expectedChecksumHex.empty() ? nullptr
                                                              : expectedChecksumHex.c_str();
 

@@ -10,8 +10,9 @@
 
 #pragma once
 
-#include <string>
 #include <functional>
+#include <mutex>
+#include <string>
 
 #include "rac_types.h"
 #include "rac_device_manager.h"
@@ -111,6 +112,12 @@ public:
     rac_result_t registerCallbacks();
 
     /**
+     * Unregister callbacks and clear process-local callback state.
+     * Durable device identity and registration values remain in secure storage.
+     */
+    void unregisterCallbacks();
+
+    /**
      * Check if device is registered
      */
     bool isRegistered() const;
@@ -139,6 +146,7 @@ private:
     DeviceBridge& operator=(const DeviceBridge&) = delete;
 
     bool callbacksRegistered_ = false;
+    mutable std::mutex platformCallbacksMutex_;
     DevicePlatformCallbacks platformCallbacks_{};
 
     // Callbacks struct for RACommons (must persist)

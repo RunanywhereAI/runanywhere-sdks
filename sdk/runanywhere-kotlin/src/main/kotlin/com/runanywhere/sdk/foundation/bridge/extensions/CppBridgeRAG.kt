@@ -20,6 +20,10 @@ import com.runanywhere.sdk.public.types.RARAGStatistics
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
+internal data class NativeRAGQueryRequest(
+    val queryProto: ByteArray,
+)
+
 object CppBridgeRAG {
     @Volatile private var sessionHandle: Long = 0L
 
@@ -54,15 +58,40 @@ object CppBridgeRAG {
             "racRagIngestProto",
         )
 
-    fun query(options: RAGQueryOptions): RAGResult =
+    /** Encode immutable request data before cancellable JNI admission. */
+    internal fun prepareQuery(options: RAGQueryOptions): NativeRAGQueryRequest =
+        NativeRAGQueryRequest(
+            queryProto = RAGQueryOptions.ADAPTER.encode(options),
+        )
+
+    internal fun queryRequest(
+        requestId: Long,
+        request: NativeRAGQueryRequest,
+    ): RAGResult =
         decodeOrThrow(
             RAGResult.ADAPTER,
-            RunAnywhereBridge.racRagQueryProto(
+            RunAnywhereBridge.racRagQueryRequestProto(
+                requestId,
+                // The coordinator owns the lifecycle gate before this method
+                // is called. Capture only now so a queued query cannot retain
+                // a session that create/destroy replaces ahead of admission.
                 requireSession(),
-                RAGQueryOptions.ADAPTER.encode(options),
+                request.queryProto,
             ),
-            "racRagQueryProto",
+            "racRagQueryRequestProto",
         )
+
+    /** Cancel only the matching request-scoped JNI query wrapper. */
+    internal fun cancelQueryRequest(
+        requestId: Long,
+    ) {
+        // A running query holds the same coordinator gate used by every RAG
+        // lifecycle mutation, so the current handle is exactly its handle.
+        val rc = RunAnywhereBridge.racRagCancelRequestProto(requestId, requireSession())
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagCancelRequestProto failed: $rc")
+        }
+    }
 
     fun clear(): RARAGStatistics =
         decodeOrThrow(

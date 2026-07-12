@@ -94,6 +94,12 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
     return buffer.status == RAC_SUCCESS && parse_raw(buffer.data, buffer.size, out);
 }
 
+void capture_tool_calling_handle(uint64_t handle, void* user_data) {
+    if (user_data) {
+        *static_cast<uint64_t*>(user_data) = handle;
+    }
+}
+
 int test_registry_list_proto_is_active() {
     rac_model_registry_handle_t registry = nullptr;
     CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS, "registry creates");
@@ -329,7 +335,7 @@ int test_tool_calling_session_create_proto_is_active() {
     uint64_t session_handle = 0;
     const rac_result_t rc = rac_tool_calling_session_create_proto(
         request_bytes.empty() ? nullptr : request_bytes.data(), request_bytes.size(),
-        discard_event_cb, nullptr, &session_handle);
+        discard_event_cb, nullptr, capture_tool_calling_handle, &session_handle);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "tool_calling_session_create_proto is wired (not feature-unavailable)");
     if (session_handle != 0) {

@@ -84,22 +84,12 @@ public class ToolResult(
     schemaIndex = 4,
   )
   public val success: Boolean = false,
-  /**
-   * Alias for tool_call_id used by pre-proto SDK surfaces.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "callId",
-    schemaIndex = 5,
-  )
-  public val call_id: String? = null,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "startedAtMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val started_at_ms: Long = 0L,
   @field:WireField(
@@ -107,7 +97,7 @@ public class ToolResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "completedAtMs",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val completed_at_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -127,7 +117,6 @@ public class ToolResult(
     if (result_json != other.result_json) return false
     if (error != other.error) return false
     if (success != other.success) return false
-    if (call_id != other.call_id) return false
     if (started_at_ms != other.started_at_ms) return false
     if (completed_at_ms != other.completed_at_ms) return false
     return true
@@ -142,7 +131,6 @@ public class ToolResult(
       result = result * 37 + result_json.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + success.hashCode()
-      result = result * 37 + (call_id?.hashCode() ?: 0)
       result = result * 37 + started_at_ms.hashCode()
       result = result * 37 + completed_at_ms.hashCode()
       super.hashCode = result
@@ -157,7 +145,6 @@ public class ToolResult(
     result += """result_json=${sanitize(result_json)}"""
     if (error != null) result += """error=${sanitize(error)}"""
     result += """success=$success"""
-    if (call_id != null) result += """call_id=${sanitize(call_id)}"""
     result += """started_at_ms=$started_at_ms"""
     result += """completed_at_ms=$completed_at_ms"""
     return result.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
@@ -169,11 +156,10 @@ public class ToolResult(
     result_json: String = this.result_json,
     error: String? = this.error,
     success: Boolean = this.success,
-    call_id: String? = this.call_id,
     started_at_ms: Long = this.started_at_ms,
     completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, call_id, started_at_ms, completed_at_ms, unknownFields)
+  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, started_at_ms, completed_at_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -200,7 +186,6 @@ public class ToolResult(
         if (value.success != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.call_id)
         if (value.started_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.started_at_ms)
         }
@@ -224,7 +209,6 @@ public class ToolResult(
         if (value.success != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
         }
@@ -242,7 +226,6 @@ public class ToolResult(
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
         if (value.success != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
         }
@@ -264,7 +247,6 @@ public class ToolResult(
         var result_json: String = ""
         var error: String? = null
         var success: Boolean = false
-        var call_id: String? = null
         var started_at_ms: Long = 0L
         var completed_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
@@ -274,7 +256,6 @@ public class ToolResult(
             3 -> result_json = ProtoAdapter.STRING.decode(reader)
             4 -> error = ProtoAdapter.STRING.decode(reader)
             5 -> success = ProtoAdapter.BOOL.decode(reader)
-            7 -> call_id = ProtoAdapter.STRING.decode(reader)
             8 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
             9 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -286,7 +267,6 @@ public class ToolResult(
           result_json = result_json,
           error = error,
           success = success,
-          call_id = call_id,
           started_at_ms = started_at_ms,
           completed_at_ms = completed_at_ms,
           unknownFields = unknownFields

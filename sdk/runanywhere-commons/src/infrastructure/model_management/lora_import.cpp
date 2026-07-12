@@ -82,9 +82,8 @@ std::string stem_of(const std::string& filename) {
 }
 
 std::string artifact_model_id_for(const std::string& entry_id) {
-    return entry_id.starts_with(kLoraArtifactModelIdPrefix)
-               ? entry_id
-               : kLoraArtifactModelIdPrefix + entry_id;
+    return entry_id.starts_with(kLoraArtifactModelIdPrefix) ? entry_id
+                                                            : kLoraArtifactModelIdPrefix + entry_id;
 }
 
 // Snapshot the catalog through the public list ABI. Best-effort: an unhealthy
@@ -118,10 +117,10 @@ catalog_entries(rac_lora_registry_handle_t registry) {
 // counterpart of the SDKs' download-time registerArtifact. The registry save
 // also persists the durable folder manifest, so the import survives cold
 // launches like a downloaded model does.
-runanywhere::v1::ModelInfo make_artifact_record(
-    const std::string& artifact_id, const std::string& display_name,
-    const std::string& filename, const std::string& local_path, int64_t size_bytes,
-    const runanywhere::v1::LoraAdapterCatalogEntry* matched) {
+runanywhere::v1::ModelInfo
+make_artifact_record(const std::string& artifact_id, const std::string& display_name,
+                     const std::string& filename, const std::string& local_path, int64_t size_bytes,
+                     const runanywhere::v1::LoraAdapterCatalogEntry* matched) {
     runanywhere::v1::ModelInfo artifact;
     artifact.set_id(artifact_id);
     artifact.set_name(display_name);
@@ -168,9 +167,10 @@ runanywhere::v1::ModelInfo make_artifact_record(
 
 #endif  // RAC_HAVE_PROTOBUF
 
-extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
-    rac_lora_registry_handle_t registry, const uint8_t* request_proto_bytes,
-    size_t request_proto_size, rac_proto_buffer_t* out_result) {
+extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(rac_lora_registry_handle_t registry,
+                                                              const uint8_t* request_proto_bytes,
+                                                              size_t request_proto_size,
+                                                              rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -186,16 +186,16 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
                                           "LoRA registry handle is required");
     }
 
-    const rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes,
-                                                             request_proto_size);
+    const rac_result_t validation =
+        rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
     if (validation != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "LoraAdapterImportRequest bytes are invalid");
     }
     runanywhere::v1::LoraAdapterImportRequest request;
-    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
-                                                              request_proto_size),
-                                static_cast<int>(request_proto_size))) {
+    if (!request.ParseFromArray(
+            rac_proto_bytes_data_or_empty(request_proto_bytes, request_proto_size),
+            static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse LoraAdapterImportRequest");
     }
@@ -218,8 +218,7 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
     }
 
     // Deterministic match: exact path, else unambiguous filename.
-    const std::vector<runanywhere::v1::LoraAdapterCatalogEntry> entries =
-        catalog_entries(registry);
+    const std::vector<runanywhere::v1::LoraAdapterCatalogEntry> entries = catalog_entries(registry);
     const runanywhere::v1::LoraAdapterCatalogEntry* matched = nullptr;
     const runanywhere::v1::LoraAdapterCatalogEntry* name_match = nullptr;
     int name_match_count = 0;
@@ -244,17 +243,18 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
     const std::string artifact_id = artifact_model_id_for(entry_id);
 
     char folder_buffer[4096];
-    if (rac_model_paths_get_model_folder(artifact_id.c_str(), RAC_FRAMEWORK_UNKNOWN,
-                                         folder_buffer, sizeof(folder_buffer)) != RAC_SUCCESS) {
+    if (rac_model_paths_get_model_folder(artifact_id.c_str(), RAC_FRAMEWORK_UNKNOWN, folder_buffer,
+                                         sizeof(folder_buffer)) != RAC_SUCCESS) {
         return typed_failure(out_result,
                              "cannot resolve adapter folder (base directory not configured "
-                             "or unsafe adapter id: " + artifact_id + ")");
+                             "or unsafe adapter id: " +
+                                 artifact_id + ")");
     }
     const std::string folder = folder_buffer;
     fs::create_directories(folder, ec);
     if (ec) {
-        return typed_failure(out_result, "cannot create adapter folder '" + folder +
-                                             "': " + ec.message());
+        return typed_failure(out_result,
+                             "cannot create adapter folder '" + folder + "': " + ec.message());
     }
     const std::string destination = folder + "/" + filename;
     // Re-import of the already-placed file (callers may pass back the
@@ -271,8 +271,7 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
                             "filename collision on artifact id '%s')",
                             destination.c_str(), artifact_id.c_str());
         }
-        fs::copy_file(request.source_path(), destination, fs::copy_options::overwrite_existing,
-                      ec);
+        fs::copy_file(request.source_path(), destination, fs::copy_options::overwrite_existing, ec);
         if (ec) {
             return typed_failure(out_result, "failed to copy adapter file into '" + destination +
                                                  "': " + ec.message());
@@ -287,8 +286,8 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(
     if (model_registry == nullptr) {
         return typed_failure(out_result, "model registry is not initialized");
     }
-    const runanywhere::v1::ModelInfo artifact = make_artifact_record(
-        artifact_id, display_name, filename, destination, size_bytes, matched);
+    const runanywhere::v1::ModelInfo artifact =
+        make_artifact_record(artifact_id, display_name, filename, destination, size_bytes, matched);
     std::string artifact_bytes;
     if (!artifact.SerializeToString(&artifact_bytes)) {
         return typed_failure(out_result, "failed to serialize adapter artifact record");

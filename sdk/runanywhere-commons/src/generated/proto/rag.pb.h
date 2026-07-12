@@ -838,6 +838,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   enum : int {
     kQuestionFieldNumber = 1,
     kSystemPromptFieldNumber = 2,
+    kScopePrefixFieldNumber = 13,
     kMaxTokensFieldNumber = 3,
     kTemperatureFieldNumber = 4,
     kTopPFieldNumber = 5,
@@ -846,6 +847,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
     kSimilarityThresholdFieldNumber = 8,
     kStreamFieldNumber = 9,
     kDisableThinkingFieldNumber = 10,
+    kEnableMultiQueryFieldNumber = 11,
+    kMultiQueryCountFieldNumber = 12,
   };
   // string question = 1;
   void clear_question() ;
@@ -877,6 +880,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   const ::std::string& _internal_system_prompt() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_system_prompt(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_system_prompt();
+
+  public:
+  // optional string scope_prefix = 13;
+  [[nodiscard]] bool has_scope_prefix()
+      const;
+  void clear_scope_prefix() ;
+  [[nodiscard]] const ::std::string& scope_prefix() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_scope_prefix(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_scope_prefix();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_scope_prefix();
+  void set_allocated_scope_prefix(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_scope_prefix() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_scope_prefix(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_scope_prefix();
 
   public:
   // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
@@ -929,7 +949,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_retrieval_top_k(::int32_t value);
 
   public:
-  // float similarity_threshold = 8;
+  // optional float similarity_threshold = 8;
+  [[nodiscard]] bool has_similarity_threshold()
+      const;
   void clear_similarity_threshold() ;
   [[nodiscard]] float similarity_threshold() const;
   void set_similarity_threshold(float value);
@@ -959,12 +981,34 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_disable_thinking(bool value);
 
   public:
+  // bool enable_multi_query = 11;
+  void clear_enable_multi_query() ;
+  [[nodiscard]] bool enable_multi_query() const;
+  void set_enable_multi_query(bool value);
+
+  private:
+  bool _internal_enable_multi_query() const;
+  void _internal_set_enable_multi_query(bool value);
+
+  public:
+  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+  [[nodiscard]] bool has_multi_query_count()
+      const;
+  void clear_multi_query_count() ;
+  [[nodiscard]] ::int32_t multi_query_count() const;
+  void set_multi_query_count(::int32_t value);
+
+  private:
+  ::int32_t _internal_multi_query_count() const;
+  void _internal_set_multi_query_count(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 10,
-                          0, 68,
+      ::google::protobuf::internal::TcParseTable<4, 13,
+                          0, 80,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -994,6 +1038,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr question_;
     ::google::protobuf::internal::ArenaStringPtr system_prompt_;
+    ::google::protobuf::internal::ArenaStringPtr scope_prefix_;
     ::int32_t max_tokens_;
     float temperature_;
     float top_p_;
@@ -1002,6 +1047,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
     float similarity_threshold_;
     bool stream_;
     bool disable_thinking_;
+    bool enable_multi_query_;
+    ::int32_t multi_query_count_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1410,7 +1457,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   [[nodiscard]] bool has_similarity_threshold()
       const;
   void clear_similarity_threshold() ;
@@ -4146,7 +4193,7 @@ inline void RAGConfiguration::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline bool RAGConfiguration::has_similarity_threshold() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
   return value;
@@ -5359,7 +5406,7 @@ inline void RAGQueryOptions::set_allocated_system_prompt(::std::string* PROTOBUF
 inline void RAGQueryOptions::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int32_t RAGQueryOptions::max_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.max_tokens)
@@ -5367,7 +5414,7 @@ inline ::int32_t RAGQueryOptions::max_tokens() const {
 }
 inline void RAGQueryOptions::set_max_tokens(::int32_t value) {
   _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.max_tokens)
 }
 inline ::int32_t RAGQueryOptions::_internal_max_tokens() const {
@@ -5383,7 +5430,7 @@ inline void RAGQueryOptions::_internal_set_max_tokens(::int32_t value) {
 inline void RAGQueryOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline float RAGQueryOptions::temperature() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.temperature)
@@ -5391,7 +5438,7 @@ inline float RAGQueryOptions::temperature() const {
 }
 inline void RAGQueryOptions::set_temperature(float value) {
   _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.temperature)
 }
 inline float RAGQueryOptions::_internal_temperature() const {
@@ -5407,7 +5454,7 @@ inline void RAGQueryOptions::_internal_set_temperature(float value) {
 inline void RAGQueryOptions::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline float RAGQueryOptions::top_p() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.top_p)
@@ -5415,7 +5462,7 @@ inline float RAGQueryOptions::top_p() const {
 }
 inline void RAGQueryOptions::set_top_p(float value) {
   _internal_set_top_p(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.top_p)
 }
 inline float RAGQueryOptions::_internal_top_p() const {
@@ -5431,7 +5478,7 @@ inline void RAGQueryOptions::_internal_set_top_p(float value) {
 inline void RAGQueryOptions::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::int32_t RAGQueryOptions::top_k() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.top_k)
@@ -5439,7 +5486,7 @@ inline ::int32_t RAGQueryOptions::top_k() const {
 }
 inline void RAGQueryOptions::set_top_k(::int32_t value) {
   _internal_set_top_k(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.top_k)
 }
 inline ::int32_t RAGQueryOptions::_internal_top_k() const {
@@ -5455,7 +5502,7 @@ inline void RAGQueryOptions::_internal_set_top_k(::int32_t value) {
 inline void RAGQueryOptions::clear_retrieval_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.retrieval_top_k_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int32_t RAGQueryOptions::retrieval_top_k() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.retrieval_top_k)
@@ -5463,7 +5510,7 @@ inline ::int32_t RAGQueryOptions::retrieval_top_k() const {
 }
 inline void RAGQueryOptions::set_retrieval_top_k(::int32_t value) {
   _internal_set_retrieval_top_k(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.retrieval_top_k)
 }
 inline ::int32_t RAGQueryOptions::_internal_retrieval_top_k() const {
@@ -5475,11 +5522,15 @@ inline void RAGQueryOptions::_internal_set_retrieval_top_k(::int32_t value) {
   _impl_.retrieval_top_k_ = value;
 }
 
-// float similarity_threshold = 8;
+// optional float similarity_threshold = 8;
+inline bool RAGQueryOptions::has_similarity_threshold() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
 inline void RAGQueryOptions::clear_similarity_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.similarity_threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline float RAGQueryOptions::similarity_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.similarity_threshold)
@@ -5487,7 +5538,7 @@ inline float RAGQueryOptions::similarity_threshold() const {
 }
 inline void RAGQueryOptions::set_similarity_threshold(float value) {
   _internal_set_similarity_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.similarity_threshold)
 }
 inline float RAGQueryOptions::_internal_similarity_threshold() const {
@@ -5503,7 +5554,7 @@ inline void RAGQueryOptions::_internal_set_similarity_threshold(float value) {
 inline void RAGQueryOptions::clear_stream() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stream_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline bool RAGQueryOptions::stream() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.stream)
@@ -5511,7 +5562,7 @@ inline bool RAGQueryOptions::stream() const {
 }
 inline void RAGQueryOptions::set_stream(bool value) {
   _internal_set_stream(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.stream)
 }
 inline bool RAGQueryOptions::_internal_stream() const {
@@ -5527,7 +5578,7 @@ inline void RAGQueryOptions::_internal_set_stream(bool value) {
 inline void RAGQueryOptions::clear_disable_thinking() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.disable_thinking_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline bool RAGQueryOptions::disable_thinking() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.disable_thinking)
@@ -5535,7 +5586,7 @@ inline bool RAGQueryOptions::disable_thinking() const {
 }
 inline void RAGQueryOptions::set_disable_thinking(bool value) {
   _internal_set_disable_thinking(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.disable_thinking)
 }
 inline bool RAGQueryOptions::_internal_disable_thinking() const {
@@ -5545,6 +5596,126 @@ inline bool RAGQueryOptions::_internal_disable_thinking() const {
 inline void RAGQueryOptions::_internal_set_disable_thinking(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.disable_thinking_ = value;
+}
+
+// bool enable_multi_query = 11;
+inline void RAGQueryOptions::clear_enable_multi_query() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.enable_multi_query_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+}
+inline bool RAGQueryOptions::enable_multi_query() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.enable_multi_query)
+  return _internal_enable_multi_query();
+}
+inline void RAGQueryOptions::set_enable_multi_query(bool value) {
+  _internal_set_enable_multi_query(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.enable_multi_query)
+}
+inline bool RAGQueryOptions::_internal_enable_multi_query() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.enable_multi_query_;
+}
+inline void RAGQueryOptions::_internal_set_enable_multi_query(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.enable_multi_query_ = value;
+}
+
+// optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+inline bool RAGQueryOptions::has_multi_query_count() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  return value;
+}
+inline void RAGQueryOptions::clear_multi_query_count() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.multi_query_count_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+}
+inline ::int32_t RAGQueryOptions::multi_query_count() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.multi_query_count)
+  return _internal_multi_query_count();
+}
+inline void RAGQueryOptions::set_multi_query_count(::int32_t value) {
+  _internal_set_multi_query_count(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.multi_query_count)
+}
+inline ::int32_t RAGQueryOptions::_internal_multi_query_count() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.multi_query_count_;
+}
+inline void RAGQueryOptions::_internal_set_multi_query_count(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.multi_query_count_ = value;
+}
+
+// optional string scope_prefix = 13;
+inline bool RAGQueryOptions::has_scope_prefix() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
+inline void RAGQueryOptions::clear_scope_prefix() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.scope_prefix_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline const ::std::string& RAGQueryOptions::scope_prefix() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.scope_prefix)
+  return _internal_scope_prefix();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void RAGQueryOptions::set_scope_prefix(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.scope_prefix_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.scope_prefix)
+}
+inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::mutable_scope_prefix()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_scope_prefix();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGQueryOptions.scope_prefix)
+  return _s;
+}
+inline const ::std::string& RAGQueryOptions::_internal_scope_prefix() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.scope_prefix_.Get();
+}
+inline void RAGQueryOptions::_internal_set_scope_prefix(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.scope_prefix_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::_internal_mutable_scope_prefix() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.scope_prefix_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE RAGQueryOptions::release_scope_prefix() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGQueryOptions.scope_prefix)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.scope_prefix_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.scope_prefix_.Set("", GetArena());
+  }
+  return released;
+}
+inline void RAGQueryOptions::set_allocated_scope_prefix(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.scope_prefix_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.scope_prefix_.IsDefault()) {
+    _impl_.scope_prefix_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGQueryOptions.scope_prefix)
 }
 
 // -------------------------------------------------------------------

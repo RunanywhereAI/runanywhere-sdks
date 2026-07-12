@@ -199,22 +199,21 @@ export class HandleStreamFanOutRegistry<Event> {
       onDone: () => void
     ): () => void;
   } {
-    const registry = this;
     return {
-      subscribe(_req, onMessage, onError, onDone) {
-        let fan = registry.cache.get(handle);
+      subscribe: (_req, onMessage, onError, onDone) => {
+        let fan = this.cache.get(handle);
         if (!fan) {
-          fan = new HandleFanOut<Event>(handle, registry.options, () =>
-            registry.cache.delete(handle)
+          fan = new HandleFanOut<Event>(handle, this.options, () =>
+            this.cache.delete(handle)
           );
-          registry.cache.set(handle, fan);
+          this.cache.set(handle, fan);
         }
 
         const sub: Subscriber<Event> = { onMessage, onError, onDone };
         const cancel = fan.attach(sub);
         if (!cancel) {
           onError(
-            new Error(`${registry.options.label} failed for handle ${handle}`)
+            new Error(`${this.options.label} failed for handle ${handle}`)
           );
           onDone();
           return () => {

@@ -7,7 +7,7 @@ description: |
 inputs:
   platform:
     required: true
-    description: 'ios | macos | android | linux | windows | web | sdk-only | flutter'
+    description: 'ios | macos | android | linux | windows | web | node | java | flutter'
 
 runs:
   using: composite
@@ -32,8 +32,22 @@ runs:
           echo "$k=$v" >> "$GITHUB_ENV"
         done
         echo "::group::Loaded versions"
-        cat "$VERSIONS_FILE" | grep -E '^[A-Z_][A-Z0-9_]*='
+        grep -E '^[A-Z_][A-Z0-9_]*=' "$VERSIONS_FILE"
         echo "::endgroup::"
+
+    - name: Validate platform selector
+      shell: bash
+      env:
+        TOOLCHAIN_PLATFORM: ${{ inputs.platform }}
+      run: |
+        set -euo pipefail
+        case "$TOOLCHAIN_PLATFORM" in
+          ios|macos|android|linux|windows|web|node|java|flutter) ;;
+          *)
+            echo "::error::Unsupported setup-toolchain platform: $TOOLCHAIN_PLATFORM"
+            exit 1
+            ;;
+        esac
 
     # ----------------------------------------------------------------------
     # 2. Per-platform toolchain installation (uses env vars from step 1).
@@ -44,16 +58,29 @@ runs:
       with:
         xcode-version: ${{ env.XCODE_VERSION }}
 
+    - name: Verify exact Xcode build (iOS/macOS)
+      if: inputs.platform == 'ios' || inputs.platform == 'macos'
+      shell: bash
+      run: |
+        set -euo pipefail
+        xcode_version_output="$(xcodebuild -version)"
+        actual_version="$(awk '/^Xcode / { print $2 }' <<< "$xcode_version_output")"
+        actual_build="$(awk '/^Build version / { print $3 }' <<< "$xcode_version_output")"
+        if [ "$actual_version" != "$XCODE_VERSION" ] || [ "$actual_build" != "$XCODE_BUILD" ]; then
+          echo "::error::Expected Xcode $XCODE_VERSION ($XCODE_BUILD), found $actual_version ($actual_build)."
+          exit 1
+        fi
+
     - name: Setup JDK (Android/SDK)
-      if: inputs.platform == 'android' || inputs.platform == 'sdk-only'
-      uses: actions/setup-java@v4
+      if: inputs.platform == 'android' || inputs.platform == 'java'
+      uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: ${{ env.JAVA_VERSION }}
 
     - name: Setup Android SDK + NDK (Android)
       if: inputs.platform == 'android'
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
 
     - name: Install pinned Android NDK
       if: inputs.platform == 'android'
@@ -65,20 +92,20 @@ runs:
         echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 
     - name: Setup Node (Web/RN/SDK)
-      if: inputs.platform == 'web' || inputs.platform == 'sdk-only'
-      uses: actions/setup-node@v4
+      if: inputs.platform == 'web' || inputs.platform == 'node'
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
 
     - name: Setup Emscripten (Web)
       if: inputs.platform == 'web'
-      uses: mymindstorm/setup-emsdk@v14
+      uses: mymindstorm/setup-emsdk@v16
       with:
         version: ${{ env.EMSCRIPTEN_VERSION }}
         actions-cache-folder: emsdk-cache
 
-    - name: Setup Flutter (Flutter / sdk-only)
-      if: inputs.platform == 'flutter' || inputs.platform == 'sdk-only'
+    - name: Setup Flutter
+      if: inputs.platform == 'flutter'
       uses: subosito/flutter-action@v2
       with:
         flutter-version: ${{ env.FLUTTER_VERSION }}

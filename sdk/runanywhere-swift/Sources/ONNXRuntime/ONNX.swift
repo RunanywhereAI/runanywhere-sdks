@@ -47,12 +47,12 @@ public enum ONNX {
     public static let version = "2.0.0"
 
     /// ONNX Runtime library version (underlying C library)
-    public static let onnxRuntimeVersion = "1.23.2"
+    public static let onnxRuntimeVersion = RAVersions.onnxRuntimeIOS
 
     // MARK: - Registration State
 
-    private static var isRegistered = false
-    private static var isSherpaRegistered = false
+    @MainActor private static var isRegistered = false
+    @MainActor private static var isSherpaRegistered = false
 
     // MARK: - Registration
 

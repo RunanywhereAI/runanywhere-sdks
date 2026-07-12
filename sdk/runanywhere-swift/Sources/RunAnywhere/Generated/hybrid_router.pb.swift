@@ -465,12 +465,8 @@ public nonisolated struct RAHybridRoutedMetadata: Sendable {
 /// ---------------------------------------------------------------------------
 /// Per-request routing context — caller-supplied hints only.
 ///
-/// Device-state fields (is_online, battery_percent, thermal_throttled) live
-/// behind the rac_hybrid_device_state C ABI vtable in commons (task #22).
-/// `input_is_sensitive` (tag 2) was the privacy PII hint; removed entirely
-/// alongside the HybridFilter.privacy gate.
-///
-/// Reserved tags 1–4 prevent re-use of any old field number.
+/// Device state lives behind the rac_hybrid_device_state C ABI vtable in
+/// commons; callers do not serialize platform state into this message.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RAHybridRoutingContext: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -637,7 +633,7 @@ nonisolated extension RAHybridRank: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RAHybridFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridFilter"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}network\0\u{4}\u{2}quality_tier\0\u{1}battery\0\u{1}custom\0\u{b}privacy\0\u{c}\u{2}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}network\0\u{4}\u{2}quality_tier\0\u{1}battery\0\u{1}custom\0\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1018,7 +1014,7 @@ nonisolated extension RAHybridRoutedMetadata: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAHybridRoutingContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HybridRoutingContext"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{b}is_online\0\u{b}input_is_sensitive\0\u{b}battery_percent\0\u{b}thermal_throttled\0\u{c}\u{1}\u{1}\u{c}\u{2}\u{1}\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{c}\u{1}\u{1}\u{c}\u{2}\u{1}\u{c}\u{3}\u{1}\u{c}\u{4}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     // Load everything into unknown fields

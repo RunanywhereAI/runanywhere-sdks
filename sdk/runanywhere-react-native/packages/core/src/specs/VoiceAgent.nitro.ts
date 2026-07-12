@@ -57,7 +57,7 @@ export interface VoiceAgent
    * Register a proto-byte callback on a voice agent handle.
    *
    * @param handle  The voice agent handle returned by
-   *                `RunAnywhereCore.voiceAgentCreate(...)`, reinterpreted
+   *                `RunAnywhereCore.getVoiceAgentHandle()`, reinterpreted
    *                as a JS number (the C++ side casts back to
    *                `rac_voice_agent_handle_t`).
    * @param onBytes Fires once per `runanywhere.v1.VoiceEvent` with the

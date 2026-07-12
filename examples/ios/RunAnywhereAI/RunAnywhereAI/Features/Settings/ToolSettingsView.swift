@@ -24,13 +24,13 @@ class ToolSettingsViewModel: ObservableObject {
             UserDefaults.standard.set(toolCallingEnabled, forKey: "toolCallingEnabled")
             if toolCallingEnabled {
                 logger.info("Registered tool calling enabled")
-                Task { await registerDemoTools() }
+                Task { await registerBuiltInTools() }
             }
         }
     }
 
-    // App-local demo tools with REAL API implementations
-    private var demoTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
+    // App-local tools with real implementations.
+    private var builtInTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
             // Weather Tool - Uses Open-Meteo API (free, no API key required)
             (
@@ -151,11 +151,11 @@ class ToolSettingsViewModel: ObservableObject {
         registeredTools = await RunAnywhere.getRegisteredTools()
     }
 
-    func registerDemoTools() async {
+    func registerBuiltInTools() async {
         await RunAnywhere.registerWebSearchTool()
         logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
 
-        for tool in demoTools {
+        for tool in builtInTools {
             await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
         }
@@ -186,9 +186,9 @@ struct ToolSettingsSection: View {
                 }
 
                 if viewModel.registeredTools.isEmpty {
-                    Button("Add Demo Tools") {
+                    Button("Add Built-in Tools") {
                         Task {
-                            await viewModel.registerDemoTools()
+                            await viewModel.registerBuiltInTools()
                         }
                     }
                     .foregroundColor(AppColors.primaryAccent)
@@ -206,7 +206,7 @@ struct ToolSettingsSection: View {
                         }
                     }
                     .foregroundColor(AppColors.primaryRed)
-                    // Same tab-bar overlap mitigation as the demo-tools button.
+                    // Same tab-bar overlap mitigation as the built-in-tools button.
                     .padding(.bottom, 50)
                 }
             }
@@ -256,9 +256,9 @@ struct ToolSettingsCard: View {
                     }
 
                     if viewModel.registeredTools.isEmpty {
-                        Button("Add Demo Tools") {
+                        Button("Add Built-in Tools") {
                             Task {
-                                await viewModel.registerDemoTools()
+                                await viewModel.registerBuiltInTools()
                             }
                         }
                         .buttonStyle(.bordered)
@@ -301,7 +301,7 @@ struct ToolRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Image(systemName: "wrench.and.screwdriver")
-                    .font(.system(size: 12))
+                    .font(AppTypography.system12)
                     .foregroundColor(AppColors.primaryAccent)
                 Text(tool.name)
                     .font(AppTypography.subheadlineMedium)
@@ -322,7 +322,7 @@ struct ToolRow: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(AppColors.backgroundTertiary)
-                            .cornerRadius(4)
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                     }
                 }
             }
@@ -371,7 +371,7 @@ enum WeatherService {
             return nil
         }
 
-        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool call, not SDK auth/download traffic.
         let (data, _) = try await URLSession.shared.data(from: url)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -399,7 +399,7 @@ enum WeatherService {
             return ["error": RAToolValue("Invalid weather API URL")]
         }
 
-        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool call, not SDK auth/download traffic.
         let (data, _) = try await URLSession.shared.data(from: url)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

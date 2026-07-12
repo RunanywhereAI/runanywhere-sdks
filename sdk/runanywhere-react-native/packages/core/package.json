@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/core",
-  "version": "0.19.13",
+  "version": "0.20.0",
   "description": "Core SDK for RunAnywhere React Native - includes RACommons bindings, native bridges, and public API",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -31,15 +31,20 @@
     "nitrogen",
     "nitro.json",
     "react-native.config.js",
+    "LICENSE",
     "*.podspec"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --max-warnings 0",
+    "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
+    "clean": "tsc -b --clean && rm -rf lib lib-test",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
-    "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
+    "nitrogen": "nitrogen && node ../../scripts/fix-nitrogen-output.js",
     "prepack": "mkdir -p ios/URLSessionHttpTransport && cp -f ../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
-    "prepublishOnly": "npm run typecheck && node scripts/fix-nitrogen-output.js"
+    "prepublishOnly": "npm run typecheck && npm run lint && node ../../scripts/fix-nitrogen-output.js"
   },
   "keywords": [
     "react-native",
@@ -50,8 +55,19 @@
     "nitro",
     "expo"
   ],
-  "license": "MIT",
+  "homepage": "https://runanywhere.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-react-native/packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "author": "RunAnywhere AI <team@runanywhere.ai> (https://runanywhere.ai)",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "workspace:*",
     "long": "^5.3.2",
     "protobufjs": "^7.5.8"
@@ -78,6 +94,7 @@
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/react": "~19.2.14",
+    "eslint": "^9.39.4",
     "jest": "^29.7.0",
     "nitrogen": "^0.34.1",
     "react-native-nitro-modules": "^0.33.9",

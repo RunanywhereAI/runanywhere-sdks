@@ -61,18 +61,13 @@ bool has_extension(const std::string& path, const char* ext) {
     return lowercase_copy(path).ends_with(lowercase_copy(ext));
 }
 
-bool is_arch_segment(const std::string& segment) {
-    if (segment.size() < 2 || segment[0] != 'v') {
+bool is_safe_variant_segment(const std::string& segment) {
+    if (segment.empty() || segment == "." || segment == "..") {
         return false;
     }
-    return std::ranges::all_of(segment.begin() + 1, segment.end(),
-                               [](unsigned char c) { return std::isdigit(c) != 0; });
-}
-
-bool path_starts_with_arch(const std::string& path) {
-    const size_t slash = path.find('/');
-    const std::string first = slash == std::string::npos ? path : path.substr(0, slash);
-    return is_arch_segment(first);
+    return std::ranges::all_of(segment, [](unsigned char c) {
+        return std::isalnum(c) != 0 || c == '-' || c == '_' || c == '.';
+    });
 }
 
 std::string query_value(const std::string& query, const std::string& key) {
@@ -277,8 +272,8 @@ bool is_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
 
 namespace {
 
-bool logical_arch_folder_parts(const std::string& ref, const char* manifest_leaf_ext,
-                               ParsedRef* parsed_out, std::string* manifest_out) {
+bool logical_variant_folder_parts(const std::string& ref, const char* manifest_leaf_ext,
+                                  ParsedRef* parsed_out, std::string* manifest_out) {
     std::string rest = strip_prefix(ref);
     if (rest.empty() || rest.find("/resolve/") != std::string::npos ||
         rest.find("/blob/") != std::string::npos) {
@@ -300,22 +295,24 @@ bool logical_arch_folder_parts(const std::string& ref, const char* manifest_leaf
     std::string manifest = query_value(query, "manifest");
     if (!parsed.file_path.empty()) {
         const std::string path = trim_trailing_slashes(parsed.file_path);
-        if (path.empty() || path_starts_with_arch(path)) {
-            return false;
-        }
-        if (path.find('/') != std::string::npos || !has_extension(path, manifest_leaf_ext)) {
+        // A logical ref may contain only a repo-root manifest leaf. Any
+        // subfolder (with or without a manifest) is already explicitly pinned.
+        if (path.empty() || path.find('/') != std::string::npos ||
+            !has_extension(path, manifest_leaf_ext)) {
             return false;
         }
         if (!manifest.empty() && manifest != path) {
             return false;
-        } else if (manifest.empty()) {
+        }
+        if (manifest.empty()) {
             manifest = path;
         }
     }
 
     if (!manifest.empty()) {
         manifest = trim_trailing_slashes(manifest);
-        if (manifest.find('/') != std::string::npos || !has_extension(manifest, manifest_leaf_ext)) {
+        if (manifest.find('/') != std::string::npos ||
+            !has_extension(manifest, manifest_leaf_ext)) {
             return false;
         }
     }
@@ -331,23 +328,23 @@ bool logical_arch_folder_parts(const std::string& ref, const char* manifest_leaf
 
 }  // namespace
 
-bool is_logical_arch_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
-    return logical_arch_folder_parts(ref, manifest_leaf_ext, nullptr, nullptr);
+bool is_logical_variant_folder_ref(const std::string& ref, const char* manifest_leaf_ext) {
+    return logical_variant_folder_parts(ref, manifest_leaf_ext, nullptr, nullptr);
 }
 
-bool make_arch_folder_ref(const std::string& ref, const std::string& arch,
-                          const char* manifest_leaf_ext, std::string* out_ref) {
-    if (out_ref == nullptr || arch.empty() || arch == "unknown" || !is_arch_segment(arch)) {
+bool make_variant_folder_ref(const std::string& ref, const std::string& variant,
+                             const char* manifest_leaf_ext, std::string* out_ref) {
+    if (out_ref == nullptr || !is_safe_variant_segment(variant)) {
         return false;
     }
 
     ParsedRef parsed;
     std::string manifest;
-    if (!logical_arch_folder_parts(ref, manifest_leaf_ext, &parsed, &manifest)) {
+    if (!logical_variant_folder_parts(ref, manifest_leaf_ext, &parsed, &manifest)) {
         return false;
     }
 
-    *out_ref = "https://huggingface.co/" + parsed.org + "/" + parsed.repo + "/" + arch;
+    *out_ref = "https://huggingface.co/" + parsed.org + "/" + parsed.repo + "/" + variant;
     if (!manifest.empty()) {
         *out_ref += "/" + manifest;
     }
@@ -554,6 +551,32 @@ bool is_repo_housekeeping(const std::string& path) {
     return false;
 }
 
+bool is_downloadable_executable_code(const std::string& path) {
+    const std::string name = lowercase_copy(basename_of(path));
+    for (const char* extension : {
+             ".so",
+             ".dex",
+             ".jar",
+             ".apk",
+             ".aab",
+             ".class",
+             ".wasm",
+             ".dylib",
+             ".dll",
+             ".exe",
+             ".elf",
+             ".o",
+             ".a",
+         }) {
+        if (name.ends_with(extension)) {
+            return true;
+        }
+    }
+    // Reject versioned ELF shared objects such as libexample.so.1 as well.
+    const size_t so = name.rfind(".so.");
+    return so != std::string::npos && so + 4 < name.size();
+}
+
 }  // namespace
 
 rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
@@ -605,6 +628,10 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
             continue;
         }
         file.path = full_path.substr(prefix.size());
+        if (is_downloadable_executable_code(file.path)) {
+            *error = "refusing Hugging Face bundle containing executable code: " + file.path;
+            return RAC_ERROR_VALIDATION_FAILED;
+        }
         file.basename_lower = lowercase_copy(basename_of(file.path));
         bundle.push_back(std::move(file));
     }
@@ -613,8 +640,8 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
         return RAC_ERROR_NOT_FOUND;
     }
     std::ranges::sort(bundle, {}, &TreeFile::path);
-    const bool bundle_has_top_level_config =
-        std::ranges::any_of(bundle, [](const TreeFile& file) { return file.path == "config.json"; });
+    const bool bundle_has_top_level_config = std::ranges::any_of(
+        bundle, [](const TreeFile& file) { return file.path == "config.json"; });
 
     // Pick the primary: the manifest named by the ref, else the
     // alphabetically-first file the framework's bundle policy recognizes as a

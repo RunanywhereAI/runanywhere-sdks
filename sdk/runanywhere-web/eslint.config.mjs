@@ -66,8 +66,54 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/core/src/**/*.ts'],
+    rules: {
+      // Core defines provider-neutral contracts and must never depend on a
+      // concrete backend package.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@runanywhere/web-llamacpp',
+            '@runanywhere/web-llamacpp/*',
+            '@runanywhere/web-onnx',
+            '@runanywhere/web-onnx/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      'packages/llamacpp/src/**/*.ts',
+      'packages/onnx/src/**/*.ts',
+    ],
+    rules: {
+      // Backends integrate only through the bounded core contract and remain
+      // independent of sibling backend implementations.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@runanywhere/web/internal',
+            '@runanywhere/web-llamacpp',
+            '@runanywhere/web-llamacpp/*',
+            '@runanywhere/web-onnx',
+            '@runanywhere/web-onnx/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Config/script files outside the typed project — disable type-aware rules.
-    files: ['eslint.config.mjs', 'scripts/**/*.{js,mjs,cjs}'],
+    files: [
+      'eslint.config.mjs',
+      'playwright.config.ts',
+      'packages/core/src/Infrastructure/AudioCaptureProcessor.js',
+      'scripts/**/*.{js,mjs,cjs}',
+      'tests/browser/**/*.ts',
+    ],
     ...tseslint.configs.disableTypeChecked,
   },
 );

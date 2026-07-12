@@ -20,6 +20,7 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -42,6 +43,86 @@
 #include "features/rac_nonllm_lifecycle_bridge.h"
 
 namespace rac::voice_agent::detail {
+
+namespace {
+
+std::string sanitize_spoken_answer(const std::string& text) {
+    std::string sanitized;
+    sanitized.reserve(text.size());
+    bool pending_space = false;
+
+    for (const unsigned char byte : text) {
+        const bool is_ascii_whitespace = byte == ' ' || byte == '\t' || byte == '\n' ||
+                                         byte == '\r' || byte == '\f' || byte == '\v';
+        if (is_ascii_whitespace) {
+            pending_space = !sanitized.empty();
+            continue;
+        }
+        if (byte < 0x20 || byte == 0x7f) {
+            continue;
+        }
+        if (pending_space) {
+            sanitized.push_back(' ');
+            pending_space = false;
+        }
+        sanitized.push_back(static_cast<char>(byte));
+    }
+    return sanitized;
+}
+
+}  // namespace
+
+rac_llm_options_t make_voice_llm_options() {
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    options.max_tokens = kVoiceAgentMaxTokens;
+    options.temperature = kVoiceAgentTemperature;
+    options.top_p = 1.0f;
+    options.top_k = kVoiceAgentTopK;
+    options.seed = kVoiceAgentSeed;
+    options.system_prompt = kVoiceAgentSystemPrompt;
+    options.disable_thinking = RAC_TRUE;
+    return options;
+}
+
+VoiceResponseParts split_voice_response(const char* raw_text) {
+    VoiceResponseParts parts;
+    if (!raw_text) {
+        return parts;
+    }
+
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    if (rac_llm_extract_thinking(raw_text, &response, &response_len, &thinking, &thinking_len) ==
+        RAC_SUCCESS) {
+        if (response) {
+            parts.answer.assign(response, response_len);
+        }
+        if (thinking && thinking_len > 0) {
+            parts.thinking.assign(thinking, thinking_len);
+        }
+    } else {
+        parts.answer = raw_text;
+    }
+
+    // The extractor intentionally requires a closing tag. The stripping API
+    // also drops a trailing unclosed reasoning block, which is essential for
+    // voice output: a max-token cutoff must never make TTS read private chain
+    // of thought aloud. It also removes additional complete blocks after the
+    // first while the metadata above retains the first canonical trace.
+    const char* stripped = nullptr;
+    size_t stripped_len = 0;
+    if (rac_llm_strip_thinking(raw_text, &stripped, &stripped_len) == RAC_SUCCESS && stripped) {
+        parts.answer.assign(stripped, stripped_len);
+    }
+    parts.answer = sanitize_spoken_answer(parts.answer);
+    return parts;
+}
+
+rac_result_t validate_voice_response(const VoiceResponseParts& response) {
+    return response.answer.empty() ? RAC_ERROR_GENERATION_FAILED : RAC_SUCCESS;
+}
 
 // Per-handle in-flight admission guard. See the header for the
 // race it closes. The flag/counter live on the rac_voice_agent struct, so
@@ -240,8 +321,9 @@ void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, dou
     if (failed) {
         auto* err = sdk_event.mutable_error();
         err->set_c_abi_code(static_cast<int32_t>(error_code));
-        err->set_message(error_message != nullptr && error_message[0] != '\0' ? error_message
-                                                                              : "voice turn failed");
+        err->set_message(error_message != nullptr && error_message[0] != '\0'
+                             ? error_message
+                             : "voice turn failed");
         err->set_component("voice");
         err->set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     }
@@ -334,21 +416,6 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
     config.vad_config.energy_threshold = proto.vad_energy_threshold() > 0.0f
                                              ? proto.vad_energy_threshold()
                                              : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
-    config.wakeword_config.enabled = proto.wakeword_enabled() ? RAC_TRUE : RAC_FALSE;
-    config.wakeword_config.model_path =
-        proto.has_wakeword_model_path() ? proto.wakeword_model_path().c_str() : nullptr;
-    config.wakeword_config.model_id =
-        proto.has_wakeword_model_id() ? proto.wakeword_model_id().c_str() : nullptr;
-    config.wakeword_config.wake_word =
-        proto.has_wakeword_phrase() ? proto.wakeword_phrase().c_str() : nullptr;
-    config.wakeword_config.threshold = proto.wakeword_threshold() > 0.0f
-                                           ? proto.wakeword_threshold()
-                                           : RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT.threshold;
-    config.wakeword_config.embedding_model_path =
-        proto.has_wakeword_embedding_model_path() ? proto.wakeword_embedding_model_path().c_str()
-                                                  : nullptr;
-    config.wakeword_config.vad_model_path =
-        proto.has_wakeword_vad_model_path() ? proto.wakeword_vad_model_path().c_str() : nullptr;
     return config;
 }
 

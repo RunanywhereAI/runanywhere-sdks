@@ -45,9 +45,6 @@ class DartBridgeToolCalling {
   /// Parse LLM output bytes via commons.
   ToolParseResult parse(ToolParseRequest request) {
     final fn = RacNative.bindings.rac_tool_call_parse_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_tool_call_parse_proto is unavailable');
-    }
     return DartBridgeProtoUtils.callRequest<ToolParseResult>(
       request: request,
       invoke: fn,
@@ -59,10 +56,6 @@ class DartBridgeToolCalling {
   /// Format a tools-aware prompt via commons.
   ToolPromptFormatResult formatPrompt(ToolPromptFormatRequest request) {
     final fn = RacNative.bindings.rac_tool_call_format_prompt_proto;
-    if (fn == null) {
-      throw UnsupportedError(
-          'rac_tool_call_format_prompt_proto is unavailable');
-    }
     return DartBridgeProtoUtils.callRequest<ToolPromptFormatResult>(
       request: request,
       invoke: fn,
@@ -74,9 +67,6 @@ class DartBridgeToolCalling {
   /// Validate a parsed tool call via commons.
   ToolCallValidationResult validate(ToolCallValidationRequest request) {
     final fn = RacNative.bindings.rac_tool_call_validate_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_tool_call_validate_proto is unavailable');
-    }
     return DartBridgeProtoUtils.callRequest<ToolCallValidationResult>(
       request: request,
       invoke: fn,
@@ -90,9 +80,6 @@ class DartBridgeToolCalling {
   /// bytes.
   String toolValueToJson(ToolValue value) {
     final fn = RacNative.bindings.rac_tool_value_to_json_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_tool_value_to_json_proto is unavailable');
-    }
     final wrapper = DartBridgeProtoUtils.callRequest<ToolValueJSON>(
       request: value,
       invoke: fn,
@@ -106,9 +93,6 @@ class DartBridgeToolCalling {
   /// commons (`rac_tool_value_from_json_proto`); Dart only marshals bytes.
   ToolValue toolValueFromJson(String json) {
     final fn = RacNative.bindings.rac_tool_value_from_json_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_tool_value_from_json_proto is unavailable');
-    }
     final wrapper = ToolValueJSON(json: json);
     return DartBridgeProtoUtils.callRequest<ToolValue>(
       request: wrapper,
@@ -130,15 +114,9 @@ class DartBridgeToolCalling {
   ToolCallingSessionHandle createSession(
     ToolCallingSessionCreateRequest request,
   ) {
-    if (RacNative.bindings.rac_tool_calling_session_create_proto == null ||
-        RacNative.bindings.rac_tool_calling_session_step_with_result_proto ==
-            null ||
-        RacNative.bindings.rac_tool_calling_session_destroy_proto == null) {
-      throw UnsupportedError(
-        'rac_tool_calling_session_* proto APIs are unavailable',
-      );
-    }
-
+    // Ownership transfers to ToolCallingSessionHandle, whose close() method
+    // closes the controller after the worker port is quiesced.
+    // ignore: close_sinks
     final controller = StreamController<ToolCallingSessionEvent>.broadcast();
     final fromWorker = ReceivePort();
     final idCompleter = Completer<int>();
@@ -173,10 +151,10 @@ class DartBridgeToolCalling {
     final bytes = request.writeToBuffer();
     unawaited(() async {
       try {
-        final iso = await Isolate.spawn(
-          _toolSessionWorkerEntry,
-          <dynamic>[fromWorker.sendPort, bytes],
-        );
+        final iso = await Isolate.spawn(_toolSessionWorkerEntry, <dynamic>[
+          fromWorker.sendPort,
+          bytes,
+        ]);
         handle._isolate = iso;
         if (handle._closed) iso.kill(priority: Isolate.immediate);
       } catch (e, st) {
@@ -191,7 +169,6 @@ class DartBridgeToolCalling {
   /// Teardown a session handle (called by the session worker, not directly).
   void destroySession(int sessionHandle) {
     final fn = RacNative.bindings.rac_tool_calling_session_destroy_proto;
-    if (fn == null) return;
     try {
       fn(sessionHandle);
     } catch (e) {
@@ -202,15 +179,9 @@ class DartBridgeToolCalling {
   /// Cancel an in-flight session. Safe to call from any
   /// isolate; the native side latches the cancel and asks the in-flight
   /// LifecycleLlmRef to abort. Idempotent for unknown handles. Returns
-  /// false when the cancel ABI is not exported by the loaded libcommons.
+  /// false when the native cancellation call fails.
   bool cancelSession(int sessionHandle) {
     final fn = RacNative.bindings.rac_tool_calling_session_cancel_proto;
-    if (fn == null) {
-      _logger.warning(
-        'rac_tool_calling_session_cancel_proto is unavailable; falling back to destroy-only',
-      );
-      return false;
-    }
     try {
       fn(sessionHandle);
       return true;
@@ -226,15 +197,15 @@ class DartBridgeToolCalling {
 /// must be closed when the session ends.
 class ToolCallingSessionHandle {
   ToolCallingSessionHandle._({
-    required Future<int> sessionId,
-    required StreamController<ToolCallingSessionEvent> events,
-    required ReceivePort fromWorker,
-  })  : _sessionId = sessionId,
-        _events = events,
-        _fromWorker = fromWorker {
+    required this._sessionId,
+    required this._events,
+    required this._fromWorker,
+  }) {
     // Cache the resolved id for synchronous cancel. Errors are swallowed here —
     // a failed create surfaces through the events stream and to [sessionId].
-    _sessionId.then((id) => _resolvedId = id).catchError((Object _) => 0);
+    unawaited(
+      _sessionId.then((id) => _resolvedId = id).catchError((Object _) => 0),
+    );
   }
 
   final Future<int> _sessionId;
@@ -312,11 +283,12 @@ class ToolCallingSessionHandle {
 // isolate over `mainPort`. `RacNative.bindings` re-resolves the dylib symbols
 // on first access (idempotent `PlatformLoader.loadCommons()`).
 //
-// Protocol — worker → main: the control `SendPort` (first), then serialized
-// `ToolCallingSessionEvent` bytes per emission, then the `int` session id once
-// create returns; `['err', msg]` on a hard create/step failure. main → worker:
+// Protocol — worker → main: the control `SendPort` (first), then the `int`
+// session id published synchronously before initial generation, followed by
+// serialized `ToolCallingSessionEvent` bytes per emission; `['err', msg]` on a
+// hard create/step failure. main → worker:
 // `['step', toolCallId, resultJson, error]` to continue the loop; `'close'` to
-// destroy + quiesce + close the callback and exit. Cancellation is NOT routed
+// destroy + close the callback and exit. Cancellation is NOT routed
 // here — the thread-safe cancel ABI is called directly from the main isolate.
 void _toolSessionWorkerEntry(List<dynamic> args) {
   final mainPort = args[0] as SendPort;
@@ -326,29 +298,37 @@ void _toolSessionWorkerEntry(List<dynamic> args) {
   final createFn = bindings.rac_tool_calling_session_create_proto;
   final stepFn = bindings.rac_tool_calling_session_step_with_result_proto;
   final destroyFn = bindings.rac_tool_calling_session_destroy_proto;
-  if (createFn == null || stepFn == null || destroyFn == null) {
-    mainPort.send(<dynamic>['err', 'tool-calling session ABI unavailable']);
-    return;
-  }
 
   final control = ReceivePort();
   var sessionId = 0;
   var closed = false;
 
   final nativeCb =
-      ffi.NativeCallable<RacToolCallingSessionEventCallbackNative>.isolateLocal(
-          (ffi.Pointer<ffi.Uint8> bytesPtr, int bytesLen,
-              ffi.Pointer<ffi.Void> _) {
-    if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
-    // Copy synchronously — commons frees this buffer when the call returns.
-    mainPort.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
-  });
+      ffi.NativeCallable<
+        RacToolCallingSessionEventCallbackNative
+      >.isolateLocal((
+        ffi.Pointer<ffi.Uint8> bytesPtr,
+        int bytesLen,
+        ffi.Pointer<ffi.Void> _,
+      ) {
+        if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
+        // Copy synchronously — commons frees this buffer when the call returns.
+        mainPort.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
+      });
+  final nativeHandleCb =
+      ffi.NativeCallable<
+        RacToolCallingHandlePublishedCallbackNative
+      >.isolateLocal((int handle, ffi.Pointer<ffi.Void> _) {
+        // Commons invokes this synchronously before initial generation. Publish
+        // the handle immediately so cancellation cannot race the blocking turn.
+        sessionId = handle;
+        mainPort.send(handle);
+      });
 
   void cleanup() {
     if (closed) return;
     closed = true;
     if (sessionId != 0) destroyFn(sessionId);
-    bindings.rac_tool_calling_session_proto_quiesce?.call();
     nativeCb.close();
     control.close();
   }
@@ -383,24 +363,29 @@ void _toolSessionWorkerEntry(List<dynamic> args) {
   // First turn — blocks here; events fire via nativeCb → mainPort. Commons
   // returns once it needs a tool result (or on the final answer).
   final reqPtr = DartBridgeProtoUtils.copyBytes(createRequestBytes);
-  final handleOut = calloc<ffi.Uint64>();
   try {
     final code = createFn(
       reqPtr,
       createRequestBytes.length,
       nativeCb.nativeFunction,
       ffi.nullptr,
-      handleOut,
+      nativeHandleCb.nativeFunction,
+      ffi.nullptr,
     );
     if (code != 0) {
       mainPort.send(<dynamic>['err', 'create failed: code=$code']);
       cleanup();
       return;
     }
-    sessionId = handleOut.value;
-    mainPort.send(sessionId);
+    if (sessionId == 0) {
+      mainPort.send(<dynamic>[
+        'err',
+        'create returned without a session handle',
+      ]);
+      cleanup();
+    }
   } finally {
     calloc.free(reqPtr);
-    calloc.free(handleOut);
+    nativeHandleCb.close();
   }
 }

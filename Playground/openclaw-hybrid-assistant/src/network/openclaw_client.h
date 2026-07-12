@@ -75,7 +75,7 @@ public:
     // Poll for speak messages from the receive queue
     bool poll_speak_queue(SpeakMessage& out_message);
 
-    // Clear all pending speak messages (used during barge-in to discard stale responses)
+    // Clear all pending speak messages after playback cancellation.
     void clear_speak_queue();
 
     // Configuration

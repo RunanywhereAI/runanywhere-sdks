@@ -68,8 +68,11 @@ RAC_API rac_result_t rac_init(const rac_config_t* config);
 /**
  * Shuts down the commons library.
  *
- * This releases all resources and unregisters all modules. Any active
- * handles become invalid after this call.
+ * This is the canonical process-lifetime teardown boundary. It quiesces
+ * device callbacks, clears runtime state, auth-storage callbacks, copied SDK
+ * configuration/credentials, and the platform adapter. A real initialized
+ * lifetime emits exactly one canonical shutdown event. Any active handles
+ * become invalid after this call. The operation is idempotent.
  */
 RAC_API void rac_shutdown(void);
 
@@ -95,7 +98,7 @@ RAC_API rac_version_t rac_get_version(void);
  * truth every platform SDK delegates to for its public `version` constant
  * instead of hand-maintaining a copy that can drift.
  *
- * @return Static, NUL-terminated version string (e.g. "0.19.13"); never NULL,
+ * @return Static, NUL-terminated version string (e.g. "0.20.0"); never NULL,
  *         valid for the lifetime of the process. Do not free.
  */
 RAC_API const char* rac_sdk_get_version(void);
@@ -119,7 +122,7 @@ RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 // NOTE: The legacy service-registry surface (rac_service_request_t,
 // rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
 // rac_service_register_provider, rac_service_unregister_provider,
-// rac_service_create, rac_service_list_providers, RAC_DEPRECATED_LEGACY_SVC)
+// rac_service_create, rac_service_list_providers)
 // was REMOVED in v3.0.0 (RAC_PLUGIN_API_VERSION 3u).
 //
 // New code uses the unified plugin registry from rac/plugin/rac_plugin_entry.h

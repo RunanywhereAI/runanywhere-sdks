@@ -5,6 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 cd "$REPO_ROOT"
 
+# The CLI is a local developer target and consumes the staged XCFrameworks.
+export RUNANYWHERE_USE_LOCAL_NATIVES=1
+
 SWIFT_BUILD_JOBS="${SWIFT_BUILD_JOBS:-2}"
 CONFIGURATION="${CONFIGURATION:-debug}"
 PRODUCT="RunAnywhereMLXCLI"
@@ -55,7 +58,7 @@ metal_flags=(
 
 airs=()
 while IFS= read -r metal_file; do
-  rel="${metal_file#$MLX_KERNEL_DIR/}"
+  rel="${metal_file#"$MLX_KERNEL_DIR"/}"
   air_file="$AIR_DIR/${rel%.metal}.air"
   mkdir -p "$(dirname "$air_file")"
   echo "metal $rel"

@@ -5,10 +5,9 @@
  * Provides `RunAnywhere.tts.*` capability surface for owning TTS component
  * handles plus a `RunAnywhere.tts.synthesizeAuto(text, options)` shortcut.
  *
- * The proto-byte adapters (`TTSProtoAdapter`) take a numeric `handle` argument
- * — it comes from `_rac_tts_component_create()` followed by
- * `_rac_tts_component_load_voice()`. This facade owns those calls so the
- * example app and external consumers never have to touch raw exports.
+ * Low-level proto-byte adapter methods take a numeric component handle. The
+ * auto shortcut uses commons' lifecycle-owned TTS ABI so synthesis cannot
+ * evict the canonical model.
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
@@ -18,20 +17,20 @@ import {
   type TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
 import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
-import { SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import { SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
+} from '../../runtime/EmscriptenModule.js';
 import {
   missingSpeechBackendExports,
   speechBackendRequirementMessage,
-} from '../../runtime/SpeechBackendExports';
-import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
-import { AudioPlayback } from '../../Infrastructure/AudioPlayback';
+} from '../../runtime/SpeechBackendExports.js';
+import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
+import { AudioPlayback } from '../../Infrastructure/AudioPlayback.js';
 
 export type { TTSOptions, TTSOutput, TTSVoiceInfo };
 
@@ -80,6 +79,24 @@ function defaultTTSOptions(overrides?: Partial<TTSOptions>): TTSOptions {
     ...tTSOptionsDefaults(),
     ...(overrides ?? {}),
   };
+}
+
+function autoTTSOptions(options?: SynthesizeOptions): TTSOptions {
+  if (!options) return defaultTTSOptions();
+  const { voiceId, ...overrides } = options;
+  return defaultTTSOptions({
+    ...overrides,
+    voice: overrides.voice || voiceId || '',
+  });
+}
+
+function currentLifecycleVoiceId(): string | null {
+  if (!WebModelLifecycle.supportsNativeLifecycle()) return null;
+  const current = WebModelLifecycle.currentModel({
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    includeModelMetadata: true,
+  });
+  return current?.modelId || null;
 }
 
 function callCreate(module: TTSComponentModule): number {
@@ -171,8 +188,6 @@ export function stopTTSPlayback(): void {
 export interface SynthesizeOptions extends Partial<TTSOptions> {
   /** Optional explicit voice id. */
   voiceId?: string;
-  /** Optional explicit voice file path. Required when no voice has been loaded yet. */
-  voicePath?: string;
 }
 
 export const TTS = {
@@ -191,6 +206,13 @@ export const TTS = {
     if (typeof module._rac_tts_component_load_voice !== 'function') return false;
     if (typeof module._rac_tts_component_destroy !== 'function') return false;
     return TTSProtoAdapter.tryDefault()?.supportsProtoTTS() ?? false;
+  },
+
+  /** Whether the registered backend exposes lifecycle-owned TTS synthesis. */
+  supportsLifecycleProtoTTS(): boolean {
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
+    if (!module || missingSpeechBackendExports(module).length > 0) return false;
+    return TTSProtoAdapter.tryDefault()?.supportsLifecycleProtoTTS() ?? false;
   },
 
   /**
@@ -229,6 +251,13 @@ export const TTS = {
       );
     }
     return adapter.listVoices(handle) ?? [];
+  },
+
+  /** Enumerate voices through the currently lifecycle-owned TTS service. */
+  listLoadedVoices(): TTSVoiceInfo[] {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter) return [];
+    return adapter.listLifecycleVoices() ?? [];
   },
 
   /** Synthesize a chunk of text — returns an audio buffer. */
@@ -278,6 +307,14 @@ export const TTS = {
     return rc === 0;
   },
 
+  /** Stop synthesis on the model-lifecycle-owned TTS service. */
+  stopLoaded(): boolean {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter || !currentLifecycleVoiceId()) return false;
+    const state = adapter.stopLifecycle();
+    return state?.errorCode === 0;
+  },
+
   /** Unload the voice but keep the component handle alive. */
   unload(handle: number): boolean {
     const module = getModuleForCapability('tts') as TTSComponentModule | null;
@@ -295,41 +332,36 @@ export const TTS = {
 };
 
 /**
- * Top-level ergonomic shortcut: auto-creates a handle, loads the current TTS
- * voice from lifecycle (if any), synthesizes, destroys the handle.
+ * Top-level ergonomic shortcut. A lifecycle-owned TTS voice is synthesized
+ * directly through commons and remains loaded after this call.
  */
 export async function synthesize(
   text: string,
   options?: SynthesizeOptions,
 ): Promise<TTSOutput> {
-  let voicePath = options?.voicePath;
-  let voiceId = options?.voiceId;
-  let voiceName: string | undefined;
-
-  if (!voicePath && WebModelLifecycle.supportsNativeLifecycle()) {
-    const current = WebModelLifecycle.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      includeModelMetadata: true,
-    });
-    if (current?.modelId) {
-      voicePath = current.resolvedPath || current.modelId;
-      voiceId = current.modelId;
+  requireTTSModule('RunAnywhere.tts.synthesizeAuto');
+  const resolvedOptions = autoTTSOptions(options);
+  if (currentLifecycleVoiceId()) {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter?.supportsLifecycleProtoTTS()) {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.tts.synthesizeAuto',
+        'Loaded WASM module does not export rac_tts_synthesize_lifecycle_proto.',
+      );
     }
+    const output = adapter.synthesizeLifecycle(text, resolvedOptions);
+    if (!output) {
+      throw SDKException.notInitialized(
+        'TTS lifecycle synthesis failed. Reload the TTS model through RunAnywhere.loadModel(...) and retry.',
+      );
+    }
+    return output;
   }
 
-  const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
-  if (!voicePath) {
-    // Swift parity: RunAnywhere+TTS.swift:36 throws `.notInitialized` ("TTS voice not loaded").
-    throw SDKException.notInitialized(
-      'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
-    );
-  }
-
-  const handle = callCreate(module);
-  try {
-    callLoadVoice(module, handle, voicePath, voiceId, voiceName);
-    return TTS.synthesize(handle, text, options);
-  } finally {
-    TTS.destroy(handle);
-  }
+  // Swift parity: RunAnywhere+TTS.swift throws `.notInitialized` when no
+  // lifecycle voice is loaded. Explicit component handles remain available
+  // through the low-level TTS namespace for callers that own that lifecycle.
+  throw SDKException.notInitialized(
+    'No TTS voice is loaded. Call RunAnywhere.loadModel(...) before RunAnywhere.synthesize().',
+  );
 }

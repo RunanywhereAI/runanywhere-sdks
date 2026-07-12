@@ -11,6 +11,7 @@ import {
   isNativeQHexRTModuleAvailable,
 } from './native/NativeRunAnywhereQHexRT';
 import { SDKLogger } from '@runanywhere/core/internal';
+import type { HexagonArch } from '@runanywhere/proto-ts/hardware_profile';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('NPU.QHexRTProvider');
@@ -29,7 +30,7 @@ export class QHexRTProvider {
   static readonly moduleName = 'QHexRT';
   // Keep in sync with package.json "version" (same convention as the other
   // backend providers — there is no runtime package.json read in RN bundles).
-  static readonly version = '0.19.13';
+  static readonly version = '0.20.0';
 
   private static registered = false;
 
@@ -58,7 +59,9 @@ export class QHexRTProvider {
       const success = await native.registerBackend();
       if (success) {
         this.registered = true;
-        log.info('QHexRT backend registered successfully (covers LLM, VLM, STT, TTS)');
+        log.info(
+          'QHexRT backend registered successfully (covers LLM, VLM, STT, TTS)'
+        );
       }
       return success;
     } catch (error) {
@@ -91,7 +94,9 @@ export class QHexRTProvider {
       }
       return success;
     } catch (error) {
-      log.error(`QHexRT unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
+      log.error(
+        `QHexRT unregistration failed: ${error instanceof Error ? error.message : String(error)}`
+      );
       return false;
     }
   }
@@ -130,8 +135,35 @@ export class QHexRTProvider {
       const native = getNativeQHexRTModule();
       return await native.probeNpuProto();
     } catch (error) {
-      log.warning(`QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`);
+      log.warning(
+        `QHexRT NPU probe failed: ${error instanceof Error ? error.message : String(error)}`
+      );
       return null;
     }
+  }
+
+  static isArchitectureSupported(arch: HexagonArch): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().isArchitectureSupported(arch);
+  }
+
+  static modelSupportsArchitecture(
+    modelId: string,
+    arch: HexagonArch
+  ): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().modelSupportsArchitecture(modelId, arch);
+  }
+
+  static modelRequiresHfAuth(modelId: string): boolean {
+    if (!isNativeQHexRTModuleAvailable()) return false;
+    return getNativeQHexRTModule().modelRequiresHfAuth(modelId);
+  }
+
+  static async registerModelForDeviceRaw(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer | null> {
+    if (!isNativeQHexRTModuleAvailable()) return null;
+    return getNativeQHexRTModule().catalogRegisterModelProto(requestBytes);
   }
 }

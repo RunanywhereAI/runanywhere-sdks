@@ -39,7 +39,6 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
@@ -155,44 +154,6 @@ typedef struct rac_voice_agent_tts_config {
 } rac_voice_agent_tts_config_t;
 
 /**
- * @brief Wake word configuration for voice agent.
- */
-typedef struct rac_voice_agent_wakeword_config {
-    /** Whether wake word detection is enabled */
-    rac_bool_t enabled;
-
-    /** Wake word model path (ONNX format, e.g., "hey_jarvis.onnx") */
-    const char* model_path;
-
-    /** Wake word model ID for telemetry */
-    const char* model_id;
-
-    /** Human-readable wake word phrase (e.g., "Hey Jarvis") */
-    const char* wake_word;
-
-    /** Detection threshold (0.0 - 1.0, default: 0.5) */
-    float threshold;
-
-    /** Path to embedding model (required for openWakeWord) */
-    const char* embedding_model_path;
-
-    /** Path to Silero VAD model for pre-filtering (optional) */
-    const char* vad_model_path;
-} rac_voice_agent_wakeword_config_t;
-
-/**
- * @brief Default wake word configuration.
- */
-static const rac_voice_agent_wakeword_config_t RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT = {
-    .enabled = RAC_FALSE,
-    .model_path = RAC_NULL,
-    .model_id = RAC_NULL,
-    .wake_word = RAC_NULL,
-    .threshold = 0.5f,
-    .embedding_model_path = RAC_NULL,
-    .vad_model_path = RAC_NULL};
-
-/**
  * @brief Voice agent configuration.
  * Mirrors Swift's VoiceAgentConfiguration.
  */
@@ -209,8 +170,6 @@ typedef struct rac_voice_agent_config {
     /** TTS configuration */
     rac_voice_agent_tts_config_t tts_config;
 
-    /** Wake word configuration */
-    rac_voice_agent_wakeword_config_t wakeword_config;
 } rac_voice_agent_config_t;
 
 /**
@@ -220,14 +179,7 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
     .vad_config = {.sample_rate = 16000, .frame_length = 0.1f, .energy_threshold = 0.005f},
     .stt_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
     .llm_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
-    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL},
-    .wakeword_config = {.enabled = RAC_FALSE,
-                        .model_path = RAC_NULL,
-                        .model_id = RAC_NULL,
-                        .wake_word = RAC_NULL,
-                        .threshold = 0.5f,
-                        .embedding_model_path = RAC_NULL,
-                        .vad_model_path = RAC_NULL}};
+    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL}};
 
 // =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration
@@ -318,34 +270,9 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
- * @brief Create a voice agent instance with externally-managed component handles.
- *
- * Use this when you already have LLM/STT/TTS/VAD ComponentActors loaded and want
- * to compose them into a voice-agent session sharing their handles. The
- * voice-agent owns the resulting composite but does NOT take ownership of the
- * child component handles.
- *
- * For a fully-managed voice agent that creates its own children, use
- * `rac_voice_agent_create_standalone()`.
- *
- * @param llm_component_handle Handle to LLM component (rac_llm_component)
- * @param stt_component_handle Handle to STT component (rac_stt_component)
- * @param tts_component_handle Handle to TTS component (rac_tts_component)
- * @param vad_component_handle Handle to VAD component (rac_vad_component)
- * @param out_handle Output: Handle to the created voice agent
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
-                                            rac_handle_t stt_component_handle,
-                                            rac_handle_t tts_component_handle,
-                                            rac_handle_t vad_component_handle,
-                                            rac_voice_agent_handle_t* out_handle);
-
-/**
  * @brief Destroy a voice agent instance.
  *
- * If created with rac_voice_agent_create_standalone(), this also destroys
- * the owned component handles.
+ * Also destroys the component handles owned by the voice agent.
  *
  * @param handle Voice agent handle
  */
@@ -528,6 +455,20 @@ typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_byte
 RAC_API rac_result_t rac_voice_agent_process_turn_proto(
     rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
     rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);
+
+/**
+ * @brief Cancel one request-scoped voice turn.
+ *
+ * @p request_bytes contains a serialized `VoiceAgentTurnRequest`; only its
+ * non-empty `request_id` is consumed. Cancellation is cooperative: an active
+ * LLM/TTS backend receives its native interrupt immediately, while a
+ * non-interruptible STT call is allowed to return and the pipeline exits at
+ * the next stage boundary. A cancel that arrives just before the turn starts
+ * remains keyed to that request id and cannot affect a later turn.
+ */
+RAC_API rac_result_t rac_voice_agent_cancel_turn_proto(rac_voice_agent_handle_t handle,
+                                                       const uint8_t* request_bytes,
+                                                       size_t request_size);
 
 /**
  * @brief Streaming raw-frame audio ingress with in-core segmentation.

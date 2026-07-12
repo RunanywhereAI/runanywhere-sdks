@@ -36,6 +36,10 @@ final class VoiceAgentViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAgent")
     private var cancellables = Set<AnyCancellable>()
 
+    // Hardware-aware, pure recommendation helpers (example-app only).
+    private let recommendationEngine = ModelRecommendationEngine()
+    private let tierResolver = HardwareTierResolver()
+
     // MARK: - Published State (Observable by Views)
 
     /// Current session state
@@ -73,6 +77,9 @@ final class VoiceAgentViewModel: ObservableObject {
     /// Selected TTS model
     @Published var ttsModel: SelectedModelInfo?
 
+    /// Selected VAD model (auto-loaded by the SDK; surfaced for the setup card).
+    @Published var vadModel: SelectedModelInfo?
+
     /// STT model loading state
     @Published private(set) var sttModelState: ModelLoadState = .notLoaded
 
@@ -81,6 +88,22 @@ final class VoiceAgentViewModel: ObservableObject {
 
     /// TTS model loading state
     @Published private(set) var ttsModelState: ModelLoadState = .notLoaded
+
+    // MARK: - One-tap Pipeline Setup State
+
+    /// True while `downloadAndLoadAll()` is sequencing the trio's downloads/loads.
+    @Published private(set) var isSettingUpPipeline = false
+
+    /// Per-component download progress (0...1) while the one-tap setup runs.
+    @Published private(set) var sttDownloadProgress: Double = 0
+    @Published private(set) var llmDownloadProgress: Double = 0
+    @Published private(set) var ttsDownloadProgress: Double = 0
+
+    /// Human-readable status for the current setup step (e.g. "Downloading voice…").
+    @Published private(set) var pipelineSetupStatus: String?
+
+    /// Whether the best-for-device trio has been pre-selected into the slots.
+    @Published private(set) var didPreselectPipeline = false
 
     // MARK: - Computed Properties (for View)
 
@@ -197,6 +220,11 @@ final class VoiceAgentViewModel: ObservableObject {
         // Sync current model states from SDK
         await syncModelStates()
 
+        // Ensure the catalog is loaded, then pre-select the best-for-device trio
+        // so the user doesn't have to pick anything by hand.
+        await ModelListViewModel.shared.loadModelsFromRegistry()
+        preselectRecommendedPipeline()
+
         currentStatus = "Ready"
         isInitialized = true
         logger.info("Voice agent initialized successfully")
@@ -208,6 +236,7 @@ final class VoiceAgentViewModel: ObservableObject {
     func refreshComponentStatesFromSDK() {
         Task {
             await syncModelStates()
+            preselectRecommendedPipeline()
         }
     }
 
@@ -432,6 +461,119 @@ final class VoiceAgentViewModel: ObservableObject {
         await syncModelStates()
     }
 
+    // MARK: - One-tap Pipeline Setup
+
+    /// Pre-select the best-for-device STT + LLM + TTS (+ VAD) into the pipeline
+    /// slots. Only fills slots the user hasn't already loaded, so a manual pick
+    /// is never clobbered. Pure recommendation → app state; no SDK loads here.
+    func preselectRecommendedPipeline() {
+        let models = ModelListViewModel.shared.availableModels
+        guard !models.isEmpty else { return }
+
+        let tier = tierResolver.resolve(from: DeviceInfoService.shared.deviceInfo)
+        let pipeline = recommendationEngine.recommendVoicePipeline(
+            tier: tier,
+            appleFoundationAvailable: tierResolver.appleFoundationAvailable,
+            from: models
+        )
+
+        if sttModel == nil, let stt = pipeline.stt { sttModel = selectedInfo(stt) }
+        if llmModel == nil, let llm = pipeline.llm { llmModel = selectedInfo(llm) }
+        if ttsModel == nil, let tts = pipeline.tts { ttsModel = selectedInfo(tts) }
+        if vadModel == nil, let vad = pipeline.vad { vadModel = selectedInfo(vad) }
+
+        didPreselectPipeline = true
+        logger.info("Preselected voice pipeline (tier: \(tier.displayName, privacy: .public))")
+    }
+
+    /// Download (if needed) and load all three pipeline components in sequence,
+    /// reporting per-component progress. VAD is downloaded when needed; the SDK
+    /// auto-loads it during `startConversation()`.
+    func downloadAndLoadAll() async {
+        guard !isSettingUpPipeline else { return }
+        isSettingUpPipeline = true
+        errorMessage = nil
+        defer {
+            isSettingUpPipeline = false
+            pipelineSetupStatus = nil
+        }
+
+        let models = ModelListViewModel.shared.availableModels
+        func model(_ id: String?) -> RAModelInfo? {
+            guard let id else { return nil }
+            return models.first { $0.id == id }
+        }
+
+        // VAD first (no user-facing slot, but required by the pipeline).
+        if let vad = model(vadModel?.id) {
+            await ensureDownloaded(vad) { _ in }
+        }
+
+        if let stt = model(sttModel?.id) {
+            pipelineSetupStatus = "Setting up speech recognition…"
+            await setup(stt, category: .speechRecognition) { [weak self] value in
+                self?.sttDownloadProgress = value
+            }
+        }
+        if let llm = model(llmModel?.id) {
+            pipelineSetupStatus = "Setting up the assistant…"
+            await setup(llm, category: .language) { [weak self] value in
+                self?.llmDownloadProgress = value
+            }
+        }
+        if let tts = model(ttsModel?.id) {
+            pipelineSetupStatus = "Setting up the voice…"
+            await setup(tts, category: .speechSynthesis) { [weak self] value in
+                self?.ttsDownloadProgress = value
+            }
+        }
+
+        await syncModelStates()
+    }
+
+    // MARK: - Setup helpers
+
+    private func selectedInfo(_ model: RAModelInfo) -> SelectedModelInfo {
+        SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
+    }
+
+    /// Download a model if it isn't already local/built-in, reporting progress.
+    private func ensureDownloaded(_ model: RAModelInfo, progress: @escaping (Double) -> Void) async {
+        guard !model.isBuiltIn, model.localPathURL == nil else {
+            progress(1)
+            return
+        }
+        do {
+            try await RunAnywhere.downloadModel(model) { update in
+                await MainActor.run { progress(Double(update.overallProgress)) }
+            }
+            await MainActor.run { progress(1) }
+        } catch {
+            let reason = error.localizedDescription
+            logger.error("Voice component download failed for \(model.id, privacy: .public): \(reason, privacy: .public)")
+        }
+    }
+
+    /// Download (if needed) then load one component into its SDK lifecycle slot.
+    /// Loading is by model id — the SDK resolves the freshly downloaded path.
+    private func setup(
+        _ model: RAModelInfo,
+        category: RAModelCategory,
+        progress: @escaping (Double) -> Void
+    ) async {
+        await ensureDownloaded(model, progress: progress)
+
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = category
+        let result = await RunAnywhere.loadModel(request)
+        if !result.success {
+            errorMessage = result.errorMessage.isEmpty
+                ? "Failed to set up \(model.name)."
+                : result.errorMessage
+        }
+    }
+
     // MARK: - Conversation Control
 
     /// Start a voice conversation using the canonical
@@ -636,6 +778,9 @@ final class VoiceAgentViewModel: ObservableObject {
     }
     var currentTTSModel: String {
         ttsModel?.name.modelNameFromID() ?? "Not loaded"
+    }
+    var currentVADModel: String {
+        vadModel?.name.modelNameFromID() ?? "Speech detector"
     }
     var whisperModel: String { currentSTTModel }
 }

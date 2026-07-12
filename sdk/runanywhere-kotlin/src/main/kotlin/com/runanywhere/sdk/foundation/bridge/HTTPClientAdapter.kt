@@ -18,8 +18,8 @@
  * `expect`/`actual` thin Kotlin shim so commonMain doesn't depend on
  * the JNI bridge types defined in jvmAndroidMain.
  *
- * Concurrency: Swift uses `actor` isolation. Kotlin uses `Mutex` to
- * guard the `baseURL` / `apiKey` configuration state and runs the
+ * Concurrency: Swift uses `actor` isolation. Kotlin uses a synchronized
+ * lock to guard the `baseURL` / `apiKey` configuration state and runs the
  * blocking JNI `racHttpRequestExecute` call on `Dispatchers.IO`.
  */
 
@@ -32,9 +32,8 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeHttpResponse
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.net.URI
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
@@ -69,7 +68,7 @@ internal data class ApiErrorInfo(
 /**
  * HTTPClientAdapter — thin Kotlin bridge over `rac_http_client_*`.
  *
- * Singleton object (Swift uses an `actor`; Kotlin uses a `Mutex`-guarded
+ * Singleton object (Swift uses an `actor`; Kotlin uses a lock-guarded
  * `object` to provide equivalent state isolation while keeping the API
  * surface symmetrical across SDKs).
  */
@@ -92,11 +91,14 @@ public object HTTPClientAdapter {
     private const val DEV_DEVICE_REGISTER_UPSERT_FIELD: String = "device_id"
 
     private val logger = SDKLogger("HTTPClientAdapter")
-    private val stateMutex = Mutex()
+    private val stateLock = Any()
 
-    @Volatile private var baseURL: String? = null
+    private data class Configuration(
+        val baseURL: String,
+        val apiKey: String,
+    )
 
-    @Volatile private var apiKey: String? = null
+    @Volatile private var configuration: Configuration? = null
 
     // Configuration
 
@@ -108,22 +110,27 @@ public object HTTPClientAdapter {
      */
     public suspend fun configure(baseURL: String, apiKey: String) {
         val trimmedKey = apiKey.trim()
-        stateMutex.withLock {
+        synchronized(stateLock) {
             if (!isUsableHTTPURL(baseURL) || !isUsableCredential(trimmedKey)) {
-                this.baseURL = null
-                this.apiKey = null
+                configuration = null
                 logger.info("HTTP adapter not configured: no usable external config")
                 return
             }
-            this.baseURL = baseURL.trimEnd('/')
-            this.apiKey = trimmedKey
-            logger.info("HTTP adapter configured with base URL: $baseURL")
+            configuration = Configuration(baseURL = baseURL.trimEnd('/'), apiKey = trimmedKey)
+            logger.info("HTTP adapter configured with base URL: ${urlForLog(baseURL)}")
+        }
+    }
+
+    /** Clear copied credentials before a new SDK lifetime can begin. */
+    internal fun reset() {
+        synchronized(stateLock) {
+            configuration = null
         }
     }
 
     /** True iff [configure] has been called with a non-null base URL. */
     public val isConfigured: Boolean
-        get() = baseURL != null
+        get() = configuration != null
 
     /**
      * True iff the adapter has both a usable HTTP URL and a usable API
@@ -131,8 +138,8 @@ public object HTTPClientAdapter {
      */
     public val hasUsableConfiguration: Boolean
         get() {
-            val url = baseURL ?: return false
-            return isUsableHTTPURL(url) && isUsableCredential(apiKey)
+            val snapshot = configuration ?: return false
+            return isUsableHTTPURL(snapshot.baseURL) && isUsableCredential(snapshot.apiKey)
         }
 
     // Public request surface
@@ -194,14 +201,15 @@ public object HTTPClientAdapter {
         body: ByteArray?,
         requiresAuth: Boolean,
     ): ByteArray {
-        val base = baseURL ?: throw SDKException.networkError("HTTP adapter not configured")
-        val url = buildURL(base = base, path = path)
-        val token = resolveToken(requiresAuth = requiresAuth)
+        val snapshot = configuration ?: throw SDKException.networkError("HTTP adapter not configured")
+        val url = buildURL(base = snapshot.baseURL, path = path)
+        val token = resolveToken(requiresAuth = requiresAuth, apiKey = snapshot.apiKey)
+        requireCurrentConfiguration(snapshot)
         val isUpsert = path.contains(DEV_DEVICE_REGISTER_MARKER)
 
         val headers =
             buildHeaders(
-                apiKey = apiKey,
+                apiKey = snapshot.apiKey,
                 authToken = token.ifEmpty { null },
                 upsert = isUpsert,
             )
@@ -220,7 +228,11 @@ public object HTTPClientAdapter {
                     headerValues = headerValues,
                     body = body,
                     timeoutMs = DEFAULT_TIMEOUT_MS,
-                    followRedirects = true,
+                    // Control-plane requests carry the API key and may also
+                    // contain device-registration metadata/build tokens.
+                    // Fail on redirects so no custom credential or payload is
+                    // replayed to a different origin.
+                    followRedirects = false,
                     onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
                 )
             } else {
@@ -231,10 +243,17 @@ public object HTTPClientAdapter {
                     headerValues = headerValues,
                     body = body,
                     timeoutMs = DEFAULT_TIMEOUT_MS,
-                    followRedirects = true,
+                    followRedirects = false,
                 )
             }
+        requireCurrentConfiguration(snapshot)
         return interpretResult(result, method = method, url = url)
+    }
+
+    private fun requireCurrentConfiguration(snapshot: Configuration) {
+        if (configuration !== snapshot) {
+            throw SDKException.invalidState("HTTP request belongs to a retired SDK lifetime")
+        }
     }
 
     /**
@@ -244,12 +263,11 @@ public object HTTPClientAdapter {
      *  - When auth is required and a valid token is available → use it.
      *  - Otherwise fall back to the API key, throwing if none is set.
      */
-    private suspend fun resolveToken(requiresAuth: Boolean): String {
-        if (!requiresAuth) return apiKey ?: ""
+    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String): String {
+        if (!requiresAuth) return apiKey
         val token = platformResolveAuthToken()
         if (!token.isNullOrEmpty()) return token
-        val key = apiKey
-        if (!key.isNullOrEmpty()) return key
+        if (apiKey.isNotEmpty()) return apiKey
         throw SDKException.authenticationFailed(reason = "No valid authentication token")
     }
 
@@ -266,21 +284,35 @@ public object HTTPClientAdapter {
         method: String,
         url: String,
     ): ByteArray {
+        val safeUrl = urlForLog(url)
         if (result.transportError != null) {
-            logger.error("HTTP transport failure for $method $url: ${result.transportError}")
-            throw SDKException.networkError("HTTP transport error: ${result.transportError}")
+            val message = "HTTP transport failure for $method $safeUrl"
+            logger.error(message)
+            throw SDKException.networkError(message)
         }
         if (result.statusCode in 200..299) return result.body
 
-        logger.error(
-            "HTTP ${result.statusCode}: $method $url — ${result.body.decodeToString().take(1000)}",
-        )
+        val message = "HTTP ${result.statusCode}: $method $safeUrl"
+        if (result.statusCode == 404 && url.contains(TELEMETRY_ENDPOINT_MARKER)) {
+            logger.warn(message)
+        } else {
+            logger.error(message)
+        }
         throw mapAPIError(
             statusCode = result.statusCode,
             body = result.body,
             url = url,
         )
     }
+
+    private fun urlForLog(value: String): String =
+        runCatching {
+            val uri = URI(value)
+            val scheme = uri.scheme ?: return@runCatching "<redacted-url>"
+            val host = uri.host ?: return@runCatching "<redacted-url>"
+            val port = if (uri.port >= 0) ":${uri.port}" else ""
+            "$scheme://$host$port${uri.rawPath.orEmpty()}"
+        }.getOrDefault("<redacted-url>")
 
     /**
      * Map an HTTP error (status + body) to [SDKException]. Mirrors Swift's
@@ -416,6 +448,8 @@ public object HTTPClientAdapter {
     /** Minimum credential length matching commons'
      *  `RAC_MIN_CREDENTIAL_LEN` policy (8 bytes for an API key prefix). */
     private const val MIN_CREDENTIAL_LENGTH: Int = 8
+
+    private const val TELEMETRY_ENDPOINT_MARKER: String = "/telemetry/"
 }
 
 internal suspend fun platformExecuteHttp(

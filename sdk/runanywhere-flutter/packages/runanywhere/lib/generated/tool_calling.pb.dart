@@ -596,7 +596,6 @@ class ToolCall extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? argumentsJson,
     $core.String? type,
-    $core.String? callId,
     $fixnum.Int64? createdAtMs,
     $core.String? rawText,
   }) {
@@ -605,7 +604,6 @@ class ToolCall extends $pb.GeneratedMessage {
     if (name != null) result.name = name;
     if (argumentsJson != null) result.argumentsJson = argumentsJson;
     if (type != null) result.type = type;
-    if (callId != null) result.callId = callId;
     if (createdAtMs != null) result.createdAtMs = createdAtMs;
     if (rawText != null) result.rawText = rawText;
     return result;
@@ -628,7 +626,6 @@ class ToolCall extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'argumentsJson')
     ..aOS(4, _omitFieldNames ? '' : 'type')
-    ..aOS(6, _omitFieldNames ? '' : 'callId')
     ..aInt64(7, _omitFieldNames ? '' : 'createdAtMs')
     ..aOS(8, _omitFieldNames ? '' : 'rawText')
     ..hasRequiredFields = false;
@@ -697,31 +694,21 @@ class ToolCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearType() => $_clearField(4);
 
-  /// Alias for id used by pre-proto SDK surfaces.
-  @$pb.TagNumber(6)
-  $core.String get callId => $_getSZ(4);
-  @$pb.TagNumber(6)
-  set callId($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasCallId() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearCallId() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $fixnum.Int64 get createdAtMs => $_getI64(5);
+  $fixnum.Int64 get createdAtMs => $_getI64(4);
   @$pb.TagNumber(7)
-  set createdAtMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set createdAtMs($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasCreatedAtMs() => $_has(5);
+  $core.bool hasCreatedAtMs() => $_has(4);
   @$pb.TagNumber(7)
   void clearCreatedAtMs() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get rawText => $_getSZ(6);
+  $core.String get rawText => $_getSZ(5);
   @$pb.TagNumber(8)
-  set rawText($core.String value) => $_setString(6, value);
+  set rawText($core.String value) => $_setString(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasRawText() => $_has(6);
+  $core.bool hasRawText() => $_has(5);
   @$pb.TagNumber(8)
   void clearRawText() => $_clearField(8);
 }
@@ -737,7 +724,6 @@ class ToolResult extends $pb.GeneratedMessage {
     $core.String? resultJson,
     $core.String? error,
     $core.bool? success,
-    $core.String? callId,
     $fixnum.Int64? startedAtMs,
     $fixnum.Int64? completedAtMs,
   }) {
@@ -747,7 +733,6 @@ class ToolResult extends $pb.GeneratedMessage {
     if (resultJson != null) result.resultJson = resultJson;
     if (error != null) result.error = error;
     if (success != null) result.success = success;
-    if (callId != null) result.callId = callId;
     if (startedAtMs != null) result.startedAtMs = startedAtMs;
     if (completedAtMs != null) result.completedAtMs = completedAtMs;
     return result;
@@ -771,7 +756,6 @@ class ToolResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'resultJson')
     ..aOS(4, _omitFieldNames ? '' : 'error')
     ..aOB(5, _omitFieldNames ? '' : 'success')
-    ..aOS(7, _omitFieldNames ? '' : 'callId')
     ..aInt64(8, _omitFieldNames ? '' : 'startedAtMs')
     ..aInt64(9, _omitFieldNames ? '' : 'completedAtMs')
     ..hasRequiredFields = false;
@@ -847,31 +831,21 @@ class ToolResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearSuccess() => $_clearField(5);
 
-  /// Alias for tool_call_id used by pre-proto SDK surfaces.
-  @$pb.TagNumber(7)
-  $core.String get callId => $_getSZ(5);
-  @$pb.TagNumber(7)
-  set callId($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(7)
-  $core.bool hasCallId() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearCallId() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $fixnum.Int64 get startedAtMs => $_getI64(6);
+  $fixnum.Int64 get startedAtMs => $_getI64(5);
   @$pb.TagNumber(8)
-  set startedAtMs($fixnum.Int64 value) => $_setInt64(6, value);
+  set startedAtMs($fixnum.Int64 value) => $_setInt64(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasStartedAtMs() => $_has(6);
+  $core.bool hasStartedAtMs() => $_has(5);
   @$pb.TagNumber(8)
   void clearStartedAtMs() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $fixnum.Int64 get completedAtMs => $_getI64(7);
+  $fixnum.Int64 get completedAtMs => $_getI64(6);
   @$pb.TagNumber(9)
-  set completedAtMs($fixnum.Int64 value) => $_setInt64(7, value);
+  set completedAtMs($fixnum.Int64 value) => $_setInt64(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasCompletedAtMs() => $_has(7);
+  $core.bool hasCompletedAtMs() => $_has(6);
   @$pb.TagNumber(9)
   void clearCompletedAtMs() => $_clearField(9);
 }
@@ -882,26 +856,21 @@ class ToolResult extends $pb.GeneratedMessage {
 class ToolCallingOptions extends $pb.GeneratedMessage {
   factory ToolCallingOptions({
     $core.Iterable<ToolDefinition>? tools,
-    $core.int? maxIterations,
     $core.bool? autoExecute,
     $core.double? temperature,
     $core.int? maxTokens,
     $core.String? systemPrompt,
     $core.bool? replaceSystemPrompt,
     $core.bool? keepToolsAvailable,
-    $core.String? formatHint,
     ToolCallFormatName? format,
-    $core.String? customSystemPrompt,
     $core.int? maxToolCalls,
     ToolChoiceMode? toolChoice,
     $core.String? forcedToolName,
-    $core.bool? parallelToolCalls,
     $core.bool? requireJsonArguments,
     $core.bool? disableThinking,
   }) {
     final result = create();
     if (tools != null) result.tools.addAll(tools);
-    if (maxIterations != null) result.maxIterations = maxIterations;
     if (autoExecute != null) result.autoExecute = autoExecute;
     if (temperature != null) result.temperature = temperature;
     if (maxTokens != null) result.maxTokens = maxTokens;
@@ -910,14 +879,10 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
       result.replaceSystemPrompt = replaceSystemPrompt;
     if (keepToolsAvailable != null)
       result.keepToolsAvailable = keepToolsAvailable;
-    if (formatHint != null) result.formatHint = formatHint;
     if (format != null) result.format = format;
-    if (customSystemPrompt != null)
-      result.customSystemPrompt = customSystemPrompt;
     if (maxToolCalls != null) result.maxToolCalls = maxToolCalls;
     if (toolChoice != null) result.toolChoice = toolChoice;
     if (forcedToolName != null) result.forcedToolName = forcedToolName;
-    if (parallelToolCalls != null) result.parallelToolCalls = parallelToolCalls;
     if (requireJsonArguments != null)
       result.requireJsonArguments = requireJsonArguments;
     if (disableThinking != null) result.disableThinking = disableThinking;
@@ -939,22 +904,18 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..pPM<ToolDefinition>(1, _omitFieldNames ? '' : 'tools',
         subBuilder: ToolDefinition.create)
-    ..aI(2, _omitFieldNames ? '' : 'maxIterations')
     ..aOB(3, _omitFieldNames ? '' : 'autoExecute')
     ..aD(4, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aI(5, _omitFieldNames ? '' : 'maxTokens')
     ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(7, _omitFieldNames ? '' : 'replaceSystemPrompt')
     ..aOB(8, _omitFieldNames ? '' : 'keepToolsAvailable')
-    ..aOS(9, _omitFieldNames ? '' : 'formatHint')
     ..aE<ToolCallFormatName>(10, _omitFieldNames ? '' : 'format',
         enumValues: ToolCallFormatName.values)
-    ..aOS(11, _omitFieldNames ? '' : 'customSystemPrompt')
     ..aI(12, _omitFieldNames ? '' : 'maxToolCalls')
     ..aE<ToolChoiceMode>(13, _omitFieldNames ? '' : 'toolChoice',
         enumValues: ToolChoiceMode.values)
     ..aOS(14, _omitFieldNames ? '' : 'forcedToolName')
-    ..aOB(15, _omitFieldNames ? '' : 'parallelToolCalls')
     ..aOB(16, _omitFieldNames ? '' : 'requireJsonArguments')
     ..aOB(17, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
@@ -983,159 +944,113 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $pb.PbList<ToolDefinition> get tools => $_getList(0);
 
-  /// Maximum tool-call iterations in one conversation turn. 0 = SDK default
-  /// (typically 5).
-  @$pb.TagNumber(2)
-  $core.int get maxIterations => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set maxIterations($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasMaxIterations() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearMaxIterations() => $_clearField(2);
-
   /// Whether to auto-execute tools or hand them back to the caller.
   @$pb.TagNumber(3)
-  $core.bool get autoExecute => $_getBF(2);
+  $core.bool get autoExecute => $_getBF(1);
   @$pb.TagNumber(3)
-  set autoExecute($core.bool value) => $_setBool(2, value);
+  set autoExecute($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasAutoExecute() => $_has(2);
+  $core.bool hasAutoExecute() => $_has(1);
   @$pb.TagNumber(3)
   void clearAutoExecute() => $_clearField(3);
 
   /// Sampling temperature override (Swift: optional Float).
   @$pb.TagNumber(4)
-  $core.double get temperature => $_getN(3);
+  $core.double get temperature => $_getN(2);
   @$pb.TagNumber(4)
-  set temperature($core.double value) => $_setFloat(3, value);
+  set temperature($core.double value) => $_setFloat(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasTemperature() => $_has(3);
+  $core.bool hasTemperature() => $_has(2);
   @$pb.TagNumber(4)
   void clearTemperature() => $_clearField(4);
 
   /// Maximum tokens override.
   @$pb.TagNumber(5)
-  $core.int get maxTokens => $_getIZ(4);
+  $core.int get maxTokens => $_getIZ(3);
   @$pb.TagNumber(5)
-  set maxTokens($core.int value) => $_setSignedInt32(4, value);
+  set maxTokens($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasMaxTokens() => $_has(4);
+  $core.bool hasMaxTokens() => $_has(3);
   @$pb.TagNumber(5)
   void clearMaxTokens() => $_clearField(5);
 
   /// System prompt to use during tool-enabled generation.
   @$pb.TagNumber(6)
-  $core.String get systemPrompt => $_getSZ(5);
+  $core.String get systemPrompt => $_getSZ(4);
   @$pb.TagNumber(6)
-  set systemPrompt($core.String value) => $_setString(5, value);
+  set systemPrompt($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasSystemPrompt() => $_has(5);
+  $core.bool hasSystemPrompt() => $_has(4);
   @$pb.TagNumber(6)
   void clearSystemPrompt() => $_clearField(6);
 
   /// If true, replaces the system prompt entirely (no auto-injected
   /// tool instructions).
   @$pb.TagNumber(7)
-  $core.bool get replaceSystemPrompt => $_getBF(6);
+  $core.bool get replaceSystemPrompt => $_getBF(5);
   @$pb.TagNumber(7)
-  set replaceSystemPrompt($core.bool value) => $_setBool(6, value);
+  set replaceSystemPrompt($core.bool value) => $_setBool(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasReplaceSystemPrompt() => $_has(6);
+  $core.bool hasReplaceSystemPrompt() => $_has(5);
   @$pb.TagNumber(7)
   void clearReplaceSystemPrompt() => $_clearField(7);
 
   /// If true, keeps tool definitions available across multiple sequential
   /// tool calls in one generation.
   @$pb.TagNumber(8)
-  $core.bool get keepToolsAvailable => $_getBF(7);
+  $core.bool get keepToolsAvailable => $_getBF(6);
   @$pb.TagNumber(8)
-  set keepToolsAvailable($core.bool value) => $_setBool(7, value);
+  set keepToolsAvailable($core.bool value) => $_setBool(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasKeepToolsAvailable() => $_has(7);
+  $core.bool hasKeepToolsAvailable() => $_has(6);
   @$pb.TagNumber(8)
   void clearKeepToolsAvailable() => $_clearField(8);
 
-  /// Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
-  /// Empty = SDK default.
-  @$pb.TagNumber(9)
-  $core.String get formatHint => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set formatHint($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasFormatHint() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearFormatHint() => $_clearField(9);
-
-  /// Strongly-typed tool-call format. Preferred over `format_hint` when set;
-  /// `format_hint` remains for legacy callers and per-SDK custom strings
-  /// that don't round-trip through this enum.
+  /// Typed tool-call format. Unset lets commons select the model default.
   @$pb.TagNumber(10)
-  ToolCallFormatName get format => $_getN(9);
+  ToolCallFormatName get format => $_getN(7);
   @$pb.TagNumber(10)
   set format(ToolCallFormatName value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasFormat() => $_has(9);
+  $core.bool hasFormat() => $_has(7);
   @$pb.TagNumber(10)
   void clearFormat() => $_clearField(10);
 
-  /// Caller-supplied system prompt that fully replaces the SDK-injected
-  /// tool-calling system prompt (rather than being merged with it).
-  /// Distinct from `system_prompt` (field 6), which is merged unless
-  /// `replace_system_prompt` is true.
-  @$pb.TagNumber(11)
-  $core.String get customSystemPrompt => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set customSystemPrompt($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasCustomSystemPrompt() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearCustomSystemPrompt() => $_clearField(11);
-
-  /// C ABI / SDK field name for max_iterations. 0 = use max_iterations or
-  /// SDK default.
+  /// Maximum tool calls in one conversation turn. Unset/0 = SDK default
+  /// (typically 5).
   @$pb.TagNumber(12)
-  $core.int get maxToolCalls => $_getIZ(11);
+  $core.int get maxToolCalls => $_getIZ(8);
   @$pb.TagNumber(12)
-  set maxToolCalls($core.int value) => $_setSignedInt32(11, value);
+  set maxToolCalls($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(12)
-  $core.bool hasMaxToolCalls() => $_has(11);
+  $core.bool hasMaxToolCalls() => $_has(8);
   @$pb.TagNumber(12)
   void clearMaxToolCalls() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  ToolChoiceMode get toolChoice => $_getN(12);
+  ToolChoiceMode get toolChoice => $_getN(9);
   @$pb.TagNumber(13)
   set toolChoice(ToolChoiceMode value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasToolChoice() => $_has(12);
+  $core.bool hasToolChoice() => $_has(9);
   @$pb.TagNumber(13)
   void clearToolChoice() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.String get forcedToolName => $_getSZ(13);
+  $core.String get forcedToolName => $_getSZ(10);
   @$pb.TagNumber(14)
-  set forcedToolName($core.String value) => $_setString(13, value);
+  set forcedToolName($core.String value) => $_setString(10, value);
   @$pb.TagNumber(14)
-  $core.bool hasForcedToolName() => $_has(13);
+  $core.bool hasForcedToolName() => $_has(10);
   @$pb.TagNumber(14)
   void clearForcedToolName() => $_clearField(14);
 
-  @$pb.TagNumber(15)
-  $core.bool get parallelToolCalls => $_getBF(14);
-  @$pb.TagNumber(15)
-  set parallelToolCalls($core.bool value) => $_setBool(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasParallelToolCalls() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearParallelToolCalls() => $_clearField(15);
-
   @$pb.TagNumber(16)
-  $core.bool get requireJsonArguments => $_getBF(15);
+  $core.bool get requireJsonArguments => $_getBF(11);
   @$pb.TagNumber(16)
-  set requireJsonArguments($core.bool value) => $_setBool(15, value);
+  set requireJsonArguments($core.bool value) => $_setBool(11, value);
   @$pb.TagNumber(16)
-  $core.bool hasRequireJsonArguments() => $_has(15);
+  $core.bool hasRequireJsonArguments() => $_has(11);
   @$pb.TagNumber(16)
   void clearRequireJsonArguments() => $_clearField(16);
 
@@ -1144,11 +1059,11 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   /// at the prompt level — same contract as
   /// LLMGenerationOptions.disable_thinking). Default false.
   @$pb.TagNumber(17)
-  $core.bool get disableThinking => $_getBF(16);
+  $core.bool get disableThinking => $_getBF(12);
   @$pb.TagNumber(17)
-  set disableThinking($core.bool value) => $_setBool(16, value);
+  set disableThinking($core.bool value) => $_setBool(12, value);
   @$pb.TagNumber(17)
-  $core.bool hasDisableThinking() => $_has(16);
+  $core.bool hasDisableThinking() => $_has(12);
   @$pb.TagNumber(17)
   void clearDisableThinking() => $_clearField(17);
 }
@@ -1267,7 +1182,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearConversationId() => $_clearField(5);
 
-  /// Number of tool-call iterations actually used.
+  /// Number of LLM generation turns used, including the final synthesis turn.
   @$pb.TagNumber(6)
   $core.int get iterationsUsed => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -1580,14 +1495,12 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
   factory ToolPromptFormatResult({
     $core.String? formattedPrompt,
     ToolCallFormatName? format,
-    $core.String? formatHint,
     $core.String? errorMessage,
     $core.int? errorCode,
   }) {
     final result = create();
     if (formattedPrompt != null) result.formattedPrompt = formattedPrompt;
     if (format != null) result.format = format;
-    if (formatHint != null) result.formatHint = formatHint;
     if (errorMessage != null) result.errorMessage = errorMessage;
     if (errorCode != null) result.errorCode = errorCode;
     return result;
@@ -1609,7 +1522,6 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'formattedPrompt')
     ..aE<ToolCallFormatName>(2, _omitFieldNames ? '' : 'format',
         enumValues: ToolCallFormatName.values)
-    ..aOS(3, _omitFieldNames ? '' : 'formatHint')
     ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
     ..aI(5, _omitFieldNames ? '' : 'errorCode')
     ..hasRequiredFields = false;
@@ -1652,30 +1564,21 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFormat() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.String get formatHint => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set formatHint($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasFormatHint() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearFormatHint() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $core.String get errorMessage => $_getSZ(3);
+  $core.String get errorMessage => $_getSZ(2);
   @$pb.TagNumber(4)
-  set errorMessage($core.String value) => $_setString(3, value);
+  set errorMessage($core.String value) => $_setString(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasErrorMessage() => $_has(3);
+  $core.bool hasErrorMessage() => $_has(2);
   @$pb.TagNumber(4)
   void clearErrorMessage() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(4);
+  $core.int get errorCode => $_getIZ(3);
   @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(4, value);
+  set errorCode($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(4);
+  $core.bool hasErrorCode() => $_has(3);
   @$pb.TagNumber(5)
   void clearErrorCode() => $_clearField(5);
 }
@@ -2108,8 +2011,8 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   factory ToolCallingSessionCreateRequest({
     $core.String? prompt,
     $core.Iterable<ToolDefinition>? tools,
-    $core.String? formatHint,
-    $core.int? maxIterations,
+    ToolCallFormatName? format,
+    $core.int? maxToolCalls,
     $core.bool? keepToolsAvailable,
     $core.bool? validateCalls,
     ToolChoiceMode? toolChoice,
@@ -2119,12 +2022,15 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     $core.double? topP,
     $core.String? systemPrompt,
     $core.bool? disableThinking,
+    $core.bool? autoExecute,
+    $core.bool? replaceSystemPrompt,
+    $core.bool? requireJsonArguments,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
     if (tools != null) result.tools.addAll(tools);
-    if (formatHint != null) result.formatHint = formatHint;
-    if (maxIterations != null) result.maxIterations = maxIterations;
+    if (format != null) result.format = format;
+    if (maxToolCalls != null) result.maxToolCalls = maxToolCalls;
     if (keepToolsAvailable != null)
       result.keepToolsAvailable = keepToolsAvailable;
     if (validateCalls != null) result.validateCalls = validateCalls;
@@ -2135,6 +2041,11 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     if (topP != null) result.topP = topP;
     if (systemPrompt != null) result.systemPrompt = systemPrompt;
     if (disableThinking != null) result.disableThinking = disableThinking;
+    if (autoExecute != null) result.autoExecute = autoExecute;
+    if (replaceSystemPrompt != null)
+      result.replaceSystemPrompt = replaceSystemPrompt;
+    if (requireJsonArguments != null)
+      result.requireJsonArguments = requireJsonArguments;
     return result;
   }
 
@@ -2154,8 +2065,9 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'prompt')
     ..pPM<ToolDefinition>(2, _omitFieldNames ? '' : 'tools',
         subBuilder: ToolDefinition.create)
-    ..aOS(3, _omitFieldNames ? '' : 'formatHint')
-    ..aI(4, _omitFieldNames ? '' : 'maxIterations',
+    ..aE<ToolCallFormatName>(3, _omitFieldNames ? '' : 'format',
+        enumValues: ToolCallFormatName.values)
+    ..aI(4, _omitFieldNames ? '' : 'maxToolCalls',
         fieldType: $pb.PbFieldType.OU3)
     ..aOB(5, _omitFieldNames ? '' : 'keepToolsAvailable')
     ..aOB(6, _omitFieldNames ? '' : 'validateCalls')
@@ -2168,6 +2080,9 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     ..aD(13, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
     ..aOS(14, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(15, _omitFieldNames ? '' : 'disableThinking')
+    ..aOB(16, _omitFieldNames ? '' : 'autoExecute')
+    ..aOB(17, _omitFieldNames ? '' : 'replaceSystemPrompt')
+    ..aOB(18, _omitFieldNames ? '' : 'requireJsonArguments')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2207,22 +2122,22 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   $pb.PbList<ToolDefinition> get tools => $_getList(1);
 
   @$pb.TagNumber(3)
-  $core.String get formatHint => $_getSZ(2);
+  ToolCallFormatName get format => $_getN(2);
   @$pb.TagNumber(3)
-  set formatHint($core.String value) => $_setString(2, value);
+  set format(ToolCallFormatName value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasFormatHint() => $_has(2);
+  $core.bool hasFormat() => $_has(2);
   @$pb.TagNumber(3)
-  void clearFormatHint() => $_clearField(3);
+  void clearFormat() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get maxIterations => $_getIZ(3);
+  $core.int get maxToolCalls => $_getIZ(3);
   @$pb.TagNumber(4)
-  set maxIterations($core.int value) => $_setUnsignedInt32(3, value);
+  set maxToolCalls($core.int value) => $_setUnsignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasMaxIterations() => $_has(3);
+  $core.bool hasMaxToolCalls() => $_has(3);
   @$pb.TagNumber(4)
-  void clearMaxIterations() => $_clearField(4);
+  void clearMaxToolCalls() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.bool get keepToolsAvailable => $_getBF(4);
@@ -2234,9 +2149,8 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   void clearKeepToolsAvailable() => $_clearField(5);
 
   /// proto3 `optional` enables presence detection (has_validate_calls()).
-  /// When unset, commons defaults to validate_calls=true (preserves the
-  /// historical hard-coded behavior and the native run-loop / session
-  /// contract that unknown tool calls short-circuit before host execution).
+  /// When unset, commons defaults to validate_calls=true so unknown tool
+  /// calls short-circuit before host execution.
   /// Callers that delegate validation/authorization to their executor or
   /// use dynamic tool registries must explicitly set validate_calls=false.
   @$pb.TagNumber(6)
@@ -2319,6 +2233,35 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   $core.bool hasDisableThinking() => $_has(12);
   @$pb.TagNumber(15)
   void clearDisableThinking() => $_clearField(15);
+
+  /// Default true when absent. False returns the parsed ToolCall without
+  /// invoking the host executor.
+  @$pb.TagNumber(16)
+  $core.bool get autoExecute => $_getBF(13);
+  @$pb.TagNumber(16)
+  set autoExecute($core.bool value) => $_setBool(13, value);
+  @$pb.TagNumber(16)
+  $core.bool hasAutoExecute() => $_has(13);
+  @$pb.TagNumber(16)
+  void clearAutoExecute() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.bool get replaceSystemPrompt => $_getBF(14);
+  @$pb.TagNumber(17)
+  set replaceSystemPrompt($core.bool value) => $_setBool(14, value);
+  @$pb.TagNumber(17)
+  $core.bool hasReplaceSystemPrompt() => $_has(14);
+  @$pb.TagNumber(17)
+  void clearReplaceSystemPrompt() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.bool get requireJsonArguments => $_getBF(15);
+  @$pb.TagNumber(18)
+  set requireJsonArguments($core.bool value) => $_setBool(15, value);
+  @$pb.TagNumber(18)
+  $core.bool hasRequireJsonArguments() => $_has(15);
+  @$pb.TagNumber(18)
+  void clearRequireJsonArguments() => $_clearField(18);
 }
 
 class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {

@@ -173,10 +173,12 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   /// score are discarded before being passed to the LLM as context.
   /// Optional so callers can distinguish "unset" from explicit 0.0
   /// (accept-everything) without losing the canonical default.
-  /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
-  /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
-  /// so a 0.7 floor filters out every match and retrieval returns nothing
-  /// (validated by generated SDK helpers and commons session creation).
+  /// Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
+  /// produce cosine similarities that rarely exceed ~0.5 even for relevant
+  /// chunks, and chunking a document lowers each chunk's similarity further, so
+  /// any positive floor filters out real matches — a multi-chunk document then
+  /// retrieves nothing and the answer model reports "no information". top_k
+  /// bounds the result count instead of a similarity floor.
   @$pb.TagNumber(5)
   $core.double get similarityThreshold => $_getN(4);
   @$pb.TagNumber(5)
@@ -519,6 +521,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     $core.double? similarityThreshold,
     $core.bool? stream,
     $core.bool? disableThinking,
+    $core.bool? enableMultiQuery,
+    $core.int? multiQueryCount,
+    $core.String? scopePrefix,
   }) {
     final result = create();
     if (question != null) result.question = question;
@@ -532,6 +537,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
       result.similarityThreshold = similarityThreshold;
     if (stream != null) result.stream = stream;
     if (disableThinking != null) result.disableThinking = disableThinking;
+    if (enableMultiQuery != null) result.enableMultiQuery = enableMultiQuery;
+    if (multiQueryCount != null) result.multiQueryCount = multiQueryCount;
+    if (scopePrefix != null) result.scopePrefix = scopePrefix;
     return result;
   }
 
@@ -559,6 +567,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aOB(9, _omitFieldNames ? '' : 'stream')
     ..aOB(10, _omitFieldNames ? '' : 'disableThinking')
+    ..aOB(11, _omitFieldNames ? '' : 'enableMultiQuery')
+    ..aI(12, _omitFieldNames ? '' : 'multiQueryCount')
+    ..aOS(13, _omitFieldNames ? '' : 'scopePrefix')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -650,6 +661,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearRetrievalTopK() => $_clearField(7);
 
+  /// Per-query similarity floor. `optional` so an explicit 0.0 (accept
+  /// everything) is distinguishable from "unset" and can override a positive
+  /// session-level default; unset falls back to RAGConfiguration.
   @$pb.TagNumber(8)
   $core.double get similarityThreshold => $_getN(7);
   @$pb.TagNumber(8)
@@ -679,6 +693,40 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   $core.bool hasDisableThinking() => $_has(9);
   @$pb.TagNumber(10)
   void clearDisableThinking() => $_clearField(10);
+
+  /// Multi-query expansion: when true, the answer LLM rewrites the question
+  /// into `multi_query_count` variants; retrieval runs for the original plus
+  /// each variant and the rankings are RRF-fused before rerank. Falls back to
+  /// a single query if expansion yields nothing.
+  @$pb.TagNumber(11)
+  $core.bool get enableMultiQuery => $_getBF(10);
+  @$pb.TagNumber(11)
+  set enableMultiQuery($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasEnableMultiQuery() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearEnableMultiQuery() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get multiQueryCount => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set multiQueryCount($core.int value) => $_setSignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasMultiQueryCount() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearMultiQueryCount() => $_clearField(12);
+
+  /// Scoped retrieval: when set, only chunks whose document id begins with
+  /// this prefix are eligible (e.g. a chat/collection namespace). Unset =
+  /// search the whole index.
+  @$pb.TagNumber(13)
+  $core.String get scopePrefix => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set scopePrefix($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasScopePrefix() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearScopePrefix() => $_clearField(13);
 }
 
 class RAGQueryRequest extends $pb.GeneratedMessage {
@@ -878,8 +926,7 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   void clearSourceDocument() => $_clearField(4);
 
   /// Free-form metadata associated with the chunk (e.g. page number, section,
-  /// ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-  /// canonicalized here as a typed map so consumers don't re-parse.
+  /// ingestion timestamp).
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 

@@ -151,7 +151,7 @@ This repository contains **two** `Package.swift` files for different use cases:
 
 **For app developers:** Use the root-level package via the GitHub URL (as shown above).
 
-**For SDK contributors:** Set `useLocalNatives = true` in the root `Package.swift` (NOT `sdk/runanywhere-swift/Package.swift`, which is always-local and has no flag) after building the XCFrameworks (see [Local Development & Contributing](#local-development--contributing) below).
+**For SDK contributors:** After building the XCFrameworks, export `RUNANYWHERE_USE_LOCAL_NATIVES=1` when using the root `Package.swift`. The nested `sdk/runanywhere-swift/Package.swift` is always local and needs no override (see [Local Development & Contributing](#local-development--contributing) below).
 
 ---
 
@@ -659,9 +659,9 @@ We welcome contributions to the RunAnywhere Swift SDK. This section explains how
 
 ### Prerequisites
 
-- macOS 14.0 or later
-- Xcode 15.2 or later
-- CMake 3.21+ (for building native frameworks)
+- macOS 14.5 or later
+- Xcode 26.6 (build 17F113)
+- CMake 4.3.2
 
 ### First-Time Setup (Build from Source)
 
@@ -681,16 +681,18 @@ cd runanywhere-sdks
 2. Builds `RACommons.xcframework` (core infrastructure)
 3. Builds `RABackendLLAMACPP.xcframework` (LLM backend)
 4. Builds `RABackendONNX.xcframework` (STT/TTS/VAD backend)
-5. Copies frameworks to `sdk/runanywhere-swift/Binaries/`
+5. Builds `RABackendSherpa.xcframework` (speech backend)
+6. Builds `RABackendMLX.xcframework` (Apple MLX backend)
+7. Copies frameworks to `sdk/runanywhere-swift/Binaries/`
 
 ### Understanding useLocalNatives
 
-The SDK has two modes controlled by `useLocalNatives` in the root `Package.swift` (the flag does not exist in `sdk/runanywhere-swift/Package.swift`, which is always-local):
+The root package defaults to remote release artifacts and supports an explicit local-development environment override (the nested `sdk/runanywhere-swift/Package.swift` is always local):
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `useLocalNatives = true` | Uses XCFrameworks from `Binaries/` (for development) |
-| **Remote** | `useLocalNatives = false` | Downloads XCFrameworks from GitHub releases (for end users) |
+| **Local** | `RUNANYWHERE_USE_LOCAL_NATIVES=1` | Uses XCFrameworks from `Binaries/` (for development) |
+| **Remote** | Variable unset | Downloads checksum-verified XCFramework archives from GitHub releases (default for end users) |
 
 ### Testing with the iOS Sample App
 
@@ -733,7 +735,7 @@ Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
 ### Running Tests
 
 ```bash
-swift test
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test
 ```
 
 ### Code Style
@@ -750,7 +752,7 @@ swiftlint
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Make your changes with tests
-4. Ensure all tests pass: `swift test`
+4. Ensure all tests pass: `RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test`
 5. Run linter: `swiftlint`
 6. Commit with a descriptive message
 7. Push and open a Pull Request

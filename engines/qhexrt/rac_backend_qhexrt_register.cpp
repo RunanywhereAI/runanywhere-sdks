@@ -13,14 +13,14 @@
  * caller can fall back to CPU inference.
  */
 
-#include <mutex>
-
 #include "qhexrt_bundle_policy.h"
+
+#include <mutex>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/device/rac_npu_capability.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/qhexrt/rac_qhexrt.h"
 
 extern "C" RAC_PLUGIN_ENTRY_DECL(qhexrt);
 
@@ -41,23 +41,27 @@ rac_result_t rac_backend_qhexrt_register(void) {
     // selection, QNN_CONTEXT format) for one-line HF registrations. Inert
     // metadata, so it registers BEFORE the arch gate — deterministic on
     // stub builds and unsupported devices alike.
-    rac_bundle_policy_register(qhexrt_bundle_policy());
-    // Arch gate: only register on a Hexagon v75+ part. On unsupported
-    // devices QHexRT cannot run, and registering its providers would make the
-    // router select QHexRT for *all* LLM/VLM/STT/TTS loads (intercepting
-    // CPU/GGUF/ONNX models and failing them). Refuse here so the
-    // platform SDKs fall back to the CPU engines. (qhexrt_supported is false on
+    const rac_result_t policy_rc = rac_bundle_policy_register(qhexrt_bundle_policy());
+    if (policy_rc != RAC_SUCCESS) {
+        RAC_LOG_WARNING(LOG_CAT, "QHexRT bundle policy registration failed: %d", policy_rc);
+        return policy_rc;
+    }
+    // Arch gate: only register on a device-validated Hexagon v75/v79/v81 part.
+    // On unsupported devices QHexRT cannot run, and registering its providers
+    // would make the router select QHexRT for *all* LLM/VLM/STT/TTS loads
+    // (intercepting CPU/GGUF/ONNX models and failing them). Refuse here so the
+    // platform SDKs fall back to the CPU engines. (`supported` is false on
     // non-Snapdragon / non-Android and on older Hexagon parts.)
-    rac_npu_info_t npu;
-    const rac_result_t probe_rc = rac_npu_probe(&npu);
+    rac_qhexrt_device_info_t npu;
+    const rac_result_t probe_rc = rac_qhexrt_probe(&npu);
     if (probe_rc != RAC_SUCCESS) {
         RAC_LOG_WARNING(LOG_CAT, "QHexRT not registered: NPU probe failed (%d)", probe_rc);
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    if (npu.qhexrt_supported != RAC_TRUE) {
+    if (npu.supported != RAC_TRUE) {
         RAC_LOG_WARNING(LOG_CAT,
-                        "QHexRT not registered: Hexagon %s is unsupported (requires v75+)",
-                        rac_hexagon_arch_name(npu.hexagon_arch));
+                        "QHexRT not registered: Hexagon %s is unsupported (requires v75/v79/v81)",
+                        rac_qhexrt_arch_name(npu.hexagon_arch));
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
     const rac_engine_vtable_t* vt = rac_plugin_entry_qhexrt();
@@ -77,13 +81,19 @@ rac_result_t rac_backend_qhexrt_register(void) {
 
 rac_result_t rac_backend_qhexrt_unregister(void) {
     std::lock_guard<std::mutex> lock(g_mutex);
-    if (!g_registered) {
-        return RAC_SUCCESS;
+    if (g_registered) {
+        rac_plugin_unregister("qhexrt");
+        g_registered = false;
     }
-    rac_plugin_unregister("qhexrt");
+    // The policy is installed before the device gate, so always remove it even
+    // when plugin registration was rejected on an unsupported device.
     rac_bundle_policy_unregister(RAC_FRAMEWORK_QHEXRT);
-    g_registered = false;
     return RAC_SUCCESS;
+}
+
+rac_bool_t rac_backend_qhexrt_is_registered(void) {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_registered ? RAC_TRUE : RAC_FALSE;
 }
 
 }  // extern "C"

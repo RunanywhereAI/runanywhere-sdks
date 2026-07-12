@@ -11,13 +11,11 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.ToolCallFormatName
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolPromptFormatRequest
 import ai.runanywhere.proto.v1.ToolPromptFormatResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.LLM.effectiveToolFormatHint
 import com.runanywhere.sdk.public.types.RAToolDefinition
 import com.runanywhere.sdk.public.types.RAToolResult
 import com.squareup.wire.Message
@@ -59,25 +57,7 @@ object CppBridgeToolCalling {
 
     private fun ToolCallingOptions.bridgeOptions(
         toolsOverride: List<RAToolDefinition>? = null,
-    ): ToolCallingOptions {
-        val hint = effectiveToolFormatHint()
-        return copy(
-            tools = toolsOverride ?: tools,
-            format_hint = hint,
-            format = format ?: hint.toToolCallFormatName(),
-        )
-    }
-
-    private fun String.toToolCallFormatName(): ToolCallFormatName =
-        when (lowercase()) {
-            "lfm2", "lfm", "liquid", "pythonic", "hermes" ->
-                ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC
-            "openai", "openai_functions", "openai-functions" ->
-                ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS
-            "xml" -> ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML
-            "native" -> ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE
-            else -> ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON
-        }
+    ): ToolCallingOptions = copy(tools = toolsOverride ?: tools)
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,

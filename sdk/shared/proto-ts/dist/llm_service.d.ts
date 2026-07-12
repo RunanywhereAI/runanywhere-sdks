@@ -18,95 +18,28 @@ export declare enum LLMStreamEventKind {
 export declare function lLMStreamEventKindFromJSON(object: any): LLMStreamEventKind;
 export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string;
 /**
- * pass3-syn-025: the inline scalar fields below historically existed to avoid
- * importing llm_options.proto. The cycle-avoidance rationale no longer holds
- * (sdk_events.proto has no transitive dependency on llm_options.proto), so
- * idl-005 introduces the canonical `LLMGenerationOptions options` embedded
- * message at field 26. The inline scalar fields are RETAINED for wire-format
- * backwards compatibility but are deprecated; new code SHOULD populate
- * `options.*` and consumers SHOULD prefer `options.*` when set (falling back
- * to the inline fields for legacy callers). The companion fix for
- * VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
- * proto carries tts_model_id but not tts_voice_id" issue) lives in
- * idl/solutions.proto where VoiceAgentConfig is declared.
+ * Generation settings live exclusively in `options`. Reserved field numbers
+ * prevent unsafe wire reuse.
  */
 export interface LLMGenerateRequest {
     prompt: string;
-    /** @deprecated */
-    maxTokens: number;
-    /** @deprecated */
-    temperature: number;
-    /** @deprecated */
-    topP: number;
-    /** @deprecated */
-    topK: number;
-    /** @deprecated */
-    systemPrompt: string;
     /** chain-of-thought tokens emit as TokenKind.THOUGHT */
     emitThoughts: boolean;
-    /**
-     * Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
-     *
-     * Streaming gaps below remain intentional: a streaming consumer that
-     * requires these advanced knobs MUST set them on `options.*` rather than
-     * inline (no inline duplicate exists):
-     *   - thinking_pattern (LLMGenerationOptions field 11)
-     *   - structured_output (LLMGenerationOptions field 13)
-     *   - enable_real_time_tracking (LLMGenerationOptions field 14)
-     *   - repeat_last_n (LLMGenerationOptions field 18)
-     *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
-     *     is not yet supported on the LLM.Generate rpc; tool sessions must
-     *     use the non-streaming generation path with LLMGenerationOptions.
-     * Note the inline `preferred_framework` (field 11) and `execution_target`
-     * (field 13) are degraded to `string` for backwards compatibility;
-     * `options.preferred_framework` and `options.execution_target` carry the
-     * canonical InferenceFramework / ExecutionTarget enums.
-     *
-     * @deprecated
-     */
-    repetitionPenalty: number;
-    /** @deprecated */
-    stopSequences: string[];
-    /** @deprecated */
-    streamingEnabled: boolean;
-    /** @deprecated */
-    preferredFramework: string;
-    /** @deprecated */
-    jsonSchema: string;
-    /** @deprecated */
-    executionTarget: string;
     requestId: string;
     modelId: string;
     conversationId: string;
-    /** @deprecated */
-    seed: number;
-    /** @deprecated */
-    frequencyPenalty: number;
-    /** @deprecated */
-    presencePenalty: number;
-    /** @deprecated */
-    minP: number;
-    /** @deprecated */
-    grammar: string;
-    /** @deprecated */
-    responseFormat: string;
-    /** @deprecated */
-    echoPrompt: boolean;
-    /** @deprecated */
-    nThreads: number;
     metadata: {
         [key: string]: string;
     };
     /**
-     * idl-005: canonical generation options. When set, consumers SHOULD use
-     * the values here in preference to the legacy inline scalar fields above.
-     * The wire schema retains the inline fields to avoid breaking existing
-     * serialized requests; new callers should only populate `options`.
+     * Canonical generation settings. When absent, commons applies its SDK
+     * defaults; callers that need explicit controls populate this message.
      */
     options?: LLMGenerationOptions | undefined;
     /**
-     * idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
-     * stays the live user turn, and `system_prompt`, which stays separate).
+     * Prior conversation turns (excludes the current `prompt`, which
+     * stays the live user turn, and `options.system_prompt`, which stays
+     * separate).
      * Alternating user/assistant ChatMessages in chronological order. An engine
      * that owns its chat template renders {system_prompt, history, prompt} from
      * its model's markers; engines that don't simply ignore this field.
@@ -118,10 +51,9 @@ export interface LLMGenerateRequest_MetadataEntry {
     value: string;
 }
 /**
- * Aggregate result carried on the terminal LLMStreamEvent. This intentionally
- * duplicates the scalar result fields instead of importing llm_options.proto:
- * Square Wire treats files with/without go_package as different Kotlin
- * packages, and that import creates a package cycle through sdk_events.
+ * Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
+ * stream-native token, timing, and error fields distinct from the unary
+ * LLMGenerationResult shape.
  */
 export interface LLMStreamFinalResult {
     text: string;
@@ -138,10 +70,10 @@ export interface LLMStreamFinalResult {
     promptEvalTimeMs: number;
     decodeTimeMs: number;
     /**
-     * hotspot-idl-002: tool calls actually executed during the streaming
-     * session (mirrors LLMGenerationResult.tool_calls / .tool_results in
-     * llm_options.proto). Populated only on terminal events when the
-     * backend completed at least one tool call.
+     * Tool calls actually executed during the streaming session (mirrors
+     * LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
+     * Populated only on terminal events when the backend completed at least
+     * one tool call.
      */
     toolCalls: ToolCall[];
     toolResults: ToolResult[];
@@ -213,10 +145,8 @@ export interface LLMStreamEvent {
     completionTokensGenerated: number;
     elapsedMs: number;
     /**
-     * hotspot-idl-002: structured tool-call payload emitted alongside an
-     * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
-     * field the tool-call event kind carries no proto-typed payload and
-     * SDK consumers must fall back to JSON-parsing the raw `token` text.
+     * Structured tool-call payload emitted when event_kind is
+     * LLM_STREAM_EVENT_KIND_TOOL_CALL.
      */
     toolCall?: ToolCall | undefined;
 }

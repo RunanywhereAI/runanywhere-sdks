@@ -23,7 +23,7 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
-#include "rac_stt_service.h"
+#include "rac/features/stt/rac_stt_service.h"
 
 #ifdef __cplusplus
 extern "C" {

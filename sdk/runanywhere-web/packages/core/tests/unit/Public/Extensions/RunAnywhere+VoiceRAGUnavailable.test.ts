@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProtoErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
-import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
+import {
+  ModalityProtoAdapter,
+  RAGProtoAdapter,
+  type ModalityProtoModule,
+} from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
+import type { RAGQueryOptions } from '@runanywhere/proto-ts/rag';
 import type { RAGResult } from '@runanywhere/proto-ts/rag_service';
 import {
   RAG,
@@ -26,6 +31,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     setVoiceAgentProvider(null);
     setRAGProvider(null);
     clearRunanywhereModule();
+    vi.restoreAllMocks();
   });
 
   it('throws notInitialized from processVoiceTurn when no provider is registered (Swift parity)', async () => {
@@ -52,7 +58,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('keeps RAG unavailable when native exports exist but no provider/session is registered', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
 
     const availability = RAG.availability();
 
@@ -73,7 +79,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('rejects native Web RAG persistence until a browser storage-backed provider exists', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
     setRAGProvider(createRAGNativeProvider());
 
     await expect(ragCreatePipeline(createDefaultRAGConfiguration({
@@ -91,7 +97,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('rejects persistent config at native Web RAG provider construction', () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
 
     expect(() => createRAGNativeProvider({
       config: {
@@ -104,7 +110,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('keeps native RAG document listing and removal unavailable without native APIs', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
     setRAGSessionHandle(7);
 
     expect(RAG.availability()).toMatchObject({
@@ -127,6 +133,42 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       proto: { nestedMessage: expect.stringContaining('does not expose document-level removal') },
+    });
+  });
+
+  it('preserves typed query overrides when dispatching through the native provider', async () => {
+    const adapter = new RAGProtoAdapter(fakeRAGModule());
+    let capturedQuery: RAGQueryOptions | undefined;
+    const query = vi.spyOn(adapter, 'query').mockImplementation((session, options) => {
+      expect(session).toBe(7);
+      capturedQuery = options;
+      return emptyRAGResult(options.question);
+    });
+    setRAGProvider(createRAGNativeProvider({
+      adapter,
+      session: 7,
+      config: {
+        llmModelId: 'test-llm',
+        similarityThreshold: 0.35,
+      },
+    }));
+
+    await expect(ragQuery('What is indexed?', {
+      similarityThreshold: 0,
+      enableMultiQuery: true,
+      multiQueryCount: 5,
+      scopePrefix: 'chat/session-7/',
+    })).resolves.toMatchObject({
+      answer: 'no-op answer for: What is indexed?',
+    });
+
+    expect(query).toHaveBeenCalledOnce();
+    expect(capturedQuery).toMatchObject({
+      question: 'What is indexed?',
+      similarityThreshold: 0,
+      enableMultiQuery: true,
+      multiQueryCount: 5,
+      scopePrefix: 'chat/session-7/',
     });
   });
 

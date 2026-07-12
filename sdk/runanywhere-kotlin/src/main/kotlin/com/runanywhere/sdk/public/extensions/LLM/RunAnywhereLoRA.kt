@@ -62,6 +62,37 @@ interface LoRA {
     /** Apply one or more LoRA adapters to the currently loaded model. */
     suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult
 
+    /**
+     * Apply one registered catalog adapter to the currently loaded model.
+     *
+     * Preserves `entry.id` in the generated config so commons can validate
+     * registered catalog adapters against the loaded base model.
+     */
+    suspend fun apply(
+        entry: LoraAdapterCatalogEntry,
+        localPath: String? = null,
+        scale: Float? = null,
+        replaceExisting: Boolean = false,
+    ): LoRAApplyResult {
+        val adapterPath = localPath ?: entry.local_path?.takeIf { it.isNotBlank() }
+        if (adapterPath.isNullOrBlank()) {
+            throw SDKException.invalidArgument("LoRA catalog adapter '${entry.id}' has no local path")
+        }
+        return apply(
+            RALoRAApplyRequest(
+                adapters =
+                    listOf(
+                        RALoRAAdapterConfig(
+                            adapter_path = adapterPath,
+                            adapter_id = entry.id.takeIf { it.isNotBlank() },
+                            scale = scale ?: entry.default_scale.takeIf { it > 0f } ?: 1f,
+                        ),
+                    ),
+                replace_existing = replaceExisting,
+            ),
+        )
+    }
+
     /** Remove adapters by generated request semantics, including `clear_all`. */
     suspend fun remove(request: RALoRARemoveRequest): RALoRAState
 
@@ -243,7 +274,6 @@ fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
         download_url = url,
         download_size_bytes = size_bytes,
         supports_lora = false,
-        description = description,
         source = ModelSource.MODEL_SOURCE_REMOTE,
         created_at_unix_ms = timestampUnixMs,
         updated_at_unix_ms = timestampUnixMs,

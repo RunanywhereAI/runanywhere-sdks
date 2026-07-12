@@ -14,6 +14,19 @@ def findNodeBinary() {
         }
     }
 
+    // Honor the active toolchain before probing machine-global installations.
+    def configuredNode = System.getenv("NODE_BINARY")
+    if (configuredNode && new File(configuredNode).canExecute()) {
+        return configuredNode
+    }
+    def pathNode = System.getenv("PATH")
+        ?.split(File.pathSeparator)
+        ?.collect { new File(it, "node") }
+        ?.find { it.canExecute() }
+    if (pathNode) {
+        return pathNode.canonicalPath
+    }
+
     // Check common node installation paths
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
@@ -38,13 +51,13 @@ def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereCore_' + name]
 }
 
-// Supported ABIs - arm64-v8a for physical devices, x86_64 for emulators
+// Public packages ship the same three Android ABIs as the canonical native bundle.
 // Can be overridden via gradle.properties: reactNativeArchitectures=arm64-v8a
 def reactNativeArchitectures() {
     def value = rootProject.hasProperty("reactNativeArchitectures")
         ? rootProject.property("reactNativeArchitectures")
         : null
-    return value ? value.split(",").collect { it.trim() } : ["arm64-v8a", "x86_64"]
+    return value ? value.split(",").collect { it.trim() } : ["arm64-v8a", "armeabi-v7a", "x86_64"]
 }
 
 apply plugin: 'com.android.library'
@@ -94,11 +107,9 @@ def githubOrg = "RunanywhereAI"
 def commonsRepo = "runanywhere-sdks"
 
 // =============================================================================
-// useLocalNatives Toggle (canonical name; testLocal kept as legacy alias)
+// Local native source
 // =============================================================================
-def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoolean() ?:
-                    project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
-                    System.getenv("RA_TEST_LOCAL") == "1" ?: false
+def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoolean() ?: false
 
 // Native libraries directory
 def jniLibsDir = file("src/main/jniLibs")
@@ -117,7 +128,7 @@ def androidNdkHomeForRuntime() {
     def androidSdk = System.getenv("ANDROID_HOME") ?:
         System.getenv("ANDROID_SDK_ROOT") ?:
         "${System.getProperty('user.home')}/Library/Android/sdk"
-    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
     return file("${androidSdk}/ndk/${ndkVersion}")
 }
 
@@ -183,16 +194,18 @@ def syncAndroidNdkRuntimeLibs(File outputDir, boolean includeLibcxx, boolean inc
 }
 
 android {
-    namespace "com.margelo.nitro.runanywhere.core"
+    namespace = "com.margelo.nitro.runanywhere.core"
+    ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.3.13750724"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 
     defaultConfig {
         minSdkVersion getExtOrIntegerDefault('minSdkVersion')
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+        consumerProguardFiles("consumer-rules.pro")
 
         ndk {
-            abiFilters 'arm64-v8a'
+            abiFilters(*reactNativeArchitectures())
         }
 
         externalNativeBuild {
@@ -201,7 +214,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared",
                           // Fix NitroModules prefab path - use app's build directory
                           "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
-                abiFilters 'arm64-v8a'
+                abiFilters(*reactNativeArchitectures())
             }
         }
     }
@@ -209,7 +222,7 @@ android {
     externalNativeBuild {
         cmake {
             path "CMakeLists.txt"
-            version "3.30.5"
+            version = "3.30.5"
         }
     }
 
@@ -226,14 +239,11 @@ android {
             "**/librac_commons.so",
             "**/librunanywhere_jni.so"
         ]
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 
     buildFeatures {
-        buildConfig true
-        prefab true
+        buildConfig = true
+        prefab = true
     }
 
     buildTypes {
@@ -527,9 +537,6 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
-
-    // AndroidX Security for EncryptedSharedPreferences (device identity persistence)
-    implementation "androidx.security:security-crypto:1.1.0-alpha06"
 
     // OkHttp for the platform HTTP transport.
     // Routes rac_http_request_* through the system trust store + HTTP/2

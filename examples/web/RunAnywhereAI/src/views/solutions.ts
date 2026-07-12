@@ -97,8 +97,12 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
 
   updateRAGCapabilityState();
 
-  voiceBtn.addEventListener('click', () => runSolution('Voice Agent', VOICE_AGENT_YAML));
-  ragBtn.addEventListener('click', () => runSolution('RAG', RAG_YAML));
+  voiceBtn.addEventListener('click', () => {
+    void runSolution('Voice Agent', VOICE_AGENT_YAML);
+  });
+  ragBtn.addEventListener('click', () => {
+    void runSolution('RAG', RAG_YAML);
+  });
 
   return {};
 }

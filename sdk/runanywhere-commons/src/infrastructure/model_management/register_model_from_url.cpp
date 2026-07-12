@@ -24,6 +24,7 @@
  * workaround is needed to skip already-known IDs.
  */
 
+#include "bundle_policy_registry_internal.h"
 #include "hf_resolver.h"
 
 #include <cstdint>
@@ -36,7 +37,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
-#include "rac/infrastructure/device/rac_npu_capability.h"
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -144,7 +144,7 @@ const rac_bundle_policy_t* bundle_policy_for(rac_inference_framework_t framework
     if (framework == RAC_FRAMEWORK_UNKNOWN) {
         return nullptr;
     }
-    return rac_bundle_policy_find(framework);
+    return rac::infra::bundle_policy::find(framework);
 }
 
 // Convert the optional proto framework once so downstream helpers can stay on
@@ -168,66 +168,40 @@ const char* manifest_leaf_ext_for(const rac_bundle_policy_t* policy) {
                : nullptr;
 }
 
-rac_result_t qhexrt_current_arch(rac_hexagon_arch_t* out_arch, std::string* error) {
-    if (out_arch == nullptr) {
-        if (error) {
-            *error = "output arch is required";
-        }
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    rac_npu_info_t npu;
-    const rac_result_t probe_rc = rac_npu_probe(&npu);
-    if (probe_rc != RAC_SUCCESS) {
-        if (error) {
-            *error = "QHexRT NPU probe failed";
-        }
-        return probe_rc;
-    }
-    if (npu.qhexrt_supported != RAC_TRUE) {
-        if (error) {
-            *error = std::string("QHexRT NPU is not supported on this device (arch=") +
-                     rac_hexagon_arch_name(npu.hexagon_arch) + ")";
-        }
-        return RAC_ERROR_BACKEND_UNAVAILABLE;
-    }
-    *out_arch = npu.hexagon_arch;
-    return RAC_SUCCESS;
-}
-
-rac_result_t maybe_resolve_qhexrt_logical_ref(rac_inference_framework_t framework,
-                                              const rac_bundle_policy_t* policy,
+// Let an engine-owned policy select a device/runtime-specific folder while
+// commons remains responsible only for validating and inserting the returned
+// path segment. Policies without a resolver keep the existing folder behavior.
+rac_result_t maybe_resolve_logical_bundle_ref(const rac_bundle_policy_t* policy,
                                               runanywhere::v1::RegisterModelFromUrlRequest* request,
                                               rac_proto_buffer_t* out_proto) {
-    if (request == nullptr || framework != RAC_FRAMEWORK_QHEXRT) {
+    if (policy == nullptr || policy->resolve_variant == nullptr || request == nullptr) {
         return RAC_SUCCESS;
     }
 
-    if (policy == nullptr || policy->framework != RAC_FRAMEWORK_QHEXRT) {
-        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_BACKEND_UNAVAILABLE,
-                                          "QHexRT bundle policy is not registered; call "
-                                          "QHexRT.register() before registering HNPU URLs");
-    }
-
+    namespace hf = rac::infra::model_management::hf;
     const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
-    if (!rac::infra::model_management::hf::is_logical_arch_folder_ref(request->url(),
-                                                                      manifest_leaf_ext)) {
+    if (!hf::is_logical_variant_folder_ref(request->url(), manifest_leaf_ext)) {
         return RAC_SUCCESS;
     }
 
-    rac_hexagon_arch_t arch = RAC_HEXAGON_ARCH_UNKNOWN;
-    std::string error;
-    const rac_result_t arch_rc = qhexrt_current_arch(&arch, &error);
-    if (arch_rc != RAC_SUCCESS) {
-        return rac_proto_buffer_set_error(out_proto, arch_rc, error.c_str());
+    char variant[64] = {};
+    char error_message[256] = {};
+    const rac_result_t resolve_rc =
+        policy->resolve_variant(variant, sizeof(variant), error_message, sizeof(error_message));
+    if (resolve_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(
+            out_proto, resolve_rc,
+            error_message[0] != '\0' ? error_message : "bundle variant resolution failed");
     }
 
-    std::string arch_ref;
-    const char* arch_name = rac_hexagon_arch_name(arch);
-    if (rac::infra::model_management::hf::make_arch_folder_ref(request->url(), arch_name,
-                                                               manifest_leaf_ext, &arch_ref)) {
-        RAC_LOG_INFO(LOG_CAT, "Resolved logical QHexRT bundle for arch %s", arch_name);
-        request->set_url(arch_ref);
+    std::string resolved_ref;
+    if (!hf::make_variant_folder_ref(request->url(), variant, manifest_leaf_ext, &resolved_ref)) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "bundle policy returned an invalid variant folder");
     }
+
+    RAC_LOG_INFO(LOG_CAT, "Resolved logical bundle with engine variant %s", variant);
+    request->set_url(resolved_ref);
     return RAC_SUCCESS;
 }
 
@@ -389,10 +363,10 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
             // specifics live in the policy — none here.
             const rac_inference_framework_t framework = framework_for(request);
             const rac_bundle_policy_t* policy = bundle_policy_for(framework);
-            const rac_result_t qhexrt_rc =
-                maybe_resolve_qhexrt_logical_ref(framework, policy, &request, out_proto);
-            if (qhexrt_rc != RAC_SUCCESS) {
-                return qhexrt_rc;
+            const rac_result_t variant_rc =
+                maybe_resolve_logical_bundle_ref(policy, &request, out_proto);
+            if (variant_rc != RAC_SUCCESS) {
+                return variant_rc;
             }
             const char* manifest_leaf_ext = manifest_leaf_ext_for(policy);
             if (hf::is_folder_ref(request.url(), manifest_leaf_ext)) {
@@ -479,7 +453,7 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         made_model.set_context_length(request.context_length());
     }
     if (request.has_description()) {
-        made_model.set_description(request.description());
+        made_model.mutable_metadata()->set_description(request.description());
     }
     if (request.has_download_size_bytes()) {
         made_model.set_download_size_bytes(request.download_size_bytes());
@@ -633,7 +607,7 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
         model.set_supports_lora(request.supports_lora());
     }
     if (request.has_description()) {
-        model.set_description(request.description());
+        model.mutable_metadata()->set_description(request.description());
     }
     *model.mutable_multi_file()->mutable_files() = request.files();
     model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);

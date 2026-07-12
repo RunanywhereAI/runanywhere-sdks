@@ -20,11 +20,7 @@ import 'dart:async';
 /// pattern shared by `transcribeStream`, `synthesizeStream`, and
 /// `processImageStream`.
 class FakeNativeListenerStream<T> {
-  FakeNativeListenerStream({
-    bool autoCloseOnFinal = false,
-    bool Function(T event)? isFinal,
-  })  : _autoCloseOnFinal = autoCloseOnFinal,
-        _isFinal = isFinal {
+  FakeNativeListenerStream({this._autoCloseOnFinal = false, this._isFinal}) {
     _controller = StreamController<T>(
       onListen: () {
         _onListenInvocations++;

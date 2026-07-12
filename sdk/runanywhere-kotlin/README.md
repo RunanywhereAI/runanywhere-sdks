@@ -3,7 +3,7 @@
 **Privacy-first, on-device AI for Android**. Run LLMs, speech-to-text, text-to-speech, and voice agents locally with cloud fallback, OTA updates, and production observability.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.runanywhere.sdk/runanywhere-kotlin?label=Maven%20Central)](https://search.maven.org/artifact/com.runanywhere.sdk/runanywhere-kotlin)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: RunAnywhere](https://img.shields.io/badge/License-RunAnywhere-blue.svg)](../../LICENSE)
 [![Platform: Android 7.0+](https://img.shields.io/badge/Platform-Android%207.0%2B-green)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1%2B-blue?logo=kotlin)](https://kotlinlang.org)
 
@@ -30,13 +30,13 @@
 ```kotlin
 dependencies {
     // Core SDK
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.20.0")
 
     // Optional: LLM support (llama.cpp backend) - ~34MB
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.20.0")
 
     // Optional: STT/TTS/VAD support (Sherpa/ONNX backend) - ~25MB
-    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.19.13")
+    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.20.0")
 }
 ```
 
@@ -586,7 +586,8 @@ Run linting before submitting PRs:
 
 ## License
 
-Apache 2.0. See [LICENSE](../../LICENSE).
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).
+See [LICENSE](../../LICENSE).
 
 ---
 

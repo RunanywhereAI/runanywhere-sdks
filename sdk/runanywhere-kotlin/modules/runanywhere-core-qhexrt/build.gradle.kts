@@ -4,8 +4,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
-    `maven-publish`
-    signing
 }
 
 val useLocalNatives: Boolean =
@@ -101,18 +99,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
-        }
-        getByName("test") { java.srcDirs("src/test/kotlin") }
-    }
-
-    publishing {
-        singleVariant("release") { withSourcesJar() }
+        jniLibs.keepDebugSymbols += "**/*.so"
     }
 }
 
@@ -127,8 +114,10 @@ dependencies {
     api(findProject(":runanywhere-kotlin") ?: project(":"))
     implementation(libs.kotlinx.coroutines.core)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.junit)
+    testRuntimeOnly(libs.junit.vintage.engine)
 }
 
 // Stage the 16 KB-aligned NDK libc++ alongside the bundled QHexRT .so files.
@@ -151,111 +140,4 @@ tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") 
 }
 tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn("syncAndroidRuntimeLibs")
-}
-
-val isJitPack = System.getenv("JITPACK") == "true"
-val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
-group =
-    when {
-        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
-        usePendingNamespace -> "com.runanywhere"
-        else -> "io.github.sanchitmonga22"
-    }
-
-version = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
-
-val mavenCentralUsername: String? =
-    System.getenv("MAVEN_CENTRAL_USERNAME")
-        ?: project.findProperty("mavenCentral.username") as String?
-val mavenCentralPassword: String? =
-    System.getenv("MAVEN_CENTRAL_PASSWORD")
-        ?: project.findProperty("mavenCentral.password") as String?
-val signingKeyId: String? =
-    System.getenv("GPG_KEY_ID")
-        ?: project.findProperty("signing.keyId") as String?
-val signingPassword: String? =
-    System.getenv("GPG_SIGNING_PASSWORD")
-        ?: project.findProperty("signing.password") as String?
-val signingKey: String? =
-    System.getenv("GPG_SIGNING_KEY")
-        ?: project.findProperty("signing.key") as String?
-
-afterEvaluate {
-    publishing {
-        publications {
-            register<MavenPublication>("release") {
-                from(components["release"])
-                groupId = project.group.toString()
-                artifactId = "runanywhere-qhexrt"
-                version = project.version.toString()
-
-                pom {
-                    name.set("RunAnywhere QHexRT Backend")
-                    description.set("Qualcomm Hexagon NPU backend for RunAnywhere SDK - Android arm64 QNN-context inference on supported Snapdragon devices.")
-                    url.set("https://runanywhere.ai")
-                    inceptionYear.set("2024")
-
-                    licenses {
-                        license {
-                            name.set("The Apache License, Version 2.0")
-                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                            distribution.set("repo")
-                        }
-                    }
-
-                    developers {
-                        developer {
-                            id.set("runanywhere")
-                            name.set("RunAnywhere Team")
-                            email.set("founders@runanywhere.ai")
-                            organization.set("RunAnywhere AI")
-                            organizationUrl.set("https://runanywhere.ai")
-                        }
-                    }
-
-                    scm {
-                        connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
-                        developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
-                        url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
-                    }
-                }
-            }
-        }
-
-        repositories {
-            maven {
-                name = "MavenCentral"
-                url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
-                credentials {
-                    username = mavenCentralUsername
-                    password = mavenCentralPassword
-                }
-            }
-            maven {
-                name = "GitHubPackages"
-                url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
-                credentials {
-                    username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
-                    password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
-                }
-            }
-        }
-    }
-
-    signing {
-        if (signingKey != null && signingKey.contains("BEGIN PGP")) {
-            useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
-        } else {
-            useGpgCmd()
-        }
-        sign(publishing.publications)
-    }
-}
-
-tasks.withType<Sign>().configureEach {
-    onlyIf {
-        project.hasProperty("signing.gnupg.keyName") || signingKey != null
-    }
 }

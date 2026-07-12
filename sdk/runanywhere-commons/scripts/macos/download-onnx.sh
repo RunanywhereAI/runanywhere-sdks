@@ -62,7 +62,7 @@ echo "Extracting..."
 mkdir -p "${ONNX_DIR}"
 tar -xzf "${TEMP_FILE}" -C "${TEMP_DIR}"
 
-# Find the extracted directory (e.g., onnxruntime-osx-universal2-1.23.2/)
+# Find the extracted directory (e.g., onnxruntime-osx-universal2-1.24.4/)
 EXTRACTED_DIR=$(find "${TEMP_DIR}" -maxdepth 1 -type d -name "onnxruntime-*" | head -1)
 if [ -z "${EXTRACTED_DIR}" ]; then
     echo "Error: Could not find extracted ONNX Runtime directory"

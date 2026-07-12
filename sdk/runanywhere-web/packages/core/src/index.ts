@@ -3,31 +3,32 @@
  *
  * The root package intentionally mirrors the Swift SDK shape: app code talks
  * to `RunAnywhere` and public proto-derived types. Backend/runtime/browser
- * plumbing lives under `@runanywhere/web/internal` or `@runanywhere/web/browser`.
+ * plumbing lives under `@runanywhere/web/backend`,
+ * `@runanywhere/web/internal`, or `@runanywhere/web/browser`.
  */
 
-export { RunAnywhere } from './Public/RunAnywhere';
-export type { StorageBackend } from './Public/RunAnywhere';
+export { RunAnywhere } from './Public/RunAnywhere.js';
+export type { StorageBackend } from './Public/RunAnywhere.js';
 
 export type {
   JSONSchemaDescriptor,
   StructuredOutputResult,
   StructuredOutputStreamEvent,
   TextGenerationOptions,
-} from './Public/Extensions/RunAnywhere+TextGeneration';
-export type { ToolCallingGenerationOptions } from './Public/Extensions/RunAnywhere+ToolCalling';
+} from './Public/Extensions/RunAnywhere+TextGeneration.js';
+export type { ToolCallingGenerationOptions } from './Public/Extensions/RunAnywhere+ToolCalling.js';
 export type {
   STTOptions,
   STTOutput,
   STTPartialResult,
   TranscribeOptions,
-} from './Public/Extensions/RunAnywhere+STT';
+} from './Public/Extensions/RunAnywhere+STT.js';
 export type {
   SynthesizeOptions,
   TTSOptions,
   TTSOutput,
   TTSVoiceInfo,
-} from './Public/Extensions/RunAnywhere+TTS';
+} from './Public/Extensions/RunAnywhere+TTS.js';
 export type {
   DetectVoiceOptions,
   SpeechActivityEvent,
@@ -35,19 +36,19 @@ export type {
   VADOptions,
   VADResult,
   VADStatistics,
-} from './Public/Extensions/RunAnywhere+VAD';
+} from './Public/Extensions/RunAnywhere+VAD.js';
 export type {
   VisionLanguageProvider,
-} from './Public/Extensions/RunAnywhere+VisionLanguage';
+} from './Public/Extensions/RunAnywhere+VisionLanguage.js';
 // Hybrid STT router (cross-SDK parity with Kotlin RACRouter / Swift
 // HybridSTTRouter). Per-request offline(sherpa)↔online(cloud) dispatch;
 // commons owns all routing. Public API surfaces via `RunAnywhere.hybrid.*`.
-export { HybridSttRouter } from './Public/Extensions/Hybrid/HybridSttRouter';
-export { Cloud, cloud } from './Public/Extensions/Hybrid/Cloud';
+export { HybridSttRouter } from './Public/Extensions/Hybrid/HybridSttRouter.js';
+export { Cloud, cloud } from './Public/Extensions/Hybrid/Cloud.js';
 export type {
   CloudModelEntry,
   CloudSTTConfig,
-} from './Public/Extensions/Hybrid/Cloud';
+} from './Public/Extensions/Hybrid/Cloud.js';
 export {
   HybridBackendKind,
   HybridModelType,
@@ -60,7 +61,7 @@ export {
   confidenceCascade,
   offlineSherpa,
   onlineCloud,
-} from './Public/Extensions/Hybrid/HybridTypes';
+} from './Public/Extensions/Hybrid/HybridTypes.js';
 export type {
   HybridFilterSpec,
   HybridCascadeSpec,
@@ -69,40 +70,37 @@ export type {
   HybridTranscribeOptions,
   HybridTranscribeResult,
   HybridRoutedMetadata,
-} from './Public/Extensions/Hybrid/HybridTypes';
+} from './Public/Extensions/Hybrid/HybridTypes.js';
 // Custom-filter registrars are internal-only — Swift parity:
 // HybridCustomFilter.swift:31 (filters are supplied via the policy's
 // `customFilter(...)` spec, never registered directly by apps).
 export {
   setHybridDeviceStateProvider,
   browserDeviceStateProvider,
-} from './Public/Extensions/Hybrid/HybridDeviceState';
-export type { HybridDeviceStateProvider } from './Public/Extensions/Hybrid/HybridDeviceState';
+} from './Public/Extensions/Hybrid/HybridDeviceState.js';
+export type { HybridDeviceStateProvider } from './Public/Extensions/Hybrid/HybridDeviceState.js';
 export type {
   PluginInfo,
   PluginLoaderCapability,
-} from './Public/Extensions/RunAnywhere+PluginLoader';
+} from './Public/Extensions/RunAnywhere+PluginLoader.js';
 export type {
   RAGAvailability,
   RAGDocumentSummary,
   RAGEnsureReadyOptions,
-} from './Public/Extensions/RunAnywhere+RAG';
+  RAGPipelineState,
+} from './Public/Extensions/RunAnywhere+RAG.js';
 export type {
   EmbeddingsOptions,
   EmbeddingsRequest,
   EmbeddingsResult,
-} from './Public/Extensions/RunAnywhere+Embeddings';
+} from './Public/Extensions/RunAnywhere+Embeddings.js';
 export type {
   RegisterModelFile,
   RegisterModelOptions,
   RegisterMultiFileOptions,
-} from './Public/Extensions/RunAnywhere+Storage';
-export type {
-  BackendModalitySupport,
-  OnnxBackendStatus,
-} from './Public/Extensions/Backends/onnxStatus';
-export { LogLevel } from './Public/Extensions/RunAnywhere+Logging';
-export type { LoggingConfiguration, LogDestination } from './Public/Extensions/RunAnywhere+Logging';
+} from './Public/Extensions/RunAnywhere+Storage.js';
+export { LogLevel } from './Public/Extensions/RunAnywhere+Logging.js';
+export type { LoggingConfiguration, LogDestination } from './Public/Extensions/RunAnywhere+Logging.js';
 // Hardware profile types are proto-generated; import them directly from
 // `@runanywhere/proto-ts/hardware_profile` if needed.
 export type {
@@ -116,20 +114,20 @@ export type {
 // override `Runtime.streamingMode` to force `'auto' | 'worker' | 'main'`.
 // When unregistered, all adapter `*Stream` methods transparently use the
 // main-thread `queueMicrotask` path (the T3.1 MVP).
-export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
-export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
+export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry.js';
+export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry.js';
 
 // SDK metadata constants — mirror Swift `SDKConstants.version/name/platform`.
-export { SDK_NAME, SDK_PLATFORM, SDK_VERSION } from './Foundation/Version';
+export { SDK_NAME, SDK_PLATFORM, SDK_VERSION } from './Foundation/Version.js';
 
 // For error codes use ProtoErrorCode from '@runanywhere/proto-ts/errors' (re-exported below).
-export { SDKException, isSDKException } from './Foundation/SDKException';
-export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException';
+export { SDKException, isSDKException } from './Foundation/SDKException.js';
+export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException.js';
 export {
   ProtoErrorCategory,
   ProtoErrorCode,
   ProtoErrorSeverity,
-} from './Foundation/SDKException';
+} from './Foundation/SDKException.js';
 
 export {
   AudioEncoding,
@@ -148,13 +146,13 @@ export {
 } from '@runanywhere/proto-ts/voice_events';
 export { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 
-export * from './types/index';
+export * from './types/index.js';
 
 // Helpers — pure-JS proxies for commons utilities.
-export { formatFramework } from './Public/Helpers/formatFramework';
+export { formatFramework } from './Public/Helpers/formatFramework.js';
 
 // Tool calling — Swift-parity two-channel options for generateWithTools.
-export type { GenerateWithToolsOptions } from './Public/Extensions/RunAnywhere+ToolCalling';
+export type { GenerateWithToolsOptions } from './Public/Extensions/RunAnywhere+ToolCalling.js';
 
 // Cloud STT provider table — developer-defined providers by name (mirrors
 // Swift Cloud.registerProvider / Cloud.unregisterProvider).
@@ -162,12 +160,12 @@ export {
   CloudAudioFormat,
   registerCloudSttProvider,
   unregisterCloudSttProvider,
-} from './Public/Extensions/Hybrid/CloudSttProvider';
+} from './Public/Extensions/Hybrid/CloudSttProvider.js';
 export type {
   CloudSttRequest,
   CloudSttResult,
   SttProviderHandler,
-} from './Public/Extensions/Hybrid/CloudSttProvider';
+} from './Public/Extensions/Hybrid/CloudSttProvider.js';
 
 // Audio conversion helpers — mirrors Swift RAAudioConvert.swift
 // (`RunAnywhere.pcm16ToFloat32` / `pcm16ToFloat32Samples` / `pcm16ToWav`).
@@ -175,7 +173,7 @@ export {
   pcm16ToFloat32,
   pcm16ToFloat32Samples,
   pcm16ToWav,
-} from './Public/Extensions/RunAnywhere+AudioConvert';
+} from './Public/Extensions/RunAnywhere+AudioConvert.js';
 
 // SDKEnvironment helpers — mirrors Swift SDKEnvironment.swift:28-128.
 export {
@@ -188,10 +186,10 @@ export {
   environmentShouldSendTelemetry,
   environmentShouldSyncWithBackend,
   environmentRequiresAuthentication,
-} from './Foundation/SDKEnvironment+Helpers';
+} from './Foundation/SDKEnvironment+Helpers.js';
 
 // Storage proto helpers — mirrors Swift StorageProto+Helpers.swift.
-export * from './types/StorageProto+Helpers';
+export * from './types/StorageProto+Helpers.js';
 
 // Model-lifecycle event streams — mirrors Swift EventBus+ModelLifecycle.swift.
 export {
@@ -200,7 +198,7 @@ export {
   modelUnloaded,
   modelLifecycleChange,
   type ModelLifecycleChange,
-} from './Foundation/EventBus+ModelLifecycle';
+} from './Foundation/EventBus+ModelLifecycle.js';
 
 // Model-type helpers + artifacts — mirrors Swift ModelTypes.swift /
 // ModelTypes+Artifacts.swift (commons-ABI-backed; no hand-written tables).
@@ -241,23 +239,23 @@ export {
   resolvedConfigPath,
   resolvedVocabularyPath,
   lifecyclePrimaryArtifactPath,
-} from './types/ModelTypes+Artifacts';
-export type { ModelInfoArtifact, ModelInfoMakeParams } from './types/ModelTypes+Artifacts';
+} from './types/ModelTypes+Artifacts.js';
+export type { ModelInfoArtifact, ModelInfoMakeParams } from './types/ModelTypes+Artifacts.js';
 
 // Embeddings helpers — mirrors Swift Embeddings *+Helpers.swift.
 export {
   embeddingCosineSimilarity,
   embeddingComputeNorm,
   embeddingsResultProcessingTime,
-} from './Public/Extensions/RunAnywhere+Embeddings';
-export type { EmbeddingVector } from './Public/Extensions/RunAnywhere+Embeddings';
+} from './Public/Extensions/RunAnywhere+Embeddings.js';
+export type { EmbeddingVector } from './Public/Extensions/RunAnywhere+Embeddings.js';
 
 // RAG proto helpers — mirrors Swift RAGProto+Helpers.swift.
 export {
   ragQueryOptionsWithQuestion,
   ragResultTotalTime,
   ragStatisticsLastUpdated,
-} from './Public/Extensions/RunAnywhere+RAG';
+} from './Public/Extensions/RunAnywhere+RAG.js';
 
 // Structured-output proto helpers — mirrors Swift StructuredOutputProto+Helpers.swift.
 export {
@@ -265,8 +263,8 @@ export {
   structuredOutputOptionsWithSchema,
   structuredOutputResultSuccess,
   namedEntityLength,
-} from './Public/Extensions/RunAnywhere+StructuredOutput';
-export type { JSONSchema, NamedEntity } from './Public/Extensions/RunAnywhere+StructuredOutput';
+} from './Public/Extensions/RunAnywhere+StructuredOutput.js';
+export type { JSONSchema, NamedEntity } from './Public/Extensions/RunAnywhere+StructuredOutput.js';
 
 // VLM image factories — mirrors Swift RAVLMImage+Helpers.swift (cross-platform set).
 export {
@@ -275,4 +273,4 @@ export {
   vlmImageFromBase64,
   vlmImageFromRawRGB,
   vlmImageFromRawRGBA,
-} from './Public/Extensions/RAVLMImage+Helpers';
+} from './Public/Extensions/RAVLMImage+Helpers.js';

@@ -82,29 +82,14 @@ enum ToolParameterType {
 }
 
 // ---------------------------------------------------------------------------
-// Tool-call wire formats various LLM families emit. Strongly-typed counterpart
-// to `ToolCallingOptions.format_hint` (which remains a free-form string for
-// back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
-// 1:1 to this enum).
-//
-// Drift across SDKs:
-//   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
-//     today only exposes `default` and `lfm2` constants on a string-typed
-//     field — it is not yet an enum.
-//   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
-// This enum is the union of formats LLM families actually emit; SDK frontends
-// should map their existing strings onto these values when surfacing the
-// strongly-typed field. Keep `format_hint` (string) populated for legacy
-// consumers until all SDKs migrate.
+// Tool-call wire formats various LLM families emit. This enum is the single
+// portable format selector across commons and every generated SDK binding.
 // ---------------------------------------------------------------------------
 enum ToolCallFormatName {
     TOOL_CALL_FORMAT_NAME_UNSPECIFIED      = 0;
     TOOL_CALL_FORMAT_NAME_JSON             = 1;
-    TOOL_CALL_FORMAT_NAME_XML              = 2;
-    TOOL_CALL_FORMAT_NAME_NATIVE           = 3;
-    TOOL_CALL_FORMAT_NAME_PYTHONIC         = 4;
-    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5;
-    TOOL_CALL_FORMAT_NAME_HERMES           = 6;
+    reserved 2 to 6;
+    TOOL_CALL_FORMAT_NAME_LFM2             = 7;
 }
 
 enum ToolChoiceMode {
@@ -162,14 +147,7 @@ message ToolCall {
     // value at the moment). Empty = unset.
     string type                      = 4;
 
-    // Tag 5 reserved — previously `map<string, ToolValue> arguments`.
-    // Deleted in favour of the canonical `arguments_json` field above;
-    // commons never consulted the typed map.
-    reserved 5;
-    reserved "arguments";
-
-    // Alias for id used by pre-proto SDK surfaces.
-    optional string call_id          = 6;
+    reserved 5, 6;
 
     int64 created_at_ms              = 7;
     optional string raw_text         = 8;
@@ -195,14 +173,7 @@ message ToolResult {
     // consumers should fall back to result_json/error semantics.
     bool success                     = 5;
 
-    // Tag 6 reserved — previously `map<string, ToolValue> result`.
-    // Deleted in favour of the canonical `result_json` field above;
-    // commons never consulted the typed map.
-    reserved 6;
-    reserved "result";
-
-    // Alias for tool_call_id used by pre-proto SDK surfaces.
-    optional string call_id          = 7;
+    reserved 6, 7;
 
     int64 started_at_ms              = 8;
     int64 completed_at_ms            = 9;
@@ -216,9 +187,7 @@ message ToolCallingOptions {
     // its registered tools (per-SDK convention).
     repeated ToolDefinition tools    = 1;
 
-    // Maximum tool-call iterations in one conversation turn. 0 = SDK default
-    // (typically 5).
-    int32  max_iterations            = 2;
+    reserved 2, 9, 11, 15;
 
     // Whether to auto-execute tools or hand them back to the caller.
     bool   auto_execute              = 3;
@@ -240,28 +209,15 @@ message ToolCallingOptions {
     // tool calls in one generation.
     bool   keep_tools_available      = 8;
 
-    // Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
-    // Empty = SDK default.
-    string format_hint               = 9;
-
-    // Strongly-typed tool-call format. Preferred over `format_hint` when set;
-    // `format_hint` remains for legacy callers and per-SDK custom strings
-    // that don't round-trip through this enum.
+    // Typed tool-call format. Unset lets commons select the model default.
     optional ToolCallFormatName format = 10;
 
-    // Caller-supplied system prompt that fully replaces the SDK-injected
-    // tool-calling system prompt (rather than being merged with it).
-    // Distinct from `system_prompt` (field 6), which is merged unless
-    // `replace_system_prompt` is true.
-    optional string custom_system_prompt = 11;
-
-    // C ABI / SDK field name for max_iterations. 0 = use max_iterations or
-    // SDK default.
+    // Maximum tool calls in one conversation turn. Unset/0 = SDK default
+    // (typically 5).
     optional int32 max_tool_calls = 12;
 
     ToolChoiceMode tool_choice = 13;
     optional string forced_tool_name = 14;
-    bool parallel_tool_calls = 15;
     bool require_json_arguments = 16;
 
     // When true, suppress the model's thinking/reasoning phase during
@@ -285,7 +241,7 @@ message ToolCallingResult {
     bool   is_complete               = 4;
     // Conversation ID for continuing with tool results.
     optional string conversation_id  = 5;
-    // Number of tool-call iterations actually used.
+    // Number of LLM generation turns used, including the final synthesis turn.
     int32  iterations_used           = 6;
 
     optional string error_message    = 7;
@@ -327,7 +283,7 @@ message ToolPromptFormatRequest {
 message ToolPromptFormatResult {
     string formatted_prompt = 1;
     ToolCallFormatName format = 2;
-    string format_hint = 3;
+    reserved 3;
     optional string error_message = 4;
     int32 error_code = 5;
 }
@@ -400,13 +356,12 @@ message ToolCallingSessionCreateRequest {
     float top_p = 13;
     string system_prompt = 14;
     repeated ToolDefinition tools = 2;
-    string format_hint = 3;
-    uint32 max_iterations = 4;
+    ToolCallFormatName format = 3;
+    uint32 max_tool_calls = 4;
     bool keep_tools_available = 5;
     // proto3 `optional` enables presence detection (has_validate_calls()).
-    // When unset, commons defaults to validate_calls=true (preserves the
-    // historical hard-coded behavior and the native run-loop / session
-    // contract that unknown tool calls short-circuit before host execution).
+    // When unset, commons defaults to validate_calls=true so unknown tool
+    // calls short-circuit before host execution.
     // Callers that delegate validation/authorization to their executor or
     // use dynamic tool registries must explicitly set validate_calls=false.
     optional bool validate_calls = 6;
@@ -431,6 +386,12 @@ message ToolCallingSessionCreateRequest {
     // the loop/session (maps from ToolCallingOptions.disable_thinking; same
     // contract as LLMGenerationOptions.disable_thinking). Default false.
     bool disable_thinking = 15;
+
+    // Default true when absent. False returns the parsed ToolCall without
+    // invoking the host executor.
+    optional bool auto_execute = 16;
+    bool replace_system_prompt = 17;
+    bool require_json_arguments = 18;
 }
 
 message ToolCallingSessionCreateResult {

@@ -9,11 +9,12 @@ name: Auto-Tag Release
 #   release:major   — v0.19.7 → v1.0.0
 #
 # this workflow:
-#   1. Determines the current PROJECT_VERSION from sdk/runanywhere-commons/VERSIONS
-#   2. Bumps it according to the label
-#   3. Runs scripts/release/sync-versions.sh to propagate the new version across all manifests
-#   4. Commits the bump to main and pushes tag v{new-version}
-#   5. The tag push then triggers release.yml → builds everything → draft GH Release
+#   1. Reads the pre-merge version from the PR base and the reviewed version
+#      from merged main.
+#   2. Verifies the reviewed version is the exact label-selected semver bump.
+#   3. Runs scripts/release/sync-versions.sh as a read-only coherence check.
+#   4. Tags the exact reviewed merge commit and explicitly dispatches
+#      release.yml to build the draft release.
 #
 # If no release label is present, the workflow is a no-op. Merges without a label
 # just land the code on main as normal — releases are explicit opt-in.
@@ -30,7 +31,8 @@ on:
     branches: [main]
 
 permissions:
-  contents: write       # needed to commit version bump + push tag
+  actions: write        # needed to dispatch release.yml after tagging
+  contents: write       # needed to push the reviewed release tag
   pull-requests: write  # needed for gh pr comment on the merged PR
 
 jobs:
@@ -49,15 +51,19 @@ jobs:
           echo "PR labels: $NAMES"
 
           BUMP=""
+          RELEASE_LABEL_COUNT=0
           for name in $NAMES; do
             case "$name" in
-              release:patch) BUMP="patch" ;;
-              release:minor) BUMP="minor" ;;
-              release:major) BUMP="major" ;;
+              release:patch) BUMP="patch"; RELEASE_LABEL_COUNT=$((RELEASE_LABEL_COUNT + 1)) ;;
+              release:minor) BUMP="minor"; RELEASE_LABEL_COUNT=$((RELEASE_LABEL_COUNT + 1)) ;;
+              release:major) BUMP="major"; RELEASE_LABEL_COUNT=$((RELEASE_LABEL_COUNT + 1)) ;;
             esac
           done
 
-          if [ -z "$BUMP" ]; then
+          if [ "$RELEASE_LABEL_COUNT" -gt 1 ]; then
+            echo "::error::Merged PR has multiple release:* labels; exactly one is allowed."
+            exit 1
+          elif [ -z "$BUMP" ]; then
             echo "No release:* label — nothing to do."
             echo "should-release=false" >> "$GITHUB_OUTPUT"
           else
@@ -66,25 +72,28 @@ jobs:
             echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Checkout main
+      - name: Checkout the reviewed merge commit
         if: steps.label.outputs.should-release == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute next version
+      - name: Verify reviewed release version
         if: steps.label.outputs.should-release == 'true'
         id: version
         env:
           BUMP: ${{ steps.label.outputs.bump }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          CURRENT=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
-          # Strip any pre-release suffix for bumping
-          BASE="${CURRENT%%-*}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+          REVIEWED=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          BEFORE=$(git show "${BASE_SHA}:sdk/runanywhere-commons/VERSIONS" \
+            | grep -E '^PROJECT_VERSION=' | cut -d= -f2 | xargs)
+
+          BASE_VERSION="${BEFORE%%-*}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
 
           case "$BUMP" in
             patch) PATCH=$((PATCH + 1)) ;;
@@ -92,21 +101,36 @@ jobs:
             major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
           esac
 
-          NEW="${MAJOR}.${MINOR}.${PATCH}"
-          echo "Current: $CURRENT"
-          echo "Bump:    $BUMP"
-          echo "New:     $NEW"
-          echo "new-version=$NEW" >> "$GITHUB_OUTPUT"
+          EXPECTED="${MAJOR}.${MINOR}.${PATCH}"
+          echo "Pre-merge version: $BEFORE"
+          echo "Requested bump:    $BUMP"
+          echo "Expected version:  $EXPECTED"
+          echo "Reviewed version:  $REVIEWED"
+          if [ "$REVIEWED" != "$EXPECTED" ]; then
+            echo "::error::release:${BUMP} requires PROJECT_VERSION=${EXPECTED}; merged main contains ${REVIEWED}."
+            echo "::error::Run scripts/release/sync-versions.sh ${EXPECTED} in the release PR before merging."
+            exit 1
+          fi
+          echo "new-version=$REVIEWED" >> "$GITHUB_OUTPUT"
 
       - name: Sanity-check tag doesn't already exist
         if: steps.label.outputs.should-release == 'true'
+        id: tag
         env:
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
         run: |
           set -euo pipefail
           if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${NEW_VERSION} already exists."
-            exit 1
+            TAG_COMMIT="$(git rev-list -n 1 "v${NEW_VERSION}")"
+            REVIEWED_COMMIT="$(git rev-parse HEAD)"
+            if [ "$TAG_COMMIT" != "$REVIEWED_COMMIT" ]; then
+              echo "::error::Tag v${NEW_VERSION} already points to ${TAG_COMMIT}, not reviewed commit ${REVIEWED_COMMIT}."
+              exit 1
+            fi
+            echo "::notice::Tag v${NEW_VERSION} already points to the reviewed commit; release dispatch can be retried."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run sync-versions.sh
@@ -118,34 +142,27 @@ jobs:
           chmod +x scripts/release/sync-versions.sh
           ./scripts/release/sync-versions.sh "${NEW_VERSION}"
 
-      - name: Configure git identity
-        if: steps.label.outputs.should-release == 'true'
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Verify release PR contained version bump
+      - name: Verify release manifest coherence
         if: steps.label.outputs.should-release == 'true'
         env:
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
         run: |
           set -euo pipefail
-          # Main's branch protection requires all changes via PR — the workflow
-          # cannot push a version-bump commit. The release PR MUST already
-          # contain the sync-versions.sh output (run it locally before opening
-          # the PR). sync-versions.sh is re-run above as a sanity check; if it
-          # produced diff, the PR was missing the bump.
-          git add -u
-          if ! git diff --cached --quiet; then
-            echo "::error::PR merged with release:${{ steps.label.outputs.bump }} label but VERSIONS/manifests are out of sync with tag v${NEW_VERSION}."
-            echo "::error::Before opening a release PR, run: scripts/release/sync-versions.sh ${NEW_VERSION}  →  commit  →  open PR  →  merge with release label."
-            git diff --cached
+          # Main's branch protection requires every versioned manifest change
+          # to be reviewed in the PR. sync-versions.sh above is therefore a
+          # read-only assertion: it must produce no tracked diff after merge.
+          status="$(git status --porcelain --untracked-files=all)"
+          if [ -n "$status" ]; then
+            echo "::error::Merged release manifests are out of sync with reviewed version v${NEW_VERSION}."
+            echo "::error::Run scripts/release/sync-versions.sh ${NEW_VERSION}, commit its output, and merge a corrected PR."
+            git diff
+            printf '%s\n' "$status"
             exit 1
           fi
           echo "::notice::Manifests already bumped to v${NEW_VERSION} in the release PR."
 
-      - name: Push tag to trigger release.yml
-        if: steps.label.outputs.should-release == 'true'
+      - name: Push reviewed release tag
+        if: steps.label.outputs.should-release == 'true' && steps.tag.outputs.exists != 'true'
         env:
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
         run: |
@@ -153,7 +170,23 @@ jobs:
           # Tags are not subject to branch protection, so the workflow token can push them.
           git tag "v${NEW_VERSION}"
           git push origin "v${NEW_VERSION}"
-          echo "::notice::Pushed tag v${NEW_VERSION} — release.yml will now build and create a draft release"
+          echo "::notice::Pushed tag v${NEW_VERSION} at reviewed commit $(git rev-parse HEAD)"
+
+      # Pushes made with GITHUB_TOKEN do not trigger another workflow. Dispatch
+      # release.yml explicitly at the immutable tag so automatic releases work
+      # without a separate PAT and retries can recover after transient failures.
+      - name: Dispatch release workflow at tag
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "v${NEW_VERSION}" \
+            --field "version=${NEW_VERSION}"
+          echo "::notice::Dispatched release.yml at v${NEW_VERSION}"
 
       - name: Comment on merged PR
         if: steps.label.outputs.should-release == 'true'
@@ -162,4 +195,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
         run: |
-          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "🚀 Auto-tagged **v${NEW_VERSION}** — release.yml is now building artifacts. The GitHub Release will be created as a draft; publish it after reviewing the assets."
+          set -euo pipefail
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "🚀 Tagged **v${NEW_VERSION}** at the reviewed merge commit and dispatched release.yml. The GitHub Release will be created as a draft; publish it after reviewing the assets."

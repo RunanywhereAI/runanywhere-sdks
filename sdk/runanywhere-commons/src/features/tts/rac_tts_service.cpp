@@ -46,7 +46,7 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     rac_result_t result = rac::features::resolve_model_reference(
         voice_id,
         {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_ONNX,
+         .default_framework = RAC_FRAMEWORK_SHERPA,
          .allow_null_model_id = false,
          .lookup_last_path_component = true,
          .prefer_input_path_when_contains = "/"},  // explicit caller paths win over

@@ -39,8 +39,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_storage_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::StorageAvailability
         {&::_pbi::kDescriptorMethods, &::descriptor_table_storage_5ftypes_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::StoredModel
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_storage_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::StorageInfoRequest
         {&::_pbi::kDescriptorMethods, &::descriptor_table_storage_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::StorageInfoResult
@@ -64,189 +62,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
 #endif
 namespace runanywhere {
 namespace v1 {
-class StoredModel::_Internal {
- public:
-  using HasBits = decltype(::std::declval<StoredModel>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(StoredModel, _impl_._has_bits_);
-};
-
-constexpr StoredModel::ParseTableT_ StoredModel::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(StoredModel, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::StoredModel>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string model_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.model_id_)}},
-      // string name = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.name_)}},
-      // int64 size_bytes = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StoredModel, _impl_.size_bytes_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.size_bytes_)}},
-      // string local_path = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 2, 0,
-        PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.local_path_)}},
-      // optional int64 downloaded_at_ms = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(StoredModel, _impl_.downloaded_at_ms_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.downloaded_at_ms_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string model_id = 1;
-      {PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string name = 2;
-      {PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 size_bytes = 3;
-      {PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.size_bytes_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string local_path = 4;
-      {PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.local_path_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional int64 downloaded_at_ms = 5;
-      {PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.downloaded_at_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-    }},
-    // no aux_entries
-    {{
-      "\32\10\4\0\12\0\0\0"
-      "runanywhere.v1.StoredModel"
-      "model_id"
-      "name"
-      "local_path"
-    }},
-  };
-}
-
-
-inline constexpr StoredModel::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        name_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        local_path_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        size_bytes_{::int64_t{0}},
-        downloaded_at_ms_{::int64_t{0}} {}
-
-template <typename>
-constexpr StoredModel::StoredModel(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL StoredModel::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) StoredModel(arena);
-}
-constexpr auto StoredModel::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(StoredModel), alignof(StoredModel));
-}
-constexpr auto StoredModel::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &StoredModel::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<StoredModel>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &StoredModel::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<StoredModel>(), &StoredModel::ByteSizeLong,
-              &StoredModel::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(StoredModel, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[5],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_storage_5ftypes_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct StoredModelGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr StoredModelGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 StoredModel_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(StoredModel::InternalGenerateClassData_(
-            _default, &StoredModel_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<StoredModel>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~StoredModelGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) StoredModel _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<StoredModel>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(StoredModelGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST StoredModelGlobalsTypeInternal StoredModel_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* StoredModel_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return StoredModel_globals_.GetClassData();
-#else
-  return StoredModel_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class StorageInfoRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<StorageInfoRequest>()._impl_._has_bits_);
@@ -358,7 +173,7 @@ constexpr auto StorageInfoRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
+      &file_reflection_data[5],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -593,7 +408,7 @@ constexpr auto StorageDeleteResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[14],
+      &file_reflection_data[13],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -778,7 +593,7 @@ constexpr auto StorageDeletePlanRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
+      &file_reflection_data[9],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -979,7 +794,7 @@ constexpr auto StorageDeleteCandidate::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[11],
+      &file_reflection_data[10],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -1162,7 +977,7 @@ constexpr auto StorageAvailabilityRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
+      &file_reflection_data[7],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -2255,7 +2070,7 @@ constexpr auto StorageDeletePlan::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[12],
+      &file_reflection_data[11],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -2433,7 +2248,7 @@ constexpr auto StorageInfoResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[7],
+      &file_reflection_data[6],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -2636,7 +2451,7 @@ constexpr auto StorageDeleteRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[13],
+      &file_reflection_data[12],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -2829,7 +2644,7 @@ constexpr auto StorageAvailabilityResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
+      &file_reflection_data[8],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_storage_5ftypes_2eproto,
@@ -2950,19 +2765,6 @@ const ::uint32_t
         1,
         6,
         5,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_._has_bits_),
-        8, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_.name_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_.size_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_.local_path_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StoredModel, _impl_.downloaded_at_ms_),
-        0,
-        1,
-        3,
-        2,
-        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::StorageInfoRequest, _impl_._has_bits_),
         7, // hasbit index offset
@@ -3119,16 +2921,15 @@ static const ::_pbi::MigrationSchema
         {22, sizeof(::runanywhere::v1::ModelStorageMetrics)},
         {31, sizeof(::runanywhere::v1::StorageInfo)},
         {44, sizeof(::runanywhere::v1::StorageAvailability)},
-        {61, sizeof(::runanywhere::v1::StoredModel)},
-        {74, sizeof(::runanywhere::v1::StorageInfoRequest)},
-        {85, sizeof(::runanywhere::v1::StorageInfoResult)},
-        {96, sizeof(::runanywhere::v1::StorageAvailabilityRequest)},
-        {111, sizeof(::runanywhere::v1::StorageAvailabilityResult)},
-        {124, sizeof(::runanywhere::v1::StorageDeletePlanRequest)},
-        {139, sizeof(::runanywhere::v1::StorageDeleteCandidate)},
-        {158, sizeof(::runanywhere::v1::StorageDeletePlan)},
-        {179, sizeof(::runanywhere::v1::StorageDeleteRequest)},
-        {198, sizeof(::runanywhere::v1::StorageDeleteResult)},
+        {61, sizeof(::runanywhere::v1::StorageInfoRequest)},
+        {72, sizeof(::runanywhere::v1::StorageInfoResult)},
+        {83, sizeof(::runanywhere::v1::StorageAvailabilityRequest)},
+        {98, sizeof(::runanywhere::v1::StorageAvailabilityResult)},
+        {111, sizeof(::runanywhere::v1::StorageDeletePlanRequest)},
+        {126, sizeof(::runanywhere::v1::StorageDeleteCandidate)},
+        {145, sizeof(::runanywhere::v1::StorageDeletePlan)},
+        {166, sizeof(::runanywhere::v1::StorageDeleteRequest)},
+        {185, sizeof(::runanywhere::v1::StorageDeleteResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3137,7 +2938,6 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::ModelStorageMetrics_globals_,
         &::runanywhere::v1::StorageInfo_globals_,
         &::runanywhere::v1::StorageAvailability_globals_,
-        &::runanywhere::v1::StoredModel_globals_,
         &::runanywhere::v1::StorageInfoRequest_globals_,
         &::runanywhere::v1::StorageInfoResult_globals_,
         &::runanywhere::v1::StorageAvailabilityRequest_globals_,
@@ -3170,88 +2970,85 @@ const char descriptor_table_protodef_storage_5ftypes_2eproto[] ABSL_ATTRIBUTE_SE
     "warning_message\030\004 \001(\tH\000\210\001\001\022\033\n\016recommenda"
     "tion\030\005 \001(\tH\001\210\001\001\022\027\n\017shortfall_bytes\030\006 \001(\003"
     "\022#\n\033required_to_available_ratio\030\007 \001(\002B\022\n"
-    "\020_warning_messageB\021\n\017_recommendation\"\211\001\n"
-    "\013StoredModel\022\020\n\010model_id\030\001 \001(\t\022\014\n\004name\030\002"
-    " \001(\t\022\022\n\nsize_bytes\030\003 \001(\003\022\022\n\nlocal_path\030\004"
-    " \001(\t\022\035\n\020downloaded_at_ms\030\005 \001(\003H\000\210\001\001B\023\n\021_"
-    "downloaded_at_ms\"p\n\022StorageInfoRequest\022\026"
-    "\n\016include_device\030\001 \001(\010\022\023\n\013include_app\030\002 "
-    "\001(\010\022\026\n\016include_models\030\003 \001(\010\022\025\n\rinclude_c"
-    "ache\030\004 \001(\010\"x\n\021StorageInfoResult\022\017\n\007succe"
-    "ss\030\001 \001(\010\022)\n\004info\030\002 \001(\0132\033.runanywhere.v1."
-    "StorageInfo\022\025\n\rerror_message\030\003 \001(\t\022\020\n\010wa"
-    "rnings\030\004 \003(\t\"\301\001\n\032StorageAvailabilityRequ"
-    "est\022\020\n\010model_id\030\001 \001(\t\022\026\n\016required_bytes\030"
-    "\002 \001(\003\022\025\n\rsafety_margin\030\003 \001(\001\022$\n\034include_"
-    "existing_model_bytes\030\004 \001(\010\022\033\n\023include_de"
-    "lete_plan\030\005 \001(\010\022\037\n\027allow_cache_reclamati"
-    "on\030\006 \001(\010\"\335\001\n\031StorageAvailabilityResult\022\017"
-    "\n\007success\030\001 \001(\010\0229\n\014availability\030\002 \001(\0132#."
-    "runanywhere.v1.StorageAvailability\022\020\n\010wa"
-    "rnings\030\003 \003(\t\022\025\n\rerror_message\030\004 \001(\t\022;\n\013d"
-    "elete_plan\030\005 \001(\0132!.runanywhere.v1.Storag"
-    "eDeletePlanH\000\210\001\001B\016\n\014_delete_plan\"\262\001\n\030Sto"
-    "rageDeletePlanRequest\022\021\n\tmodel_ids\030\001 \003(\t"
-    "\022\026\n\016required_bytes\030\002 \001(\003\022\025\n\rinclude_cach"
-    "e\030\003 \001(\010\022\024\n\014oldest_first\030\004 \001(\010\022\033\n\023allow_l"
-    "oaded_models\030\005 \001(\010\022!\n\031include_download_p"
-    "artials\030\006 \001(\010\"\350\001\n\026StorageDeleteCandidate"
-    "\022\020\n\010model_id\030\001 \001(\t\022\031\n\021reclaimable_bytes\030"
-    "\002 \001(\003\022\031\n\014last_used_ms\030\003 \001(\003H\000\210\001\001\022\021\n\tis_l"
-    "oaded\030\004 \001(\010\022\022\n\nlocal_path\030\005 \001(\t\022\027\n\017requi"
-    "res_unload\030\006 \001(\010\022 \n\030requires_platform_de"
-    "lete\030\007 \001(\010\022\023\n\013storage_key\030\010 \001(\tB\017\n\r_last"
-    "_used_ms\"\243\002\n\021StorageDeletePlan\022\"\n\032can_re"
-    "claim_required_bytes\030\001 \001(\010\022\026\n\016required_b"
-    "ytes\030\002 \001(\003\022\031\n\021reclaimable_bytes\030\003 \001(\003\022:\n"
-    "\ncandidates\030\004 \003(\0132&.runanywhere.v1.Stora"
-    "geDeleteCandidate\022\020\n\010warnings\030\005 \003(\t\022\025\n\re"
-    "rror_message\030\006 \001(\t\022\027\n\017requires_unload\030\007 "
-    "\001(\010\022 \n\030requires_platform_delete\030\010 \001(\010\022\027\n"
-    "\017candidate_count\030\t \001(\005\"\202\002\n\024StorageDelete"
-    "Request\022\021\n\tmodel_ids\030\001 \003(\t\022\024\n\014delete_fil"
-    "es\030\002 \001(\010\022\034\n\024clear_registry_paths\030\003 \001(\010\022\030"
-    "\n\020unload_if_loaded\030\004 \001(\010\022\017\n\007dry_run\030\005 \001("
-    "\010\0224\n\004plan\030\006 \001(\0132!.runanywhere.v1.Storage"
-    "DeletePlanH\000\210\001\001\022\032\n\022require_plan_match\030\007 "
-    "\001(\010\022\035\n\025allow_platform_delete\030\010 \001(\010B\007\n\005_p"
-    "lan\"\370\001\n\023StorageDeleteResult\022\017\n\007success\030\001"
-    " \001(\010\022\025\n\rdeleted_bytes\030\002 \001(\003\022\031\n\021deleted_m"
-    "odel_ids\030\003 \003(\t\022\030\n\020failed_model_ids\030\004 \003(\t"
-    "\022\020\n\010warnings\030\005 \003(\t\022\025\n\rerror_message\030\006 \001("
-    "\t\022\031\n\021skipped_model_ids\030\007 \003(\t\022\017\n\007dry_run\030"
-    "\010 \001(\010\022\030\n\020registry_updated\030\t \001(\010\022\025\n\rfiles"
-    "_deleted\030\n \001(\010*\327\001\n\007NPUChip\022\030\n\024NPU_CHIP_U"
-    "NSPECIFIED\020\000\022\021\n\rNPU_CHIP_NONE\020\001\022 \n\034NPU_C"
-    "HIP_APPLE_NEURAL_ENGINE\020\002\022\035\n\031NPU_CHIP_QU"
-    "ALCOMM_HEXAGON\020\003\022\031\n\025NPU_CHIP_MEDIATEK_AP"
-    "U\020\004\022\027\n\023NPU_CHIP_GOOGLE_TPU\020\005\022\026\n\022NPU_CHIP"
-    "_INTEL_NPU\020\006\022\022\n\016NPU_CHIP_OTHER\020c2\357\002\n\007Sto"
-    "rage\022M\n\004Info\022\".runanywhere.v1.StorageInf"
-    "oRequest\032!.runanywhere.v1.StorageInfoRes"
-    "ult\022e\n\014Availability\022*.runanywhere.v1.Sto"
-    "rageAvailabilityRequest\032).runanywhere.v1"
-    ".StorageAvailabilityResult\022Y\n\nDeletePlan"
-    "\022(.runanywhere.v1.StorageDeletePlanReque"
-    "st\032!.runanywhere.v1.StorageDeletePlan\022S\n"
-    "\006Delete\022$.runanywhere.v1.StorageDeleteRe"
-    "quest\032#.runanywhere.v1.StorageDeleteResu"
-    "ltB\214\001\n\027ai.runanywhere.proto.v1B\021StorageT"
-    "ypesProtoP\001Z<github.com/runanywhere/runa"
-    "nywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004R"
-    "AV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\020_warning_messageB\021\n\017_recommendation\"p\n\022"
+    "StorageInfoRequest\022\026\n\016include_device\030\001 \001"
+    "(\010\022\023\n\013include_app\030\002 \001(\010\022\026\n\016include_model"
+    "s\030\003 \001(\010\022\025\n\rinclude_cache\030\004 \001(\010\"x\n\021Storag"
+    "eInfoResult\022\017\n\007success\030\001 \001(\010\022)\n\004info\030\002 \001"
+    "(\0132\033.runanywhere.v1.StorageInfo\022\025\n\rerror"
+    "_message\030\003 \001(\t\022\020\n\010warnings\030\004 \003(\t\"\301\001\n\032Sto"
+    "rageAvailabilityRequest\022\020\n\010model_id\030\001 \001("
+    "\t\022\026\n\016required_bytes\030\002 \001(\003\022\025\n\rsafety_marg"
+    "in\030\003 \001(\001\022$\n\034include_existing_model_bytes"
+    "\030\004 \001(\010\022\033\n\023include_delete_plan\030\005 \001(\010\022\037\n\027a"
+    "llow_cache_reclamation\030\006 \001(\010\"\335\001\n\031Storage"
+    "AvailabilityResult\022\017\n\007success\030\001 \001(\010\0229\n\014a"
+    "vailability\030\002 \001(\0132#.runanywhere.v1.Stora"
+    "geAvailability\022\020\n\010warnings\030\003 \003(\t\022\025\n\rerro"
+    "r_message\030\004 \001(\t\022;\n\013delete_plan\030\005 \001(\0132!.r"
+    "unanywhere.v1.StorageDeletePlanH\000\210\001\001B\016\n\014"
+    "_delete_plan\"\262\001\n\030StorageDeletePlanReques"
+    "t\022\021\n\tmodel_ids\030\001 \003(\t\022\026\n\016required_bytes\030\002"
+    " \001(\003\022\025\n\rinclude_cache\030\003 \001(\010\022\024\n\014oldest_fi"
+    "rst\030\004 \001(\010\022\033\n\023allow_loaded_models\030\005 \001(\010\022!"
+    "\n\031include_download_partials\030\006 \001(\010\"\350\001\n\026St"
+    "orageDeleteCandidate\022\020\n\010model_id\030\001 \001(\t\022\031"
+    "\n\021reclaimable_bytes\030\002 \001(\003\022\031\n\014last_used_m"
+    "s\030\003 \001(\003H\000\210\001\001\022\021\n\tis_loaded\030\004 \001(\010\022\022\n\nlocal"
+    "_path\030\005 \001(\t\022\027\n\017requires_unload\030\006 \001(\010\022 \n\030"
+    "requires_platform_delete\030\007 \001(\010\022\023\n\013storag"
+    "e_key\030\010 \001(\tB\017\n\r_last_used_ms\"\243\002\n\021Storage"
+    "DeletePlan\022\"\n\032can_reclaim_required_bytes"
+    "\030\001 \001(\010\022\026\n\016required_bytes\030\002 \001(\003\022\031\n\021reclai"
+    "mable_bytes\030\003 \001(\003\022:\n\ncandidates\030\004 \003(\0132&."
+    "runanywhere.v1.StorageDeleteCandidate\022\020\n"
+    "\010warnings\030\005 \003(\t\022\025\n\rerror_message\030\006 \001(\t\022\027"
+    "\n\017requires_unload\030\007 \001(\010\022 \n\030requires_plat"
+    "form_delete\030\010 \001(\010\022\027\n\017candidate_count\030\t \001"
+    "(\005\"\202\002\n\024StorageDeleteRequest\022\021\n\tmodel_ids"
+    "\030\001 \003(\t\022\024\n\014delete_files\030\002 \001(\010\022\034\n\024clear_re"
+    "gistry_paths\030\003 \001(\010\022\030\n\020unload_if_loaded\030\004"
+    " \001(\010\022\017\n\007dry_run\030\005 \001(\010\0224\n\004plan\030\006 \001(\0132!.ru"
+    "nanywhere.v1.StorageDeletePlanH\000\210\001\001\022\032\n\022r"
+    "equire_plan_match\030\007 \001(\010\022\035\n\025allow_platfor"
+    "m_delete\030\010 \001(\010B\007\n\005_plan\"\370\001\n\023StorageDelet"
+    "eResult\022\017\n\007success\030\001 \001(\010\022\025\n\rdeleted_byte"
+    "s\030\002 \001(\003\022\031\n\021deleted_model_ids\030\003 \003(\t\022\030\n\020fa"
+    "iled_model_ids\030\004 \003(\t\022\020\n\010warnings\030\005 \003(\t\022\025"
+    "\n\rerror_message\030\006 \001(\t\022\031\n\021skipped_model_i"
+    "ds\030\007 \003(\t\022\017\n\007dry_run\030\010 \001(\010\022\030\n\020registry_up"
+    "dated\030\t \001(\010\022\025\n\rfiles_deleted\030\n \001(\010*\327\001\n\007N"
+    "PUChip\022\030\n\024NPU_CHIP_UNSPECIFIED\020\000\022\021\n\rNPU_"
+    "CHIP_NONE\020\001\022 \n\034NPU_CHIP_APPLE_NEURAL_ENG"
+    "INE\020\002\022\035\n\031NPU_CHIP_QUALCOMM_HEXAGON\020\003\022\031\n\025"
+    "NPU_CHIP_MEDIATEK_APU\020\004\022\027\n\023NPU_CHIP_GOOG"
+    "LE_TPU\020\005\022\026\n\022NPU_CHIP_INTEL_NPU\020\006\022\022\n\016NPU_"
+    "CHIP_OTHER\020c2\357\002\n\007Storage\022M\n\004Info\022\".runan"
+    "ywhere.v1.StorageInfoRequest\032!.runanywhe"
+    "re.v1.StorageInfoResult\022e\n\014Availability\022"
+    "*.runanywhere.v1.StorageAvailabilityRequ"
+    "est\032).runanywhere.v1.StorageAvailability"
+    "Result\022Y\n\nDeletePlan\022(.runanywhere.v1.St"
+    "orageDeletePlanRequest\032!.runanywhere.v1."
+    "StorageDeletePlan\022S\n\006Delete\022$.runanywher"
+    "e.v1.StorageDeleteRequest\032#.runanywhere."
+    "v1.StorageDeleteResultB\214\001\n\027ai.runanywher"
+    "e.proto.v1B\021StorageTypesProtoP\001Z<github."
+    "com/runanywhere/runanywhere-sdks/idl/v1;"
+    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
+    "\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_storage_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_storage_5ftypes_2eproto = {
     false,
     false,
-    3593,
+    3453,
     descriptor_table_protodef_storage_5ftypes_2eproto,
     "storage_types.proto",
     &descriptor_table_storage_5ftypes_2eproto_once,
     nullptr,
     0,
-    15,
+    14,
     schemas,
     file_message_globals,
     TableStruct_storage_5ftypes_2eproto::offsets,
@@ -4789,351 +4586,6 @@ void StorageAvailability::InternalSwap(StorageAvailability* PROTOBUF_RESTRICT PR
 }
 
 ::google::protobuf::Metadata StorageAvailability::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-StoredModel::StoredModel(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, StoredModel_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.StoredModel)
-}
-PROTOBUF_NDEBUG_INLINE StoredModel::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::StoredModel& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        model_id_(arena, from.model_id_),
-        name_(arena, from.name_),
-        local_path_(arena, from.local_path_) {}
-
-StoredModel::StoredModel(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const StoredModel& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, StoredModel_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  StoredModel* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, size_bytes_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, size_bytes_),
-           offsetof(Impl_, downloaded_at_ms_) -
-               offsetof(Impl_, size_bytes_) +
-               sizeof(Impl_::downloaded_at_ms_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.StoredModel)
-}
-PROTOBUF_NDEBUG_INLINE StoredModel::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        model_id_(arena),
-        name_(arena),
-        local_path_(arena) {}
-
-inline void StoredModel::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, size_bytes_),
-           0,
-           offsetof(Impl_, downloaded_at_ms_) -
-               offsetof(Impl_, size_bytes_) +
-               sizeof(Impl_::downloaded_at_ms_));
-}
-StoredModel::~StoredModel() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.StoredModel)
-  SharedDtor(*this);
-}
-inline void StoredModel::SharedDtor(MessageLite& self) {
-  StoredModel& this_ = static_cast<StoredModel&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.model_id_.Destroy();
-  this_._impl_.name_.Destroy();
-  this_._impl_.local_path_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull StoredModel_class_data_ =
-        StoredModel::InternalGenerateClassData_(StoredModel_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-StoredModel::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&StoredModel_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(StoredModel_class_data_.tc_table);
-  return StoredModel_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-StoredModel::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&StoredModel_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&StoredModel_globals_));
-  return StoredModel_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const StoredModel::ParseTableT_
-    StoredModel::_table_ =
-        StoredModel::InternalGenerateParseTable_(StoredModel_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void StoredModel::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.StoredModel)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.model_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.name_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.local_path_.ClearNonDefaultToEmpty();
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
-    ::memset(&_impl_.size_bytes_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.downloaded_at_ms_) -
-        reinterpret_cast<char*>(&_impl_.size_bytes_)) + sizeof(_impl_.downloaded_at_ms_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL StoredModel::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const StoredModel& this_ = static_cast<const StoredModel&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL StoredModel::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const StoredModel& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.StoredModel)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string model_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_model_id().empty()) {
-      const ::std::string& _s = this_._internal_model_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StoredModel.model_id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // string name = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_name().empty()) {
-      const ::std::string& _s = this_._internal_name();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StoredModel.name");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // int64 size_bytes = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_size_bytes() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
-              stream, this_._internal_size_bytes(), target);
-    }
-  }
-
-  // string local_path = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (!this_._internal_local_path().empty()) {
-      const ::std::string& _s = this_._internal_local_path();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.StoredModel.local_path");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
-    }
-  }
-
-  // optional int64 downloaded_at_ms = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    target =
-        ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
-            stream, this_._internal_downloaded_at_ms(), target);
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.StoredModel)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t StoredModel::ByteSizeLong(const MessageLite& base) {
-  const StoredModel& this_ = static_cast<const StoredModel&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t StoredModel::ByteSizeLong() const {
-  const StoredModel& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.StoredModel)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // string model_id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_model_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_id());
-      }
-    }
-    // string name = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_name().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_name());
-      }
-    }
-    // string local_path = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!this_._internal_local_path().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_local_path());
-      }
-    }
-    // int64 size_bytes = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_size_bytes() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_size_bytes());
-      }
-    }
-    // optional int64 downloaded_at_ms = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-          this_._internal_downloaded_at_ms());
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void StoredModel::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<StoredModel*>(&to_msg);
-  auto& from = static_cast<const StoredModel&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.StoredModel)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_model_id().empty()) {
-        _this->_internal_set_model_id(from._internal_model_id());
-      } else {
-        if (_this->_impl_.model_id_.IsDefault()) {
-          _this->_internal_set_model_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_name().empty()) {
-        _this->_internal_set_name(from._internal_name());
-      } else {
-        if (_this->_impl_.name_.IsDefault()) {
-          _this->_internal_set_name("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (!from._internal_local_path().empty()) {
-        _this->_internal_set_local_path(from._internal_local_path());
-      } else {
-        if (_this->_impl_.local_path_.IsDefault()) {
-          _this->_internal_set_local_path("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_size_bytes() != 0) {
-        _this->_impl_.size_bytes_ = from._impl_.size_bytes_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_impl_.downloaded_at_ms_ = from._impl_.downloaded_at_ms_;
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void StoredModel::CopyFrom(const StoredModel& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.StoredModel)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void StoredModel::InternalSwap(StoredModel* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.local_path_, &other->_impl_.local_path_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.downloaded_at_ms_)
-      + sizeof(StoredModel::_impl_.downloaded_at_ms_)
-      - PROTOBUF_FIELD_OFFSET(StoredModel, _impl_.size_bytes_)>(
-          reinterpret_cast<char*>(&_impl_.size_bytes_),
-          reinterpret_cast<char*>(&other->_impl_.size_bytes_));
-}
-
-::google::protobuf::Metadata StoredModel::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

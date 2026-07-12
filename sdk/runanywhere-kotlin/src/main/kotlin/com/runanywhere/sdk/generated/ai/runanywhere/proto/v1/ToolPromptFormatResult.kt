@@ -46,18 +46,10 @@ public class ToolPromptFormatResult(
   )
   public val format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "formatHint",
-    schemaIndex = 2,
-  )
-  public val format_hint: String = "",
-  @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "errorMessage",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val error_message: String? = null,
   @field:WireField(
@@ -65,7 +57,7 @@ public class ToolPromptFormatResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "errorCode",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -82,7 +74,6 @@ public class ToolPromptFormatResult(
     if (unknownFields != other.unknownFields) return false
     if (formatted_prompt != other.formatted_prompt) return false
     if (format != other.format) return false
-    if (format_hint != other.format_hint) return false
     if (error_message != other.error_message) return false
     if (error_code != other.error_code) return false
     return true
@@ -94,7 +85,6 @@ public class ToolPromptFormatResult(
       result = unknownFields.hashCode()
       result = result * 37 + formatted_prompt.hashCode()
       result = result * 37 + format.hashCode()
-      result = result * 37 + format_hint.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + error_code.hashCode()
       super.hashCode = result
@@ -106,7 +96,6 @@ public class ToolPromptFormatResult(
     val result = mutableListOf<String>()
     result += """formatted_prompt=${sanitize(formatted_prompt)}"""
     result += """format=$format"""
-    result += """format_hint=${sanitize(format_hint)}"""
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     result += """error_code=$error_code"""
     return result.joinToString(prefix = "ToolPromptFormatResult{", separator = ", ", postfix = "}")
@@ -115,11 +104,10 @@ public class ToolPromptFormatResult(
   public fun copy(
     formatted_prompt: String = this.formatted_prompt,
     format: ToolCallFormatName = this.format,
-    format_hint: String = this.format_hint,
     error_message: String? = this.error_message,
     error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolPromptFormatResult = ToolPromptFormatResult(formatted_prompt, format, format_hint, error_message, error_code, unknownFields)
+  ): ToolPromptFormatResult = ToolPromptFormatResult(formatted_prompt, format, error_message, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -140,9 +128,6 @@ public class ToolPromptFormatResult(
         if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
           size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(2, value.format)
         }
-        if (value.format_hint != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.format_hint)
-        }
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error_message)
         if (value.error_code != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
@@ -157,9 +142,6 @@ public class ToolPromptFormatResult(
         if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
           ToolCallFormatName.ADAPTER.encodeWithTag(writer, 2, value.format)
         }
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.format_hint)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
         if (value.error_code != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
@@ -173,9 +155,6 @@ public class ToolPromptFormatResult(
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.format_hint)
-        }
         if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
           ToolCallFormatName.ADAPTER.encodeWithTag(writer, 2, value.format)
         }
@@ -187,7 +166,6 @@ public class ToolPromptFormatResult(
       override fun decode(reader: ProtoReader): ToolPromptFormatResult {
         var formatted_prompt: String = ""
         var format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-        var format_hint: String = ""
         var error_message: String? = null
         var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
@@ -198,7 +176,6 @@ public class ToolPromptFormatResult(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            3 -> format_hint = ProtoAdapter.STRING.decode(reader)
             4 -> error_message = ProtoAdapter.STRING.decode(reader)
             5 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -207,7 +184,6 @@ public class ToolPromptFormatResult(
         return ToolPromptFormatResult(
           formatted_prompt = formatted_prompt,
           format = format,
-          format_hint = format_hint,
           error_message = error_message,
           error_code = error_code,
           unknownFields = unknownFields

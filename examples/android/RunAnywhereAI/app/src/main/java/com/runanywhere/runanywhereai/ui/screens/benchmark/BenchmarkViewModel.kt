@@ -35,6 +35,8 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         private set
     var progress by mutableStateOf<BenchmarkProgress?>(null)
         private set
+    var message by mutableStateOf<String?>(null)
+        private set
 
     private var job: Job? = null
 
@@ -53,6 +55,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         val results = mutableListOf<BenchmarkResult>()
         isRunning = true
         progress = null
+        message = null
         job = viewModelScope.launch(Dispatchers.Default) {
             var status = BenchmarkStatus.COMPLETED
             try {
@@ -66,18 +69,21 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 RACLog.e("benchmark run failed", e)
                 status = BenchmarkStatus.FAILED
+                message = e.message ?: "Benchmark failed"
             } finally {
                 withContext(NonCancellable) {
-                    BenchmarkStore.save(
-                        BenchmarkRun(
-                            id = UUID.randomUUID().toString(),
-                            startedAt = startedAt,
-                            completedAt = System.currentTimeMillis(),
-                            status = status,
-                            device = device,
-                            results = results.toList(),
-                        ),
-                    )
+                    if (results.isNotEmpty()) {
+                        BenchmarkStore.save(
+                            BenchmarkRun(
+                                id = UUID.randomUUID().toString(),
+                                startedAt = startedAt,
+                                completedAt = System.currentTimeMillis(),
+                                status = status,
+                                device = device,
+                                results = results.toList(),
+                            ),
+                        )
+                    }
                 }
                 isRunning = false
                 progress = null
@@ -91,5 +97,9 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun delete(id: String) {
         BenchmarkStore.delete(id)
+    }
+
+    fun clearMessage() {
+        message = null
     }
 }

@@ -210,11 +210,11 @@ struct StorageView: View {
                     Spacer()
                 }
             } else {
-                ForEach(viewModel.storedModels, id: \.id) { model in
+                ForEach(viewModel.storedModels, id: \.modelID) { model in
                     StoredModelRow(model: model) {
                         await viewModel.deleteModel(model)
                     }
-                    if model.id != viewModel.storedModels.last?.id {
+                    if model.modelID != viewModel.storedModels.last?.modelID {
                         Divider()
                             .padding(.vertical, AppSpacing.xSmall)
                     }
@@ -231,7 +231,7 @@ struct StorageView: View {
                     .foregroundColor(AppColors.textSecondary)
                     .font(AppTypography.caption)
             } else {
-                ForEach(viewModel.storedModels, id: \.id) { model in
+                ForEach(viewModel.storedModels, id: \.modelID) { model in
                     StoredModelRow(model: model) {
                         await viewModel.deleteModel(model)
                     }
@@ -344,22 +344,41 @@ struct StorageView: View {
 // MARK: - Supporting Views
 
 private struct StoredModelRow: View {
-    let model: RAStoredModel
+    let model: RAModelStorageMetrics
     let onDelete: () async -> Void
     @ObservedObject private var modelListViewModel = ModelListViewModel.shared
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
+    private var registryModel: RAModelInfo? {
+        modelListViewModel.availableModels.first { $0.id == model.modelID }
+    }
+
+    private var displayName: String {
+        guard let name = registryModel?.name, !name.isEmpty else { return model.modelID }
+        return name
+    }
+
+    private var localPath: String? {
+        guard let path = registryModel?.localPath, !path.isEmpty else { return nil }
+        return path
+    }
+
     private var backend: InferenceFramework? {
-        modelListViewModel.availableModels.first { $0.id == model.id }?.framework
+        registryModel?.framework
+    }
+
+    private var lastUsedDate: Date? {
+        guard model.hasLastUsedMs else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(model.lastUsedMs) / 1000.0)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
             HStack {
                 VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                    Text(model.name)
+                    Text(displayName)
                         .font(AppTypography.subheadlineMedium)
                     if let backend {
                         backendBadge(backend)
@@ -369,7 +388,7 @@ private struct StoredModelRow: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: AppSpacing.xSmall) {
-                    Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
+                    Text(ByteCountFormatter.string(fromByteCount: model.sizeOnDiskBytes, countStyle: .file))
                         .font(AppTypography.captionMedium)
 
                     HStack(spacing: AppSpacing.xSmall) {
@@ -403,22 +422,26 @@ private struct StoredModelRow: View {
 
             if showingDetails {
                 VStack(alignment: .leading, spacing: AppSpacing.small) {
-                    // File Information
-                    VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+                    if let localPath {
                         Text("Path:")
                             .font(AppTypography.caption2Medium)
-                        Text(model.path.path)
+                        Text(localPath)
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    HStack {
-                        Text("Created:")
+                    if let lastUsedDate {
+                        HStack {
+                            Text("Last used:")
+                                .font(AppTypography.caption2Medium)
+                            Text(lastUsedDate, style: .date)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    } else {
+                        Text("Last used: Never")
                             .font(AppTypography.caption2Medium)
-                        Text(model.createdDate, style: .date)
-                            .font(AppTypography.caption2)
-                            .foregroundColor(AppColors.textSecondary)
                     }
                 }
                 .padding(.top, AppSpacing.xSmall)
@@ -439,7 +462,7 @@ private struct StoredModelRow: View {
                 }
             }
         } message: {
-            Text("Are you sure you want to delete \(model.name)? This action cannot be undone.")
+            Text("Are you sure you want to delete \(displayName)? This action cannot be undone.")
         }
     }
 

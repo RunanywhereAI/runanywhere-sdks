@@ -1,6 +1,8 @@
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+
 /// Platform-specific library loader for RunAnywhere core native library (RACommons).
 ///
 /// This loader is ONLY responsible for loading the core RACommons library.
@@ -22,6 +24,8 @@ import 'dart:io';
 /// ## Android
 /// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
 class PlatformLoader {
+  static final _logger = SDKLogger('PlatformLoader');
+
   // Cached library instance for RACommons
   static DynamicLibrary? _commonsLibrary;
   static String? _loadError;
@@ -80,6 +84,11 @@ class PlatformLoader {
   // Cached handle for the cloud-STT backend provider lib (Android only).
   static DynamicLibrary? _cloudBackendLibrary;
 
+  // Cached handle for Flutter-owned callback helper symbols. Android builds
+  // ship these in a small plugin-side shared library; iOS links the same
+  // helpers into the process image via CocoaPods.
+  static DynamicLibrary? _flutterNativePortHelpersLibrary;
+
   /// Ensure the cloud-STT backend provider library is loaded so its symbols
   /// (`rac_backend_cloud_register` / `rac_backend_cloud_unregister`) are
   /// resolvable.
@@ -108,6 +117,31 @@ class PlatformLoader {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Load optional Flutter-owned native-port callback helpers.
+  ///
+  /// These are not part of RACommons; they are platform SDK bridge glue that
+  /// copies borrowed proto bytes inside native callbacks before posting owned
+  /// messages to Dart ReceivePorts.
+  static DynamicLibrary? tryLoadFlutterNativePortHelpers() {
+    if (!Platform.isAndroid && !Platform.isLinux) {
+      return null;
+    }
+    if (_flutterNativePortHelpersLibrary != null) {
+      _logger.debug('Flutter native-port helper library already loaded');
+      return _flutterNativePortHelpersLibrary;
+    }
+    try {
+      _flutterNativePortHelpersLibrary = DynamicLibrary.open(
+        'librunanywhere_flutter_helpers.so',
+      );
+      _logger.debug('Flutter native-port helper library loaded');
+      return _flutterNativePortHelpersLibrary;
+    } catch (e) {
+      _logger.debug('Flutter native-port helper library unavailable: $e');
+      return null;
     }
   }
 
@@ -240,10 +274,7 @@ class PlatformLoader {
     ]);
 
     // System paths
-    paths.addAll([
-      '/usr/local/lib/$dylibName',
-      '/opt/homebrew/lib/$dylibName',
-    ]);
+    paths.addAll(['/usr/local/lib/$dylibName', '/opt/homebrew/lib/$dylibName']);
 
     return paths;
   }
@@ -274,10 +305,7 @@ class PlatformLoader {
   /// Load on Windows.
   static DynamicLibrary _loadWindows(String libraryName) {
     final dllName = '$libraryName.dll';
-    final paths = [
-      dllName,
-      './$dllName',
-    ];
+    final paths = [dllName, './$dllName'];
 
     for (final path in paths) {
       try {
@@ -332,5 +360,4 @@ class PlatformLoader {
       return false;
     }
   }
-
 }

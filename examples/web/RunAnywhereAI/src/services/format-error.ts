@@ -13,11 +13,18 @@
  *   4. Anything else — fall back to `String(err)`.
  */
 
+import { sanitizeDiagnosticText } from './app-logger';
+
 export function formatError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    return String((err as { message: unknown }).message);
+  let message: string;
+  if (err instanceof Error) {
+    message = err.message;
+  } else if (typeof err === 'string') {
+    message = err;
+  } else if (typeof err === 'object' && err !== null && 'message' in err) {
+    message = String((err as { message: unknown }).message);
+  } else {
+    message = String(err);
   }
-  return String(err);
+  return sanitizeDiagnosticText(message);
 }

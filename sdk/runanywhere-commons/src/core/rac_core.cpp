@@ -15,12 +15,16 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_sdk_state.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_environment.h"
 #if !defined(RAC_PLATFORM_ANDROID)
 #include "rac/features/diffusion/rac_diffusion_model_registry.h"
 #endif
@@ -253,16 +257,47 @@ rac_result_t rac_init(const rac_config_t* config) {
 void rac_shutdown(void) {
     std::lock_guard<std::mutex> lock(s_init_mutex);
 
-    if (!s_initialized.load()) {
-        return;
+    const bool core_was_initialized = s_initialized.load(std::memory_order_acquire);
+    const bool state_was_initialized = rac_state_is_initialized();
+    if (core_was_initialized || state_was_initialized) {
+        internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
     }
 
-    internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
-    rac::events::publish_shutdown();
+    // The global lifecycle owns backend service implementations independently
+    // of platform component handles. Destroy them while every borrowed platform
+    // callback and the adapter are still live; cleanup may call back into the
+    // host. The reset drains active lifecycle references before returning.
+    rac_model_lifecycle_reset();
+
+    // Quiesce platform callbacks before detaching their storage. The platform
+    // bridge may release callback-owned objects immediately after this call.
+    rac_device_manager_clear_callbacks();
+
+    // Canonical ownership boundary: one call clears every Commons copy of SDK
+    // configuration and credentials. rac_state_shutdown publishes the
+    // shutdown event when Phase 1 state exists; core-only users still receive
+    // exactly one event from the fallback below.
+    rac_state_shutdown();
+    if (core_was_initialized && !state_was_initialized) {
+        rac::events::publish_shutdown();
+    }
+
+    // Deliver the terminal event while auth and the platform HTTP callback are
+    // still valid. Platform SDKs drain callback work before releasing their
+    // transport; flushing after rac_auth_init(nullptr) would defer the batch as
+    // unauthenticated and the subsequent telemetry-manager destroy would drop it.
+    if (core_was_initialized || state_was_initialized) {
+        (void)rac_events_flush_telemetry_sink();
+    }
+
+    rac_auth_init(nullptr);
+    rac_sdk_reset();
 
 #if !defined(RAC_PLATFORM_ANDROID)
     // Cleanup diffusion model registry (iOS/Apple only)
-    rac_diffusion_model_registry_cleanup();
+    if (core_was_initialized) {
+        rac_diffusion_model_registry_cleanup();
+    }
 #endif
 
     // Clear state. Release-store so a concurrent acquire-load on a worker
@@ -274,7 +309,7 @@ void rac_shutdown(void) {
         std::lock_guard<std::mutex> tag_lock(s_log_tag_mutex);
         s_log_tag = "RAC";
     }
-    s_initialized.store(false);
+    s_initialized.store(false, std::memory_order_release);
 }
 
 rac_bool_t rac_is_initialized(void) {
@@ -311,8 +346,8 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
 
         case RAC_ENV_PRODUCTION:
         default:
-            // Production: NO C++ stderr, only send to Swift bridge
-            // Swift handles local console and Sentry routing
+            // Production: NO C++ stderr, only send to the platform bridge.
+            // The SDK handles local console and custom destination routing.
             rac_logger_set_stderr_always(RAC_FALSE);
             rac_logger_set_min_level(RAC_LOG_WARNING);
             // Note: This log will only go to Swift, not stderr

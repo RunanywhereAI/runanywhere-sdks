@@ -16,10 +16,9 @@
  *     `delete after SDK migration`. Replaced by serialized
  *     runanywhere.v1.VLMImage / VLMGenerationOptions / VLMResult /
  *     VLMStreamEvent bytes via rac_vlm_*_proto APIs.
- *   - Chat-template/family helpers (rac_vlm_chat_template_t,
- *     rac_vlm_model_family_t, rac_vlm_image_format_t,
- *     rac_vlm_get_builtin_template): `internal` portable helpers used
- *     by commons; not part of the public SDK contract.
+ *   - Chat-template/family types (rac_vlm_chat_template_t,
+ *     rac_vlm_model_family_t, rac_vlm_image_format_t): `internal`
+ *     portable helpers used by commons; not part of the public SDK contract.
  */
 
 #ifndef RAC_VLM_TYPES_H
@@ -90,14 +89,6 @@ typedef struct rac_vlm_chat_template {
      */
     const char* default_system_prompt;
 } rac_vlm_chat_template_t;
-
-/**
- * @brief Get built-in chat template for a model family
- *
- * @param family Model family enum value
- * @return Pointer to static template, or NULL if family not supported
- */
-RAC_API const rac_vlm_chat_template_t* rac_vlm_get_builtin_template(rac_vlm_model_family_t family);
 
 // =============================================================================
 // IMAGE INPUT - Supports multiple input formats

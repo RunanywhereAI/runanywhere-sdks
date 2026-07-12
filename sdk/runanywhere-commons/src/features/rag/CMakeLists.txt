@@ -27,7 +27,7 @@ set(USEARCH_USE_SIMSIMD OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     usearch
     GIT_REPOSITORY https://github.com/unum-cloud/usearch.git
-    GIT_TAG        ${USEARCH_VERSION}
+    GIT_TAG        ${RAC_USEARCH_VERSION}
     GIT_SHALLOW    TRUE
 )
 set(USEARCH_BUILD_TEST_C OFF CACHE BOOL "" FORCE)
@@ -42,7 +42,7 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
     FetchContent_Declare(
         nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG        v${NLOHMANN_JSON_VERSION}
+        GIT_TAG        v${RAC_NLOHMANN_JSON_VERSION}
         GIT_SHALLOW    TRUE
     )
     set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -59,6 +59,8 @@ endif()
 set(RAG_PIPELINE_SOURCES
     rag_backend.cpp
     rag_pipeline_graph.cpp
+    rag_rerank.cpp
+    rag_fusion.cpp
     vector_store_usearch.cpp
     rag_chunker.cpp
     bm25_index.cpp
@@ -75,6 +77,7 @@ set(RAG_PIPELINE_SOURCES
 set(RAG_PIPELINE_HEADERS
     rag_backend.h
     rag_pipeline_graph.h
+    rag_rerank.h
     vector_store_usearch.h
     rag_chunker.h
     bm25_index.h
@@ -168,16 +171,6 @@ endif()
 # =============================================================================
 
 message(STATUS "RAG Pipeline Configuration:")
-message(STATUS "  USearch: ${USEARCH_VERSION} (HNSW vector search)")
+message(STATUS "  USearch: ${RAC_USEARCH_VERSION} (HNSW vector search)")
 message(STATUS "  Architecture: Pipeline (calls LLM + Embeddings via vtables)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
-
-# =============================================================================
-# JNI Bridge for Android (DELETED — legacy non-proto RAG pipeline JNI)
-#
-# The previous rac_backend_rag_jni target and `jni/rac_rag_jni.cpp` exposed
-# the struct/JSON `rac_rag_pipeline_*` path to Kotlin. All SDK callers
-# moved to the proto-byte `rac_rag_*_proto` surface (served by the main
-# `librunanywhere_jni.so` via `racRag*Proto` methods in
-# `runanywhere_commons_jni.cpp`). The dedicated JNI library is gone.
-# =============================================================================

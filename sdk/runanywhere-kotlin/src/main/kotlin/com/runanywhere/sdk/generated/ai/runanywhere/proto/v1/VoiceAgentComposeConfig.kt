@@ -162,66 +162,6 @@ public class VoiceAgentComposeConfig(
   public val vad_energy_threshold: Float = 0f,
   /**
    * -------------------------------------------------------------------
-   * Wake-word sub-config (mirrors rac_voice_agent_wakeword_config_t /
-   * rac_wakeword_config_t).
-   * -------------------------------------------------------------------
-   */
-  @field:WireField(
-    tag = 13,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "wakewordEnabled",
-    schemaIndex = 12,
-  )
-  public val wakeword_enabled: Boolean = false,
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "wakewordModelPath",
-    schemaIndex = 13,
-  )
-  public val wakeword_model_path: String? = null,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "wakewordModelId",
-    schemaIndex = 14,
-  )
-  public val wakeword_model_id: String? = null,
-  @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "wakewordPhrase",
-    schemaIndex = 15,
-  )
-  public val wakeword_phrase: String? = null,
-  /**
-   * default 0.5
-   */
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "wakewordThreshold",
-    schemaIndex = 16,
-  )
-  public val wakeword_threshold: Float = 0f,
-  @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "wakewordEmbeddingModelPath",
-    schemaIndex = 17,
-  )
-  public val wakeword_embedding_model_path: String? = null,
-  @field:WireField(
-    tag = 19,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "wakewordVadModelPath",
-    schemaIndex = 18,
-  )
-  public val wakeword_vad_model_path: String? = null,
-  /**
-   * -------------------------------------------------------------------
    * Session-behavior sub-config. Optional so the C ABI can be invoked
    * without runtime-behavior overrides (engine defaults applied).
    * -------------------------------------------------------------------
@@ -230,7 +170,7 @@ public class VoiceAgentComposeConfig(
     tag = 20,
     adapter = "ai.runanywhere.proto.v1.VoiceSessionConfig#ADAPTER",
     jsonName = "sessionConfig",
-    schemaIndex = 19,
+    schemaIndex = 12,
   )
   public val session_config: VoiceSessionConfig? = null,
   /**
@@ -241,7 +181,7 @@ public class VoiceAgentComposeConfig(
     tag = 21,
     adapter = "ai.runanywhere.proto.v1.AudioPipelineConfig#ADAPTER",
     jsonName = "audioPipelineConfig",
-    schemaIndex = 20,
+    schemaIndex = 13,
   )
   public val audio_pipeline_config: AudioPipelineConfig? = null,
   /**
@@ -251,14 +191,14 @@ public class VoiceAgentComposeConfig(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "sessionId",
-    schemaIndex = 21,
+    schemaIndex = 14,
   )
   public val session_id: String? = null,
   @field:WireField(
     tag = 23,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "defaultLanguageCode",
-    schemaIndex = 22,
+    schemaIndex = 15,
   )
   public val default_language_code: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -285,13 +225,6 @@ public class VoiceAgentComposeConfig(
     if (vad_sample_rate != other.vad_sample_rate) return false
     if (vad_frame_length != other.vad_frame_length) return false
     if (vad_energy_threshold != other.vad_energy_threshold) return false
-    if (wakeword_enabled != other.wakeword_enabled) return false
-    if (wakeword_model_path != other.wakeword_model_path) return false
-    if (wakeword_model_id != other.wakeword_model_id) return false
-    if (wakeword_phrase != other.wakeword_phrase) return false
-    if (wakeword_threshold != other.wakeword_threshold) return false
-    if (wakeword_embedding_model_path != other.wakeword_embedding_model_path) return false
-    if (wakeword_vad_model_path != other.wakeword_vad_model_path) return false
     if (session_config != other.session_config) return false
     if (audio_pipeline_config != other.audio_pipeline_config) return false
     if (session_id != other.session_id) return false
@@ -315,13 +248,6 @@ public class VoiceAgentComposeConfig(
       result = result * 37 + vad_sample_rate.hashCode()
       result = result * 37 + vad_frame_length.hashCode()
       result = result * 37 + vad_energy_threshold.hashCode()
-      result = result * 37 + wakeword_enabled.hashCode()
-      result = result * 37 + (wakeword_model_path?.hashCode() ?: 0)
-      result = result * 37 + (wakeword_model_id?.hashCode() ?: 0)
-      result = result * 37 + (wakeword_phrase?.hashCode() ?: 0)
-      result = result * 37 + wakeword_threshold.hashCode()
-      result = result * 37 + (wakeword_embedding_model_path?.hashCode() ?: 0)
-      result = result * 37 + (wakeword_vad_model_path?.hashCode() ?: 0)
       result = result * 37 + (session_config?.hashCode() ?: 0)
       result = result * 37 + (audio_pipeline_config?.hashCode() ?: 0)
       result = result * 37 + (session_id?.hashCode() ?: 0)
@@ -345,13 +271,6 @@ public class VoiceAgentComposeConfig(
     result += """vad_sample_rate=$vad_sample_rate"""
     result += """vad_frame_length=$vad_frame_length"""
     result += """vad_energy_threshold=$vad_energy_threshold"""
-    result += """wakeword_enabled=$wakeword_enabled"""
-    if (wakeword_model_path != null) result += """wakeword_model_path=${sanitize(wakeword_model_path)}"""
-    if (wakeword_model_id != null) result += """wakeword_model_id=${sanitize(wakeword_model_id)}"""
-    if (wakeword_phrase != null) result += """wakeword_phrase=${sanitize(wakeword_phrase)}"""
-    result += """wakeword_threshold=$wakeword_threshold"""
-    if (wakeword_embedding_model_path != null) result += """wakeword_embedding_model_path=${sanitize(wakeword_embedding_model_path)}"""
-    if (wakeword_vad_model_path != null) result += """wakeword_vad_model_path=${sanitize(wakeword_vad_model_path)}"""
     if (session_config != null) result += """session_config=$session_config"""
     if (audio_pipeline_config != null) result += """audio_pipeline_config=$audio_pipeline_config"""
     if (session_id != null) result += """session_id=${sanitize(session_id)}"""
@@ -372,19 +291,12 @@ public class VoiceAgentComposeConfig(
     vad_sample_rate: Int = this.vad_sample_rate,
     vad_frame_length: Float = this.vad_frame_length,
     vad_energy_threshold: Float = this.vad_energy_threshold,
-    wakeword_enabled: Boolean = this.wakeword_enabled,
-    wakeword_model_path: String? = this.wakeword_model_path,
-    wakeword_model_id: String? = this.wakeword_model_id,
-    wakeword_phrase: String? = this.wakeword_phrase,
-    wakeword_threshold: Float = this.wakeword_threshold,
-    wakeword_embedding_model_path: String? = this.wakeword_embedding_model_path,
-    wakeword_vad_model_path: String? = this.wakeword_vad_model_path,
     session_config: VoiceSessionConfig? = this.session_config,
     audio_pipeline_config: AudioPipelineConfig? = this.audio_pipeline_config,
     session_id: String? = this.session_id,
     default_language_code: String? = this.default_language_code,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name, llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name, vad_sample_rate, vad_frame_length, vad_energy_threshold, wakeword_enabled, wakeword_model_path, wakeword_model_id, wakeword_phrase, wakeword_threshold, wakeword_embedding_model_path, wakeword_vad_model_path, session_config, audio_pipeline_config, session_id, default_language_code, unknownFields)
+  ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name, llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name, vad_sample_rate, vad_frame_length, vad_energy_threshold, session_config, audio_pipeline_config, session_id, default_language_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -417,17 +329,6 @@ public class VoiceAgentComposeConfig(
         if (!value.vad_energy_threshold.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.vad_energy_threshold)
         }
-        if (value.wakeword_enabled != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(13, value.wakeword_enabled)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.wakeword_model_path)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.wakeword_model_id)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.wakeword_phrase)
-        if (!value.wakeword_threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(17, value.wakeword_threshold)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.wakeword_embedding_model_path)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.wakeword_vad_model_path)
         size += VoiceSessionConfig.ADAPTER.encodedSizeWithTag(20, value.session_config)
         size += AudioPipelineConfig.ADAPTER.encodedSizeWithTag(21, value.audio_pipeline_config)
         size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.session_id)
@@ -454,17 +355,6 @@ public class VoiceAgentComposeConfig(
         if (!value.vad_energy_threshold.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.vad_energy_threshold)
         }
-        if (value.wakeword_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.wakeword_enabled)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.wakeword_model_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.wakeword_model_id)
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.wakeword_phrase)
-        if (!value.wakeword_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.wakeword_threshold)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.wakeword_embedding_model_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
@@ -478,17 +368,6 @@ public class VoiceAgentComposeConfig(
         ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
-        ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.wakeword_embedding_model_path)
-        if (!value.wakeword_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.wakeword_threshold)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.wakeword_phrase)
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.wakeword_model_id)
-        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.wakeword_model_path)
-        if (value.wakeword_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.wakeword_enabled)
-        }
         if (!value.vad_energy_threshold.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.vad_energy_threshold)
         }
@@ -522,13 +401,6 @@ public class VoiceAgentComposeConfig(
         var vad_sample_rate: Int = 0
         var vad_frame_length: Float = 0f
         var vad_energy_threshold: Float = 0f
-        var wakeword_enabled: Boolean = false
-        var wakeword_model_path: String? = null
-        var wakeword_model_id: String? = null
-        var wakeword_phrase: String? = null
-        var wakeword_threshold: Float = 0f
-        var wakeword_embedding_model_path: String? = null
-        var wakeword_vad_model_path: String? = null
         var session_config: VoiceSessionConfig? = null
         var audio_pipeline_config: AudioPipelineConfig? = null
         var session_id: String? = null
@@ -547,13 +419,6 @@ public class VoiceAgentComposeConfig(
             10 -> vad_sample_rate = ProtoAdapter.INT32.decode(reader)
             11 -> vad_frame_length = ProtoAdapter.FLOAT.decode(reader)
             12 -> vad_energy_threshold = ProtoAdapter.FLOAT.decode(reader)
-            13 -> wakeword_enabled = ProtoAdapter.BOOL.decode(reader)
-            14 -> wakeword_model_path = ProtoAdapter.STRING.decode(reader)
-            15 -> wakeword_model_id = ProtoAdapter.STRING.decode(reader)
-            16 -> wakeword_phrase = ProtoAdapter.STRING.decode(reader)
-            17 -> wakeword_threshold = ProtoAdapter.FLOAT.decode(reader)
-            18 -> wakeword_embedding_model_path = ProtoAdapter.STRING.decode(reader)
-            19 -> wakeword_vad_model_path = ProtoAdapter.STRING.decode(reader)
             20 -> session_config = VoiceSessionConfig.ADAPTER.decode(reader)
             21 -> audio_pipeline_config = AudioPipelineConfig.ADAPTER.decode(reader)
             22 -> session_id = ProtoAdapter.STRING.decode(reader)
@@ -574,13 +439,6 @@ public class VoiceAgentComposeConfig(
           vad_sample_rate = vad_sample_rate,
           vad_frame_length = vad_frame_length,
           vad_energy_threshold = vad_energy_threshold,
-          wakeword_enabled = wakeword_enabled,
-          wakeword_model_path = wakeword_model_path,
-          wakeword_model_id = wakeword_model_id,
-          wakeword_phrase = wakeword_phrase,
-          wakeword_threshold = wakeword_threshold,
-          wakeword_embedding_model_path = wakeword_embedding_model_path,
-          wakeword_vad_model_path = wakeword_vad_model_path,
           session_config = session_config,
           audio_pipeline_config = audio_pipeline_config,
           session_id = session_id,

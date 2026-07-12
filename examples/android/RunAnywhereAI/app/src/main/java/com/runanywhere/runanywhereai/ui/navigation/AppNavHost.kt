@@ -32,6 +32,7 @@ import com.runanywhere.runanywhereai.ui.theme.AppMotion
 fun AppNavHost(
     navController: NavHostController,
     chatViewModel: ChatViewModel,
+    onOpenModels: () -> Unit,
     onOpenVision: () -> Unit,
     onOpenVoice: () -> Unit,
     onOpenAdvanced: () -> Unit,
@@ -68,12 +69,19 @@ fun AppNavHost(
         }
         composable<Voice> { VoiceScreen() }
         composable<More> { MoreScreen(onNavigate = { navController.navigate(it) }) }
-        composable<Settings> { SettingsScreen() }
+        composable<Settings> {
+            SettingsScreen(
+                onOpenModels = onOpenModels,
+                onOpenAdvanced = onOpenAdvanced,
+            )
+        }
         composable<Tools> { ToolsScreen() }
         composable<Tts> { TtsScreen() }
         composable<Stt> { SttScreen() }
         composable<Vad> { VadScreen() }
-        composable<Vision> { VisionScreen() }
+        composable<Vision> { entry ->
+            VisionScreen(openLiveCamera = entry.toRoute<Vision>().openLiveCamera)
+        }
         composable<Documents> { RagScreen() }
         composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }

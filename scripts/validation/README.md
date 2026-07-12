@@ -19,6 +19,8 @@ inventory and cleanup policy.
 | Script | Purpose | Default build output |
 | --- | --- | --- |
 | `gates/check_typescript_centralization.sh` | syncpack: TS/RN/Web `package.json` pins vs `dependencies/versions.json`. | N/A |
+| `gates/check_release_version_coherence.sh` | Release/package manifests, public fallbacks, and workspace lockfiles vs `sdk/runanywhere-commons/VERSION`; in PR CI, also enforces the exact base-version bump selected by the single `release:*` label. | N/A |
+| `gates/check_wasm_provenance_contract.sh` | Component-specific ORT/Sherpa WASM recipe-schema wiring. | N/A |
 | `gates/check_flutter_centralization.sh` | Flutter `pubspec.yaml` pins vs the central registry. | N/A |
 | `gates/check_gradle_centralization.sh` | Fails on hardcoded Maven coords outside `gradle/libs.versions.toml`. | N/A |
 | `gates/check_deprecated_surfaces.sh` | Regression guard against hand-written DTOs / string enums (allowlist beside it). | N/A |

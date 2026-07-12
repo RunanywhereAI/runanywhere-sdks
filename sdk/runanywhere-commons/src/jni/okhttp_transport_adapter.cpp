@@ -387,6 +387,7 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
@@ -394,8 +395,9 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     // Call into Kotlin. OkHttpTransport.executeRequest returns a non-null
     // HttpResponse on any transport outcome (including errors) — a null
     // return only happens on catastrophic JVM state.
-    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method,
-                                                 j_url, j_headers, j_body, j_timeout_ms);
+    jobject j_resp =
+        env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method, j_url,
+                                    j_headers, j_body, j_timeout_ms, j_follow_redirects);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
@@ -550,13 +552,14 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     // in deliverChunkNative.
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_streaming_request_mid,
                                                  j_method, j_url, j_headers, j_body, j_timeout_ms,
-                                                 j_native_cb, j_native_ud);
+                                                 j_native_cb, j_native_ud, j_follow_redirects);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
@@ -692,13 +695,14 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jlong j_resume_from = static_cast<jlong>(resume_from_byte);
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
+    jboolean j_follow_redirects = req->follow_redirects != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 
     // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
-    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
-                                                 j_method, j_url, j_headers, j_body, j_timeout_ms,
-                                                 j_resume_from, j_native_cb, j_native_ud);
+    jobject j_resp = env->CallStaticObjectMethod(
+        g.transport_cls, g.execute_resume_request_mid, j_method, j_url, j_headers, j_body,
+        j_timeout_ms, j_resume_from, j_native_cb, j_native_ud, j_follow_redirects);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
@@ -877,11 +881,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    // Signature: (Ljava/lang/String; Ljava/lang/String; [Ljava/lang/String; [B J)
+    // Signature: (Ljava/lang/String; Ljava/lang/String; [Ljava/lang/String; [B J Z)
     //            Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;
     g.execute_request_mid = env->GetStaticMethodID(
         g.transport_cls, "executeRequest",
-        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJ)"
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJZ)"
         "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;");
     if (g.execute_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeRequest method not found");
@@ -892,11 +896,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         return RAC_ERROR_INTERNAL;
     }
 
-    // Signature: (String, String, String[], byte[], long, long, long)
+    // Signature: (String, String, String[], byte[], long, long, long, boolean)
     //            -> OkHttpTransport$StreamResponse
     g.execute_streaming_request_mid = env->GetStaticMethodID(
         g.transport_cls, "executeStreamingRequest",
-        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJ)"
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJZ)"
         "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
     if (g.execute_streaming_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeStreamingRequest method not found");
@@ -908,7 +912,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         return RAC_ERROR_INTERNAL;
     }
 
-    // Signature: (String, String, String[], byte[], long, long, long, long)
+    // Signature: (String, String, String[], byte[], long, long, long, long, boolean)
     //            -> OkHttpHttpTransport$StreamResponse
     // Same StreamResponse shape as executeStreamingRequest plus the extra
     // resume_from_byte long argument. This slot was
@@ -916,7 +920,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     // with RAC_ERROR_FEATURE_NOT_AVAILABLE on Android resumes.
     g.execute_resume_request_mid = env->GetStaticMethodID(
         g.transport_cls, "executeResumeRequest",
-        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJJ)"
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJJZ)"
         "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
     if (g.execute_resume_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeResumeRequest method not found");

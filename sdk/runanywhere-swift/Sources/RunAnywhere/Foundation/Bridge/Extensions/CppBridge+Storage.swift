@@ -30,6 +30,11 @@ private enum StorageProtoABI {
     )
 }
 
+/// Storage-analyzer pointer owned by the `Storage` actor.
+private struct StorageAnalyzerHandle: @unchecked Sendable {
+    let rawValue: rac_storage_analyzer_handle_t
+}
+
 extension CppBridge {
 
     /// Storage analyzer bridge
@@ -40,7 +45,7 @@ extension CppBridge {
         /// Shared storage analyzer instance
         public static let shared = Storage()
 
-        private var handle: rac_storage_analyzer_handle_t?
+        private var handle: StorageAnalyzerHandle?
         private let logger = SDKLogger(category: "CppBridge.Storage")
 
         private init() {
@@ -59,7 +64,7 @@ extension CppBridge {
             var handlePtr: rac_storage_analyzer_handle_t?
             let result = rac_storage_analyzer_create(&callbacks, &handlePtr)
             if result == RAC_SUCCESS {
-                self.handle = handlePtr
+                self.handle = handlePtr.map(StorageAnalyzerHandle.init(rawValue:))
                 logger.debug("Storage analyzer created")
             } else {
                 logger.error("Failed to create storage analyzer: \(result)")
@@ -68,7 +73,7 @@ extension CppBridge {
 
         deinit {
             if let handle = handle {
-                rac_storage_analyzer_destroy(handle)
+                rac_storage_analyzer_destroy(handle.rawValue)
             }
         }
 
@@ -106,7 +111,7 @@ extension CppBridge {
 
         // MARK: - Private
 
-        private func getRegistryHandle() async -> rac_model_registry_handle_t? {
+        private func getRegistryHandle() async -> ModelRegistryHandle? {
             // Access the registry's handle
             // Note: We need to expose this from CppBridge.ModelRegistry
             return await CppBridge.ModelRegistry.shared.getHandle()
@@ -128,7 +133,7 @@ extension CppBridge {
             defer { NativeProtoABI.free(&outBuffer) }
 
             let status = try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(handle, registryHandle, bytes, size, &outBuffer)
+                symbol(handle.rawValue, registryHandle.rawValue, bytes, size, &outBuffer)
             }
             guard status == RAC_SUCCESS else {
                 throw SDKException(code: .processingFailed, message: "Storage proto request failed: \(status)", category: .internal)
@@ -220,7 +225,7 @@ private func storageDeletePathCallback(
 
 extension CppBridge.ModelRegistry {
     /// Get the underlying C handle (for use by other bridges)
-    func getHandle() -> rac_model_registry_handle_t? {
-        return handle
+    func getHandle() -> CppBridge.ModelRegistryHandle? {
+        handle.map(CppBridge.ModelRegistryHandle.init(rawValue:))
     }
 }

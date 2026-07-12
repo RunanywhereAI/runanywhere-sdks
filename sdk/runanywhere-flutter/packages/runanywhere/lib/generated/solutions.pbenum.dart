@@ -27,8 +27,6 @@ class SolutionType extends $pb.ProtobufEnum {
       SolutionType._(1, _omitEnumNames ? '' : 'SOLUTION_TYPE_VOICE_AGENT');
   static const SolutionType SOLUTION_TYPE_RAG =
       SolutionType._(2, _omitEnumNames ? '' : 'SOLUTION_TYPE_RAG');
-  static const SolutionType SOLUTION_TYPE_WAKEWORD =
-      SolutionType._(3, _omitEnumNames ? '' : 'SOLUTION_TYPE_WAKEWORD');
   static const SolutionType SOLUTION_TYPE_TIME_SERIES =
       SolutionType._(4, _omitEnumNames ? '' : 'SOLUTION_TYPE_TIME_SERIES');
   static const SolutionType SOLUTION_TYPE_AGENT_LOOP =
@@ -38,7 +36,6 @@ class SolutionType extends $pb.ProtobufEnum {
     SOLUTION_TYPE_UNSPECIFIED,
     SOLUTION_TYPE_VOICE_AGENT,
     SOLUTION_TYPE_RAG,
-    SOLUTION_TYPE_WAKEWORD,
     SOLUTION_TYPE_TIME_SERIES,
     SOLUTION_TYPE_AGENT_LOOP,
   ];
