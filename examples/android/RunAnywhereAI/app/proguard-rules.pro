@@ -160,6 +160,7 @@
 -keep,allowobfuscation class kotlinx.coroutines.CoroutineExceptionHandler$Key { *; }
 -keep,allowobfuscation class kotlinx.coroutines.CoroutineScopeKt { *; }
 -keep,allowobfuscation class kotlinx.coroutines.DelayKt { *; }
+-keep,allowobfuscation interface kotlinx.coroutines.DelayWithTimeoutDiagnostics
 -keep,allowobfuscation class kotlinx.coroutines.Job$Key { *; }
 -keep,allowobfuscation class kotlinx.coroutines.JobKt { *; }
 -keep,allowobfuscation class kotlinx.coroutines.MainCoroutineDispatcher { *; }
