@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.public.types.RAChatMessage
 import com.runanywhere.sdk.public.types.RAExecutionTarget
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -53,7 +54,10 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
  * - Promotes `execution_target` and `preferred_framework` to their wire
  *   string forms.
  */
-fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
+fun RALLMGenerationOptions.toRALLMGenerateRequest(
+    prompt: String,
+    history: List<RAChatMessage> = emptyList(),
+): RALLMGenerateRequest {
     val requestOptions =
         copy(
             max_tokens = max_tokens.takeIf { it > 0 } ?: 100,
@@ -90,6 +94,7 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
         grammar = effectiveGrammar,
         execution_target = execution_target?.wireString.orEmpty(),
         options = requestOptions,
+        history = history,
     )
 }
 
