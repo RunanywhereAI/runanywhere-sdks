@@ -69,6 +69,7 @@
 # The separately packaged navigation test links this Compose scope while
 # reflecting its test method. Keep only that cross-APK type in the target APK.
 -keep class androidx.compose.animation.AnimatedContentScope { *; }
+-keep class androidx.compose.runtime.Composer { *; }
 
 # AndroidX Test's TestDirCalculator calls kotlin.LazyKt.lazy(Function0), whose
 # implementation lives on the LazyKt multifile facade's superclass. Keeping
