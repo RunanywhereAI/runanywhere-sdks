@@ -36,6 +36,47 @@ TARBALL="${DIST_DIR}/rcli-${PLATFORM}-v${VERSION}.tar.gz"
 
 [ -x "${BINARY}" ] || { echo "ERROR: rcli binary not found at ${BINARY}" >&2; exit 1; }
 
+sanitize_pinned_host_path() {
+    local artifact="$1"
+    local source="$2"
+    local replacement="$3"
+    local expected_count="$4"
+    local raw_digest="$5"
+    local transformed_digest="$6"
+    local label="$7"
+
+    python3 - "${artifact}" "${source}" "${replacement}" "${expected_count}" \
+        "${raw_digest}" "${transformed_digest}" "${label}" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+
+artifact = Path(sys.argv[1])
+source = sys.argv[2].encode()
+replacement = sys.argv[3].encode()
+expected_count = int(sys.argv[4])
+raw_digest, transformed_digest, label = sys.argv[5:8]
+payload = artifact.read_bytes()
+
+if len(source) != len(replacement):
+    raise SystemExit(f"ERROR: {label} replacement changes binary offsets")
+
+digest = sha256(payload).hexdigest()
+if digest == raw_digest:
+    if payload.count(source) != expected_count or replacement in payload:
+        raise SystemExit(f"ERROR: {label} embedded-path inventory drifted")
+    payload = payload.replace(source, replacement)
+    if sha256(payload).hexdigest() != transformed_digest:
+        raise SystemExit(f"ERROR: {label} sanitized digest mismatch")
+    artifact.write_bytes(payload)
+elif digest != transformed_digest:
+    raise SystemExit(f"ERROR: unreviewed {label} bytes")
+
+if payload.count(source) or payload.count(replacement) != expected_count:
+    raise SystemExit(f"ERROR: {label} path sanitization was incomplete")
+PY
+}
+
 rm -rf "${STAGE}"
 mkdir -p "${STAGE}/bin" "${STAGE}/lib"
 cp "${BINARY}" "${STAGE}/bin/rcli"
@@ -71,33 +112,14 @@ case "${PLATFORM}" in
         # pinned so an upstream artifact change fails closed.
         for library in "${STAGE}"/lib/libonnxruntime*.dylib; do
             [ -e "${library}" ] || continue
-            python3 - "${library}" <<'PY'
-from hashlib import sha256
-from pathlib import Path
-import sys
-
-library = Path(sys.argv[1])
-payload = library.read_bytes()
-source = b"/Users/cloudtest/vss/_work/"
-replacement = b"/runanywhere/vendor/onnxrt/"
-raw_digest = "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289"
-transformed_digest = "3e4f1ac4cef99693c95532f38b436bd106156504c4dd51595af2e51d3c3d00ee"
-expected_count = 843
-
-digest = sha256(payload).hexdigest()
-if digest == raw_digest:
-    if payload.count(source) != expected_count or replacement in payload:
-        raise SystemExit("ERROR: ONNX Runtime embedded-path inventory drifted")
-    payload = payload.replace(source, replacement)
-    if sha256(payload).hexdigest() != transformed_digest:
-        raise SystemExit("ERROR: ONNX Runtime sanitized digest mismatch")
-    library.write_bytes(payload)
-elif digest != transformed_digest:
-    raise SystemExit("ERROR: unreviewed ONNX Runtime dylib bytes")
-
-if payload.count(source) or payload.count(replacement) != expected_count:
-    raise SystemExit("ERROR: ONNX Runtime path sanitization was incomplete")
-PY
+            sanitize_pinned_host_path \
+                "${library}" \
+                "/Users/cloudtest/vss/_work/" \
+                "/runanywhere/vendor/onnxrt/" \
+                843 \
+                "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289" \
+                "3e4f1ac4cef99693c95532f38b436bd106156504c4dd51595af2e51d3c3d00ee" \
+                "ONNX Runtime 1.24.4 arm64 dylib"
         done
 
         # A copied Homebrew dylib may retain an absolute install ID or refer
@@ -158,6 +180,20 @@ PY
         for src in ${deps}; do
             [ -f "${src}" ] && cp -L "${src}" "${STAGE}/lib/$(basename "${src}")"
         done
+        # The pinned Sherpa-ONNX 1.13.2 x64 C API library carries its
+        # upstream GitHub Actions source root. Apply the same exact,
+        # byte-preserving fail-closed policy as the macOS runtime input.
+        for library in "${STAGE}"/lib/libsherpa-onnx-c-api.so*; do
+            [ -e "${library}" ] || continue
+            sanitize_pinned_host_path \
+                "${library}" \
+                "/home/runner/work/sherpa-onnx/sherpa-onnx" \
+                "/runanywhere/vendor/sherpa-onnx/src/root0" \
+                250 \
+                "744cabaf8bdc079414e3f07d3cdf3550a5c74798a4b50c789468e7b038b7907f" \
+                "b6fecd4a48bea06c50bf6bfd69e08ff241071b47251f90b8549491a120af0498" \
+                "Sherpa-ONNX 1.13.2 x64 C API library"
+        done
         command -v patchelf >/dev/null 2>&1 || {
             echo "ERROR: patchelf is required to make the Linux package relocatable" >&2
             exit 1
@@ -187,7 +223,7 @@ while IFS= read -r -d '' artifact; do
         echo "ERROR: packaged artifact embeds the local checkout path: ${artifact#"${STAGE}/"}" >&2
         exit 1
     fi
-    if LC_ALL=C grep -aE -q -- '/Users/[^/]+/|/home/[^/]+/' "${artifact}" \
+    if LC_ALL=C grep -aE -q -- '/Users/[^/]+/|/home/[^/]+/|/var/folders/' "${artifact}" \
         || LC_ALL=C grep -aE -q -- "[A-Za-z]:\\\\Users\\\\" "${artifact}"; then
         echo "ERROR: packaged artifact embeds a developer home path: ${artifact#"${STAGE}/"}" >&2
         exit 1
