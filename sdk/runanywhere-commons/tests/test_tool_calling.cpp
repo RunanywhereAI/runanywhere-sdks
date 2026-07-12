@@ -592,6 +592,37 @@ int test_format_prompt_proto_round_trip() {
 #endif
 }
 
+int test_format_specific_zero_parameter_prompt() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    runanywhere::v1::ToolPromptFormatRequest request;
+    request.set_user_prompt("Call get_current_time now.");
+    auto* options = request.mutable_options();
+    options->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    options->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    options->set_forced_tool_name("get_current_time");
+    auto* tool = options->add_tools();
+    tool->set_name("get_current_time");
+    tool->set_description("Get the current time");
+
+    std::string request_bytes;
+    ASSERT_TRUE(request.SerializeToString(&request_bytes));
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_tool_call_format_prompt_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    runanywhere::v1::ToolPromptFormatResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_SUBSTR(result.formatted_prompt().c_str(),
+                  "<tool_call>{\"tool\":\"get_current_time\"}</tool_call>");
+    ASSERT_TRUE(std::strstr(result.formatted_prompt().c_str(), "\"arguments\"") == nullptr);
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // 15. generated proto ABI: validate ToolCallValidationRequest -> Result
 // ---------------------------------------------------------------------------
@@ -677,6 +708,8 @@ int main(int argc, char** argv) {
          .fn = test_validate_tool_call_json_definitions},
         {.name = "parse_proto_round_trip", .fn = test_parse_proto_round_trip},
         {.name = "format_prompt_proto_round_trip", .fn = test_format_prompt_proto_round_trip},
+        {.name = "format_specific_zero_parameter_prompt",
+         .fn = test_format_specific_zero_parameter_prompt},
         {.name = "validate_proto_round_trip", .fn = test_validate_proto_round_trip},
     };
 

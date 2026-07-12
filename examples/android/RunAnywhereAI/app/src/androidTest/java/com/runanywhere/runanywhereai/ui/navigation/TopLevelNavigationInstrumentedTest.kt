@@ -1,13 +1,15 @@
 package com.runanywhere.runanywhereai.ui.navigation
 
+import androidx.activity.compose.setContent
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.runanywhere.runanywhereai.MainActivity
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -17,14 +19,14 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class TopLevelNavigationInstrumentedTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
     fun ordinaryDrawerVisionDoesNotRestoreSavedLiveCameraArgument() {
         lateinit var navController: NavHostController
         val renderedLiveCamera = AtomicReference<Boolean?>()
 
-        composeRule.setContent {
+        composeRule.activity.setContent(parent = null) {
             navController = rememberNavController()
             NavHost(navController = navController, startDestination = Chat) {
                 composable<Chat> {}

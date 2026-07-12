@@ -65,6 +65,7 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { SDKError as SDKErrorMessage } from '@runanywhere/proto-ts/errors';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
@@ -855,6 +856,13 @@ export const ToolCalling = {
           return finalResult;
         }
         if (errorBytes) {
+          let decodedError: ReturnType<typeof SDKErrorMessage.decode> | undefined;
+          try {
+            decodedError = SDKErrorMessage.decode(errorBytes);
+          } catch {
+            // Preserve the protocol-level fallback for malformed custom builds.
+          }
+          if (decodedError?.message) throw new SDKException(decodedError);
           throw SDKException.fromCode(
             -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
             'Tool-calling session failed',

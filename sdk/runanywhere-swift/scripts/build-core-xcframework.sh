@@ -32,6 +32,7 @@ export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-315532800}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/sdk/runanywhere-swift/Binaries"
+ARCHIVE_MEMBER_NORMALIZER="${REPO_ROOT}/sdk/runanywhere-swift/scripts/normalize-static-archive.py"
 # The source path is anchored dynamically so the script works from any cwd.
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
@@ -930,6 +931,12 @@ COMMONS_MAC_LIB="${STAGING_DIR}/Release-macos/librac_commons.a"
 merge_commons_slice "${DEV_BIN}" "Release-iphoneos" "${COMMONS_DEV_LIB}" "arm64"
 merge_commons_slice "${SIM_BIN}" "Release-iphonesimulator" "${COMMONS_SIM_LIB}" "arm64"
 merge_commons_macos_slice "${MAC_BIN}" "${COMMONS_MAC_LIB}" "arm64"
+# CMake's Xcode generator disambiguates duplicate object basenames with a
+# checkout-path-derived digest. Keep the reviewed, pinned collision inventory
+# explicit so a new upstream content-addressed member fails closed.
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COMMONS_DEV_LIB}" parser=2
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COMMONS_SIM_LIB}" parser=2
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COMMONS_MAC_LIB}"
 sanitize_and_validate_archive_host_paths "${COMMONS_DEV_LIB}" "ios-device RACommons"
 sanitize_and_validate_archive_host_paths "${COMMONS_SIM_LIB}" "ios-simulator RACommons"
 sanitize_and_validate_archive_host_paths "${COMMONS_MAC_LIB}" "macos RACommons"
@@ -943,6 +950,12 @@ LLAMACPP_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_llamacpp.a"
 merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
 merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
 merge_llamacpp_backend_macos_slice "${MAC_BIN}" "${LLAMACPP_MAC_LIB}" "arm64"
+LLAMACPP_HASHED_MEMBER_INVENTORY=(
+    llama=2 ggml=2 ggml-cpu=2 ggml-metal-device=2 quants=2 repack=2
+)
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${LLAMACPP_DEV_LIB}" "${LLAMACPP_HASHED_MEMBER_INVENTORY[@]}"
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${LLAMACPP_SIM_LIB}" "${LLAMACPP_HASHED_MEMBER_INVENTORY[@]}"
+run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${LLAMACPP_MAC_LIB}"
 sanitize_and_validate_archive_host_paths "${LLAMACPP_DEV_LIB}" "ios-device RABackendLLAMACPP"
 sanitize_and_validate_archive_host_paths "${LLAMACPP_SIM_LIB}" "ios-simulator RABackendLLAMACPP"
 sanitize_and_validate_archive_host_paths "${LLAMACPP_MAC_LIB}" "macos RABackendLLAMACPP"
@@ -956,6 +969,9 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     merge_onnx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${ONNX_DEV_LIB}" "arm64"
     merge_onnx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${ONNX_SIM_LIB}" "arm64"
     merge_onnx_backend_macos_slice "${MAC_BIN}" "${ONNX_MAC_LIB}" "arm64"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${ONNX_DEV_LIB}"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${ONNX_SIM_LIB}"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${ONNX_MAC_LIB}"
     sanitize_and_validate_archive_host_paths \
         "${ONNX_DEV_LIB}" "ios-device RABackendONNX" \
         "/Users/runner/work/1/s" "/runanywhere/vendor/rt" 512 \
@@ -982,6 +998,9 @@ if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
         merge_sherpa_backend_slice "${DEV_BIN}" "Release-iphoneos" "${SHERPA_DEV_LIB}" "arm64"
         merge_sherpa_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${SHERPA_SIM_LIB}" "arm64"
         merge_sherpa_backend_macos_slice "${MAC_BIN}" "${SHERPA_MAC_LIB}" "arm64"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${SHERPA_DEV_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${SHERPA_SIM_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${SHERPA_MAC_LIB}"
         sanitize_and_validate_archive_host_paths \
             "${SHERPA_DEV_LIB}" "ios-device RABackendSherpa" \
             "/Users/runner/work/sherpa-onnx/sherpa-onnx" \
@@ -1009,6 +1028,9 @@ if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     merge_mlx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${MLX_DEV_LIB}" "arm64"
     merge_mlx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${MLX_SIM_LIB}" "arm64"
     merge_mlx_backend_macos_slice "${MAC_BIN}" "${MLX_MAC_LIB}" "arm64"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${MLX_DEV_LIB}"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${MLX_SIM_LIB}"
+    run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${MLX_MAC_LIB}"
     sanitize_and_validate_archive_host_paths "${MLX_DEV_LIB}" "ios-device RABackendMLX"
     sanitize_and_validate_archive_host_paths "${MLX_SIM_LIB}" "ios-simulator RABackendMLX"
     sanitize_and_validate_archive_host_paths "${MLX_MAC_LIB}" "macos RABackendMLX"

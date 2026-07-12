@@ -160,7 +160,9 @@
 -keep,allowobfuscation class kotlinx.coroutines.CoroutineExceptionHandler$Key { *; }
 -keep,allowobfuscation class kotlinx.coroutines.CoroutineScopeKt { *; }
 -keep,allowobfuscation class kotlinx.coroutines.DelayKt { *; }
--keep,allowobfuscation interface kotlinx.coroutines.DelayWithTimeoutDiagnostics
+-keep,allowobfuscation interface kotlinx.coroutines.DelayWithTimeoutDiagnostics {
+    java.lang.String timeoutMessage-LRDsOJo(long);
+}
 -keep,allowobfuscation class kotlinx.coroutines.Job$Key { *; }
 -keep,allowobfuscation class kotlinx.coroutines.JobKt { *; }
 -keep,allowobfuscation class kotlinx.coroutines.MainCoroutineDispatcher { *; }
@@ -360,8 +362,12 @@
     kotlin.coroutines.CoroutineContext minusKey(kotlin.coroutines.CoroutineContext$Element, kotlin.coroutines.CoroutineContext$Key);
     kotlin.coroutines.CoroutineContext plus(kotlin.coroutines.CoroutineContext$Element, kotlin.coroutines.CoroutineContext);
 }
+-keep,allowobfuscation class kotlin.jvm.internal.PropertyReference1 {
+    java.lang.Object invoke(java.lang.Object);
+}
 -keep,allowobfuscation class kotlin.jvm.internal.PropertyReference1Impl {
     <init>(java.lang.Class, java.lang.String, java.lang.String, int);
+    java.lang.Object get(java.lang.Object);
 }
 -keep,allowobfuscation class kotlin.time.AbstractLongTimeSource {
     <init>(kotlin.time.DurationUnit);
@@ -655,6 +661,7 @@
 -keep,allowobfuscation class kotlinx.coroutines.JobSupport {
     java.lang.Throwable getCompletionCause();
     java.lang.Throwable getCompletionExceptionOrNull();
+    java.lang.String toString();
 }
 -keep,allowobfuscation interface kotlinx.coroutines.channels.ReceiveChannel {
     kotlinx.coroutines.selects.SelectClause1 getOnReceive();

@@ -1620,8 +1620,11 @@ static std::string compact_specific_tool_prompt(const std::string& user_prompt,
                 arguments[parameter.name()] = compact_tool_argument_placeholder(parameter);
             }
         }
-        call_example = "<tool_call>{\"tool\":" + json(tool.name()).dump() +
-                       ",\"arguments\":" + arguments.dump() + "}</tool_call>";
+        call_example = "<tool_call>{\"tool\":" + json(tool.name()).dump();
+        if (!tool.parameters().empty()) {
+            call_example += ",\"arguments\":" + arguments.dump();
+        }
+        call_example += "}</tool_call>";
     }
 
     std::string prompt;

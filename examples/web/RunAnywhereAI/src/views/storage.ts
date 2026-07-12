@@ -114,6 +114,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     try {
       const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
       if (ok) {
+        refreshModelSelectionState();
         showToast(`Using folder: ${RunAnywhere.storage.localStorageDirectoryName ?? 'selected'}`, 'success');
       } else {
         showToast('Folder selection cancelled or unsupported', 'info');
@@ -128,6 +129,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#storage-reauth-btn')!.addEventListener('click', () => {
     void (async () => {
       const ok = await RunAnywhere.storage.requestLocalStorageAccess();
+      if (ok) refreshModelSelectionState();
       showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
       updateStorageLocationUI();
     })();

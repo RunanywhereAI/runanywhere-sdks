@@ -34,6 +34,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${WASM_DIR}/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
 
 # Defaults
 BUILD_TYPE="Release"
@@ -143,11 +145,27 @@ if [ "$BUILD_CORE" = "OFF" ] && [ "$LLAMACPP" = "OFF" ] && [ "$ONNX" = "OFF" ] &
     LLAMACPP="ON"
 fi
 
-# Check Emscripten
-if ! command -v emcmake &> /dev/null; then
+# Check Emscripten. Accepting whichever emsdk happens to be first on PATH can
+# produce release artifacts with a different ABI/toolchain than CI and the
+# vendored ONNX/Sherpa archives.
+if ! command -v emcmake &> /dev/null || ! command -v emcc &> /dev/null; then
     echo "ERROR: Emscripten not found. Please install and activate emsdk:"
     echo "  ./scripts/setup-emsdk.sh"
     echo "  source <emsdk-path>/emsdk_env.sh"
+    exit 1
+fi
+
+ACTIVE_EMSCRIPTEN_VERSION="$(
+    emcc --version 2>/dev/null \
+        | head -n1 \
+        | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' \
+        | head -n1 \
+        || true
+)"
+if [ "${ACTIVE_EMSCRIPTEN_VERSION}" != "${EMSCRIPTEN_VERSION}" ]; then
+    echo "ERROR: Emscripten ${EMSCRIPTEN_VERSION} is required; found ${ACTIVE_EMSCRIPTEN_VERSION:-unknown}."
+    echo "       Activate the canonical toolchain before building:"
+    echo "       source ${WASM_DIR}/../emsdk/emsdk_env.sh"
     exit 1
 fi
 
