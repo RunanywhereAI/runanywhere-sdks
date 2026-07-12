@@ -25,6 +25,7 @@ import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAChatMessage
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
@@ -54,6 +55,7 @@ private fun checkRc(rc: Int, operation: String) {
 private fun RALLMGenerationOptions?.toGenerateRequest(
     prompt: String,
     streaming: Boolean,
+    history: List<RAChatMessage> = emptyList(),
 ): RALLMGenerateRequest {
     val options = this ?: RALLMGenerationOptions()
     val requestOptions =
@@ -84,6 +86,7 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
         grammar = options.structured_output?.grammar ?: options.grammar.orEmpty(),
         execution_target = options.execution_target?.name.orEmpty(),
         options = requestOptions,
+        history = history,
     )
 }
 
@@ -153,8 +156,12 @@ object CppBridgeLLM {
         RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
 
     /** One-shot generation. */
-    suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
-        val request = options.toGenerateRequest(prompt, streaming = false)
+    suspend fun generate(
+        prompt: String,
+        options: RALLMGenerationOptions?,
+        history: List<RAChatMessage> = emptyList(),
+    ): RALLMGenerationResult {
+        val request = options.toGenerateRequest(prompt, streaming = false, history = history)
         return generate(request)
     }
 
@@ -220,9 +227,10 @@ object CppBridgeLLM {
     suspend fun generateStream(
         prompt: String,
         options: RALLMGenerationOptions?,
+        history: List<RAChatMessage> = emptyList(),
         onEvent: (RALLMStreamEvent) -> Boolean,
     ) {
-        val request = options.toGenerateRequest(prompt, streaming = true)
+        val request = options.toGenerateRequest(prompt, streaming = true, history = history)
         generateStream(request, onEvent)
     }
 

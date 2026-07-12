@@ -19,6 +19,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
+import com.runanywhere.sdk.public.types.RAChatMessage
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
@@ -38,9 +39,15 @@ import kotlinx.coroutines.runBlocking
 
 private val llmLogger = SDKLogger.llm
 
+/**
+ * @param history PRIOR conversation turns. MUST exclude the current user
+ *   [prompt] (which stays the live user turn) and MUST start with a USER turn.
+ *   The system prompt stays on [options].system_prompt, not in history.
+ */
 suspend fun RunAnywhere.generate(
     prompt: String,
     options: RALLMGenerationOptions? = null,
+    history: List<RAChatMessage> = emptyList(),
 ): RALLMGenerationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -50,7 +57,7 @@ suspend fun RunAnywhere.generate(
 
     val opts = options ?: RALLMGenerationOptions()
     llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
-    return CppBridgeLLM.generate(prompt, opts)
+    return CppBridgeLLM.generate(prompt, opts, history)
 }
 
 suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGenerationResult {
@@ -73,9 +80,15 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
     return CppBridgeLLM.generate(request)
 }
 
+/**
+ * @param history PRIOR conversation turns. MUST exclude the current user
+ *   [prompt] (which stays the live user turn) and MUST start with a USER turn.
+ *   The system prompt stays on [options].system_prompt, not in history.
+ */
 fun RunAnywhere.generateStream(
     prompt: String,
     options: RALLMGenerationOptions? = null,
+    history: List<RAChatMessage> = emptyList(),
 ): Flow<RALLMStreamEvent> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -88,7 +101,7 @@ fun RunAnywhere.generateStream(
         ensureServicesReady()
         val driver =
             launch(Dispatchers.IO) {
-                CppBridgeLLM.generateStream(prompt, opts) { event ->
+                CppBridgeLLM.generateStream(prompt, opts, history) { event ->
                     trySend(event)
                     !event.is_final
                 }
