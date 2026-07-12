@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
+import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
 import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.MessageRole
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VLMImageFormat
@@ -47,6 +49,7 @@ import com.runanywhere.sdk.public.extensions.ragGetStatistics
 import com.runanywhere.sdk.public.extensions.ragIngest
 import com.runanywhere.sdk.public.extensions.ragQuery
 import com.runanywhere.sdk.public.extensions.processImageStream
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
@@ -352,6 +355,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    // Prior conversation turns for the SDK's multi-turn history (proto field 27).
+    // send() appends the current user message + an empty assistant placeholder
+    // (2 items) BEFORE generation launches, so dropLast(2) removes exactly the
+    // live turn; the current prompt stays on the request, system prompt on
+    // options. Blank turns (e.g. an in-flight placeholder) are filtered out.
+    private fun priorTurns(): List<ProtoChatMessage> =
+        messages.dropLast(2).filter { it.text.isNotBlank() }.map {
+            ProtoChatMessage(
+                role = if (it.isUser) MessageRole.MESSAGE_ROLE_USER else MessageRole.MESSAGE_ROLE_ASSISTANT,
+                content = it.text,
+            )
+        }
+
     private suspend fun ensureRagPipeline(embeddingModel: RAModelInfo, answerModel: RAModelInfo) {
         val key = embeddingModel.id to answerModel.id
         if (ragPipelineKey == key) return
@@ -361,7 +377,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun generateReply(prompt: String, index: Int) {
-        val result = RunAnywhere.generate(prompt, generationOptions())
+        val result = RunAnywhere.generate(
+            RALLMGenerateRequest(prompt = prompt, options = generationOptions(), history = priorTurns()),
+        )
         if (!result.error_message.isNullOrBlank()) {
             messages[index] = messages[index].copy(text = "Error: ${result.error_message}")
             return
@@ -391,8 +409,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun streamReply(prompt: String, index: Int) {
-        val options = generationOptions()
-        val events = RunAnywhere.generateStream(prompt, options)
+        val request = RALLMGenerateRequest(prompt = prompt, options = generationOptions(), history = priorTurns())
+        val events = RunAnywhere.generateStream(request)
         val result =
             RunAnywhere.aggregateStream(prompt, events) { accumulated ->
                 messages[index] = messages[index].copy(text = accumulated)
