@@ -162,7 +162,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev patchelf
       - name: Sherpa-ONNX prebuilts
         run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
       - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON

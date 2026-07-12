@@ -219,7 +219,7 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: linux
-      - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev patchelf
       - name: Sherpa-ONNX prebuilts
         run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
       - name: Build rcli (Linux x86_64)

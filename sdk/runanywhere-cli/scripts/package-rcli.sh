@@ -64,6 +64,26 @@ case "${PLATFORM}" in
             cp "${src}" "${STAGE}/lib/${local_name}"
             install_name_tool -change "${dep}" "@rpath/${local_name}" "${STAGE}/bin/rcli"
         done
+
+        # The build-tree executable carries absolute LC_RPATH entries so it
+        # can locate fetched dylibs before packaging. Retire every build-root
+        # entry and install exactly one relocatable package rpath before the
+        # privacy scan and ad-hoc signature.
+        has_package_rpath=0
+        while IFS= read -r rpath; do
+            if [ "${rpath}" = "@loader_path/../lib" ]; then
+                has_package_rpath=1
+            elif [[ "${rpath}" == "${BUILD_DIR}"* ]]; then
+                install_name_tool -delete_rpath "${rpath}" "${STAGE}/bin/rcli"
+            fi
+        done < <(otool -l "${STAGE}/bin/rcli" | awk '
+            $1 == "cmd" && $2 == "LC_RPATH" { in_rpath = 1; next }
+            in_rpath && $1 == "path" { print $2; in_rpath = 0 }
+        ')
+        if [ "${has_package_rpath}" -eq 0 ]; then
+            install_name_tool -add_rpath "@loader_path/../lib" "${STAGE}/bin/rcli"
+        fi
+
         # Ad-hoc signature so Gatekeeper accepts the modified binary locally.
         codesign --force -s - "${STAGE}/bin/rcli"
         find "${STAGE}/lib" -name "*.dylib" -exec codesign --force -s - {} \;
@@ -74,6 +94,11 @@ case "${PLATFORM}" in
         for src in ${deps}; do
             [ -f "${src}" ] && cp -L "${src}" "${STAGE}/lib/$(basename "${src}")"
         done
+        command -v patchelf >/dev/null 2>&1 || {
+            echo "ERROR: patchelf is required to make the Linux package relocatable" >&2
+            exit 1
+        }
+        patchelf --set-rpath "\$ORIGIN/../lib" "${STAGE}/bin/rcli"
         ;;
     *)
         echo "ERROR: unknown platform tag '${PLATFORM}'" >&2
