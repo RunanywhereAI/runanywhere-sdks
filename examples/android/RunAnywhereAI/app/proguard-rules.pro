@@ -302,6 +302,12 @@
 -keep,allowobfuscation class kotlinx.coroutines.CancellableContinuationImpl {
     <init>(kotlin.coroutines.Continuation, int);
 }
+-keep,allowobfuscation class kotlin.coroutines.jvm.internal.SuspendLambda {
+    <init>(int, kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlinx.coroutines.Dispatchers {
+    kotlinx.coroutines.MainCoroutineDispatcher getMain();
+}
 -keep,allowobfuscation class kotlinx.coroutines.Delay {
     java.lang.Object delay(long, kotlin.coroutines.Continuation);
     void scheduleResumeAfterDelay(long, kotlinx.coroutines.CancellableContinuation);
