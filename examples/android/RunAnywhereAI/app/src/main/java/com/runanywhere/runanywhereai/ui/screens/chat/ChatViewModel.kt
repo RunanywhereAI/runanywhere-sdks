@@ -350,6 +350,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return RALLMGenerationOptions(
             max_tokens = s.maxTokens,
             temperature = s.temperature,
+            repetition_penalty = CHAT_REPETITION_PENALTY,
             system_prompt = s.systemPrompt.ifBlank { null },
             disable_thinking = s.disableThinking,
         )
@@ -360,13 +361,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     // (2 items) BEFORE generation launches, so dropLast(2) removes exactly the
     // live turn; the current prompt stays on the request, system prompt on
     // options. Blank turns (e.g. an in-flight placeholder) are filtered out.
-    private fun priorTurns(): List<ProtoChatMessage> =
-        messages.dropLast(2).filter { it.text.isNotBlank() }.map {
+    //
+    // SEAM: assembling + bounding history in the example app is a STOPGAP. The
+    // durable fix is for the SDK / C++ commons to own conversation history from
+    // the persisted conversation, so every SDK gets bounded multi-turn for free
+    // (see AGENTS.md "logic lives at the lowest layer"). Until then the app caps
+    // history to the most-recent turns so the context window never overflows.
+    private fun priorTurns(): List<ProtoChatMessage> {
+        val turns = messages.dropLast(2).filter { it.text.isNotBlank() }.map {
             ProtoChatMessage(
                 role = if (it.isUser) MessageRole.MESSAGE_ROLE_USER else MessageRole.MESSAGE_ROLE_ASSISTANT,
                 content = it.text,
             )
         }
+        return boundedHistory(turns, MAX_HISTORY_TURNS)
+    }
 
     private suspend fun ensureRagPipeline(embeddingModel: RAModelInfo, answerModel: RAModelInfo) {
         val key = embeddingModel.id to answerModel.id
@@ -569,6 +578,30 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private companion object {
         const val MAX_TRACKED_GENERATIONS = 10
+
+        // A mild repetition penalty keeps multi-turn chat from looping on the
+        // same phrase once prior turns are fed back into the prompt.
+        const val CHAT_REPETITION_PENALTY = 1.1f
+
+        // Cap on prior turns sent as history so a long conversation never
+        // overflows the model's context window (see SEAM note on priorTurns).
+        const val MAX_HISTORY_TURNS = 20
+
+        // Keep an optional leading system turn plus the most-recent maxTurns of
+        // conversation. Pure + side-effect-free so it stays trivially testable.
+        fun boundedHistory(
+            turns: List<ProtoChatMessage>,
+            maxTurns: Int,
+        ): List<ProtoChatMessage> {
+            if (turns.size <= maxTurns) return turns
+            val leadingSystem = turns.firstOrNull { it.role == MessageRole.MESSAGE_ROLE_SYSTEM }
+            val recent = turns.takeLast(maxTurns)
+            return if (leadingSystem != null && recent.none { it === leadingSystem }) {
+                listOf(leadingSystem) + recent
+            } else {
+                recent
+            }
+        }
     }
 }
 
