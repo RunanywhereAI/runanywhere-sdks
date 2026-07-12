@@ -215,11 +215,10 @@
 -keep,allowobfuscation class com.runanywhere.runanywhereai.ui.navigation.Vision {
     <init>(boolean, int, kotlin.jvm.internal.DefaultConstructorMarker);
 }
--keep,allowobfuscation class androidx.compose.ui.unit.Density {
+-keep interface androidx.compose.ui.unit.Density {
+    float getFontScale();
     int roundToPx--R2X_6o(long);
-    float toDp-GaN1DYA(long);
     androidx.compose.ui.geometry.Rect toRect(androidx.compose.ui.unit.DpRect);
-    long toSp-0xMU5do(float);
     long toSp-kPz2Gy4(int);
 }
 -keep,allowobfuscation class androidx.core.view.ViewConfigurationCompat {
@@ -348,6 +347,340 @@
 }
 -keep,allowobfuscation class androidx.compose.runtime.ProvidedValue {
     int $stable;
+}
+
+# The release test APK is minified separately with the target APK's mapping.
+# Preserve the exact non-platform linkage closure reached from its 24 test
+# methods. These rules intentionally retain only measured types and members.
+
+# Types removed completely from the target by R8.
+-keep,allowobfuscation class kotlin.coroutines.CoroutineContext$Element$DefaultImpls {
+    java.lang.Object fold(kotlin.coroutines.CoroutineContext$Element, java.lang.Object, kotlin.jvm.functions.Function2);
+    kotlin.coroutines.CoroutineContext$Element get(kotlin.coroutines.CoroutineContext$Element, kotlin.coroutines.CoroutineContext$Key);
+    kotlin.coroutines.CoroutineContext minusKey(kotlin.coroutines.CoroutineContext$Element, kotlin.coroutines.CoroutineContext$Key);
+    kotlin.coroutines.CoroutineContext plus(kotlin.coroutines.CoroutineContext$Element, kotlin.coroutines.CoroutineContext);
+}
+-keep,allowobfuscation class kotlin.jvm.internal.PropertyReference1Impl {
+    <init>(java.lang.Class, java.lang.String, java.lang.String, int);
+}
+-keep,allowobfuscation class kotlin.time.AbstractLongTimeSource {
+    <init>(kotlin.time.DurationUnit);
+}
+-keep,allowobfuscation interface kotlin.time.TimeSource$WithComparableMarks
+-keep,allowobfuscation class kotlinx.coroutines.CancellableContinuationKt {
+    void disposeOnCancellation(kotlinx.coroutines.CancellableContinuation, kotlinx.coroutines.DisposableHandle);
+}
+-keep,allowobfuscation class kotlinx.coroutines.DebugKt {
+    boolean getRECOVER_STACK_TRACES();
+}
+-keep,allowobfuscation class kotlinx.coroutines.ExecutorsKt {
+    kotlinx.coroutines.CoroutineDispatcher from(java.util.concurrent.Executor);
+}
+-keep,allowobfuscation class kotlinx.coroutines.YieldContext$Key
+-keep,allowobfuscation class kotlinx.coroutines.YieldKt {
+    java.lang.Object yield(kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlinx.coroutines.debug.internal.DebugProbesImpl {
+    void dumpCoroutines(java.io.PrintStream);
+    void install$kotlinx_coroutines_core();
+    boolean isInstalled$kotlinx_coroutines_debug();
+    void uninstall$kotlinx_coroutines_core();
+    kotlinx.coroutines.debug.internal.DebugProbesImpl INSTANCE;
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.ExceptionSuccessfullyProcessed {
+    kotlinx.coroutines.internal.ExceptionSuccessfullyProcessed INSTANCE;
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.MainDispatchersKt {
+    boolean isMissing(kotlinx.coroutines.MainCoroutineDispatcher);
+    kotlinx.coroutines.MainCoroutineDispatcher tryCreateDispatcher(kotlinx.coroutines.internal.MainDispatcherFactory, java.util.List);
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.MissingMainCoroutineDispatcherFactory {
+    kotlinx.coroutines.internal.MissingMainCoroutineDispatcherFactory INSTANCE;
+}
+-keep,allowobfuscation interface kotlinx.coroutines.internal.ThreadSafeHeapNode
+-keep,allowobfuscation class kotlinx.coroutines.selects.OnTimeoutKt {
+    void onTimeout-8Mi8wO0(kotlinx.coroutines.selects.SelectBuilder, long, kotlin.jvm.functions.Function1);
+}
+-keep,allowobfuscation interface kotlinx.coroutines.selects.SelectBuilder {
+    void invoke(kotlinx.coroutines.selects.SelectClause0, kotlin.jvm.functions.Function1);
+    void invoke(kotlinx.coroutines.selects.SelectClause1, kotlin.jvm.functions.Function2);
+}
+-keep,allowobfuscation interface kotlinx.coroutines.selects.SelectClause1
+-keep,allowobfuscation class kotlinx.coroutines.selects.SelectImplementation {
+    <init>(kotlin.coroutines.CoroutineContext);
+    java.lang.Object doSelect(kotlin.coroutines.Continuation);
+}
+
+# Members removed, renamed without an applicable external mapping, or changed
+# incompatibly on target classes that survive shrinking.
+-keep,allowobfuscation class androidx.compose.runtime.Composer$Companion {
+    java.lang.Object getEmpty();
+}
+-keep,allowobfuscation class androidx.compose.runtime.ComposerKt {
+    boolean isTraceInProgress();
+    void traceEventEnd();
+}
+-keep,allowobfuscation class androidx.compose.runtime.Recomposer {
+    boolean getHasPendingWork();
+}
+-keep,allowobfuscation class androidx.compose.runtime.saveable.SaveableStateRegistryKt {
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalSaveableStateRegistry();
+}
+-keep,allowobfuscation class androidx.compose.runtime.snapshots.Snapshot {
+    boolean hasPendingChanges();
+}
+-keep,allowobfuscation class androidx.compose.ui.geometry.Offset {
+    long unbox-impl();
+}
+-keep,allowobfuscation class androidx.compose.ui.geometry.Rect {
+    float getBottom();
+    float getLeft();
+    float getRight();
+    float getTop();
+}
+-keep,allowobfuscation class androidx.compose.ui.input.key.Key {
+    long unbox-impl();
+}
+-keep,allowobfuscation class androidx.compose.ui.layout.Placeable {
+    int getHeight();
+    int getWidth();
+}
+-keep,allowobfuscation class androidx.compose.ui.node.ComposeUiNode$Companion {
+    kotlin.jvm.functions.Function1 getApplyOnDeactivatedNodeAssertion();
+    kotlin.jvm.functions.Function0 getConstructor();
+    kotlin.jvm.functions.Function2 getSetCompositeKeyHash();
+    kotlin.jvm.functions.Function2 getSetMeasurePolicy();
+    kotlin.jvm.functions.Function2 getSetModifier();
+    kotlin.jvm.functions.Function2 getSetResolvedCompositionLocals();
+}
+-keep,allowobfuscation interface androidx.compose.ui.node.RootForTest {
+    androidx.compose.ui.semantics.SemanticsOwner getSemanticsOwner();
+}
+-keep,allowobfuscation class androidx.compose.ui.platform.AndroidCompositionLocals_androidKt {
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalConfiguration();
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalContext();
+}
+-keep,allowobfuscation class androidx.compose.ui.platform.CompositionLocalsKt {
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalDensity();
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalFontFamilyResolver();
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalLayoutDirection();
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalProvidableLocaleList();
+    androidx.compose.runtime.ProvidableCompositionLocal getLocalWindowInfo();
+}
+-keep,allowobfuscation interface androidx.compose.ui.platform.ViewConfiguration {
+    long getDoubleTapMinTimeMillis();
+}
+# ViewRootForTest is already retained as a complete exact owner above. Its
+# synthesized method mapping is not applicable to the separately minified APK,
+# so this one interface entry point must retain its source owner and name.
+-keep interface androidx.compose.ui.platform.ViewRootForTest {
+    void measureAndLayoutForTest();
+}
+-keep,allowobfuscation interface androidx.compose.ui.platform.WindowInfo {
+    int getKeyboardModifiers-k7X9c1A();
+    boolean isWindowFocused();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.AccessibilityAction {
+    kotlin.Function getAction();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.ScrollAxisRange {
+    kotlin.jvm.functions.Function0 getMaxValue();
+    boolean getReverseScrolling();
+    kotlin.jvm.functions.Function0 getValue();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsActions {
+    androidx.compose.ui.semantics.SemanticsPropertyKey getCustomActions();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getGetTextLayoutResult();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getInsertTextAtCursor();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getOnClick();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getOnImeAction();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getRequestFocus();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getScrollBy();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getScrollToIndex();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getSetSelection();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getSetText();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsConfiguration {
+    boolean isClearingSemantics();
+    boolean isMergingSemanticsOfDescendants();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsNode {
+    java.util.List getChildren();
+    int getId();
+    androidx.compose.ui.layout.LayoutInfo getLayoutInfo();
+    long getPositionInRoot-F1C5BW0();
+    long getPositionInWindow-F1C5BW0();
+    androidx.compose.ui.node.RootForTest getRoot();
+    long getSize-YbymL2g();
+    boolean isRoot();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsOwner {
+    androidx.compose.ui.semantics.SemanticsNode getRootSemanticsNode();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsProperties {
+    androidx.compose.ui.semantics.SemanticsPropertyKey getContentDescription();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getDisabled();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getEditableText();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getFocused();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getHeading();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getHideFromAccessibility();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getHorizontalScrollAxisRange();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getImeAction();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getIndexForKey();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getInputText();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getIsDialog();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getIsEditable();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getIsPopup();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getLinkTestMarker();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getProgressBarRangeInfo();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getSelected();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getStateDescription();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getTestTag();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getText();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getToggleableState();
+    androidx.compose.ui.semantics.SemanticsPropertyKey getVerticalScrollAxisRange();
+}
+-keep,allowobfuscation class androidx.compose.ui.semantics.SemanticsPropertyKey {
+    java.lang.String getName();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.AnnotatedString {
+    java.util.List getParagraphStyles();
+    java.util.List getSpanStyles();
+    java.lang.String getText();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.AnnotatedString$Range {
+    int getEnd();
+    int getStart();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.TextLayoutInput {
+    androidx.compose.ui.text.AnnotatedString getText();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.TextLayoutResult {
+    androidx.compose.ui.text.TextLayoutInput getLayoutInput();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.intl.Locale {
+    java.lang.String toLanguageTag();
+}
+-keep,allowobfuscation class androidx.compose.ui.text.intl.LocaleList {
+    java.util.List getLocaleList();
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.Constraints {
+    long unbox-impl();
+}
+-keep interface androidx.compose.ui.unit.FontScaling {
+    float toDp-GaN1DYA(long);
+    long toSp-0xMU5do(float);
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.Dp {
+    float unbox-impl();
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.DpSize {
+    long unbox-impl();
+}
+-keep,allowobfuscation class androidx.compose.ui.unit.IntSize {
+    long unbox-impl();
+}
+-keep,allowobfuscation class androidx.core.os.LocaleListCompat {
+    int size();
+}
+-keep,allowobfuscation class com.runanywhere.runanywhereai.ui.navigation.Vision {
+    boolean getOpenLiveCamera();
+}
+-keep,allowobfuscation class kotlin.collections.AbstractIterator {
+    <init>();
+    void done();
+    void setNext(java.lang.Object);
+}
+-keep,allowobfuscation class kotlin.collections.ArrayDeque {
+    java.lang.Object removeFirstOrNull();
+}
+-keep,allowobfuscation class kotlin.collections.SetsKt__SetsKt {
+    java.util.Set setOf(java.lang.Object[]);
+}
+-keep,allowobfuscation class kotlin.collections.SetsKt___SetsKt {
+    java.util.Set emptySet();
+}
+# These synthesized Kotlin default/debug methods are absent from the externally
+# applicable mapping; retain only their source member names. The
+# existing exact-class rules keep their implementations while still allowing
+# the class owners themselves to consume the target mapping.
+-keepclassmembernames class kotlin.coroutines.ContinuationInterceptor$DefaultImpls {
+    void releaseInterceptedContinuation(kotlin.coroutines.ContinuationInterceptor, kotlin.coroutines.Continuation);
+}
+-keepclassmembernames class kotlin.coroutines.jvm.internal.DebugProbesKt {
+    void probeCoroutineSuspended(kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlin.jvm.internal.Ref$BooleanRef {
+    <init>();
+}
+-keep,allowobfuscation class kotlin.jvm.internal.Ref$FloatRef {
+    <init>();
+}
+-keep,allowobfuscation class kotlin.jvm.internal.Ref$ObjectRef {
+    <init>();
+}
+-keep,allowobfuscation class kotlin.ranges.LongProgression {
+    long getFirst();
+    long getLast();
+}
+-keep,allowobfuscation interface kotlin.reflect.KClass {
+    java.lang.String getSimpleName();
+}
+-keep,allowobfuscation class kotlin.time.Duration {
+    kotlin.time.Duration box-impl(long);
+    long getInWholeMilliseconds-impl(long);
+    boolean isNegative-impl(long);
+    long unbox-impl();
+}
+-keep,allowobfuscation class kotlinx.coroutines.AbstractCoroutine {
+    <init>(kotlin.coroutines.CoroutineContext, boolean, boolean);
+    void start(kotlinx.coroutines.CoroutineStart, java.lang.Object, kotlin.jvm.functions.Function2);
+}
+-keep,allowobfuscation interface kotlinx.coroutines.CancellableContinuation {
+    void resume(java.lang.Object, kotlin.jvm.functions.Function1);
+    void resumeUndispatched(kotlinx.coroutines.CoroutineDispatcher, java.lang.Object);
+}
+-keep,allowobfuscation class kotlinx.coroutines.CoroutineName {
+    <init>(java.lang.String);
+}
+-keep,allowobfuscation class kotlinx.coroutines.DefaultExecutorKt {
+    kotlinx.coroutines.Delay getDefaultDelay();
+}
+-keep,allowobfuscation class kotlinx.coroutines.Dispatchers {
+    kotlinx.coroutines.CoroutineDispatcher getDefault();
+}
+-keep,allowobfuscation interface kotlinx.coroutines.Job {
+    kotlinx.coroutines.DisposableHandle invokeOnCompletion$default(kotlinx.coroutines.Job, boolean, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object);
+}
+-keep,allowobfuscation class kotlinx.coroutines.JobSupport {
+    java.lang.Throwable getCompletionCause();
+    java.lang.Throwable getCompletionExceptionOrNull();
+}
+-keep,allowobfuscation interface kotlinx.coroutines.channels.ReceiveChannel {
+    kotlinx.coroutines.selects.SelectClause1 getOnReceive();
+    java.lang.Object receive(kotlin.coroutines.Continuation);
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.CoroutineExceptionHandlerImplKt {
+    void ensurePlatformExceptionHandlerLoaded(kotlinx.coroutines.CoroutineExceptionHandler);
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.StackTraceRecoveryKt {
+    java.lang.Throwable unwrapImpl(java.lang.Throwable);
+}
+-keep,allowobfuscation class kotlinx.coroutines.internal.ThreadSafeHeap {
+    <init>();
+    void addLast(kotlinx.coroutines.internal.ThreadSafeHeapNode);
+    kotlinx.coroutines.internal.ThreadSafeHeapNode find(kotlin.jvm.functions.Function1);
+    kotlinx.coroutines.internal.ThreadSafeHeapNode firstImpl();
+    boolean isEmpty();
+    boolean remove(kotlinx.coroutines.internal.ThreadSafeHeapNode);
+    kotlinx.coroutines.internal.ThreadSafeHeapNode removeAtImpl(int);
+    kotlinx.coroutines.internal.ThreadSafeHeapNode removeFirstOrNull();
+}
+-keep,allowobfuscation class kotlin.jvm.internal.StringCompanionObject {
+    kotlin.jvm.internal.StringCompanionObject INSTANCE;
+}
+-keep,allowobfuscation class kotlinx.coroutines.YieldContext {
+    kotlinx.coroutines.YieldContext$Key Key;
 }
 
 # Release instrumentation calls these coroutine entry-point facades directly

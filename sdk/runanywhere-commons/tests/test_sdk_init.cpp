@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -84,6 +85,32 @@ void run_phase1_development() {
     CHECK(rac_state_is_initialized(), "rac_state_is_initialized() after phase1");
     CHECK(rac_state_get_environment() == RAC_ENV_DEVELOPMENT,
           "rac_state_get_environment() == DEVELOPMENT");
+
+    rac_proto_buffer_free(&out);
+}
+
+void run_phase2_without_external_config() {
+    std::fprintf(stdout, "-- phase2 skips control-plane setup without external config --\n");
+    CHECK(rac_state_is_initialized(), "phase2 no-config prereq: development state initialized");
+
+    SdkInitPhase2Request request;
+    std::vector<uint8_t> bytes;
+    bytes.assign(request.ByteSizeLong(), 0u);
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = rac_sdk_init_phase2_proto(bytes.data(), bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS, "phase2 no-config returns RAC_SUCCESS");
+
+    SdkInitResult result;
+    CHECK(parse_result(out, &result), "phase2 no-config result parses");
+    CHECK(result.success(), "phase2 no-config succeeds");
+    CHECK(!result.http_applicable(), "phase2 no-config reports http_applicable=false");
+    CHECK(!result.device_registered(), "phase2 no-config reports device_registered=false");
+    CHECK(result.warning().find("auth setup deferred") == std::string::npos,
+          "phase2 no-config does not report deferred auth");
+    CHECK(result.warning().find("device registration deferred") == std::string::npos,
+          "phase2 no-config does not report deferred device registration");
 
     rac_proto_buffer_free(&out);
 }
@@ -261,6 +288,7 @@ int main() {
 #else
     run_invalid_arguments();
     run_phase1_development();
+    run_phase2_without_external_config();
     run_phase1_production_validation_failure();
     run_phase1_production_success();
     run_phase2_offline_mode();
