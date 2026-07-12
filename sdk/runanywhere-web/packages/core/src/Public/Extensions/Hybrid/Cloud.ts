@@ -20,11 +20,9 @@
  *
  * HTTP under WASM: the cloud engine does its HTTP through the commons
  * `rac_http_client`, which on Emscripten routes through the registered
- * transport — either the emscripten_fetch shim (rac_http_client_emscripten.cpp)
- * or the JS XHR/fetch transport (FetchHttpTransport.ts, installed via
- * rac_http_transport_register_from_js). So cloud STT works in the browser
- * WITHOUT bespoke JS fetch orchestration: the WASM router calls cloud →
- * rac_http_client → the already-wired Web transport. No extra plumbing needed.
+ * emscripten_fetch transport (rac_http_client_emscripten.cpp). So cloud STT
+ * works in the browser without bespoke JavaScript HTTP orchestration: the WASM
+ * router calls cloud → rac_http_client → the native Web transport.
  */
 
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';

@@ -21,9 +21,8 @@
  *
  * No cascade / filter / rank logic lives here — only marshalling.
  *
- * Symbols are resolved through proto_compat::symbol (dlsym) so the bridge keeps
- * compiling/linking against staged commons artifacts that may lag these ABIs,
- * matching every other *Proto method in this module.
+ * RACommons APIs are linked directly. The cloud backend entry point remains a
+ * dynamic plugin lookup because that engine is packaged separately.
  *
  * Callback bridging:
  *   - Custom filter: commons invokes the predicate SYNCHRONOUSLY on the routing
@@ -39,12 +38,12 @@
  *     The routing decision still happens in commons against that vtable.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <dlfcn.h>
 #include <functional>
 #include <future>
 #include <memory>
@@ -52,10 +51,13 @@
 #include <string>
 #include <unordered_map>
 
+#include "rac/cloud/rac_cloud_stt_provider.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_loader.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/hybrid/rac_hybrid_custom_filter.h"
 #include "rac/router/hybrid/rac_hybrid_device_state.h"
@@ -69,38 +71,14 @@ using namespace ::runanywhere::bridges;
 
 namespace {
 
-// --- proto-byte ABI function-pointer typedefs (resolved via dlsym) -----------
-
-using HybridRouterCreateFn = rac_result_t (*)(rac_handle_t*);
-using HybridRouterDestroyFn = void (*)(rac_handle_t);
-using HybridRouterSetServiceProtoFn = rac_result_t (*)(
-    rac_handle_t, rac_stt_service_t*, const uint8_t*, size_t);
-using HybridRouterSetPolicyProtoFn = rac_result_t (*)(
-    rac_handle_t, const uint8_t*, size_t);
-using HybridRouterTranscribeProtoFn = rac_result_t (*)(
-    rac_handle_t, const uint8_t*, size_t, uint8_t**, size_t*);
-using HybridRouterProtoBufferFreeFn = void (*)(uint8_t*);
-using HybridRouterCancelFn = rac_result_t (*)(rac_handle_t);
-
-using PluginFindForEngineFn = const rac_engine_vtable_t* (*)(
-    rac_primitive_t, const char*);
-using SttDestroyFn = void (*)(rac_handle_t);
-
-using HybridSetDeviceStateFn = rac_result_t (*)(
-    const rac_hybrid_device_state_ops_t*);
-using HybridRegisterCustomFilterFn = rac_result_t (*)(
-    const char*, rac_hybrid_custom_filter_predicate_t, void*);
-using HybridUnregisterCustomFilterFn = rac_result_t (*)(const char*);
-
+// The cloud engine is a separately packaged backend plugin. Its entry point is
+// intentionally resolved only after that plugin has been loaded.
 using CloudRegisterFn = rac_result_t (*)(void);
-// Host-side cloud STT provider callback ABI (rac/cloud/rac_cloud_stt_provider.h).
-using CloudSttTranscribeCallbackFn = rac_result_t (*)(
-    const char*, const uint8_t*, size_t, int32_t, char**, void*);
-using CloudSttProviderRegisterFn = rac_result_t (*)(
-    const char*, CloudSttTranscribeCallbackFn, void*);
-using CloudSttProviderUnregisterFn = rac_result_t (*)(const char*);
-using RegistryListPluginsFn = rac_result_t (*)(const char***, size_t*);
-using RegistryFreePluginListFn = void (*)(const char**, size_t);
+
+template <typename Fn>
+Fn pluginSymbol(const char* name) {
+    return reinterpret_cast<Fn>(dlsym(RTLD_DEFAULT, name));
+}
 
 std::vector<uint8_t> copyHybridArrayBufferBytes(
     const std::shared_ptr<ArrayBuffer>& buffer) {
@@ -132,16 +110,8 @@ std::vector<uint8_t> copyHybridArrayBufferBytes(
 rac_stt_service_t* createSttServiceViaRegistry(const std::string& engineHint,
                                                const std::string& modelOrPath,
                                                const std::string& configJson) {
-    auto findForEngine =
-        proto_compat::symbol<PluginFindForEngineFn>("rac_plugin_find_for_engine");
-    if (!findForEngine) {
-        LOGE("hybridSttRouterCreateService: rac_plugin_find_for_engine ABI "
-             "unavailable");
-        return nullptr;
-    }
-
     const rac_engine_vtable_t* vt =
-        findForEngine(RAC_PRIMITIVE_TRANSCRIBE, engineHint.c_str());
+        rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engineHint.c_str());
     if (vt == nullptr || vt->stt_ops == nullptr ||
         vt->stt_ops->create == nullptr) {
         LOGE("hybridSttRouterCreateService: no TRANSCRIBE engine for hint='%s'",
@@ -296,14 +266,8 @@ bool isRegistrationSuccess(rac_result_t rc) {
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterCreate() {
     return Promise<double>::async([]() -> double {
-        auto fn = proto_compat::symbol<HybridRouterCreateFn>(
-            "rac_stt_hybrid_router_create");
-        if (!fn) {
-            LOGE("hybridSttRouterCreate: ABI unavailable");
-            return 0.0;
-        }
         rac_handle_t handle = nullptr;
-        if (fn(&handle) != RAC_SUCCESS || handle == nullptr) {
+        if (rac_stt_hybrid_router_create(&handle) != RAC_SUCCESS || handle == nullptr) {
             return 0.0;
         }
         return static_cast<double>(reinterpret_cast<uintptr_t>(handle));
@@ -316,11 +280,8 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::hybridSttRouterDestroy(
         if (routerHandle == 0.0) {
             return;
         }
-        if (auto fn = proto_compat::symbol<HybridRouterDestroyFn>(
-                "rac_stt_hybrid_router_destroy")) {
-            fn(reinterpret_cast<rac_handle_t>(
-                static_cast<uintptr_t>(routerHandle)));
-        }
+        rac_stt_hybrid_router_destroy(reinterpret_cast<rac_handle_t>(
+            static_cast<uintptr_t>(routerHandle)));
     });
 }
 
@@ -347,10 +308,8 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::hybridSttRouterDestroyServ
         }
         // Both router sides route destruction through rac_stt_destroy, which
         // calls the engine's stt_ops->destroy and frees the wrapper.
-        if (auto fn = proto_compat::symbol<SttDestroyFn>("rac_stt_destroy")) {
-            fn(reinterpret_cast<rac_handle_t>(
-                static_cast<uintptr_t>(serviceHandle)));
-        }
+        rac_stt_destroy(reinterpret_cast<rac_handle_t>(
+            static_cast<uintptr_t>(serviceHandle)));
     });
 }
 
@@ -365,14 +324,8 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterSetOfflin
     auto bytes = copyHybridArrayBufferBytes(descriptorBytes);
     return Promise<double>::async(
         [routerHandle, serviceHandle, bytes = std::move(bytes)]() -> double {
-            auto fn = proto_compat::symbol<HybridRouterSetServiceProtoFn>(
-                "rac_stt_hybrid_router_set_offline_service_proto");
-            if (!fn) {
-                LOGE("hybridSttRouterSetOfflineService: ABI unavailable");
-                return static_cast<double>(RAC_ERROR_NOT_IMPLEMENTED);
-            }
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            return static_cast<double>(fn(
+            return static_cast<double>(rac_stt_hybrid_router_set_offline_service_proto(
                 reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(routerHandle)),
                 reinterpret_cast<rac_stt_service_t*>(
                     static_cast<uintptr_t>(serviceHandle)),
@@ -387,14 +340,8 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterSetOnline
     auto bytes = copyHybridArrayBufferBytes(descriptorBytes);
     return Promise<double>::async(
         [routerHandle, serviceHandle, bytes = std::move(bytes)]() -> double {
-            auto fn = proto_compat::symbol<HybridRouterSetServiceProtoFn>(
-                "rac_stt_hybrid_router_set_online_service_proto");
-            if (!fn) {
-                LOGE("hybridSttRouterSetOnlineService: ABI unavailable");
-                return static_cast<double>(RAC_ERROR_NOT_IMPLEMENTED);
-            }
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            return static_cast<double>(fn(
+            return static_cast<double>(rac_stt_hybrid_router_set_online_service_proto(
                 reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(routerHandle)),
                 reinterpret_cast<rac_stt_service_t*>(
                     static_cast<uintptr_t>(serviceHandle)),
@@ -408,14 +355,8 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterSetPolicy
     auto bytes = copyHybridArrayBufferBytes(policyBytes);
     return Promise<double>::async(
         [routerHandle, bytes = std::move(bytes)]() -> double {
-            auto fn = proto_compat::symbol<HybridRouterSetPolicyProtoFn>(
-                "rac_stt_hybrid_router_set_policy_proto");
-            if (!fn) {
-                LOGE("hybridSttRouterSetPolicy: ABI unavailable");
-                return static_cast<double>(RAC_ERROR_NOT_IMPLEMENTED);
-            }
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            return static_cast<double>(fn(
+            return static_cast<double>(rac_stt_hybrid_router_set_policy_proto(
                 reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(routerHandle)),
                 data, bytes.size()));
         });
@@ -432,34 +373,24 @@ HybridRunAnywhereCore::hybridSttRouterTranscribe(
     auto bytes = copyHybridArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
         [routerHandle, bytes = std::move(bytes)]() -> std::shared_ptr<ArrayBuffer> {
-            auto fn = proto_compat::symbol<HybridRouterTranscribeProtoFn>(
-                "rac_stt_hybrid_router_transcribe_proto");
-            if (!fn) {
-                LOGE("hybridSttRouterTranscribe: ABI unavailable");
-                return ArrayBuffer::allocate(0);
-            }
             uint8_t* outBytes = nullptr;
             size_t outSize = 0;
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            rac_result_t rc = fn(
+            rac_result_t rc = rac_stt_hybrid_router_transcribe_proto(
                 reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(routerHandle)),
                 data, bytes.size(), &outBytes, &outSize);
 
-            auto freeFn = proto_compat::symbol<HybridRouterProtoBufferFreeFn>(
-                "rac_stt_hybrid_router_proto_buffer_free");
             if (rc != RAC_SUCCESS || outBytes == nullptr || outSize == 0) {
                 if (rc != RAC_SUCCESS) {
                     LOGE("hybridSttRouterTranscribe: rc=%d", rc);
                 }
-                if (outBytes != nullptr && freeFn) {
-                    freeFn(outBytes);
+                if (outBytes != nullptr) {
+                    rac_stt_hybrid_router_proto_buffer_free(outBytes);
                 }
                 return ArrayBuffer::allocate(0);
             }
             auto buffer = ArrayBuffer::copy(outBytes, outSize);
-            if (freeFn) {
-                freeFn(outBytes);
-            }
+            rac_stt_hybrid_router_proto_buffer_free(outBytes);
             return buffer;
         });
 }
@@ -470,12 +401,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridSttRouterCancel(
         if (routerHandle == 0.0) {
             return static_cast<double>(RAC_SUCCESS);
         }
-        auto fn = proto_compat::symbol<HybridRouterCancelFn>(
-            "rac_stt_hybrid_router_cancel");
-        if (!fn) {
-            return static_cast<double>(RAC_SUCCESS);  // best-effort no-op
-        }
-        return static_cast<double>(fn(
+        return static_cast<double>(rac_stt_hybrid_router_cancel(
             reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(routerHandle))));
     });
 }
@@ -490,12 +416,6 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridRegisterCustomFilt
     return Promise<double>::async([name, predicate]() -> double {
         if (name.empty()) {
             return static_cast<double>(RAC_ERROR_INVALID_PARAMETER);
-        }
-        auto fn = proto_compat::symbol<HybridRegisterCustomFilterFn>(
-            "rac_hybrid_register_custom_filter");
-        if (!fn) {
-            LOGE("hybridRegisterCustomFilter: ABI unavailable");
-            return static_cast<double>(RAC_ERROR_NOT_IMPLEMENTED);
         }
         // Store the JS callback in the process-global table BEFORE registering
         // with commons, so a predicate invocation racing the register call
@@ -514,7 +434,8 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridRegisterCustomFilt
         // same name overwrites the table entry. The small per-name strdup is
         // bounded by the number of distinct filter names an app uses.
         char* userData = ::strdup(name.c_str());
-        rac_result_t rc = fn(name.c_str(), customFilterPredicate, userData);
+        rac_result_t rc = rac_hybrid_register_custom_filter(
+            name.c_str(), customFilterPredicate, userData);
         if (rc != RAC_SUCCESS) {
             std::lock_guard<std::mutex> lock(g_customFilterMutex);
             customFilterRegistry().erase(name);
@@ -535,12 +456,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::hybridUnregisterCustomFi
             std::lock_guard<std::mutex> lock(g_customFilterMutex);
             customFilterRegistry().erase(name);
         }
-        auto fn = proto_compat::symbol<HybridUnregisterCustomFilterFn>(
-            "rac_hybrid_unregister_custom_filter");
-        if (!fn) {
-            return static_cast<double>(RAC_SUCCESS);
-        }
-        return static_cast<double>(fn(name.c_str()));
+        return static_cast<double>(rac_hybrid_unregister_custom_filter(name.c_str()));
     });
 }
 
@@ -567,18 +483,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::hybridSetDeviceState(
         if (g_deviceStateInstalled.load(std::memory_order_relaxed)) {
             return true;
         }
-        auto fn = proto_compat::symbol<HybridSetDeviceStateFn>(
-            "rac_hybrid_set_device_state");
-        if (!fn) {
-            LOGE("hybridSetDeviceState: ABI unavailable");
-            return false;
-        }
         rac_hybrid_device_state_ops_t ops{};
         ops.is_online = deviceStateIsOnline;
         ops.battery_percent = deviceStateBatteryPercent;
         ops.is_thermal_throttled = deviceStateIsThermalThrottled;
         ops.user_data = nullptr;  // callbacks read process-global atomics
-        rac_result_t rc = fn(&ops);
+        rac_result_t rc = rac_hybrid_set_device_state(&ops);
         if (rc != RAC_SUCCESS) {
             LOGE("hybridSetDeviceState: rac_hybrid_set_device_state rc=%d", rc);
             return false;
@@ -591,12 +501,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::hybridSetDeviceState(
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::hybridClearDeviceState() {
     return Promise<bool>::async([]() -> bool {
         std::lock_guard<std::mutex> lock(g_deviceStateMutex);
-        auto fn = proto_compat::symbol<HybridSetDeviceStateFn>(
-            "rac_hybrid_set_device_state");
-        if (!fn) {
-            return false;
-        }
-        rac_result_t rc = fn(nullptr);
+        rac_result_t rc = rac_hybrid_set_device_state(nullptr);
         g_deviceStateInstalled.store(false, std::memory_order_release);
         // Reset to the commons optimistic defaults for any future re-install.
         g_deviceIsOnline.store(true, std::memory_order_relaxed);
@@ -705,25 +610,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudRegisterSttProvider(
             LOGE("cloudRegisterSttProvider: name and handler must be non-empty");
             return false;
         }
-        auto registerFn = proto_compat::symbol<CloudSttProviderRegisterFn>(
-            "rac_cloud_register_stt_provider");
-        if (!registerFn) {
-            LOGE("cloudRegisterSttProvider: rac_cloud_register_stt_provider "
-                 "unavailable in bundled RACommons");
-            return false;
-        }
-
         // Ensure the cloud engine plugin is in the registry (idempotent),
         // mirroring Swift Cloud.registerProvider's register() call.
         if (auto engineFn =
-                proto_compat::symbol<CloudRegisterFn>("rac_backend_cloud_register")) {
+                pluginSymbol<CloudRegisterFn>("rac_backend_cloud_register")) {
             engineFn();
         }
 
         auto state = std::make_shared<CloudSttProviderState>();
         state->onTranscribe = onTranscribe;
-        rac_result_t rc =
-            registerFn(name.c_str(), &cloudSttProviderTrampoline, state.get());
+        rac_result_t rc = rac_cloud_register_stt_provider(
+            name.c_str(), &cloudSttProviderTrampoline, state.get());
         if (rc != RAC_SUCCESS) {
             LOGE("cloudRegisterSttProvider('%s'): rc=%d", name.c_str(), rc);
             return false;
@@ -741,12 +638,9 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cloudUnregisterSttProvider
         if (name.empty()) {
             return;
         }
-        if (auto unregisterFn = proto_compat::symbol<CloudSttProviderUnregisterFn>(
-                "rac_cloud_unregister_stt_provider")) {
-            rac_result_t rc = unregisterFn(name.c_str());
-            if (rc != RAC_SUCCESS) {
-                LOGE("cloudUnregisterSttProvider('%s'): rc=%d", name.c_str(), rc);
-            }
+        rac_result_t rc = rac_cloud_unregister_stt_provider(name.c_str());
+        if (rc != RAC_SUCCESS) {
+            LOGE("cloudUnregisterSttProvider('%s'): rc=%d", name.c_str(), rc);
         }
         // Per rac_cloud_stt_provider.h, unregister retires the previous table
         // snapshot one generation later. Registration brackets policy
@@ -762,7 +656,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cloudUnregisterSttProvider
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudRegister() {
     return Promise<bool>::async([]() -> bool {
-        auto fn = proto_compat::symbol<CloudRegisterFn>(
+        auto fn = pluginSymbol<CloudRegisterFn>(
             "rac_backend_cloud_register");
         if (!fn) {
             LOGE("cloudRegister: rac_backend_cloud_register unavailable "
@@ -780,7 +674,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudRegister() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudUnregister() {
     return Promise<bool>::async([]() -> bool {
-        auto fn = proto_compat::symbol<CloudRegisterFn>(
+        auto fn = pluginSymbol<CloudRegisterFn>(
             "rac_backend_cloud_unregister");
         if (!fn) {
             return false;
@@ -796,16 +690,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudUnregister() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudIsRegistered() {
     return Promise<bool>::async([]() -> bool {
-        auto listFn = proto_compat::symbol<RegistryListPluginsFn>(
-            "rac_registry_list_plugins");
-        auto freeFn = proto_compat::symbol<RegistryFreePluginListFn>(
-            "rac_registry_free_plugin_list");
-        if (!listFn) {
-            return false;
-        }
         const char** names = nullptr;
         size_t count = 0;
-        if (listFn(&names, &count) != RAC_SUCCESS || names == nullptr) {
+        if (rac_registry_list_plugins(&names, &count) != RAC_SUCCESS ||
+            names == nullptr) {
             return false;
         }
         bool found = false;
@@ -815,9 +703,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cloudIsRegistered() {
                 break;
             }
         }
-        if (freeFn) {
-            freeFn(names, count);
-        }
+        rac_registry_free_plugin_list(names, count);
         return found;
     });
 }

@@ -40,7 +40,13 @@ target_include_directories(rac_server PUBLIC
 target_include_directories(rac_server PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/../generated/proto
+    ${Protobuf_INCLUDE_DIRS}
 )
+
+if(RAC_PROTOBUF_NAMESPACE_ISOLATED)
+    target_compile_definitions(rac_server PRIVATE google=runanywhere_internal)
+endif()
 
 # Link dependencies
 target_link_libraries(rac_server PUBLIC

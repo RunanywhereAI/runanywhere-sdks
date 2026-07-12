@@ -4,22 +4,17 @@
  *
  * Ergonomic helpers for canonical STT proto types.
  *
- * Mirrors Swift RASTTConfiguration+Helpers.swift exactly. Pure ergonomics —
- * no JNI, no business logic. Defaults factories, validation, and computed
- * properties that adapt Wire millisecond fields into seconds-based Doubles
- * to match the cross-SDK public API surface.
+ * defaults() / validate() live in generated/convenience/RAConvenience.kt,
+ * emitted from the canonical IDL annotations. This file contains only
+ * Kotlin-specific computed helpers.
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.STTConfiguration
 import ai.runanywhere.proto.v1.STTLanguage
-import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.TranscriptionAlternative
 import ai.runanywhere.proto.v1.TranscriptionMetadata
 import ai.runanywhere.proto.v1.WordTimestamp
-import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
 
 // MARK: - STTLanguage
@@ -65,53 +60,6 @@ val STTLanguage.bcp47Code: String
             STTLanguage.STT_LANGUAGE_RU -> "ru"
             STTLanguage.STT_LANGUAGE_HI -> "hi"
         }
-
-// MARK: - STTConfiguration
-
-/**
- * Default STT configuration. Mirrors Swift `RASTTConfiguration.defaults(...)`.
- */
-fun STTConfiguration.Companion.defaults(
-    modelId: String = "",
-    language: STTLanguage = STTLanguage.STT_LANGUAGE_EN,
-    sampleRate: Int = 16_000,
-    enableVad: Boolean = false,
-): STTConfiguration =
-    STTConfiguration(
-        model_id = modelId,
-        language = language,
-        sample_rate = sampleRate,
-        enable_vad = enableVad,
-    )
-
-/**
- * Validate this configuration. Throws [SDKException] on invalid fields.
- */
-@Throws(SDKException::class)
-fun STTConfiguration.validate() {
-    if (sample_rate <= 0 || sample_rate > 48_000) {
-        throw SDKException.invalidArgument(
-            "Sample rate must be between 1 and 48000 Hz (got $sample_rate)",
-        )
-    }
-}
-
-// MARK: - STTOptions
-
-/**
- * Default STT runtime options. Mirrors Swift `RASTTOptions.defaults(...)`.
- */
-fun STTOptions.Companion.defaults(
-    language: STTLanguage = STTLanguage.STT_LANGUAGE_EN,
-): RASTTOptions =
-    RASTTOptions(
-        language = language,
-        enable_punctuation = true,
-        enable_diarization = false,
-        enable_word_timestamps = true,
-        max_speakers = 0,
-        beam_size = 0,
-    )
 
 // MARK: - STTOutput
 

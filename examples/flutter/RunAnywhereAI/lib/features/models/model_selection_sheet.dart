@@ -79,7 +79,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   }
 
   Future<void> _loadInitialData() async {
-    await _viewModel.loadModels();
+    await _viewModel.loadModelsFromRegistry();
+    await _viewModel.loadAvailableFrameworks();
   }
 
   @override

@@ -21,6 +21,13 @@ import CRACommons
 
 extension CppBridge {
 
+    /// Opaque component pointer whose lifetime is owned and serialized by a
+    /// `ComponentActor`. The wrapper is the only value allowed to cross actor
+    /// boundaries; callers unwrap it immediately for one synchronous C call.
+    struct ComponentHandle: @unchecked Sendable {
+        let rawValue: rac_handle_t
+    }
+
     /// Generic component actor: holds one opaque C++ handle and routes
     /// all calls through a `ComponentVTable`.
     ///
@@ -62,9 +69,9 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or lazily create the underlying C handle.
-        public func getHandle() throws -> rac_handle_t {
+        func getHandle() throws -> ComponentHandle {
             if let handle = handle {
-                return handle
+                return ComponentHandle(rawValue: handle)
             }
             if isClosed {
                 throw SDKException(
@@ -85,7 +92,7 @@ extension CppBridge {
             }
             self.handle = createdHandle
             logger.debug("\(vtable.component.displayName) component created")
-            return createdHandle
+            return ComponentHandle(rawValue: createdHandle)
         }
 
         // MARK: - State queries
@@ -106,7 +113,9 @@ extension CppBridge {
 
         /// Read-only access to the raw handle without triggering creation.
         /// Returns `nil` if the handle has not been created yet.
-        public func existingHandle() -> rac_handle_t? { handle }
+        func existingHandle() -> ComponentHandle? {
+            handle.map(ComponentHandle.init(rawValue:))
+        }
 
         // MARK: - Lifecycle
 
@@ -125,7 +134,7 @@ extension CppBridge {
                     category: .component
                 )
             }
-            let handle = try getHandle()
+            let handle = try getHandle().rawValue
             let status = path.withCString { pathPtr in
                 id.withCString { idPtr in
                     name.withCString { namePtr in

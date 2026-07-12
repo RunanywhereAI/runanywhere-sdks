@@ -501,7 +501,6 @@ object RunAnywhere
 | Property | Type | Description |
 |----------|------|-------------|
 | `isInitialized` | `Boolean` | Whether Phase 1 initialization is complete |
-| `isSDKInitialized` | `Boolean` | Alias for `isInitialized` |
 | `areServicesReady` | `Boolean` | Whether Phase 2 (services) initialization is complete |
 | `isActive` | `Boolean` | Whether SDK is initialized and has an environment |
 | `version` | `String` | Current SDK version string |

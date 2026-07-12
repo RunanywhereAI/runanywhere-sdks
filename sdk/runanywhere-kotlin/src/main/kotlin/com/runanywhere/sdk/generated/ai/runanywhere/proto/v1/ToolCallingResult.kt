@@ -72,7 +72,7 @@ public class ToolCallingResult(
   )
   public val conversation_id: String? = null,
   /**
-   * Number of tool-call iterations actually used.
+   * Number of LLM generation turns used, including the final synthesis turn.
    */
   @field:WireField(
     tag = 6,

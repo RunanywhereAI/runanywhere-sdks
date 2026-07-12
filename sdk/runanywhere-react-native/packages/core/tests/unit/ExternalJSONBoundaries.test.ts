@@ -9,7 +9,6 @@ import {
   decodeRegisteredPluginNamesJSON,
 } from '../../src/Public/Extensions/RunAnywhere+PluginLoader';
 import { decodeCloudSttProviderConfigJSON } from '../../src/Public/Extensions/Hybrid/CloudSTT';
-import { parseRAGMetadataJSON } from '../../src/Public/Extensions/RAG/RunAnywhere+RAG';
 
 describe('external JSON boundaries', () => {
   describe('plugin loader native results', () => {
@@ -22,20 +21,22 @@ describe('external JSON boundaries', () => {
         decodeLoadedPluginsJSON(
           '[{"name":"llamacpp","path":"/plugins/libllamacpp.so"}]'
         )
-      ).toEqual([
-        { name: 'llamacpp', path: '/plugins/libllamacpp.so' },
-      ]);
+      ).toEqual([{ name: 'llamacpp', path: '/plugins/libllamacpp.so' }]);
       expect(
-        decodeLoadedPluginJSON(
-          '{"name":"onnx","path":"/plugins/libonnx.so"}'
-        )
+        decodeLoadedPluginJSON('{"name":"onnx","path":"/plugins/libonnx.so"}')
       ).toEqual({ name: 'onnx', path: '/plugins/libonnx.so' });
     });
 
     test.each([
-      ['registered names', () => decodeRegisteredPluginNamesJSON('["onnx",42]')],
+      [
+        'registered names',
+        () => decodeRegisteredPluginNamesJSON('["onnx",42]'),
+      ],
       ['loaded list root', () => decodeLoadedPluginsJSON('{"name":"onnx"}')],
-      ['loaded list member', () => decodeLoadedPluginsJSON('[{"name":"onnx"}]')],
+      [
+        'loaded list member',
+        () => decodeLoadedPluginsJSON('[{"name":"onnx"}]'),
+      ],
       ['loaded result', () => decodeLoadedPluginJSON('null')],
       ['malformed JSON', () => decodeLoadedPluginJSON('{')],
     ])('rejects an invalid %s response', (_label, decode) => {
@@ -72,21 +73,5 @@ describe('external JSON boundaries', () => {
         '{"provider":7,"api_key":false,"timeout_ms":"slow"}'
       )
     ).toEqual({});
-  });
-
-  test('RAG metadata accepts an object and rejects other JSON roots', () => {
-    expect(
-      parseRAGMetadataJSON(
-        '{"source":"notes.txt","page":7,"verified":true,"empty":null}'
-      )
-    ).toEqual({
-      source: 'notes.txt',
-      page: '7',
-      verified: 'true',
-      empty: 'null',
-    });
-    expect(parseRAGMetadataJSON('null')).toEqual({});
-    expect(parseRAGMetadataJSON('["not","metadata"]')).toEqual({});
-    expect(parseRAGMetadataJSON('{')).toEqual({});
   });
 });

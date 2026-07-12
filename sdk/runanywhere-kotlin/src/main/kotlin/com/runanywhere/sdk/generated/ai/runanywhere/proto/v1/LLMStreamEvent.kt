@@ -220,10 +220,8 @@ public class LLMStreamEvent(
   )
   public val elapsed_ms: Long = 0L,
   /**
-   * hotspot-idl-002: structured tool-call payload emitted alongside an
-   * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
-   * field the tool-call event kind carries no proto-typed payload and
-   * SDK consumers must fall back to JSON-parsing the raw `token` text.
+   * Structured tool-call payload emitted when event_kind is
+   * LLM_STREAM_EVENT_KIND_TOOL_CALL.
    */
   @field:WireField(
     tag = 18,

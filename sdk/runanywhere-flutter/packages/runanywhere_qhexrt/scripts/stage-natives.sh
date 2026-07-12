@@ -12,9 +12,9 @@
 # Usage:
 #   scripts/stage-natives.sh --natives-from /path/to/dir
 #
-# where /path/to/dir either contains the .so files directly or an arm64-v8a/
-# subdirectory (the package-sdk.sh convention). Missing optional libs are
-# skipped with a note; the backend .so itself is required.
+# where /path/to/dir is the explicit canonical private ownership directory
+# PATH/arm64-v8a/qhexrt. Missing optional libs are skipped with a note; the
+# backend .so itself is required.
 
 set -euo pipefail
 
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
             shift 2
             ;;
         -h|--help)
-            sed -n '2,16p' "$0"
+            sed -n '2,17p' "$0"
             exit 0
             ;;
         *)
@@ -46,11 +46,7 @@ if [ -z "$NATIVES_FROM" ]; then
     exit 1
 fi
 
-# Accept either the ABI dir itself or its parent (package-sdk.sh layout).
 SRC="$NATIVES_FROM"
-if [ -d "$NATIVES_FROM/arm64-v8a" ]; then
-    SRC="$NATIVES_FROM/arm64-v8a"
-fi
 if [ ! -d "$SRC" ]; then
     echo "ERROR: natives dir not found: $SRC" >&2
     exit 1
@@ -80,6 +76,8 @@ SKEL_LIBS=(
     libQnnHtpV81Skel.so
 )
 
+# Never let a missing input be masked by a previously staged private runtime.
+rm -rf "$JNI_DEST" "$SKEL_DEST"
 mkdir -p "$JNI_DEST" "$SKEL_DEST"
 
 staged_jni=0

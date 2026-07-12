@@ -100,20 +100,17 @@ build/screenshots/app-store-2026-07-09/
 The recommended iPhone set uses real simulator evidence from llama.cpp LFM2
 350M, Sherpa-ONNX Whisper Tiny, and Piper TTS. MLX may be mentioned elsewhere
 as a supported runtime, but do not present it as tested evidence unless it is
-separately verified for that build. The current Mac target links core and MLX,
-so its model copy should describe the shared catalog rather than claim local
-llama.cpp execution.
+separately verified for that build.
 
 ## iOS Build And Archive
 
-The iOS archive requires a build-then-patch sequence because binary framework
-Info.plists need a valid `MinimumOSVersion`. Do not clean between the patch and
-archive steps.
+The iOS archive consumes immutable XCFrameworks whose metadata already declares
+the canonical `MinimumOSVersion` of 17.5.
 
 ```bash
 JOBS="$(sysctl -n hw.logicalcpu)"
 
-# 1. Populate DerivedData and SPM binary artifacts.
+# 1. Build the final Release inputs.
 xcodebuild \
   -project RunAnywhereAI.xcodeproj \
   -scheme RunAnywhereAI \
@@ -123,10 +120,7 @@ xcodebuild \
   -jobs "$JOBS" \
   build
 
-# 2. Patch framework Info.plists. Do not clean after this command.
-./scripts/patch-framework-plist.sh
-
-# 3. Archive into Xcode Organizer's standard folder.
+# 2. Archive into Xcode Organizer's standard folder.
 ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
 ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI iOS $(date +%Y-%m-%d\ %H.%M.%S).xcarchive"
 mkdir -p "$ARCHIVE_DIR"
@@ -327,9 +321,8 @@ open -a Xcode "$ARCHIVE"
 
 ### Invalid Minimum OS Version
 
-For iOS, rebuild once, run `./scripts/patch-framework-plist.sh`, and archive
-again without cleaning. Confirm the app and embedded frameworks all declare
-the expected deployment floor.
+Rebuild the canonical XCFrameworks; do not mutate DerivedData. Confirm the app
+and every embedded framework declare the expected deployment floor.
 
 ### Missing Native Proto ABI
 
@@ -352,7 +345,7 @@ local validation but not for the final App Store export.
 [ ] Marketing version and build number are correct
 [ ] Production secrets and Release config are present without being printed
 [ ] Release build succeeds at iOS 17.5
-[ ] Framework plist patch runs after the final build
+[ ] Every packaged framework declares `MinimumOSVersion = 17.5`
 [ ] Archive appears in Organizer
 [ ] Native ABI gate reports zero missing symbols
 [ ] 1320x2868 screenshots are reviewed in upload order

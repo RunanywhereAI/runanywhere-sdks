@@ -79,13 +79,16 @@ validate_one() {
             if ! unzip -l "$path" >/dev/null 2>&1; then
                 fail "cannot unzip $path"
             fi
-            if ! unzip -l "$path" | grep -q '^.* classes.jar$'; then
+            # Avoid `grep -q` under pipefail: on a large archive it exits as
+            # soon as it sees classes.jar, unzip receives SIGPIPE, and the
+            # otherwise-valid pipeline is reported as a failure.
+            if ! unzip -Z1 "$path" | grep -Fx 'classes.jar' >/dev/null; then
                 fail "AAR missing classes.jar: $path"
             fi
             ok "AAR contains classes.jar"
-            if unzip -l "$path" | grep -q 'jni/[^/]*/.*\.so$'; then
+            if unzip -Z1 "$path" | grep -E 'jni/[^/]*/.*\.so$' >/dev/null; then
                 local count
-                count=$(unzip -l "$path" | grep -c 'jni/[^/]*/.*\.so$' || true)
+                count=$(unzip -Z1 "$path" | grep -Ec 'jni/[^/]*/.*\.so$' || true)
                 ok "AAR contains $count jni/*.so entries"
             else
                 echo "    note: no JNI .so files bundled (AAR may link against external natives)"
@@ -95,7 +98,7 @@ validate_one() {
             if ! unzip -l "$path" >/dev/null 2>&1; then
                 fail "cannot unzip $path"
             fi
-            if ! unzip -l "$path" | grep -q 'META-INF/MANIFEST.MF$'; then
+            if ! unzip -Z1 "$path" | grep -Fx 'META-INF/MANIFEST.MF' >/dev/null; then
                 fail "JAR missing META-INF/MANIFEST.MF: $path"
             fi
             ok "JAR has valid manifest"
@@ -115,12 +118,19 @@ validate_one() {
                 fail "cannot unzip $path"
             fi
             # XCFramework ZIPs contain an Info.plist at top of the framework root
-            if unzip -l "$path" | grep -q '\.xcframework/Info\.plist$'; then
+            local plist_entry
+            plist_entry=$(unzip -Z1 "$path" | awk '/\.xcframework\/Info\.plist$/ { entry = $0 } END { print entry }')
+            if [ -n "$plist_entry" ]; then
                 ok "XCFramework ZIP: Info.plist present"
-                # Count arch slices (each subdir with an Info.plist sibling is a slice)
+                # Static-library XCFrameworks have one root Info.plist; their
+                # slices are declared as AvailableLibraries entries rather
+                # than per-slice Info.plist files.
                 local slices
-                slices=$(unzip -l "$path" | grep -c '\.xcframework/[^/]*/Info\.plist$' || true)
-                [ "$slices" -gt 0 ] && echo "    arch slices declared: $slices"
+                slices=$(unzip -p "$path" "$plist_entry" | grep -c '<key>LibraryIdentifier</key>' || true)
+                if [ "$slices" -le 0 ]; then
+                    fail "XCFramework Info.plist declares no library slices: $path"
+                fi
+                echo "    arch slices declared: $slices"
             else
                 ok "ZIP listable ($(unzip -l "$path" | tail -1 | awk '{print $2}') entries)"
             fi
@@ -129,6 +139,8 @@ validate_one() {
             ok "unknown extension — size check only"
             ;;
     esac
+
+    return 0
 }
 
 for path in "$@"; do

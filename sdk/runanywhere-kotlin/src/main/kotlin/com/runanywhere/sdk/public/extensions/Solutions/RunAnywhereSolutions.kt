@@ -17,14 +17,11 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.SolutionConfig
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
-
-private val solutionsLogger = SDKLogger("Solutions")
 
 class SolutionHandle internal constructor(
     nativeHandle: Long,
@@ -90,15 +87,6 @@ class SolutionHandle internal constructor(
             withContext(Dispatchers.IO) {
                 RunAnywhereBridge.racSolutionDestroy(h)
             }
-        }
-    }
-
-    @Suppress("DEPRECATION", "removal", "ProtectedInFinal")
-    protected fun finalize() {
-        val h = handleRef.getAndSet(0L)
-        if (h != 0L) {
-            solutionsLogger.warn("SolutionHandle finalized without explicit destroy — leaking C handle for $h")
-            RunAnywhereBridge.racSolutionDestroy(h)
         }
     }
 

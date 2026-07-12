@@ -93,8 +93,7 @@ class RunAnywhereLogging {
   /// Enable verbose debugging mode.
   /// Mirrors Swift's `setDebugMode(_:)`.
   static void setDebugMode(bool enabled) {
-    setLogLevel(
-        enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
+    setLogLevel(enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
     setLocalLoggingEnabled(enabled);
   }
 

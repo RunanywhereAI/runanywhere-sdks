@@ -290,7 +290,7 @@ abstract final class RunAnywhere {
   // Swift which uses `_servicesInitLock: DispatchQueue`).
   static Future<void>? _servicesInitFuture;
 
-  /// SDK semver string (e.g. "0.19.13").
+  /// SDK semver string (e.g. "0.19.15").
   static String get version => SDKConstants.version;
 
   /// Event bus for cross-capability SDK events.
@@ -448,16 +448,21 @@ abstract final class RunAnywhere {
       if (apiKey == null || apiKey.isEmpty) {
         throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
+          fieldPath: 'SDKInitParams.apiKey',
         );
       }
       if (baseURL == null || baseURL.isEmpty) {
         throw SDKException.validationFailed(
           'Base URL is required for ${environment.description} mode',
+          fieldPath: 'SDKInitParams.baseURL',
         );
       }
       final uri = Uri.tryParse(baseURL);
       if (uri == null) {
-        throw SDKException.validationFailed('Invalid base URL: $baseURL');
+        throw SDKException.validationFailed(
+          'Invalid base URL: $baseURL',
+          fieldPath: 'SDKInitParams.baseURL',
+        );
       }
       params = SDKInitParams(
         apiKey: apiKey,

@@ -172,7 +172,7 @@ struct ModelSelectionSheet: View {
     private var handlers: ModelActionHandlers {
         ModelActionHandlers(
             onSelect: { model in Task { await selectAndLoadModel(model) } },
-            onChanged: { Task { await viewModel.loadModels() } }
+            onChanged: { Task { await viewModel.loadModelsFromRegistry() } }
         )
     }
 
@@ -197,7 +197,7 @@ struct ModelSelectionSheet: View {
             .toolbar { toolbarContent }
         }
         .adaptiveSheetFrame()
-        .task { await viewModel.loadModels() }
+        .task { await viewModel.loadModelsFromRegistry() }
         .alert(
             "Unable to Load Model",
             isPresented: Binding(

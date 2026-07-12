@@ -110,7 +110,7 @@ class ToolCallingModelPolicyTest {
         assertEquals(tools, plan.toolOptions.tools)
         assertEquals(null, plan.toolChoice)
         assertEquals(null, plan.forcedToolName)
-        assertEquals(ToolCallingExecutionPolicy.MAX_ITERATIONS, plan.toolOptions.max_iterations)
+        assertEquals(ToolCallingExecutionPolicy.MAX_TOOL_CALLS, plan.toolOptions.max_tool_calls)
         assertEquals(64, plan.generationOptions.max_tokens)
         assertEquals(64, plan.toolOptions.max_tokens)
         assertEquals(0f, plan.toolOptions.temperature)

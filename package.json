@@ -7,7 +7,6 @@
     "sdk/shared/proto-ts",
     "sdk/runanywhere-react-native/packages/core",
     "sdk/runanywhere-react-native/packages/llamacpp",
-    "sdk/runanywhere-react-native/packages/mlx",
     "sdk/runanywhere-react-native/packages/onnx",
     "sdk/runanywhere-react-native/packages/qhexrt",
     "examples/react-native/RunAnywhereAI"

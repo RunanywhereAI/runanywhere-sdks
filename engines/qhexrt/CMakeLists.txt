@@ -64,6 +64,104 @@ function(_qhexrt_require_json_keys json_variable label expected_csv)
     endif()
 endfunction()
 
+# The receipt's C ABI version is provenance and a breaking-line guard, not a
+# feature gate. QHexRT has kept additive, size-versioned extensions on ABI 1.0,
+# so validate the exact header surface this adapter consumes instead of
+# inventing a minimum minor version that the producer does not publish.
+function(_qhexrt_validate_header_surface include_dir abi_major abi_minor)
+    include(CheckCSourceCompiles)
+    set(CMAKE_REQUIRED_INCLUDES "${include_dir}")
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    unset(RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE CACHE)
+    check_c_source_compiles("
+#include <qhexrt/qhexrt_c.h>
+
+#if !defined(QHX_ABI_VERSION_MAJOR) || !defined(QHX_ABI_VERSION_MINOR)
+#error QHexRT header omits its C ABI identity
+#endif
+#if QHX_ABI_VERSION_MAJOR != ${abi_major} || QHX_ABI_VERSION_MINOR != ${abi_minor}
+#error QHexRT header C ABI identity differs from the staged receipt
+#endif
+
+static qhx_status (*const require_generate_ex)(
+    qhx_session*, const qhx_inputs*, const qhx_gen_cfg*,
+    const qhx_generate_options*, qhx_token_cb, void*, qhx_output*) = qhx_generate_ex;
+static void (*const require_generate_options_default)(qhx_generate_options*) =
+    qhx_generate_options_default;
+static void (*const require_session_cancel)(qhx_session*) = qhx_session_cancel;
+
+int qhexrt_header_surface_probe(void) {
+    qhx_inputs inputs = {0};
+    qhx_output output = {0};
+    qhx_generate_options options = {0};
+
+    inputs.mask_path = 0;
+    output.embedding = 0;
+    output.n_embedding = 0;
+    output.image = 0;
+    output.img_h = output.img_w = output.img_c = 0;
+    options.struct_size = sizeof(options);
+    options.disable_thinking = 0;
+    options.should_cancel = 0;
+    options.should_cancel_user = 0;
+
+    return require_generate_ex == 0 || require_generate_options_default == 0 ||
+           require_session_cancel == 0 || inputs.mask_path != 0 ||
+           output.embedding != 0 || output.image != 0 || options.struct_size == 0;
+}
+" RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE)
+    if(NOT RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE)
+        message(FATAL_ERROR
+            "QHexRT header does not provide the ABI surface required by the SDK adapter")
+    endif()
+    unset(RAC_QHEXRT_HEADER_SURFACE_COMPATIBLE CACHE)
+endfunction()
+
+function(_qhexrt_require_archive_symbols archive)
+    if(NOT CMAKE_NM OR NOT EXISTS "${CMAKE_NM}")
+        message(FATAL_ERROR "CMAKE_NM is required to validate the QHexRT archive ABI")
+    endif()
+
+    execute_process(
+        COMMAND "${CMAKE_NM}" --defined-only --extern-only "${archive}"
+        RESULT_VARIABLE _qhexrt_nm_status
+        OUTPUT_VARIABLE _qhexrt_nm_output
+        ERROR_QUIET)
+    if(NOT _qhexrt_nm_status EQUAL 0)
+        execute_process(
+            COMMAND "${CMAKE_NM}" -g "${archive}"
+            RESULT_VARIABLE _qhexrt_nm_status
+            OUTPUT_VARIABLE _qhexrt_nm_output
+            ERROR_VARIABLE _qhexrt_nm_error)
+    endif()
+    if(NOT _qhexrt_nm_status EQUAL 0)
+        message(FATAL_ERROR "Unable to inspect QHexRT archive symbols: ${_qhexrt_nm_error}")
+    endif()
+
+    string(REPLACE "\r\n" "\n" _qhexrt_nm_output "${_qhexrt_nm_output}")
+    string(REPLACE "\n" ";" _qhexrt_nm_lines "${_qhexrt_nm_output}")
+    foreach(_qhexrt_required_symbol IN ITEMS
+        qhx_runtime_create qhx_runtime_free qhx_runtime_device
+        qhx_model_load qhx_model_free
+        qhx_session_create qhx_session_free qhx_session_reset qhx_session_cancel
+        qhx_gen_cfg_default qhx_generate_options_default
+        qhx_generate qhx_generate_ex qhx_status_str qhx_version)
+        set(_qhexrt_symbol_defined FALSE)
+        foreach(_qhexrt_nm_line IN LISTS _qhexrt_nm_lines)
+            if(_qhexrt_nm_line MATCHES
+               "[ \t]([A-Za-z?])[ \t]+${_qhexrt_required_symbol}$" AND
+               NOT CMAKE_MATCH_1 MATCHES "[uU?]")
+                set(_qhexrt_symbol_defined TRUE)
+                break()
+            endif()
+        endforeach()
+        if(NOT _qhexrt_symbol_defined)
+            message(FATAL_ERROR
+                "QHexRT core archive omits required defined symbol: ${_qhexrt_required_symbol}")
+        endif()
+    endforeach()
+endfunction()
+
 get_filename_component(RAC_COMMONS_ROOT_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
@@ -313,6 +411,9 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_root_selected)
             message(FATAL_ERROR "QHexRT prebuilt identity mismatch for ${_qhexrt_relative}")
         endif()
     endforeach()
+    _qhexrt_validate_header_surface(
+        "${QHEXRT_ROOT}/include" "${_qhexrt_abi_major}" "${_qhexrt_abi_minor}")
+    _qhexrt_require_archive_symbols("${QHEXRT_CORE_LIB}")
     set(_qhexrt_prebuilt_valid TRUE)
 endif()
 

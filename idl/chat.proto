@@ -88,10 +88,7 @@ message ChatMessage {
     // distinguish multiple users in a multi-party conversation.
     optional string name       = 5;
 
-    // Tag 6 reserved — previously `repeated string tool_calls_json` (legacy).
-    // Deleted in favour of the typed `tool_calls` field below.
     reserved 6;
-    reserved "tool_calls_json";
 
     // Optional tool-call ID this message is responding to (only set when
     // role == MESSAGE_ROLE_TOOL).

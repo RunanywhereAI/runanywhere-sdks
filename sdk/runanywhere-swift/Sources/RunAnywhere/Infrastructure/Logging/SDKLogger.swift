@@ -16,7 +16,7 @@ import os
 /// `trace(0) < debug(1) < info(2) < warning(3) < error(4) < fatal(5)`.
 /// SwiftProtobuf's generated enum is not `Comparable`, so we add ordered
 /// comparisons here for severity gating (`level >= minLogLevel`).
-extension RALogLevel: @retroactive Comparable {
+extension RALogLevel: Comparable {
     public static func < (lhs: RALogLevel, rhs: RALogLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
     }

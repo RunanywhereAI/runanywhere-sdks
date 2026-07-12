@@ -38,6 +38,7 @@ struct GenerationCancelBinding {
     std::mutex* active_ref_mu = nullptr;
     LifecycleLlmRef** active_ref = nullptr;
     std::atomic<bool>* cancel_requested = nullptr;
+    bool* generation_started = nullptr;  // guarded by active_ref_mu
 };
 
 inline void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
@@ -72,6 +73,26 @@ inline void split_display_text_and_thinking(const std::string& raw_text, std::st
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
+inline GenerationState generation_for_tool_step(
+    const GenerationState& base, uint32_t iteration, bool has_tool_choice,
+    runanywhere::v1::ToolChoiceMode tool_choice,
+    runanywhere::v1::ToolCallFormatName format) {
+    GenerationState step = base;
+    const bool forced_decision = iteration == 1 && has_tool_choice &&
+                                 tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
+    if (!forced_decision) {
+        return step;
+    }
+    step.max_tokens = 192;
+    step.temperature = 0.0f;
+    step.top_p = 1.0f;
+    step.disable_thinking = true;
+    step.stop_sequence = format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2
+                             ? "<|tool_call_end|>"
+                             : "</tool_call>";
+    return step;
+}
+
 inline void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
                                           const std::string& raw_text,
                                           const GenerationState& generation) {
@@ -240,11 +261,26 @@ inline bool run_generate_once(GenerationState& generation,
     }
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref &&
-        cancel_binding.cancel_requested) {
-        std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
-        *cancel_binding.active_ref = &ref;
-        if (cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+        cancel_binding.cancel_requested && cancel_binding.generation_started) {
+        bool cancelled_before_start = false;
+        {
+            std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+            *cancel_binding.active_ref = &ref;
+            *cancel_binding.generation_started = false;
+            if (cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+                *cancel_binding.active_ref = nullptr;
+                cancelled_before_start = true;
+            } else {
+                *cancel_binding.generation_started = true;
+            }
+        }
+        if (cancelled_before_start) {
             request_lifecycle_llm_cancel(&ref);
+            release_lifecycle_llm(&ref);
+            if (out_rc) {
+                *out_rc = RAC_ERROR_CANCELLED;
+            }
+            return false;
         }
     }
 
@@ -255,7 +291,20 @@ inline bool run_generate_once(GenerationState& generation,
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {
         std::lock_guard<std::mutex> guard(*cancel_binding.active_ref_mu);
+        if (cancel_binding.generation_started) {
+            *cancel_binding.generation_started = false;
+        }
         *cancel_binding.active_ref = nullptr;
+    }
+
+    if (cancel_binding.cancel_requested &&
+        cancel_binding.cancel_requested->load(std::memory_order_acquire)) {
+        rac_llm_result_free(&raw);
+        release_lifecycle_llm(&ref);
+        if (out_rc) {
+            *out_rc = RAC_ERROR_CANCELLED;
+        }
+        return false;
     }
 
     if (rc != RAC_SUCCESS) {

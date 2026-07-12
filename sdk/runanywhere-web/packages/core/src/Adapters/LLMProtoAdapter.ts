@@ -5,6 +5,7 @@ import {
   type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
 import {
+  LLMGenerationOptions,
   LLMGenerationResult,
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
@@ -58,7 +59,19 @@ export class LLMProtoAdapter {
   }
 
   generateStream(request: ProtoLLMGenerateRequest): AsyncIterable<ProtoLLMStreamEvent> {
-    const encoded = LLMGenerateRequest.encode({ ...request, streamingEnabled: true }).finish();
+    const options = request.options;
+    const encoded = LLMGenerateRequest.encode({
+      ...request,
+      options: LLMGenerationOptions.fromPartial({
+        maxTokens: options?.maxTokens ?? 100,
+        temperature: options?.temperature ?? 0.8,
+        topP: options?.topP ?? 1.0,
+        topK: options?.topK ?? 0,
+        repetitionPenalty: options?.repetitionPenalty ?? 1.0,
+        ...options,
+        streamingEnabled: true,
+      }),
+    }).finish();
     // T6.1: prefer the Worker path when a streamWorkerFactory is
     // registered (and `streamingMode !== 'main'`); transparently fall
     // back to the existing main-thread `streamCallback` MVP otherwise.

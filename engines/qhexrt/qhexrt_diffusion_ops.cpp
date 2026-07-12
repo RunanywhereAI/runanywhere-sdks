@@ -90,10 +90,48 @@ class ScopedEncodedFile {
     std::string path_;
 };
 
-int cancel_trampoline(void* user, const char*, int, int, int) {
-    auto* session = static_cast<Session*>(user);
-    return session != nullptr && session->cancel.load(std::memory_order_relaxed) ? 0 : 1;
+struct CancelCtx {
+    Session* session;
+    uint64_t request_id;
+    bool cancelled = false;
+};
+
+int should_cancel_trampoline(void* user) {
+    auto* ctx = static_cast<CancelCtx*>(user);
+    return ctx != nullptr && ctx->session != nullptr &&
+                   ctx->session->diffusion_requests.is_cancelled(ctx->request_id)
+               ? 1
+               : 0;
 }
+
+int cancel_trampoline(void* user, const char*, int, int, int) {
+    auto* ctx = static_cast<CancelCtx*>(user);
+    if (ctx != nullptr && ctx->session != nullptr &&
+        ctx->session->diffusion_requests.is_cancelled(ctx->request_id)) {
+        ctx->cancelled = true;
+        return 0;
+    }
+    return 1;
+}
+
+class DiffusionRequestScope {
+   public:
+    explicit DiffusionRequestScope(Session* session)
+        : session_(session), id_(session != nullptr ? session->diffusion_requests.begin() : 0) {}
+    ~DiffusionRequestScope() {
+        if (session_ != nullptr)
+            session_->diffusion_requests.finish(id_);
+    }
+
+    uint64_t id() const { return id_; }
+    bool cancelled() const {
+        return session_ != nullptr && session_->diffusion_requests.is_cancelled(id_);
+    }
+
+   private:
+    Session* session_;
+    uint64_t id_;
+};
 
 rac_result_t copy_rgba(const qhx_output& source, rac_diffusion_result_t* result) {
     if (source.image == nullptr || source.img_w <= 0 || source.img_h <= 0 ||
@@ -155,6 +193,7 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
     std::lock_guard<std::mutex> operation_lock(session->operation_mutex);
     if (session->sess == nullptr)
         return RAC_ERROR_INVALID_HANDLE;
+    DiffusionRequestScope request(session);
     *out_result = {};
     if (options->mode != RAC_DIFFUSION_MODE_INPAINTING)
         return RAC_ERROR_NOT_SUPPORTED;
@@ -181,6 +220,12 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
                       session->scratch_dir.c_str());
         return RAC_ERROR_FILE_WRITE_FAILED;
     }
+    if (request.cancelled())
+        return RAC_ERROR_CANCELLED;
+
+    qhx_session_reset(session->sess);
+    if (request.cancelled())
+        return RAC_ERROR_CANCELLED;
 
     qhx_inputs inputs{};
     inputs.text = options->prompt;
@@ -191,15 +236,21 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
     qhx_gen_cfg cfg;
     qhx_gen_cfg_default(&cfg);
 
-    qhx_session_reset(session->sess);
-    session->cancel.store(false, std::memory_order_relaxed);
+    CancelCtx cancel_ctx{session, request.id()};
+    qhx_generate_options generate_options;
+    qhx_generate_options_default(&generate_options);
+    generate_options.should_cancel = should_cancel_trampoline;
+    generate_options.should_cancel_user = &cancel_ctx;
     qhx_output output{};
-    const qhx_status status =
-        qhx_generate(session->sess, &inputs, &cfg, cancel_trampoline, session, &output);
+    const qhx_status status = qhx_generate_ex(session->sess, &inputs, &cfg, &generate_options,
+                                              cancel_trampoline, &cancel_ctx, &output);
+    if (cancel_ctx.cancelled || request.cancelled()) {
+        RAC_LOG_INFO(kLogCat, "Diffusion request %llu cancelled during generation",
+                     static_cast<unsigned long long>(request.id()));
+        return RAC_ERROR_CANCELLED;
+    }
     if (status != 0) {
-        if (session->cancel.load(std::memory_order_relaxed))
-            return RAC_ERROR_CANCELLED;
-        RAC_LOG_ERROR(kLogCat, "qhx_generate(inpaint) failed: %s", qhx_status_str(status));
+        RAC_LOG_ERROR(kLogCat, "qhx_generate_ex(inpaint) failed: %s", qhx_status_str(status));
         return RAC_ERROR_GENERATION_FAILED;
     }
     rac_result_t rc = copy_rgba(output, out_result);
@@ -262,7 +313,11 @@ rac_result_t qhexrt_diffusion_cancel(void* impl) {
     auto* session = as_session(impl);
     if (session == nullptr)
         return RAC_ERROR_INVALID_HANDLE;
-    session->cancel.store(true, std::memory_order_relaxed);
+    const uint64_t request_id =
+        session->diffusion_requests.active_id.load(std::memory_order_acquire);
+    session->diffusion_requests.cancel_active();
+    RAC_LOG_INFO(kLogCat, "Diffusion cancel routed to request %llu",
+                 static_cast<unsigned long long>(request_id));
     return RAC_SUCCESS;
 }
 
@@ -274,7 +329,6 @@ rac_result_t qhexrt_diffusion_cleanup(void* impl) {
     if (session->sess == nullptr)
         return RAC_ERROR_INVALID_HANDLE;
     qhx_session_reset(session->sess);
-    session->cancel.store(false, std::memory_order_relaxed);
     return RAC_SUCCESS;
 }
 

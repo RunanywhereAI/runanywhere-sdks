@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  VADOptions,
   VADResult,
   VADStreamEvent,
   VADStreamEventKind,
 } from '@runanywhere/proto-ts/vad_options';
 import type { ModalityProtoModule } from '../../../../src/Adapters/ProtoAdapterTypes';
-import { VAD } from '../../../../src/Public/Extensions/RunAnywhere+VAD';
+import { VADProtoAdapter } from '../../../../src/Adapters/VADProtoAdapter';
 import {
   clearRunanywhereModule,
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
 interface VADStreamCounters {
   componentCreates: number;
@@ -230,6 +232,8 @@ function fakeVADModule(): FakeVADHarness {
     },
   };
 
+  installCurrentModelRegistryExports(module);
+
   return { module, counters };
 }
 
@@ -248,28 +252,30 @@ afterEach(() => {
 });
 
 describe('persistent Web VAD streaming', () => {
-  it('loads one model and preserves one native session across every chunk', async () => {
+  it('preserves one native session across every chunk', async () => {
     const { module, counters } = fakeVADModule();
     install(module);
+    const adapter = new VADProtoAdapter(module);
 
     const results: VADResult[] = [];
-    for await (const result of VAD.streamVoiceAuto(chunks(3), {
-      modelPath: '/models/silero_vad.onnx',
-      modelId: 'silero-vad',
-    })) {
+    for await (const result of adapter.stream(
+      COMPONENT_HANDLE,
+      chunks(3),
+      VADOptions.create(),
+    )) {
       results.push(result);
     }
 
     expect(results.map((result) => result.isSpeech)).toEqual([true, true, false]);
     expect(results.map((result) => result.durationMs)).toEqual([10, 20, 30]);
     expect(counters).toMatchObject({
-      componentCreates: 1,
-      componentLoads: 1,
-      componentConfigures: 1,
-      componentInitializes: 1,
-      componentStarts: 1,
-      componentStops: 1,
-      componentDestroys: 1,
+      componentCreates: 0,
+      componentLoads: 0,
+      componentConfigures: 0,
+      componentInitializes: 0,
+      componentStarts: 0,
+      componentStops: 0,
+      componentDestroys: 0,
       callbackSets: 1,
       callbackUnsets: 1,
       callbackRemovals: 1,
@@ -285,17 +291,19 @@ describe('persistent Web VAD streaming', () => {
   it('cancels and tears down exactly once when the consumer exits early', async () => {
     const { module, counters } = fakeVADModule();
     install(module);
+    const adapter = new VADProtoAdapter(module);
 
-    for await (const _result of VAD.streamVoiceAuto(chunks(3), {
-      modelPath: '/models/silero_vad.onnx',
-      modelId: 'silero-vad',
-    })) {
+    for await (const _result of adapter.stream(
+      COMPONENT_HANDLE,
+      chunks(3),
+      VADOptions.create(),
+    )) {
       break;
     }
 
     expect(counters).toMatchObject({
-      componentLoads: 1,
-      componentDestroys: 1,
+      componentLoads: 0,
+      componentDestroys: 0,
       callbackSets: 1,
       callbackUnsets: 1,
       callbackRemovals: 1,

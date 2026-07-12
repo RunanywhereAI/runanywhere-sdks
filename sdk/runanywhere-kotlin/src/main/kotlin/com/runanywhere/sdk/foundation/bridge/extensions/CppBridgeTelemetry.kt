@@ -81,6 +81,7 @@ object CppBridgeTelemetry {
         sdkVersion: String,
     ) {
         synchronized(lock) {
+            telemetryHttpDisabled = false
             currentEnvironment = environment
 
             telemetryManagerHandle =
@@ -158,7 +159,11 @@ object CppBridgeTelemetry {
      */
     fun unregister() {
         synchronized(lock) {
-            if (!isRegistered) return
+            if (!isRegistered) {
+                currentEnvironment = null
+                telemetryHttpDisabled = false
+                return
+            }
             if (telemetryManagerHandle != 0L) {
                 // Detach the telemetry sink first so the C++ router stops
                 // feeding events into a manager we are about to destroy.
@@ -175,6 +180,7 @@ object CppBridgeTelemetry {
             // Mirrors Swift's `activeEnvironment.withLock { $0 = nil }` in
             // `CppBridge.Telemetry.shutdown()`.
             currentEnvironment = null
+            telemetryHttpDisabled = false
             isRegistered = false
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Telemetry unregistered")
         }

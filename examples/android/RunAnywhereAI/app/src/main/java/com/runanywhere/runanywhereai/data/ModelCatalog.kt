@@ -83,9 +83,9 @@ internal object ModelCatalog {
         SingleFileModel("parakeet_tdt_0_6b_v2", "Parakeet TDT 0.6B v2 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json", QHEXRT, STT, 1_280_063_837L),
         SingleFileModel("parakeet_tdt_0_6b_v3", "Parakeet TDT 0.6B v3 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json", QHEXRT, STT, 1_317_902_802L),
         SingleFileModel("parakeet_rnnt_1_1b", "Parakeet RNNT 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json", QHEXRT, STT, 2_211_659_923L),
-        // The V81 product bundle is the complete ASR pipeline. The similarly named
-        // `-llm.json` manifest belonged to a separate V75 decoder-only experiment.
-        SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json", QHEXRT, STT, 5_491_333_979L),
+        // The V81 product bundle is the complete ASR pipeline. Pin the manifest
+        // path explicitly so the downloader does not depend on repository-root layout.
+        SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json", QHEXRT, STT, 5_491_333_979L),
         SingleFileModel("canary_1b_flash", "Canary-1B-flash (HNPU)", "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json", QHEXRT, STT, 1_835_592_227L),
         SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 1_361_283_432L),
         SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 120_439_053L),

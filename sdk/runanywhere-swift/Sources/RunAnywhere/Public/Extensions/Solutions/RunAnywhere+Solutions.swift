@@ -29,16 +29,21 @@ import SwiftProtobuf
 public final class SolutionHandle: @unchecked Sendable {
 
     // Per AGENTS.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
-    private let handle: OSAllocatedUnfairLock<rac_solution_handle_t?>
+    private let handle: OSAllocatedUnfairLock<SolutionHandleState>
 
     // swiftlint:disable:next strict_fileprivate
     fileprivate init(handle: rac_solution_handle_t) {
-        self.handle = OSAllocatedUnfairLock(initialState: handle)
+        self.handle = OSAllocatedUnfairLock(
+            initialState: SolutionHandleState(handle: handle)
+        )
     }
 
     deinit {
-        if let handle = handle.withLock({ $0 }) {
-            rac_solution_destroy(handle)
+        handle.withLock { state in
+            if let current = state.handle {
+                rac_solution_destroy(current)
+                state.handle = nil
+            }
         }
     }
 
@@ -71,10 +76,10 @@ public final class SolutionHandle: @unchecked Sendable {
 
     /// Cancel, join, and destroy the solution. Idempotent.
     public func destroy() {
-        handle.withLock { current in
-            if let handle = current {
-                rac_solution_destroy(handle)
-                current = nil
+        handle.withLock { state in
+            if let current = state.handle {
+                rac_solution_destroy(current)
+                state.handle = nil
             }
         }
     }
@@ -85,7 +90,7 @@ public final class SolutionHandle: @unchecked Sendable {
     /// triggered). Once destroyed, further calls to the lifecycle verbs throw
     /// `SDKException(.invalidState)`.
     public var isAlive: Bool {
-        handle.withLock { $0 != nil }
+        handle.withLock { $0.handle != nil }
     }
 
     /// Run `body` against the native handle while holding the slot lock so
@@ -94,9 +99,11 @@ public final class SolutionHandle: @unchecked Sendable {
     /// the runner, so serialising the lifecycle verbs is the simplest way
     /// to honour the Sendable contract without resurrecting a freed pointer
     /// (see swift-public-features-002).
-    private func withHandle(_ body: (rac_solution_handle_t) -> rac_result_t) throws {
-        let result: rac_result_t = try handle.withLock { current in
-            guard let current else {
+    private func withHandle(
+        _ body: @Sendable (rac_solution_handle_t) -> rac_result_t
+    ) throws {
+        let result: rac_result_t = try handle.withLock { state in
+            guard let current = state.handle else {
                 throw SDKException(
                     code: .invalidState,
                     message: "Solution handle has already been destroyed",
@@ -139,6 +146,12 @@ public final class SolutionHandle: @unchecked Sendable {
         message += " [rc=\(rc)]"
         return message
     }
+}
+
+/// The native solution pointer is owned by `SolutionHandle` and is only read,
+/// invoked, or cleared while the enclosing unfair lock is held.
+private struct SolutionHandleState: @unchecked Sendable {
+    var handle: rac_solution_handle_t?
 }
 
 // MARK: - Solutions Capability

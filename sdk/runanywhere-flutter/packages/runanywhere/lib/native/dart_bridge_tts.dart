@@ -222,13 +222,13 @@ class DartBridgeTTS {
     }
 
     final bindings = RacNative.bindings;
-    final fn = bindings.rac_tts_synthesize_stream_lifecycle_proto;
     final nativePortFn =
         bindings.ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port;
-    if (fn == null && nativePortFn == null) {
+    if (nativePortFn == null) {
       return Stream<TTSStreamEvent>.error(
         UnsupportedError(
-          'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
+          'ra_flutter_tts_synthesize_stream_lifecycle_proto_native_port '
+          'is unavailable',
         ),
       );
     }
@@ -237,10 +237,8 @@ class DartBridgeTTS {
     // worker isolate (`Isolate.run`). On iOS and Android, the Flutter plugin
     // exports a native-port helper that copies event bytes inside the C
     // callback and posts owned `Uint8List` messages here, which is safe for
-    // MLX/Swift async and native worker-thread callbacks. Older or unsupported
-    // binaries fall back to a worker-owned `NativeCallable.isolateLocal`, valid
-    // only for same-thread backend callbacks. The calling isolate stays
-    // responsive either way.
+    // MLX/Swift async and native worker-thread callbacks. The calling isolate
+    // stays responsive.
     final controller = StreamController<TTSStreamEvent>(sync: false);
     final receivePort = ReceivePort();
     var sawTerminalEvent = false;
@@ -294,11 +292,10 @@ class DartBridgeTTS {
     });
 
     final requestBytes = request.writeToBuffer();
-    final sendPort = receivePort.sendPort;
-    final useNativePortWorker = nativePortFn != null;
-    final worker = useNativePortWorker
-        ? _runTtsStreamNativePortWorker(requestBytes, sendPort.nativePort)
-        : _runTtsStreamWorker(requestBytes, sendPort);
+    final worker = _runTtsStreamNativePortWorker(
+      requestBytes,
+      receivePort.sendPort.nativePort,
+    );
     unawaited(
       worker.catchError((Object e, StackTrace st) {
         // Worker isolate crashed (RemoteError) before the rc sentinel.
@@ -565,14 +562,14 @@ class DartBridgeTTS {
         // Same quiesce-before-close ordering as the
         // lifecycle-owned stream wrapper above. See
         // `synthesizeStreamLifecycleProto`.
-        _quiesceBestEffort();
+        _quiesce();
         callback?.close();
         callback = null;
       }
     }
 
     controller.onCancel = () {
-      _quiesceBestEffort();
+      _quiesce();
       callback?.close();
       callback = null;
     };
@@ -605,15 +602,11 @@ class DartBridgeTTS {
     }
   }
 
-  /// Best-effort quiesce. Wraps the FFI lookup in a try/catch
-  /// so the unit-test harness (which can't `dlopen` librac_commons via the
-  /// test seams' `streamOverride` path) does not crash when the production
-  /// onCancel / finally cleanup runs without a native library staged.
-  void _quiesceBestEffort() {
+  void _quiesce() {
     try {
-      RacNative.bindings.rac_tts_proto_quiesce?.call();
+      RacNative.bindings.rac_tts_proto_quiesce();
     } catch (e) {
-      _logger.debug('rac_tts_proto_quiesce skipped: $e');
+      _logger.error('rac_tts_proto_quiesce failed: $e');
     }
   }
 }
@@ -671,13 +664,6 @@ Uint8List _ttsSynthesizeWorker(Uint8List requestBytes) {
   }
 }
 
-/// Runs [_ttsStreamWorker] in a worker isolate. Hoisted to top level so the
-/// `Isolate.run` closure captures ONLY its two sendable parameters
-/// (`Uint8List` + `SendPort`) — inlined, the closure would capture the
-/// unsendable `ReceivePort`/`StreamController` and fail the isolate spawn.
-Future<int> _runTtsStreamWorker(Uint8List requestBytes, SendPort port) =>
-    Isolate.run(() => _ttsStreamWorker(requestBytes, port));
-
 /// Runs the Flutter native-port stream helper in a worker isolate. The helper
 /// itself posts copied stream bytes to [nativePort] and posts the return code
 /// as the final sentinel.
@@ -705,58 +691,6 @@ int _ttsStreamNativePortWorker(Uint8List requestBytes, int nativePort) {
       NativeApi.postCObject,
     );
   } finally {
-    calloc.free(requestPtr);
-  }
-}
-
-/// Blocking body of [DartBridgeTTS.synthesizeStreamLifecycleProto]. Runs the
-/// single-call streaming ABI on the worker isolate; the worker-owned
-/// `isolateLocal` callback fires synchronously per chunk (commons passes a
-/// pointer into a `thread_local` scratch buffer, so the callback must copy
-/// eagerly and same-thread), copies the bytes, and forwards the copy to the
-/// main isolate. The rc is sent LAST on the same port so it is FIFO-ordered
-/// after every chunk.
-int _ttsStreamWorker(Uint8List requestBytes, SendPort port) {
-  final bindings = RacNative.bindings;
-  final fn = bindings.rac_tts_synthesize_stream_lifecycle_proto;
-  if (fn == null) {
-    throw UnsupportedError(
-      'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
-    );
-  }
-
-  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
-  NativeCallable<RacTtsStreamEventCallbackNative>? callback;
-  try {
-    callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal((
-      Pointer<Uint8> bytesPtr,
-      int bytesLen,
-      Pointer<Void> _,
-    ) {
-      if (bytesPtr == nullptr || bytesLen <= 0) return;
-      // Copy INSIDE the synchronous callback — commons reuses the scratch
-      // buffer the moment we return. The copy is what crosses isolates.
-      port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
-    });
-
-    final rc = fn(
-      requestPtr,
-      requestBytes.length,
-      callback.nativeFunction,
-      nullptr,
-    );
-    port.send(rc);
-    return rc;
-  } finally {
-    // Quiesce in-flight TTS chunk dispatches before closing the NativeCallable.
-    // `rac_tts_synthesize_stream_lifecycle_proto` may post the terminal
-    // callback from a worker thread that copies the user_data slot under
-    // commons' internal mutex and releases it BEFORE invoking the callback
-    // (see `rac/features/tts/rac_tts_stream.h`). Without `rac_tts_proto_quiesce`
-    // the C side can invoke the trampoline after `callback.close()` — UAF on
-    // the proto scratch buffer. Best-effort: skipped if the export is absent.
-    bindings.rac_tts_proto_quiesce?.call();
-    callback?.close();
     calloc.free(requestPtr);
   }
 }

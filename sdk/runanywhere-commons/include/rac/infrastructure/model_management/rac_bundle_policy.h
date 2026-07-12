@@ -107,9 +107,6 @@ RAC_API rac_result_t rac_bundle_policy_register(const rac_bundle_policy_t* polic
 /** Removes the policy for @p framework (no-op when absent). */
 RAC_API rac_result_t rac_bundle_policy_unregister(rac_inference_framework_t framework);
 
-/** @return the registered policy for @p framework, or NULL. */
-RAC_API const rac_bundle_policy_t* rac_bundle_policy_find(rac_inference_framework_t framework);
-
 #ifdef __cplusplus
 }
 #endif

@@ -634,7 +634,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       const ttsStarted = performance.now();
       const tts = await synthesize(assistantResponse, {
         voiceId: config.sessionConfig?.voiceId ?? config.ttsVoiceId,
-        voicePath: config.ttsVoicePath,
         languageCode: config.sessionConfig?.languageCode ?? config.defaultLanguageCode ?? '',
       });
       this.assertCurrent(lifecycleVersion);
@@ -734,7 +733,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
   async voiceAgentSynthesizeSpeech(text: string): Promise<Float32Array> {
     const output = await synthesize(text, {
       voiceId: this.config.ttsVoiceId,
-      voicePath: this.config.ttsVoicePath,
     });
     return ttsAudioToFloat32(output.audioData, output.audioFormat);
   }

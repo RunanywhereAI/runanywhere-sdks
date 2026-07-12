@@ -12,6 +12,7 @@
 
 #include "qhexrt_session.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
@@ -226,8 +227,8 @@ bool looks_like_manifest(const fs::path& file) {
            head.find("\"plan\"") != std::string::npos || head.find("dsp_arch") != std::string::npos;
 }
 
-// Returns the manifest .json inside `dir`, or empty. Prefers a file that sniffs
-// as a QHexRT manifest; otherwise the single non-aux .json.
+// Returns the manifest .json inside `dir`, or empty. Candidate order matches
+// the remote bundle policy: alphabetically first after excluding aux files.
 std::string find_manifest_in_dir(const fs::path& dir) {
     std::error_code ec;
     if (!fs::is_directory(dir, ec)) {
@@ -244,10 +245,13 @@ std::string find_manifest_in_dir(const fs::path& dir) {
         if (!ends_with_ci(name, ".json") || is_aux_json(name)) {
             continue;
         }
-        if (looks_like_manifest(p)) {
-            return p.generic_string();
-        }
         candidates.push_back(p);
+    }
+    std::sort(candidates.begin(), candidates.end());
+    for (const fs::path& candidate : candidates) {
+        if (looks_like_manifest(candidate)) {
+            return candidate.generic_string();
+        }
     }
     if (candidates.size() == 1) {
         return candidates.front().generic_string();

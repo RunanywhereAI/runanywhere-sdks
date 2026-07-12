@@ -389,28 +389,6 @@ message VLMServiceState {
     int32 error_code = 8;
 }
 
-// ---------------------------------------------------------------------------
-// VLM load-resolved-artifacts request / response.
-//
-// Replaces the legacy trio `rac_vlm_create` + `rac_vlm_initialize` +
-// `rac_vlm_destroy` (on error) with a single proto-backed call. Consumers
-// pass the already-resolved model paths (primary model + optional mmproj
-// vision projector) together with an optional model_id for telemetry. The
-// response carries the resulting native handle as an opaque uint64; callers
-// store the handle and use it for subsequent process/cancel/destroy calls.
-// ---------------------------------------------------------------------------
-message VLMLoadResolvedArtifactsRequest {
-    string model_id              = 1;
-    string primary_model_path    = 2;
-    optional string mmproj_path  = 3;
-}
-
-message VLMLoadResolvedArtifactsResponse {
-    uint64 handle                = 1;   // opaque native handle (0 on failure)
-    int32  result_code           = 2;   // RAC_SUCCESS or error code
-    optional string error_message = 3;
-}
-
 // Logical VLM service contract. Native camera capture, file picking, image
 // decoding performed by OS media APIs, and backend execution remain
 // adapter-owned; C++ consumes only serialized request/result/event messages.

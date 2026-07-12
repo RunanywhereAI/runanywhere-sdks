@@ -7,12 +7,6 @@
 
 import Foundation
 
-// MARK: - RASTTConfiguration
-
-extension RASTTConfiguration {
-    public var modelId: String? { modelID.isEmpty ? nil : modelID }
-}
-
 // MARK: - RASTTOptions: C-bridge + convenience
 
 public extension RASTTOptions {

@@ -91,8 +91,8 @@ typedef struct rac_stt_service_ops {
     // particular MUST NOT re-initialize its online recognizer every frame —
     // doing so discards the decoder state and inflates first-token latency.
     //
-    // Backends that leave these slots NULL continue to receive per-chunk
-    // `transcribe_stream` calls (legacy path). Backends that fill them in
+    // Backends that leave these slots NULL continue to receive one-shot
+    // per-chunk `transcribe_stream` calls. Backends that fill them in
     // get a stream_create on first chunk, N x stream_feed_audio_chunk, and
     // a final stream_destroy on stop/cancel.
     // -------------------------------------------------------------------------
@@ -111,8 +111,8 @@ typedef struct rac_stt_service_ops {
      * Feed one chunk of Int16 mono PCM samples into an active stream. @p
      * samples is non-null when @p count > 0. Backends decode the chunk
      * using their online recognizer and push partials / finals back to
-     * commons by invoking @p callback — exactly the same bridge signature
-     * the legacy transcribe_stream uses.
+     * commons by invoking @p callback — the same backend emission contract
+     * used by one-shot transcribe_stream calls.
      */
     rac_result_t (*stream_feed_audio_chunk)(void* impl, rac_handle_t stream_handle,
                                             const int16_t* samples, size_t count,

@@ -176,7 +176,6 @@ public enum CppBridge {
         await TTS.shared.destroy()
         await VAD.shared.destroy()
         await VoiceAgent.shared.destroy()
-        await VLM.shared.destroy()
 
         // Shutdown in reverse order
         // Note: Platform callbacks remain valid (static)

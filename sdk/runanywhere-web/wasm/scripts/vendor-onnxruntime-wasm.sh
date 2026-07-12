@@ -16,6 +16,7 @@ source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
 ONNX_RUNTIME_VERSION="${ONNX_VERSION_WEB}"
 : "${SHERPA_ONNX_VERSION_WEB:?SHERPA_ONNX_VERSION_WEB is missing from VERSIONS}"
 : "${EMSCRIPTEN_VERSION:?EMSCRIPTEN_VERSION is missing from VERSIONS}"
+: "${ONNX_COMMIT_WEB:?ONNX_COMMIT_WEB is missing from VERSIONS}"
 SRC_DIR="${ONNX_RUNTIME_SRC_DIR:-${WASM_DIR}/third_party/onnxruntime}"
 DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
 BUILD_CONFIG="${ONNX_RUNTIME_BUILD_CONFIG:-Release}"
@@ -27,7 +28,6 @@ ORT_BUILD_DIR="${SRC_DIR}/build/${_ORT_OS_DIR}/${BUILD_CONFIG}"
 PROVENANCE_FILE="${DEST_DIR}/.rac-wasm-provenance"
 BUILD_PROVENANCE_FILE="${ORT_BUILD_DIR}/.rac-wasm-build-provenance"
 ORT_ARCHIVE_DEST="${DEST_DIR}/lib/libonnxruntime.a"
-ORT_HEADER_DEST="${DEST_DIR}/include/onnxruntime_c_api.h"
 # ORT v1.27.1 intentionally pins protobuf v21.12, while RACommons-generated
 # protocol bindings pin protobuf v35.1. Both runtimes are linked into the one
 # canonical ONNX/Sherpa module. Shade ORT's private C++ protobuf namespace so
@@ -42,7 +42,7 @@ UNSHADED_PROTOBUF_NAMESPACE_MANGLED="6google8protobuf"
 # Rename ORT's private copy so strict wasm-ld duplicate enforcement remains on.
 ORT_ABSL_OFFSET_CONVERTER_SYMBOL="rac_ort_have_offset_converter"
 UNSHADED_ABSL_OFFSET_CONVERTER_SYMBOL="HaveOffsetConverter"
-RECIPE_SCHEMA="5"
+RECIPE_SCHEMA="6"
 SOURCE_REVISION=""
 PATCH_STATE=""
 ORT_REQUIRED_FILES=(
@@ -199,7 +199,7 @@ provenance_matches() {
     provenance_has "${PROVENANCE_FILE}" "recipe_schema=${RECIPE_SCHEMA}" &&
     provenance_has "${PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
-    provenance_has_pattern "${PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
+    provenance_has "${PROVENANCE_FILE}" "source_revision=${ONNX_COMMIT_WEB}" &&
     provenance_has_pattern "${PROVENANCE_FILE}" '^patch_state=(applied|absent)$' &&
     archive_namespace_is_shaded "${ORT_ARCHIVE_DEST}" &&
     archive_absl_em_js_is_shaded "${ORT_ARCHIVE_DEST}"
@@ -218,7 +218,7 @@ build_provenance_matches() {
     provenance_has "${BUILD_PROVENANCE_FILE}" "recipe_schema=${RECIPE_SCHEMA}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
-    provenance_has_pattern "${BUILD_PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
+    provenance_has "${BUILD_PROVENANCE_FILE}" "source_revision=${ONNX_COMMIT_WEB}" &&
     provenance_has_pattern "${BUILD_PROVENANCE_FILE}" '^patch_state=(applied|absent)$'
 }
 
@@ -269,6 +269,7 @@ require_canonical_emscripten() {
 ensure_source_checkout() {
   local expected_tag="v${ONNX_RUNTIME_VERSION}"
   local actual_tag=""
+  local actual_revision=""
   local dirty="0"
   local source_root=""
   local source_real=""
@@ -284,17 +285,20 @@ ensure_source_checkout() {
 
   if [ "${has_own_git}" = "1" ]; then
     actual_tag="$(git -C "${SRC_DIR}" describe --tags --exact-match HEAD 2>/dev/null || true)"
+    actual_revision="$(git -C "${SRC_DIR}" rev-parse HEAD 2>/dev/null || true)"
     if ! git -C "${SRC_DIR}" diff --quiet --ignore-submodules -- ||
        ! git -C "${SRC_DIR}" diff --cached --quiet --ignore-submodules -- ||
        [ -n "$(git -C "${SRC_DIR}" ls-files --others --exclude-standard)" ]; then
       dirty="1"
     fi
-    if [ "${actual_tag}" != "${expected_tag}" ] || [ "${dirty}" = "1" ]; then
+    if [ "${actual_tag}" != "${expected_tag}" ] ||
+       [ "${actual_revision}" != "${ONNX_COMMIT_WEB}" ] ||
+       [ "${dirty}" = "1" ]; then
       if [ -n "${ONNX_RUNTIME_SRC_DIR:-}" ]; then
-        echo "ERROR: ONNX_RUNTIME_SRC_DIR must be clean and exactly at ${expected_tag} (found ${actual_tag:-untagged}, dirty=${dirty})." >&2
+        echo "ERROR: ONNX_RUNTIME_SRC_DIR must be clean at ${expected_tag}/${ONNX_COMMIT_WEB} (found ${actual_tag:-untagged}/${actual_revision:-unknown}, dirty=${dirty})." >&2
         exit 1
       fi
-      echo "Removing stale/dirty ONNX Runtime source checkout (${actual_tag:-unknown}, dirty=${dirty}; need ${expected_tag})."
+      echo "Removing stale/dirty ONNX Runtime source checkout (${actual_tag:-unknown}/${actual_revision:-unknown}, dirty=${dirty}; need ${expected_tag}/${ONNX_COMMIT_WEB})."
       rm -rf "${SRC_DIR}"
       has_own_git="0"
     fi
@@ -310,6 +314,11 @@ ensure_source_checkout() {
   if [ "${has_own_git}" != "1" ]; then
     git clone --depth 1 --branch "${expected_tag}" \
       https://github.com/microsoft/onnxruntime.git "${SRC_DIR}"
+  fi
+  actual_revision="$(git -C "${SRC_DIR}" rev-parse HEAD)"
+  if [ "${actual_revision}" != "${ONNX_COMMIT_WEB}" ]; then
+    echo "ERROR: upstream ${expected_tag} resolved to an unexpected revision." >&2
+    exit 1
   fi
 }
 
@@ -331,50 +340,12 @@ fi
 
 mkdir -p "$(dirname "${SRC_DIR}")" "${DEST_DIR}/lib" "${DEST_DIR}/include"
 
-# --- Prebuilt WASM bundle (download-first; mirrors the Android prebuilt .so) ---
-# The matched ORT+sherpa WASM static libs are published on the sherpa-onnx-rac
-# release. Download + extract instead of the ~30-60 min from-source build.
-# A prebuilt is accepted only when it contains the provenance marker emitted by
-# this script; a tag or cached filename alone cannot prove its Emscripten pin.
-# Force a source build with RAC_WASM_BUILD_FROM_SOURCE=1; override the source
-# repo/tag with RAC_WASM_PREBUILT_REPO / RAC_WASM_PREBUILT_TAG.
-if [ "${RAC_WASM_BUILD_FROM_SOURCE:-0}" != "1" ]; then
-  if provenance_matches; then
-    echo "ONNX Runtime WASM already vendored with current provenance: ${ORT_ARCHIVE_DEST}"
-    exit 0
-  fi
-  _RAC_TP="${REPO_ROOT}/sdk/runanywhere-commons/third_party"
-  _RAC_REPO="${RAC_WASM_PREBUILT_REPO:-${SHERPA_ONNX_REPO_ANDROID:-Siddhesh2377/sherpa-onnx-rac}}"
-  _RAC_TAG="${RAC_WASM_PREBUILT_TAG:-v${SHERPA_ONNX_VERSION_WEB}}"
-  _RAC_TARBALL="sherpa-onnx-${_RAC_TAG}-wasm.tar.bz2"
-  _RAC_URL="https://github.com/${_RAC_REPO}/releases/download/${_RAC_TAG}/${_RAC_TARBALL}"
-  _RAC_CACHE="${WASM_DIR}/third_party/${_RAC_TARBALL}"
-  if [ ! -f "${_RAC_CACHE}" ]; then
-    echo "Downloading prebuilt WASM bundle: ${_RAC_URL}"
-    if curl -fL --retry 3 -o "${_RAC_CACHE}.part" "${_RAC_URL}"; then
-      mv "${_RAC_CACHE}.part" "${_RAC_CACHE}"
-    else
-      echo "Prebuilt download failed; falling back to from-source build."
-      rm -f "${_RAC_CACHE}.part"
-    fi
-  fi
-  if [ -f "${_RAC_CACHE}" ]; then
-    mkdir -p "${_RAC_TP}"
-    if tar -xjf "${_RAC_CACHE}" -C "${_RAC_TP}" onnxruntime-wasm; then
-      if provenance_matches; then
-        echo "Vendored ONNX Runtime WASM from provenance-matched prebuilt bundle: ${ORT_ARCHIVE_DEST}"
-        exit 0
-      fi
-      echo "Prebuilt bundle is incomplete or lacks matching version/toolchain provenance; falling back to source."
-    else
-      echo "Prebuilt bundle is corrupt or lacks the onnxruntime-wasm member; falling back to source."
-      rm -f "${_RAC_CACHE}"
-    fi
-    rm -rf "${DEST_DIR}"
-    mkdir -p "${DEST_DIR}/lib" "${DEST_DIR}/include"
-  fi
+# Public Web releases are built only from the exact upstream revision pinned in
+# VERSIONS. Personal-fork prebuilt archives are not an acceptable OSS input.
+if provenance_matches; then
+  echo "ONNX Runtime WASM already vendored with current provenance: ${ORT_ARCHIVE_DEST}"
+  exit 0
 fi
-# --- from-source build (reached if RAC_WASM_BUILD_FROM_SOURCE=1 or download failed) ---
 
 require_canonical_emscripten
 ensure_source_checkout
@@ -428,8 +399,8 @@ set +e
   --cmake_extra_defines \
     CMAKE_POLICY_VERSION_MINIMUM=3.5 \
     onnxruntime_BUILD_UNIT_TESTS=OFF \
-    CMAKE_C_FLAGS=-fexceptions \
-    "CMAKE_CXX_FLAGS=-fexceptions -Dprotobuf=rac_ort_protobuf -DHaveOffsetConverter=rac_ort_have_offset_converter"
+    "CMAKE_C_FLAGS=-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
+    "CMAKE_CXX_FLAGS=-fexceptions -Dprotobuf=rac_ort_protobuf -DHaveOffsetConverter=rac_ort_have_offset_converter -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/onnxruntime -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
 BUILD_RC=$?
 set -e
 

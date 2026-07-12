@@ -26,7 +26,7 @@ struct MacSettingsView: View {
             }
             .padding(24)
         }
-        .background(AppColors.backgroundPrimaryDark)
+        .background(AppColors.backgroundPrimary)
         .onAppear { refreshPermissions() }
     }
 

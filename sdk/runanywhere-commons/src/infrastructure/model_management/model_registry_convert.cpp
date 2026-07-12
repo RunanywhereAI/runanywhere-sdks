@@ -450,7 +450,9 @@ void model_info_to_proto(const rac_model_info_t* in, ModelInfo* out, bool overwr
     out->set_context_length(in->context_length);
     out->set_supports_thinking(in->supports_thinking == RAC_TRUE);
     out->set_supports_lora(in->supports_lora == RAC_TRUE);
-    out->set_description(in->description ? in->description : "");
+    if (in->description && in->description[0] != '\0') {
+        out->mutable_metadata()->set_description(in->description);
+    }
     out->set_source(model_source_to_proto(in->source));
     out->set_created_at_unix_ms(in->created_at);
     out->set_updated_at_unix_ms(in->updated_at);
@@ -622,7 +624,8 @@ rac_model_info_t* model_info_from_proto(const ModelInfo& proto) {
     model->context_length = proto.context_length();
     model->supports_thinking = proto.supports_thinking() ? RAC_TRUE : RAC_FALSE;
     model->supports_lora = proto.supports_lora() ? RAC_TRUE : RAC_FALSE;
-    model->description = dup_optional_proto_string(proto.description());
+    model->description =
+        proto.has_metadata() ? dup_optional_proto_string(proto.metadata().description()) : nullptr;
     model->source = model_source_from_proto(proto.source());
     model->created_at = proto.created_at_unix_ms();
     model->updated_at = proto.updated_at_unix_ms();
@@ -701,8 +704,32 @@ void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming
     if (!incoming->has_thinking_pattern() && existing.has_thinking_pattern()) {
         incoming->mutable_thinking_pattern()->CopyFrom(existing.thinking_pattern());
     }
-    if (!incoming->has_metadata() && existing.has_metadata()) {
-        incoming->mutable_metadata()->CopyFrom(existing.metadata());
+    if (existing.has_metadata()) {
+        if (!incoming->has_metadata()) {
+            incoming->mutable_metadata()->CopyFrom(existing.metadata());
+        } else {
+            runanywhere::v1::ModelInfoMetadata merged = existing.metadata();
+            const runanywhere::v1::ModelInfoMetadata& update = incoming->metadata();
+            if (!update.description().empty()) {
+                merged.set_description(update.description());
+            }
+            if (!update.author().empty()) {
+                merged.set_author(update.author());
+            }
+            if (!update.license().empty()) {
+                merged.set_license(update.license());
+            }
+            if (!update.version().empty()) {
+                merged.set_version(update.version());
+            }
+            if (update.tags_size() > 0) {
+                merged.clear_tags();
+                for (const auto& tag : update.tags()) {
+                    merged.add_tags(tag);
+                }
+            }
+            incoming->mutable_metadata()->CopyFrom(merged);
+        }
     }
     if (!incoming->has_expected_files() && existing.has_expected_files()) {
         incoming->mutable_expected_files()->CopyFrom(existing.expected_files());

@@ -280,8 +280,8 @@ RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
  *
  * Partials / finals produced by the backend are pushed to @p callback
  * synchronously during the call. @p callback uses the same
- * rac_stt_stream_callback_t signature the legacy transcribe_stream path
- * exposes so commons can route both through the same bridge.
+ * rac_stt_stream_callback_t backend emission contract as one-shot
+ * transcribe_stream calls so commons can route both through the same bridge.
  *
  * @param handle        STT component handle.
  * @param stream_handle Stream handle returned by rac_stt_component_stream_create.

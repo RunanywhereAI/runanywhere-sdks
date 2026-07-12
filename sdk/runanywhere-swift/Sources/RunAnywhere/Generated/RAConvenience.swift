@@ -200,13 +200,13 @@ extension RAEmbeddingsConfiguration {
         if embeddingDimension < 1 {
             throw SDKException.validationFailed(
                 fieldPath: "EmbeddingsConfiguration.embedding_dimension",
-                message: "embedding_dimension must be in >= 1 (got \(embeddingDimension))"
+                message: "embedding_dimension must be >= 1 (got \(embeddingDimension))"
             )
         }
         if maxSequenceLength < 1 {
             throw SDKException.validationFailed(
                 fieldPath: "EmbeddingsConfiguration.max_sequence_length",
-                message: "max_sequence_length must be in >= 1 (got \(maxSequenceLength))"
+                message: "max_sequence_length must be >= 1 (got \(maxSequenceLength))"
             )
         }
     }
@@ -330,7 +330,7 @@ extension RARAGConfiguration {
         if effectiveTopK < 1 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.top_k",
-                message: "top_k must be in >= 1 (got \(effectiveTopK))"
+                message: "top_k must be >= 1 (got \(effectiveTopK))"
             )
         }
         let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.0
@@ -344,14 +344,14 @@ extension RARAGConfiguration {
         if effectiveChunkSize < 1 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.chunk_size",
-                message: "chunk_size must be in >= 1 (got \(effectiveChunkSize))"
+                message: "chunk_size must be >= 1 (got \(effectiveChunkSize))"
             )
         }
         let effectiveChunkOverlap = hasChunkOverlap ? chunkOverlap : 64
         if effectiveChunkOverlap < 0 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.chunk_overlap",
-                message: "chunk_overlap must be in >= 0 (got \(effectiveChunkOverlap))"
+                message: "chunk_overlap must be >= 0 (got \(effectiveChunkOverlap))"
             )
         }
     }
@@ -373,10 +373,10 @@ extension RARAGQueryOptions {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         let effectiveMultiQueryCount = hasMultiQueryCount ? multiQueryCount : 3
-        if effectiveMultiQueryCount < 1 {
+        if effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGQueryOptions.multi_query_count",
-                message: "multi_query_count must be in >= 1 (got \(effectiveMultiQueryCount))"
+                message: "multi_query_count must be in 1...8 (got \(effectiveMultiQueryCount))"
             )
         }
     }

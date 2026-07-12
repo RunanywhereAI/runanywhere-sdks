@@ -67,20 +67,6 @@ function defaultSTTOptions(): STTOptions {
   });
 }
 
-/** Convert Uint8Array / ArrayBuffer / base64 string audio input to ArrayBuffer. */
-function audioToArrayBuffer(audio: Uint8Array | string | ArrayBuffer): ArrayBuffer {
-  if (typeof audio === 'string') {
-    const binary = atob(audio);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytesToArrayBuffer(bytes);
-  }
-  if (audio instanceof Uint8Array) {
-    return bytesToArrayBuffer(audio);
-  }
-  return audio;
-}
-
 function buildSTTOptions(options?: Partial<STTOptions>): STTOptions {
   return STTOptionsCtor.create({
     ...defaultSTTOptions(),
@@ -110,14 +96,13 @@ function nextSTTRequestId(): string {
 }
 
 function buildSTTRequestBytes(
-  audio: ArrayBuffer,
+  audio: Uint8Array,
   options?: Partial<STTOptions>
 ): ArrayBuffer {
-  const audioBytes = arrayBufferToBytes(audio);
   const request = STTTranscriptionRequest.fromPartial({
     requestId: nextSTTRequestId(),
     audio: STTAudioSource.fromPartial({
-      audioData: audioBytes,
+      audioData: audio,
       encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
       sampleRate: options?.sampleRate ?? 16000,
@@ -134,12 +119,11 @@ function buildSTTRequestBytes(
  * Transcribe audio data.
  *
  * Canonical cross-SDK signature: transcribe(audio: Uint8Array, options: STTOptions)
- * Also accepts string | ArrayBuffer for legacy callers.
  *
  * Matches Swift SDK: `RunAnywhere.transcribe(_:options:)`.
  */
 export async function transcribe(
-  audio: Uint8Array | string | ArrayBuffer,
+  audio: Uint8Array,
   options?: Partial<STTOptions>
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
@@ -147,9 +131,8 @@ export async function transcribe(
   }
   await ensureServicesReady();
   const native = requireNativeModule();
-  const audioBytes = audioToArrayBuffer(audio);
   return decodeSTTOutput(
-    await native.sttTranscribeProto(buildSTTRequestBytes(audioBytes, options))
+    await native.sttTranscribeProto(buildSTTRequestBytes(audio, options))
   );
 }
 
@@ -171,49 +154,9 @@ export async function transcribe(
  */
 export function transcribeStream(
   audio: AsyncIterable<Uint8Array>,
-  options?: Partial<STTOptions>
-): AsyncIterable<STTPartialResult>;
-
-/**
- * Single-buffer convenience overload: accepts a pre-assembled audio clip.
- * Kept for backward compatibility with existing callers; routed through
- * the same native session as a one-chunk stream.
- */
-export function transcribeStream(
-  audio: Uint8Array | string | ArrayBuffer,
-  options?: Partial<STTOptions>
-): AsyncIterable<STTPartialResult>;
-
-export function transcribeStream(
-  audio: AsyncIterable<Uint8Array> | Uint8Array | string | ArrayBuffer,
   options: Partial<STTOptions> = {}
 ): AsyncIterable<STTPartialResult> {
-  if (audio != null && typeof audio === 'object' && Symbol.asyncIterator in audio) {
-    return transcribeStreamFromAsyncIterable(audio as AsyncIterable<Uint8Array>, options);
-  }
-  const clip = arrayBufferToBytes(
-    audioToArrayBuffer(audio as Uint8Array | string | ArrayBuffer)
-  );
-  return transcribeStreamFromAsyncIterable(singleChunkIterable(clip), options);
-}
-
-/** Wrap a pre-assembled clip as a one-chunk async iterable (manual iterator,
- *  matching the file's Hermes-safe iteration convention). */
-function singleChunkIterable(chunk: Uint8Array): AsyncIterable<Uint8Array> {
-  return {
-    [Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
-      let delivered = false;
-      return {
-        async next(): Promise<IteratorResult<Uint8Array>> {
-          if (delivered) {
-            return { value: undefined as unknown as Uint8Array, done: true };
-          }
-          delivered = true;
-          return { value: chunk, done: false };
-        },
-      };
-    },
-  };
+  return transcribeStreamFromAsyncIterable(audio, options);
 }
 
 /**

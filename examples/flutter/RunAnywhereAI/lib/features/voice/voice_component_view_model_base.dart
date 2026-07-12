@@ -116,26 +116,26 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
     }
     _hasSubscribedToSDKEvents = true;
 
-    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen(
-      (change) {
-        if (change.component != component &&
-            change.event.category != eventCategory) {
-          return;
-        }
-        switch (change.kind) {
-          case sdk.ModelLifecycleChangeKind.loaded:
-            // Resolve from the event payload rather than doing extra snapshot
-            // work inside the lifecycle handler. The change carries the model
-            // id; resolve the rest from the catalog and apply through
-            // `applyLoadedModel` so the subclass
-            // overrides (STT live-mode, TTS system-voice) still run.
-            applyLoadedModel(resolveLoadedModel(change.modelId));
-          case sdk.ModelLifecycleChangeKind.unloaded:
-            clearLoadedModel();
-            debugPrint('Voice component model unloaded');
-        }
-      },
-    );
+    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen((
+      change,
+    ) {
+      if (change.component != component &&
+          change.event.category != eventCategory) {
+        return;
+      }
+      switch (change.kind) {
+        case sdk.ModelLifecycleChangeKind.loaded:
+          // Resolve from the event payload rather than doing extra snapshot
+          // work inside the lifecycle handler. The change carries the model
+          // id; resolve the rest from the catalog and apply through
+          // `applyLoadedModel` so the subclass
+          // overrides (STT live-mode, TTS system-voice) still run.
+          applyLoadedModel(resolveLoadedModel(change.modelId));
+        case sdk.ModelLifecycleChangeKind.unloaded:
+          clearLoadedModel();
+          debugPrint('Voice component model unloaded');
+      }
+    });
   }
 
   // --- Initial model state ----------------------------------------------------
@@ -186,8 +186,9 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   @protected
   void applyLoadedModelFromCatalog(ModelInfo model) {
     selectedModelId = model.id;
-    final matches = ModelListViewModel.shared.availableModels
-        .where((m) => m.id == model.id);
+    final matches = ModelListViewModel.shared.availableModels.where(
+      (m) => m.id == model.id,
+    );
     if (matches.isNotEmpty) {
       final match = matches.first;
       selectedModelName = match.name;
@@ -206,8 +207,9 @@ abstract class VoiceComponentViewModelBase extends ChangeNotifier {
   /// subclass `applyLoadedModel` overrides a populated name/framework.
   @protected
   ModelInfo resolveLoadedModel(String modelId) {
-    final matches = ModelListViewModel.shared.availableModels
-        .where((m) => m.id == modelId);
+    final matches = ModelListViewModel.shared.availableModels.where(
+      (m) => m.id == modelId,
+    );
     if (matches.isNotEmpty) return matches.first;
     return ModelInfo()..id = modelId;
   }

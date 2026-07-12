@@ -51,10 +51,9 @@ void main() {
       final sub = stream.listen(received.add, onDone: done.complete);
 
       for (var i = 0; i < 10; i++) {
-        fanOut.dispatch(VoiceEvent(
-          seq: $fixnum.Int64(i),
-          sessionId: 'session-$i',
-        ));
+        fanOut.dispatch(
+          VoiceEvent(seq: $fixnum.Int64(i), sessionId: 'session-$i'),
+        );
       }
       fanOut.dispose();
       await done.future;
@@ -76,10 +75,7 @@ void main() {
       final subB = adapter.stream().listen(b.add);
 
       for (var i = 0; i < 3; i++) {
-        fanOut.dispatch(VoiceEvent(
-          seq: $fixnum.Int64(i),
-          sessionId: 'p$i',
-        ));
+        fanOut.dispatch(VoiceEvent(seq: $fixnum.Int64(i), sessionId: 'p$i'));
       }
       // Let pending microtasks drain so the broadcast reaches both subs.
       await Future<void>.delayed(Duration.zero);
@@ -91,19 +87,29 @@ void main() {
       await subB.cancel();
     });
 
-    test('cancelling the only subscription tears the fan-out down exactly once',
-        () async {
-      final fanOut = _FakeVoiceFanOut();
-      final sub = _FakeVoiceAgentStreamAdapter(fanOut).stream().listen((_) {});
+    test(
+      'cancelling the only subscription tears the fan-out down exactly once',
+      () async {
+        final fanOut = _FakeVoiceFanOut();
+        final sub = _FakeVoiceAgentStreamAdapter(
+          fanOut,
+        ).stream().listen((_) {});
 
-      expect(fanOut.tornDown, isFalse,
-          reason: 'tear-down must not fire before any detach');
-      await sub.cancel();
-      // Detach is synchronous in the production adapter.
-      expect(fanOut.tornDown, isTrue,
-          reason: 'last detach must trigger _tearDown -> _onTornDown');
-      expect(fanOut.tearDownCalls, equals(1));
-    });
+        expect(
+          fanOut.tornDown,
+          isFalse,
+          reason: 'tear-down must not fire before any detach',
+        );
+        await sub.cancel();
+        // Detach is synchronous in the production adapter.
+        expect(
+          fanOut.tornDown,
+          isTrue,
+          reason: 'last detach must trigger _tearDown -> _onTornDown',
+        );
+        expect(fanOut.tearDownCalls, equals(1));
+      },
+    );
 
     test('teardown only fires after the LAST subscriber detaches', () async {
       final fanOut = _FakeVoiceFanOut();
@@ -112,81 +118,89 @@ void main() {
       final subB = adapter.stream().listen((_) {});
 
       await subA.cancel();
-      expect(fanOut.tornDown, isFalse,
-          reason: 'one subscriber still attached — fan-out must persist');
-
-      await subB.cancel();
-      expect(fanOut.tornDown, isTrue,
-          reason: 'last detach must trigger _tearDown');
-      expect(fanOut.tearDownCalls, equals(1));
-    });
-
-    test('events dispatched after a subscriber closes are silently dropped',
-        () async {
-      final fanOut = _FakeVoiceFanOut();
-      final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
-      final a = <VoiceEvent>[];
-      final b = <VoiceEvent>[];
-      final subA = adapter.stream().listen(a.add);
-      final subB = adapter.stream().listen(b.add);
-
-      fanOut.dispatch(VoiceEvent(
-        seq: $fixnum.Int64(1),
-        sessionId: 'first',
-      ));
-      await Future<void>.delayed(Duration.zero);
-
-      // Cancel subA. A subsequent dispatch must reach subB only.
-      await subA.cancel();
-
-      fanOut.dispatch(VoiceEvent(
-        seq: $fixnum.Int64(2),
-        sessionId: 'after-cancel',
-      ));
-      await Future<void>.delayed(Duration.zero);
-
-      expect(a.map((e) => e.sessionId).toList(), equals(['first']));
       expect(
-        b.map((e) => e.sessionId).toList(),
-        equals(['first', 'after-cancel']),
+        fanOut.tornDown,
+        isFalse,
+        reason: 'one subscriber still attached — fan-out must persist',
       );
+
       await subB.cancel();
-    });
-
-    test('error broadcast fans out to every subscriber and tears down',
-        () async {
-      final fanOut = _FakeVoiceFanOut();
-      final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
-      Object? errA;
-      Object? errB;
-      final aDone = Completer<void>();
-      final bDone = Completer<void>();
-      adapter.stream().listen(
-            (_) {},
-            onError: (Object e, StackTrace st) => errA = e,
-            onDone: aDone.complete,
-          );
-      adapter.stream().listen(
-            (_) {},
-            onError: (Object e, StackTrace st) => errB = e,
-            onDone: bDone.complete,
-          );
-
-      const boom = FormatException('decode failed');
-      fanOut.dispatchError(boom, StackTrace.current);
-
-      await aDone.future;
-      await bDone.future;
-
-      expect(errA, same(boom));
-      expect(errB, same(boom));
-      expect(fanOut.tornDown, isTrue,
-          reason: '_broadcastError must tearDown the fan-out');
+      expect(
+        fanOut.tornDown,
+        isTrue,
+        reason: 'last detach must trigger _tearDown',
+      );
       expect(fanOut.tearDownCalls, equals(1));
     });
 
     test(
-        'two distinct handles route to isolated fan-outs '
+      'events dispatched after a subscriber closes are silently dropped',
+      () async {
+        final fanOut = _FakeVoiceFanOut();
+        final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
+        final a = <VoiceEvent>[];
+        final b = <VoiceEvent>[];
+        final subA = adapter.stream().listen(a.add);
+        final subB = adapter.stream().listen(b.add);
+
+        fanOut.dispatch(VoiceEvent(seq: $fixnum.Int64(1), sessionId: 'first'));
+        await Future<void>.delayed(Duration.zero);
+
+        // Cancel subA. A subsequent dispatch must reach subB only.
+        await subA.cancel();
+
+        fanOut.dispatch(
+          VoiceEvent(seq: $fixnum.Int64(2), sessionId: 'after-cancel'),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(a.map((e) => e.sessionId).toList(), equals(['first']));
+        expect(
+          b.map((e) => e.sessionId).toList(),
+          equals(['first', 'after-cancel']),
+        );
+        await subB.cancel();
+      },
+    );
+
+    test(
+      'error broadcast fans out to every subscriber and tears down',
+      () async {
+        final fanOut = _FakeVoiceFanOut();
+        final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
+        Object? errA;
+        Object? errB;
+        final aDone = Completer<void>();
+        final bDone = Completer<void>();
+        adapter.stream().listen(
+          (_) {},
+          onError: (Object e, StackTrace st) => errA = e,
+          onDone: aDone.complete,
+        );
+        adapter.stream().listen(
+          (_) {},
+          onError: (Object e, StackTrace st) => errB = e,
+          onDone: bDone.complete,
+        );
+
+        const boom = FormatException('decode failed');
+        fanOut.dispatchError(boom, StackTrace.current);
+
+        await aDone.future;
+        await bDone.future;
+
+        expect(errA, same(boom));
+        expect(errB, same(boom));
+        expect(
+          fanOut.tornDown,
+          isTrue,
+          reason: '_broadcastError must tearDown the fan-out',
+        );
+        expect(fanOut.tearDownCalls, equals(1));
+      },
+    );
+
+    test('two distinct handles route to isolated fan-outs '
         '(no cross-leak)', () async {
       // Models `_VoiceFanOutRegistry.fanOutFor(handle.address)`: each
       // native handle gets its OWN `_VoiceHandleFanOut`, and dispatching on
@@ -194,28 +208,32 @@ void main() {
       final registry = _FakeVoiceFanOutRegistry();
       final fanOutA = registry.fanOutFor(handleAddress: 0xA);
       final fanOutB = registry.fanOutFor(handleAddress: 0xB);
-      expect(identical(fanOutA, fanOutB), isFalse,
-          reason: 'distinct handles must yield distinct fan-outs');
-      expect(identical(fanOutA, registry.fanOutFor(handleAddress: 0xA)), isTrue,
-          reason: 'same handle must reuse its fan-out');
+      expect(
+        identical(fanOutA, fanOutB),
+        isFalse,
+        reason: 'distinct handles must yield distinct fan-outs',
+      );
+      expect(
+        identical(fanOutA, registry.fanOutFor(handleAddress: 0xA)),
+        isTrue,
+        reason: 'same handle must reuse its fan-out',
+      );
 
       final aEvents = <VoiceEvent>[];
       final bEvents = <VoiceEvent>[];
-      final subA = _FakeVoiceAgentStreamAdapter(fanOutA).stream().listen(
-            aEvents.add,
-          );
-      final subB = _FakeVoiceAgentStreamAdapter(fanOutB).stream().listen(
-            bEvents.add,
-          );
+      final subA = _FakeVoiceAgentStreamAdapter(
+        fanOutA,
+      ).stream().listen(aEvents.add);
+      final subB = _FakeVoiceAgentStreamAdapter(
+        fanOutB,
+      ).stream().listen(bEvents.add);
 
-      fanOutA.dispatch(VoiceEvent(
-        seq: $fixnum.Int64(1),
-        sessionId: 'handle-A',
-      ));
-      fanOutB.dispatch(VoiceEvent(
-        seq: $fixnum.Int64(2),
-        sessionId: 'handle-B',
-      ));
+      fanOutA.dispatch(
+        VoiceEvent(seq: $fixnum.Int64(1), sessionId: 'handle-A'),
+      );
+      fanOutB.dispatch(
+        VoiceEvent(seq: $fixnum.Int64(2), sessionId: 'handle-B'),
+      );
       await Future<void>.delayed(Duration.zero);
 
       expect(aEvents.map((e) => e.sessionId).toList(), equals(['handle-A']));
@@ -227,28 +245,29 @@ void main() {
       expect(fanOutB.tornDown, isTrue);
     });
 
-    test(
-        'attach failure surfaces a StateError to the subscriber and closes '
+    test('attach failure surfaces a StateError to the subscriber and closes '
         'the stream', () async {
       // Models the `VoiceAgentStreamAdapter.stream.onListen` branch where
-      // `_install()` returns false (e.g. commons predates Protobuf or
-      // `rac_voice_agent_set_proto_callback` returns non-zero): the adapter
-      // adds a `StateError` then closes the controller.
+      // `_install()` returns false because
+      // `rac_voice_agent_set_proto_callback` returns non-zero: the adapter adds
+      // a `StateError` then closes the controller.
       final fanOut = _FakeVoiceFanOut(installSucceeds: false);
       final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
 
       Object? capturedError;
       final done = Completer<void>();
       adapter.stream().listen(
-            (_) {},
-            onError: (Object e, StackTrace _) => capturedError = e,
-            onDone: done.complete,
-          );
+        (_) {},
+        onError: (Object e, StackTrace _) => capturedError = e,
+        onDone: done.complete,
+      );
 
       await done.future;
       expect(capturedError, isA<StateError>());
-      expect((capturedError! as StateError).message,
-          contains('rac_voice_agent_set_proto_callback'));
+      expect(
+        (capturedError! as StateError).message,
+        contains('rac_voice_agent_set_proto_callback'),
+      );
     });
   });
 }
@@ -346,10 +365,12 @@ class _FakeVoiceAgentStreamAdapter {
         if (!attached) {
           // Mirrors production: `cb.close(); return false;` →
           // `controller.addError(StateError(...)); controller.close();`.
-          controller.addError(StateError(
-            'rac_voice_agent_set_proto_callback failed '
-            '(Protobuf may not be linked)',
-          ));
+          controller.addError(
+            StateError(
+              'rac_voice_agent_set_proto_callback failed '
+              '(Protobuf may not be linked)',
+            ),
+          );
           unawaited(controller.close());
         }
       },

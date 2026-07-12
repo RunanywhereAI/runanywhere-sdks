@@ -30,10 +30,15 @@ SHERPA_SCRIPT_SCHEMA="$(read_assignment "${SHERPA_SCRIPT}" SHERPA_RECIPE_SCHEMA)
 
 bash -n "${ORT_SCRIPT}" "${SHERPA_SCRIPT}"
 
+# These checks intentionally match the literal variable references in the
+# generated provenance metadata written by the vendor scripts.
+# shellcheck disable=SC2016
 grep -Fq 'recipe_schema=${RECIPE_SCHEMA}' "${ORT_SCRIPT}" ||
   fail "ORT vendor script does not validate/write its RECIPE_SCHEMA"
+# shellcheck disable=SC2016
 grep -Fq 'recipe_schema=${ORT_RECIPE_SCHEMA}' "${SHERPA_SCRIPT}" ||
   fail "Sherpa vendor script does not validate ORT with ORT_RECIPE_SCHEMA"
+# shellcheck disable=SC2016
 grep -Fq 'recipe_schema=${SHERPA_RECIPE_SCHEMA}' "${SHERPA_SCRIPT}" ||
   fail "Sherpa vendor script does not validate/write SHERPA_RECIPE_SCHEMA"
 

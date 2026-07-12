@@ -56,6 +56,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "infrastructure/model_management/model_manifest_internal.h"
 #include "infrastructure/rac_path_safety_internal.h"
 
 #ifdef __EMSCRIPTEN__
@@ -1784,13 +1785,12 @@ void run_proto_download_worker_async(void* user_data) {
 // =============================================================================
 // EVENT-DRIVEN ASYNC DOWNLOAD DRIVER (Emscripten / Web)
 // =============================================================================
-// The synchronous worker above buffers the whole body on the main thread when
-// the only transport is FetchHttpTransport's sync XHR — the UI freezes and the
-// poll loop never ticks until 100%. When the platform supplies the async
-// `http_download` adapter slot (the Web SDK implements it with streaming
-// fetch + ReadableStream), drive the plan event-driven instead: start a file,
-// report each chunk via the progress callback, and on completion advance to the
-// next file or finalize. Nothing blocks the main thread, so progress is live.
+// The synchronous worker above cannot provide live main-thread progress. When
+// the platform supplies the async `http_download` adapter slot (the Web SDK
+// implements it with streaming fetch + ReadableStream), drive the plan
+// event-driven instead: start a file, report each chunk via the progress
+// callback, and on completion advance to the next file or finalize. Nothing
+// blocks the main thread, so progress is live.
 //
 // This path reuses every leaf helper the synchronous worker uses
 // (set_task_progress / emit_progress / extraction / validate_downloaded_sizes /
@@ -3103,8 +3103,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // cold-launch / lookup-miss restore re-registers the entry as incomplete
     // and a pull/download by id resumes from the partial bytes. Best-effort —
     // a metadata write must never block the download itself.
-    (void)rac_model_registry_persist_folder_manifest(rac_get_model_registry(),
-                                                     task->model_id.c_str());
+    (void)rac::infra::model_manifest::persist(rac_get_model_registry(), task->model_id.c_str());
 
     start_proto_download_worker(task, resume_from);
 

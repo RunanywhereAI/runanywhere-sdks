@@ -12,12 +12,8 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi' show nullptr;
 
-import 'package:ffi/ffi.dart' show Utf8Pointer;
-import 'package:protobuf/protobuf.dart'
-    show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
@@ -44,14 +40,13 @@ import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 /// `ToolCall.argumentsJson`) and returns a JSON-encodable result
 /// map. The framework re-encodes the result into
 /// `ToolResult.resultJson`.
-typedef ToolExecutor = Future<Map<String, dynamic>> Function(
-    Map<String, dynamic> args);
+typedef ToolExecutor =
+    Future<Map<String, dynamic>> Function(Map<String, dynamic> args);
 
 /// Executor signature for callers that want generated-proto tool values
 /// instead of untyped JSON maps.
-typedef TypedToolExecutor = Future<Map<String, ToolValue>> Function(
-  Map<String, ToolValue> args,
-);
+typedef TypedToolExecutor =
+    Future<Map<String, ToolValue>> Function(Map<String, ToolValue> args);
 
 /// Tools (function calling) capability surface.
 ///
@@ -85,7 +80,6 @@ class RunAnywhereTools {
     _toolExecutors[definition.name] = executor;
     _logger.info('Registered tool: ${definition.name}');
   }
-
 
   /// Unregister a tool by name.
   ///
@@ -144,7 +138,8 @@ class RunAnywhereTools {
             toolCallId: toolCall.id,
             name: toolCall.name,
             success: false,
-            error: 'Failed to parse tool arguments: expected a JSON object, '
+            error:
+                'Failed to parse tool arguments: expected a JSON object, '
                 'got ${decoded.runtimeType}',
           );
         }
@@ -212,9 +207,12 @@ class RunAnywhereTools {
     final llm = llmOptions ?? _defaultLLMOptions();
     // Swift: `toolOptions ?? (options.hasToolCalling ? options.toolCalling
     // : RAToolCallingOptions.defaults())`.
-    final opts = (options ??
-            (llm.hasToolCalling() ? llm.toolCalling : _defaultToolOptions()))
-        .deepCopy();
+    final opts =
+        (options ??
+                (llm.hasToolCalling()
+                    ? llm.toolCalling
+                    : _defaultToolOptions()))
+            .deepCopy();
     if (toolChoice != null) {
       opts.toolChoice = toolChoice;
     }
@@ -228,8 +226,8 @@ class RunAnywhereTools {
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
       tools: tools,
-      formatHint: opts.resolvedFormatName,
-      maxIterations: opts.maxToolCallCount,
+      format: opts.format,
+      maxToolCalls: opts.maxToolCallCount,
       keepToolsAvailable: opts.keepToolsAvailable,
       maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
           ? opts.maxTokens
@@ -238,6 +236,9 @@ class RunAnywhereTools {
       topP: llm.topP,
       // Suppress thinking when either options surface asks for it.
       disableThinking: opts.disableThinking || llm.disableThinking,
+      autoExecute: autoExecute,
+      replaceSystemPrompt: opts.replaceSystemPrompt,
+      requireJsonArguments: opts.requireJsonArguments,
     );
     // `validate_calls` is `optional bool` on the proto — leave it UNSET when
     // the caller did not supply a value so commons applies its documented
@@ -262,11 +263,13 @@ class RunAnywhereTools {
     // Publish the active session handle so consumers can
     // call `RunAnywhereTools.shared.cancelGeneration()` to interrupt the
     // in-flight loop (mirrors RunAnywhereLLM.cancelGeneration). The native
-    // session id resolves a turn after create starts (it now runs off the UI
-    // isolate), so publish it once known.
-    unawaited(session.sessionId
-        .then((id) => _activeSessionHandle = id)
-        .catchError((Object _) => _activeSessionHandle));
+    // session id is published synchronously before native generation starts,
+    // so expose it as soon as the worker forwards that callback.
+    unawaited(
+      session.sessionId
+          .then((id) => _activeSessionHandle = id)
+          .catchError((Object _) => _activeSessionHandle),
+    );
     final collectedCalls = <ToolCall>[];
     final collectedResults = <ToolResult>[];
     final completer = Completer<ToolCallingResult>();
@@ -372,64 +375,42 @@ class RunAnywhereTools {
     final handle = _activeSessionHandle;
     if (handle == 0) {
       _logger.debug(
-          'cancelGeneration: no active tool-calling session to cancel');
+        'cancelGeneration: no active tool-calling session to cancel',
+      );
       return false;
     }
     _logger.info('Cancelling in-flight tool-calling session: handle=$handle');
     return DartBridgeToolCalling.shared.cancelSession(handle);
   }
 
-
   // -- helpers --------------------------------------------------------------
 
   /// Mirrors Swift `RALLMGenerationOptions.defaults()`
   /// (RALLMTypes+CppBridge.swift:13-21).
   static LLMGenerationOptions _defaultLLMOptions() => LLMGenerationOptions(
-        maxTokens: 100,
-        temperature: 0.8,
-        topP: 1.0,
-        topK: 0,
-        repetitionPenalty: 1.0,
-      );
+    maxTokens: 100,
+    temperature: 0.8,
+    topP: 1.0,
+    topK: 0,
+    repetitionPenalty: 1.0,
+  );
 
   /// Mirrors Swift `RAToolCallingOptions.defaults()`
   /// (ToolCallingTypes.swift:148-154).
   static ToolCallingOptions _defaultToolOptions() => ToolCallingOptions(
-        maxIterations: 5,
-        maxToolCalls: 5,
-        autoExecute: true,
-        format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-        formatHint: 'default',
-      );
+    maxToolCalls: 5,
+    autoExecute: true,
+    format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+  );
 }
 
 /// Run-loop knobs derived from [ToolCallingOptions]. Mirrors Swift's
 /// `RAToolCallingOptions` extension (ToolCallingTypes.swift:157-171).
 extension ToolCallingOptionsRunLoop on ToolCallingOptions {
-  /// Effective max tool-call iterations — explicit max_tool_calls wins over
-  /// max_iterations; non-positive values fall back to 5.
+  /// Effective maximum tool calls; non-positive values fall back to 5.
   int get maxToolCallCount {
-    final explicit = hasMaxToolCalls() ? maxToolCalls : maxIterations;
+    final explicit = hasMaxToolCalls() ? maxToolCalls : 0;
     return explicit > 0 ? explicit : 5;
-  }
-
-  /// Format hint string for the commons session request. Delegates the
-  /// proto-enum → hint-string mapping to commons
-  /// (`rac_tool_call_format_hint_from_format_name`) so every SDK shares one
-  /// source of truth.
-  String get resolvedFormatName {
-    if (hasFormat()) {
-      final fn =
-          RacNative.bindings.rac_tool_call_format_hint_from_format_name;
-      if (fn != null) {
-        final ptr = fn(format.value);
-        if (ptr != nullptr) {
-          // Static literal owned by commons — read, never free.
-          return ptr.toDartString();
-        }
-      }
-    }
-    return formatHint.isEmpty ? 'default' : formatHint;
   }
 }
 
@@ -468,7 +449,9 @@ abstract final class ToolValues {
   }
 
   static String jsonStringFromObject(Map<String, ToolValue> object) =>
-      toJSONString(ToolValue(objectValue: ToolValueObject(fields: object.entries)));
+      toJSONString(
+        ToolValue(objectValue: ToolValueObject(fields: object.entries)),
+      );
 }
 
 extension ToolValueAccessors on ToolValue {

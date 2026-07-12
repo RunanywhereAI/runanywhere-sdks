@@ -98,7 +98,7 @@ class VoiceAgentStreamAdapter internal constructor(
         fun unregisterCallback(handle: Long, callbackId: Long)
 
         /** Wait for in-flight native callback dispatches to return. */
-        fun quiesce() {}
+        fun quiesce()
     }
 
     internal companion object {

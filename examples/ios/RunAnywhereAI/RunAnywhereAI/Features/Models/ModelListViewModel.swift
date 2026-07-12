@@ -163,11 +163,6 @@ class ModelListViewModel: ObservableObject {
         return false
     }
 
-    /// Alias for loadModelsFromRegistry to match view calls
-    func loadModels() async {
-        await loadModelsFromRegistry()
-    }
-
     @Published private(set) var isLoadingModel = false
 
     /// Select and load a model

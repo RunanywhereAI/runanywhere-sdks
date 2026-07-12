@@ -40,5 +40,4 @@ export const tTSOptionsDefaults = (): TTSOptions => ({
   audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
   sampleRate: 22050,
   speakerId: 0,
-  speed: 0,
 });

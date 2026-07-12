@@ -43,7 +43,7 @@ class SettingsViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [RAStoredModel] = []
+    @Published var storedModels: [RAModelStorageMetrics] = []
 
     // UI State
     @Published var showApiKeyEntry: Bool = false
@@ -428,7 +428,7 @@ class SettingsViewModel: ObservableObject {
             }
 
             Task {
-                await ModelListViewModel.shared.loadModels()
+                await ModelListViewModel.shared.loadModelsFromRegistry()
             }
         } catch {
             hfTokenMessage = trimmed.isEmpty
@@ -494,7 +494,7 @@ class SettingsViewModel: ObservableObject {
     }
 
     /// Delete a stored model
-    func deleteModel(_ model: RAStoredModel) async {
+    func deleteModel(_ model: RAModelStorageMetrics) async {
         await StorageViewModel.shared.deleteModel(model)
         await loadStorageData()
     }

@@ -154,8 +154,8 @@ typedef struct rac_diffusion_config {
     /** Enable safety checker for NSFW content filtering (default: true) */
     rac_bool_t enable_safety_checker;
 
-    /** Reduce memory footprint (may reduce quality, default: false) */
-    rac_bool_t reduce_memory;
+    /** Maximum working-set memory in MiB (0 = engine default) */
+    int32_t max_memory_mb;
 
     /** Tokenizer configuration for downloading missing tokenizer files
      *  Apple's compiled CoreML models don't include tokenizer files */
@@ -170,7 +170,7 @@ static const rac_diffusion_config_t RAC_DIFFUSION_CONFIG_DEFAULT = {
     .preferred_framework = 99,  // RAC_FRAMEWORK_UNKNOWN
     .model_variant = RAC_DIFFUSION_MODEL_SD_1_5,
     .enable_safety_checker = RAC_TRUE,
-    .reduce_memory = RAC_FALSE,
+    .max_memory_mb = 0,
     .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
                   .custom_base_url = RAC_NULL,
                   .auto_download = RAC_TRUE}};

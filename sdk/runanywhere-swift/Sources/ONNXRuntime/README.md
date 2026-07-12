@@ -16,8 +16,8 @@ This module enables on-device voice processing with support for:
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 17.0+           |
-| macOS    | 14.0+           |
+| iOS      | 17.5+           |
+| macOS    | 14.5+           |
 
 The module requires:
 - `RABackendONNX.xcframework` (included in SDK)
@@ -242,7 +242,7 @@ public enum ONNX {
     public static let version = "2.0.0"
 
     /// Underlying ONNX Runtime version
-    public static let onnxRuntimeVersion = "1.23.2"
+    public static let onnxRuntimeVersion = RAVersions.onnxRuntimeIOS // 1.24.3
 
     /// Register the ONNX backend with the C++ service registry.
     /// Registers the generic ONNX module (embeddings + Silero VAD) and the

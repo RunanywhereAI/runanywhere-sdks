@@ -94,8 +94,7 @@ interface EmscriptenFS {
   isDir?(mode: number): boolean;
 }
 
-/** Async directory iteration is implemented by browsers but not yet present
- * in every TypeScript DOM lib version. Keep the compatibility shim typed. */
+/** Local structural type for the browser's async directory iterator surface. */
 interface IterableFileSystemDirectoryHandle {
   entries?(): AsyncIterableIterator<[string, FileSystemHandle]>;
   values?(): AsyncIterableIterator<FileSystemHandle>;

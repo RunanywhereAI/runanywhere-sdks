@@ -10,7 +10,6 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "rac/infrastructure/device/rac_npu_capability.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/qhexrt/rac_qhexrt.h"
@@ -39,13 +38,6 @@ namespace {
     } while (0)
 
 int test_supported_arch_policy() {
-    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V75) ==
-                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V75));
-    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V79) ==
-                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V79));
-    static_assert(static_cast<int32_t>(RAC_HEXAGON_ARCH_V81) ==
-                  static_cast<int32_t>(RAC_QHEXRT_HEXAGON_ARCH_V81));
-
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V75), RAC_TRUE);
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V79), RAC_TRUE);
     ASSERT_EQ(rac_qhexrt_arch_is_supported(RAC_QHEXRT_HEXAGON_ARCH_V81), RAC_TRUE);
@@ -60,16 +52,10 @@ int test_supported_arch_policy() {
     ASSERT_EQ(std::string(rac_qhexrt_arch_name(static_cast<rac_qhexrt_hexagon_arch_t>(83))),
               std::string("unknown"));
 
-    rac_npu_info_t legacy{};
     rac_qhexrt_device_info_t engine{};
-    ASSERT_EQ(rac_npu_probe(&legacy), RAC_SUCCESS);
     ASSERT_EQ(rac_qhexrt_probe(&engine), RAC_SUCCESS);
-    ASSERT_EQ(std::string(legacy.soc_model), std::string(engine.soc_model));
-    ASSERT_EQ(legacy.soc_id, engine.soc_id);
-    ASSERT_EQ(static_cast<int32_t>(legacy.hexagon_arch), static_cast<int32_t>(engine.hexagon_arch));
-    ASSERT_EQ(legacy.qhexrt_supported, engine.supported);
-    ASSERT_EQ(std::string(rac_hexagon_arch_name(legacy.hexagon_arch)),
-              std::string(rac_qhexrt_arch_name(engine.hexagon_arch)));
+    ASSERT_EQ(engine.supported, rac_qhexrt_arch_is_supported(engine.hexagon_arch));
+    ASSERT_TRUE(std::strlen(rac_qhexrt_arch_name(engine.hexagon_arch)) > 0);
     return 0;
 }
 

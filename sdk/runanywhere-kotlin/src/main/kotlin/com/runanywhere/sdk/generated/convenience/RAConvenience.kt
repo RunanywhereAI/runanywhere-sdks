@@ -180,13 +180,13 @@ public fun EmbeddingsConfiguration.validate() {
     if (embedding_dimension < 1) {
         throw SDKException.validationFailed(
             fieldPath = "EmbeddingsConfiguration.embedding_dimension",
-            message = "embedding_dimension must be in >= 1 (got ${embedding_dimension})",
+            message = "embedding_dimension must be >= 1 (got ${embedding_dimension})",
         )
     }
     if (max_sequence_length < 1) {
         throw SDKException.validationFailed(
             fieldPath = "EmbeddingsConfiguration.max_sequence_length",
-            message = "max_sequence_length must be in >= 1 (got ${max_sequence_length})",
+            message = "max_sequence_length must be >= 1 (got ${max_sequence_length})",
         )
     }
 }
@@ -283,7 +283,7 @@ public fun RAGConfiguration.validate() {
     if (top_k != null && (top_k < 1)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGConfiguration.top_k",
-            message = "top_k must be in >= 1 (got ${top_k})",
+            message = "top_k must be >= 1 (got ${top_k})",
         )
     }
     if (similarity_threshold != null && (similarity_threshold < 0.0 || similarity_threshold > 1.0)) {
@@ -295,13 +295,13 @@ public fun RAGConfiguration.validate() {
     if (chunk_size != null && (chunk_size < 1)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGConfiguration.chunk_size",
-            message = "chunk_size must be in >= 1 (got ${chunk_size})",
+            message = "chunk_size must be >= 1 (got ${chunk_size})",
         )
     }
     if (chunk_overlap != null && (chunk_overlap < 0)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGConfiguration.chunk_overlap",
-            message = "chunk_overlap must be in >= 0 (got ${chunk_overlap})",
+            message = "chunk_overlap must be >= 0 (got ${chunk_overlap})",
         )
     }
 }
@@ -317,10 +317,10 @@ public fun RAGQueryOptions.Companion.defaults(): RAGQueryOptions =
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun RAGQueryOptions.validate() {
-    if (multi_query_count != null && (multi_query_count < 1)) {
+    if (multi_query_count != null && (multi_query_count < 1 || multi_query_count > 8)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGQueryOptions.multi_query_count",
-            message = "multi_query_count must be in >= 1 (got ${multi_query_count})",
+            message = "multi_query_count must be in 1...8 (got ${multi_query_count})",
         )
     }
 }

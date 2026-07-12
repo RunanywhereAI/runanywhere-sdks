@@ -4,7 +4,7 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 namespace margelo::nitro::runanywhere {
 
@@ -43,17 +43,17 @@ std::shared_ptr<ArrayBuffer> emptyEventProtoBuffer() {
 
 std::shared_ptr<ArrayBuffer> copyEventProtoBuffer(rac_proto_buffer_t& protoBuffer) {
     if (protoBuffer.status != RAC_SUCCESS) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyEventProtoBuffer();
     }
 
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyEventProtoBuffer();
     }
 
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
@@ -95,16 +95,7 @@ HybridRunAnywhereCore::subscribeSDKEventsProto(
         auto* registration = new SDKEventProtoRegistration();
         registration->onEventBytes = onEventBytes;
 
-        auto subscribe =
-            proto_compat::symbol<proto_compat::SDKEventSubscribeFn>(
-                "rac_sdk_event_subscribe");
-        if (!subscribe) {
-            delete registration;
-            LOGE("subscribeSDKEventsProto: rac_sdk_event_subscribe unavailable");
-            return 0.0;
-        }
-
-        uint64_t subscriptionId = subscribe(
+        uint64_t subscriptionId = rac_sdk_event_subscribe(
             &sdkEventProtoTrampoline,
             registration);
         if (subscriptionId == 0) {
@@ -141,24 +132,14 @@ HybridRunAnywhereCore::unsubscribeSDKEventsProto(double subscriptionId) {
             registration->active.store(false, std::memory_order_release);
         }
 
-        if (auto unsubscribe =
-                proto_compat::symbol<proto_compat::SDKEventUnsubscribeFn>(
-                    "rac_sdk_event_unsubscribe")) {
-            unsubscribe(id);
-        } else {
-            LOGE("unsubscribeSDKEventsProto: rac_sdk_event_unsubscribe unavailable");
-        }
+        rac_sdk_event_unsubscribe(id);
 
         // Commons dispatches subscriber callbacks after releasing its mutex, so
         // unsubscribe alone does not guarantee no publisher thread is mid-call
         // with this registration. Drain in-flight callbacks per the documented
         // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
         // free) before deleting, mirroring the Swift/Kotlin event bridges.
-        if (auto quiesce =
-                proto_compat::symbol<proto_compat::SDKEventQuiesceFn>(
-                    "rac_sdk_event_quiesce")) {
-            quiesce();
-        }
+        rac_sdk_event_quiesce();
 
         if (registration) {
             delete registration;
@@ -175,15 +156,7 @@ HybridRunAnywhereCore::publishSDKEventProto(const std::shared_ptr<ArrayBuffer>& 
             return false;
         }
 
-        auto publishProto =
-            proto_compat::symbol<proto_compat::SDKEventPublishProtoFn>(
-                "rac_sdk_event_publish_proto");
-        if (!publishProto) {
-            LOGE("publishSDKEventProto: rac_sdk_event_publish_proto unavailable");
-            return false;
-        }
-
-        rac_result_t rc = publishProto(bytes.data(), bytes.size());
+        rac_result_t rc = rac_sdk_event_publish_proto(bytes.data(), bytes.size());
         if (rc != RAC_SUCCESS) {
             LOGE("publishSDKEventProto: rc=%d", rc);
             return false;
@@ -196,18 +169,10 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::pollSDKEventProto() {
     return Promise<std::shared_ptr<ArrayBuffer>>::async([]() -> std::shared_ptr<ArrayBuffer> {
         rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        auto poll =
-            proto_compat::symbol<proto_compat::SDKEventPollFn>(
-                "rac_sdk_event_poll");
-        if (!poll) {
-            LOGE("pollSDKEventProto: rac_sdk_event_poll unavailable");
-            return emptyEventProtoBuffer();
-        }
-
-        rac_result_t rc = poll(&out);
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_sdk_event_poll(&out);
         if (rc != RAC_SUCCESS) {
-            proto_compat::freeBuffer(&out);
+            rac_proto_buffer_free(&out);
             return emptyEventProtoBuffer();
         }
         return copyEventProtoBuffer(out);
@@ -221,15 +186,7 @@ HybridRunAnywhereCore::publishSDKFailureProto(double errorCode,
                                               const std::string& operation,
                                               bool recoverable) {
     return Promise<bool>::async([errorCode, message, component, operation, recoverable]() -> bool {
-        auto publishFailure =
-            proto_compat::symbol<proto_compat::SDKEventPublishFailureFn>(
-                "rac_sdk_event_publish_failure");
-        if (!publishFailure) {
-            LOGE("publishSDKFailureProto: rac_sdk_event_publish_failure unavailable");
-            return false;
-        }
-
-        rac_result_t rc = publishFailure(
+        rac_result_t rc = rac_sdk_event_publish_failure(
             static_cast<rac_result_t>(errorCode),
             message.c_str(),
             component.c_str(),

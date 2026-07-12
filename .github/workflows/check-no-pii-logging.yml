@@ -12,11 +12,14 @@ on:
       - master
       - feat/v2-architecture
 
+permissions:
+  contents: read
+
 jobs:
   check-no-pii-logging:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run PII-logging regression guard
         shell: bash
         run: |

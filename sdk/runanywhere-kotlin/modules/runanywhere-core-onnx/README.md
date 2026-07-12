@@ -242,20 +242,25 @@ VAD uses Silero VAD which is bundled with Sherpa-ONNX (~5MB).
 
 ## Native Libraries
 
-This module bundles the following native libraries (~25MB total for ARM64):
+This module bundles the following native libraries for each supported ABI:
 
 | Library | Size | Description |
 |---------|------|-------------|
-| `librac_backend_onnx_jni.so` | ~1MB | JNI bridge |
-| `librunanywhere_onnx.so` | ~2MB | RunAnywhere ONNX wrapper |
-| `libonnxruntime.so` | ~15MB | ONNX Runtime |
-| `libsherpa-onnx-c-api.so` | ~2MB | Sherpa-ONNX C API |
-| `libsherpa-onnx-cxx-api.so` | ~3MB | Sherpa-ONNX C++ API |
-| `libsherpa-onnx-jni.so` | ~2MB | Sherpa-ONNX JNI bridge |
+| `libc++_shared.so` | — | Android C++ runtime |
+| `libonnxruntime.so` | — | ONNX Runtime |
+| `librac_backend_onnx.so` | — | ONNX engine plugin |
+| `librac_backend_onnx_jni.so` | — | ONNX registration JNI bridge |
+| `librac_backend_sherpa.so` | — | Sherpa speech engine plugin |
+| `librunanywhere_onnx.so` | — | RunAnywhere ONNX JNI wrapper |
+| `librunanywhere_sherpa.so` | — | RunAnywhere Sherpa JNI wrapper |
+| `libsherpa-onnx-c-api.so` | — | Sherpa-ONNX C API |
+| `libsherpa-onnx-jni.so` | — | Sherpa-ONNX JNI bridge |
 
 ### Supported ABIs
 
-- `arm64-v8a` — Primary target (modern Android devices)
+- `arm64-v8a`
+- `armeabi-v7a`
+- `x86_64`
 
 ---
 

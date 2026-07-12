@@ -32,16 +32,6 @@ import CRACommons
 /// — consumers exit the stream by `break`-ing out of the `for-await`.
 public typealias VoiceAgentStreamAdapter = HandleStreamAdapter<rac_voice_agent_handle_t, RAVoiceEvent>
 
-private enum VoiceAgentStreamProtoABI {
-    typealias QuiesceFn = @convention(c) () -> Void
-
-    // `rac_voice_agent_proto_quiesce` is absent from older RACommons
-    // binaries, so it is resolved dynamically (dlsym) rather than called
-    // directly; nil means the linked binary predates the symbol and
-    // teardown skips the quiesce.
-    static let quiesce = NativeProtoABI.load("rac_voice_agent_proto_quiesce", as: QuiesceFn.self)
-}
-
 public extension HandleStreamAdapter where Handle == rac_voice_agent_handle_t, Event == RAVoiceEvent {
 
     /// Wrap an existing voice agent handle as an event stream.
@@ -60,7 +50,7 @@ public extension HandleStreamAdapter where Handle == rac_voice_agent_handle_t, E
             streamKey: "voice-agent",
             register: { handle, cb, ud in rac_voice_agent_set_proto_callback(handle, cb, ud) },
             unregister: { handle in _ = rac_voice_agent_set_proto_callback(handle, nil, nil) },
-            quiesce: { VoiceAgentStreamProtoABI.quiesce?() }
+            quiesce: { rac_voice_agent_proto_quiesce() }
         )
     }
 }

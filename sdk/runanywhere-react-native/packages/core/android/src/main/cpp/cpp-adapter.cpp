@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <android/log.h>
+#include <fbjni/fbjni.h>
 #include "runanywherecoreOnLoad.hpp"
 #include "PlatformDownloadBridge.h"
 
@@ -72,41 +73,20 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_getArchitectureMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getArchitecture", "()Ljava/lang/String;");
       g_getGPUFamilyMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getGPUFamily", "()Ljava/lang/String;");
       g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
-      auto getOptionalStaticMethod = [&](const char* name, const char* signature) -> jmethodID {
-        jmethodID method = env->GetStaticMethodID(g_platformAdapterBridgeClass, name, signature);
-        if (env->ExceptionCheck()) {
-          env->ExceptionClear();
-          return nullptr;
-        }
-        return method;
-      };
-      // Best-effort: older host-app Kotlin bridges may predate these methods.
-      g_getAppIdentifierMethod = getOptionalStaticMethod("getAppIdentifier", "()Ljava/lang/String;");
-      g_getAppNameMethod = getOptionalStaticMethod("getAppName", "()Ljava/lang/String;");
-      g_getAppVersionMethod = getOptionalStaticMethod("getAppVersion", "()Ljava/lang/String;");
-      g_getAppBuildMethod = getOptionalStaticMethod("getAppBuild", "()Ljava/lang/String;");
-      g_getLocaleIdentifierMethod = getOptionalStaticMethod("getLocaleIdentifier", "()Ljava/lang/String;");
-      g_getTimezoneIdentifierMethod = getOptionalStaticMethod("getTimezoneIdentifier", "()Ljava/lang/String;");
+      g_getAppIdentifierMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAppIdentifier", "()Ljava/lang/String;");
+      g_getAppNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAppName", "()Ljava/lang/String;");
+      g_getAppVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAppVersion", "()Ljava/lang/String;");
+      g_getAppBuildMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAppBuild", "()Ljava/lang/String;");
+      g_getLocaleIdentifierMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getLocaleIdentifier", "()Ljava/lang/String;");
+      g_getTimezoneIdentifierMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getTimezoneIdentifier", "()Ljava/lang/String;");
       g_httpDownloadMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownload", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
       g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
-      // Best-effort directory enumeration lookups. If the host app's Kotlin
-      // bridge predates these methods, GetStaticMethodID returns NULL and the
-      // platform adapter falls through to its existing NULL-callback branches
-      // (commons emits the documented warning string instead).
       g_fileListDirectoryMethod = env->GetStaticMethodID(
           g_platformAdapterBridgeClass,
           "fileListDirectory",
           "(Ljava/lang/String;)[Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$RacDirectoryEntry;");
-      if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-        g_fileListDirectoryMethod = nullptr;
-      }
       g_isNonEmptyDirectoryMethod = env->GetStaticMethodID(
           g_platformAdapterBridgeClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
-      if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-        g_isNonEmptyDirectoryMethod = nullptr;
-      }
 
       if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
           g_getModelBaseDirectoryMethod &&
@@ -130,73 +110,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
 
   }
 
-  return margelo::nitro::runanywhere::initialize(vm);
-}
-
-/**
- * Get JNIEnv for the current thread
- * Attaches thread if not already attached
- */
-static JNIEnv* getJNIEnv() {
-    JNIEnv* env = nullptr;
-    if (g_javaVM == nullptr) {
-        LOGE("JavaVM is null");
-        return nullptr;
-    }
-
-    int status = g_javaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (status == JNI_EDETACHED) {
-        if (g_javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
-            LOGE("Failed to attach thread");
-            return nullptr;
-        }
-        LOGI("Attached thread to JVM");
-    } else if (status != JNI_OK) {
-        LOGE("Failed to get JNIEnv, status=%d", status);
-        return nullptr;
-    }
-    return env;
-}
-
-/**
- * Log Java exception details before clearing
- */
-static void logAndClearException(JNIEnv* env, const char* context) {
-    if (env->ExceptionCheck()) {
-        jthrowable exception = env->ExceptionOccurred();
-        env->ExceptionClear();
-
-        // Get exception message
-        jclass throwableClass = env->FindClass("java/lang/Throwable");
-        if (throwableClass) {
-            jmethodID getMessageMethod = env->GetMethodID(throwableClass, "getMessage", "()Ljava/lang/String;");
-            if (getMessageMethod) {
-                jstring messageStr = (jstring)env->CallObjectMethod(exception, getMessageMethod);
-                if (messageStr) {
-                    const char* message = env->GetStringUTFChars(messageStr, nullptr);
-                    LOGE("[%s] Java exception: %s", context, message);
-                    env->ReleaseStringUTFChars(messageStr, message);
-                    env->DeleteLocalRef(messageStr);
-                } else {
-                    LOGE("[%s] Java exception (no message)", context);
-                }
-            }
-            env->DeleteLocalRef(throwableClass);
-        }
-
-        // Also print stack trace to logcat
-        jclass exceptionClass = env->GetObjectClass(exception);
-        if (exceptionClass) {
-            jmethodID printStackTraceMethod = env->GetMethodID(exceptionClass, "printStackTrace", "()V");
-            if (printStackTraceMethod) {
-                env->CallVoidMethod(exception, printStackTraceMethod);
-                env->ExceptionClear(); // Clear any exception from printStackTrace
-            }
-            env->DeleteLocalRef(exceptionClass);
-        }
-
-        env->DeleteLocalRef(exception);
-    }
+  return facebook::jni::initialize(vm, []() {
+    margelo::nitro::runanywhere::registerAllNatives();
+  });
 }
 
 // =============================================================================

@@ -61,7 +61,7 @@ class ModelCatalogTest {
         val model = ModelCatalog.npuCatalog.single { it.id == "canary_qwen_2_5b" }
 
         assertEquals(
-            "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json",
+            "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json",
             model.url,
         )
         assertEquals(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, model.category)

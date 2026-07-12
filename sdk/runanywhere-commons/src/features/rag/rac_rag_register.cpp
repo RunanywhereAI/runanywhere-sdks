@@ -5,7 +5,7 @@
  * Registers the RAG pipeline module and its ONNX embeddings provider.
  * RAG itself is a pipeline (like Voice Agent) — it does not register as
  * a service provider. The ONNX embeddings provider is registered so that
- * rac_embeddings_create() can discover it via the service registry.
+ * the embeddings service factory can discover it via the plugin registry.
  */
 
 #include "rac/core/rac_logger.h"

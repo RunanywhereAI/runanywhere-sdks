@@ -21,7 +21,6 @@ class ChatRequestPolicyTest {
         assertEquals("Current prompt", request.prompt)
         assertEquals("conversation-1", request.conversation_id)
         assertTrue(request.history.isEmpty())
-        assertFalse(request.streaming_enabled)
         assertFalse(requireNotNull(request.options).streaming_enabled)
     }
 
@@ -48,7 +47,7 @@ class ChatRequestPolicyTest {
     }
 
     @Test
-    fun `stream request preserves history budget and both streaming flags`() {
+    fun `stream request preserves history budget and canonical streaming flag`() {
         val turn = ChatRequestPolicy.snapshot(
             prompt = "follow up",
             messages = listOf(ChatMessage(text = "prior", isUser = true)),
@@ -60,10 +59,8 @@ class ChatRequestPolicyTest {
             streaming = true,
         )
 
-        assertEquals(37, request.max_tokens)
         assertEquals(37, requireNotNull(request.options).max_tokens)
         assertEquals(turn.history, request.history)
-        assertTrue(request.streaming_enabled)
         assertTrue(requireNotNull(request.options).streaming_enabled)
     }
 }

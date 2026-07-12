@@ -122,16 +122,9 @@ class DiffusionTokenizerSource extends $pb.GeneratedMessage {
 ///   Web    — n/a (config is implicit in the llamacpp service ctor)
 ///   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
 ///
-/// Drift note: Swift/Kotlin/RN also carry `model_id`, `preferred_framework`,
-/// and `reduce_memory` fields. Those belong on the more general component
-/// configuration carried by ModelInfo / framework selection elsewhere in
-/// this IDL package; this message intentionally narrows to the four
-/// diffusion-specific knobs called out by the v1 spec.
-/// `max_memory_mb` here is the new generalization of pre-IDL `reduce_memory`
-/// (a bool) — backends interpret 0 as "no cap / engine default" and any
-/// positive value as a hard MB ceiling. SDKs translating pre-IDL
-/// `reduceMemory == true` should set this to the backend's documented
-/// reduced-memory threshold; `reduceMemory == false` ⇒ 0.
+/// `max_memory_mb` is the single portable working-set control; backends
+/// interpret 0 as "no cap / engine default" and a positive value as a hard
+/// MiB ceiling.
 /// ---------------------------------------------------------------------------
 class DiffusionConfiguration extends $pb.GeneratedMessage {
   factory DiffusionConfiguration({
@@ -141,7 +134,6 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
     $core.int? maxMemoryMb,
     $core.String? modelId,
     $0.InferenceFramework? preferredFramework,
-    $core.bool? reduceMemory,
   }) {
     final result = create();
     if (modelVariant != null) result.modelVariant = modelVariant;
@@ -152,7 +144,6 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
     if (modelId != null) result.modelId = modelId;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
-    if (reduceMemory != null) result.reduceMemory = reduceMemory;
     return result;
   }
 
@@ -178,7 +169,6 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'modelId')
     ..aE<$0.InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $0.InferenceFramework.values)
-    ..aOB(7, _omitFieldNames ? '' : 'reduceMemory')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -237,8 +227,7 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
   void clearEnableSafetyChecker() => $_clearField(3);
 
   /// Maximum working-set memory the diffusion runtime is allowed to use,
-  /// in MiB. 0 = no cap (engine default). Generalizes the pre-IDL
-  /// `reduceMemory` bool flag.
+  /// in MiB. 0 = no cap (engine default).
   @$pb.TagNumber(4)
   $core.int get maxMemoryMb => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -266,17 +255,6 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
   $core.bool hasPreferredFramework() => $_has(5);
   @$pb.TagNumber(6)
   void clearPreferredFramework() => $_clearField(6);
-
-  /// Legacy low-memory boolean. Backends may translate true to an internal
-  /// memory cap when max_memory_mb is unset.
-  @$pb.TagNumber(7)
-  $core.bool get reduceMemory => $_getBF(6);
-  @$pb.TagNumber(7)
-  set reduceMemory($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasReduceMemory() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearReduceMemory() => $_clearField(7);
 }
 
 /// ---------------------------------------------------------------------------

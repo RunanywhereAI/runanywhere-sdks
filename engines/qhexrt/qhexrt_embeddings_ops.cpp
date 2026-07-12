@@ -11,15 +11,11 @@
  * is applied (embedding inputs are raw text).
  */
 
+#include "qhexrt_session.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <string>
-
-#include "qhexrt_session.h"
-
-#include <cstring>
-#include <strings.h>
-#include <unistd.h>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -34,7 +30,9 @@ using qhexrt_engine::Session;
 using qhexrt_engine::session_close;
 using qhexrt_engine::session_open;
 
-Session* as_session(void* impl) { return static_cast<Session*>(impl); }
+Session* as_session(void* impl) {
+    return static_cast<Session*>(impl);
+}
 
 // qhx_generate wants a token callback even though the embedding plan emits no
 // tokens; a trivial "keep going" callback keeps the signature happy.
@@ -50,22 +48,9 @@ rac_result_t embed_one(Session* c, const char* text, rac_embedding_vector_t* out
     qhx_session_reset(c->sess);  // each public embed() call is an independent request
     c->cancel.store(false, std::memory_order_relaxed);
     qhx_inputs in{};
-    // Multimodal embedders (siglip2): a CLIP-style bundle has BOTH an image tower and a text tower and
-    // returns an L2-normalized vector for either. If the input string is a readable image file path,
-    // embed the IMAGE tower (in.image_path); otherwise embed the TEXT tower. This lets the SAME public
-    // embed()/embed_batch() API do zero-shot image classification: embed(image) vs embed(labels), argmax
-    // cosine — all through the one embedding modality, no new SDK surface. Text embedders are unaffected
-    // (their inputs never end in an image extension / are not real files).
     const char* t = (text != nullptr) ? text : "";
-    const size_t tl = std::strlen(t);
-    const bool looks_img = (tl > 4 && (strcasecmp(t + tl - 4, ".jpg") == 0 || strcasecmp(t + tl - 4, ".png") == 0)) ||
-                           (tl > 5 && strcasecmp(t + tl - 5, ".jpeg") == 0);
-    if (looks_img && access(t, R_OK) == 0) {
-        in.image_path = t;             // image tower
-    } else {
-        in.text = t;                   // text tower
-        in.no_template = 1;            // embedding inputs are raw text, never chat-templated
-    }
+    in.text = t;
+    in.no_template = 1;  // embedding inputs are raw text, never chat-templated
     qhx_gen_cfg cfg;
     qhx_gen_cfg_default(&cfg);
     qhx_output out{};
@@ -120,8 +105,8 @@ rac_result_t qhexrt_embeddings_initialize(void* /*impl*/, const char* /*model_pa
 }
 
 rac_result_t qhexrt_embeddings_embed(void* impl, const char* text,
-                                    const rac_embeddings_options_t* /*options*/,
-                                    rac_embeddings_result_t* out_result) {
+                                     const rac_embeddings_options_t* /*options*/,
+                                     rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
     if (c == nullptr || out_result == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -156,8 +141,8 @@ rac_result_t qhexrt_embeddings_embed(void* impl, const char* text,
 }
 
 rac_result_t qhexrt_embeddings_embed_batch(void* impl, const char* const* texts, size_t num_texts,
-                                          const rac_embeddings_options_t* /*options*/,
-                                          rac_embeddings_result_t* out_result) {
+                                           const rac_embeddings_options_t* /*options*/,
+                                           rac_embeddings_result_t* out_result) {
     auto* c = as_session(impl);
     if (c == nullptr || out_result == nullptr || texts == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -234,7 +219,9 @@ rac_result_t qhexrt_embeddings_cleanup(void* impl) {
     return RAC_SUCCESS;
 }
 
-void qhexrt_embeddings_destroy(void* impl) { session_close(as_session(impl)); }
+void qhexrt_embeddings_destroy(void* impl) {
+    session_close(as_session(impl));
+}
 
 }  // namespace
 

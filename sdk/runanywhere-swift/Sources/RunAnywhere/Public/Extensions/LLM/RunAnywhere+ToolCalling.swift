@@ -58,31 +58,25 @@ private enum ToolCallingRunLoopProtoABI {
         UnsafeMutablePointer<rac_proto_buffer_t>?,
         UnsafeMutableRawPointer?
     ) -> rac_result_t
+    typealias HandlePublishedCallback = @convention(c) (
+        UInt64,
+        UnsafeMutableRawPointer?
+    ) -> Void
     typealias RunLoop = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
-        ExecuteCallback?,
+        ExecuteCallback,
         UnsafeMutableRawPointer?,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    // With-handle variant publishes a cancel handle.
-    typealias RunLoopWithHandle = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        ExecuteCallback?,
+        HandlePublishedCallback,
         UnsafeMutableRawPointer?,
-        UnsafeMutablePointer<UInt64>?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
     typealias Cancel = @convention(c) (UInt64) -> rac_result_t
 
     static let runLoopName = "rac_tool_calling_run_loop_proto"
-    static let runLoopWithHandleName = "rac_tool_calling_run_loop_with_handle_proto"
     static let cancelName = "rac_tool_calling_run_loop_cancel_proto"
 
     static let runLoop = NativeProtoABI.load(runLoopName, as: RunLoop.self)
-    static let runLoopWithHandle =
-        NativeProtoABI.load(runLoopWithHandleName, as: RunLoopWithHandle.self)
     static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
@@ -278,39 +272,38 @@ public extension RunAnywhere {
             validateCalls: validateCalls
         )
         let requestBytes = try request.serializedData()
-        // Prefer the with-handle variant so the surrounding
-        // Task can cancel the in-flight native loop via
-        // `withTaskCancellationHandler`. Falls back to the legacy ABI if the
-        // newer entry point isn't exported by the loaded libcommons (e.g.
-        // running against an older build of the static framework).
-        let runLoopWithHandle = ToolCallingRunLoopProtoABI.runLoopWithHandle
-        let cancelFn = ToolCallingRunLoopProtoABI.cancel
-        if let runLoopWithHandle, let cancelFn {
-            return try await generateWithToolsCancellable(
-                requestBytes: requestBytes,
-                runLoopWithHandle: runLoopWithHandle,
-                cancelFn: cancelFn
-            )
-        }
         let runLoop = try NativeProtoABI.require(
             ToolCallingRunLoopProtoABI.runLoop,
             named: ToolCallingRunLoopProtoABI.runLoopName
         )
+        let cancelFn = try NativeProtoABI.require(
+            ToolCallingRunLoopProtoABI.cancel,
+            named: ToolCallingRunLoopProtoABI.cancelName
+        )
+        return try await generateWithToolsCancellable(
+            requestBytes: requestBytes,
+            runLoop: runLoop,
+            cancelFn: cancelFn
+        )
+    }
 
-        // The legacy ABI has no cancel entry point, so the in-flight C call
-        // itself runs to completion regardless of Task state. Even so, route
-        // it through `withTaskCancellationHandler` + an upfront
-        // `Task.checkCancellation()` so a Task cancelled before — or by the
-        // time — the C call returns surfaces a `CancellationError` instead of
-        // silently delivering the result. Matches the with-handle path's
-        // Swift-level cancellation contract; only the in-flight cancel
-        // remains a no-op until the with-handle ABI is exported.
-        try Task.checkCancellation()
+    /// Cancellation-aware variant. Commons publishes the native run-loop
+    /// handle synchronously through `toolRunLoopHandlePublished`, before its
+    /// first generation iteration. `HandleBox` coordinates that callback
+    /// with Swift task cancellation and forwards cancellation through
+    /// `rac_tool_calling_run_loop_cancel_proto`.
+    private static func generateWithToolsCancellable(
+        requestBytes: Data,
+        runLoop: ToolCallingRunLoopProtoABI.RunLoop,
+        cancelFn: ToolCallingRunLoopProtoABI.Cancel
+    ) async throws -> RAToolCallingResult {
+        let handleBox = HandleBox(cancel: cancelFn)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
                 DispatchQueue.global(qos: .userInitiated).async {
                     let context = ToolExecuteContext()
                     let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                    let handleContextPtr = Unmanaged.passUnretained(handleBox).toOpaque()
                     var outBuffer = rac_proto_buffer_t()
                     let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
                         runLoop(
@@ -318,104 +311,13 @@ public extension RunAnywhere {
                             rawBuffer.count,
                             toolExecuteTrampoline,
                             contextPtr,
+                            toolRunLoopHandlePublished,
+                            handleContextPtr,
                             &outBuffer
                         )
                     }
+                    if Task.isCancelled { handleBox.requestCancellation() }
                     Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
-
-                    defer { NativeProtoABI.free(&outBuffer) }
-                    if Task.isCancelled {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    guard status == RAC_SUCCESS else {
-                        let message = outBuffer.error_message.map { String(cString: $0) }
-                            ?? "Tool calling run loop failed: \(status)"
-                        continuation.resume(throwing: SDKException(
-                            code: .processingFailed,
-                            message: message,
-                            category: .component
-                        ))
-                        return
-                    }
-                    do {
-                        let result = try NativeProtoABI.decode(
-                            RAToolCallingResult.self,
-                            from: outBuffer
-                        )
-                        continuation.resume(returning: result)
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-        } onCancel: {
-            // Best-effort: the legacy ABI cannot interrupt the in-flight
-            // native loop. The post-call `Task.isCancelled` check in the
-            // continuation body translates the Swift Task cancel into a
-            // `CancellationError` once the C call returns.
-        }
-    }
-
-    /// Cancellation-aware variant. Publishes the native run-loop handle via
-    /// the with-handle ABI and wires `withTaskCancellationHandler` to fan a
-    /// Swift Task cancel into `rac_tool_calling_run_loop_cancel_proto`.
-    ///
-    /// The handle slot MUST be stable cross-thread storage
-    /// that the C ABI writes to synchronously (commons writes
-    /// `*out_run_loop_handle = handle` at
-    /// `tool_calling_run_loop.cpp:391-393`, BEFORE any iteration work
-    /// starts). `HandleBox` owns a heap-allocated `UInt64` cell whose
-    /// address is passed directly into the C call — so the cancel handler
-    /// observes the real handle the instant the native call publishes it,
-    /// not after the entire synchronous loop returns. This mirrors the RN
-    /// `onHandle: (handle: number) => void` synchronous-publish pattern
-    /// from `RunAnywhere+ToolCalling.ts:247-252`.
-    private static func generateWithToolsCancellable(
-        requestBytes: Data,
-        runLoopWithHandle: ToolCallingRunLoopProtoABI.RunLoopWithHandle,
-        cancelFn: ToolCallingRunLoopProtoABI.Cancel
-    ) async throws -> RAToolCallingResult {
-        let handleBox = HandleBox()
-        return try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let context = ToolExecuteContext()
-                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
-                    var outBuffer = rac_proto_buffer_t()
-                    // Drive the C call through the HandleBox's heap cell so
-                    // the handle written by commons is visible to onCancel
-                    // mid-call, not just after the synchronous run loop
-                    // returns.
-                    let status = handleBox.withHandlePointer { handlePtr in
-                        requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
-                            runLoopWithHandle(
-                                rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                                rawBuffer.count,
-                                toolExecuteTrampoline,
-                                contextPtr,
-                                handlePtr,
-                                &outBuffer
-                            )
-                        }
-                    }
-                    // Snapshot before clearing so the post-return cancel
-                    // check (and any onCancel races against the same
-                    // handleBox.clear) can still see the value the C call
-                    // published.
-                    let publishedHandle = handleBox.value
-                    // If the Task was already cancelled by the time the
-                    // native call returned, fan that into the loop's
-                    // latched cancel slot — commons swallows cancels for
-                    // already-completed handles, so this is a safe no-op
-                    // when the loop finished cleanly.
-                    if Task.isCancelled, publishedHandle != 0 {
-                        _ = cancelFn(publishedHandle)
-                    }
-                    Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
-                    // Clear AFTER the post-call cancel fan-out so any
-                    // onCancel firing concurrently with this teardown
-                    // still observes the real handle.
                     handleBox.clear()
 
                     defer { NativeProtoABI.free(&outBuffer) }
@@ -441,23 +343,14 @@ public extension RunAnywhere {
                 }
             }
         } onCancel: {
-            let activeHandle = handleBox.value
-            if activeHandle != 0 {
-                _ = cancelFn(activeHandle)
-            }
+            handleBox.requestCancellation()
         }
     }
 
     // MARK: - Private Helpers
 
     private static func toolCallIdentifier(_ toolCall: RAToolCall) -> String? {
-        if !toolCall.id.isEmpty {
-            return toolCall.id
-        }
-        if !toolCall.callID.isEmpty {
-            return toolCall.callID
-        }
-        return nil
+        toolCall.id.isEmpty ? nil : toolCall.id
     }
 
     private static func makeToolResult(
@@ -479,15 +372,14 @@ public extension RunAnywhere {
         }
         if let toolCallID {
             toolResult.toolCallID = toolCallID
-            toolResult.callID = toolCallID
         }
         return toolResult
     }
 
     /// Build the `ToolCallingSessionCreateRequest` proto consumed by
-    /// `rac_tool_calling_run_loop_proto`. Mirrors the loop's old Swift
-    /// orchestration: applies `toolOptions` overrides on top of the base LLM
-    /// generation options and forwards the registered tool list.
+    /// `rac_tool_calling_run_loop_proto`. Applies `toolOptions`
+    /// overrides on top of the base LLM generation options and forwards the
+    /// registered tool list.
     private static func makeRunLoopRequest(
         prompt: String,
         options: RALLMGenerationOptions,
@@ -522,8 +414,11 @@ public extension RunAnywhere {
         }
 
         request.tools = tools
-        request.formatHint = toolOptions.resolvedFormatName
-        request.maxIterations = UInt32(max(toolOptions.maxToolCallCount, 0))
+        request.format = toolOptions.format
+        request.maxToolCalls = UInt32(toolOptions.maxToolCalls > 0 ? toolOptions.maxToolCalls : 5)
+        request.autoExecute = toolOptions.autoExecute
+        request.replaceSystemPrompt = toolOptions.replaceSystemPrompt
+        request.requireJsonArguments = toolOptions.requireJsonArguments
         request.keepToolsAvailable = toolOptions.keepToolsAvailable
         // `validate_calls` is `optional bool` on the proto so
         // hosts that delegate validation/authorization to their executor (or
@@ -655,56 +550,57 @@ private final class ToolResultBox: @unchecked Sendable {
     }
 }
 
-/// Shared handle slot between the
-/// DispatchQueue thread that owns the in-flight C call and the `onCancel`
-/// closure that may fire from any thread.
-///
-/// The handle lives in a heap-allocated `UnsafeMutablePointer<UInt64>` cell
-/// so its address is stable for the lifetime of the box and can be passed
-/// directly to the C ABI. Commons writes `*out_run_loop_handle = handle`
-/// synchronously inside `rac_tool_calling_run_loop_with_handle_proto`
-/// before the iteration loop begins
-/// (sdk/runanywhere-commons/src/features/llm/tool_calling_run_loop.cpp:391-393),
-/// so `onCancel` reading `value` while the C call is in flight observes
-/// the real handle — not zero. Reads/writes are coordinated through
-/// OSAllocatedUnfairLock (the Swift 6 / iOS 16+ replacement for NSLock).
+private let toolRunLoopHandlePublished: ToolCallingRunLoopProtoABI.HandlePublishedCallback = { handle, userData in
+    guard let userData else { return }
+    let handleBox = Unmanaged<HandleBox>.fromOpaque(userData).takeUnretainedValue()
+    handleBox.publish(handle)
+}
+
+/// Thread-safe bridge between the native handle-publication callback and the
+/// Swift task cancellation handler. A cancellation requested before handle
+/// publication is delivered asynchronously immediately after publication so
+/// the callback does not re-enter the tool-calling C ABI.
 private final class HandleBox: @unchecked Sendable {
-    // Stateless lock — the value lives in `cell` (a heap pointer) because
-    // OSAllocatedUnfairLock's internal state has no stable address that
-    // could be handed to the C ABI.
-    private let lock = OSAllocatedUnfairLock<Void>(initialState: ())
-    private let cell: UnsafeMutablePointer<UInt64>
-
-    init() {
-        cell = UnsafeMutablePointer<UInt64>.allocate(capacity: 1)
-        cell.initialize(to: 0)
+    private struct State {
+        var handle: UInt64 = 0
+        var cancellationRequested = false
+        var cancellationDelivered = false
     }
 
-    deinit {
-        cell.deinitialize(count: 1)
-        cell.deallocate()
+    private let state = OSAllocatedUnfairLock<State>(initialState: State())
+    private let cancel: ToolCallingRunLoopProtoABI.Cancel
+
+    init(cancel: @escaping ToolCallingRunLoopProtoABI.Cancel) {
+        self.cancel = cancel
     }
 
-    /// Run `body` with the cell pointer so the C ABI can write the handle
-    /// directly into shared storage. The lock is NOT held across `body`
-    /// because the C call is synchronous on the caller's thread and the
-    /// only concurrent reader (`value` from onCancel) takes the lock for
-    /// its read; UnsafeMutablePointer load/store of UInt64 on supported
-    /// platforms is naturally atomic for the read-after-write the cancel
-    /// handler performs.
-    func withHandlePointer<T>(_ body: (UnsafeMutablePointer<UInt64>) -> T) -> T {
-        body(cell)
+    func publish(_ handle: UInt64) {
+        let shouldCancel = state.withLock { state in
+            state.handle = handle
+            guard state.cancellationRequested, !state.cancellationDelivered else { return false }
+            state.cancellationDelivered = true
+            return true
+        }
+        guard shouldCancel else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            _ = cancel(handle)
+        }
     }
 
-    /// Current handle value. Safe to call from any thread.
-    var value: UInt64 {
-        lock.withLock { _ in cell.pointee }
+    func requestCancellation() {
+        let handle = state.withLock { state -> UInt64 in
+            state.cancellationRequested = true
+            guard state.handle != 0, !state.cancellationDelivered else { return 0 }
+            state.cancellationDelivered = true
+            return state.handle
+        }
+        if handle != 0 {
+            _ = cancel(handle)
+        }
     }
 
-    /// Reset the handle to zero. Called after the C call returns so a
-    /// late-firing `onCancel` no-ops instead of cancelling a stale handle.
     func clear() {
-        lock.withLock { _ in cell.pointee = 0 }
+        state.withLock { $0.handle = 0 }
     }
 }
 

@@ -6,6 +6,9 @@ const runtimeState = vi.hoisted(() => ({
 const registrationState = vi.hoisted(() => ({
   waitForPendingRegistration: vi.fn(),
 }));
+const protoState = vi.hoisted(() => ({
+  hasCompletedHttpSetup: true,
+}));
 
 vi.mock('../../../src/runtime/EmscriptenModule', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -41,7 +44,7 @@ vi.mock('../../../src/runtime/ProtoWasm', () => ({
       callback(16);
       return {
         success: true,
-        hasCompletedHttpSetup: true,
+        hasCompletedHttpSetup: protoState.hasCompletedHttpSetup,
       } as T;
     }
   },
@@ -71,8 +74,28 @@ function fakeSdkModule() {
 describe('RunAnywhere services lifecycle', () => {
   afterEach(async () => {
     registrationState.waitForPendingRegistration.mockReset();
+    protoState.hasCompletedHttpSetup = true;
     runtimeState.module = null;
     await RunAnywhere.shutdown();
+  });
+
+  it('keeps a no-module Phase 2 attempt retryable after a module registers', async () => {
+    runtimeState.module = null;
+
+    await RunAnywhere.completeServicesInitialization();
+    await expect(RunAnywhere.ensureServicesReady()).rejects.toMatchObject({
+      proto: {
+        message: expect.stringContaining('initialize()'),
+      },
+    });
+
+    const module = fakeSdkModule();
+    runtimeState.module = module;
+    registrationState.waitForPendingRegistration.mockResolvedValue(false);
+    await RunAnywhere.completeServicesInitialization();
+
+    expect(module._rac_sdk_init_phase2_proto).toHaveBeenCalledOnce();
+    expect(RunAnywhere.areServicesReady).toBe(true);
   });
 
   it('does not let registration completion from a shut-down lifetime mutate a reinitialize', async () => {
@@ -102,5 +125,43 @@ describe('RunAnywhere services lifecycle', () => {
 
     expect(newModule._rac_sdk_init_phase2_proto).toHaveBeenCalledOnce();
     expect(RunAnywhere.areServicesReady).toBe(true);
+  });
+
+  it('retries HTTP setup only through the current proto API', async () => {
+    protoState.hasCompletedHttpSetup = false;
+    registrationState.waitForPendingRegistration.mockResolvedValue(false);
+    const retry = vi.fn(() => 0);
+    const legacyAuthProbe = vi.fn(() => 1);
+    runtimeState.module = {
+      ...fakeSdkModule(),
+      _rac_sdk_retry_http_proto: retry,
+      _rac_auth_is_authenticated: legacyAuthProbe,
+    };
+
+    await RunAnywhere.completeServicesInitialization();
+    protoState.hasCompletedHttpSetup = true;
+    await RunAnywhere.ensureServicesReady();
+
+    expect(retry).toHaveBeenCalledOnce();
+    expect(legacyAuthProbe).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale WASM artifact without the current HTTP retry API', async () => {
+    protoState.hasCompletedHttpSetup = false;
+    registrationState.waitForPendingRegistration.mockResolvedValue(false);
+    const legacyAuthProbe = vi.fn(() => 1);
+    runtimeState.module = {
+      ...fakeSdkModule(),
+      _rac_auth_is_authenticated: legacyAuthProbe,
+    };
+
+    await RunAnywhere.completeServicesInitialization();
+
+    await expect(RunAnywhere.ensureServicesReady()).rejects.toMatchObject({
+      proto: {
+        nestedMessage: expect.stringContaining('_rac_sdk_retry_http_proto'),
+      },
+    });
+    expect(legacyAuthProbe).not.toHaveBeenCalled();
   });
 });

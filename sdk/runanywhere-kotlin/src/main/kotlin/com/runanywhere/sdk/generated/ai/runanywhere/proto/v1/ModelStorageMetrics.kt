@@ -36,10 +36,8 @@ import okio.ByteString
  * model_types.proto. This avoids circular embeds and keeps the wire payload
  * for storage queries small.
  *
- * `last_used_ms` (epoch ms, optional) preserves the field that lived on the
- * older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
- * other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
- * LRU eviction without another type round-trip.
+ * `last_used_ms` supports LRU presentation and eviction without another type
+ * round-trip.
  *
  * Sources pre-IDL: see header drift table.
  * ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@
 
 #include "rac_mlx_callbacks_internal.h"
 
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -12,6 +13,7 @@
 #include <new>
 #include <string>
 
+#include "common/rac_engine_unavailable.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -23,7 +25,6 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry_mlx.h"
-#include "common/rac_engine_unavailable.h"
 
 #define LOG_CAT "MLX"
 
@@ -32,14 +33,23 @@ namespace {
 std::mutex g_callbacks_mutex;
 rac_mlx_callbacks_t g_callbacks = {};
 bool g_callbacks_set = false;
+ra_mlx_clear_cancel_fn g_clear_cancel = nullptr;
+void* g_clear_cancel_user_data = nullptr;
 
 struct MlxSession {
-    std::mutex mutex;
+    // Normal operations remain serialized, but interrupt callbacks must not
+    // take this mutex: an active Swift inference callback owns it until the
+    // callback returns and relies on cancel/stop being callable concurrently.
+    std::mutex operation_mutex;
+    std::mutex state_mutex;
+    std::condition_variable interrupts_finished;
     rac_mlx_session_kind_t kind = RAC_MLX_SESSION_KIND_LLM;
     rac_handle_t swift_handle = nullptr;
     std::string model_id;
     std::string model_path;
+    size_t interrupts_in_flight = 0;
     bool initialized = false;
+    bool operation_active = false;
     bool closing = false;
 };
 
@@ -55,12 +65,111 @@ rac_result_t lock_session(void* impl, std::unique_lock<std::mutex>& lock, MlxSes
     if (session == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
-    lock = std::unique_lock<std::mutex>(session->mutex);
-    if (session->closing || session->swift_handle == nullptr) {
-        return RAC_ERROR_INVALID_HANDLE;
+    lock = std::unique_lock<std::mutex>(session->operation_mutex);
+    {
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
+        if (session->closing || session->swift_handle == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
     }
     *out = session;
     return RAC_SUCCESS;
+}
+
+class MlxCancellableOperation {
+   public:
+    MlxCancellableOperation() = default;
+
+    rac_result_t begin(void* impl) {
+        if (!impl) {
+            return RAC_ERROR_NULL_POINTER;
+        }
+        session_ = as_session(impl);
+        operation_lock_ = std::unique_lock<std::mutex>(session_->operation_mutex);
+        {
+            std::lock_guard<std::mutex> state_lock(session_->state_mutex);
+            if (session_->closing || session_->swift_handle == nullptr) {
+                session_ = nullptr;
+                return RAC_ERROR_INVALID_HANDLE;
+            }
+            swift_handle_ = session_->swift_handle;
+        }
+        // Clear only while interrupts are filtered. Once operation_active is
+        // published, every cancellation belongs to this admitted operation
+        // and Swift must not reset it at inference entry.
+        runanywhere::commons::mlx::clear_cancel(swift_handle_);
+        {
+            std::lock_guard<std::mutex> state_lock(session_->state_mutex);
+            if (session_->closing) {
+                session_ = nullptr;
+                return RAC_ERROR_INVALID_HANDLE;
+            }
+            session_->operation_active = true;
+        }
+        return RAC_SUCCESS;
+    }
+
+    ~MlxCancellableOperation() {
+        if (!session_) {
+            return;
+        }
+        {
+            std::unique_lock<std::mutex> state_lock(session_->state_mutex);
+            session_->operation_active = false;
+            session_->interrupts_finished.wait(state_lock,
+                                               [&] { return session_->interrupts_in_flight == 0; });
+        }
+        // All interrupts admitted for the completed callback have returned,
+        // and new ones are filtered by operation_active=false. Resetting here
+        // cannot erase a current operation or leak cancellation to a successor.
+        runanywhere::commons::mlx::clear_cancel(swift_handle_);
+    }
+
+    rac_handle_t swift_handle() const { return swift_handle_; }
+
+    MlxCancellableOperation(const MlxCancellableOperation&) = delete;
+    MlxCancellableOperation& operator=(const MlxCancellableOperation&) = delete;
+
+   private:
+    MlxSession* session_ = nullptr;
+    rac_handle_t swift_handle_ = nullptr;
+    std::unique_lock<std::mutex> operation_lock_;
+};
+
+template <typename Callback>
+rac_result_t dispatch_interrupt(void* impl, Callback callback, void* user_data) {
+    if (!impl) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (callback == nullptr) {
+        return RAC_SUCCESS;
+    }
+
+    auto* session = as_session(impl);
+    rac_handle_t swift_handle = nullptr;
+    {
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
+        if (session->closing || session->swift_handle == nullptr) {
+            return RAC_ERROR_INVALID_HANDLE;
+        }
+        // A late interrupt after the Swift callback returned belongs to the
+        // completed operation. Ignoring it here prevents poisoning the next
+        // inference on this session.
+        if (!session->operation_active) {
+            return RAC_SUCCESS;
+        }
+        swift_handle = session->swift_handle;
+        session->interrupts_in_flight += 1;
+    }
+
+    const rac_result_t rc = callback(swift_handle, user_data);
+
+    {
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
+        session->interrupts_in_flight -= 1;
+    }
+    session->interrupts_finished.notify_all();
+    return rc;
 }
 
 std::string normalized_load_path(const char* model_path) {
@@ -75,8 +184,7 @@ std::string normalized_load_path(const char* model_path) {
     return load_path;
 }
 
-rac_result_t create_session(rac_mlx_session_kind_t kind, const char* model_id,
-                            const char* config_json, void** out_impl) {
+rac_result_t create_session(rac_mlx_session_kind_t kind, const char* model_id, void** out_impl) {
     if (!out_impl) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -89,8 +197,7 @@ rac_result_t create_session(rac_mlx_session_kind_t kind, const char* model_id,
     }
 
     rac_handle_t swift_handle = nullptr;
-    rac_result_t rc =
-        callbacks.create(kind, model_id, config_json, &swift_handle, callbacks.user_data);
+    rac_result_t rc = callbacks.create(kind, model_id, &swift_handle, callbacks.user_data);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
@@ -139,17 +246,14 @@ rac_result_t mlx_initialize(void* impl, const char* model_path) {
 }
 
 rac_result_t mlx_cancel(void* impl) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
+    if (!impl) {
+        return RAC_ERROR_NULL_POINTER;
     }
     rac_mlx_callbacks_t callbacks = {};
     if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) || callbacks.cancel == nullptr) {
         return RAC_SUCCESS;
     }
-    return callbacks.cancel(session->swift_handle, callbacks.user_data);
+    return dispatch_interrupt(impl, callbacks.cancel, callbacks.user_data);
 }
 
 rac_result_t mlx_cleanup(void* impl) {
@@ -180,8 +284,14 @@ void mlx_destroy(void* impl) {
     rac_mlx_callbacks_t callbacks = {};
     rac_handle_t swift_handle = nullptr;
     {
-        std::lock_guard<std::mutex> lock(session->mutex);
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
         session->closing = true;
+    }
+    {
+        std::unique_lock<std::mutex> operation_lock(session->operation_mutex);
+        std::unique_lock<std::mutex> state_lock(session->state_mutex);
+        session->interrupts_finished.wait(state_lock,
+                                          [&] { return session->interrupts_in_flight == 0; });
         swift_handle = session->swift_handle;
         session->swift_handle = nullptr;
         session->initialized = false;
@@ -200,12 +310,6 @@ rac_result_t llm_initialize(void* impl, const char* model_path) {
 
 rac_result_t llm_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
                           rac_llm_result_t* out_result) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!prompt || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -214,18 +318,17 @@ rac_result_t llm_generate(void* impl, const char* prompt, const rac_llm_options_
         callbacks.llm_generate == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    return callbacks.llm_generate(session->swift_handle, prompt, options, out_result,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.llm_generate(operation.swift_handle(), prompt, options, out_result,
                                   callbacks.user_data);
 }
 
 rac_result_t llm_generate_stream(void* impl, const char* prompt, const rac_llm_options_t* options,
                                  rac_llm_stream_callback_fn callback, void* user_data) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!prompt || !callback) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -234,7 +337,12 @@ rac_result_t llm_generate_stream(void* impl, const char* prompt, const rac_llm_o
         callbacks.llm_generate_stream == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    return callbacks.llm_generate_stream(session->swift_handle, prompt, options, callback,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.llm_generate_stream(operation.swift_handle(), prompt, options, callback,
                                          user_data, callbacks.user_data);
 }
 
@@ -245,7 +353,7 @@ rac_result_t llm_get_info(void* impl, rac_llm_info_t* out_info) {
     MlxSession* session = as_session(impl);
     std::unique_lock<std::mutex> lock;
     if (session) {
-        lock = std::unique_lock<std::mutex>(session->mutex);
+        lock = std::unique_lock<std::mutex>(session->operation_mutex);
     }
     out_info->is_ready = session && session->initialized ? RAC_TRUE : RAC_FALSE;
     out_info->supports_streaming = RAC_TRUE;
@@ -255,8 +363,8 @@ rac_result_t llm_get_info(void* impl, rac_llm_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t llm_create(const char* model_id, const char* config_json, void** out_impl) {
-    return create_session(RAC_MLX_SESSION_KIND_LLM, model_id, config_json, out_impl);
+rac_result_t llm_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_LLM, model_id, out_impl);
 }
 
 rac_result_t vlm_initialize(void* impl, const char* model_path, const char* mmproj_path) {
@@ -266,12 +374,6 @@ rac_result_t vlm_initialize(void* impl, const char* model_path, const char* mmpr
 
 rac_result_t vlm_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
                          const rac_vlm_options_t* options, rac_vlm_result_t* out_result) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!image || !prompt || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -280,19 +382,18 @@ rac_result_t vlm_process(void* impl, const rac_vlm_image_t* image, const char* p
         callbacks.vlm_process == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    return callbacks.vlm_process(session->swift_handle, image, prompt, options, out_result,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.vlm_process(operation.swift_handle(), image, prompt, options, out_result,
                                  callbacks.user_data);
 }
 
 rac_result_t vlm_process_stream(void* impl, const rac_vlm_image_t* image, const char* prompt,
                                 const rac_vlm_options_t* options,
                                 rac_vlm_stream_callback_fn callback, void* user_data) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!image || !prompt || !callback) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -301,7 +402,12 @@ rac_result_t vlm_process_stream(void* impl, const rac_vlm_image_t* image, const 
         callbacks.vlm_process_stream == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    return callbacks.vlm_process_stream(session->swift_handle, image, prompt, options, callback,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.vlm_process_stream(operation.swift_handle(), image, prompt, options, callback,
                                         user_data, callbacks.user_data);
 }
 
@@ -312,7 +418,7 @@ rac_result_t vlm_get_info(void* impl, rac_vlm_info_t* out_info) {
     MlxSession* session = as_session(impl);
     std::unique_lock<std::mutex> lock;
     if (session) {
-        lock = std::unique_lock<std::mutex>(session->mutex);
+        lock = std::unique_lock<std::mutex>(session->operation_mutex);
     }
     out_info->is_ready = session && session->initialized ? RAC_TRUE : RAC_FALSE;
     out_info->current_model =
@@ -324,8 +430,8 @@ rac_result_t vlm_get_info(void* impl, rac_vlm_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t vlm_create(const char* model_id, const char* config_json, void** out_impl) {
-    return create_session(RAC_MLX_SESSION_KIND_VLM, model_id, config_json, out_impl);
+rac_result_t vlm_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_VLM, model_id, out_impl);
 }
 
 rac_result_t embedding_initialize(void* impl, const char* model_path) {
@@ -384,8 +490,8 @@ rac_result_t embedding_get_info(void* impl, rac_embeddings_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t embedding_create(const char* model_id, const char* config_json, void** out_impl) {
-    return create_session(RAC_MLX_SESSION_KIND_EMBEDDINGS, model_id, config_json, out_impl);
+rac_result_t embedding_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_EMBEDDINGS, model_id, out_impl);
 }
 
 rac_result_t stt_initialize(void* impl, const char* model_path) {
@@ -440,9 +546,14 @@ rac_result_t stt_get_info(void* impl, rac_stt_info_t* out_info) {
     MlxSession* session = as_session(impl);
     std::unique_lock<std::mutex> lock;
     if (session) {
-        lock = std::unique_lock<std::mutex>(session->mutex);
+        lock = std::unique_lock<std::mutex>(session->operation_mutex);
     }
-    if (session && !session->closing && session->swift_handle) {
+    bool session_available = false;
+    if (session) {
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
+        session_available = !session->closing && session->swift_handle != nullptr;
+    }
+    if (session_available) {
         rac_mlx_callbacks_t callbacks = {};
         if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
             callbacks.stt_info != nullptr) {
@@ -456,8 +567,8 @@ rac_result_t stt_get_info(void* impl, rac_stt_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t stt_create(const char* model_id, const char* config_json, void** out_impl) {
-    return create_session(RAC_MLX_SESSION_KIND_STT, model_id, config_json, out_impl);
+rac_result_t stt_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_STT, model_id, out_impl);
 }
 
 rac_result_t tts_initialize(void* impl) {
@@ -467,8 +578,8 @@ rac_result_t tts_initialize(void* impl) {
     if (rc != RAC_SUCCESS) {
         return rc;
     }
-    const std::string& load_path = !session->model_path.empty() ? session->model_path
-                                                                : session->model_id;
+    const std::string& load_path =
+        !session->model_path.empty() ? session->model_path : session->model_id;
     if (load_path.empty()) {
         return RAC_ERROR_INVALID_PATH;
     }
@@ -487,12 +598,6 @@ rac_result_t tts_initialize(void* impl) {
 
 rac_result_t tts_synthesize(void* impl, const char* text, const rac_tts_options_t* options,
                             rac_tts_result_t* out_result) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!text || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -501,18 +606,17 @@ rac_result_t tts_synthesize(void* impl, const char* text, const rac_tts_options_
         callbacks.tts_synthesize == nullptr) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
     }
-    return callbacks.tts_synthesize(session->swift_handle, text, options, out_result,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.tts_synthesize(operation.swift_handle(), text, options, out_result,
                                     callbacks.user_data);
 }
 
 rac_result_t tts_synthesize_stream(void* impl, const char* text, const rac_tts_options_t* options,
                                    rac_tts_stream_callback_t callback, void* user_data) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
     if (!text || !callback) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -521,24 +625,26 @@ rac_result_t tts_synthesize_stream(void* impl, const char* text, const rac_tts_o
         callbacks.tts_synthesize_stream == nullptr) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
-    return callbacks.tts_synthesize_stream(session->swift_handle, text, options, callback,
+    MlxCancellableOperation operation;
+    const rac_result_t rc = operation.begin(impl);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.tts_synthesize_stream(operation.swift_handle(), text, options, callback,
                                            user_data, callbacks.user_data);
 }
 
 rac_result_t tts_stop(void* impl) {
-    MlxSession* session = nullptr;
-    std::unique_lock<std::mutex> lock;
-    rac_result_t rc = lock_session(impl, lock, &session);
-    if (rc != RAC_SUCCESS) {
-        return rc;
+    if (!impl) {
+        return RAC_ERROR_NULL_POINTER;
     }
     rac_mlx_callbacks_t callbacks = {};
     if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
         callbacks.tts_stop != nullptr) {
-        return callbacks.tts_stop(session->swift_handle, callbacks.user_data);
+        return dispatch_interrupt(impl, callbacks.tts_stop, callbacks.user_data);
     }
     if (callbacks.cancel != nullptr) {
-        return callbacks.cancel(session->swift_handle, callbacks.user_data);
+        return dispatch_interrupt(impl, callbacks.cancel, callbacks.user_data);
     }
     return RAC_SUCCESS;
 }
@@ -550,9 +656,14 @@ rac_result_t tts_get_info(void* impl, rac_tts_info_t* out_info) {
     MlxSession* session = as_session(impl);
     std::unique_lock<std::mutex> lock;
     if (session) {
-        lock = std::unique_lock<std::mutex>(session->mutex);
+        lock = std::unique_lock<std::mutex>(session->operation_mutex);
     }
-    if (session && !session->closing && session->swift_handle) {
+    bool session_available = false;
+    if (session) {
+        std::lock_guard<std::mutex> state_lock(session->state_mutex);
+        session_available = !session->closing && session->swift_handle != nullptr;
+    }
+    if (session_available) {
         rac_mlx_callbacks_t callbacks = {};
         if (runanywhere::commons::mlx::snapshot_callbacks(&callbacks) &&
             callbacks.tts_info != nullptr) {
@@ -566,8 +677,8 @@ rac_result_t tts_get_info(void* impl, rac_tts_info_t* out_info) {
     return RAC_SUCCESS;
 }
 
-rac_result_t tts_create(const char* model_id, const char* config_json, void** out_impl) {
-    return create_session(RAC_MLX_SESSION_KIND_TTS, model_id, config_json, out_impl);
+rac_result_t tts_create(const char* model_id, const char* /*config_json*/, void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_TTS, model_id, out_impl);
 }
 
 rac_result_t mlx_capability_check(void) {
@@ -596,9 +707,29 @@ bool snapshot_callbacks(rac_mlx_callbacks_t* out) {
     return true;
 }
 
+void clear_cancel(rac_handle_t handle) {
+    ra_mlx_clear_cancel_fn callback = nullptr;
+    void* user_data = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_callbacks_mutex);
+        callback = g_clear_cancel;
+        user_data = g_clear_cancel_user_data;
+    }
+    if (callback) {
+        callback(handle, user_data);
+    }
+}
+
 }  // namespace runanywhere::commons::mlx
 
 extern "C" {
+
+rac_result_t ra_mlx_set_clear_cancel_callback(ra_mlx_clear_cancel_fn callback, void* user_data) {
+    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
+    g_clear_cancel = callback;
+    g_clear_cancel_user_data = user_data;
+    return RAC_SUCCESS;
+}
 
 rac_result_t rac_mlx_set_callbacks(const rac_mlx_callbacks_t* callbacks) {
     if (!callbacks || callbacks->struct_size != sizeof(rac_mlx_callbacks_t) ||
@@ -701,11 +832,8 @@ static const uint32_t k_mlx_formats[] = {
 };
 
 static const rac_primitive_t k_mlx_primitives[] = {
-    RAC_PRIMITIVE_GENERATE_TEXT,
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_SYNTHESIZE,
-    RAC_PRIMITIVE_EMBED,
-    RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE, RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_EMBED,         RAC_PRIMITIVE_VLM,
 };
 
 static const rac_engine_manifest_t k_mlx_manifest = {

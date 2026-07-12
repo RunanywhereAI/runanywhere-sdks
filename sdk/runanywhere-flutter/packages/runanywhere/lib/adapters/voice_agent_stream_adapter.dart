@@ -16,8 +16,6 @@
 
 import 'dart:async';
 import 'dart:ffi' as ffi;
-// NativeCallable moved from dart:isolate to dart:ffi in Dart 3.1+.
-import 'dart:ffi' show NativeCallable;
 import 'dart:isolate';
 import 'dart:typed_data' show Uint8List;
 
@@ -80,9 +78,7 @@ class _VoiceHandleFanOut {
   final ffi.Pointer<ffi.Void> _handle;
   final void Function() _onTornDown;
   final Set<StreamController<VoiceEvent>> _controllers = {};
-  NativeCallable<_CCallbackNative>? _nativeCb;
   ReceivePort? _receivePort;
-  bool _usingNativePort = false;
 
   bool attach(StreamController<VoiceEvent> controller) {
     // Add the controller BEFORE calling _install() so that a
@@ -97,7 +93,7 @@ class _VoiceHandleFanOut {
     return true;
   }
 
-  bool get _isInstalled => _usingNativePort || _nativeCb != null;
+  bool get _isInstalled => _receivePort != null;
 
   void detach(StreamController<VoiceEvent> controller) {
     _controllers.remove(controller);
@@ -108,13 +104,13 @@ class _VoiceHandleFanOut {
 
   bool _install() {
     final bindings = RacNative.bindings;
-    if (bindings.ra_flutter_voice_agent_set_proto_callback_native_port !=
-            null &&
-        bindings.ra_flutter_voice_agent_unset_proto_callback_native_port !=
+    if (bindings.ra_flutter_voice_agent_set_proto_callback_native_port ==
+            null ||
+        bindings.ra_flutter_voice_agent_unset_proto_callback_native_port ==
             null) {
-      return _installNativePort();
+      return false;
     }
-    return _installNativeCallable();
+    return _installNativePort();
   }
 
   bool _installNativePort() {
@@ -144,44 +140,6 @@ class _VoiceHandleFanOut {
     }
 
     _receivePort = port;
-    _usingNativePort = true;
-    return true;
-  }
-
-  bool _installNativeCallable() {
-    // Fallback for older or unsupported binaries that do not export the Flutter
-    // native-port helper. `NativeCallable.listener` is cross-thread safe, but
-    // it runs later on the Dart event loop. Commons only keeps `event_bytes`
-    // alive for the callback invocation and reuses a thread-local scratch
-    // buffer immediately after it returns, so a listener can read corrupted
-    // bytes. Use `isolateLocal` here so bytes are copied before returning to
-    // commons. This fallback remains valid only for callbacks invoked on the
-    // registering Dart isolate.
-    final cb = NativeCallable<_CCallbackNative>.isolateLocal((
-      ffi.Pointer<ffi.Uint8> bytesPtr,
-      int bytesLen,
-      ffi.Pointer<ffi.Void> _,
-    ) {
-      if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
-      final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-      try {
-        _broadcast(VoiceEvent.fromBuffer(copy));
-      } catch (e, st) {
-        _broadcastError(e, st);
-      }
-    });
-
-    final rc = RacNative.bindings.rac_voice_agent_set_proto_callback(
-      _handle,
-      cb.nativeFunction,
-      ffi.nullptr,
-    );
-    if (rc != 0) {
-      cb.close();
-      return false;
-    }
-
-    _nativeCb = cb;
     return true;
   }
 
@@ -207,51 +165,18 @@ class _VoiceHandleFanOut {
   }
 
   void _tearDown() {
-    if (_usingNativePort) {
-      final bindings = RacNative.bindings;
-      final unsetFn =
-          bindings.ra_flutter_voice_agent_unset_proto_callback_native_port;
-      if (unsetFn != null) {
-        unsetFn(_handle);
-      } else {
-        bindings.rac_voice_agent_set_proto_callback(
-          _handle,
-          ffi.nullptr,
-          ffi.nullptr,
-        );
-        bindings.rac_voice_agent_proto_quiesce?.call();
-      }
-      _receivePort?.close();
-      _receivePort = null;
-      _usingNativePort = false;
-      _onTornDown();
-      return;
+    if (_receivePort == null) return;
+    final unsetFn = RacNative
+        .bindings
+        .ra_flutter_voice_agent_unset_proto_callback_native_port;
+    if (unsetFn == null) {
+      throw UnsupportedError(
+        'ra_flutter_voice_agent_unset_proto_callback_native_port is unavailable',
+      );
     }
-
-    final cb = _nativeCb;
-    if (cb == null) return;
-    // Teardown ordering: (1) unregister the C callback so no NEW
-    // dispatches will fire, (2) `rac_voice_agent_proto_quiesce()` spins
-    // until every in-flight dispatch returns, (3) close the NativeCallable
-    // whose `user_data` was the dispatcher's argument. Skipping the quiesce
-    // step lets the dispatcher invoke the trampoline after the
-    // NativeCallable is freed (UAF). Mirrors Swift's
-    // `HandleStreamAdapter.tearDown()` lock-release-before-unregister
-    // pattern in
-    // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
-    RacNative.bindings.rac_voice_agent_set_proto_callback(
-      _handle,
-      ffi.nullptr,
-      ffi.nullptr,
-    );
-    RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
-    cb.close();
-    _nativeCb = null;
+    unsetFn(_handle);
+    _receivePort?.close();
+    _receivePort = null;
     _onTornDown();
   }
 }
-
-/// `void (*)(uint8_t*, size_t, void*)` matching
-/// `rac_voice_agent_proto_event_callback_fn`.
-typedef _CCallbackNative =
-    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);

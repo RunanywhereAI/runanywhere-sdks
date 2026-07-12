@@ -147,7 +147,7 @@ echo "=== Downloading Sherpa-ONNX ==="
 ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
 
 echo "=== Building runanywhere-commons ==="
-./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+./sdk/runanywhere-commons/scripts/build-linux.sh
 
 echo "=== Downloading models ==="
 cd Playground/openclaw-hybrid-assistant
@@ -166,7 +166,7 @@ cmake --build . -j\$(nproc)
 cd ..
 
 echo "=== Running tests ==="
-export LD_LIBRARY_PATH="${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/\$(uname -m):${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/lib:${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH"
 ./build/test-components --run-all
 EOF
 
@@ -200,7 +200,7 @@ test_with_orbstack() {
 
         echo '=== Building ==='
         ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
-        ./sdk/runanywhere-commons/scripts/build-linux.sh --shared
+        ./sdk/runanywhere-commons/scripts/build-linux.sh
 
         cd Playground/openclaw-hybrid-assistant
         ./scripts/download-models.sh
@@ -213,7 +213,7 @@ test_with_orbstack() {
         cd ..
 
         echo '=== Running tests ==='
-        export LD_LIBRARY_PATH='${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/\$(uname -m):${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH'
+        export LD_LIBRARY_PATH='${ROOT_DIR}/sdk/runanywhere-commons/dist/linux/lib:${ROOT_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:\$LD_LIBRARY_PATH'
         ./build/test-components --run-all
     "
 

@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%2013.0%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 13.0+ | Android 7.0+" />
-  <img src="https://img.shields.io/badge/Flutter-3.24%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" />
-  <img src="https://img.shields.io/badge/Dart-3.5%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" />
+  <img src="https://img.shields.io/badge/Platform-iOS%2017.5%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 17.5+ | Android 7.0+" />
+  <img src="https://img.shields.io/badge/Flutter-3.44.6%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.44.6+" />
+  <img src="https://img.shields.io/badge/Dart-3.12.2%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.12.2+" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
 </p>
 
@@ -23,9 +23,9 @@
 
 Prerequisites:
 
-- Flutter 3.24+ and Dart 3.5+ on `PATH`.
+- Flutter 3.44.6+ and Dart 3.12.2+ on `PATH`.
 - Android Studio with Android SDK 24+, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
-- Xcode 15+ and CocoaPods for iOS simulator builds.
+- Xcode 26+ and CocoaPods for iOS simulator builds.
 - JDK 17 and enough disk for native artifacts and downloaded AI models.
 
 From a fresh checkout:
@@ -48,7 +48,7 @@ flutter build ios --simulator --debug
 Notes:
 
 - `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
-- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
+- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into package-owned `ios/<package>/Frameworks` directories shared by CocoaPods and SwiftPM.
 - If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
 - `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 
@@ -72,13 +72,13 @@ This sample app's `pubspec.yaml` uses path dependencies to reference the local F
 ```
 This Sample App → Local Flutter SDK packages (sdk/runanywhere-flutter/packages/)
                           ↓
-              Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/src/main/jniLibs/)
+              Local XCFrameworks/JNI libs (in package-owned ios/<package>/Frameworks/ and android/src/main/jniLibs/)
                           ↑
            Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh + ./scripts/build/build-core-android.sh
 ```
 
 Repo-root native build scripts (called from project root):
-1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
+1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into package-owned `sdk/runanywhere-flutter/packages/*/ios/<package>/Frameworks/` directories.
 2. `./scripts/build/build-core-android.sh <ABI>` — builds Android `.so` libraries and stages them into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
 
 Local consumption is enabled by the `runanywhere.useLocalNatives=true` Gradle property (default for development checkouts).
@@ -248,9 +248,9 @@ RunAnywhereAI/
 
 ### Prerequisites
 
-- **Flutter** 3.10.0 or later ([install guide](https://flutter.dev/docs/get-started/install))
-- **Dart** 3.0.0 or later (included with Flutter)
-- **iOS** — Xcode 14+ (for iOS builds)
+- **Flutter** 3.44.6 or later ([install guide](https://flutter.dev/docs/get-started/install))
+- **Dart** 3.12.2 or later (included with Flutter)
+- **iOS** — Xcode 26+ with an iOS 17.5+ deployment target
 - **Android** — Android Studio + SDK 21+ (for Android builds)
 - **~2GB** free storage for AI models
 - **Device** — Physical device recommended for best performance

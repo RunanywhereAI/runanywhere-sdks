@@ -64,8 +64,79 @@ class BuildCoreAndroidGuardTest(unittest.TestCase):
             engine.write_bytes(b"prefix qhexrt:engine-available suffix")
             self.assertEqual(self.run_bash(command).returncode, 0)
 
+    def test_qairt_discovery_skips_newer_runtime_with_wrong_identity(self):
+        functions = function_source("qairt_identity_matches", "validate_linked_qhexrt_outputs")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "runanywhere-sdks"
+            repo.mkdir()
+            manifest = root / "qhexrt-prebuilt.json"
+            expected = b"matching runtime"
+            manifest.write_text(json.dumps({
+                "build": {"qnn_sdk": {
+                    "metadata_file": "sdk.yaml",
+                    "metadata_sha256": hashlib.sha256(expected).hexdigest(),
+                }},
+            }), encoding="utf-8")
+            matching = root / "qairt" / "2.47.0"
+            mismatched = root / "qairt" / "9.99.0"
+            for candidate, metadata in ((matching, expected), (mismatched, b"different runtime")):
+                (candidate / "lib" / "aarch64-android").mkdir(parents=True)
+                (candidate / "sdk.yaml").write_bytes(metadata)
+            command = (
+                f'{functions}\n'
+                f'REPO_ROOT="{repo}"\n'
+                f'find_qairt_root "{manifest}"'
+            )
+            result = self.run_bash(command, {
+                "QAIRT_ROOT": "",
+                "QNN_SDK_ROOT": "",
+                "QNN_ROOT": "",
+            })
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()).resolve(), matching.resolve())
+
+    def test_explicit_qnn_sdk_root_has_precedence_and_must_match_identity(self):
+        functions = function_source("qairt_identity_matches", "validate_linked_qhexrt_outputs")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "runanywhere-sdks"
+            repo.mkdir()
+            manifest = root / "qhexrt-prebuilt.json"
+            expected = b"matching runtime"
+            manifest.write_text(json.dumps({
+                "build": {"qnn_sdk": {
+                    "metadata_file": "sdk.yaml",
+                    "metadata_sha256": hashlib.sha256(expected).hexdigest(),
+                }},
+            }), encoding="utf-8")
+            explicit = root / "explicit-qairt"
+            fallback = root / "qairt" / "9.99.0"
+            for candidate, metadata in ((explicit, b"wrong runtime"), (fallback, expected)):
+                (candidate / "lib" / "aarch64-android").mkdir(parents=True)
+                (candidate / "sdk.yaml").write_bytes(metadata)
+            command = (
+                f'{functions}\n'
+                f'REPO_ROOT="{repo}"\n'
+                f'find_qairt_root "{manifest}"'
+            )
+            env = {
+                "QAIRT_ROOT": "",
+                "QNN_SDK_ROOT": str(explicit),
+                "QNN_ROOT": "",
+            }
+            result = self.run_bash(command, env)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("QNN_SDK_ROOT does not match", result.stderr)
+
+            (explicit / "sdk.yaml").write_bytes(expected)
+            result = self.run_bash(command, env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(Path(result.stdout.strip()), explicit)
+
     def test_stub_never_discovers_or_stages_sibling_qairt(self):
-        function = function_source("stage_qhexrt_qnn_runtime_libs", "validate_elf_16kb_alignment")
+        function = function_source("qairt_identity_matches", "validate_elf_16kb_alignment")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             stub = root / "stub.so"
@@ -82,7 +153,7 @@ class BuildCoreAndroidGuardTest(unittest.TestCase):
             self.assertFalse(called.exists())
 
     def test_qairt_metadata_must_match_selected_prebuilt(self):
-        function = function_source("stage_qhexrt_qnn_runtime_libs", "validate_elf_16kb_alignment")
+        function = function_source("qairt_identity_matches", "validate_elf_16kb_alignment")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             engine = root / "engine.so"
@@ -105,7 +176,7 @@ class BuildCoreAndroidGuardTest(unittest.TestCase):
             )
             result = self.run_bash(shell)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("does not match", result.stderr)
+            self.assertIn("changed after identity-aware discovery", result.stderr)
 
     def test_absent_prebuilt_explicitly_clears_cached_backend_and_stale_outputs(self):
         self.assertIn('"-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT"', SOURCE)

@@ -29,7 +29,7 @@ resolve_emscripten_toolchain() {
     fi
 
     if command -v emcc >/dev/null 2>&1; then
-        local emcc_real emscripten_root emsdk_root
+        local emcc_real emscripten_root
         emcc_real="$(python3 - <<'PY'
 import os, shutil
 print(os.path.realpath(shutil.which("emcc")))
@@ -73,10 +73,10 @@ echo "▶ Configure wasm build"
 #     RAC_HAVE_PROTOBUF=1 so the real proto implementations link.
 #   * RAC_ENABLE_SOLUTIONS=OFF — the L5 Solutions runtime is not part of this
 #     bundle; keep it explicitly off (it also requires protobuf+absl).
-#   * ZLIB_BUILD_SHARED=OFF / ZLIB_VERSION — zlib 1.3.2 added ZLIB_BUILD_SHARED
-#     (default ON, ignores BUILD_SHARED_LIBS); Emscripten's wasm-ld rejects the
-#     SHARED add_library, so force it off and pin the numeric version libarchive's
-#     nested find_package(ZLIB 1.2.1) accepts.
+#   * ZLIB_BUILD_SHARED=OFF — zlib 1.3.2 added ZLIB_BUILD_SHARED (default ON,
+#     ignores BUILD_SHARED_LIBS); Emscripten's wasm-ld rejects the SHARED
+#     add_library, so force it off. Commons exposes the fetched source header to
+#     FindZLIB so the dependency's own numeric version satisfies libarchive.
 cmake \
     -S "${REPO_ROOT}" \
     -B "${BUILD_DIR}" \
@@ -91,8 +91,6 @@ cmake \
     -DRAC_BUILD_PLATFORM=OFF \
     -DRAC_BUILD_SHARED=OFF \
     -DZLIB_BUILD_SHARED=OFF \
-    -DZLIB_VERSION="1.3.2" \
-    -DZLIB_VERSION_STRING="1.3.2" \
     -DRAC_WASM_LLAMACPP=ON
 
 echo "▶ Build wasm target"

@@ -187,7 +187,10 @@ function requiredLayoutHelper(
 }
 
 function resolveControlPlaneURL(baseURL: string, endpoint: string): string | null {
-  const normalizedBase = baseURL.trim().replace(/\/+$/, '');
+  const trimmedBase = baseURL.trim();
+  let baseEnd = trimmedBase.length;
+  while (baseEnd > 0 && trimmedBase[baseEnd - 1] === '/') baseEnd -= 1;
+  const normalizedBase = trimmedBase.slice(0, baseEnd);
   if (!normalizedBase || !endpoint.startsWith('/') || endpoint.startsWith('//')) return null;
   try {
     const base = new URL(normalizedBase);

@@ -11,7 +11,8 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = "RunAnywhere AI"
 
-  s.platforms    = { :ios => "17.0" }
+  s.platforms    = { :ios => "17.5" }
+  s.swift_version = "6.0"
   s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================
@@ -48,6 +49,11 @@ Pod::Spec.new do |s|
   s.preserve_paths = [
     "ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
   ]
+  # Keep one privacy declaration at the SDK boundary. This file is an exact
+  # copy of the canonical Swift SDK manifest and is validated during npm pack.
+  s.resource_bundles = {
+    "RunAnywhereCorePrivacy" => ["ios/PrivacyInfo.xcprivacy"],
+  }
 
   # The .inc.mm is an include-only implementation fragment: it is guarded by an
   # `#error` unless the wrapper (ios/URLSessionHttpTransport.mm) defines

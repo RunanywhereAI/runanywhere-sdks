@@ -3,10 +3,13 @@
  * @brief Lifecycle-owned generated-proto ABI coverage for non-LLM one-shots.
  */
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -52,6 +55,21 @@ int fail_count = 0;
 struct MockState {
     std::string model_path;
     float vad_threshold{0.015f};
+};
+
+const std::filesystem::path& test_model_root() {
+    static const auto root =
+        std::filesystem::temp_directory_path() /
+        ("runanywhere-nonllm-lifecycle-" +
+         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    return root;
+}
+
+struct TestModelRootCleanup {
+    ~TestModelRootCleanup() {
+        std::error_code ignored;
+        std::filesystem::remove_all(test_model_root(), ignored);
+    }
 };
 
 char* dup_cstr(const char* text) {
@@ -233,7 +251,9 @@ runanywhere::v1::ModelInfo build_model(const char* id, runanywhere::v1::ModelCat
     model.set_category(category);
     model.set_format(runanywhere::v1::MODEL_FORMAT_ONNX);
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_ONNX);
-    model.set_local_path(std::string("/tmp/") + id + ".onnx");
+    const auto model_path = test_model_root() / (std::string(id) + ".onnx");
+    std::ofstream(model_path, std::ios::binary).put('\0');
+    model.set_local_path(model_path.string());
     model.set_is_downloaded(true);
     model.set_is_available(true);
     return model;
@@ -573,6 +593,11 @@ int main() {
         std::fprintf(stdout, "  skip: non-LLM lifecycle proto ABI tests (no protobuf)\n");
         return 0;
 #else
+        std::error_code filesystem_error;
+        std::filesystem::create_directories(test_model_root(), filesystem_error);
+        TestModelRootCleanup model_root_cleanup;
+        CHECK(!filesystem_error, "isolated model fixture directory creates");
+
         rac_model_registry_handle_t registry = nullptr;
         CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
               "model registry creates");

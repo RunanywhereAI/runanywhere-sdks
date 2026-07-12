@@ -63,7 +63,7 @@ extern "C" {
  *                 (`rac_service_register_provider`, `rac_service_create`,
  *                 `rac_service_list_providers`, `rac_service_unregister_provider`,
  *                 `rac_service_request_t`, `rac_service_provider_t`,
- *                 `rac_service_{can_handle,create}_fn`, `RAC_DEPRECATED_LEGACY_SVC`).
+ *                 `rac_service_{can_handle,create}_fn`).
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
  *                 new `create` slot is unreachable otherwise.

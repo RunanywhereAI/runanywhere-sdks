@@ -255,14 +255,9 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
             }
             embedded_any = true;
 
-            // Candidate gathering must never apply an absolute cosine floor:
-            // gather top-k and let fusion + rerank select (real-RAG). all-MiniLM
-            // scores are low/near-zero even for relevant chunks, so any floor
-            // here silently drops real matches. The configured
-            // similarity_threshold is intentionally ignored for gathering.
-            auto dense = vstore->search(emb, fetch_k, 0.0f);
-            LOGI("RAG dense: query %zu -> %zu candidates (cfg sim_thresh=%.3f ignored for gather)",
-                 qi, dense.size(), sim_thresh);
+            auto dense = vstore->search(emb, fetch_k, sim_thresh);
+            LOGI("RAG dense: query %zu -> %zu candidates (sim_thresh=%.3f)", qi, dense.size(),
+                 sim_thresh);
             std::vector<std::string> dense_ids;
             for (const auto& d : dense) {
                 if (!scoped || chunk_matches_scope(vstore, d.id, inputs.scope_prefix))

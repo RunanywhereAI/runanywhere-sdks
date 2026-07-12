@@ -15,7 +15,7 @@ jobs:
   legacy-files-blocklist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fail if removed legacy files reappear
         shell: bash
         run: |

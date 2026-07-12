@@ -67,10 +67,10 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 ### SDK Implementations
 | SDK | Path | Bridge Mechanism | Platforms |
 |-----|------|-----------------|-----------|
-| Swift | `sdk/runanywhere-swift/` | XCFramework + CRACommons module map | iOS 17+, macOS 14+ |
+| Swift | `sdk/runanywhere-swift/` | XCFramework + CRACommons module map | iOS 17.5+, macOS 14.5+ |
 | Kotlin (Android library) | `sdk/runanywhere-kotlin/` | JNI (`librunanywhere_jni.so`) | Android (min 24) |
 | Flutter | `sdk/runanywhere-flutter/` | Dart FFI (`ffi` package) | iOS, Android |
-| React Native | `sdk/runanywhere-react-native/` | NitroModules (JSI HybridObject) | iOS 15.1+, Android arm64 |
+| React Native | `sdk/runanywhere-react-native/` | NitroModules (JSI HybridObject) | iOS 17.5+, Android arm64 |
 | Web | `sdk/runanywhere-web/` | Emscripten WASM + TypeScript | Browsers (Chrome, Safari, Firefox) |
 
 ### Native Core
@@ -227,10 +227,10 @@ ctest --test-dir build --output-on-failure
 
 ```bash
 # Build (requires XCFrameworks in sdk/runanywhere-swift/Binaries/)
-swift build
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build
 
 # Run tests
-swift test
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test
 
 # Build for specific platform
 xcodebuild build -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
@@ -419,7 +419,7 @@ Requires WASM pre-built. `SharedArrayBuffer` needs cross-origin isolation header
 
 ## Version Management
 
-Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.19.13`).
+Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.19.15`).
 
 ```bash
 # Bump everywhere: VERSION, Package.swift, gradle.properties, package.json, pubspec.yaml
@@ -436,27 +436,11 @@ Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merg
 |----------|---------|---------|
 | `pr-build.yml` | PR to main, push to main/feat branch | Parallel native builds (macOS/Linux/iOS/Android) + per-SDK typecheck |
 | `release.yml` | Tag `v*.*.*` or manual | Full artifact build matrix, SDK packaging, consumer validation, draft Release |
-| `auto-tag.yml` | PR merged to main with `release:*` label | Computes next semver, pushes git tag |
+| `auto-tag.yml` | PR merged to main with `release:*` label | Verifies the reviewed semver bump, then pushes that exact git tag |
 | `idl-drift-check.yml` | Changes to `idl/` or generated files | Regenerates protos, fails if `git diff` is non-empty |
-| `streaming-perf.yml` | Changes to `tests/streaming/` or voice agent | Cross-SDK streaming parity + performance tests |
 | `legacy-files-blocklist.yml` | All PRs/pushes | Prevents 5 specific deleted files from being re-introduced |
 | `secret-scan.yml` | PRs and pushes to main | Incremental gitleaks scan on diff range |
 | `check-no-pii-logging.yml` | All PRs/pushes to main, master, feat-branch | Regression guard against Android logcat / RAC_LOG_INFO calls that emit signed URLs alongside active-download destination paths |
-
----
-
-## Cross-SDK Streaming Parity Tests (`tests/streaming/`)
-
-C++ "golden producer" binaries generate deterministic fixture files. Equivalent Swift, Kotlin, Dart, and TypeScript tests read the same fixtures and verify wire-format parity.
-
-```bash
-# Build and run parity tests
-cmake -B build -DRAC_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --target parity_test_cpp perf_producer cancel_producer
-ctest --test-dir build -R parity
-```
-
-Test categories: voice agent parity (`golden_events.txt`), LLM streaming parity (`llm_golden_events.txt`), perf bench (p50 decode < 1ms assertion), cancel parity (interrupt at index 500).
 
 ---
 
@@ -489,13 +473,13 @@ All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to t
 
 | Platform | Min Version | Build Tool | Key Versions |
 |----------|------------|------------|--------------|
-| iOS | 17.0 | Xcode 15+ | Swift 5.9+ |
-| macOS | 14.0 | Xcode 15+ | Swift 5.9+ |
-| Android | API 24 | AGP 8.13.0 | Kotlin 2.1.21, NDK 27.3.13750724 |
-| JVM | 17 | Gradle 8.13 | Kotlin 2.1.21 |
-| Flutter | 3.10+ | Melos | Dart 3.0+ |
-| React Native | 0.83.1 | Yarn Berry 3.6.1 | NitroModules, Hermes |
-| Web | Chrome 86+ | Vite | Emscripten 5.0+, Node 20.19+ or 22.12+ |
+| iOS | 17.5 | Xcode 26+ | Swift 6.2 |
+| macOS | 14.5 | Xcode 26+ | Swift 6.2 |
+| Kotlin SDK | Android API 24 | AGP 9.2.1 / Gradle 9.5.0 | Kotlin 2.4.0, NDK 27.3.13750724 |
+| Android example | Android API 24 | AGP 9.2.1 / Gradle 9.6.0 | Kotlin 2.4.0, compile/target SDK 37 |
+| Flutter | 3.44.6 | Melos / AGP 9.0.1 / Gradle 9.1.0 | Dart 3.12.2+, compile/target SDK 36, NDK 28.2.13676358 |
+| React Native | 0.85.3 (min 0.83.1) | Yarn Berry 3.6.1 | NitroModules, Hermes |
+| Web | Chrome 86+ | Vite | Emscripten 6.0.2, Node 24 LTS |
 | C++ Core | N/A | CMake 3.22+ | C++20, Ninja |
 
 ---
@@ -542,7 +526,7 @@ Standard Android library layout. There is no `commonMain`/`jvmAndroidMain`/`andr
 
 ## Non-Obvious Configuration Details
 
-**`Package.swift:43`** — `let useLocalNatives = true` is hard-coded for local dev. External SPM consumers need `false`. Scripts toggle this.
+**`Package.swift`** — remote release artifacts are the fail-closed default. Local builds opt into staged XCFrameworks with `RUNANYWHERE_USE_LOCAL_NATIVES=1`; scripts set this explicitly and never rewrite the manifest.
 
 **`Package.swift:186-191`** — Three `.grpc.swift` files are excluded from compilation. They require iOS 18 / macOS 15, above the SDK's minimums. In-process C callback path replaces gRPC.
 
@@ -593,7 +577,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
 | Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
-| C++ Commons (full backends) | `CC=gcc CXX=g++ bash scripts/build-linux.sh --shared` | Backend tests need downloaded models | N/A | Builds onnx+llamacpp. RAG backend has pre-existing zero-size array bug; use `-DRAC_BACKEND_RAG=OFF`. Sherpa-ONNX v1.12.23 URL changed: use `sherpa-onnx-v{VER}-linux-x64-shared.tar.bz2` (no `-cpu` suffix) |
+| C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |
 | Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |
 | iOS/Swift SDK | Not buildable | Not buildable | Not available | Requires macOS + Xcode |
 | Android emulator | Not runnable | Not runnable | N/A | No KVM support in cloud VM |
@@ -612,20 +596,14 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 ```bash
 # 1. Build commons with backends
 cd sdk/runanywhere-commons
-CC=gcc CXX=g++ cmake -B build-linux-x86_64 -DCMAKE_BUILD_TYPE=Release \
-  -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_LLAMACPP=ON \
-  -DRAC_BACKEND_RAG=OFF -DRAC_BUILD_SHARED=ON -DRAC_BUILD_PLATFORM=OFF
-cmake --build build-linux-x86_64 -j$(nproc)
+CC=gcc CXX=g++ ./scripts/build-linux.sh
 
-# 2. Copy libs to dist
-# (see build-linux.sh for full dist copy steps)
-
-# 3. Build voice assistant
-cd Playground/linux-voice-assistant
+# 2. Build voice assistant
+cd ../../Playground/linux-voice-assistant
 CC=gcc CXX=g++ cmake -B build && cmake --build build
 
-# 4. Run test pipeline (headless, no mic needed)
-export LD_LIBRARY_PATH="../../sdk/runanywhere-commons/dist/linux/x86_64:../../sdk/runanywhere-commons/third_party/sherpa-onnx/lib"
+# 3. Run test pipeline (headless, no mic needed)
+export LD_LIBRARY_PATH="../../sdk/runanywhere-commons/dist/linux/lib:../../sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib"
 ./build/test-pipeline /path/to/audio.wav
 ```
 

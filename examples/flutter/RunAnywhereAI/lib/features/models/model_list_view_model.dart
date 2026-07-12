@@ -97,12 +97,6 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Alias for loadModelsFromRegistry
-  Future<void> loadModels() async {
-    await loadModelsFromRegistry();
-    await loadAvailableFrameworks();
-  }
-
   /// Set current model
   void setCurrentModel(ModelInfo? model) {
     _currentModel = model;

@@ -22,7 +22,7 @@ extension CppBridge {
     public enum Platform {
 
         private static let logger = SDKLogger(category: "CppBridge.Platform")
-        private static var isInitialized = false
+        @MainActor private static var isInitialized = false
 
         // MARK: - Service Handle Convention
         //
@@ -107,6 +107,7 @@ extension CppBridge {
         }
 
         /// Unregister the platform backend.
+        @MainActor
         public static func unregister() {
             guard isInitialized else { return }
 
@@ -135,15 +136,15 @@ extension CppBridge {
         /// Run `work` to completion off the caller's actor and return its
         /// handle, or `nil` on timeout / error.
         private static func syncWait(
-            _ work: @escaping @Sendable () async throws -> rac_handle_t?,
+            _ work: @escaping @Sendable () async throws -> PlatformServiceHandle?,
             onTimeout: @Sendable () -> Void,
             onError: @escaping @Sendable (Error) -> Void,
-            releaseAfterTimeout: @escaping @Sendable (rac_handle_t) -> Void
+            releaseAfterTimeout: @escaping @Sendable (PlatformServiceHandle) -> Void
         ) -> rac_handle_t? {
             let semaphore = DispatchSemaphore(value: 0)
             let box = TimedPlatformHandleBox()
             Task.detached(priority: .userInitiated) {
-                let handle: rac_handle_t?
+                let handle: PlatformServiceHandle?
                 do {
                     handle = try await work()
                 } catch {
@@ -162,7 +163,7 @@ extension CppBridge {
                 }
                 return nil
             }
-            return box.value
+            return box.value?.rawValue
         }
 
         /// Run `work` to completion off the caller's actor and return its
@@ -173,7 +174,7 @@ extension CppBridge {
             onError: @escaping @Sendable (Error) -> Void
         ) -> rac_result_t {
             let semaphore = DispatchSemaphore(value: 0)
-            let box = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            let box = LockedResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
             Task.detached(priority: .userInitiated) {
                 do { box.value = try await work() } catch { onError(error) }
                 semaphore.signal()
@@ -193,8 +194,8 @@ extension CppBridge {
             onError: @escaping @Sendable (Error) -> Void
         ) -> (result: rac_result_t, value: T?) {
             let semaphore = DispatchSemaphore(value: 0)
-            let valueBox = UnsafeResultBox<T?>(nil)
-            let resultBox = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            let valueBox = LockedResultBox<T?>(nil)
+            let resultBox = LockedResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
             Task.detached(priority: .userInitiated) {
                 do {
                     valueBox.value = try await work()
@@ -290,7 +291,9 @@ extension CppBridge {
                 try await service.initialize(modelPath: "built-in")
                 // Retain the service and hand its opaque pointer back as the
                 // handle; `generate`/`destroy` recover it via Unmanaged.
-                let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                let handle = PlatformServiceHandle(
+                    rawValue: Unmanaged.passRetained(service).toOpaque()
+                )
                 Platform.logger.info("Foundation Models service created")
                 return handle
             } onTimeout: {
@@ -298,8 +301,7 @@ extension CppBridge {
             } onError: { error in
                 Platform.logger.error("Failed to create Foundation Models service: \(error)")
             } releaseAfterTimeout: { handle in
-                guard #available(iOS 26.0, macOS 26.0, *) else { return }
-                Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
+                Unmanaged<SystemFoundationModelsService>.fromOpaque(handle.rawValue).release()
             }
         }
 
@@ -377,7 +379,9 @@ extension CppBridge {
                     let service = await MainActor.run { SystemTTSService() }
                     // Retain the service and hand its opaque pointer back as the
                     // handle; synthesize/stop/destroy recover it via Unmanaged.
-                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                    let handle = PlatformServiceHandle(
+                        rawValue: Unmanaged.passRetained(service).toOpaque()
+                    )
                     Platform.logger.info("System TTS service created")
                     return handle
                 } onTimeout: {
@@ -385,7 +389,7 @@ extension CppBridge {
                 } onError: { error in
                     Platform.logger.error("Failed to create System TTS service: \(error)")
                 } releaseAfterTimeout: { handle in
-                    Unmanaged<SystemTTSService>.fromOpaque(handle).release()
+                    Unmanaged<SystemTTSService>.fromOpaque(handle.rawValue).release()
                 }
             }
 
@@ -398,29 +402,10 @@ extension CppBridge {
 
                 let text = String(cString: textPtr)
 
-                // Build TTS options from C struct
-                var rate: Float = 1.0
-                var pitch: Float = 1.0
-                var volume: Float = 1.0
-                var voice = ""
-
-                if let optionsPtr = optionsPtr {
-                    rate = optionsPtr.pointee.rate
-                    pitch = optionsPtr.pointee.pitch
-                    volume = optionsPtr.pointee.volume
-                    if let voicePtr = optionsPtr.pointee.voice_id {
-                        voice = String(cString: voicePtr)
-                    }
-                }
-
-                var options = RATTSOptions.defaults()
-                options.voice = voice
-                options.speakingRate = rate
-                options.pitch = pitch
-                options.volume = volume
+                let synthesisOptions = Platform.makeTTSOptions(optionsPtr)
 
                 return Platform.syncWaitResult {
-                    try await service.speak(text: text, options: options)
+                    try await service.speak(text: text, options: synthesisOptions)
                     return RAC_SUCCESS
                 } onError: { error in
                     Platform.logger.error("System TTS speak failed: \(error)")
@@ -455,33 +440,62 @@ extension CppBridge {
                 logger.error("Failed to register TTS callbacks: \(result)")
             }
         }
+
+        private static func makeTTSOptions(
+            _ optionsPtr: UnsafePointer<rac_tts_platform_options_t>?
+        ) -> RATTSOptions {
+            var options = RATTSOptions.defaults()
+            guard let optionsPtr else { return options }
+
+            options.speakingRate = optionsPtr.pointee.rate
+            options.pitch = optionsPtr.pointee.pitch
+            options.volume = optionsPtr.pointee.volume
+            if let voicePtr = optionsPtr.pointee.voice_id {
+                options.voice = String(cString: voicePtr)
+            }
+            return options
+        }
     }
 }
 
 /// Single-writer/single-reader handoff across the platform-callback semaphore
 /// boundary. The detached task writes before signalling; the caller reads only
 /// after a successful wait, so there is no concurrent access.
-private final class UnsafeResultBox<T>: @unchecked Sendable {
-    var value: T
-    init(_ value: T) { self.value = value }
+private final class LockedResultBox<T: Sendable>: Sendable {
+    private let state: OSAllocatedUnfairLock<T>
+
+    var value: T {
+        get { state.withLock { $0 } }
+        set { state.withLock { $0 = newValue } }
+    }
+
+    init(_ value: T) {
+        state = OSAllocatedUnfairLock(initialState: value)
+    }
+}
+
+/// Opaque Swift-service pointer retained for the C platform ABI. Creation and
+/// destruction are synchronized by the callback handoff and native lifecycle.
+private struct PlatformServiceHandle: @unchecked Sendable {
+    let rawValue: rac_handle_t
 }
 
 /// Thread-safe handoff for platform create callbacks. If the C callback times
 /// out, a later async success must release its retained service handle instead
 /// of storing a value nobody will destroy.
-private final class TimedPlatformHandleBox: @unchecked Sendable {
-    private struct State: @unchecked Sendable {
+private final class TimedPlatformHandleBox: Sendable {
+    private struct State: Sendable {
         var timedOut = false
-        var handle: rac_handle_t?
+        var handle: PlatformServiceHandle?
     }
 
     private let state = OSAllocatedUnfairLock<State>(initialState: State())
 
-    var value: rac_handle_t? {
+    var value: PlatformServiceHandle? {
         state.withLock { $0.handle }
     }
 
-    func complete(_ handle: rac_handle_t?) -> rac_handle_t? {
+    func complete(_ handle: PlatformServiceHandle?) -> PlatformServiceHandle? {
         state.withLock { current in
             guard !current.timedOut else { return handle }
             current.handle = handle
@@ -489,7 +503,7 @@ private final class TimedPlatformHandleBox: @unchecked Sendable {
         }
     }
 
-    func markTimedOut() -> rac_handle_t? {
+    func markTimedOut() -> PlatformServiceHandle? {
         state.withLock { current in
             current.timedOut = true
             let handle = current.handle

@@ -26,6 +26,12 @@ export function redactResourceURL(value: string): string {
   } catch {
     // Ordinary relative paths are not accepted by URL without a base, but may
     // still carry signed query parameters.
-    return value.replace(/[?#].*$/, '');
+    const queryIndex = value.indexOf('?');
+    const fragmentIndex = value.indexOf('#');
+    const suffixIndex = Math.min(
+      queryIndex === -1 ? value.length : queryIndex,
+      fragmentIndex === -1 ? value.length : fragmentIndex,
+    );
+    return value.slice(0, suffixIndex);
   }
 }

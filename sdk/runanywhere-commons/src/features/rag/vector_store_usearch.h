@@ -31,16 +31,11 @@ struct DocumentChunk {
 
 /**
  * @brief Search result with similarity score
- *
- * Note: id/chunk_id and score/similarity are aliases kept for backward
- * compatibility with JNI and React Native bridges. Prefer id and score.
  */
 struct SearchResult {
-    std::string id;           // Primary chunk identifier
-    std::string chunk_id;     // Alias for id (kept for bridge compatibility)
+    std::string id;           // Chunk identifier
     std::string text;         // Chunk text content
-    float score = 0.0f;       // Primary similarity score (0.0-1.0)
-    float similarity = 0.0f;  // Alias for score (kept for bridge compatibility)
+    float score = 0.0f;       // Similarity score (0.0-1.0)
     nlohmann::json metadata;  // Additional metadata
 };
 

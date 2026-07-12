@@ -23,6 +23,9 @@ typedef struct rac_proto_buffer {
     char* error_message;
 } rac_proto_buffer_t;
 
+typedef void (*rac_proto_bytes_callback_fn)(const uint8_t* proto_bytes, size_t proto_size,
+                                            void* user_data);
+
 RAC_API void rac_proto_buffer_init(rac_proto_buffer_t* buffer);
 RAC_API rac_result_t rac_proto_buffer_copy(const uint8_t* data,
                                            size_t size,
@@ -31,10 +34,6 @@ RAC_API rac_result_t rac_proto_buffer_set_error(rac_proto_buffer_t* buffer,
                                                 rac_result_t status,
                                                 const char* error_message);
 RAC_API void rac_proto_buffer_free(rac_proto_buffer_t* buffer);
-RAC_API rac_result_t rac_proto_buffer_copy_to_raw(const uint8_t* data,
-                                                  size_t size,
-                                                  uint8_t** data_out,
-                                                  size_t* size_out);
 RAC_API void rac_proto_buffer_free_data(uint8_t* data);
 
 #ifdef __cplusplus

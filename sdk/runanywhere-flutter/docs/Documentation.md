@@ -324,7 +324,7 @@ class RunAnywhereDownloads {
   Stream<DownloadProgress>        start(String modelId);
   Future<void>                    cancel(String modelId);
   Future<void>                    delete(String modelId);
-  Future<List<StoredModel>>       list();
+  Future<List<ModelStorageMetrics>> list();
   Future<StorageInfo>             getStorageInfo();
 }
 ```
@@ -525,7 +525,7 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 - Canonical SDK version: `RunAnywhere.version` (currently `0.19.15`).
 - Native commons version: vendored `RACommons` build (`0.1.6`).
 - llama.cpp engine: `b7199`.
-- ONNX Runtime: `1.23.2`.
+- ONNX Runtime: `1.24.3`.
 
 All four Flutter packages share the same version, bumped together via the
 root `scripts/release/sync-versions.sh`.

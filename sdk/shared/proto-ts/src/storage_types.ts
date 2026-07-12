@@ -13,9 +13,6 @@ export const protobufPackage = "runanywhere.v1";
  * ---------------------------------------------------------------------------
  * NPU chipset detected on the host device. Used to drive vendor-NPU
  * model-download URL selection and runtime backend wiring.
- * Sources pre-IDL:
- *   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
- * Canonical superset (this file): vendor-grouped, vendor-agnostic.
  * ---------------------------------------------------------------------------
  */
 export enum NPUChip {
@@ -139,10 +136,8 @@ export interface AppStorageInfo {
  * model_types.proto. This avoids circular embeds and keeps the wire payload
  * for storage queries small.
  *
- * `last_used_ms` (epoch ms, optional) preserves the field that lived on the
- * older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
- * other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
- * LRU eviction without another type round-trip.
+ * `last_used_ms` supports LRU presentation and eviction without another type
+ * round-trip.
  *
  * Sources pre-IDL: see header drift table.
  * ---------------------------------------------------------------------------
@@ -192,26 +187,6 @@ export interface StorageAvailability {
   recommendation?: string | undefined;
   shortfallBytes: number;
   requiredToAvailableRatio: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
- * surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
- * flattens to the columns those SDKs actually exposed via computed
- * properties (id, name, size, local path, downloaded-at), so RN / Web can
- * emit the same shape without round-tripping through `ModelInfo`.
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
-export interface StoredModel {
-  modelId: string;
-  name: string;
-  sizeBytes: number;
-  localPath: string;
-  /** Unix epoch ms of download completion */
-  downloadedAtMs?: number | undefined;
 }
 
 export interface StorageInfoRequest {
@@ -975,146 +950,6 @@ export const StorageAvailability: MessageFns<StorageAvailability> = {
     message.recommendation = object.recommendation ?? undefined;
     message.shortfallBytes = object.shortfallBytes ?? 0;
     message.requiredToAvailableRatio = object.requiredToAvailableRatio ?? 0;
-    return message;
-  },
-};
-
-function createBaseStoredModel(): StoredModel {
-  return { modelId: "", name: "", sizeBytes: 0, localPath: "", downloadedAtMs: undefined };
-}
-
-export const StoredModel: MessageFns<StoredModel> = {
-  encode(message: StoredModel, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.modelId !== "") {
-      writer.uint32(10).string(message.modelId);
-    }
-    if (message.name !== "") {
-      writer.uint32(18).string(message.name);
-    }
-    if (message.sizeBytes !== 0) {
-      writer.uint32(24).int64(message.sizeBytes);
-    }
-    if (message.localPath !== "") {
-      writer.uint32(34).string(message.localPath);
-    }
-    if (message.downloadedAtMs !== undefined) {
-      writer.uint32(40).int64(message.downloadedAtMs);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StoredModel {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStoredModel();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.sizeBytes = longToNumber(reader.int64());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.localPath = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.downloadedAtMs = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StoredModel {
-    return {
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      sizeBytes: isSet(object.sizeBytes)
-        ? globalThis.Number(object.sizeBytes)
-        : isSet(object.size_bytes)
-        ? globalThis.Number(object.size_bytes)
-        : 0,
-      localPath: isSet(object.localPath)
-        ? globalThis.String(object.localPath)
-        : isSet(object.local_path)
-        ? globalThis.String(object.local_path)
-        : "",
-      downloadedAtMs: isSet(object.downloadedAtMs)
-        ? globalThis.Number(object.downloadedAtMs)
-        : isSet(object.downloaded_at_ms)
-        ? globalThis.Number(object.downloaded_at_ms)
-        : undefined,
-    };
-  },
-
-  toJSON(message: StoredModel): unknown {
-    const obj: any = {};
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.name !== "") {
-      obj.name = message.name;
-    }
-    if (message.sizeBytes !== 0) {
-      obj.sizeBytes = Math.round(message.sizeBytes);
-    }
-    if (message.localPath !== "") {
-      obj.localPath = message.localPath;
-    }
-    if (message.downloadedAtMs !== undefined) {
-      obj.downloadedAtMs = Math.round(message.downloadedAtMs);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<StoredModel>, I>>(base?: I): StoredModel {
-    return StoredModel.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<StoredModel>, I>>(object: I): StoredModel {
-    const message = createBaseStoredModel();
-    message.modelId = object.modelId ?? "";
-    message.name = object.name ?? "";
-    message.sizeBytes = object.sizeBytes ?? 0;
-    message.localPath = object.localPath ?? "";
-    message.downloadedAtMs = object.downloadedAtMs ?? undefined;
     return message;
   },
 };

@@ -148,7 +148,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
     ensureServicesReady()
     val states =
         CppBridgeVoiceAgent.initialize(
-            CppBridgeVoiceAgent.getRawHandle(),
+            CppBridgeVoiceAgent.getHandle(),
             config,
         )
     voiceAgentLogger.info("Voice agent initialized from RAVoiceAgentComposeConfig: ready=${states.ready}")
@@ -157,7 +157,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
     if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
-    return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
+    return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getHandle())
 }
 
 /**

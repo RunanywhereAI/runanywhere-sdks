@@ -89,14 +89,14 @@ class QHexRT {
 
   /// Register the QHexRT backend with the C++ plugin registry. Safe to call
   /// multiple times; on unsupported devices registration is rejected.
-  static Future<void> register() async {
+  static Future<bool> register() async {
     if (_isRegistered) {
       _logger.debug('QHexRT already registered');
-      return;
+      return true;
     }
     if (!isAvailable) {
       _logger.error('QHexRT native library not available');
-      return;
+      return false;
     }
     try {
       _bindings ??= QhexrtBindings();
@@ -111,17 +111,19 @@ class QHexRT {
         _logger.error(
           'QHexRT unavailable; a supported Hexagon V75/V79/V81 NPU is required.',
         );
-        return;
+        return false;
       }
       if (result != RacResultCode.success &&
           result != RacResultCode.errorModuleAlreadyRegistered) {
         _logger.error('QHexRT registration failed with code: $result');
-        return;
+        return false;
       }
       _isRegistered = true;
       _logger.info('QHexRT backend registered (LLM/VLM/STT/TTS)');
+      return true;
     } catch (e) {
       _logger.error('QHexRT registration error: $e');
+      return false;
     }
   }
 

@@ -81,7 +81,7 @@ class DartBridgeEvents {
       // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
       // close) before closing the callable, mirroring the Swift/Kotlin/RN
       // event bridges and avoiding a use-after-free onto the closing isolate.
-      RacNative.bindings.rac_sdk_event_quiesce?.call();
+      RacNative.bindings.rac_sdk_event_quiesce();
     } catch (e) {
       _logger.debug('SDKEvent proto unregistration failed: $e');
     } finally {
@@ -124,8 +124,9 @@ class DartBridgeEvents {
       if (code != RacResultCode.success || out.ref.data == nullptr) {
         return null;
       }
-      final bytes =
-          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      final bytes = out.ref.data
+          .asTypedList(out.ref.size)
+          .toList(growable: false);
       return event_pb.SDKEvent.fromBuffer(bytes);
     } catch (e) {
       _logger.debug('rac_sdk_event_poll error: $e');
@@ -249,8 +250,9 @@ void _sdkEventCallback(
         return;
       }
       try {
-        final bytes =
-            out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+        final bytes = out.ref.data
+            .asTypedList(out.ref.size)
+            .toList(growable: false);
         DartBridgeEvents.instance.emit(event_pb.SDKEvent.fromBuffer(bytes));
       } catch (e) {
         SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent: $e');

@@ -9,8 +9,6 @@
 // consumers subscribe via `EventBus.shared.stream` which surfaces
 // commons-emitted events through `rac_sdk_event_subscribe`.
 
-import 'dart:convert';
-
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/model_types.pb.dart'
     show ModelInfo, ModelLoadRequest, ModelLoadResult;
@@ -98,13 +96,6 @@ class RunAnywhereRAG {
 
   // -- document management --------------------------------------------------
 
-  /// Ingest a single document into the pipeline (chunk → embed → index).
-  Future<void> ingest(String text, {String? metadataJSON}) async {
-    await ragIngest(
-      RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON).entries),
-    );
-  }
-
   /// Ingest a generated-proto document through the C++ RAG ABI.
   Future<RAGStatistics> ragIngest(RAGDocument document) async {
     if (!DartBridge.isInitialized) {
@@ -116,19 +107,6 @@ class RunAnywhereRAG {
     } catch (e) {
       throw SDKException.invalidState('RAG ingestion failed: $e');
     }
-  }
-
-  /// Ingest multiple documents in batch. Each map needs a `text` key
-  /// and optionally a `metadataJson` key.
-  Future<void> addDocumentsBatch(List<Map<String, String>> documents) async {
-    await ragAddDocumentsBatch(
-      documents
-          .map((doc) => RAGDocument(
-                text: doc['text'] ?? '',
-                metadata: _parseMetadataJSON(doc['metadataJson']).entries,
-              ))
-          .toList(),
-    );
   }
 
   /// Ingest multiple generated-proto documents.
@@ -197,10 +175,7 @@ class RunAnywhereRAG {
 
   /// Query the RAG pipeline with a natural-language question —
   /// retrieves relevant chunks and generates an answer.
-  Future<RAGResult> query(
-    String question, {
-    RAGQueryOptions? options,
-  }) async {
+  Future<RAGResult> query(String question, {RAGQueryOptions? options}) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
@@ -240,8 +215,8 @@ class RunAnywhereRAG {
           : model.category,
       framework:
           model.framework != InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
-              ? model.framework
-              : null,
+          ? model.framework
+          : null,
     );
     final result = await RunAnywhereModelLifecycle.shared.load(request);
     if (!result.success) {
@@ -268,12 +243,6 @@ extension RAGConfigurationResolvedArtifacts on RAGConfiguration {
   }
 }
 
-extension RAGDocumentConvenience on RAGDocument {
-  static RAGDocument fromText(String text, {String? metadataJSON}) {
-    return RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON).entries);
-  }
-}
-
 extension RAGQueryOptionsConvenience on RAGQueryOptions {
   static RAGQueryOptions defaultsForQuestion(String question) {
     return RAGQueryOptions(question: question);
@@ -288,18 +257,5 @@ extension RAGStatisticsTimeConvenience on RAGStatistics {
   DateTime? get lastUpdated {
     final millis = lastUpdatedMs.toInt();
     return millis > 0 ? DateTime.fromMillisecondsSinceEpoch(millis) : null;
-  }
-}
-
-Map<String, String> _parseMetadataJSON(String? json) {
-  if (json == null || json.isEmpty) return const <String, String>{};
-  try {
-    final decoded = jsonDecode(json);
-    if (decoded is! Map) return const <String, String>{};
-    return decoded.map(
-      (key, value) => MapEntry(key.toString(), value.toString()),
-    );
-  } catch (_) {
-    return const <String, String>{};
   }
 }

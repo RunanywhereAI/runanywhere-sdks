@@ -12,10 +12,7 @@ import type {
   ModelInfoMetadata as ProtoModelInfoMetadata,
   SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
-import type {
-  StorageInfo as ProtoStorageInfo,
-  StoredModel as ProtoStoredModel,
-} from '@runanywhere/proto-ts/storage_types';
+import type { StorageInfo as ProtoStorageInfo } from '@runanywhere/proto-ts/storage_types';
 import type { ThinkingTagPattern as ProtoThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 
 export type ThinkingTagPattern = ProtoThinkingTagPattern;
@@ -41,4 +38,3 @@ export interface SDKInitOptions {
 }
 
 export type StorageInfo = ProtoStorageInfo;
-export type StoredModel = ProtoStoredModel;

@@ -1,4 +1,4 @@
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
@@ -280,14 +280,14 @@ rac_link_archive_deps(test_voice_agent_response_policy)
 target_compile_features(test_voice_agent_response_policy PRIVATE cxx_std_17)
 add_test(NAME voice_agent_response_policy_tests COMMAND test_voice_agent_response_policy)
 
-# --- Rac_tool_call_* C ABI test ----------------------
-# Behavioral tests for the single-source-of-truth tool-calling API shared by
-# Swift, Kotlin, Flutter, Web, and React Native SDKs. Covers parse (default +
-# LFM2), free-form, format_prompt, build_initial/followup_prompt, normalize_json,
-# and free-function idempotence.
+# --- Tool parser implementation test ----------------------
+# Behavioral tests for the private parser used behind the generated-proto
+# public ABI. Covers both formats, prompt construction, normalization, and
+# allocation cleanup.
 add_executable(test_tool_calling test_tool_calling.cpp)
 target_include_directories(test_tool_calling PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
     ${CMAKE_SOURCE_DIR}/include
 )
 target_link_libraries(test_tool_calling PRIVATE rac_commons)
@@ -297,9 +297,9 @@ rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
 # --- commons-owned RAModelInfo heuristics --------
-# Exercises rac_tool_call_format_from_model_info_proto +
-# rac_model_info_parameter_count_b_proto + rac_model_info_is_small_model_proto.
-# Replaces example-side detectToolCallFormat / isLikelySmallModel duplication.
+# Exercises rac_model_info_parameter_count_b_proto +
+# rac_model_info_is_small_model_proto.
+# Replaces example-side isLikelySmallModel duplication.
 add_executable(test_model_heuristics test_model_heuristics.cpp)
 target_include_directories(test_model_heuristics PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -416,6 +416,7 @@ add_executable(test_llm_stream_proto test_llm_stream_proto.cpp)
 target_include_directories(test_llm_stream_proto PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
 )
 target_link_libraries(test_llm_stream_proto PRIVATE rac_commons)
 rac_link_archive_deps(test_llm_stream_proto)
@@ -472,15 +473,15 @@ rac_link_archive_deps(test_engine_vtable)
 target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
 
-add_executable(test_legacy_coexistence test_legacy_coexistence.cpp)
-target_include_directories(test_legacy_coexistence PRIVATE
+add_executable(test_plugin_registry_isolation test_plugin_registry_isolation.cpp)
+target_include_directories(test_plugin_registry_isolation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
-target_link_libraries(test_legacy_coexistence PRIVATE rac_commons)
-rac_link_archive_deps(test_legacy_coexistence)
-target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
-add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
+target_link_libraries(test_plugin_registry_isolation PRIVATE rac_commons)
+rac_link_archive_deps(test_plugin_registry_isolation)
+target_compile_features(test_plugin_registry_isolation PRIVATE cxx_std_17)
+add_test(NAME plugin_registry_isolation_tests COMMAND test_plugin_registry_isolation)
 
 # --- Shared C ABI proto-byte buffer ownership tests -------------------------
 add_executable(test_proto_buffer test_proto_buffer.cpp)
@@ -1526,7 +1527,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     include(FetchContent)
     find_package(Threads REQUIRED)
 
-    # GoogleTest pinned via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION
+    # GoogleTest pinned via RAC_GOOGLETEST_VERSION from LoadVersions.
     # so the RAG and benchmark suites below agree on a single tag (previously
     # this block requested release-1.12.1 while the benchmark block fetched
     # FetchContent dedupes by name and silently used whichever
@@ -1534,7 +1535,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        ${GOOGLETEST_VERSION}
+        GIT_TAG        ${RAC_GOOGLETEST_VERSION}
         GIT_SHALLOW    TRUE
     )
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -1567,7 +1568,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         Threads::Threads
         GTest::gtest_main
     )
-    # Force the bundled (centralized GOOGLETEST_VERSION) gtest headers to win
+    # Force the bundled, centrally pinned GoogleTest headers to win
     # over any system gtest (e.g. /opt/homebrew/include) — without this the
     # prebuilt libgtest_main.a (older `const char*` ABI) link-fails when the
     # test picks up the newer `std::string` header signatures. Same fix as
@@ -1616,13 +1617,13 @@ endif()
 
 include(FetchContent)
 
-# Pin via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION so this and the
+# Pin via RAC_GOOGLETEST_VERSION so this and the
 # RAG-test block above share a single FetchContent declaration. (FetchContent
 # dedupes by content name; first declaration wins. Both must match.)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG ${GOOGLETEST_VERSION}
+    GIT_TAG ${RAC_GOOGLETEST_VERSION}
 )
 
 # Prevent GoogleTest from overriding compiler/linker options

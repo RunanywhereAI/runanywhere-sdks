@@ -10,7 +10,6 @@ import Foundation
 enum LoRAArtifactMetadata {
     static let modelIDPrefix = "lora-adapter:"
     static let adapterTag = "lora-adapter"
-    static let legacyAdapterTag = "lora"
     static let baseModelTagPrefix = "base-model:"
 }
 
@@ -23,10 +22,8 @@ public extension RAModelInfo {
             return true
         }
 
-        return metadata.tags.contains { tag in
-            let normalizedTag = tag.lowercased()
-            return normalizedTag == LoRAArtifactMetadata.adapterTag ||
-                normalizedTag == LoRAArtifactMetadata.legacyAdapterTag
+        return metadata.tags.contains {
+            $0.lowercased() == LoRAArtifactMetadata.adapterTag
         }
     }
 }

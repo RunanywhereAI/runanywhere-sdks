@@ -3,7 +3,7 @@
  * @brief HTTP bridge implementation
  *
  * NOTE: Public RN HTTP is handled by rac_http_client_*; this bridge manages
- * shared configuration and optional legacy executors.
+ * shared bootstrap configuration only.
  */
 
 #include "HTTPBridge.hpp"
@@ -14,12 +14,10 @@
 #define LOG_TAG "HTTPBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #else
 #include <cstdio>
 #define LOGI(...) printf("[HTTPBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[HTTPBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[HTTPBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
 #endif
 
 namespace runanywhere {
@@ -50,28 +48,6 @@ std::optional<std::string> HTTPBridge::getAuthorizationToken() const {
 void HTTPBridge::clearAuthorizationToken() {
     authToken_.reset();
     LOGD("Authorization token cleared");
-}
-
-void HTTPBridge::setHTTPExecutor(HTTPExecutor executor) {
-    executor_ = executor;
-    LOGI("HTTP executor registered");
-}
-
-std::optional<HTTPResponse> HTTPBridge::execute(
-    const std::string& method,
-    const std::string& endpoint,
-    const std::string& body,
-    bool requiresAuth
-) {
-    if (!executor_) {
-        LOGE("No HTTP executor registered for legacy HTTPBridge::execute caller");
-        return std::nullopt;
-    }
-
-    std::string url = buildURL(endpoint);
-    LOGD("Executing %s %s", method.c_str(), url.c_str());
-
-    return executor_(method, url, body, requiresAuth);
 }
 
 std::string HTTPBridge::buildURL(const std::string& endpoint) const {

@@ -28,7 +28,7 @@ extension CppBridge {
     /// C++ handles all event logic - Swift just handles HTTP transport
     public enum Events {
 
-        private static var isRegistered = false
+        private static let registration = OSAllocatedUnfairLock(initialState: false)
 
         /// Register the C++ telemetry sink.
         ///
@@ -38,32 +38,36 @@ extension CppBridge {
         /// only has to attach the telemetry manager once as the sink — there is
         /// no per-event analytics callback to translate anymore.
         static func register() {
-            guard !isRegistered else { return }
+            registration.withLock { isRegistered in
+                guard !isRegistered else { return }
 
-            guard let mgr = CppBridge.Telemetry.handle else {
-                SDKLogger(category: "CppBridge.Events").warning(
-                    "Telemetry manager not initialized; skipping telemetry sink registration"
-                )
-                return
+                guard let mgr = CppBridge.Telemetry.handle else {
+                    SDKLogger(category: "CppBridge.Events").warning(
+                        "Telemetry manager not initialized; skipping telemetry sink registration"
+                    )
+                    return
+                }
+
+                // Attach the telemetry manager as the router's telemetry sink.
+                // `rac_events_set_telemetry_sink` takes the manager as an opaque
+                // `void*` (NULL to detach) and returns void.
+                rac_events_set_telemetry_sink(UnsafeMutableRawPointer(mgr.ptr))
+
+                // Note: Public events are handled directly by app developers via C++ callbacks
+                // No Swift EventPublisher layer needed
+
+                isRegistered = true
+                SDKLogger(category: "CppBridge.Events").debug("Registered C++ telemetry sink")
             }
-
-            // Attach the telemetry manager as the router's telemetry sink.
-            // `rac_events_set_telemetry_sink` takes the manager as an opaque
-            // `void*` (NULL to detach) and returns void.
-            rac_events_set_telemetry_sink(UnsafeMutableRawPointer(mgr.ptr))
-
-            // Note: Public events are handled directly by app developers via C++ callbacks
-            // No Swift EventPublisher layer needed
-
-            isRegistered = true
-            SDKLogger(category: "CppBridge.Events").debug("Registered C++ telemetry sink")
         }
 
         /// Detach the C++ telemetry sink.
         static func unregister() {
-            guard isRegistered else { return }
-            rac_events_set_telemetry_sink(nil)
-            isRegistered = false
+            registration.withLock { isRegistered in
+                guard isRegistered else { return }
+                rac_events_set_telemetry_sink(nil)
+                isRegistered = false
+            }
         }
     }
 }

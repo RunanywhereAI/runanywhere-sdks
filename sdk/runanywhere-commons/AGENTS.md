@@ -42,17 +42,13 @@ cmake --build build
 # iOS build
 ./scripts/ios/download-onnx.sh           # Download ONNX Runtime xcframework
 ./scripts/ios/download-sherpa-onnx.sh    # Download Sherpa-ONNX xcframework
-./scripts/build-ios.sh                   # Full build → dist/RACommons.xcframework
-./scripts/build-ios.sh --skip-download   # Use cached deps
-./scripts/build-ios.sh --backend llamacpp
-./scripts/build-ios.sh --clean --package # Clean build + create ZIPs
+./scripts/build-ios.sh                   # Canonical Apple build + versioned packages
 
 # Android build
 ./scripts/android/download-sherpa-onnx.sh          # Download Sherpa-ONNX .so files
-./scripts/build-android.sh                          # All backends, all ABIs
-./scripts/build-android.sh llamacpp                 # LlamaCPP only
-./scripts/build-android.sh onnx arm64-v8a           # Specific backend + ABI
-./scripts/build-android.sh --check                  # Verify 16KB page alignment
+for abi in arm64-v8a armeabi-v7a x86_64; do
+  ./scripts/build-android.sh "$abi"                 # Complete public set for one ABI
+done
 
 # macOS / Linux / Windows dependency downloads
 ./scripts/macos/download-onnx.sh
@@ -300,9 +296,9 @@ All versions centralized in `VERSIONS` file. Consumed three ways:
 
 ## Build Outputs
 
-**iOS**: `dist/RACommons.xcframework`, `dist/RABackendLLAMACPP.xcframework`, `dist/RABackendONNX.xcframework`
+**Apple**: XCFrameworks under `../runanywhere-swift/Binaries/`; versioned reproducible archives under `dist/packages/`.
 
-**Android**: `dist/android/jni/{abi}/librac_commons_jni.so` + per-backend JNI `.so` files. 16KB page alignment required for Play Store (Android 15+).
+**Android**: one versioned `dist/RACommons-android-{abi}-v{version}.zip` plus checksum per invocation. The archive contains the public core, LlamaCPP, and ONNX/Sherpa native sets for that ABI. 16 KB ELF alignment is enforced before packaging.
 
 **JNI separation**: `librac_commons_jni.so` links only `rac_commons` (no backends). Each backend ships its own JNI `.so` that calls `rac_backend_*_register()`. Mirrors iOS XCFramework separation.
 

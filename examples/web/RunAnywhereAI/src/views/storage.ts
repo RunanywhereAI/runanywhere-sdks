@@ -235,16 +235,25 @@ function updateStorageLocationUI(): void {
       + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   } else if (RunAnywhere.storage.hasLocalStorageHandle) {
     label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = '';
+  } else if (RunAnywhere.storage.backend === 'memory') {
+    label.innerHTML = '<strong>Persistent model storage unavailable</strong>'
+      + '<br><span style="font-size:0.75rem;opacity:0.5">Model downloads require OPFS or an approved local folder in the split-WASM SDK.</span>';
+    label.style.color = 'var(--color-warning, #ff9800)';
+    chooseDirBtn.style.display = RunAnywhere.storage.isLocalStorageSupported ? '' : 'none';
+    reauthBtn.style.display = 'none';
   } else {
     label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Sandboxed browser storage &mdash; not visible in Finder. Use "Choose Storage Folder" for a real path.</span>`;
     label.style.color = '';
+    chooseDirBtn.style.display = '';
     reauthBtn.style.display = 'none';
   }
 }

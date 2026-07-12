@@ -46,10 +46,14 @@ group =
         else -> "io.github.sanchitmonga22"
     }
 
+val canonicalVersion =
+    rootProject.file("../runanywhere-commons/VERSION").readText().trim().also {
+        require(it.isNotEmpty()) { "Canonical SDK VERSION is empty" }
+    }
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")
-        ?: "0.1.5-SNAPSHOT"
+        ?: canonicalVersion
 version = resolvedVersion
 
 logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")
@@ -475,6 +479,9 @@ val signingPassword: String? =
 val signingKey: String? =
     System.getenv("GPG_SIGNING_KEY")
         ?: project.findProperty("signing.key") as String?
+val skipSigning: Boolean =
+    rootProject.findProperty("runanywhere.skipSigning")?.toString()?.toBoolean()
+        ?: false
 
 afterEvaluate {
     publishing {
@@ -563,9 +570,12 @@ afterEvaluate {
 
 tasks.withType<Sign>().configureEach {
     onlyIf {
-        gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
-            gradle.taskGraph.hasTask(":publish") ||
-            project.hasProperty("signing.gnupg.keyName") ||
-            signingKey != null
+        !skipSigning &&
+            (
+                gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
+                    gradle.taskGraph.hasTask(":publish") ||
+                    project.hasProperty("signing.gnupg.keyName") ||
+                    signingKey != null
+            )
     }
 }

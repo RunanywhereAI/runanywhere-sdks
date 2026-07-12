@@ -381,7 +381,8 @@ private extension RunAnywhere {
             rac_model_id_from_url(urlPtr, &buffer, buffer.count)
         }
         if status == RAC_SUCCESS {
-            let derived = String(cString: buffer)
+            let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+            let derived = String(bytes: bytes, encoding: .utf8) ?? ""
             if !derived.isEmpty { return derived }
         }
         return name

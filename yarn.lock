@@ -2729,6 +2729,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/core@workspace:sdk/runanywhere-react-native/packages/core"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     "@types/jest": ^29.5.12
     "@types/react": ~19.2.14
@@ -2761,6 +2762,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:sdk/runanywhere-react-native/packages/llamacpp"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     eslint: ^9.39.4
     nitrogen: ^0.34.1
@@ -2774,24 +2776,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/mlx@workspace:*, @runanywhere/mlx@workspace:sdk/runanywhere-react-native/packages/mlx":
-  version: 0.0.0-use.local
-  resolution: "@runanywhere/mlx@workspace:sdk/runanywhere-react-native/packages/mlx"
-  dependencies:
-    eslint: ^9.39.4
-    typescript: ^5.9.3
-  peerDependencies:
-    "@runanywhere/core": ">=0.19.15"
-    react: ">=19.0.0"
-    react-native: ">=0.83.1"
-    react-native-nitro-modules: ^0.33.9
-  languageName: unknown
-  linkType: soft
-
 "@runanywhere/onnx@workspace:*, @runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx":
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     eslint: ^9.39.4
     nitrogen: ^0.34.1
@@ -9086,7 +9075,6 @@ __metadata:
     "@react-navigation/native-stack": ^7.12.0
     "@runanywhere/core": "workspace:*"
     "@runanywhere/llamacpp": "workspace:*"
-    "@runanywhere/mlx": "workspace:*"
     "@runanywhere/onnx": "workspace:*"
     "@runanywhere/proto-ts": "workspace:*"
     "@runanywhere/qhexrt": "workspace:*"

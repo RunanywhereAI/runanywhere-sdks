@@ -37,9 +37,8 @@ namespace rac::llm {
  *
  * Callers populate the fields they know; the rest remain proto3
  * defaults (0 / empty string / nullptr) and are omitted from the wire.
- * This keeps the 9-field wire shape emitted by the legacy
- * `llm_component.cpp` callers identical to before while allowing the
- * `rac_llm_proto_service.cpp` caller to populate the extra 4+ fields.
+ * Both component and proto-service callers use this structure so additions
+ * remain source-compatible without parallel dispatcher signatures.
  */
 struct LLMStreamEventParams {
     // Per-token scalars (always known by every caller).
@@ -122,19 +121,6 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
  * the callback without holding the registry lock.
  */
 void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p);
-
-/**
- * @brief Legacy 9-arg dispatcher. Forwards to the struct-based overload
- *        so existing call sites in `llm_component.cpp` (and the unit
- *        tests) remain source-compatible. The 4 newer fields
- *        (`request_id`, `conversation_id`,
- *        `completion_tokens_generated`, `elapsed_ms`,
- *        `final_result`) stay at proto3 defaults on this path —
- *        identical wire output to the pre-unification 9-field shape.
- */
-void dispatch_llm_stream_event(rac_handle_t handle, const char* token, bool is_final, int kind,
-                               uint32_t token_id, float logprob, const char* finish_reason,
-                               const char* error_message);
 
 }  // namespace rac::llm
 

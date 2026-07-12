@@ -23,6 +23,19 @@ def findNodeBinary() {
         }
     }
 
+    // Honor the active toolchain before probing machine-global installations.
+    def configuredNode = System.getenv("NODE_BINARY")
+    if (configuredNode && new File(configuredNode).canExecute()) {
+        return configuredNode
+    }
+    def pathNode = System.getenv("PATH")
+        ?.split(File.pathSeparator)
+        ?.collect { new File(it, "node") }
+        ?.find { it.canExecute() }
+    if (pathNode) {
+        return pathNode.canonicalPath
+    }
+
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
         "/opt/homebrew/bin/node",

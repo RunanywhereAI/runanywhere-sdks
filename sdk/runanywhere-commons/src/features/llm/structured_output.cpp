@@ -20,6 +20,7 @@
 
 #include "features/llm/llm_thinking_tags_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/structured_output_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"

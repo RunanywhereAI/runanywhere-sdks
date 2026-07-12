@@ -18,19 +18,14 @@ message(STATUS "Configuring LlamaCPP backend...")
 include(FetchContent)
 include(LoadVersions)
 
-# Pin to the centralized LLAMACPP_VERSION from sdk/runanywhere-commons/VERSIONS.
-# LoadVersions FORCEs the cache var, so it is always defined here — no local
-# fallback (DRY; single source of truth).
-set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
-
 # Propagate llama.cpp upstream tag through to the JNI bridge so
 # nativeGetVersion() doesn't drift from the actual linked llama.cpp build.
-add_compile_definitions(RAC_LLAMACPP_VERSION="${LLAMACPP_VERSION}")
+add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 
 FetchContent_Declare(
     llamacpp
     GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
-    GIT_TAG        ${LLAMA_CPP_VERSION}
+    GIT_TAG        ${RAC_LLAMACPP_VERSION}
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
 )
@@ -194,7 +189,7 @@ file(GLOB _RAC_MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
     "${llamacpp_SOURCE_DIR}/tools/mtmd/models/*.cpp"
 )
 list(LENGTH _RAC_MTMD_MODEL_SOURCES _RAC_MTMD_MODEL_COUNT)
-message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${LLAMACPP_VERSION})")
+message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${RAC_LLAMACPP_VERSION})")
 list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 
 # Migrated to rac_add_engine_plugin().
@@ -381,5 +376,5 @@ endif()
 # =============================================================================
 
 message(STATUS "LlamaCPP Backend Configuration:")
-message(STATUS "  llama.cpp version: ${LLAMA_CPP_VERSION}")
+message(STATUS "  llama.cpp version: ${RAC_LLAMACPP_VERSION}")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

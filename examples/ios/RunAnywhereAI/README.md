@@ -46,7 +46,7 @@ cd ../../..
 cd examples/ios/RunAnywhereAI
 
 # Resolve local Swift package dependencies.
-swift package resolve
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve
 xcodebuild \
   -project RunAnywhereAI.xcodeproj \
   -scheme RunAnywhereAI \
@@ -343,7 +343,7 @@ struct RunAnywhereAIApp: App {
 ```swift
 // Download with progress tracking
 for try await progress in RunAnywhere.downloadModel("smollm2-360m-q8_0") {
-    print("Download: \(Int(progress.percentage * 100))%")
+    print("Download: \(Int(Double(progress.overallProgress) * 100))%")
 }
 
 // Load into memory

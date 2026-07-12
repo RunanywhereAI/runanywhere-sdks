@@ -30,7 +30,7 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the LLM component handle
-        public func getHandle() async throws -> rac_handle_t {
+        func getHandle() async throws -> ComponentHandle {
             try await inner.getHandle()
         }
 
@@ -61,7 +61,7 @@ extension CppBridge {
         /// Cancel ongoing generation
         public func cancel() async {
             guard let handle = await inner.existingHandle() else { return }
-            rac_llm_component_cancel(handle)
+            rac_llm_component_cancel(handle.rawValue)
         }
 
         // MARK: - Cleanup

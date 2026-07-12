@@ -40,16 +40,9 @@ import okio.ByteString
  *   Web    — n/a (config is implicit in the llamacpp service ctor)
  *   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
  *
- * Drift note: Swift/Kotlin/RN also carry `model_id`, `preferred_framework`,
- * and `reduce_memory` fields. Those belong on the more general component
- * configuration carried by ModelInfo / framework selection elsewhere in
- * this IDL package; this message intentionally narrows to the four
- * diffusion-specific knobs called out by the v1 spec.
- * `max_memory_mb` here is the new generalization of pre-IDL `reduce_memory`
- * (a bool) — backends interpret 0 as "no cap / engine default" and any
- * positive value as a hard MB ceiling. SDKs translating pre-IDL
- * `reduceMemory == true` should set this to the backend's documented
- * reduced-memory threshold; `reduceMemory == false` ⇒ 0.
+ * `max_memory_mb` is the single portable working-set control; backends
+ * interpret 0 as "no cap / engine default" and a positive value as a hard
+ * MiB ceiling.
  * ---------------------------------------------------------------------------
  */
 public class DiffusionConfiguration(
@@ -92,8 +85,7 @@ public class DiffusionConfiguration(
   public val enable_safety_checker: Boolean = false,
   /**
    * Maximum working-set memory the diffusion runtime is allowed to use,
-   * in MiB. 0 = no cap (engine default). Generalizes the pre-IDL
-   * `reduceMemory` bool flag.
+   * in MiB. 0 = no cap (engine default).
    */
   @field:WireField(
     tag = 4,
@@ -120,18 +112,6 @@ public class DiffusionConfiguration(
     schemaIndex = 5,
   )
   public val preferred_framework: InferenceFramework? = null,
-  /**
-   * Legacy low-memory boolean. Backends may translate true to an internal
-   * memory cap when max_memory_mb is unset.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "reduceMemory",
-    schemaIndex = 6,
-  )
-  public val reduce_memory: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -150,7 +130,6 @@ public class DiffusionConfiguration(
     if (max_memory_mb != other.max_memory_mb) return false
     if (model_id != other.model_id) return false
     if (preferred_framework != other.preferred_framework) return false
-    if (reduce_memory != other.reduce_memory) return false
     return true
   }
 
@@ -164,7 +143,6 @@ public class DiffusionConfiguration(
       result = result * 37 + max_memory_mb.hashCode()
       result = result * 37 + (model_id?.hashCode() ?: 0)
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
-      result = result * 37 + reduce_memory.hashCode()
       super.hashCode = result
     }
     return result
@@ -178,7 +156,6 @@ public class DiffusionConfiguration(
     result += """max_memory_mb=$max_memory_mb"""
     if (model_id != null) result += """model_id=${sanitize(model_id)}"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
-    result += """reduce_memory=$reduce_memory"""
     return result.joinToString(prefix = "DiffusionConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -189,9 +166,8 @@ public class DiffusionConfiguration(
     max_memory_mb: Int = this.max_memory_mb,
     model_id: String? = this.model_id,
     preferred_framework: InferenceFramework? = this.preferred_framework,
-    reduce_memory: Boolean = this.reduce_memory,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionConfiguration = DiffusionConfiguration(model_variant, tokenizer_source, enable_safety_checker, max_memory_mb, model_id, preferred_framework, reduce_memory, unknownFields)
+  ): DiffusionConfiguration = DiffusionConfiguration(model_variant, tokenizer_source, enable_safety_checker, max_memory_mb, model_id, preferred_framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -220,9 +196,6 @@ public class DiffusionConfiguration(
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_id)
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(6, value.preferred_framework)
-        if (value.reduce_memory != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.reduce_memory)
-        }
         return size
       }
 
@@ -241,17 +214,11 @@ public class DiffusionConfiguration(
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
-        if (value.reduce_memory != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.reduce_memory)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionConfiguration) {
         writer.writeBytes(value.unknownFields)
-        if (value.reduce_memory != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.reduce_memory)
-        }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         if (value.max_memory_mb != 0) {
@@ -275,7 +242,6 @@ public class DiffusionConfiguration(
         var max_memory_mb: Int = 0
         var model_id: String? = null
         var preferred_framework: InferenceFramework? = null
-        var reduce_memory: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -292,7 +258,6 @@ public class DiffusionConfiguration(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            7 -> reduce_memory = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -303,7 +268,6 @@ public class DiffusionConfiguration(
           max_memory_mb = max_memory_mb,
           model_id = model_id,
           preferred_framework = preferred_framework,
-          reduce_memory = reduce_memory,
           unknownFields = unknownFields
         )
       }

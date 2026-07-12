@@ -41,18 +41,6 @@ import okio.ByteString
 public class ToolCallingOptions(
   tools: List<ToolDefinition> = emptyList(),
   /**
-   * Maximum tool-call iterations in one conversation turn. 0 = SDK default
-   * (typically 5).
-   */
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxIterations",
-    schemaIndex = 1,
-  )
-  public val max_iterations: Int = 0,
-  /**
    * Whether to auto-execute tools or hand them back to the caller.
    */
   @field:WireField(
@@ -60,7 +48,7 @@ public class ToolCallingOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "autoExecute",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val auto_execute: Boolean = false,
   /**
@@ -69,7 +57,7 @@ public class ToolCallingOptions(
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val temperature: Float? = null,
   /**
@@ -79,7 +67,7 @@ public class ToolCallingOptions(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "maxTokens",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val max_tokens: Int? = null,
   /**
@@ -89,7 +77,7 @@ public class ToolCallingOptions(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "systemPrompt",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val system_prompt: String? = null,
   /**
@@ -101,7 +89,7 @@ public class ToolCallingOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "replaceSystemPrompt",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val replace_system_prompt: Boolean = false,
   /**
@@ -113,54 +101,27 @@ public class ToolCallingOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "keepToolsAvailable",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val keep_tools_available: Boolean = false,
   /**
-   * Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
-   * Empty = SDK default.
-   */
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "formatHint",
-    schemaIndex = 8,
-  )
-  public val format_hint: String = "",
-  /**
-   * Strongly-typed tool-call format. Preferred over `format_hint` when set;
-   * `format_hint` remains for legacy callers and per-SDK custom strings
-   * that don't round-trip through this enum.
+   * Typed tool-call format. Unset lets commons select the model default.
    */
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.ToolCallFormatName#ADAPTER",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val format: ToolCallFormatName? = null,
   /**
-   * Caller-supplied system prompt that fully replaces the SDK-injected
-   * tool-calling system prompt (rather than being merged with it).
-   * Distinct from `system_prompt` (field 6), which is merged unless
-   * `replace_system_prompt` is true.
-   */
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "customSystemPrompt",
-    schemaIndex = 10,
-  )
-  public val custom_system_prompt: String? = null,
-  /**
-   * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
-   * SDK default.
+   * Maximum tool calls in one conversation turn. Unset/0 = SDK default
+   * (typically 5).
    */
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "maxToolCalls",
-    schemaIndex = 11,
+    schemaIndex = 8,
   )
   public val max_tool_calls: Int? = null,
   @field:WireField(
@@ -168,30 +129,22 @@ public class ToolCallingOptions(
     adapter = "ai.runanywhere.proto.v1.ToolChoiceMode#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "toolChoice",
-    schemaIndex = 12,
+    schemaIndex = 9,
   )
   public val tool_choice: ToolChoiceMode = ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED,
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "forcedToolName",
-    schemaIndex = 13,
+    schemaIndex = 10,
   )
   public val forced_tool_name: String? = null,
-  @field:WireField(
-    tag = 15,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "parallelToolCalls",
-    schemaIndex = 14,
-  )
-  public val parallel_tool_calls: Boolean = false,
   @field:WireField(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requireJsonArguments",
-    schemaIndex = 15,
+    schemaIndex = 11,
   )
   public val require_json_arguments: Boolean = false,
   /**
@@ -204,7 +157,7 @@ public class ToolCallingOptions(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "disableThinking",
-    schemaIndex = 16,
+    schemaIndex = 12,
   )
   public val disable_thinking: Boolean? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -232,20 +185,16 @@ public class ToolCallingOptions(
     if (other !is ToolCallingOptions) return false
     if (unknownFields != other.unknownFields) return false
     if (tools != other.tools) return false
-    if (max_iterations != other.max_iterations) return false
     if (auto_execute != other.auto_execute) return false
     if (temperature != other.temperature) return false
     if (max_tokens != other.max_tokens) return false
     if (system_prompt != other.system_prompt) return false
     if (replace_system_prompt != other.replace_system_prompt) return false
     if (keep_tools_available != other.keep_tools_available) return false
-    if (format_hint != other.format_hint) return false
     if (format != other.format) return false
-    if (custom_system_prompt != other.custom_system_prompt) return false
     if (max_tool_calls != other.max_tool_calls) return false
     if (tool_choice != other.tool_choice) return false
     if (forced_tool_name != other.forced_tool_name) return false
-    if (parallel_tool_calls != other.parallel_tool_calls) return false
     if (require_json_arguments != other.require_json_arguments) return false
     if (disable_thinking != other.disable_thinking) return false
     return true
@@ -256,20 +205,16 @@ public class ToolCallingOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + tools.hashCode()
-      result = result * 37 + max_iterations.hashCode()
       result = result * 37 + auto_execute.hashCode()
       result = result * 37 + (temperature?.hashCode() ?: 0)
       result = result * 37 + (max_tokens?.hashCode() ?: 0)
       result = result * 37 + (system_prompt?.hashCode() ?: 0)
       result = result * 37 + replace_system_prompt.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
-      result = result * 37 + format_hint.hashCode()
       result = result * 37 + (format?.hashCode() ?: 0)
-      result = result * 37 + (custom_system_prompt?.hashCode() ?: 0)
       result = result * 37 + (max_tool_calls?.hashCode() ?: 0)
       result = result * 37 + tool_choice.hashCode()
       result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
-      result = result * 37 + parallel_tool_calls.hashCode()
       result = result * 37 + require_json_arguments.hashCode()
       result = result * 37 + (disable_thinking?.hashCode() ?: 0)
       super.hashCode = result
@@ -280,20 +225,16 @@ public class ToolCallingOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (tools.isNotEmpty()) result += """tools=$tools"""
-    result += """max_iterations=$max_iterations"""
     result += """auto_execute=$auto_execute"""
     if (temperature != null) result += """temperature=$temperature"""
     if (max_tokens != null) result += """max_tokens=$max_tokens"""
     if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
     result += """replace_system_prompt=$replace_system_prompt"""
     result += """keep_tools_available=$keep_tools_available"""
-    result += """format_hint=${sanitize(format_hint)}"""
     if (format != null) result += """format=$format"""
-    if (custom_system_prompt != null) result += """custom_system_prompt=${sanitize(custom_system_prompt)}"""
     if (max_tool_calls != null) result += """max_tool_calls=$max_tool_calls"""
     result += """tool_choice=$tool_choice"""
     if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
-    result += """parallel_tool_calls=$parallel_tool_calls"""
     result += """require_json_arguments=$require_json_arguments"""
     if (disable_thinking != null) result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "ToolCallingOptions{", separator = ", ", postfix = "}")
@@ -301,24 +242,20 @@ public class ToolCallingOptions(
 
   public fun copy(
     tools: List<ToolDefinition> = this.tools,
-    max_iterations: Int = this.max_iterations,
     auto_execute: Boolean = this.auto_execute,
     temperature: Float? = this.temperature,
     max_tokens: Int? = this.max_tokens,
     system_prompt: String? = this.system_prompt,
     replace_system_prompt: Boolean = this.replace_system_prompt,
     keep_tools_available: Boolean = this.keep_tools_available,
-    format_hint: String = this.format_hint,
     format: ToolCallFormatName? = this.format,
-    custom_system_prompt: String? = this.custom_system_prompt,
     max_tool_calls: Int? = this.max_tool_calls,
     tool_choice: ToolChoiceMode = this.tool_choice,
     forced_tool_name: String? = this.forced_tool_name,
-    parallel_tool_calls: Boolean = this.parallel_tool_calls,
     require_json_arguments: Boolean = this.require_json_arguments,
     disable_thinking: Boolean? = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingOptions = ToolCallingOptions(tools, max_iterations, auto_execute, temperature, max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint, format, custom_system_prompt, max_tool_calls, tool_choice, forced_tool_name, parallel_tool_calls, require_json_arguments, disable_thinking, unknownFields)
+  ): ToolCallingOptions = ToolCallingOptions(tools, auto_execute, temperature, max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format, max_tool_calls, tool_choice, forced_tool_name, require_json_arguments, disable_thinking, unknownFields)
 
   public companion object {
     @JvmField
@@ -334,9 +271,6 @@ public class ToolCallingOptions(
       override fun encodedSize(`value`: ToolCallingOptions): Int {
         var size = value.unknownFields.size
         size += ToolDefinition.ADAPTER.asRepeated().encodedSizeWithTag(1, value.tools)
-        if (value.max_iterations != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.max_iterations)
-        }
         if (value.auto_execute != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.auto_execute)
         }
@@ -349,19 +283,12 @@ public class ToolCallingOptions(
         if (value.keep_tools_available != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.keep_tools_available)
         }
-        if (value.format_hint != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.format_hint)
-        }
         size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(10, value.format)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.custom_system_prompt)
         size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.max_tool_calls)
         if (value.tool_choice != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
           size += ToolChoiceMode.ADAPTER.encodedSizeWithTag(13, value.tool_choice)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.forced_tool_name)
-        if (value.parallel_tool_calls != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.parallel_tool_calls)
-        }
         if (value.require_json_arguments != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(16, value.require_json_arguments)
         }
@@ -371,9 +298,6 @@ public class ToolCallingOptions(
 
       override fun encode(writer: ProtoWriter, `value`: ToolCallingOptions) {
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.tools)
-        if (value.max_iterations != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_iterations)
-        }
         if (value.auto_execute != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
         }
@@ -386,19 +310,12 @@ public class ToolCallingOptions(
         if (value.keep_tools_available != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.keep_tools_available)
         }
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
-        }
         ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
         ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_tool_calls)
         if (value.tool_choice != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
           ToolChoiceMode.ADAPTER.encodeWithTag(writer, 13, value.tool_choice)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 14, value.forced_tool_name)
-        if (value.parallel_tool_calls != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.parallel_tool_calls)
-        }
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.require_json_arguments)
         }
@@ -412,19 +329,12 @@ public class ToolCallingOptions(
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.require_json_arguments)
         }
-        if (value.parallel_tool_calls != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.parallel_tool_calls)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 14, value.forced_tool_name)
         if (value.tool_choice != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
           ToolChoiceMode.ADAPTER.encodeWithTag(writer, 13, value.tool_choice)
         }
         ProtoAdapter.INT32.encodeWithTag(writer, 12, value.max_tool_calls)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.custom_system_prompt)
         ToolCallFormatName.ADAPTER.encodeWithTag(writer, 10, value.format)
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.format_hint)
-        }
         if (value.keep_tools_available != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.keep_tools_available)
         }
@@ -437,47 +347,37 @@ public class ToolCallingOptions(
         if (value.auto_execute != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
         }
-        if (value.max_iterations != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_iterations)
-        }
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.tools)
       }
 
       override fun decode(reader: ProtoReader): ToolCallingOptions {
         val tools = mutableListOf<ToolDefinition>()
-        var max_iterations: Int = 0
         var auto_execute: Boolean = false
         var temperature: Float? = null
         var max_tokens: Int? = null
         var system_prompt: String? = null
         var replace_system_prompt: Boolean = false
         var keep_tools_available: Boolean = false
-        var format_hint: String = ""
         var format: ToolCallFormatName? = null
-        var custom_system_prompt: String? = null
         var max_tool_calls: Int? = null
         var tool_choice: ToolChoiceMode = ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
         var forced_tool_name: String? = null
-        var parallel_tool_calls: Boolean = false
         var require_json_arguments: Boolean = false
         var disable_thinking: Boolean? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
-            2 -> max_iterations = ProtoAdapter.INT32.decode(reader)
             3 -> auto_execute = ProtoAdapter.BOOL.decode(reader)
             4 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             5 -> max_tokens = ProtoAdapter.INT32.decode(reader)
             6 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             7 -> replace_system_prompt = ProtoAdapter.BOOL.decode(reader)
             8 -> keep_tools_available = ProtoAdapter.BOOL.decode(reader)
-            9 -> format_hint = ProtoAdapter.STRING.decode(reader)
             10 -> try {
               format = ToolCallFormatName.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            11 -> custom_system_prompt = ProtoAdapter.STRING.decode(reader)
             12 -> max_tool_calls = ProtoAdapter.INT32.decode(reader)
             13 -> try {
               tool_choice = ToolChoiceMode.ADAPTER.decode(reader)
@@ -485,7 +385,6 @@ public class ToolCallingOptions(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             14 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
-            15 -> parallel_tool_calls = ProtoAdapter.BOOL.decode(reader)
             16 -> require_json_arguments = ProtoAdapter.BOOL.decode(reader)
             17 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
@@ -493,20 +392,16 @@ public class ToolCallingOptions(
         }
         return ToolCallingOptions(
           tools = tools,
-          max_iterations = max_iterations,
           auto_execute = auto_execute,
           temperature = temperature,
           max_tokens = max_tokens,
           system_prompt = system_prompt,
           replace_system_prompt = replace_system_prompt,
           keep_tools_available = keep_tools_available,
-          format_hint = format_hint,
           format = format,
-          custom_system_prompt = custom_system_prompt,
           max_tool_calls = max_tool_calls,
           tool_choice = tool_choice,
           forced_tool_name = forced_tool_name,
-          parallel_tool_calls = parallel_tool_calls,
           require_json_arguments = require_json_arguments,
           disable_thinking = disable_thinking,
           unknownFields = unknownFields

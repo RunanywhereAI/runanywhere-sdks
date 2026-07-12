@@ -41,9 +41,9 @@
     "clean": "tsc -b --clean && rm -rf lib lib-test",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
-    "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
+    "nitrogen": "nitrogen && node ../../scripts/fix-nitrogen-output.js",
     "prepack": "mkdir -p ios/URLSessionHttpTransport && cp -f ../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
-    "prepublishOnly": "npm run typecheck && npm run lint && node scripts/fix-nitrogen-output.js"
+    "prepublishOnly": "npm run typecheck && npm run lint && node ../../scripts/fix-nitrogen-output.js"
   },
   "keywords": [
     "react-native",
@@ -56,6 +56,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "workspace:*",
     "long": "^5.3.2",
     "protobufjs": "^7.5.8"

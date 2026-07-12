@@ -53,6 +53,7 @@ function createRegistryModule(handle: number): FakeRegistryModule {
       heapU8[ptr + bytes.length] = 0;
     },
     _rac_get_model_registry: () => handle,
+    _rac_model_registry_refresh_proto: () => 0,
     _rac_model_registry_register_proto: () => 0,
     _rac_model_registry_update_proto: () => 0,
     _rac_model_registry_update_download_status: (_registry, modelIdPtr, localPathPtr) => {
@@ -67,6 +68,7 @@ function createRegistryModule(handle: number): FakeRegistryModule {
     _rac_model_registry_query_proto: () => 0,
     _rac_model_registry_list_downloaded_proto: () => 0,
     _rac_model_registry_remove_proto: () => 0,
+    _rac_model_registry_import_proto: () => 0,
     _rac_model_registry_proto_free: () => undefined,
   };
 
@@ -99,16 +101,13 @@ describe('ModelRegistryAdapter download status', () => {
     }
   });
 
-  it('does not disable unrelated proto registry operations when the status ABI is absent', () => {
-    const legacy = createRegistryModule(404);
-    delete legacy.module._rac_model_registry_update_download_status;
-    ModelRegistryAdapter.setDefaultModule(legacy.module);
+  it('rejects an outdated artifact that omits a required registry export', () => {
+    const incomplete = createRegistryModule(404);
+    delete (incomplete.module as Partial<ModelRegistryModule>)
+      ._rac_model_registry_update_download_status;
 
-    const registry = ModelRegistryAdapter.tryDefault();
-    expect(registry).not.toBeNull();
-    expect(registry!.supportsProtoRegistry()).toBe(true);
-    expect(registry!.updateDownloadStatus('silero-vad', null)).toBe(false);
-    expect(legacy.calls).toEqual([]);
-    expect(legacy.liveAllocations.size).toBe(0);
+    expect(() => ModelRegistryAdapter.setDefaultModule(incomplete.module))
+      .toThrow(/missing required model-registry exports.*update_download_status/);
+    expect(ModelRegistryAdapter.tryDefault()).toBeNull();
   });
 });

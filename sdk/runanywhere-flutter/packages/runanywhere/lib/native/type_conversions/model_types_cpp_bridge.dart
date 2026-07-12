@@ -15,7 +15,6 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
-import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
 import 'package:runanywhere/native/platform_loader.dart';
@@ -50,37 +49,26 @@ abstract class RacArtifactKind {
 typedef _RacEnumMapperNative = Int32 Function(Int32, Pointer<Int32>);
 typedef _RacEnumMapperDart = int Function(int, Pointer<Int32>);
 
-final SDKLogger _mapperLogger = SDKLogger('ModelTypesCppBridge');
-
 class _EnumMapperCache {
   _EnumMapperCache._();
   static final _EnumMapperCache instance = _EnumMapperCache._();
 
-  final Map<String, _RacEnumMapperDart?> _cache =
-      <String, _RacEnumMapperDart?>{};
+  final Map<String, _RacEnumMapperDart> _cache = <String, _RacEnumMapperDart>{};
 
-  _RacEnumMapperDart? lookup(String symbol) {
-    if (_cache.containsKey(symbol)) return _cache[symbol];
-    try {
+  _RacEnumMapperDart lookup(String symbol) {
+    return _cache.putIfAbsent(symbol, () {
       final lib = PlatformLoader.loadCommons();
-      final fn =
-          lib.lookupFunction<_RacEnumMapperNative, _RacEnumMapperDart>(symbol);
-      _cache[symbol] = fn;
-      return fn;
-    } catch (e) {
-      _mapperLogger.debug('FFI mapper $symbol not available: $e');
-      _cache[symbol] = null;
-      return null;
-    }
+      return lib.lookupFunction<_RacEnumMapperNative, _RacEnumMapperDart>(
+        symbol,
+      );
+    });
   }
 }
 
 /// Invoke a `rac_*_from_proto` / `rac_*_to_proto` mapper. Returns the mapped
-/// integer on success, or `fallback` when the symbol is missing or the C
-/// call rejects the input (preserves prior hand-written fallback behavior).
+/// integer on success, or [fallback] when commons rejects the input.
 int _invokeEnumMapper(String symbol, int input, int fallback) {
   final fn = _EnumMapperCache.instance.lookup(symbol);
-  if (fn == null) return fallback;
   final outPtr = calloc<Int32>();
   try {
     final result = fn(input, outPtr);
@@ -137,10 +125,10 @@ extension ProtoModelCategoryCppBridge on pb.ModelCategory {
   /// Convert a generated model category enum to C++ rac_model_category_t.
   /// Delegates to commons' `rac_model_category_from_proto`.
   int toC() => _invokeEnumMapper(
-        'rac_model_category_from_proto',
-        value,
-        99, // RAC_MODEL_CATEGORY_UNKNOWN
-      );
+    'rac_model_category_from_proto',
+    value,
+    99, // RAC_MODEL_CATEGORY_UNKNOWN
+  );
 
   String get displayName {
     switch (this) {
@@ -173,10 +161,10 @@ extension ProtoModelFormatCppBridge on pb.ModelFormat {
   /// Convert a generated model format enum to C++ rac_model_format_t.
   /// Delegates to commons' `rac_model_format_from_proto`.
   int toC() => _invokeEnumMapper(
-        'rac_model_format_from_proto',
-        value,
-        99, // RAC_MODEL_FORMAT_UNKNOWN
-      );
+    'rac_model_format_from_proto',
+    value,
+    99, // RAC_MODEL_FORMAT_UNKNOWN
+  );
 
   String get rawValue {
     switch (this) {
@@ -204,10 +192,10 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
   /// Convert a generated inference framework enum to C++ rac_inference_framework_t.
   /// Delegates to commons' `rac_inference_framework_from_proto`.
   int toC() => _invokeEnumMapper(
-        'rac_inference_framework_from_proto',
-        value,
-        99, // RAC_FRAMEWORK_UNKNOWN
-      );
+    'rac_inference_framework_from_proto',
+    value,
+    99, // RAC_FRAMEWORK_UNKNOWN
+  );
 
   /// Snake_case key for analytics/telemetry. Delegates to commons'
   /// `rac_inference_framework_analytics_key` so the table lives in one
@@ -215,7 +203,6 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
   /// `RAInferenceFramework.analyticsKey` (ModelTypes.swift:195-199).
   String get analyticsKey {
     final fn = RacNative.bindings.rac_inference_framework_analytics_key;
-    if (fn == null) return 'unknown';
     final out = calloc<Pointer<Utf8>>();
     try {
       final rc = fn(toC(), out);
@@ -261,10 +248,10 @@ extension ProtoModelSourceCppBridge on pb.ModelSource {
   /// Convert a generated model source enum to C++ rac_model_source_t.
   /// Delegates to commons' `rac_model_source_from_proto`.
   int toC() => _invokeEnumMapper(
-        'rac_model_source_from_proto',
-        value,
-        0, // RAC_MODEL_SOURCE_REMOTE
-      );
+    'rac_model_source_from_proto',
+    value,
+    0, // RAC_MODEL_SOURCE_REMOTE
+  );
 }
 
 extension ProtoModelInfoHelpers on model_pb.ModelInfo {
@@ -330,7 +317,7 @@ model_pb.ModelInfo protoModelInfoFromCFields({
     contextLength: contextLength,
     supportsThinking: supportsThinking != 0,
     supportsLora: supportsLora != 0,
-    description: description ?? '',
+    metadata: model_pb.ModelInfoMetadata(description: description ?? ''),
     createdAtUnixMs: fixnum.Int64(createdAtUnixMs),
     updatedAtUnixMs: fixnum.Int64(updatedAtUnixMs),
   );
@@ -351,10 +338,10 @@ extension ProtoArchiveTypeCppBridge on pb.ArchiveType {
   /// Delegates to commons' `rac_archive_type_from_proto`. Returns
   /// `RAC_ARCHIVE_TYPE_NONE` (-1) on UNSPECIFIED / unrecognized inputs.
   int toC() => _invokeEnumMapper(
-        'rac_archive_type_from_proto',
-        value,
-        -1, // RAC_ARCHIVE_TYPE_NONE
-      );
+    'rac_archive_type_from_proto',
+    value,
+    -1, // RAC_ARCHIVE_TYPE_NONE
+  );
 }
 
 extension ProtoArchiveStructureCppBridge on pb.ArchiveStructure {
@@ -363,8 +350,8 @@ extension ProtoArchiveStructureCppBridge on pb.ArchiveStructure {
   /// `rac_archive_structure_from_proto`. Falls back to
   /// `RAC_ARCHIVE_STRUCTURE_UNKNOWN` (99) on UNSPECIFIED / unrecognized.
   int toC() => _invokeEnumMapper(
-        'rac_archive_structure_from_proto',
-        value,
-        99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN
-      );
+    'rac_archive_structure_from_proto',
+    value,
+    99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN
+  );
 }

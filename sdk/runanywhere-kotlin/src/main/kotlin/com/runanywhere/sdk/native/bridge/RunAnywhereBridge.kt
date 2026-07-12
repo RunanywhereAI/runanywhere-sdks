@@ -397,37 +397,13 @@ object RunAnywhereBridge {
     // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
 
     @JvmStatic
-    external fun racVlmComponentCreate(): Long
-
-    @JvmStatic
-    external fun racVlmComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racVlmComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
-
-    @JvmStatic
-    external fun racVlmComponentCleanup(handle: Long): Int
-
-    @JvmStatic
-    external fun racVlmComponentDestroy(handle: Long)
-
-    @JvmStatic
-    external fun racVlmComponentLoadResolvedArtifactsProto(requestProto: ByteArray): ByteArray?
-
-    @JvmStatic
-    external fun racVlmProcessProto(
-        handle: Long,
-        imageProto: ByteArray,
-        optionsProto: ByteArray,
-    ): ByteArray?
+    external fun racVlmGenerateProto(requestProto: ByteArray): ByteArray?
 
     /** JNI-private request-scoped wrapper used by cancellable Kotlin calls. */
     @JvmStatic
-    external fun racVlmProcessRequestProto(
+    external fun racVlmGenerateRequestProto(
         requestId: Long,
-        handle: Long,
-        imageProto: ByteArray,
-        optionsProto: ByteArray,
+        requestProto: ByteArray,
     ): ByteArray?
 
     /**
@@ -451,9 +427,6 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener?,
     ): Int
 
-    @JvmStatic
-    external fun racVlmCancelProto(handle: Long): Int
-
     /**
      * Lifecycle-style cancel (mirrors Swift's
      * `rac_vlm_cancel_lifecycle_proto`). The lifecycle ABI acquires the
@@ -461,9 +434,7 @@ object RunAnywhereBridge {
      * `CANCELLATION_EVENT_KIND_*` SDKEvents — no handle threaded.
      *
      * Returns the encoded `SDKEvent` proto on success, or `null` on
-     * failure (e.g. no lifecycle VLM loaded). Symbol may not yet be
-     * implemented in `librunanywhere_jni.so`; callers must catch
-     * `UnsatisfiedLinkError` and fall back to the handle-based path.
+     * failure (e.g. no lifecycle VLM loaded).
      */
     @JvmStatic
     external fun racVlmCancelLifecycleProto(): ByteArray?
@@ -471,9 +442,6 @@ object RunAnywhereBridge {
     /** Cancel only the matching request-scoped VLM JNI wrapper. */
     @JvmStatic
     external fun racVlmCancelRequestLifecycleProto(requestId: Long): ByteArray?
-
-    @JvmStatic
-    external fun racVlmDestroy(handle: Long)
 
     // DIFFUSION LIFECYCLE-PROTO ABI. The generated request carries encoded
     // image and mask bytes and resolves the lifecycle-owned diffusion model.
@@ -1098,7 +1066,7 @@ object RunAnywhereBridge {
 
     // VOICE AGENT (rac_voice_agent.h)
     //
-    // 4 thunks exposing the voice-agent handle lifecycle to
+    // Thunks exposing the voice-agent handle lifecycle to
     // Kotlin. Mirrors Swift's CppBridge.VoiceAgent.shared.getHandle()
     // pattern. The handle is what VoiceAgentStreamAdapter(handle).stream()
     // subscribes to for proto event streaming.
@@ -1209,12 +1177,9 @@ object RunAnywhereBridge {
 
     // TOOL-CALLING RUN LOOP (rac_tool_calling.h)
     //
-    // Single-call native orchestration. Mirrors Swift's
-    // RunAnywhere+ToolCalling.swift which drives
-    // rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
-    // `_and_cb_proto` variant so the just-minted run-loop handle is published
-    // synchronously into a Kotlin sink the moment it is minted, letting a
-    // cancel coroutine on a different thread fan a cancel into
+    // Single-call native orchestration. The canonical API publishes the
+    // just-minted run-loop handle synchronously into Kotlin before generation,
+    // letting a cancel coroutine on another thread fan cancellation into
     // [racToolCallingRunLoopCancelProto].
 
     /**
@@ -1222,14 +1187,14 @@ object RunAnywhereBridge {
      * commons. Accepts serialized `ToolCallingSessionCreateRequest` bytes.
      * [executor] is invoked synchronously for each tool call (returns a
      * serialized `ToolResult`); [onHandle] is fired the moment the
-     * cancellable handle is minted (may be null). Returns serialized
+     * cancellable handle is minted. Returns serialized
      * `ToolCallingResult` bytes, or null on failure.
      */
     @JvmStatic
-    external fun racToolCallingRunLoopWithHandleAndCbProto(
+    external fun racToolCallingRunLoopProto(
         requestBytes: ByteArray,
         executor: NativeToolExecuteListener,
-        onHandle: NativeRunLoopHandleListener?,
+        onHandle: NativeRunLoopHandleListener,
     ): ByteArray?
 
     /**
@@ -1298,8 +1263,6 @@ object RunAnywhereBridge {
     @JvmStatic external fun racSolutionDestroy(handle: Long)
 
     // EMBEDDINGS GENERATED-PROTO ABI (rac_embeddings_service.h)
-
-    @JvmStatic external fun racEmbeddingsCreate(modelId: String): Long
 
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
@@ -1380,33 +1343,6 @@ object RunAnywhereBridge {
 
     /** Snapshot of currently registered plugin names. */
     @JvmStatic external fun racRegistryGetRegisteredNames(): Array<String>?
-
-    // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
-    //
-    // Legacy direct HTTP runner retained for modality-specific adapters that
-    // still need migration. Registry/model downloads use the generated
-    // Download* proto service in CppBridgeDownload.
-    //
-    // @param url                  Absolute HTTP/HTTPS URL.
-    // @param destPath             Local file path to write bytes to.
-    // @param expectedSha256Hex    Lowercase hex SHA-256, or null/empty
-    //                             to skip checksum verification.
-    // @param resumeFromByte       Byte offset to resume from (0 = fresh).
-    // @param timeoutMs            Timeout in ms (0 = no timeout).
-    // @param listener             Optional progress listener (nullable).
-    // @param outHttpStatus        Single-element int[] out-param: the
-    //                             final HTTP status code. Pass null if
-    //                             you don't need it.
-    // @return RAC_HTTP_DL_* code from rac_http_download.h.
-    @JvmStatic external fun racHttpDownloadExecute(
-        url: String,
-        destPath: String,
-        expectedSha256Hex: String?,
-        resumeFromByte: Long,
-        timeoutMs: Int,
-        listener: NativeDownloadProgressListener?,
-        outHttpStatus: IntArray?,
-    ): Int
 
     // PLATFORM HTTP TRANSPORT (rac_http_transport.h)
     //
@@ -1634,11 +1570,6 @@ object RunAnywhereBridge {
     // VLM COMPONENT METADATA (Swift-alignment)
 
     /** Check if the VLM component supports streaming. */
-    @JvmStatic external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
-
-    /** Get current VLM lifecycle state. Returns rac_lifecycle_state_t enum value. */
-    @JvmStatic external fun racVlmComponentGetState(handle: Long): Int
-
     // STT COMPONENT METADATA (Swift-alignment)
 
     /** Check if the STT component supports streaming. */
@@ -1648,13 +1579,6 @@ object RunAnywhereBridge {
      *  All other config fields use their RAC_STT_CONFIG_DEFAULT values.
      *  Returns rac_result_t. */
     @JvmStatic external fun racSttComponentConfigure(handle: Long, framework: Int): Int
-
-    // VOICE AGENT — COMPOSITE LIFECYCLE (Swift-alignment)
-
-    /** Create a voice-agent handle that wraps four already-created STT/LLM/TTS/VAD
-     *  component handles. Mirrors Swift's voice-agent composite constructor.
-     *  Returns 0 on failure. */
-    @JvmStatic external fun racVoiceAgentCreate(llm: Long, stt: Long, tts: Long, vad: Long): Long
 
     /** Cleanup the voice-agent — unload child components but keep the handle alive.
      *  Returns rac_result_t. */

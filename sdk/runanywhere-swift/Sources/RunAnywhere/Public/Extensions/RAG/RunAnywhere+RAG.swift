@@ -61,10 +61,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        // Generated `createPipeline(_:)` returns the fresh handle; the actor
-        // is responsible for stashing it as its proto session.
-        let newSession = try await CppBridge.RAG.shared.createPipeline(config)
-        await CppBridge.RAG.shared.setProtoSession(newSession)
+        try await CppBridge.RAG.shared.replacePipeline(config)
     }
 
     /// Destroy the RAG pipeline and release all resources.
@@ -74,19 +71,6 @@ public extension RunAnywhere {
 
     // MARK: - Document Ingestion
 
-    /// Ingest a text document into the RAG pipeline.
-    ///
-    /// The document is split into overlapping chunks, each chunk is embedded
-    /// and indexed for vector search. Large documents may take noticeable time.
-    ///
-    /// - Parameters:
-    ///   - text: Plain text content of the document
-    ///   - metadataJSON: Optional JSON string attached to all chunks from this document
-    /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
-    static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
-        try await ragIngest(RARAGDocument(text: text, metadataJSON: metadataJSON))
-    }
-
     /// Ingest a generated-proto document through the C++ RAG ABI.
     @discardableResult
     static func ragIngest(_ document: RARAGDocument) async throws -> RARAGStatistics {
@@ -95,8 +79,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        let session = try await CppBridge.RAG.shared.requireProtoSession()
-        return try await CppBridge.RAG.shared.ingest(handle: session, document)
+        return try await CppBridge.RAG.shared.ingest(document)
     }
 
     /// Ingest multiple text documents into the RAG pipeline in a single batch.
@@ -113,10 +96,7 @@ public extension RunAnywhere {
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
 
-        let session = try await CppBridge.RAG.shared.requireProtoSession()
-        for document in documents {
-            _ = try await CppBridge.RAG.shared.ingest(handle: session, document)
-        }
+        try await CppBridge.RAG.shared.ingest(documents)
     }
 
     /// Get the number of indexed document chunks in the pipeline as a function call.
@@ -126,8 +106,7 @@ public extension RunAnywhere {
     ///
     /// - Returns: Number of indexed chunks in the pipeline, or 0 if not initialized.
     static func ragGetDocumentCount() async -> Int {
-        if let session = try? await CppBridge.RAG.shared.requireProtoSession(),
-           let stats = try? await CppBridge.RAG.shared.statsProto(handle: session) {
+        if let stats = try? await CppBridge.RAG.shared.statistics() {
             return Int(stats.indexedChunks)
         }
         return 0
@@ -143,8 +122,7 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        let session = try await CppBridge.RAG.shared.requireProtoSession()
-        return try await CppBridge.RAG.shared.statsProto(handle: session)
+        return try await CppBridge.RAG.shared.statistics()
     }
 
     /// Clear all previously ingested documents from the pipeline.
@@ -154,8 +132,7 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        let session = try await CppBridge.RAG.shared.requireProtoSession()
-        _ = try await CppBridge.RAG.shared.clearProto(handle: session)
+        _ = try await CppBridge.RAG.shared.clearDocuments()
     }
 
     /// The current number of indexed document chunks in the pipeline.
@@ -193,8 +170,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        let session = try await CppBridge.RAG.shared.requireProtoSession()
-        return try await CppBridge.RAG.shared.query(handle: session, options)
+        return try await CppBridge.RAG.shared.runQuery(options)
     }
 }
 

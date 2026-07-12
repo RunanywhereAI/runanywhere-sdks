@@ -1,11 +1,8 @@
 # Define a global platform for your project
 #
-# iOS 15.1 matches the React Native sample (examples/react-native/…/Podfile)
-# and the underlying RACommons xcframework's deployment floor. Bumped from
-# 14.0 when we switched from remote podspec downloads to locally vendored
-# xcframeworks so all four SDKs (Swift / RN / Flutter / Kotlin) share one
-# set of minimum-OS assumptions.
-platform :ios, '17.0'
+# Match the canonical Apple deployment floor in runanywhere-commons/VERSIONS
+# and every RunAnywhere Flutter podspec.
+platform :ios, '17.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -50,7 +47,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.5'
 
       # Locally built RACommons / RABackend* xcframeworks ship an
       # `ios-arm64-simulator` slice (arm64 only, no x86_64). Xcode's default
@@ -78,7 +75,7 @@ post_install do |installer|
     project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.5'
       end
     end
     project.build_configurations.each do |config|

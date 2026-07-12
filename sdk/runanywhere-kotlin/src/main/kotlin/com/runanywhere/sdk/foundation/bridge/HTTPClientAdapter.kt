@@ -35,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.net.URI
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
@@ -117,7 +118,7 @@ public object HTTPClientAdapter {
             }
             this.baseURL = baseURL.trimEnd('/')
             this.apiKey = trimmedKey
-            logger.info("HTTP adapter configured with base URL: $baseURL")
+            logger.info("HTTP adapter configured with base URL: ${urlForLog(baseURL)}")
         }
     }
 
@@ -270,13 +271,14 @@ public object HTTPClientAdapter {
         method: String,
         url: String,
     ): ByteArray {
+        val safeUrl = urlForLog(url)
         if (result.transportError != null) {
-            logger.error("HTTP transport failure for $method $url: ${result.transportError}")
+            logger.error("HTTP transport failure for $method $safeUrl: ${result.transportError}")
             throw SDKException.networkError("HTTP transport error: ${result.transportError}")
         }
         if (result.statusCode in 200..299) return result.body
 
-        val message = "HTTP ${result.statusCode}: $method $url — ${result.body.decodeToString().take(1000)}"
+        val message = "HTTP ${result.statusCode}: $method $safeUrl"
         if (result.statusCode == 404 && url.contains(TELEMETRY_ENDPOINT_MARKER)) {
             logger.warn(message)
         } else {
@@ -288,6 +290,15 @@ public object HTTPClientAdapter {
             url = url,
         )
     }
+
+    private fun urlForLog(value: String): String =
+        runCatching {
+            val uri = URI(value)
+            val scheme = uri.scheme ?: return@runCatching "<redacted-url>"
+            val host = uri.host ?: return@runCatching "<redacted-url>"
+            val port = if (uri.port >= 0) ":${uri.port}" else ""
+            "$scheme://$host$port${uri.rawPath.orEmpty()}"
+        }.getOrDefault("<redacted-url>")
 
     /**
      * Map an HTTP error (status + body) to [SDKException]. Mirrors Swift's

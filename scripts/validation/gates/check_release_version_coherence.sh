@@ -19,6 +19,15 @@ expect_literal() {
   fi
 }
 
+reject_literal() {
+  local file="$1"
+  local literal="$2"
+  if grep -Fq -- "${literal}" "${REPO_ROOT}/${file}"; then
+    echo "[FAIL] ${file}: retired literal remains '${literal}'" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
 expect_exact_file() {
   local file="$1"
   local expected="$2"
@@ -57,6 +66,33 @@ expect_literal "sdk/runanywhere-kotlin/gradle.properties" "runanywhere.nativeLib
 expect_literal "sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
   "const val VERSION = \"${VERSION}\""
 
+read_version_pin() {
+  local key="$1"
+  awk -F= -v key="${key}" '$1 == key { print substr($0, index($0, "=") + 1); exit }' \
+    "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+}
+
+ONNX_VERSION_IOS_PIN="$(read_version_pin ONNX_VERSION_IOS)"
+ONNX_VERSION_ANDROID_PIN="$(read_version_pin ONNX_VERSION_ANDROID)"
+if [ -z "${ONNX_VERSION_IOS_PIN}" ] || [ -z "${ONNX_VERSION_ANDROID_PIN}" ]; then
+  echo "[FAIL] VERSIONS: missing platform ONNX Runtime pin" >&2
+  FAILURES=$((FAILURES + 1))
+elif [ "${ONNX_VERSION_IOS_PIN}" != "${ONNX_VERSION_ANDROID_PIN}" ]; then
+  echo "[FAIL] VERSIONS: shared SDK ONNX metadata requires matching iOS/Android pins; found iOS=${ONNX_VERSION_IOS_PIN}, Android=${ONNX_VERSION_ANDROID_PIN}" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  expect_literal "sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift" \
+    "public static let onnxRuntimeIOS = \"${ONNX_VERSION_IOS_PIN}\""
+  expect_literal "sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift" \
+    "public static let onnxRuntimeVersion = RAVersions.onnxRuntimeIOS"
+  expect_literal "sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/kotlin/com/runanywhere/sdk/core/onnx/ONNX.kt" \
+    "const val onnxRuntimeVersion = \"${ONNX_VERSION_ANDROID_PIN}\""
+  expect_literal "sdk/runanywhere-flutter/packages/runanywhere_onnx/lib/onnx.dart" \
+    "static const String onnxRuntimeVersion = '${ONNX_VERSION_IOS_PIN}'"
+  expect_literal "sdk/runanywhere-react-native/packages/onnx/src/ONNXProvider.ts" \
+    "static readonly version = '${ONNX_VERSION_IOS_PIN}'"
+fi
+
 expect_literal "sdk/shared/proto-ts/package.json" "\"version\": \"${VERSION}\""
 expect_literal "dependencies/versions.json" "\"@runanywhere/proto-ts\": \"^${VERSION}\""
 
@@ -74,16 +110,15 @@ for package_json in \
   sdk/runanywhere-web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/web\": \">=${VERSION} <1\""
 done
-expect_literal "sdk/runanywhere-web/yarn.lock" \
-  "\"@runanywhere/proto-ts@^${VERSION}\", \"@runanywhere/proto-ts@file:../shared/proto-ts\":"
-expect_literal "sdk/runanywhere-web/yarn.lock" \
-  "\"@runanywhere/web@>=${VERSION} <1\", \"@runanywhere/web@file:packages/core\":"
+expect_count "sdk/runanywhere-web/package-lock.json" \
+  "\"@runanywhere/proto-ts\": \"^${VERSION}\"" 2
+expect_count "sdk/runanywhere-web/package-lock.json" \
+  "\"@runanywhere/web\": \">=${VERSION} <1\"" 2
 
 for package_json in \
   sdk/runanywhere-react-native/package.json \
   sdk/runanywhere-react-native/packages/core/package.json \
   sdk/runanywhere-react-native/packages/llamacpp/package.json \
-  sdk/runanywhere-react-native/packages/mlx/package.json \
   sdk/runanywhere-react-native/packages/onnx/package.json \
   sdk/runanywhere-react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"version\": \"${VERSION}\""
@@ -91,7 +126,6 @@ done
 expect_literal "sdk/runanywhere-react-native/lerna.json" "\"version\": \"${VERSION}\""
 for package_json in \
   sdk/runanywhere-react-native/packages/llamacpp/package.json \
-  sdk/runanywhere-react-native/packages/mlx/package.json \
   sdk/runanywhere-react-native/packages/onnx/package.json \
   sdk/runanywhere-react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/core\": \">=${VERSION}\""
@@ -101,26 +135,28 @@ expect_literal "sdk/runanywhere-react-native/packages/core/src/Foundation/Consta
 expect_literal "sdk/runanywhere-react-native/packages/qhexrt/src/QHexRTProvider.ts" \
   "static readonly version = '${VERSION}'"
 expect_count "sdk/runanywhere-react-native/yarn.lock" \
-  "\"@runanywhere/core\": \">=${VERSION}\"" 4
-expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 4
+  "\"@runanywhere/core\": \">=${VERSION}\"" 3
+expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 3
 
 for pubspec in \
   sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "version: ${VERSION}"
 done
 for pubspec in \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
-  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "runanywhere: ^${VERSION}"
 done
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
-  "static const String _fallbackVersion = '${VERSION}'"
+  "static final String version = _nativeVersion"
+expect_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+  "RacNative.bindings.rac_sdk_get_version()"
+reject_literal "sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+  "_fallbackVersion"
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/qhexrt.dart" \
   "static const String version = '${VERSION}'"
 
@@ -129,13 +165,22 @@ for gradle_file in \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/build.gradle \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/android/build.gradle \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/build.gradle; do
-  expect_literal "${gradle_file}" "version '${VERSION}'"
+  expect_literal "${gradle_file}" "version = '${VERSION}'"
+done
+for binary_config in \
+  sdk/runanywhere-flutter/packages/runanywhere/android/binary_config.gradle \
+  sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/binary_config.gradle \
+  sdk/runanywhere-flutter/packages/runanywhere_onnx/android/binary_config.gradle; do
+  expect_literal "${binary_config}" "fallbackCoreVersion = \"${VERSION}\""
+  # Gradle expands these placeholders when selecting an ABI/version archive.
+  # shellcheck disable=SC2016
+  expect_literal "${binary_config}" 'RACommons-android-${abi}-v${coreVersion}.zip'
 done
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
   "private const val SDK_VERSION = \"${VERSION}\""
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt" \
   "private const val COMMONS_VERSION = \"${VERSION}\""
-expect_count "sdk/runanywhere-flutter/packages/runanywhere/ios/Classes/RunAnywherePlugin.swift" \
+expect_count "sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Sources/runanywhere/RunAnywherePlugin.swift" \
   "result(\"${VERSION}\")" 2
 expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/main/kotlin/ai/runanywhere/sdk/qhexrt/QhexrtPlugin.kt" \
   "private const val BACKEND_VERSION = \"${VERSION}\""
@@ -143,8 +188,7 @@ expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/
 for podspec in \
   sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec \
-  sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec \
-  sdk/runanywhere-flutter/packages/runanywhere_qhexrt/ios/runanywhere_qhexrt.podspec; do
+  sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec; do
   expect_literal "${podspec}" "s.version          = '${VERSION}'"
 done
 

@@ -15,18 +15,4 @@ struct ChatDocumentAttachment: Identifiable {
     var characterCount: Int {
         text.count
     }
-
-    var metadataJSON: String? {
-        let payload = [
-            "source": filename,
-            "filename": filename
-        ]
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: payload,
-            options: [.sortedKeys]
-        ) else {
-            return nil
-        }
-        return String(data: data, encoding: .utf8)
-    }
 }

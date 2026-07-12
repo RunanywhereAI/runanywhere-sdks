@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.ChatMessage as ProtoChatMessage
 import ai.runanywhere.proto.v1.MessageRole
-import com.runanywhere.sdk.foundation.bridge.extensions.toRALLMGenerateRequest
+import com.runanywhere.sdk.public.extensions.toRALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 

@@ -19,7 +19,7 @@ class StorageViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [RAStoredModel] = []
+    @Published var storedModels: [RAModelStorageMetrics] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -53,10 +53,8 @@ class StorageViewModel: ObservableObject {
         modelStorageSize = storageInfo.totalModelsSize
 
         // Filter out registry-only / pseudo-model entries that have no on-disk
-        // artifact (Apple system models, built-in pseudo-models, etc.). These
-        // entries leak into the disk view but report `size == 0`, producing
-        // "Zero KB" rows that aren't actually using storage.
-        storedModels = storageInfo.storedModels.filter { $0.size > 0 }
+        // artifact (Apple system models, built-in pseudo-models, etc.).
+        storedModels = storageInfo.models.filter { $0.sizeOnDiskBytes > 0 }
 
         isLoading = false
     }
@@ -83,8 +81,8 @@ class StorageViewModel: ObservableObject {
         }
     }
 
-    func deleteModel(_ model: RAStoredModel) async {
-        let result = await RunAnywhere.deleteModel(model.id)
+    func deleteModel(_ model: RAModelStorageMetrics) async {
+        let result = await RunAnywhere.deleteModel(model.modelID)
         guard result.success else {
             errorMessage = result.errorMessage.isEmpty
                 ? "Failed to delete model"

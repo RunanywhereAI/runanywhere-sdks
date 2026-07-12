@@ -10,7 +10,7 @@
 #   1. Build runanywhere-commons for Linux first:
 #      cd sdk/runanywhere-commons
 #      ./scripts/linux/download-sherpa-onnx.sh
-#      ./scripts/build-linux.sh --shared
+#      ./scripts/build-linux.sh
 #
 #   2. Build this application:
 #      cd Playground/linux-voice-assistant
@@ -40,14 +40,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Path to runanywhere-commons
 set(RAC_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons")
-set(RAC_COMMONS_DIST "${RAC_COMMONS_DIR}/dist/linux/${CMAKE_SYSTEM_PROCESSOR}")
+set(RAC_COMMONS_DIST "${RAC_COMMONS_DIR}/dist/linux")
+set(RAC_COMMONS_LIB_DIR "${RAC_COMMONS_DIST}/lib")
 
 # Check if runanywhere-commons is built
-if(NOT EXISTS "${RAC_COMMONS_DIST}/librac_commons.so")
+if(NOT EXISTS "${RAC_COMMONS_LIB_DIR}/librac_commons.so")
     message(WARNING "runanywhere-commons not built. Build it first:")
     message(WARNING "  cd ${RAC_COMMONS_DIR}")
     message(WARNING "  ./scripts/linux/download-sherpa-onnx.sh")
-    message(WARNING "  ./scripts/build-linux.sh --shared")
+    message(WARNING "  ./scripts/build-linux.sh")
 endif()
 
 # =============================================================================
@@ -123,7 +124,7 @@ endif()
 
 # Link runanywhere-commons libraries
 target_link_directories(voice-assistant PRIVATE
-    ${RAC_COMMONS_DIST}
+    ${RAC_COMMONS_LIB_DIR}
     ${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib
 )
 
@@ -155,8 +156,8 @@ endif()
 
 # Set RPATH so the executable can find libraries at runtime
 set_target_properties(voice-assistant PROPERTIES
-    BUILD_RPATH "${RAC_COMMONS_DIST};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
-    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../sdk/runanywhere-commons/dist/linux/${CMAKE_SYSTEM_PROCESSOR}"
+    BUILD_RPATH "${RAC_COMMONS_LIB_DIR};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
+    INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../sdk/runanywhere-commons/dist/linux/lib"
 )
 
 # =============================================================================
@@ -181,7 +182,7 @@ target_include_directories(test-pipeline PRIVATE
 )
 
 target_link_directories(test-pipeline PRIVATE
-    ${RAC_COMMONS_DIST}
+    ${RAC_COMMONS_LIB_DIR}
     ${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib
 )
 
@@ -196,7 +197,7 @@ target_link_libraries(test-pipeline PRIVATE
 )
 
 set_target_properties(test-pipeline PROPERTIES
-    BUILD_RPATH "${RAC_COMMONS_DIST};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
+    BUILD_RPATH "${RAC_COMMONS_LIB_DIR};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
 )
 
 target_compile_options(test-pipeline PRIVATE -Wall -O2)

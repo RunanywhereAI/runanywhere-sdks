@@ -926,8 +926,7 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   void clearSourceDocument() => $_clearField(4);
 
   /// Free-form metadata associated with the chunk (e.g. page number, section,
-  /// ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-  /// canonicalized here as a typed map so consumers don't re-parse.
+  /// ingestion timestamp).
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 

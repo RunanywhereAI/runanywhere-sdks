@@ -278,9 +278,10 @@ bool load_mock_model(rac_model_registry_handle_t registry) {
 std::vector<uint8_t> generate_request_bytes(const char* prompt) {
     runanywhere::v1::LLMGenerateRequest request;
     request.set_prompt(prompt);
-    request.set_max_tokens(12);
-    request.set_temperature(0.2f);
-    request.set_top_p(0.9f);
+    auto* options = request.mutable_options();
+    options->set_max_tokens(12);
+    options->set_temperature(0.2f);
+    options->set_top_p(0.9f);
     std::vector<uint8_t> bytes;
     (void)serialize(request, &bytes);
     return bytes;
@@ -447,7 +448,7 @@ int test_hidden_thinking_counts_toward_length(rac_model_registry_handle_t regist
 
     runanywhere::v1::LLMGenerateRequest request;
     request.set_prompt("hidden-thinking-stream");
-    request.set_max_tokens(3);
+    request.mutable_options()->set_max_tokens(3);
     request.set_emit_thoughts(false);
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "hidden thinking stream request serializes");

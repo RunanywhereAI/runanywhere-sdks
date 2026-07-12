@@ -41,6 +41,10 @@ check_xcframeworks() {
 
 cd "${APP_ROOT}"
 
+# The manifest defaults to remote release artifacts for external consumers.
+# This verifier checks the locally staged XCFrameworks above.
+export RUNANYWHERE_USE_LOCAL_NATIVES=1
+
 require_command swift
 require_command xcodebuild
 

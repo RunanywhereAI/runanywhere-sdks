@@ -100,7 +100,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumer = Task {
@@ -144,7 +145,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumerCount = 10
@@ -203,7 +205,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         // Drive the failing install. The for-await must drain to zero
@@ -287,7 +290,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                 captureA.withLock { $0 = snapshot }
                 return 0
             },
-            unregister: { _ in }
+            unregister: { _ in },
+            quiesce: {}
         )
         let adapterB = HandleStreamAdapter<CollidingHandle, RAChatMessage>(
             handle: handleB,
@@ -297,7 +301,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                 captureB.withLock { $0 = snapshot }
                 return 0
             },
-            unregister: { _ in }
+            unregister: { _ in },
+            quiesce: {}
         )
 
         let receivedA = OSAllocatedUnfairLock<[String]>(initialState: [])
@@ -397,7 +402,8 @@ final class HandleStreamAdapterTests: XCTestCase {
                     }
                 }
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumer = Task {
@@ -470,7 +476,8 @@ final class HandleStreamAdapterTests: XCTestCase {
             },
             unregister: { _ in
                 unregisterCount.withLock { $0 += 1 }
-            }
+            },
+            quiesce: {}
         )
 
         let consumerCount = 5

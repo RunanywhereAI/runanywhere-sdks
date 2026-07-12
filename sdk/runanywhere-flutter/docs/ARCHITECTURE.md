@@ -162,7 +162,6 @@ dart_bridge_hardware.dart         # hardware profile
 dart_bridge_http.dart             # HTTP transport (Dart side)
 dart_bridge_llm.dart              # LLM generate / generateStream
 dart_bridge_lora.dart             # LoRA adapter ops
-dart_bridge_model_assignment.dart # model-assignment proto
 dart_bridge_model_lifecycle.dart  # load / unload / current
 dart_bridge_model_paths.dart      # storage roots, model dirs
 dart_bridge_model_registry.dart   # registry CRUD + URL → format/artifact inference
@@ -333,7 +332,7 @@ Native libraries come from `runanywhere-commons` (the shared C++ core). The
 top-level repo provides:
 
 ```
-sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → packages/*/ios/Frameworks/
+sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → packages/*/ios/<package>/Frameworks/
 scripts/build/build-core-android.sh       # Android .so → packages/*/android/src/main/jniLibs/
 ```
 
@@ -418,9 +417,9 @@ lives in the bundled C++ backend library.
 | `runanywhere_qhexrt` | 0.19.15 |
 | `RACommons` native | 0.1.6 |
 | llama.cpp engine | b7199 |
-| ONNX Runtime | 1.23.2 |
-| Android NDK | 27.0.12077973 |
-| iOS deployment target | 15.1 |
+| ONNX Runtime | 1.24.3 |
+| Android NDK | 28.2.13676358 |
+| iOS deployment target | 17.5 |
 | Canonical source | `sdk/runanywhere-commons/VERSION` |
 
 ---
@@ -432,8 +431,8 @@ lives in the bundled C++ backend library.
 | Package | Framework | Slices |
 |---------|-----------|--------|
 | `runanywhere` | `RACommons.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
-| `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
-| `runanywhere_onnx` | `RABackendONNX.xcframework`, `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator` |
+| `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
+| `runanywhere_onnx` | `RABackendONNX.xcframework`, `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_qhexrt` | — | none |
 
 ### Android Shared Libraries (per ABI: arm64-v8a, armeabi-v7a, x86_64)
@@ -442,5 +441,5 @@ lives in the bundled C++ backend library.
 |---------|-----------|
 | `runanywhere` | `librac_commons.so`, `librunanywhere_jni.so`, `libc++_shared.so`, `libomp.so` |
 | `runanywhere_llamacpp` | `librac_backend_llamacpp.so`, `librac_backend_llamacpp_jni.so`, `libc++_shared.so` |
-| `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-cxx-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `libc++_shared.so` |
+| `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `librunanywhere_onnx.so`, `librunanywhere_sherpa.so`, `libc++_shared.so` |
 | `runanywhere_qhexrt` | `librac_backend_qhexrt*.so`, QAIRT/QNN libs, `libc++_shared.so` (private natives staged separately) |

@@ -41,17 +41,6 @@ public extension RADownloadStage {
 // MARK: - Progress Helpers
 
 public extension RADownloadProgress {
-    /// Legacy percentage convenience: returns stage progress for the
-    /// download stage, and the overall progress everywhere else.
-    var percentage: Double {
-        switch stage {
-        case .downloading:
-            return Double(stageProgress)
-        default:
-            return Double(overallProgress)
-        }
-    }
-
     /// Download speed (bytes/sec). `nil` when unknown.
     var speed: Double? {
         overallSpeedBps > 0 ? Double(overallSpeedBps) : nil

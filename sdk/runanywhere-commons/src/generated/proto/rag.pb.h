@@ -991,7 +991,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_enable_multi_query(bool value);
 
   public:
-  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1];
+  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
   [[nodiscard]] bool has_multi_query_count()
       const;
   void clear_multi_query_count() ;
@@ -5622,7 +5622,7 @@ inline void RAGQueryOptions::_internal_set_enable_multi_query(bool value) {
   _impl_.enable_multi_query_ = value;
 }
 
-// optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1];
+// optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
 inline bool RAGQueryOptions::has_multi_query_count() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
   return value;

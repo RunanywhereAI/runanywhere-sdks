@@ -25,7 +25,6 @@
 import type {
   ModelCategory} from '@runanywhere/proto-ts/model_types';
 import {
-  ArchiveStructure,
   ArchiveType,
   InferenceFramework,
   ModelArtifactType,
@@ -434,23 +433,6 @@ function archiveTypeToArtifactType(type: ArchiveType): ModelArtifactType {
   }
 }
 
-/** Swift parity: `RAModelArtifactType.legacyArchiveType` (ModelTypes+Artifacts.swift:431-443). */
-function legacyArchiveType(type: ModelArtifactType): ArchiveType | null {
-  switch (type) {
-    case ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE:
-    case ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
-      return ArchiveType.ARCHIVE_TYPE_ZIP;
-    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
-      return ArchiveType.ARCHIVE_TYPE_TAR_GZ;
-    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE:
-      return ArchiveType.ARCHIVE_TYPE_TAR_BZ2;
-    case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE:
-      return ArchiveType.ARCHIVE_TYPE_TAR_XZ;
-    default:
-      return null;
-  }
-}
-
 /** Swift parity: `OneOf_Artifact.artifactType` (ModelTypes+Artifacts.swift:196). */
 export function artifactCaseType(artifact: ModelInfoArtifact): ModelArtifactType {
   switch (artifact.case) {
@@ -604,18 +586,7 @@ export function modelInfoArtifactDisplayName(model: ModelInfo): string {
 /** Swift parity: `RAModelInfo.archiveArtifact` (ModelTypes+Artifacts.swift:362). */
 export function modelInfoArchiveArtifact(model: ModelInfo): ArchiveArtifact | null {
   const artifact = modelInfoArtifact(model);
-  if (artifact?.case === 'archive') return artifact.value;
-  const archiveType = legacyArchiveType(
-    model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
-  );
-  if (archiveType === null) return null;
-  return {
-    type: archiveType,
-    structure: ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
-    requiredPatterns: [],
-    optionalPatterns: [],
-    expectedFiles: undefined,
-  };
+  return artifact?.case === 'archive' ? artifact.value : null;
 }
 
 /** Swift parity: `RAModelInfo.multiFileDescriptors` (ModelTypes+Artifacts.swift:371). */
@@ -800,7 +771,13 @@ export function modelInfoMake(params: ModelInfoMakeParams): ModelInfo {
   if (model.supportsThinking) {
     model.thinkingPattern = params.thinkingPattern ?? defaultThinkingTagPattern();
   }
-  model.description = params.description ?? '';
+  model.metadata = {
+    description: params.description ?? '',
+    author: model.metadata?.author ?? '',
+    license: model.metadata?.license ?? '',
+    tags: model.metadata?.tags ?? [],
+    version: model.metadata?.version ?? '',
+  };
   model.createdAtUnixMs = params.createdAtUnixMs ?? Date.now();
   model.updatedAtUnixMs = params.updatedAtUnixMs ?? Date.now();
   // Caller-supplied artifact override re-runs the artifact-type sync.

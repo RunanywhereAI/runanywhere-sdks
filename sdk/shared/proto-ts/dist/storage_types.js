@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: storage_types.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StorageDeleteResult = exports.StorageDeleteRequest = exports.StorageDeletePlan = exports.StorageDeleteCandidate = exports.StorageDeletePlanRequest = exports.StorageAvailabilityResult = exports.StorageAvailabilityRequest = exports.StorageInfoResult = exports.StorageInfoRequest = exports.StoredModel = exports.StorageAvailability = exports.StorageInfo = exports.ModelStorageMetrics = exports.AppStorageInfo = exports.DeviceStorageInfo = exports.NPUChip = exports.protobufPackage = void 0;
+exports.StorageDeleteResult = exports.StorageDeleteRequest = exports.StorageDeletePlan = exports.StorageDeleteCandidate = exports.StorageDeletePlanRequest = exports.StorageAvailabilityResult = exports.StorageAvailabilityRequest = exports.StorageInfoResult = exports.StorageInfoRequest = exports.StorageAvailability = exports.StorageInfo = exports.ModelStorageMetrics = exports.AppStorageInfo = exports.DeviceStorageInfo = exports.NPUChip = exports.protobufPackage = void 0;
 exports.nPUChipFromJSON = nPUChipFromJSON;
 exports.nPUChipToJSON = nPUChipToJSON;
 /* eslint-disable */
@@ -15,9 +15,6 @@ exports.protobufPackage = "runanywhere.v1";
  * ---------------------------------------------------------------------------
  * NPU chipset detected on the host device. Used to drive vendor-NPU
  * model-download URL selection and runtime backend wiring.
- * Sources pre-IDL:
- *   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
- * Canonical superset (this file): vendor-grouped, vendor-agnostic.
  * ---------------------------------------------------------------------------
  */
 var NPUChip;
@@ -716,135 +713,6 @@ exports.StorageAvailability = {
         message.recommendation = object.recommendation ?? undefined;
         message.shortfallBytes = object.shortfallBytes ?? 0;
         message.requiredToAvailableRatio = object.requiredToAvailableRatio ?? 0;
-        return message;
-    },
-};
-function createBaseStoredModel() {
-    return { modelId: "", name: "", sizeBytes: 0, localPath: "", downloadedAtMs: undefined };
-}
-exports.StoredModel = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.modelId !== "") {
-            writer.uint32(10).string(message.modelId);
-        }
-        if (message.name !== "") {
-            writer.uint32(18).string(message.name);
-        }
-        if (message.sizeBytes !== 0) {
-            writer.uint32(24).int64(message.sizeBytes);
-        }
-        if (message.localPath !== "") {
-            writer.uint32(34).string(message.localPath);
-        }
-        if (message.downloadedAtMs !== undefined) {
-            writer.uint32(40).int64(message.downloadedAtMs);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseStoredModel();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.name = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.sizeBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.localPath = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.downloadedAtMs = longToNumber(reader.int64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            name: isSet(object.name) ? globalThis.String(object.name) : "",
-            sizeBytes: isSet(object.sizeBytes)
-                ? globalThis.Number(object.sizeBytes)
-                : isSet(object.size_bytes)
-                    ? globalThis.Number(object.size_bytes)
-                    : 0,
-            localPath: isSet(object.localPath)
-                ? globalThis.String(object.localPath)
-                : isSet(object.local_path)
-                    ? globalThis.String(object.local_path)
-                    : "",
-            downloadedAtMs: isSet(object.downloadedAtMs)
-                ? globalThis.Number(object.downloadedAtMs)
-                : isSet(object.downloaded_at_ms)
-                    ? globalThis.Number(object.downloaded_at_ms)
-                    : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.name !== "") {
-            obj.name = message.name;
-        }
-        if (message.sizeBytes !== 0) {
-            obj.sizeBytes = Math.round(message.sizeBytes);
-        }
-        if (message.localPath !== "") {
-            obj.localPath = message.localPath;
-        }
-        if (message.downloadedAtMs !== undefined) {
-            obj.downloadedAtMs = Math.round(message.downloadedAtMs);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.StoredModel.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseStoredModel();
-        message.modelId = object.modelId ?? "";
-        message.name = object.name ?? "";
-        message.sizeBytes = object.sizeBytes ?? 0;
-        message.localPath = object.localPath ?? "";
-        message.downloadedAtMs = object.downloadedAtMs ?? undefined;
         return message;
     },
 };

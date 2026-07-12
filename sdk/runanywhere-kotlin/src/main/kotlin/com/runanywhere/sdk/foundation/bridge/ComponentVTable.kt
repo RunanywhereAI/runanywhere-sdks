@@ -89,15 +89,5 @@ public class ComponentVTable internal constructor(
                 cleanupFn = { handle -> RunAnywhereBridge.racVadComponentCleanup(handle) },
                 loadModel = { handle, path, id, name -> RunAnywhereBridge.racVadComponentLoadModel(handle, path, id, name) },
             )
-
-        public val vlm: ComponentVTable =
-            ComponentVTable(
-                component = SDKComponent.SDK_COMPONENT_VLM,
-                createFn = { RunAnywhereBridge.racVlmComponentCreate() },
-                isLoadedFn = { handle -> RunAnywhereBridge.racVlmComponentIsLoaded(handle) },
-                destroyFn = { handle -> RunAnywhereBridge.racVlmComponentDestroy(handle) },
-                cleanupFn = { handle -> RunAnywhereBridge.racVlmComponentCleanup(handle) },
-                loadModel = { handle, path, id, name -> RunAnywhereBridge.racVlmComponentLoadModel(handle, path, id, name) },
-            )
     }
 }

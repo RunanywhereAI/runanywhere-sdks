@@ -42,9 +42,9 @@ idevicesyslog | grep "com.runanywhere"
 ```
 
 ### App Store Release
-See `docs/RELEASE_INSTRUCTIONS.md` for the full App Store flow. Key step:
-after building, run `./scripts/patch-framework-plist.sh` to fix
-`MinimumOSVersion` in ONNX Runtime / RACommons XCFrameworks before archiving.
+See `docs/RELEASE_INSTRUCTIONS.md` for the full App Store flow. The packaged
+XCFrameworks already declare the canonical iOS 17.5 deployment floor; release
+archives validate that metadata without post-build mutation.
 
 #### Required Native Symbol Release Gate
 
@@ -70,7 +70,7 @@ Release archives must preserve the RunAnywhere native ABI export surface:
 From `examples/ios/RunAnywhereAI/`, use this release flow:
 
 ```bash
-# 1. Build once so DerivedData and SPM binary artifacts are populated.
+# 1. Build the final release inputs.
 xcodebuild \
   -project RunAnywhereAI.xcodeproj \
   -scheme RunAnywhereAI \
@@ -80,10 +80,7 @@ xcodebuild \
   -jobs "$(sysctl -n hw.logicalcpu)" \
   build
 
-# 2. Patch framework plists before archiving. Do not clean after this step.
-./scripts/patch-framework-plist.sh
-
-# 3. Archive directly into Xcode Organizer's archive folder.
+# 2. Archive directly into Xcode Organizer's archive folder.
 ARCHIVE_DIR="$HOME/Library/Developer/Xcode/Archives/$(date +%Y-%m-%d)"
 ARCHIVE="$ARCHIVE_DIR/RunAnywhereAI-$(date +%Y%m%d-%H%M%S).xcarchive"
 mkdir -p "$ARCHIVE_DIR"
@@ -194,9 +191,8 @@ Mac App Store release:
   `RunAnywhereConfig-Release.plist` without printing credential values.
 - Keep `RunAnywhereExportedSymbols.txt` out of the app resources and run the
   platform-filtered Swift-facing native ABI audit against
-  `Contents/MacOS/RunAnywhereAI`. The current Mac target links `RunAnywhere`
-  and `MLXRuntime`; the llama.cpp, ONNX, and Sherpa products are iOS-only
-  because their local XCFrameworks do not contain macOS slices.
+  `Contents/MacOS/RunAnywhereAI`. Every published Swift backend binary now
+  carries a macOS arm64 slice.
 - Verify `codesign`, `arm64`, the absence of quarantine metadata, and zero
   missing `_rac_*` / `_ra_mlx_*` symbols before opening Organizer.
 
@@ -427,7 +423,7 @@ Real-time camera-based image description. `AVCaptureSession` with BGRA pixel for
 
 PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
-**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → `RunAnywhere.ragCreatePipeline(config:)` → `RunAnywhere.ragIngest(text:)` → user asks question → `RunAnywhere.ragQuery(question:)` → thinking content parsed via `ThinkingContentParser`
+**Flow**: Select embedding + LLM models → import document → `DocumentService.extractText(from:)` → construct `RARAGDocument` with its typed `metadata` map → `RunAnywhere.ragCreatePipeline(config:)` → `RunAnywhere.ragIngest(_:)` → user asks question → `RunAnywhere.ragQuery(question:)` → thinking content parsed via `ThinkingContentParser`
 
 Path resolution handles multi-file embedding models (e.g., `all-minilm-l6-v2` with `model.onnx` + `vocab.txt`).
 
@@ -445,7 +441,12 @@ Deterministic performance testing across 4 modalities (LLM, STT, TTS, VLM). Each
 
 ### 11. Storage (`Features/Storage/`)
 
-`RunAnywhere.getStorageInfo()` → disk usage display. Per-model deletion via `RunAnywhere.deleteStoredModel()`. Cache/temp clearing via `RunAnywhere.clearCache()` / `RunAnywhere.cleanTempFiles()`.
+`RunAnywhere.getStorageInfo()` → disk usage display using
+`RAStorageInfo.models` / `RAModelStorageMetrics` directly. Rows cross-reference
+`ModelListViewModel` for display name and local path, and treat `lastUsedMs`
+only as last-used time. Per-model deletion uses `RunAnywhere.deleteModel()`.
+Cache/temp clearing uses `RunAnywhere.clearCache()` /
+`RunAnywhere.cleanTempFiles()`.
 
 ### 12. Settings (`Features/Settings/`)
 
@@ -564,7 +565,6 @@ All styling is centralized — no inline magic numbers or color literals in view
 | `scripts/build_and_run_ios_sample.sh` | End-to-end build+deploy (simulator/device/mac) with optional SDK rebuild |
 | `scripts/verify.sh` | Local gate: checks XCFrameworks exist, resolves packages, runs full xcodebuild |
 | `scripts/smoke.sh` | Fast preflight: greps source for SDK API call patterns (no compilation) |
-| `scripts/patch-framework-plist.sh` | Post-build: patches MinimumOSVersion in XCFramework plists for App Store |
 
 ---
 

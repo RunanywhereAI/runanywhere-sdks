@@ -40,11 +40,11 @@ class RunAnywhereVoice {
   /// True when STT + LLM + TTS are all loaded through commons lifecycle.
   ///
   /// Reads each capability's lifecycle-backed `isLoaded` getter
-  /// (`COMPONENT_LIFECYCLE_STATE_READY` + non-empty modelId), NOT the legacy
-  /// DartBridge component handles. The new public load APIs
+  /// (`COMPONENT_LIFECYCLE_STATE_READY` + non-empty modelId), not bridge-local
+  /// component handles. The public load APIs
   /// (`RunAnywhere.{stt,llm,tts}.load`) route through
-  /// `RunAnywhereModelLifecycle.shared.load(...)` and never set the legacy
-  /// DartBridge handles, so checking those would report false even after a
+  /// `RunAnywhereModelLifecycle.shared.load(...)` and do not populate those
+  /// bridge-local handles, so checking them would report false even after a
   /// successful load.
   bool get isReady =>
       RunAnywhereSTT.shared.isLoaded &&
@@ -81,7 +81,8 @@ class RunAnywhereVoice {
 
     final snapshot = await RunAnywhereModelLifecycle.shared.current(
       model_pb.CurrentModelRequest(
-        category: model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        category:
+            model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       ),
     );
     if (snapshot.found && snapshot.modelId.isNotEmpty) {
@@ -96,7 +97,8 @@ class RunAnywhereVoice {
     final result = await RunAnywhereModelLifecycle.shared.load(
       model_pb.ModelLoadRequest(
         modelId: targetID,
-        category: model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        category:
+            model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       ),
     );
     if (!result.success) {
@@ -231,11 +233,7 @@ class RunAnywhereVoice {
   /// Mirrors Swift's `processVoiceTurn(_:)`.
   Future<voice_agent_proto.VoiceAgentResult> processVoiceTurn(
     Uint8List audioData,
-  ) =>
-      DartBridge.voiceAgent.processVoiceTurnProto(audioData);
-
-
-
+  ) => DartBridge.voiceAgent.processVoiceTurnProto(audioData);
 
   /// Subscribe to canonical voice-agent events.
   ///

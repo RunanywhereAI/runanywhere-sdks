@@ -1,4 +1,4 @@
-# Must match VERSIONS::MIN_CMAKE_VERSION (3.30). Required for FetchContent's
+# Must match VERSIONS::MIN_CMAKE_VERSION (3.24). Required for FetchContent's
 # FIND_PACKAGE_ARGS and DOWNLOAD_EXTRACT_TIMESTAMP keywords (both added in 3.24)
 # used by the protobuf and ONNX Runtime fetches below.
 cmake_minimum_required(VERSION 3.24)
@@ -169,13 +169,10 @@ include(FetchContent)
 set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
 
 # nlohmann/json - header-only JSON library (used by JNI, backends, server)
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v${NLOHMANN_JSON_VERSION}
+    GIT_TAG v${RAC_NLOHMANN_JSON_VERSION}
     GIT_SHALLOW TRUE
 )
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -186,10 +183,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 include_directories(SYSTEM ${nlohmann_json_SOURCE_DIR}/include)
 
 # libarchive - streaming archive extraction (ZIP, TAR.GZ, TAR.BZ2)
-# Used for native model archive extraction across all platforms
-if(NOT DEFINED LIBARCHIVE_VERSION)
-    set(LIBARCHIVE_VERSION "3.8.1")
-endif()
+# Used for native model archive extraction across all platforms.
 
 # -----------------------------------------------------------------------------
 # Zlib: Bundle from source when system zlib is not available.
@@ -214,29 +208,6 @@ endif()
 set(_RAC_FORCE_BUNDLED_ZLIB OFF)
 if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
-endif()
-
-# Defense-in-depth normalization of the
-# ZLIB_VERSION cache. LoadVersions.cmake now strips a leading 'v' from
-# ZLIB_VERSION specifically (so engines that re-`include(LoadVersions)` don't
-# restore the raw form). Re-assert the strip here in case a future caller
-# passes `-DZLIB_VERSION=v1.3.2` on the command line. Also set
-# ZLIB_VERSION_STRING (the legacy alias CMake's FindZLIB sometimes consults)
-# so both stay in lockstep.
-#
-# RAC_ZLIB_VERSION (with prefix) holds the original GIT_TAG-form ('v1.3.2')
-# for FetchContent_Declare below; do not overwrite that one.
-if(DEFINED ZLIB_VERSION AND ZLIB_VERSION MATCHES "^v")
-    string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
-    set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
-    message(STATUS "Pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
-                   "(GIT_TAG '${RAC_ZLIB_VERSION}' preserved on RAC_ZLIB_VERSION for FetchContent) "
-                   "so libarchive's find_package(ZLIB 1.2.1) accepts it.")
-endif()
-if(NOT DEFINED ZLIB_VERSION_STRING OR ZLIB_VERSION_STRING MATCHES "^v")
-    if(DEFINED ZLIB_VERSION)
-        set(ZLIB_VERSION_STRING "${ZLIB_VERSION}" CACHE STRING "" FORCE)
-    endif()
 endif()
 
 if(_RAC_FORCE_BUNDLED_ZLIB)
@@ -290,7 +261,10 @@ if(NOT ZLIB_FOUND)
     # passing the logical target name through cache variables leaks raw
     # `zlibstatic` / `-lzlibstatic` entries into downstream link lines, and
     # libarchive's internal find_package(ZLIB 1.2.1) reject that.
-    set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
+    # Keep FindZLIB's singular include probe pointed at the source directory
+    # containing zlib.h so it reads the actual numeric version. The plural
+    # include path also carries the generated zconf.h directory.
+    set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR}" CACHE PATH "" FORCE)
     set(ZLIB_INCLUDE_DIRS "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
     if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(ZLIB_LIBRARY "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
@@ -301,23 +275,6 @@ if(NOT ZLIB_FOUND)
         set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
     endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
-    # VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
-    # form madler/zlib uses). libarchive's bundled CMake module runs
-    # `find_package(ZLIB 1.2.1)`, which dispatches to CMake's FindZLIB module
-    # with `VERSION_VAR ZLIB_VERSION`. FindZLIB normally derives ZLIB_VERSION
-    # from `${ZLIB_INCLUDE_DIR}/zlib.h`, but our ZLIB_INCLUDE_DIR above is a
-    # semicolon-list (`src-dir;build-dir`) which fails its EXISTS check, so the
-    # version-extraction branch is skipped and ZLIB_VERSION keeps the value
-    # cached by LoadVersions.cmake from the VERSIONS file — the raw GIT_TAG
-    # `v1.3.2`. CMake's numeric comparator then rejects that as unsuitable for
-    # the `>= 1.2.1` requirement, HAVE_ZLIB_H is left undefined, and libarchive
-    # falls back to archive_read_support_filter_program("gzip -d") — the very
-    # fallback this whole block exists to prevent on iOS. Force a purely
-    # numeric form into both the VERSION_VAR (ZLIB_VERSION) and the legacy
-    # ZLIB_VERSION_STRING so FindZLIB hands libarchive an acceptable version.
-    string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
-    set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
-    set(ZLIB_VERSION_STRING "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
     # Create an imported ZLIB::ZLIB target that points to our zlibstatic
     if(NOT TARGET ZLIB::ZLIB)
         add_library(ZLIB::ZLIB ALIAS zlibstatic)
@@ -329,7 +286,7 @@ if(NOT ZLIB_FOUND)
             ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
         )
     endif()
-    message(STATUS "Bundled zlib ready (${ZLIB_VERSION})")
+    message(STATUS "Bundled zlib ready (${RAC_ZLIB_VERSION})")
 else()
     message(STATUS "Using system zlib: ${ZLIB_LIBRARIES}")
 endif()
@@ -363,7 +320,7 @@ if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
         bzip2_src
-        URL https://sourceware.org/pub/bzip2/bzip2-${BZIP2_VERSION}.tar.gz
+        URL https://sourceware.org/pub/bzip2/bzip2-${RAC_BZIP2_VERSION}.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
     )
     FetchContent_MakeAvailable(bzip2_src)
@@ -412,7 +369,7 @@ if(NOT BZIP2_FOUND)
             ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
         )
     endif()
-    message(STATUS "Bundled BZip2 ready (v${BZIP2_VERSION})")
+    message(STATUS "Bundled BZip2 ready (v${RAC_BZIP2_VERSION})")
 else()
     message(STATUS "Using system BZip2: ${BZIP2_LIBRARIES}")
 endif()
@@ -420,7 +377,7 @@ endif()
 FetchContent_Declare(
     libarchive
     GIT_REPOSITORY https://github.com/libarchive/libarchive.git
-    GIT_TAG v${LIBARCHIVE_VERSION}
+    GIT_TAG v${RAC_LIBARCHIVE_VERSION}
     GIT_SHALLOW TRUE
 )
 # Disable everything except the static library and the formats we need
@@ -510,8 +467,8 @@ endif()
 #
 # This was fixed for iOS by:
 #   (a) forcing bundled zlib for IOS|ANDROID|EMSCRIPTEN
-#   (b) stripping the 'v' prefix from ZLIB_VERSION so libarchive's internal
-#       find_package(ZLIB 1.2.1) version check succeeds
+#   (b) giving FindZLIB a singular include directory that contains zlib.h so
+#       its version check reads the source's numeric version
 #
 # But the cross-compile cache is order-sensitive (the web lane once shipped
 # a build with HAVE_ZLIB_H still undefined because the libarchive subbuild
@@ -533,12 +490,11 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
                 "which iOS sandbox and Emscripten/WASM both block, so every .tar.gz "
                 "extraction will fail at runtime.\n"
                 "  config.h path: ${_RAC_LIBARCHIVE_CONFIG_H}\n"
-                "  ZLIB_VERSION cache: ${ZLIB_VERSION}\n"
+                "  zlib source pin: ${RAC_ZLIB_VERSION}\n"
                 "  ZLIB_LIBRARY cache: ${ZLIB_LIBRARY}\n"
                 "  ZLIB_INCLUDE_DIR cache: ${ZLIB_INCLUDE_DIR}\n"
-                "Fix: ensure ZLIB_VERSION is a plain numeric string (e.g. 1.3.2, "
-                "NOT v1.3.2) and re-configure from a clean build dir. See the "
-                "v-strip block above for the canonical fix.")
+                "Fix: ensure ZLIB_INCLUDE_DIR points to the directory containing "
+                "zlib.h and re-configure from a clean build directory.")
         endif()
         # Same check for bzip2 — the iOS sandbox + Emscripten also block
         # program(\"bzip2 -d\"), and the same find_package(BZip2) version
@@ -598,7 +554,7 @@ elseif(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     link_directories("${RAC_BUNDLED_LIB_DIR}")
 endif()
 
-message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
+message(STATUS "libarchive ready (v${RAC_LIBARCHIVE_VERSION})")
 
 # =============================================================================
 # HTTP transport (libcurl removed)
@@ -624,7 +580,7 @@ if(RAC_BUILD_SERVER)
     FetchContent_Declare(
         cpp-httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-        GIT_TAG ${CPPHTTPLIB_VERSION}
+        GIT_TAG ${RAC_CPPHTTPLIB_VERSION}
         GIT_SHALLOW TRUE
     )
 
@@ -832,8 +788,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
-    # Compatibility NPU probe ABI retained for existing commons consumers.
-    src/infrastructure/device/rac_npu_capability.cpp
     src/infrastructure/device/rac_device_manager.cpp
     # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
@@ -1330,6 +1284,12 @@ else()
 endif()
 option(RAC_ENABLE_PROTOBUF "Build protobuf-backed native ABI implementations" ${RAC_ENABLE_PROTOBUF_DEFAULT})
 option(RAC_VENDOR_PROTOBUF "Fetch/build protobuf when RAC_ENABLE_PROTOBUF=ON and find_package(Protobuf) fails" ON)
+option(RAC_ISOLATE_PROTOBUF_NAMESPACE
+       "Build the private protobuf runtime in a RunAnywhere-owned C++ namespace"
+       ON)
+if(RAC_BUILD_SERVER AND NOT RAC_ENABLE_PROTOBUF)
+    message(FATAL_ERROR "RAC_BUILD_SERVER=ON requires RAC_ENABLE_PROTOBUF=ON")
+endif()
 
 if(EMSCRIPTEN)
     set(RAC_ENABLE_SOLUTIONS_DEFAULT OFF)
@@ -1339,6 +1299,8 @@ endif()
 option(RAC_ENABLE_SOLUTIONS "Build Solutions API (requires protobuf+absl)" ${RAC_ENABLE_SOLUTIONS_DEFAULT})
 
 set(RAC_PROTOBUF_RUNTIME_ENABLED OFF CACHE INTERNAL "rac_commons protobuf runtime enabled" FORCE)
+set(RAC_PROTOBUF_NAMESPACE_ISOLATED OFF CACHE INTERNAL
+    "rac_commons protobuf C++ namespace isolated from process-global runtimes" FORCE)
 set(RAC_SOLUTIONS_RUNTIME_ENABLED OFF CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
 set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
 set(_RAC_PROTO_GENERATED_SOURCES
@@ -1394,10 +1356,20 @@ endif()
 
 if(RAC_ENABLE_PROTOBUF)
     message(STATUS "RAC_ENABLE_PROTOBUF=ON — building generated-proto native ABI implementations")
-    if(RAC_VENDOR_PROTOBUF)
-        find_package(Protobuf ${PROTOBUF_VERSION} EXACT CONFIG QUIET)
+    if(RAC_ISOLATE_PROTOBUF_NAMESPACE)
+        if(NOT RAC_VENDOR_PROTOBUF)
+            message(FATAL_ERROR
+                "RAC_ISOLATE_PROTOBUF_NAMESPACE=ON requires RAC_VENDOR_PROTOBUF=ON: "
+                "an already-built system protobuf cannot be moved into RunAnywhere's private namespace.")
+        endif()
+        # Ignore any parent-scope probe result. Namespace isolation is an
+        # all-or-nothing ABI property shared by generated code and runtime.
+        set(Protobuf_FOUND FALSE)
+        unset(Protobuf_LIBRARIES)
+    elseif(RAC_VENDOR_PROTOBUF)
+        find_package(Protobuf ${RAC_PROTOBUF_VERSION} EXACT CONFIG QUIET)
     else()
-        find_package(Protobuf ${PROTOBUF_VERSION} EXACT QUIET)
+        find_package(Protobuf ${RAC_PROTOBUF_VERSION} EXACT QUIET)
     endif()
     # The checked-in C++ gencode hard-checks the protobuf runtime patch line.
     # Do not accept a loose system
@@ -1426,6 +1398,25 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
         set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
+        set(ABSL_BUILD_TESTING             OFF CACHE BOOL "" FORCE)
+        set(ABSL_BUILD_TEST_HELPERS        OFF CACHE BOOL "" FORCE)
+
+        # Protobuf's module fallback pins an older Abseil release internally.
+        # Declare the supported toolchain's exact Abseil first so protobuf
+        # consumes this target instead of creating its fallback. This keeps
+        # the bundled runtime and generated-header consumers on the same
+        # inline namespace without linking Homebrew dylibs into release
+        # artifacts.
+        if(NOT TARGET absl::strings)
+            FetchContent_Declare(
+                absl
+                GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+                GIT_TAG        ${RAC_ABSEIL_VERSION}
+                GIT_SHALLOW    TRUE
+            )
+            FetchContent_MakeAvailable(absl)
+        endif()
+
         # FIND_PACKAGE_ARGS was removed because on Ubuntu CI
         # the internal find_package(Protobuf ... NAMES Protobuf) call silently
         # registered `protobuf::libprotobuf-lite` as an IMPORTED target from
@@ -1438,7 +1429,7 @@ if(RAC_ENABLE_PROTOBUF)
         FetchContent_Declare(
             protobuf_fetched
             GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-            GIT_TAG        v${PROTOBUF_VERSION}
+            GIT_TAG        v${RAC_PROTOBUF_VERSION}
             GIT_SHALLOW    TRUE
         )
         FetchContent_MakeAvailable(protobuf_fetched)
@@ -1453,8 +1444,28 @@ if(RAC_ENABLE_PROTOBUF)
         endif()
         if(TARGET protobuf::libprotobuf OR TARGET libprotobuf)
             set(Protobuf_FOUND TRUE)
-            message(STATUS "RunAnywhere: vendored libprotobuf v${PROTOBUF_VERSION} via FetchContent (absl=module)")
+            message(STATUS "RunAnywhere: vendored libprotobuf v${RAC_PROTOBUF_VERSION} via FetchContent (absl=module)")
         endif()
+    endif()
+
+    if(RAC_ISOLATE_PROTOBUF_NAMESPACE)
+        # Protobuf does not expose a supported namespace-setting CMake option.
+        # Rewriting the namespace token at compile time keeps the checked-in
+        # generated code and the exact pinned runtime ABI-identical while
+        # preventing collisions with unshaded copies embedded in static ML
+        # runtimes (notably ONNX Runtime on macOS). PUBLIC is intentional on
+        # these private build targets: every internal TU that directly includes
+        # generated protobuf headers must see the same rewrite.
+        foreach(_rac_pb_build_target libprotobuf libprotobuf-lite)
+            if(TARGET ${_rac_pb_build_target})
+                target_compile_definitions(${_rac_pb_build_target} PUBLIC
+                    google=runanywhere_internal)
+            endif()
+        endforeach()
+        set(RAC_PROTOBUF_NAMESPACE_ISOLATED ON CACHE INTERNAL
+            "rac_commons protobuf C++ namespace isolated from process-global runtimes" FORCE)
+        message(STATUS
+            "Protobuf namespace: google::protobuf -> runanywhere_internal::protobuf (private ABI)")
     endif()
 
     if(RAC_PROTOBUF_COMPILE_OPTIONS)

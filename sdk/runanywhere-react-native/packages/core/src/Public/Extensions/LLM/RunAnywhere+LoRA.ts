@@ -379,7 +379,9 @@ async function markImportCompleted(
  * record + manifest persistence, and catalog completion for matched entries.
  * Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
  */
-async function importAdapter(sourcePath: string): Promise<LoraAdapterImportResult> {
+async function importAdapter(
+  sourcePath: string
+): Promise<LoraAdapterImportResult> {
   requireInitialized();
   const native = ensureNative();
   return decodeRequired(
@@ -450,8 +452,7 @@ function loraArtifactModelID(entry: LoraAdapterCatalogEntry): string {
  */
 function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
   const urlTail = entry.url.split('/').pop() ?? entry.url;
-  const artifactFilename =
-    entry.filename || urlTail.split('?')[0] || urlTail;
+  const artifactFilename = entry.filename || urlTail.split('?')[0] || urlTail;
 
   const descriptor = {
     role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
@@ -482,7 +483,6 @@ function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
     framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
     downloadUrl: entry.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    description: entry.description,
     singleFile: {
       requiredPatterns: [artifactFilename],
       expectedFiles,

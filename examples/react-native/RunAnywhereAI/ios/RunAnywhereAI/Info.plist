@@ -26,13 +26,9 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string/>
 	<key>NSCameraUsageDescription</key>
 	<string>Vision AI needs camera access to describe what you see</string>
 	<key>NSMicrophoneUsageDescription</key>

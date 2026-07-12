@@ -14,7 +14,9 @@ source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
 # independently overriding the Sherpa version would make the ORT pair invalid.
 SHERPA_ONNX_VERSION="${SHERPA_ONNX_VERSION_WEB}"
 : "${ONNX_VERSION_WEB:?ONNX_VERSION_WEB is missing from VERSIONS}"
+: "${ONNX_COMMIT_WEB:?ONNX_COMMIT_WEB is missing from VERSIONS}"
 : "${EMSCRIPTEN_VERSION:?EMSCRIPTEN_VERSION is missing from VERSIONS}"
+: "${SHERPA_ONNX_COMMIT_WEB:?SHERPA_ONNX_COMMIT_WEB is missing from VERSIONS}"
 SRC_DIR="${SHERPA_ONNX_SRC_DIR:-${WASM_DIR}/third_party/sherpa-onnx}"
 DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm"
 ORT_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
@@ -24,13 +26,12 @@ BUILD_PROVENANCE_FILE="${BUILD_DIR}/.rac-wasm-build-provenance"
 SHERPA_ARCHIVE_DEST="${DEST_DIR}/lib/libsherpa-onnx-c-api.a"
 SHERPA_HEADER_DEST="${DEST_DIR}/include/sherpa-onnx/c-api/c-api.h"
 ORT_ARCHIVE="${ORT_DIR}/lib/libonnxruntime.a"
-ORT_HEADER="${ORT_DIR}/include/onnxruntime_c_api.h"
 ORT_PROVENANCE_FILE="${ORT_DIR}/.rac-wasm-provenance"
 ORT_VENDOR_SCRIPT="${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh"
 # These schemas belong to different provenance producers. Never use the
 # Sherpa schema to validate ORT just because the records are checked together.
-SHERPA_RECIPE_SCHEMA="3"
-ORT_RECIPE_SCHEMA="5"
+SHERPA_RECIPE_SCHEMA="4"
+ORT_RECIPE_SCHEMA="6"
 PATCH_DIR="${WASM_DIR}/patches"
 SHERPA_PATCH="${PATCH_DIR}/sherpa-onnx-c-api-try-catch.patch"
 SOURCE_REVISION=""
@@ -120,7 +121,7 @@ provenance_matches() {
     provenance_has "${PROVENANCE_FILE}" "recipe_schema=${SHERPA_RECIPE_SCHEMA}" &&
     provenance_has "${PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
-    provenance_has_pattern "${PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
+    provenance_has "${PROVENANCE_FILE}" "source_revision=${SHERPA_ONNX_COMMIT_WEB}" &&
     provenance_has_pattern "${PROVENANCE_FILE}" '^patch_state=(applied|skipped|absent)$'
 }
 
@@ -136,7 +137,7 @@ ort_provenance_matches() {
     provenance_has "${ORT_PROVENANCE_FILE}" "recipe_schema=${ORT_RECIPE_SCHEMA}" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "script_sha256=${ORT_SCRIPT_SHA256}" &&
     provenance_has "${ORT_PROVENANCE_FILE}" "patch_sha256=${ORT_PATCH_SHA256}" &&
-    provenance_has_pattern "${ORT_PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
+    provenance_has "${ORT_PROVENANCE_FILE}" "source_revision=${ONNX_COMMIT_WEB}" &&
     provenance_has_pattern "${ORT_PROVENANCE_FILE}" '^patch_state=(applied|absent)$'
 }
 
@@ -150,7 +151,7 @@ build_provenance_matches() {
     provenance_has "${BUILD_PROVENANCE_FILE}" "recipe_schema=${SHERPA_RECIPE_SCHEMA}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "script_sha256=${SCRIPT_SHA256}" &&
     provenance_has "${BUILD_PROVENANCE_FILE}" "patch_sha256=${PATCH_SHA256}" &&
-    provenance_has_pattern "${BUILD_PROVENANCE_FILE}" '^source_revision=[0-9a-f]{40,64}$' &&
+    provenance_has "${BUILD_PROVENANCE_FILE}" "source_revision=${SHERPA_ONNX_COMMIT_WEB}" &&
     provenance_has_pattern "${BUILD_PROVENANCE_FILE}" '^patch_state=(applied|skipped|absent)$'
 }
 
@@ -198,6 +199,7 @@ require_canonical_emscripten() {
 ensure_source_checkout() {
   local expected_tag="v${SHERPA_ONNX_VERSION}"
   local actual_tag=""
+  local actual_revision=""
   local dirty="0"
   local source_root=""
   local source_real=""
@@ -213,17 +215,20 @@ ensure_source_checkout() {
 
   if [ "${has_own_git}" = "1" ]; then
     actual_tag="$(git -C "${SRC_DIR}" describe --tags --exact-match HEAD 2>/dev/null || true)"
+    actual_revision="$(git -C "${SRC_DIR}" rev-parse HEAD 2>/dev/null || true)"
     if ! git -C "${SRC_DIR}" diff --quiet --ignore-submodules -- ||
        ! git -C "${SRC_DIR}" diff --cached --quiet --ignore-submodules -- ||
        [ -n "$(git -C "${SRC_DIR}" ls-files --others --exclude-standard)" ]; then
       dirty="1"
     fi
-    if [ "${actual_tag}" != "${expected_tag}" ] || [ "${dirty}" = "1" ]; then
+    if [ "${actual_tag}" != "${expected_tag}" ] ||
+       [ "${actual_revision}" != "${SHERPA_ONNX_COMMIT_WEB}" ] ||
+       [ "${dirty}" = "1" ]; then
       if [ -n "${SHERPA_ONNX_SRC_DIR:-}" ]; then
-        echo "ERROR: SHERPA_ONNX_SRC_DIR must be clean and exactly at ${expected_tag} (found ${actual_tag:-untagged}, dirty=${dirty})." >&2
+        echo "ERROR: SHERPA_ONNX_SRC_DIR must be clean at ${expected_tag}/${SHERPA_ONNX_COMMIT_WEB} (found ${actual_tag:-untagged}/${actual_revision:-unknown}, dirty=${dirty})." >&2
         exit 1
       fi
-      echo "Removing stale/dirty Sherpa-ONNX source checkout (${actual_tag:-unknown}, dirty=${dirty}; need ${expected_tag})."
+      echo "Removing stale/dirty Sherpa-ONNX source checkout (${actual_tag:-unknown}/${actual_revision:-unknown}, dirty=${dirty}; need ${expected_tag}/${SHERPA_ONNX_COMMIT_WEB})."
       rm -rf "${SRC_DIR}"
       has_own_git="0"
     fi
@@ -239,6 +244,11 @@ ensure_source_checkout() {
   if [ "${has_own_git}" != "1" ]; then
     git clone --depth 1 --branch "${expected_tag}" \
       https://github.com/k2-fsa/sherpa-onnx.git "${SRC_DIR}"
+  fi
+  actual_revision="$(git -C "${SRC_DIR}" rev-parse HEAD)"
+  if [ "${actual_revision}" != "${SHERPA_ONNX_COMMIT_WEB}" ]; then
+    echo "ERROR: upstream ${expected_tag} resolved to an unexpected revision." >&2
+    exit 1
   fi
 }
 
@@ -275,50 +285,12 @@ if ! ort_provenance_matches; then
   exit 1
 fi
 
-# --- Prebuilt WASM bundle (download-first; mirrors the Android prebuilt .so) ---
-# Download + extract the matched ORT+sherpa WASM static libs from the
-# sherpa-onnx-rac release only after validating the embedded marker; the
-# release tag/cache filename is not sufficient evidence of the Emscripten
-# toolchain used to build it. Force a source build with
-# RAC_WASM_BUILD_FROM_SOURCE=1; override the source repo/tag with
-# RAC_WASM_PREBUILT_REPO / RAC_WASM_PREBUILT_TAG.
-if [ "${RAC_WASM_BUILD_FROM_SOURCE:-0}" != "1" ]; then
-  if provenance_matches; then
-    echo "Sherpa-ONNX WASM already vendored with current provenance: ${SHERPA_ARCHIVE_DEST}"
-    exit 0
-  fi
-  _RAC_TP="${REPO_ROOT}/sdk/runanywhere-commons/third_party"
-  _RAC_REPO="${RAC_WASM_PREBUILT_REPO:-${SHERPA_ONNX_REPO_ANDROID:-Siddhesh2377/sherpa-onnx-rac}}"
-  _RAC_TAG="${RAC_WASM_PREBUILT_TAG:-v${SHERPA_ONNX_VERSION}}"
-  _RAC_TARBALL="sherpa-onnx-${_RAC_TAG}-wasm.tar.bz2"
-  _RAC_URL="https://github.com/${_RAC_REPO}/releases/download/${_RAC_TAG}/${_RAC_TARBALL}"
-  _RAC_CACHE="${WASM_DIR}/third_party/${_RAC_TARBALL}"
-  if [ ! -f "${_RAC_CACHE}" ]; then
-    echo "Downloading prebuilt WASM bundle: ${_RAC_URL}"
-    if curl -fL --retry 3 -o "${_RAC_CACHE}.part" "${_RAC_URL}"; then
-      mv "${_RAC_CACHE}.part" "${_RAC_CACHE}"
-    else
-      echo "Prebuilt download failed; falling back to from-source build."
-      rm -f "${_RAC_CACHE}.part"
-    fi
-  fi
-  if [ -f "${_RAC_CACHE}" ]; then
-    mkdir -p "${_RAC_TP}"
-    if tar -xjf "${_RAC_CACHE}" -C "${_RAC_TP}" sherpa-onnx-wasm; then
-      if provenance_matches; then
-        echo "Vendored Sherpa-ONNX WASM from provenance-matched prebuilt bundle: ${SHERPA_ARCHIVE_DEST}"
-        exit 0
-      fi
-      echo "Prebuilt bundle is incomplete or lacks matching version/toolchain provenance; falling back to source."
-    else
-      echo "Prebuilt bundle is corrupt or lacks the sherpa-onnx-wasm member; falling back to source."
-      rm -f "${_RAC_CACHE}"
-    fi
-    rm -rf "${DEST_DIR}"
-    mkdir -p "${DEST_DIR}/lib" "${DEST_DIR}/include"
-  fi
+# Public Web releases are built only from the exact upstream revision pinned in
+# VERSIONS. Personal-fork prebuilt archives are not an acceptable OSS input.
+if provenance_matches; then
+  echo "Sherpa-ONNX WASM already vendored with current provenance: ${SHERPA_ARCHIVE_DEST}"
+  exit 0
 fi
-# --- from-source build (reached if RAC_WASM_BUILD_FROM_SOURCE=1 or download failed) ---
 
 require_canonical_emscripten
 ensure_source_checkout
@@ -365,8 +337,8 @@ emcmake cmake \
   -B "${BUILD_DIR}" \
   -S "${SRC_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-fexceptions" \
-  -DCMAKE_CXX_FLAGS="-fexceptions" \
+  -DCMAKE_C_FLAGS="-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
+  -DCMAKE_CXX_FLAGS="-fexceptions -ffile-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fmacro-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -fdebug-prefix-map=${SRC_DIR}=/runanywhere-deps/sherpa-onnx -ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks" \
   -DCMAKE_EXE_LINKER_FLAGS="-fexceptions" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fexceptions" \
   -DBUILD_SHARED_LIBS=OFF \

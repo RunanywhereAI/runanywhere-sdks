@@ -421,7 +421,7 @@ abstract final class QHexRTModelCatalog {
       id: 'canary_qwen_2_5b',
       name: 'Canary Qwen 2.5B (HNPU)',
       url:
-          'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/canary-qwen-2.5b.json',
+          'https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json',
       category: _stt,
       memoryBytes: 5491333979,
     ),

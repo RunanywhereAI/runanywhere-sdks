@@ -109,10 +109,9 @@ public:
      * @brief Complete deferred services initialization
      *
      * Registers native device callbacks and then drives commons Phase 2 through
-     * rac_sdk_init_phase2_proto when bundled commons exposes it.
+     * rac_sdk_init_phase2_proto.
      *
-     * @param outResultBytes Serialized RASdkInitResult proto bytes; empty when
-     *        the bundled commons lacks the phase-2 symbol (deferred mode).
+     * @param outResultBytes Serialized RASdkInitResult proto bytes.
      * @return RAC_SUCCESS or error code
      */
     rac_result_t completeServicesInitialization(std::vector<uint8_t>& outResultBytes);
@@ -124,9 +123,8 @@ public:
      * re-checks usable external config and reports whether HTTP is configured.
      * Mirrors Swift CppBridge.SdkInit.retryHTTP().
      *
-     * @param outResultBytes Serialized RASdkInitResult proto bytes; empty when
-     *        the bundled commons lacks the retry symbol.
-     * @return RAC_SUCCESS (incl. the feature-unavailable downgrade) or error.
+     * @param outResultBytes Serialized RASdkInitResult proto bytes.
+     * @return RAC_SUCCESS or error.
      */
     rac_result_t retryHTTPSetup(std::vector<uint8_t>& outResultBytes);
 

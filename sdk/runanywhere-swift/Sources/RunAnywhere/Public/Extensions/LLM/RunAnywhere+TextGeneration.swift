@@ -21,8 +21,9 @@ public extension RunAnywhere {
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RALLMGenerationResult {
-        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
-        request.streamingEnabled = false
+        var requestOptions = options ?? .defaults()
+        requestOptions.streamingEnabled = false
+        let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generate(request)
     }
 
@@ -34,8 +35,9 @@ public extension RunAnywhere {
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> AsyncStream<RALLMStreamEvent> {
-        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
-        request.streamingEnabled = true
+        var requestOptions = options ?? .defaults()
+        requestOptions.streamingEnabled = true
+        let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generateStream(request)
     }
 
@@ -47,11 +49,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
+        let options = request.options
+        let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generate: temperature=\(request.temperature), top_p=\(request.topP), "
-            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(request.streamingEnabled)"
+            "[PARAMS] generate: temperature=\(options.temperature), top_p=\(options.topP), "
+            + "max_tokens=\(options.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(options.streamingEnabled)"
         )
 
         return try await CppBridge.LLM.shared.generate(request)
@@ -76,11 +79,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let systemPromptDesc = request.systemPrompt.isEmpty ? "nil" : "set(\(request.systemPrompt.count) chars)"
+        let options = request.options
+        let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
         SDKLogger.llm.info(
-            "[PARAMS] generateStream: temperature=\(request.temperature), top_p=\(request.topP), "
-            + "max_tokens=\(request.maxTokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(request.streamingEnabled)"
+            "[PARAMS] generateStream: temperature=\(options.temperature), top_p=\(options.topP), "
+            + "max_tokens=\(options.maxTokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(options.streamingEnabled)"
         )
 
         return try await CppBridge.LLM.shared.generateStream(request)
@@ -91,8 +95,8 @@ public extension RunAnywhere {
     /// Routes through the lifecycle proto ABI (`rac_llm_cancel_proto`) so the
     /// active `generate` / `generateStream` call — which runs through the
     /// handleless lifecycle path — observes the cancel signal and terminates
-    /// promptly with `finishReason == .cancelled`. Calling the legacy
-    /// per-component actor `cancel()` is a no-op against lifecycle generation
+    /// promptly with `finishReason == .cancelled`. Calling the per-component
+    /// actor `cancel()` is a no-op against lifecycle generation
     /// (see comment record `hotspot-swift-public-features-002`).
     static func cancelGeneration() async {
         guard isInitialized else { return }

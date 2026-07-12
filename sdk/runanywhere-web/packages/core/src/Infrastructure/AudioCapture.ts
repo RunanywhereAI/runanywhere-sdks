@@ -31,19 +31,16 @@ export interface AudioCaptureConfig {
 /**
  * AudioCapture - Captures microphone audio for STT/VAD processing.
  *
- * Uses Web Audio API (AudioContext + ScriptProcessorNode) to capture
- * microphone audio, resample to target rate, and deliver Float32Array
- * PCM chunks to the consumer.
+ * Uses Web Audio API (AudioContext + AudioWorkletNode) to capture microphone
+ * audio, resample to the target rate, and deliver exact-size Float32Array PCM
+ * chunks to the consumer without running audio processing on the main thread.
  *
  * Includes buffer accumulation for batch STT and an AnalyserNode for
  * real-time audio level metering (0-1 range).
  */
 export class AudioCapture {
-  private audioContext: AudioContext | null = null;
-  private mediaStream: MediaStream | null = null;
-  private sourceNode: MediaStreamAudioSourceNode | null = null;
-  private processorNode: ScriptProcessorNode | null = null;
-  private _analyser: AnalyserNode | null = null;
+  private activeResources: AudioCaptureResources | null = null;
+  private pendingStart: PendingAudioCaptureStart | null = null;
   private _animFrameId: number | null = null;
   private _isCapturing = false;
   private _currentLevel = 0;
@@ -80,7 +77,7 @@ export class AudioCapture {
    * May differ from requested rate if browser doesn't support it.
    */
   get actualSampleRate(): number {
-    return this.audioContext?.sampleRate ?? this.config.sampleRate;
+    return this.activeResources?.context.sampleRate ?? this.config.sampleRate;
   }
 
   /** Duration of collected audio in seconds based on configured sample rate. */
@@ -103,6 +100,7 @@ export class AudioCapture {
     }
 
     const generation = ++this.lifecycleGeneration;
+    this.cancelPendingStart();
     this.chunkCallback = onChunk ?? null;
     this.levelCallback = onLevel ?? null;
     this._pcmChunks = [];
@@ -111,6 +109,7 @@ export class AudioCapture {
     logger.info(`Starting audio capture (${this.config.sampleRate}Hz, chunk=${this.config.chunkSize})`);
 
     let acquiredStream: MediaStream | null = null;
+    let pendingStart: PendingAudioCaptureStart | null = null;
     try {
       // Request microphone access
       acquiredStream = await navigator.mediaDevices.getUserMedia({
@@ -129,47 +128,77 @@ export class AudioCapture {
         acquiredStream.getTracks().forEach((track) => track.stop());
         return;
       }
-      this.mediaStream = acquiredStream;
-      acquiredStream = null;
-
       // Create AudioContext at target sample rate
-      this.audioContext = new AudioContext({
+      const context = new AudioContext({
         sampleRate: this.config.sampleRate,
       });
+      pendingStart = {
+        generation,
+        context,
+        stream: acquiredStream,
+        disposed: false,
+      };
+      this.pendingStart = pendingStart;
+      acquiredStream = null;
 
-      // Connect microphone to AudioContext
-      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
-
-      // --- AnalyserNode for level metering ---
-      this._analyser = this.audioContext.createAnalyser();
-      this._analyser.fftSize = 256;
-      this.sourceNode.connect(this._analyser);
-
-      // --- ScriptProcessorNode for chunk-based processing ---
-      // Note: ScriptProcessorNode is deprecated but AudioWorklet requires
-      // cross-origin isolation. We use ScriptProcessor as a fallback.
-      const bufferSize = this.nearestPowerOf2(this.config.chunkSize);
-      this.processorNode = this.audioContext.createScriptProcessor(
-        bufferSize, this.config.channels, this.config.channels,
+      await context.audioWorklet.addModule(
+        new URL('./AudioCaptureProcessor.js', import.meta.url).href,
       );
 
-      this.processorNode.onaudioprocess = (event) => {
-        if (!this._isCapturing) return;
+      if (!this.isCurrentPendingStart(pendingStart)) {
+        this.disposePendingStart(pendingStart);
+        return;
+      }
 
-        const inputData = event.inputBuffer.getChannelData(0);
-        // Copy to avoid buffer reuse issues
-        const samples = new Float32Array(inputData.length);
-        samples.set(inputData);
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
 
-        // Accumulate into internal buffer
-        this._pcmChunks.push(samples);
+      if (!this.isCurrentPendingStart(pendingStart)) {
+        this.disposePendingStart(pendingStart);
+        return;
+      }
 
-        // Notify chunk callback if provided
-        this.chunkCallback?.(samples);
+      // Connect microphone to AudioContext
+      const sourceNode = context.createMediaStreamSource(pendingStart.stream);
+
+      // --- AnalyserNode for level metering ---
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+
+      // AudioWorklet owns render-quantum aggregation off the main thread and
+      // posts one transferable Float32Array per configured chunk.
+      const workletNode = new AudioWorkletNode(context, AUDIO_CAPTURE_PROCESSOR_NAME, {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        channelCount: this.config.channels,
+        channelCountMode: 'explicit',
+        channelInterpretation: 'discrete',
+        processorOptions: { chunkSize: this.config.chunkSize },
+      });
+      workletNode.port.onmessage = (event: MessageEvent<unknown>) => {
+        this.handleWorkletMessage(event.data);
+      };
+      workletNode.onprocessorerror = () => {
+        logger.error('Audio capture worklet stopped unexpectedly');
+        this.stop();
       };
 
-      this.sourceNode.connect(this.processorNode);
-      this.processorNode.connect(this.audioContext.destination);
+      sourceNode.connect(analyser);
+      sourceNode.connect(workletNode);
+      // Keep the worklet in the active graph. Its output remains silent, so
+      // microphone audio is never played back through the speakers.
+      workletNode.connect(context.destination);
+
+      this.pendingStart = null;
+      this.activeResources = {
+        context,
+        stream: pendingStart.stream,
+        sourceNode,
+        analyser,
+        workletNode,
+      };
 
       this._isCapturing = true;
 
@@ -179,13 +208,19 @@ export class AudioCapture {
       logger.info('Audio capture started');
     } catch (error) {
       acquiredStream?.getTracks().forEach((track) => track.stop());
-      // A stale request must not tear down resources owned by a newer start.
-      if (generation === this.lifecycleGeneration) {
-        this.cleanupResources();
+      if (pendingStart) {
+        if (this.pendingStart === pendingStart) this.pendingStart = null;
+        this.disposePendingStart(pendingStart);
       }
+      // Cancellation or a newer start is not a microphone failure.
+      if (generation !== this.lifecycleGeneration) {
+        return;
+      }
+      this.chunkCallback = null;
+      this.levelCallback = null;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to start audio capture: ${message}`);
-      throw new Error(`Microphone access failed: ${message}`);
+      throw new Error(`Audio capture failed: ${message}`);
     }
   }
 
@@ -199,6 +234,7 @@ export class AudioCapture {
     this._currentLevel = 0;
     this.chunkCallback = null;
     this.levelCallback = null;
+    this.cancelPendingStart();
     this.cleanupResources();
 
     logger.info('Audio capture stopped');
@@ -237,13 +273,13 @@ export class AudioCapture {
 
   /** Start the requestAnimationFrame loop that reads the AnalyserNode. */
   private startLevelMonitoring(): void {
-    const analyser = this._analyser;
-    if (!analyser) return;
+    const resources = this.activeResources;
+    if (!resources) return;
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const dataArray = new Uint8Array(resources.analyser.frequencyBinCount);
     const tick = () => {
-      if (!this._isCapturing || !this._analyser) return;
-      this._analyser.getByteFrequencyData(dataArray);
+      if (!this._isCapturing || this.activeResources !== resources) return;
+      resources.analyser.getByteFrequencyData(dataArray);
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
       const avg = sum / dataArray.length / 255;
@@ -259,34 +295,62 @@ export class AudioCapture {
       cancelAnimationFrame(this._animFrameId);
       this._animFrameId = null;
     }
-    if (this.processorNode) {
-      this.processorNode.disconnect();
-      this.processorNode.onaudioprocess = null;
-      this.processorNode = null;
-    }
-    if (this._analyser) {
-      this._analyser.disconnect();
-      this._analyser = null;
-    }
-    if (this.sourceNode) {
-      this.sourceNode.disconnect();
-      this.sourceNode = null;
-    }
-    if (this.audioContext) {
-      this.audioContext.close().catch(() => { /* ignore */ });
-      this.audioContext = null;
-    }
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
+    const resources = this.activeResources;
+    this.activeResources = null;
+    if (!resources) return;
+
+    resources.workletNode.port.onmessage = null;
+    resources.workletNode.port.close();
+    resources.workletNode.onprocessorerror = null;
+    resources.workletNode.disconnect();
+    resources.analyser.disconnect();
+    resources.sourceNode.disconnect();
+    resources.context.close().catch(() => { /* ignore */ });
+    resources.stream.getTracks().forEach((track) => track.stop());
   }
 
-  private nearestPowerOf2(n: number): number {
-    let power = 256;
-    while (power < n && power < 16384) {
-      power *= 2;
+  private handleWorkletMessage(message: unknown): void {
+    if (!this._isCapturing) return;
+    if (!(message instanceof Float32Array)) {
+      logger.warning('Ignoring invalid audio worklet message');
+      return;
     }
-    return power;
+    this._pcmChunks.push(message);
+    this.chunkCallback?.(message);
   }
+
+  private isCurrentPendingStart(pendingStart: PendingAudioCaptureStart): boolean {
+    return pendingStart.generation === this.lifecycleGeneration
+      && this.pendingStart === pendingStart;
+  }
+
+  private cancelPendingStart(): void {
+    const pendingStart = this.pendingStart;
+    this.pendingStart = null;
+    if (pendingStart) this.disposePendingStart(pendingStart);
+  }
+
+  private disposePendingStart(pendingStart: PendingAudioCaptureStart): void {
+    if (pendingStart.disposed) return;
+    pendingStart.disposed = true;
+    pendingStart.context.close().catch(() => { /* ignore */ });
+    pendingStart.stream.getTracks().forEach((track) => track.stop());
+  }
+}
+
+const AUDIO_CAPTURE_PROCESSOR_NAME = 'runanywhere-audio-capture';
+
+interface PendingAudioCaptureStart {
+  generation: number;
+  context: AudioContext;
+  stream: MediaStream;
+  disposed: boolean;
+}
+
+interface AudioCaptureResources {
+  context: AudioContext;
+  stream: MediaStream;
+  sourceNode: MediaStreamAudioSourceNode;
+  analyser: AnalyserNode;
+  workletNode: AudioWorkletNode;
 }

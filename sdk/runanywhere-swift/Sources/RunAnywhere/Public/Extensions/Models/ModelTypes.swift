@@ -18,8 +18,8 @@
 //
 //  Wire strings now match the proto enum names emitted by swift-protobuf
 //  (e.g. `INFERENCE_FRAMEWORK_LLAMA_CPP`). The accompanying `from_string`
-//  decoder accepts wire strings, analytics keys, and display names
-//  case-insensitively, so legacy Codable inputs continue to round-trip.
+//  decoder accepts canonical wire strings, analytics keys, and display names
+//  case-insensitively.
 //
 //  Artifact / archive / expected-files helpers (RAModelInfo.make,
 //  resolvedPrimaryModelPath, inferredArtifact, etc.) live in
@@ -103,23 +103,11 @@ public extension RAModelFormat {
         }
     }
 
-    /// Parse a `RAModelFormat` from a wire string. Matches case-insensitively
-    /// against the proto-name `wireString` emitted by `rac_model_format_wire_string`
-    /// (e.g. `MODEL_FORMAT_GGUF`) AND the legacy short extension string from
-    /// `rac_model_format_extension` (e.g. `gguf`, `onnx`, `mlmodel`). The
-    /// legacy fallback preserves Codable round-trip for persisted model
-    /// metadata that was written with the pre-IDL short names — see comment
-    /// record `hotspot-swift-public-features-004`.
+    /// Parse a `RAModelFormat` from its canonical proto-name wire string
+    /// (for example, `MODEL_FORMAT_GGUF`), case-insensitively.
     static func fromWireString(_ raw: String) -> RAModelFormat? {
         let lowered = raw.lowercased()
-        for format in RAModelFormat.allCases {
-            if format.wireString.lowercased() == lowered { return format }
-            if let extPtr = rac_model_format_extension(format.toC()),
-               String(cString: extPtr).lowercased() == lowered {
-                return format
-            }
-        }
-        return nil
+        return RAModelFormat.allCases.first { $0.wireString.lowercased() == lowered }
     }
 }
 
@@ -201,7 +189,7 @@ public extension RAInferenceFramework {
     /// Convert Swift InferenceFramework to C rac_inference_framework_t.
     /// Delegates to commons' `rac_inference_framework_from_proto`, which
     /// maps the proto enum int32 value (this enum's rawValue) to the C
-    /// enum's legacy ordering.
+    /// ABI enum ordering.
     func toCFramework() -> rac_inference_framework_t {
         var out: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
         _ = rac_inference_framework_from_proto(Int32(self.rawValue), &out)
@@ -239,17 +227,6 @@ public extension RAInferenceFramework {
         ]
     }
 
-    // MARK: - Pre-IDL case-name aliases
-    //
-    // The hand-written `InferenceFramework` enum used `.systemTTS` (UK-TLA
-    // camel-case). Proto conversion normalizes to `.systemTts`. Aliases below
-    // keep every existing call site compiling with zero edits.
-
-    static var systemTTS: RAInferenceFramework { .systemTts }
-    static var picoLLM: RAInferenceFramework { .picoLlm }
-    static var piperTTS: RAInferenceFramework { .piperTts }
-    static var execuTorch: RAInferenceFramework { .executorch }
-    static var mediaPipe: RAInferenceFramework { .mediapipe }
 }
 
 extension RAThinkingTagPattern: Codable {
@@ -305,28 +282,11 @@ public extension RAArchiveType {
         }
     }
 
-    /// Parse a `RAArchiveType` from a wire string. Matches case-insensitively
-    /// against the canonical proto-name `wireString` (e.g. `ARCHIVE_TYPE_ZIP`)
-    /// AND the legacy short extension from `rac_archive_type_extension`
-    /// (e.g. `zip`, `tar.bz2`, `tbz2`). The legacy fallback preserves Codable
-    /// round-trip for persisted model metadata written with the pre-IDL short
-    /// names, mirroring `RAModelFormat.fromWireString`.
+    /// Parse a `RAArchiveType` from its canonical proto-name wire string
+    /// (for example, `ARCHIVE_TYPE_ZIP`), case-insensitively.
     static func fromWireString(_ raw: String) -> RAArchiveType? {
         let lowered = raw.lowercased()
-        switch lowered {
-        case "tbz2": return .tarBz2
-        case "tgz":  return .tarGz
-        case "txz":  return .tarXz
-        default:     break
-        }
-        for type in RAArchiveType.allCases {
-            if type.wireString.lowercased() == lowered { return type }
-            if !type.fileExtension.isEmpty,
-               type.fileExtension.lowercased() == lowered {
-                return type
-            }
-        }
-        return nil
+        return RAArchiveType.allCases.first { $0.wireString.lowercased() == lowered }
     }
 
     /// File extension used in URLs, sourced from

@@ -1969,11 +1969,11 @@ constexpr DiffusionConfiguration::ParseTableT_ DiffusionConfiguration::InternalG
     {
       PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_._has_bits_),
       0, // no _extensions_
-      7, 56,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967168,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      6,  // num_field_entries
       1,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1993,25 +1993,22 @@ constexpr DiffusionConfiguration::ParseTableT_ DiffusionConfiguration::InternalG
        {18, 1, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.tokenizer_source_)}},
       // bool enable_safety_checker = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionConfiguration, _impl_.enable_safety_checker_), 4>(),
-       {24, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionConfiguration, _impl_.enable_safety_checker_), 3>(),
+       {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.enable_safety_checker_)}},
       // int32 max_memory_mb = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.max_memory_mb_), 3>(),
-       {32, 3, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.max_memory_mb_), 4>(),
+       {32, 4, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.max_memory_mb_)}},
       // optional string model_id = 5;
       {::_pbi::TcParser::FastUS1,
        {42, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_id_)}},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.preferred_framework_), 6>(),
-       {48, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionConfiguration, _impl_.preferred_framework_), 5>(),
+       {48, 5, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_)}},
-      // bool reduce_memory = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(DiffusionConfiguration, _impl_.reduce_memory_), 5>(),
-       {56, 5, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.reduce_memory_)}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
@@ -2020,15 +2017,13 @@ constexpr DiffusionConfiguration::ParseTableT_ DiffusionConfiguration::InternalG
       // .runanywhere.v1.DiffusionTokenizerSource tokenizer_source = 2;
       {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.tokenizer_source_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // bool enable_safety_checker = 3;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.enable_safety_checker_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.enable_safety_checker_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int32 max_memory_mb = 4;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.max_memory_mb_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.max_memory_mb_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional string model_id = 5;
       {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // bool reduce_memory = 7;
-      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.reduce_memory_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(DiffusionConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2055,9 +2050,8 @@ inline constexpr DiffusionConfiguration::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         tokenizer_source_{nullptr},
         model_variant_{static_cast< ::runanywhere::v1::DiffusionModelVariant >(0)},
-        max_memory_mb_{0},
         enable_safety_checker_{false},
-        reduce_memory_{false},
+        max_memory_mb_{0},
         preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)} {}
 
 template <typename>
@@ -2351,20 +2345,18 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_._has_bits_),
-        10, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.model_variant_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.tokenizer_source_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.enable_safety_checker_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.max_memory_mb_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.preferred_framework_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfiguration, _impl_.reduce_memory_),
         2,
         1,
-        4,
         3,
+        4,
         0,
-        6,
         5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionConfig, _impl_._has_bits_),
@@ -2559,15 +2551,15 @@ static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::DiffusionTokenizerSource)},
         {9, sizeof(::runanywhere::v1::DiffusionConfiguration)},
-        {26, sizeof(::runanywhere::v1::DiffusionConfig)},
-        {37, sizeof(::runanywhere::v1::DiffusionGenerationOptions)},
-        {80, sizeof(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse)},
-        {87, sizeof(::runanywhere::v1::DiffusionGenerationRequest)},
-        {98, sizeof(::runanywhere::v1::DiffusionProgress)},
-        {121, sizeof(::runanywhere::v1::DiffusionResult)},
-        {148, sizeof(::runanywhere::v1::DiffusionCapabilities)},
-        {177, sizeof(::runanywhere::v1::DiffusionStreamEvent)},
-        {196, sizeof(::runanywhere::v1::DiffusionServiceState)},
+        {24, sizeof(::runanywhere::v1::DiffusionConfig)},
+        {35, sizeof(::runanywhere::v1::DiffusionGenerationOptions)},
+        {78, sizeof(::runanywhere::v1::DiffusionGenerationRequest_MetadataEntry_DoNotUse)},
+        {85, sizeof(::runanywhere::v1::DiffusionGenerationRequest)},
+        {96, sizeof(::runanywhere::v1::DiffusionProgress)},
+        {119, sizeof(::runanywhere::v1::DiffusionResult)},
+        {146, sizeof(::runanywhere::v1::DiffusionCapabilities)},
+        {175, sizeof(::runanywhere::v1::DiffusionStreamEvent)},
+        {194, sizeof(::runanywhere::v1::DiffusionServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2590,135 +2582,134 @@ const char descriptor_table_protodef_diffusion_5foptions_2eproto[] ABSL_ATTRIBUT
     "zerSource\022:\n\004kind\030\001 \001(\0162,.runanywhere.v1"
     ".DiffusionTokenizerSourceKind\022\030\n\013custom_"
     "path\030\002 \001(\tH\000\210\001\001\022\025\n\rauto_download\030\003 \001(\010B\016"
-    "\n\014_custom_path\"\351\002\n\026DiffusionConfiguratio"
+    "\n\014_custom_path\"\330\002\n\026DiffusionConfiguratio"
     "n\022<\n\rmodel_variant\030\001 \001(\0162%.runanywhere.v"
     "1.DiffusionModelVariant\022B\n\020tokenizer_sou"
     "rce\030\002 \001(\0132(.runanywhere.v1.DiffusionToke"
     "nizerSource\022\035\n\025enable_safety_checker\030\003 \001"
     "(\010\022\025\n\rmax_memory_mb\030\004 \001(\005\022\025\n\010model_id\030\005 "
     "\001(\tH\000\210\001\001\022D\n\023preferred_framework\030\006 \001(\0162\"."
-    "runanywhere.v1.InferenceFrameworkH\001\210\001\001\022\025"
-    "\n\rreduce_memory\030\007 \001(\010B\013\n\t_model_idB\026\n\024_p"
-    "referred_framework\"\241\001\n\017DiffusionConfig\022\022"
-    "\n\nmodel_path\030\001 \001(\t\022\020\n\010model_id\030\002 \001(\t\022\022\n\n"
-    "model_name\030\003 \001(\t\022B\n\rconfiguration\030\004 \001(\0132"
-    "&.runanywhere.v1.DiffusionConfigurationH"
-    "\000\210\001\001B\020\n\016_configuration\"\225\005\n\032DiffusionGene"
-    "rationOptions\022\016\n\006prompt\030\001 \001(\t\022\027\n\017negativ"
-    "e_prompt\030\002 \001(\t\022\r\n\005width\030\003 \001(\005\022\016\n\006height\030"
-    "\004 \001(\005\022\033\n\023num_inference_steps\030\005 \001(\005\022\026\n\016gu"
-    "idance_scale\030\006 \001(\002\022\014\n\004seed\030\007 \001(\003\0225\n\tsche"
-    "duler\030\010 \001(\0162\".runanywhere.v1.DiffusionSc"
-    "heduler\022+\n\004mode\030\t \001(\0162\035.runanywhere.v1.D"
-    "iffusionMode\022\030\n\013input_image\030\n \001(\014H\000\210\001\001\022\027"
-    "\n\nmask_image\030\013 \001(\014H\001\210\001\001\022\030\n\020denoise_stren"
-    "gth\030\014 \001(\002\022\"\n\032report_intermediate_images\030"
-    "\r \001(\010\022\027\n\017progress_stride\030\016 \001(\005\022\031\n\021input_"
-    "image_width\030\017 \001(\005\022\032\n\022input_image_height\030"
-    "\020 \001(\005\022#\n\026input_image_media_type\030\021 \001(\tH\002\210"
-    "\001\001\022\"\n\025mask_image_media_type\030\022 \001(\tH\003\210\001\001\022\022"
-    "\n\nbatch_size\030\023 \001(\005\022\026\n\016return_latents\030\024 \001"
-    "(\010B\016\n\014_input_imageB\r\n\013_mask_imageB\031\n\027_in"
-    "put_image_media_typeB\030\n\026_mask_image_medi"
-    "a_type\"\237\002\n\032DiffusionGenerationRequest\022\022\n"
-    "\nrequest_id\030\001 \001(\t\022@\n\007options\030\002 \001(\0132*.run"
-    "anywhere.v1.DiffusionGenerationOptionsH\000"
-    "\210\001\001\022\025\n\010model_id\030\003 \001(\tH\001\210\001\001\022J\n\010metadata\030\004"
-    " \003(\01328.runanywhere.v1.DiffusionGeneratio"
-    "nRequest.MetadataEntry\032/\n\rMetadataEntry\022"
-    "\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_opti"
-    "onsB\013\n\t_model_id\"\342\002\n\021DiffusionProgress\022\030"
-    "\n\020progress_percent\030\001 \001(\002\022\024\n\014current_step"
-    "\030\002 \001(\005\022\023\n\013total_steps\030\003 \001(\005\022\r\n\005stage\030\004 \001"
-    "(\t\022$\n\027intermediate_image_data\030\005 \001(\014H\000\210\001\001"
-    "\022 \n\030intermediate_image_width\030\006 \001(\005\022!\n\031in"
-    "termediate_image_height\030\007 \001(\005\022\024\n\014timesta"
-    "mp_ms\030\010 \001(\003\022\016\n\006eta_ms\030\t \001(\003\022*\n\035intermedi"
-    "ate_image_media_type\030\n \001(\tH\001\210\001\001B\032\n\030_inte"
-    "rmediate_image_dataB \n\036_intermediate_ima"
-    "ge_media_type\"\345\002\n\017DiffusionResult\022\022\n\nima"
-    "ge_data\030\001 \001(\014\022\r\n\005width\030\002 \001(\005\022\016\n\006height\030\003"
-    " \001(\005\022\021\n\tseed_used\030\004 \001(\003\022\025\n\rtotal_time_ms"
-    "\030\005 \001(\003\022\023\n\013safety_flag\030\006 \001(\010\022:\n\016used_sche"
-    "duler\030\007 \001(\0162\".runanywhere.v1.DiffusionSc"
-    "heduler\022\032\n\rerror_message\030\010 \001(\tH\000\210\001\001\022\022\n\ne"
-    "rror_code\030\t \001(\005\022\035\n\020image_media_type\030\n \001("
-    "\tH\001\210\001\001\022\024\n\014batch_images\030\013 \003(\014\022\030\n\020images_g"
-    "enerated\030\014 \001(\005B\020\n\016_error_messageB\023\n\021_ima"
-    "ge_media_type\"\214\004\n\025DiffusionCapabilities\022"
-    "A\n\022supported_variants\030\001 \003(\0162%.runanywher"
-    "e.v1.DiffusionModelVariant\022@\n\024supported_"
-    "schedulers\030\002 \003(\0162\".runanywhere.v1.Diffus"
-    "ionScheduler\022\031\n\021max_resolution_px\030\003 \001(\005\022"
-    "6\n\017supported_modes\030\004 \003(\0162\035.runanywhere.v"
-    "1.DiffusionMode\022\024\n\014max_width_px\030\005 \001(\005\022\025\n"
-    "\rmax_height_px\030\006 \001(\005\022$\n\034supports_interme"
-    "diate_images\030\007 \001(\010\022\037\n\027supports_safety_ch"
-    "ecker\030\010 \001(\010\022\020\n\010is_ready\030\t \001(\010\022\032\n\rcurrent"
-    "_model\030\n \001(\tH\000\210\001\001\022\036\n\026safety_checker_enab"
-    "led\030\013 \001(\010\022!\n\031supports_batch_generation\030\014"
-    " \001(\010\022$\n\034supported_output_media_types\030\r \003"
-    "(\tB\020\n\016_current_model\"\317\002\n\024DiffusionStream"
-    "Event\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003"
-    "\022\022\n\nrequest_id\030\003 \001(\t\0226\n\004kind\030\004 \001(\0162(.run"
-    "anywhere.v1.DiffusionStreamEventKind\0228\n\010"
-    "progress\030\005 \001(\0132!.runanywhere.v1.Diffusio"
-    "nProgressH\000\210\001\001\0224\n\006result\030\006 \001(\0132\037.runanyw"
-    "here.v1.DiffusionResultH\001\210\001\001\022\032\n\rerror_me"
-    "ssage\030\007 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\013\n\t"
-    "_progressB\t\n\007_resultB\020\n\016_error_message\"\271"
-    "\002\n\025DiffusionServiceState\022\020\n\010is_ready\030\001 \001"
-    "(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001\022@\n\014capabi"
-    "lities\030\003 \001(\0132%.runanywhere.v1.DiffusionC"
-    "apabilitiesH\001\210\001\001\022\025\n\ris_generating\030\004 \001(\010\022"
-    "\036\n\021active_request_id\030\005 \001(\tH\002\210\001\001\022\032\n\rerror"
-    "_message\030\006 \001(\tH\003\210\001\001\022\022\n\nerror_code\030\007 \001(\005B"
-    "\020\n\016_current_modelB\017\n\r_capabilitiesB\024\n\022_a"
-    "ctive_request_idB\020\n\016_error_message*\223\001\n\rD"
-    "iffusionMode\022\036\n\032DIFFUSION_MODE_UNSPECIFI"
-    "ED\020\000\022 \n\034DIFFUSION_MODE_TEXT_TO_IMAGE\020\001\022!"
-    "\n\035DIFFUSION_MODE_IMAGE_TO_IMAGE\020\002\022\035\n\031DIF"
-    "FUSION_MODE_INPAINTING\020\003*\376\002\n\022DiffusionSc"
-    "heduler\022#\n\037DIFFUSION_SCHEDULER_UNSPECIFI"
-    "ED\020\000\022 \n\034DIFFUSION_SCHEDULER_DPMPP_2M\020\001\022\'"
-    "\n#DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS\020\002\022"
-    "\034\n\030DIFFUSION_SCHEDULER_DDIM\020\003\022\034\n\030DIFFUSI"
-    "ON_SCHEDULER_DDPM\020\004\022\035\n\031DIFFUSION_SCHEDUL"
-    "ER_EULER\020\005\022\037\n\033DIFFUSION_SCHEDULER_EULER_"
-    "A\020\006\022\034\n\030DIFFUSION_SCHEDULER_PNDM\020\007\022\033\n\027DIF"
-    "FUSION_SCHEDULER_LMS\020\010\022\033\n\027DIFFUSION_SCHE"
-    "DULER_LCM\020\t\022$\n DIFFUSION_SCHEDULER_DPMPP"
-    "_2M_SDE\020\n*\225\002\n\025DiffusionModelVariant\022\'\n#D"
-    "IFFUSION_MODEL_VARIANT_UNSPECIFIED\020\000\022\"\n\036"
-    "DIFFUSION_MODEL_VARIANT_SD_1_5\020\001\022\"\n\036DIFF"
-    "USION_MODEL_VARIANT_SD_2_1\020\002\022 \n\034DIFFUSIO"
-    "N_MODEL_VARIANT_SDXL\020\003\022&\n\"DIFFUSION_MODE"
-    "L_VARIANT_SDXL_TURBO\020\004\022 \n\034DIFFUSION_MODE"
-    "L_VARIANT_SDXS\020\005\022\037\n\033DIFFUSION_MODEL_VARI"
-    "ANT_LCM\020\006*\220\002\n\034DiffusionTokenizerSourceKi"
-    "nd\022/\n+DIFFUSION_TOKENIZER_SOURCE_KIND_UN"
-    "SPECIFIED\020\000\0220\n,DIFFUSION_TOKENIZER_SOURC"
-    "E_KIND_BUNDLED_SD15\020\001\022/\n+DIFFUSION_TOKEN"
-    "IZER_SOURCE_KIND_BUNDLED_SD2\020\002\0220\n,DIFFUS"
-    "ION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL\020\003"
-    "\022*\n&DIFFUSION_TOKENIZER_SOURCE_KIND_CUST"
-    "OM\020\004*\240\002\n\030DiffusionStreamEventKind\022+\n\'DIF"
-    "FUSION_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022\'"
-    "\n#DIFFUSION_STREAM_EVENT_KIND_STARTED\020\001\022"
-    "(\n$DIFFUSION_STREAM_EVENT_KIND_PROGRESS\020"
-    "\002\0222\n.DIFFUSION_STREAM_EVENT_KIND_INTERME"
-    "DIATE_IMAGE\020\003\022)\n%DIFFUSION_STREAM_EVENT_"
-    "KIND_COMPLETED\020\004\022%\n!DIFFUSION_STREAM_EVE"
-    "NT_KIND_ERROR\020\0052\302\001\n\tDiffusion\022W\n\010Generat"
-    "e\022*.runanywhere.v1.DiffusionGenerationRe"
-    "quest\032\037.runanywhere.v1.DiffusionResult\022\\"
-    "\n\006Stream\022*.runanywhere.v1.DiffusionGener"
-    "ationRequest\032$.runanywhere.v1.DiffusionS"
-    "treamEvent0\001B\220\001\n\027ai.runanywhere.proto.v1"
-    "B\025DiffusionOptionsProtoP\001Z<github.com/ru"
-    "nanywhere/runanywhere-sdks/idl/v1;runany"
-    "wherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb"
-    "\006proto3"
+    "runanywhere.v1.InferenceFrameworkH\001\210\001\001B\013"
+    "\n\t_model_idB\026\n\024_preferred_frameworkJ\004\010\007\020"
+    "\010\"\241\001\n\017DiffusionConfig\022\022\n\nmodel_path\030\001 \001("
+    "\t\022\020\n\010model_id\030\002 \001(\t\022\022\n\nmodel_name\030\003 \001(\t\022"
+    "B\n\rconfiguration\030\004 \001(\0132&.runanywhere.v1."
+    "DiffusionConfigurationH\000\210\001\001B\020\n\016_configur"
+    "ation\"\225\005\n\032DiffusionGenerationOptions\022\016\n\006"
+    "prompt\030\001 \001(\t\022\027\n\017negative_prompt\030\002 \001(\t\022\r\n"
+    "\005width\030\003 \001(\005\022\016\n\006height\030\004 \001(\005\022\033\n\023num_infe"
+    "rence_steps\030\005 \001(\005\022\026\n\016guidance_scale\030\006 \001("
+    "\002\022\014\n\004seed\030\007 \001(\003\0225\n\tscheduler\030\010 \001(\0162\".run"
+    "anywhere.v1.DiffusionScheduler\022+\n\004mode\030\t"
+    " \001(\0162\035.runanywhere.v1.DiffusionMode\022\030\n\013i"
+    "nput_image\030\n \001(\014H\000\210\001\001\022\027\n\nmask_image\030\013 \001("
+    "\014H\001\210\001\001\022\030\n\020denoise_strength\030\014 \001(\002\022\"\n\032repo"
+    "rt_intermediate_images\030\r \001(\010\022\027\n\017progress"
+    "_stride\030\016 \001(\005\022\031\n\021input_image_width\030\017 \001(\005"
+    "\022\032\n\022input_image_height\030\020 \001(\005\022#\n\026input_im"
+    "age_media_type\030\021 \001(\tH\002\210\001\001\022\"\n\025mask_image_"
+    "media_type\030\022 \001(\tH\003\210\001\001\022\022\n\nbatch_size\030\023 \001("
+    "\005\022\026\n\016return_latents\030\024 \001(\010B\016\n\014_input_imag"
+    "eB\r\n\013_mask_imageB\031\n\027_input_image_media_t"
+    "ypeB\030\n\026_mask_image_media_type\"\237\002\n\032Diffus"
+    "ionGenerationRequest\022\022\n\nrequest_id\030\001 \001(\t"
+    "\022@\n\007options\030\002 \001(\0132*.runanywhere.v1.Diffu"
+    "sionGenerationOptionsH\000\210\001\001\022\025\n\010model_id\030\003"
+    " \001(\tH\001\210\001\001\022J\n\010metadata\030\004 \003(\01328.runanywher"
+    "e.v1.DiffusionGenerationRequest.Metadata"
+    "Entry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005v"
+    "alue\030\002 \001(\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\""
+    "\342\002\n\021DiffusionProgress\022\030\n\020progress_percen"
+    "t\030\001 \001(\002\022\024\n\014current_step\030\002 \001(\005\022\023\n\013total_s"
+    "teps\030\003 \001(\005\022\r\n\005stage\030\004 \001(\t\022$\n\027intermediat"
+    "e_image_data\030\005 \001(\014H\000\210\001\001\022 \n\030intermediate_"
+    "image_width\030\006 \001(\005\022!\n\031intermediate_image_"
+    "height\030\007 \001(\005\022\024\n\014timestamp_ms\030\010 \001(\003\022\016\n\006et"
+    "a_ms\030\t \001(\003\022*\n\035intermediate_image_media_t"
+    "ype\030\n \001(\tH\001\210\001\001B\032\n\030_intermediate_image_da"
+    "taB \n\036_intermediate_image_media_type\"\345\002\n"
+    "\017DiffusionResult\022\022\n\nimage_data\030\001 \001(\014\022\r\n\005"
+    "width\030\002 \001(\005\022\016\n\006height\030\003 \001(\005\022\021\n\tseed_used"
+    "\030\004 \001(\003\022\025\n\rtotal_time_ms\030\005 \001(\003\022\023\n\013safety_"
+    "flag\030\006 \001(\010\022:\n\016used_scheduler\030\007 \001(\0162\".run"
+    "anywhere.v1.DiffusionScheduler\022\032\n\rerror_"
+    "message\030\010 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\t \001(\005\022\035"
+    "\n\020image_media_type\030\n \001(\tH\001\210\001\001\022\024\n\014batch_i"
+    "mages\030\013 \003(\014\022\030\n\020images_generated\030\014 \001(\005B\020\n"
+    "\016_error_messageB\023\n\021_image_media_type\"\214\004\n"
+    "\025DiffusionCapabilities\022A\n\022supported_vari"
+    "ants\030\001 \003(\0162%.runanywhere.v1.DiffusionMod"
+    "elVariant\022@\n\024supported_schedulers\030\002 \003(\0162"
+    "\".runanywhere.v1.DiffusionScheduler\022\031\n\021m"
+    "ax_resolution_px\030\003 \001(\005\0226\n\017supported_mode"
+    "s\030\004 \003(\0162\035.runanywhere.v1.DiffusionMode\022\024"
+    "\n\014max_width_px\030\005 \001(\005\022\025\n\rmax_height_px\030\006 "
+    "\001(\005\022$\n\034supports_intermediate_images\030\007 \001("
+    "\010\022\037\n\027supports_safety_checker\030\010 \001(\010\022\020\n\010is"
+    "_ready\030\t \001(\010\022\032\n\rcurrent_model\030\n \001(\tH\000\210\001\001"
+    "\022\036\n\026safety_checker_enabled\030\013 \001(\010\022!\n\031supp"
+    "orts_batch_generation\030\014 \001(\010\022$\n\034supported"
+    "_output_media_types\030\r \003(\tB\020\n\016_current_mo"
+    "del\"\317\002\n\024DiffusionStreamEvent\022\013\n\003seq\030\001 \001("
+    "\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 "
+    "\001(\t\0226\n\004kind\030\004 \001(\0162(.runanywhere.v1.Diffu"
+    "sionStreamEventKind\0228\n\010progress\030\005 \001(\0132!."
+    "runanywhere.v1.DiffusionProgressH\000\210\001\001\0224\n"
+    "\006result\030\006 \001(\0132\037.runanywhere.v1.Diffusion"
+    "ResultH\001\210\001\001\022\032\n\rerror_message\030\007 \001(\tH\002\210\001\001\022"
+    "\022\n\nerror_code\030\010 \001(\005B\013\n\t_progressB\t\n\007_res"
+    "ultB\020\n\016_error_message\"\271\002\n\025DiffusionServi"
+    "ceState\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_mod"
+    "el\030\002 \001(\tH\000\210\001\001\022@\n\014capabilities\030\003 \001(\0132%.ru"
+    "nanywhere.v1.DiffusionCapabilitiesH\001\210\001\001\022"
+    "\025\n\ris_generating\030\004 \001(\010\022\036\n\021active_request"
+    "_id\030\005 \001(\tH\002\210\001\001\022\032\n\rerror_message\030\006 \001(\tH\003\210"
+    "\001\001\022\022\n\nerror_code\030\007 \001(\005B\020\n\016_current_model"
+    "B\017\n\r_capabilitiesB\024\n\022_active_request_idB"
+    "\020\n\016_error_message*\223\001\n\rDiffusionMode\022\036\n\032D"
+    "IFFUSION_MODE_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
+    "_MODE_TEXT_TO_IMAGE\020\001\022!\n\035DIFFUSION_MODE_"
+    "IMAGE_TO_IMAGE\020\002\022\035\n\031DIFFUSION_MODE_INPAI"
+    "NTING\020\003*\376\002\n\022DiffusionScheduler\022#\n\037DIFFUS"
+    "ION_SCHEDULER_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
+    "_SCHEDULER_DPMPP_2M\020\001\022\'\n#DIFFUSION_SCHED"
+    "ULER_DPMPP_2M_KARRAS\020\002\022\034\n\030DIFFUSION_SCHE"
+    "DULER_DDIM\020\003\022\034\n\030DIFFUSION_SCHEDULER_DDPM"
+    "\020\004\022\035\n\031DIFFUSION_SCHEDULER_EULER\020\005\022\037\n\033DIF"
+    "FUSION_SCHEDULER_EULER_A\020\006\022\034\n\030DIFFUSION_"
+    "SCHEDULER_PNDM\020\007\022\033\n\027DIFFUSION_SCHEDULER_"
+    "LMS\020\010\022\033\n\027DIFFUSION_SCHEDULER_LCM\020\t\022$\n DI"
+    "FFUSION_SCHEDULER_DPMPP_2M_SDE\020\n*\225\002\n\025Dif"
+    "fusionModelVariant\022\'\n#DIFFUSION_MODEL_VA"
+    "RIANT_UNSPECIFIED\020\000\022\"\n\036DIFFUSION_MODEL_V"
+    "ARIANT_SD_1_5\020\001\022\"\n\036DIFFUSION_MODEL_VARIA"
+    "NT_SD_2_1\020\002\022 \n\034DIFFUSION_MODEL_VARIANT_S"
+    "DXL\020\003\022&\n\"DIFFUSION_MODEL_VARIANT_SDXL_TU"
+    "RBO\020\004\022 \n\034DIFFUSION_MODEL_VARIANT_SDXS\020\005\022"
+    "\037\n\033DIFFUSION_MODEL_VARIANT_LCM\020\006*\220\002\n\034Dif"
+    "fusionTokenizerSourceKind\022/\n+DIFFUSION_T"
+    "OKENIZER_SOURCE_KIND_UNSPECIFIED\020\000\0220\n,DI"
+    "FFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD"
+    "15\020\001\022/\n+DIFFUSION_TOKENIZER_SOURCE_KIND_"
+    "BUNDLED_SD2\020\002\0220\n,DIFFUSION_TOKENIZER_SOU"
+    "RCE_KIND_BUNDLED_SDXL\020\003\022*\n&DIFFUSION_TOK"
+    "ENIZER_SOURCE_KIND_CUSTOM\020\004*\240\002\n\030Diffusio"
+    "nStreamEventKind\022+\n\'DIFFUSION_STREAM_EVE"
+    "NT_KIND_UNSPECIFIED\020\000\022\'\n#DIFFUSION_STREA"
+    "M_EVENT_KIND_STARTED\020\001\022(\n$DIFFUSION_STRE"
+    "AM_EVENT_KIND_PROGRESS\020\002\0222\n.DIFFUSION_ST"
+    "REAM_EVENT_KIND_INTERMEDIATE_IMAGE\020\003\022)\n%"
+    "DIFFUSION_STREAM_EVENT_KIND_COMPLETED\020\004\022"
+    "%\n!DIFFUSION_STREAM_EVENT_KIND_ERROR\020\0052\302"
+    "\001\n\tDiffusion\022W\n\010Generate\022*.runanywhere.v"
+    "1.DiffusionGenerationRequest\032\037.runanywhe"
+    "re.v1.DiffusionResult\022\\\n\006Stream\022*.runany"
+    "where.v1.DiffusionGenerationRequest\032$.ru"
+    "nanywhere.v1.DiffusionStreamEvent0\001B\220\001\n\027"
+    "ai.runanywhere.proto.v1B\025DiffusionOption"
+    "sProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_diffusion_5foptions_2eproto_deps[1] = {
@@ -2728,7 +2719,7 @@ static ::absl::once_flag descriptor_table_diffusion_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diffusion_5foptions_2eproto = {
     false,
     false,
-    5327,
+    5310,
     descriptor_table_protodef_diffusion_5foptions_2eproto,
     "diffusion_options.proto",
     &descriptor_table_diffusion_5foptions_2eproto_once,
@@ -3171,7 +3162,7 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
       _impl_.tokenizer_source_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
     ::memset(&_impl_.model_variant_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.preferred_framework_) -
         reinterpret_cast<char*>(&_impl_.model_variant_)) + sizeof(_impl_.preferred_framework_));
@@ -3216,7 +3207,7 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
   }
 
   // bool enable_safety_checker = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_enable_safety_checker() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -3225,7 +3216,7 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
   }
 
   // int32 max_memory_mb = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_max_memory_mb() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -3242,19 +3233,10 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
   }
 
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         6, this_._internal_preferred_framework(), target);
-  }
-
-  // bool reduce_memory = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_reduce_memory() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          7, this_._internal_reduce_memory(), target);
-    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -3282,7 +3264,7 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // optional string model_id = 5;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -3300,27 +3282,21 @@ PROTOBUF_NOINLINE void DiffusionConfiguration::Clear() {
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_model_variant());
       }
     }
-    // int32 max_memory_mb = 4;
+    // bool enable_safety_checker = 3;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_enable_safety_checker() != 0) {
+        total_size += 2;
+      }
+    }
+    // int32 max_memory_mb = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_max_memory_mb() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_memory_mb());
       }
     }
-    // bool enable_safety_checker = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_enable_safety_checker() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool reduce_memory = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_reduce_memory() != 0) {
-        total_size += 2;
-      }
-    }
     // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_preferred_framework());
     }
@@ -3343,7 +3319,7 @@ void DiffusionConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_model_id(from._internal_model_id());
     }
@@ -3361,21 +3337,16 @@ void DiffusionConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_max_memory_mb() != 0) {
-        _this->_impl_.max_memory_mb_ = from._impl_.max_memory_mb_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_enable_safety_checker() != 0) {
         _this->_impl_.enable_safety_checker_ = from._impl_.enable_safety_checker_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_reduce_memory() != 0) {
-        _this->_impl_.reduce_memory_ = from._impl_.reduce_memory_;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_max_memory_mb() != 0) {
+        _this->_impl_.max_memory_mb_ = from._impl_.max_memory_mb_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_impl_.preferred_framework_ = from._impl_.preferred_framework_;
     }
   }

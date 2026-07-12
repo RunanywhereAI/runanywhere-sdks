@@ -3,10 +3,10 @@
 On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voice AI locally with privacy-first, offline-capable inference.
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/React%20Native-0.74+-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.74+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/iOS-17.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.0+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/React%20Native-0.83.1+-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.83.1+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-7.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 7.0+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.2+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.2+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.9+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.9+" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
 </p>
 
@@ -69,11 +69,11 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **React Native** | 0.71+ | 0.74+ |
-| **iOS** | 17.0+ | 17.0+ |
+| **React Native** | 0.83.1 | 0.85.3 |
+| **iOS** | 17.5+ | 17.5+ |
 | **Android** | API 24 (7.0+) | API 28+ |
-| **Node.js** | 18+ | 20+ |
-| **Xcode** | 15+ | 16+ |
+| **Node.js** | 22.12+ | 24 LTS |
+| **Xcode** | 26+ | 26+ |
 | **Android Studio** | Hedgehog+ | Latest |
 | **RAM** | 3GB | 6GB+ for 7B models |
 | **Storage** | Variable | Models: 200MB–8GB |
@@ -505,7 +505,7 @@ subscribing to the EventBus stream below for observability.
 import { LogLevel, SDKLogger } from '@runanywhere/core/internal';
 
 // Set minimum log level
-RunAnywhere.setLogLevel(LogLevel.Debug);  // debug, info, warning, error, fault
+RunAnywhere.setLogLevel(LogLevel.LOG_LEVEL_DEBUG);  // trace, debug, info, warning, error, fatal
 
 // Create a custom logger
 const logger = new SDKLogger('MyApp');
@@ -659,7 +659,7 @@ await RunAnywhere.cleanTempFiles();
 **A:** No. All inference happens on-device. Only anonymous analytics (latency, error rates) are collected in production mode, and this can be disabled.
 
 ### Q: Which devices are supported?
-**A:** iOS 17.0+ (iPhone/iPad) and Android 7.0+ (API 24+). Modern devices with 6GB+ RAM are recommended for larger models.
+**A:** iOS 17.5+ (iPhone/iPad) and Android 7.0+ (API 24+). Modern devices with 6GB+ RAM are recommended for larger models.
 
 ### Q: Can I use custom models?
 **A:** Yes, any GGUF model works with the LlamaCPP backend. ONNX models work for STT/TTS.
@@ -717,7 +717,7 @@ yarn llamacpp:download-ios      # or yarn llamacpp:download-android
 yarn onnx:download-ios          # or yarn onnx:download-android
 ```
 
-### Understanding testLocal
+### Native binary consumption
 
 The SDK has two native-binary consumption modes:
 
@@ -726,9 +726,11 @@ The SDK has two native-binary consumption modes:
 | **Local** | Uses frameworks/JNI libs staged into package directories for development |
 | **Packaged** | Published npm packages include package-owned natives; CocoaPods and Gradle consume them from the package directories |
 
-Toggle local mode after staging natives:
-- **iOS**: `yarn native:local` writes the `.testlocal` marker files in each package's `ios/` directory; `yarn native:remote` removes them.
-- **Android**: set `RA_TEST_LOCAL=1` in your environment or `runanywhere.useLocalNatives=true` in `gradle.properties`.
+After staging local natives, iOS consumes the package-owned
+`ios/Binaries/*.xcframework` files directly. On Android, set the canonical
+`runanywhere.useLocalNatives=true` property in the consuming app's
+`gradle.properties`; this skips release downloads and uses the staged local
+libraries.
 
 ### Testing with the React Native Sample App
 
@@ -796,7 +798,6 @@ cd sdk/runanywhere-react-native
 | `./scripts/package-sdk.sh --mode local\|ci` | Override packaging mode (default: auto-detect from `$CI`) |
 | `yarn <core\|llamacpp\|onnx>:download-ios` | Download pre-built iOS natives from GitHub releases for that package |
 | `yarn <core\|llamacpp\|onnx>:download-android` | Download pre-built Android `.so` files from GitHub releases for that package |
-| `yarn native:local` / `yarn native:remote` | Toggle iOS `.testlocal` marker files for local-vs-published native consumption |
 
 ### Code Style
 

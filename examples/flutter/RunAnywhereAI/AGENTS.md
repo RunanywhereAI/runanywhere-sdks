@@ -67,7 +67,7 @@ runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_
 These packages wrap pre-built native C++ libraries via Dart FFI (`dart:ffi`), not method channels. AI inference calls go directly from Dart → native `.so`/xcframework without any platform channel hop.
 
 - **Android**: `.so` files live in each SDK package's `android/src/main/jniLibs/` dirs. The Gradle property `runanywhere.useLocalNatives=true` (in `android/gradle.properties`) tells the build to use these local files instead of downloading from GitHub releases.
-- **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`) are vendored in each SDK package's `ios/Frameworks/` dirs. Static linkage (`use_frameworks! :linkage => :static` in Podfile) is required so `DynamicLibrary.executable()` can find the symbols at runtime.
+- **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`) are staged in each SDK package's `ios/<package>/Frameworks/` directory. Static linkage (`use_frameworks! :linkage => :static` in Podfile) is required so `DynamicLibrary.executable()` can find the symbols at runtime.
 
 If native binaries are missing (fresh clone), they must be staged first — see README's "Clean-Clone Bring-Up" or use `scripts/verify.sh` with `REFRESH_ANDROID_NATIVE=1` / `REFRESH_IOS_NATIVE=1`.
 
@@ -132,7 +132,7 @@ All AI calls go through `RunAnywhere`:
 - **iOS Podfile post_install**: forces `EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64` on all pods and Runner — locally built xcframeworks only contain arm64 simulator slices
 - **iOS Podfile permission flags**: `PERMISSION_MICROPHONE=1`, `PERMISSION_SPEECH_RECOGNIZER=1`, `PERMISSION_CAMERA=1` must be set for `permission_handler` to compile those capabilities
 - **Gradle heap**: `-Xmx6g` in `gradle.properties` — native compilation is memory-intensive
-- **Kotlin 2.1.21 / AGP 8.9.1 / Gradle 8.11.1** — these versions must stay in sync; mismatches cause build failures
+- **Flutter 3.44.6 / AGP 9.0.1 / Gradle 9.1.0** — canonical pins live in `sdk/runanywhere-commons/VERSIONS`
 
 ## Analysis Options
 
@@ -143,7 +143,7 @@ All AI calls go through `RunAnywhere`:
 
 ## Platform Requirements
 
-- Flutter `>=3.10.0`, Dart `>=3.0.0 <4.0.0`
-- Android: compileSdk 36, targetSdk 34, minSdk from Flutter default, JVM 17
-- iOS: deployment target 15.1 (enforced by Podfile), Xcode 15+
+- Flutter `>=3.44.0`, Dart `>=3.12.0 <4.0.0` (validated with Flutter 3.44.6 / Dart 3.12.2)
+- Android: compileSdk 36, targetSdk 36, minSdk 24, JVM 17, NDK 28.2.13676358
+- iOS: deployment target 17.5 (enforced by Podfile), Xcode 15+
 - Physical ARM64 device recommended — native libs are optimized for arm64

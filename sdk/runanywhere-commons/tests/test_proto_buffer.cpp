@@ -194,36 +194,6 @@ int test_error_status_must_be_failure() {
     return 0;
 }
 
-int test_raw_compatibility_helper() {
-    const uint8_t bytes[] = {0x0a, 0x02, 0x6f, 0x6b};
-    uint8_t* out = nullptr;
-    size_t size = 0;
-
-    ASSERT_EQ(rac_proto_buffer_copy_to_raw(bytes, sizeof(bytes), &out, &size), RAC_SUCCESS);
-    ASSERT_TRUE(out != nullptr);
-    ASSERT_EQ(size, sizeof(bytes));
-    ASSERT_EQ(std::memcmp(out, bytes, sizeof(bytes)), 0);
-    rac_proto_buffer_free_data(out);
-
-    out = const_cast<uint8_t*>(bytes);
-    size = 7;
-    ASSERT_EQ(rac_proto_buffer_copy_to_raw(nullptr, 1, &out, &size), RAC_ERROR_INVALID_ARGUMENT);
-    ASSERT_TRUE(out == nullptr);
-    ASSERT_EQ(size, 0U);
-    return 0;
-}
-
-int test_raw_compatibility_empty_success_is_owned() {
-    uint8_t* out = nullptr;
-    size_t size = 999;
-
-    ASSERT_EQ(rac_proto_buffer_copy_to_raw(nullptr, 0, &out, &size), RAC_SUCCESS);
-    ASSERT_TRUE(out != nullptr);
-    ASSERT_EQ(size, 0U);
-    rac_proto_buffer_free_data(out);
-    return 0;
-}
-
 struct CallbackCapture {
     rac_result_t validation;
     const void* parse_data;
@@ -275,8 +245,6 @@ int main() {
     RUN(test_error_replaces_success_payload);
     RUN(test_error_status_propagation);
     RUN(test_error_status_must_be_failure);
-    RUN(test_raw_compatibility_helper);
-    RUN(test_raw_compatibility_empty_success_is_owned);
     RUN(test_stream_callback_payload_contract_compiles);
 
     std::printf("\n%d test(s) failed\n", failures);

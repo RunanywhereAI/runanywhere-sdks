@@ -13,7 +13,6 @@ import {
   AppStorageInfo as AppStorageInfoMessage,
   StorageInfo as StorageInfoMessage,
   ModelStorageMetrics as ModelStorageMetricsMessage,
-  StoredModel as StoredModelMessage,
   StorageAvailability as StorageAvailabilityMessage,
 } from '@runanywhere/proto-ts/storage_types';
 import type {
@@ -21,7 +20,6 @@ import type {
   AppStorageInfo,
   StorageInfo,
   ModelStorageMetrics,
-  StoredModel,
   StorageAvailability,
 } from '@runanywhere/proto-ts/storage_types';
 
@@ -90,20 +88,6 @@ export function totalModelsSize(info: StorageInfo): number {
   return info.totalModelsBytes > 0
     ? info.totalModelsBytes
     : totalModelsSizeBytes(info);
-}
-
-/**
- * Per-model metrics projected into `StoredModel` rows. Mirrors Swift
- * `RAStorageInfo.storedModels`.
- */
-export function storedModels(info: StorageInfo): StoredModel[] {
-  return info.models.map((metrics: ModelStorageMetrics) =>
-    StoredModelMessage.fromPartial({
-      modelId: metrics.modelId,
-      name: metrics.modelId,
-      sizeBytes: metrics.sizeOnDiskBytes,
-    })
-  );
 }
 
 /**

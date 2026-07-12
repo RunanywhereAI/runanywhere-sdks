@@ -52,11 +52,11 @@ constexpr LoggingConfiguration::ParseTableT_ LoggingConfiguration::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967264,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
+      5,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -87,10 +87,7 @@ constexpr LoggingConfiguration::ParseTableT_ LoggingConfiguration::InternalGener
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LoggingConfiguration, _impl_.enable_remote_logging_), 4>(),
        {40, 4, 0,
         PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_remote_logging_)}},
-      // bool enable_sentry_logging = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LoggingConfiguration, _impl_.enable_sentry_logging_), 5>(),
-       {48, 5, 0,
-        PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_sentry_logging_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
@@ -105,8 +102,6 @@ constexpr LoggingConfiguration::ParseTableT_ LoggingConfiguration::InternalGener
       {PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.include_device_metadata_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // bool enable_remote_logging = 5;
       {PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_remote_logging_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool enable_sentry_logging = 6;
-      {PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_sentry_logging_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     // no aux_entries
     {{
@@ -123,8 +118,7 @@ inline constexpr LoggingConfiguration::Impl_::Impl_(
         enable_local_logging_{false},
         include_source_location_{false},
         include_device_metadata_{false},
-        enable_remote_logging_{false},
-        enable_sentry_logging_{false} {}
+        enable_remote_logging_{false} {}
 
 template <typename>
 constexpr LoggingConfiguration::LoggingConfiguration(::_pbi::ConstantInitialized,
@@ -607,19 +601,17 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_._has_bits_),
-        9, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.enable_local_logging_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.min_log_level_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.include_source_location_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.include_device_metadata_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.enable_remote_logging_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LoggingConfiguration, _impl_.enable_sentry_logging_),
         1,
         0,
         2,
         3,
         4,
-        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LogEntry_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
@@ -657,8 +649,8 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::LoggingConfiguration)},
-        {15, sizeof(::runanywhere::v1::LogEntry_MetadataEntry_DoNotUse)},
-        {22, sizeof(::runanywhere::v1::LogEntry)},
+        {13, sizeof(::runanywhere::v1::LogEntry_MetadataEntry_DoNotUse)},
+        {20, sizeof(::runanywhere::v1::LogEntry)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -669,31 +661,31 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_logging_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\rlogging.proto\022\016runanywhere.v1\032\021rac_opt"
-    "ions.proto\"\357\001\n\024LoggingConfiguration\022&\n\024e"
+    "ions.proto\"\326\001\n\024LoggingConfiguration\022&\n\024e"
     "nable_local_logging\030\001 \001(\010B\010\212\265\030\004true\022/\n\rm"
     "in_log_level\030\002 \001(\0162\030.runanywhere.v1.LogL"
     "evel\022\037\n\027include_source_location\030\003 \001(\010\022\037\n"
     "\027include_device_metadata\030\004 \001(\010\022\035\n\025enable"
-    "_remote_logging\030\005 \001(\010\022\035\n\025enable_sentry_l"
-    "ogging\030\006 \001(\010\"\303\002\n\010LogEntry\022\031\n\021timestamp_u"
-    "nix_ms\030\001 \001(\003\022\'\n\005level\030\002 \001(\0162\030.runanywher"
-    "e.v1.LogLevel\022\020\n\010category\030\003 \001(\t\022\017\n\007messa"
-    "ge\030\004 \001(\t\0228\n\010metadata\030\005 \003(\0132&.runanywhere"
-    ".v1.LogEntry.MetadataEntry\022\014\n\004file\030\006 \001(\t"
-    "\022\014\n\004line\030\007 \001(\005\022\020\n\010function\030\010 \001(\t\022\022\n\nerro"
-    "r_code\030\t \001(\005\022\020\n\010model_id\030\n \001(\t\022\021\n\tframew"
-    "ork\030\013 \001(\t\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022"
-    "\r\n\005value\030\002 \001(\t:\0028\001*\203\002\n\010LogLevel\022\'\n\017LOG_L"
-    "EVEL_TRACE\020\000\032\022\322\265\030\005Trace\342\265\030\005trace\022\'\n\017LOG_"
-    "LEVEL_DEBUG\020\001\032\022\322\265\030\005Debug\342\265\030\005debug\022$\n\016LOG"
-    "_LEVEL_INFO\020\002\032\020\322\265\030\004Info\342\265\030\004info\022-\n\021LOG_L"
-    "EVEL_WARNING\020\003\032\026\322\265\030\007Warning\342\265\030\007warning\022\'"
-    "\n\017LOG_LEVEL_ERROR\020\004\032\022\322\265\030\005Error\342\265\030\005error\022"
-    "\'\n\017LOG_LEVEL_FATAL\020\005\032\022\322\265\030\005Fatal\342\265\030\005fatal"
-    "B\207\001\n\027ai.runanywhere.proto.v1B\014LoggingPro"
-    "toP\001Z<github.com/runanywhere/runanywhere"
-    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
-    "unanywhere.V1\272\002\002RAb\006proto3"
+    "_remote_logging\030\005 \001(\010J\004\010\006\020\007\"\303\002\n\010LogEntry"
+    "\022\031\n\021timestamp_unix_ms\030\001 \001(\003\022\'\n\005level\030\002 \001"
+    "(\0162\030.runanywhere.v1.LogLevel\022\020\n\010category"
+    "\030\003 \001(\t\022\017\n\007message\030\004 \001(\t\0228\n\010metadata\030\005 \003("
+    "\0132&.runanywhere.v1.LogEntry.MetadataEntr"
+    "y\022\014\n\004file\030\006 \001(\t\022\014\n\004line\030\007 \001(\005\022\020\n\010functio"
+    "n\030\010 \001(\t\022\022\n\nerror_code\030\t \001(\005\022\020\n\010model_id\030"
+    "\n \001(\t\022\021\n\tframework\030\013 \001(\t\032/\n\rMetadataEntr"
+    "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001*\203\002\n\010Lo"
+    "gLevel\022\'\n\017LOG_LEVEL_TRACE\020\000\032\022\322\265\030\005Trace\342\265"
+    "\030\005trace\022\'\n\017LOG_LEVEL_DEBUG\020\001\032\022\322\265\030\005Debug\342"
+    "\265\030\005debug\022$\n\016LOG_LEVEL_INFO\020\002\032\020\322\265\030\004Info\342\265"
+    "\030\004info\022-\n\021LOG_LEVEL_WARNING\020\003\032\026\322\265\030\007Warni"
+    "ng\342\265\030\007warning\022\'\n\017LOG_LEVEL_ERROR\020\004\032\022\322\265\030\005"
+    "Error\342\265\030\005error\022\'\n\017LOG_LEVEL_FATAL\020\005\032\022\322\265\030"
+    "\005Fatal\342\265\030\005fatalB\207\001\n\027ai.runanywhere.proto"
+    ".v1B\014LoggingProtoP\001Z<github.com/runanywh"
+    "ere/runanywhere-sdks/idl/v1;runanywherev"
+    "1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto"
+    "3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_logging_2eproto_deps[1] = {
@@ -703,7 +695,7 @@ static ::absl::once_flag descriptor_table_logging_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_logging_2eproto = {
     false,
     false,
-    1026,
+    1001,
     descriptor_table_protodef_logging_2eproto,
     "logging.proto",
     &descriptor_table_logging_2eproto_once,
@@ -757,9 +749,9 @@ inline void LoggingConfiguration::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE are
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, min_log_level_),
            0,
-           offsetof(Impl_, enable_sentry_logging_) -
+           offsetof(Impl_, enable_remote_logging_) -
                offsetof(Impl_, min_log_level_) +
-               sizeof(Impl_::enable_sentry_logging_));
+               sizeof(Impl_::enable_remote_logging_));
 }
 LoggingConfiguration::~LoggingConfiguration() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.LoggingConfiguration)
@@ -809,10 +801,10 @@ PROTOBUF_NOINLINE void LoggingConfiguration::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     ::memset(&_impl_.min_log_level_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.enable_sentry_logging_) -
-        reinterpret_cast<char*>(&_impl_.min_log_level_)) + sizeof(_impl_.enable_sentry_logging_));
+        reinterpret_cast<char*>(&_impl_.enable_remote_logging_) -
+        reinterpret_cast<char*>(&_impl_.min_log_level_)) + sizeof(_impl_.enable_remote_logging_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -882,15 +874,6 @@ PROTOBUF_NOINLINE void LoggingConfiguration::Clear() {
     }
   }
 
-  // bool enable_sentry_logging = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_enable_sentry_logging() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          6, this_._internal_enable_sentry_logging(), target);
-    }
-  }
-
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -916,7 +899,7 @@ PROTOBUF_NOINLINE void LoggingConfiguration::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // .runanywhere.v1.LogLevel min_log_level = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (this_._internal_min_log_level() != 0) {
@@ -948,12 +931,6 @@ PROTOBUF_NOINLINE void LoggingConfiguration::Clear() {
         total_size += 2;
       }
     }
-    // bool enable_sentry_logging = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_enable_sentry_logging() != 0) {
-        total_size += 2;
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -972,7 +949,7 @@ void LoggingConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (from._internal_min_log_level() != 0) {
         _this->_impl_.min_log_level_ = from._impl_.min_log_level_;
@@ -998,11 +975,6 @@ void LoggingConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.enable_remote_logging_ = from._impl_.enable_remote_logging_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_enable_sentry_logging() != 0) {
-        _this->_impl_.enable_sentry_logging_ = from._impl_.enable_sentry_logging_;
-      }
-    }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
@@ -1022,8 +994,8 @@ void LoggingConfiguration::InternalSwap(LoggingConfiguration* PROTOBUF_RESTRICT 
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_sentry_logging_)
-      + sizeof(LoggingConfiguration::_impl_.enable_sentry_logging_)
+      PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.enable_remote_logging_)
+      + sizeof(LoggingConfiguration::_impl_.enable_remote_logging_)
       - PROTOBUF_FIELD_OFFSET(LoggingConfiguration, _impl_.min_log_level_)>(
           reinterpret_cast<char*>(&_impl_.min_log_level_),
           reinterpret_cast<char*>(&other->_impl_.min_log_level_));

@@ -16,8 +16,7 @@ import Foundation
 // public `RunAnywhere.generateStructured(...)` facade routes through the
 // LLM path (`LLM.generate(...)`), and the streaming variant lives in the
 // generated `Generated/ModalityProtoABI+Generated.swift` extension.
-// Periphery flagged them as dead at HEAD a2de2a4d6. Per repo MEMORY.md
-// "no backwards compat — aggressive deletions OK".
+// Periphery flagged them as dead at HEAD a2de2a4d6.
 private enum StructuredOutputGeneratedProtoABI {
     static let parseName = "rac_structured_output_parse_proto"
     static let preparePromptName = "rac_structured_output_prepare_prompt_proto"

@@ -171,8 +171,7 @@ public extension RunAnywhere.LoRA {
         var request = RALoraAdapterImportRequest()
         request.sourcePath = url.path
 
-        let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-        let result = try await CppBridge.LoraRegistry.shared.importAdapter(handle: handle, request)
+        let result = try await CppBridge.LoraRegistry.shared.importAdapter(request)
         guard result.success else {
             throw SDKException(
                 code: .processingFailed,

@@ -1,25 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# build-ios.sh — package-local compatibility wrapper.
+# Canonical Apple release build and packaging entry point.
 #
-# The original per-package iOS/macOS build entry
-# point was deleted in favour of repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh,
-# but `.github/workflows/release.yml` (native_ios job) and the
-# README/CLAUDE.md docs continue to invoke this path. This shim restores
-# the workflow contract by:
-#
-#   1. Forwarding the legacy CLI flags (--backend / --release /
-#      --include-macos / --package — accepted but currently ignored, since
-#      build-core-xcframework.sh always builds the canonical Apple slice
-#      set) to the repo-root xcframework build.
-#   2. Packaging the resulting `.xcframework` bundles into the versioned
+# Builds the canonical Apple slice set through
+# sdk/runanywhere-swift/scripts/build-core-xcframework.sh, then packages the
+# resulting `.xcframework` bundles into the versioned
 #      `sdk/runanywhere-commons/dist/packages/<Framework>-ios-v<version>.zip`
 #      (+ .sha256) that release.yml uploads and `publish` asserts on.
-#
-# This wrapper exists so we can collapse the legacy CLI without forcing a
-# release-CI rewrite in the same change. Long-term, callers should migrate
-# to invoking sdk/runanywhere-swift/scripts/build-core-xcframework.sh directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,11 +18,10 @@ if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: build-ios.sh only runs on macOS" >&2
     exit 1
 fi
-
-# Forward (and discard) the legacy flag surface — build-core-xcframework.sh
-# does not parse them today but we accept them so the workflow command
-# remains byte-identical.
-LEGACY_ARGS=("$@")
+if [ "$#" -ne 0 ]; then
+    echo "usage: build-ios.sh" >&2
+    exit 2
+fi
 
 XCFRAMEWORK_SCRIPT="${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 if [ ! -x "${XCFRAMEWORK_SCRIPT}" ]; then
@@ -43,7 +30,8 @@ if [ ! -x "${XCFRAMEWORK_SCRIPT}" ]; then
 fi
 
 echo "▶ Delegating iOS/macOS xcframework build to sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
-echo "  legacy args (forwarded for log fidelity, ignored by repo-root script): ${LEGACY_ARGS[*]:-<none>}"
+# Keep Apple static archives free of per-build member timestamps.
+export ZERO_AR_DATE=1
 "${XCFRAMEWORK_SCRIPT}"
 
 # Stage the produced xcframeworks into dist/packages/ as the versioned release
@@ -75,7 +63,8 @@ for fw in "${xcframeworks[@]}"; do
     fw_name="$(basename "${fw}")"
     zip_path="${DEST_DIR}/${fw_name%.xcframework}-ios-v${VERSION}.zip"
     echo "▶ Packaging ${fw_name} → ${zip_path}"
-    (cd "${SRC_DIR}" && zip -ry "${zip_path}" "${fw_name}")
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-xcframework-zip.sh" \
+        "${fw}" "${zip_path}"
 done
 (cd "${DEST_DIR}" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done)
 

@@ -13,17 +13,17 @@ if(TARGET onnxruntime)
 endif()
 
 # Validate required versions are loaded
-if(NOT DEFINED ONNX_VERSION_IOS OR "${ONNX_VERSION_IOS}" STREQUAL "")
-    message(FATAL_ERROR "ONNX_VERSION_IOS not defined in VERSIONS file")
+if(NOT DEFINED RAC_ONNX_VERSION_IOS OR "${RAC_ONNX_VERSION_IOS}" STREQUAL "")
+    message(FATAL_ERROR "RAC_ONNX_VERSION_IOS not defined by LoadVersions")
 endif()
-if(NOT DEFINED ONNX_VERSION_MACOS OR "${ONNX_VERSION_MACOS}" STREQUAL "")
-    message(FATAL_ERROR "ONNX_VERSION_MACOS not defined in VERSIONS file")
+if(NOT DEFINED RAC_ONNX_VERSION_MACOS OR "${RAC_ONNX_VERSION_MACOS}" STREQUAL "")
+    message(FATAL_ERROR "RAC_ONNX_VERSION_MACOS not defined by LoadVersions")
 endif()
-if(NOT DEFINED ONNX_VERSION_LINUX OR "${ONNX_VERSION_LINUX}" STREQUAL "")
-    message(FATAL_ERROR "ONNX_VERSION_LINUX not defined in VERSIONS file")
+if(NOT DEFINED RAC_ONNX_VERSION_LINUX OR "${RAC_ONNX_VERSION_LINUX}" STREQUAL "")
+    message(FATAL_ERROR "RAC_ONNX_VERSION_LINUX not defined by LoadVersions")
 endif()
 
-message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
+message(STATUS "ONNX Runtime versions: iOS=${RAC_ONNX_VERSION_IOS}, Android=${RAC_ONNX_VERSION_ANDROID}, macOS=${RAC_ONNX_VERSION_MACOS}, Linux=${RAC_ONNX_VERSION_LINUX}")
 
 # Vendored ONNX and Sherpa artifacts live under sdk/runanywhere-commons/third_party.
 # Anchor all local lookups on this module path so the single-root CMake build no
@@ -76,7 +76,7 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # Downloaded by: ./scripts/ios/download-onnx.sh
     # NOTE: Version must match what sherpa-onnx was built against
 
-    set(ONNX_IOS_VERSION "${ONNX_VERSION_IOS}")
+    set(ONNX_IOS_VERSION "${RAC_ONNX_VERSION_IOS}")
 
     # third_party is inside runanywhere-commons
     set(ONNX_LOCAL_PATH "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-ios")
@@ -147,7 +147,7 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
 elseif(ANDROID)
     # Android: Use ONNX Runtime from Sherpa-ONNX (16KB aligned in v1.12.20+)
-    # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
+    # Sherpa-ONNX version is loaded from the canonical VERSIONS file.
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
     # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
     # Anchor on this module's location so the lookup is stable under the
@@ -173,10 +173,14 @@ elseif(ANDROID)
         # wrappers still consumed by Sherpa wakeword compatibility code.
         # Download them if missing.
         if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
+            if(NOT DEFINED RAC_ONNX_COMMIT_ANDROID OR "${RAC_ONNX_COMMIT_ANDROID}" STREQUAL "")
+                message(FATAL_ERROR
+                    "RAC_ONNX_COMMIT_ANDROID is required for immutable Android header downloads")
+            endif()
             set(ONNX_CXX_HEADER_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-cxx-headers")
             file(MAKE_DIRECTORY "${ONNX_CXX_HEADER_DIR}")
 
-            set(ONNX_HEADER_BASE_URL "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_VERSION_ANDROID}/include/onnxruntime/core/session")
+            set(ONNX_HEADER_BASE_URL "https://raw.githubusercontent.com/microsoft/onnxruntime/${RAC_ONNX_COMMIT_ANDROID}/include/onnxruntime/core/session")
             set(ONNX_CXX_HEADERS
                 onnxruntime_cxx_api.h
                 onnxruntime_cxx_inline.h
@@ -211,13 +215,35 @@ elseif(ANDROID)
     endif()
 
 elseif(APPLE)
-    # macOS: Use local ONNX Runtime from third_party if available, otherwise download
-    # Downloaded by: ./scripts/macos/download-onnx.sh
+    # macOS: Prefer the pinned static ONNX Runtime built with Sherpa-ONNX. This
+    # is the release path: the archive is folded into RABackendONNX.xcframework
+    # so SwiftPM consumers never need an unshipped dylib at runtime.
+    #
+    # Developer builds may still use the separately downloaded dylib when the
+    # static inventory is absent. Release callers set
+    # RAC_REQUIRE_STATIC_ONNXRT=ON, which converts that fallback into a hard
+    # failure.
 
-    set(ONNX_MACOS_VERSION "${ONNX_VERSION_MACOS}")
+    set(ONNX_MACOS_VERSION "${RAC_ONNX_VERSION_MACOS}")
     set(ONNX_MACOS_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos")
+    set(ONNX_MACOS_STATIC_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-macos")
 
-    if(EXISTS "${ONNX_MACOS_DIR}/lib/libonnxruntime.dylib")
+    if(EXISTS "${ONNX_MACOS_STATIC_DIR}/lib/libonnxruntime.a" AND
+       EXISTS "${ONNX_MACOS_STATIC_DIR}/include/onnxruntime_c_api.h" AND
+       EXISTS "${ONNX_MACOS_STATIC_DIR}/include/onnxruntime_cxx_api.h")
+        message(STATUS "Using pinned static ONNX Runtime macOS inventory from ${ONNX_MACOS_STATIC_DIR}")
+
+        add_library(onnxruntime STATIC IMPORTED GLOBAL)
+        set_target_properties(onnxruntime PROPERTIES
+            IMPORTED_LOCATION "${ONNX_MACOS_STATIC_DIR}/lib/libonnxruntime.a"
+            INTERFACE_INCLUDE_DIRECTORIES "${ONNX_MACOS_STATIC_DIR}/include"
+            INTERFACE_LINK_LIBRARIES "-framework Foundation;-framework CoreML"
+        )
+    elseif(RAC_REQUIRE_STATIC_ONNXRT)
+        message(FATAL_ERROR
+            "RAC_REQUIRE_STATIC_ONNXRT=ON, but the complete macOS static ONNX Runtime inventory is missing under ${ONNX_MACOS_STATIC_DIR}. "
+            "Run sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh first.")
+    elseif(EXISTS "${ONNX_MACOS_DIR}/lib/libonnxruntime.dylib")
         # Use local ONNX Runtime
         message(STATUS "Using local ONNX Runtime macOS from ${ONNX_MACOS_DIR}")
 
@@ -281,9 +307,9 @@ elseif(APPLE)
 elseif(UNIX)
     # Linux: Download Linux binaries
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_LINUX}/onnxruntime-linux-aarch64-${ONNX_VERSION_LINUX}.tgz")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_LINUX}/onnxruntime-linux-aarch64-${RAC_ONNX_VERSION_LINUX}.tgz")
     else()
-        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_LINUX}/onnxruntime-linux-x64-${ONNX_VERSION_LINUX}.tgz")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_LINUX}/onnxruntime-linux-x64-${RAC_ONNX_VERSION_LINUX}.tgz")
     endif()
 
     FetchContent_Declare(
@@ -308,14 +334,14 @@ elseif(UNIX)
 
 elseif(WIN32)
     # Windows: Download Windows binaries
-    if(NOT DEFINED ONNX_VERSION_WINDOWS OR "${ONNX_VERSION_WINDOWS}" STREQUAL "")
-        message(FATAL_ERROR "ONNX_VERSION_WINDOWS not defined in VERSIONS file")
+    if(NOT DEFINED RAC_ONNX_VERSION_WINDOWS OR "${RAC_ONNX_VERSION_WINDOWS}" STREQUAL "")
+        message(FATAL_ERROR "RAC_ONNX_VERSION_WINDOWS not defined by LoadVersions")
     endif()
 
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-x64-${ONNX_VERSION_WINDOWS}.zip")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-x64-${RAC_ONNX_VERSION_WINDOWS}.zip")
     else()
-        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-x86-${ONNX_VERSION_WINDOWS}.zip")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${RAC_ONNX_VERSION_WINDOWS}/onnxruntime-win-x86-${RAC_ONNX_VERSION_WINDOWS}.zip")
     endif()
 
     FetchContent_Declare(

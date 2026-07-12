@@ -79,6 +79,13 @@ option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
 option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
 
+# Protobuf is a private implementation detail of the serialized-byte C ABI.
+# Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime
+# may carry a different unshaded protobuf runtime in the same final app.
+option(RAC_ISOLATE_PROTOBUF_NAMESPACE
+       "Build the private protobuf runtime in a RunAnywhere-owned C++ namespace"
+       ON)
+
 # Plugin loading mode
 # RAC_STATIC_PLUGINS:
 #   ON  → engine TUs are linked into rac_commons; iOS/WASM force this.
@@ -252,91 +259,22 @@ endif()
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
     enable_testing()
-    # Host-only race regression: compile the real QHexRT STT adapter against a
-    # deterministic fake C runtime so CI can prove same-session operations do
-    # not overlap even when Qualcomm device libraries are unavailable.
-    if(NOT TARGET test_qhexrt_session_serialization)
-        find_package(Threads REQUIRED)
-        add_executable(test_qhexrt_session_serialization
-            engines/qhexrt/tests/test_qhexrt_session_serialization.cpp
-            engines/qhexrt/qhexrt_stt_ops.cpp
-        )
-        target_include_directories(test_qhexrt_session_serialization PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/tests/fake_qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-        )
-        target_link_libraries(test_qhexrt_session_serialization PRIVATE
-            rac_commons
-            Threads::Threads
-        )
-        target_compile_features(test_qhexrt_session_serialization PRIVATE cxx_std_17)
-        add_test(NAME qhexrt_session_serialization_tests
-                 COMMAND test_qhexrt_session_serialization)
+    if(TARGET test_mlx_cancellation)
+        add_test(NAME mlx_cancellation_tests COMMAND test_mlx_cancellation)
     endif()
-    # Host-only VLM cancellation regression: cancellation during native reset
-    # must stop that request without poisoning the next independent request.
-    if(NOT TARGET test_qhexrt_vlm_cancellation)
+    # Pure request-latch regression: cancellation in the reset/setup window
+    # must reach the active request without poisoning its successor. This test
+    # deliberately has no dependency on QHexRT's private C ABI.
+    if(NOT TARGET test_qhexrt_request_cancellation)
         find_package(Threads REQUIRED)
-        add_executable(test_qhexrt_vlm_cancellation
-            engines/qhexrt/tests/test_qhexrt_vlm_cancellation.cpp
-            engines/qhexrt/qhexrt_vlm_ops.cpp
-        )
-        target_include_directories(test_qhexrt_vlm_cancellation PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/tests/fake_qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-        )
-        target_link_libraries(test_qhexrt_vlm_cancellation PRIVATE
-            rac_commons
-            Threads::Threads
-        )
-        target_compile_features(test_qhexrt_vlm_cancellation PRIVATE cxx_std_17)
-        add_test(NAME qhexrt_vlm_cancellation_tests
-                 COMMAND test_qhexrt_vlm_cancellation)
-    endif()
-    # Host-only bridge regression: the semantic disable_thinking flag must reach
-    # QHexRT's template-aware input ABI for both batch and streaming generation.
-    if(NOT TARGET test_qhexrt_llm_thinking_bridge)
-        find_package(Threads REQUIRED)
-        add_executable(test_qhexrt_llm_thinking_bridge
-            engines/qhexrt/tests/test_qhexrt_llm_thinking_bridge.cpp
-            engines/qhexrt/qhexrt_llm_ops.cpp
-        )
-        target_include_directories(test_qhexrt_llm_thinking_bridge PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/tests/fake_qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-        )
-        target_link_libraries(test_qhexrt_llm_thinking_bridge PRIVATE
-            rac_commons
-            Threads::Threads
-        )
-        target_compile_features(test_qhexrt_llm_thinking_bridge PRIVATE cxx_std_17)
-        add_test(NAME qhexrt_llm_thinking_bridge_tests
-                 COMMAND test_qhexrt_llm_thinking_bridge)
-    endif()
-    # Host-only provider cancellation regression: cancel must survive the
-    # reset/setup window, interrupt prefill without waiting for a token callback,
-    # and map a callback stop to RAC_ERROR_CANCELLED even if QHexRT returns cleanly.
-    if(NOT TARGET test_qhexrt_llm_cancellation)
-        find_package(Threads REQUIRED)
-        add_executable(test_qhexrt_llm_cancellation
-            engines/qhexrt/tests/test_qhexrt_llm_cancellation.cpp
-            engines/qhexrt/qhexrt_llm_ops.cpp
-        )
-        target_include_directories(test_qhexrt_llm_cancellation PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt/tests/fake_qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-        )
-        target_link_libraries(test_qhexrt_llm_cancellation PRIVATE
-            rac_commons
-            Threads::Threads
-        )
-        target_compile_features(test_qhexrt_llm_cancellation PRIVATE cxx_std_17)
-        add_test(NAME qhexrt_llm_cancellation_tests
-                 COMMAND test_qhexrt_llm_cancellation)
+        add_executable(test_qhexrt_request_cancellation
+            engines/qhexrt/tests/test_qhexrt_request_cancellation.cpp)
+        target_include_directories(test_qhexrt_request_cancellation PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/qhexrt)
+        target_link_libraries(test_qhexrt_request_cancellation PRIVATE Threads::Threads)
+        target_compile_features(test_qhexrt_request_cancellation PRIVATE cxx_std_17)
+        add_test(NAME qhexrt_request_cancellation_tests
+                 COMMAND test_qhexrt_request_cancellation)
     endif()
     # QHexRT owns Qualcomm chip selection and the device-aware model catalog
     # facade. The test lives with the engine and links after the engine target
@@ -374,9 +312,11 @@ if(RAC_BUILD_TESTS)
         add_test(NAME qhexrt_model_catalog_tests COMMAND test_qhexrt_model_catalog)
     endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
-    # rac_backend_sherpa is built by engines/
-    # which is configured after sdk/runanywhere-commons/, so the target does
-    # not exist when commons/tests/CMakeLists.txt runs.
+    # rac_backend_sherpa is built by engines/, which is configured after
+    # sdk/runanywhere-commons/. This is also an intentional final-link gate:
+    # rac_commons contributes RunAnywhere's private protobuf runtime while the
+    # static macOS ONNX Runtime inventory contributes its own protobuf. A
+    # namespace-isolation regression therefore fails this target at link time.
     if(RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa AND NOT TARGET test_plugin_entry_sherpa)
         add_executable(test_plugin_entry_sherpa
             sdk/runanywhere-commons/tests/test_plugin_entry_sherpa.cpp)
@@ -399,6 +339,8 @@ if(RAC_BUILD_TESTS)
         endif()
         target_compile_features(test_plugin_entry_sherpa PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
+        set_tests_properties(plugin_entry_sherpa_tests PROPERTIES
+            LABELS "native;protobuf-isolation;sherpa")
     endif()
 
     if(APPLE AND RAC_BACKEND_COREML

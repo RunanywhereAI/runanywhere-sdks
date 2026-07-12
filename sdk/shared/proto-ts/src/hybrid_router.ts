@@ -350,12 +350,8 @@ export interface HybridRoutedMetadata {
  * ---------------------------------------------------------------------------
  * Per-request routing context — caller-supplied hints only.
  *
- * Device-state fields (is_online, battery_percent, thermal_throttled) live
- * behind the rac_hybrid_device_state C ABI vtable in commons (task #22).
- * `input_is_sensitive` (tag 2) was the privacy PII hint; removed entirely
- * alongside the HybridFilter.privacy gate.
- *
- * Reserved tags 1–4 prevent re-use of any old field number.
+ * Device state lives behind the rac_hybrid_device_state C ABI vtable in
+ * commons; callers do not serialize platform state into this message.
  * ---------------------------------------------------------------------------
  */
 export interface HybridRoutingContext {

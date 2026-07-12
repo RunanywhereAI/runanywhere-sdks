@@ -259,7 +259,7 @@ function heapU32(m: EmscriptenRunanywhereModule): Uint32Array {
   throw new Error(
     'RunAnywhere WASM module is missing HEAPU8/HEAPU32. ' +
     'Ensure a backend (e.g. LlamaCPP) has been registered via ' +
-    'setRunanywhereModule() before calling RunAnywhere.solutions.run().',
+    'registerWasmModule() before calling RunAnywhere.solutions.run().',
   );
 }
 

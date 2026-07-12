@@ -122,8 +122,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
-            let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-            return try await CppBridge.LoraRegistry.shared.register(handle: handle, entry)
+            return try await CppBridge.LoraRegistry.shared.register(entry)
         }
 
         /// List LoRA catalog entries using the generated catalog request/result ABI.
@@ -133,8 +132,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
-            let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-            return try await CppBridge.LoraRegistry.shared.listCatalog(handle: handle, request)
+            return try await CppBridge.LoraRegistry.shared.listCatalog(request)
         }
 
         /// Query LoRA catalog entries using the generated catalog query/result ABI.
@@ -144,8 +142,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
-            let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-            return try await CppBridge.LoraRegistry.shared.queryCatalog(handle: handle, query)
+            return try await CppBridge.LoraRegistry.shared.queryCatalog(query)
         }
 
         /// Fetch one LoRA catalog entry by generated request.
@@ -155,8 +152,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
-            let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-            return try await CppBridge.LoraRegistry.shared.getCatalogEntry(handle: handle, request)
+            return try await CppBridge.LoraRegistry.shared.getCatalogEntry(request)
         }
 
         /// Persist native-reported LoRA adapter download completion in commons.
@@ -170,8 +166,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
-            let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
-            return try await CppBridge.LoraRegistry.shared.markDownloadCompleted(handle: handle, request)
+            return try await CppBridge.LoraRegistry.shared.markDownloadCompleted(request)
         }
 
         /// Persist native-reported LoRA adapter import completion in commons.

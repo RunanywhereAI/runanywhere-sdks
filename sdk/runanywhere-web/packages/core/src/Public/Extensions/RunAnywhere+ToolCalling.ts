@@ -41,6 +41,7 @@ import {
   ToolCallingSessionCreateRequest as ToolCallingSessionCreateRequestMessage,
   ToolCallingSessionEvent as ToolCallingSessionEventMessage,
   ToolCallingSessionStepWithResultRequest as ToolCallingSessionStepWithResultRequestMessage,
+  ToolCallFormatName,
   ToolChoiceMode,
   ToolParseRequest as ToolParseRequestMessage,
   ToolParseResult as ToolParseResultMessage,
@@ -67,7 +68,7 @@ import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/pro
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
-import { readWasmUint64, wasmUint64ToSafeNumber } from '../../runtime/WasmInt64.js';
+import { wasmUint64ToSafeNumber } from '../../runtime/WasmInt64.js';
 import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
@@ -139,20 +140,16 @@ export type ToolExecutor = (
 const registeredTools = new Map<string, RegisteredTool>();
 
 /**
- * Swift parity: ToolCallingTypes.swift `maxToolCallCount` — an explicit
- * `maxToolCalls` wins over `maxIterations`; a non-positive value resolves to
- * the canonical default of 5.
+ * Resolve the canonical per-turn tool-call cap.
  */
 function maxToolCallCount(options: ToolCallingOptions): number {
-  const explicit = options.maxToolCalls !== undefined
-    ? options.maxToolCalls
-    : (options.maxIterations ?? 0);
+  const explicit = options.maxToolCalls ?? 0;
   return explicit > 0 ? explicit : 5;
 }
 
-/** Swift parity: `toolCallIdentifier` prefers `id`, then `callId`. */
+/** Canonical ID carried by ToolCall.id. */
 function toolCallIdentifier(toolCall: ToolCall): string {
-  return toolCall.id || toolCall.callId || '';
+  return toolCall.id;
 }
 
 function buildToolCallingOptions(
@@ -162,22 +159,17 @@ function buildToolCallingOptions(
   const overrides = options.toolCalling ?? {};
   return ToolCallingOptionsMessage.fromPartial({
     tools: overrides.tools ?? tools,
-    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
-    maxIterations: overrides.maxIterations ?? overrides.maxToolCalls ?? 5,
+    maxToolCalls: overrides.maxToolCalls ?? 5,
     autoExecute: overrides.autoExecute ?? true,
     temperature: overrides.temperature ?? options.temperature,
     maxTokens: overrides.maxTokens ?? options.maxTokens,
     systemPrompt: overrides.systemPrompt ?? options.systemPrompt,
     replaceSystemPrompt: overrides.replaceSystemPrompt ?? false,
     keepToolsAvailable: overrides.keepToolsAvailable ?? false,
-    formatHint: overrides.formatHint ?? '',
-    format: overrides.format,
-    customSystemPrompt: overrides.customSystemPrompt,
-    maxToolCalls: overrides.maxToolCalls,
+    format: overrides.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     toolChoice: overrides.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     forcedToolName: overrides.forcedToolName,
-    parallelToolCalls: overrides.parallelToolCalls ?? false,
-    requireJsonArguments: overrides.requireJsonArguments ?? true,
+    requireJsonArguments: overrides.requireJsonArguments ?? false,
   });
 }
 
@@ -188,18 +180,16 @@ function buildPromptOptions(
   return ToolCallingOptionsMessage.fromPartial({
     ...options,
     tools: options.tools ?? tools,
-    // Swift parity: RAToolCallingOptions.defaults() resolves to 5 iterations.
-    maxIterations: options.maxIterations ?? options.maxToolCalls ?? 5,
+    maxToolCalls: options.maxToolCalls ?? 5,
     autoExecute: options.autoExecute ?? true,
-    formatHint: options.formatHint ?? '',
+    format: options.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     toolChoice: options.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     // pass2-syn-006-followup-web: explicitly propagate forcedToolName so that
     // tool_choice=SPECIFIC reaches the commons parse/format/validate primitives
     // (and any future session/run-loop ABI). Spread alone is not sufficient
     // when callers pass undefined keys.
     forcedToolName: options.forcedToolName,
-    parallelToolCalls: options.parallelToolCalls ?? false,
-    requireJsonArguments: options.requireJsonArguments ?? true,
+    requireJsonArguments: options.requireJsonArguments ?? false,
   });
 }
 
@@ -398,7 +388,6 @@ function makeToolResult(params: {
     resultJson: jsonStringFromObject(params.result ?? {}),
     error: params.error,
     toolCallId: params.toolCallId,
-    callId: params.toolCallId,
     startedAtMs: params.startedAtMs,
     completedAtMs: Date.now(),
   });
@@ -433,10 +422,9 @@ function buildSessionCreateRequest(
     topP: llm?.topP ?? 1.0,
     systemPrompt: effectiveOptions.systemPrompt || llm?.systemPrompt || '',
     tools,
-    formatHint: effectiveOptions.formatHint ?? '',
-    // Swift parity: `UInt32(max(toolOptions.maxToolCallCount, 0))`
-    // (RunAnywhere+ToolCalling.swift:526) — never 0, defaults to 5.
-    maxIterations: Math.max(maxToolCallCount(effectiveOptions), 0),
+    format:
+      effectiveOptions.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+    maxToolCalls: Math.max(maxToolCallCount(effectiveOptions), 0),
     keepToolsAvailable: effectiveOptions.keepToolsAvailable ?? false,
     // `validate_calls` is `optional bool` on the proto. Leave it UNSET unless
     // the caller chose, so commons applies its documented default (true) —
@@ -460,6 +448,9 @@ function buildSessionCreateRequest(
     // (RunAnywhere+ToolCalling.swift:548).
     disableThinking:
       (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
+    autoExecute: effectiveOptions.autoExecute ?? true,
+    replaceSystemPrompt: effectiveOptions.replaceSystemPrompt ?? false,
+    requireJsonArguments: effectiveOptions.requireJsonArguments ?? false,
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
@@ -679,7 +670,7 @@ export const ToolCalling = {
    *
    * The TS side is now a thin event-pump driver — no manual parse loop, no
    * manual buildFollowupPrompt walk, no JS-side iteration cap. Every loop
-   * semantic (validation, max_iterations, format selection, validation policy
+   * semantic (validation, max_tool_calls, format selection, validation policy
    * on the W1 tool_choice=NONE fix) is owned by `tool_calling_run_loop.cpp` /
    * `tool_calling_session.cpp`.
    */
@@ -724,6 +715,25 @@ export const ToolCalling = {
     const bridge = new ProtoWasmBridge(module, logger);
     const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions, extra);
 
+    let sessionHandle = 0n;
+    let cancelDispatched = false;
+    const dispatchCancel = () => {
+      if (
+        sessionHandle !== 0n &&
+        !cancelDispatched &&
+        typeof module._rac_tool_calling_session_cancel_proto === 'function'
+      ) {
+        try {
+          module._rac_tool_calling_session_cancel_proto(sessionHandle);
+          cancelDispatched = true;
+        } catch (err) {
+          logger.warning(
+            `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    };
+
     // Event queue: the C session callback fires before each awaited
     // session_create_proto / session_step_with_result_proto invocation
     // resolves. WebGPU may unwind either export through Asyncify, so the
@@ -743,46 +753,24 @@ export const ToolCalling = {
         decodeFailure = decoded.error;
       }
     }, 'viii');
+    const handleCallbackPtr = module.addFunction((handle: bigint /*, userData */) => {
+      sessionHandle = handle;
+      // If abort won the narrow window between the eager check and handle
+      // publication, wait until this callback returns before entering the C
+      // API again. Asyncify yields the initial generation back to the event
+      // loop, where this microtask can dispatch cancellation.
+      if (extra.signal?.aborted) {
+        queueMicrotask(dispatchCancel);
+      }
+    }, 'vji');
 
-    // Reserve 8 bytes for the uint64 out-session-handle. The pointer itself
-    // is WASM32; reconstruct its two uint32 words directly as bigint before
-    // passing the handle to any WASM_BIGINT export.
-    const handlePtr = module._malloc(8);
-    if (!handlePtr) {
-      module.removeFunction(callbackPtr);
-      throw SDKException.backendNotAvailable(
-        'toolCalling.generateWithTools',
-        'failed to allocate session handle slot',
-      );
-    }
-    module.HEAPU32[handlePtr >>> 2] = 0;
-    module.HEAPU32[(handlePtr >>> 2) + 1] = 0;
-
-    let sessionHandle = 0n;
-    let cancelDispatched = false;
     // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
     // Asyncify yields to the browser event loop while an awaited native call
     // is in flight. Once commons has published the session handle, abort can
     // therefore latch cancellation during a later step continuation;
     // backend compute may use its own workers internally.
     const onAbort = () => {
-      if (sessionHandle === 0n) {
-        sessionHandle = readWasmUint64(module.HEAPU32, handlePtr);
-      }
-      if (
-        sessionHandle !== 0n &&
-        !cancelDispatched &&
-        typeof module._rac_tool_calling_session_cancel_proto === 'function'
-      ) {
-        try {
-          module._rac_tool_calling_session_cancel_proto(sessionHandle);
-          cancelDispatched = true;
-        } catch (err) {
-          logger.warning(
-            `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-      }
+      dispatchCancel();
     };
     extra.signal?.addEventListener('abort', onAbort);
     const cleanup = () => {
@@ -796,8 +784,8 @@ export const ToolCalling = {
           `session_destroy_proto failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      module._free!(handlePtr);
       module.removeFunction!(callbackPtr);
+      module.removeFunction!(handleCallbackPtr);
     };
 
     try {
@@ -805,14 +793,15 @@ export const ToolCalling = {
         callEmscriptenAsyncNumber(
           module,
           'rac_tool_calling_session_create_proto',
-          ['number', 'number', 'number', 'number', 'number'],
-          [ptr, size, callbackPtr, 0, handlePtr],
+          ['number', 'number', 'number', 'number', 'number', 'number'],
+          [ptr, size, callbackPtr, 0, handleCallbackPtr, 0],
           () => module._rac_tool_calling_session_create_proto!(
             ptr,
             size,
             callbackPtr,
             0,
-            handlePtr,
+            handleCallbackPtr,
+            0,
           ),
         )
       ));
@@ -823,7 +812,13 @@ export const ToolCalling = {
           `rc=${createRc}`,
         );
       }
-      sessionHandle = readWasmUint64(module.HEAPU32, handlePtr);
+      if (sessionHandle === 0n) {
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
+          'rac_tool_calling_session_create_proto failed',
+          'commons returned success without publishing a session handle',
+        );
+      }
       // pass2-syn-007: if the AbortSignal already fired before the session
       // handle was published, fan that cancel through to commons now.
       if (extra.signal?.aborted) {

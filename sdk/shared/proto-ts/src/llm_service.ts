@@ -83,95 +83,28 @@ export function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string {
 }
 
 /**
- * pass3-syn-025: the inline scalar fields below historically existed to avoid
- * importing llm_options.proto. The cycle-avoidance rationale no longer holds
- * (sdk_events.proto has no transitive dependency on llm_options.proto), so
- * idl-005 introduces the canonical `LLMGenerationOptions options` embedded
- * message at field 26. The inline scalar fields are RETAINED for wire-format
- * backwards compatibility but are deprecated; new code SHOULD populate
- * `options.*` and consumers SHOULD prefer `options.*` when set (falling back
- * to the inline fields for legacy callers). The companion fix for
- * VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
- * proto carries tts_model_id but not tts_voice_id" issue) lives in
- * idl/solutions.proto where VoiceAgentConfig is declared.
+ * Generation settings live exclusively in `options`. Reserved field numbers
+ * prevent unsafe wire reuse.
  */
 export interface LLMGenerateRequest {
   prompt: string;
-  /** @deprecated */
-  maxTokens: number;
-  /** @deprecated */
-  temperature: number;
-  /** @deprecated */
-  topP: number;
-  /** @deprecated */
-  topK: number;
-  /** @deprecated */
-  systemPrompt: string;
   /** chain-of-thought tokens emit as TokenKind.THOUGHT */
   emitThoughts: boolean;
-  /**
-   * Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
-   *
-   * Streaming gaps below remain intentional: a streaming consumer that
-   * requires these advanced knobs MUST set them on `options.*` rather than
-   * inline (no inline duplicate exists):
-   *   - thinking_pattern (LLMGenerationOptions field 11)
-   *   - structured_output (LLMGenerationOptions field 13)
-   *   - enable_real_time_tracking (LLMGenerationOptions field 14)
-   *   - repeat_last_n (LLMGenerationOptions field 18)
-   *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
-   *     is not yet supported on the LLM.Generate rpc; tool sessions must
-   *     use the non-streaming generation path with LLMGenerationOptions.
-   * Note the inline `preferred_framework` (field 11) and `execution_target`
-   * (field 13) are degraded to `string` for backwards compatibility;
-   * `options.preferred_framework` and `options.execution_target` carry the
-   * canonical InferenceFramework / ExecutionTarget enums.
-   *
-   * @deprecated
-   */
-  repetitionPenalty: number;
-  /** @deprecated */
-  stopSequences: string[];
-  /** @deprecated */
-  streamingEnabled: boolean;
-  /** @deprecated */
-  preferredFramework: string;
-  /** @deprecated */
-  jsonSchema: string;
-  /** @deprecated */
-  executionTarget: string;
   requestId: string;
   modelId: string;
   conversationId: string;
-  /** @deprecated */
-  seed: number;
-  /** @deprecated */
-  frequencyPenalty: number;
-  /** @deprecated */
-  presencePenalty: number;
-  /** @deprecated */
-  minP: number;
-  /** @deprecated */
-  grammar: string;
-  /** @deprecated */
-  responseFormat: string;
-  /** @deprecated */
-  echoPrompt: boolean;
-  /** @deprecated */
-  nThreads: number;
   metadata: { [key: string]: string };
   /**
-   * idl-005: canonical generation options. When set, consumers SHOULD use
-   * the values here in preference to the legacy inline scalar fields above.
-   * The wire schema retains the inline fields to avoid breaking existing
-   * serialized requests; new callers should only populate `options`.
+   * Canonical generation settings. When absent, commons applies its SDK
+   * defaults; callers that need explicit controls populate this message.
    */
   options?:
     | LLMGenerationOptions
     | undefined;
   /**
-   * idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
-   * stays the live user turn, and `system_prompt`, which stays separate).
+   * Prior conversation turns (excludes the current `prompt`, which
+   * stays the live user turn, and `options.system_prompt`, which stays
+   * separate).
    * Alternating user/assistant ChatMessages in chronological order. An engine
    * that owns its chat template renders {system_prompt, history, prompt} from
    * its model's markers; engines that don't simply ignore this field.
@@ -185,10 +118,9 @@ export interface LLMGenerateRequest_MetadataEntry {
 }
 
 /**
- * Aggregate result carried on the terminal LLMStreamEvent. This intentionally
- * duplicates the scalar result fields instead of importing llm_options.proto:
- * Square Wire treats files with/without go_package as different Kotlin
- * packages, and that import creates a package cycle through sdk_events.
+ * Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
+ * stream-native token, timing, and error fields distinct from the unary
+ * LLMGenerationResult shape.
  */
 export interface LLMStreamFinalResult {
   text: string;
@@ -205,10 +137,10 @@ export interface LLMStreamFinalResult {
   promptEvalTimeMs: number;
   decodeTimeMs: number;
   /**
-   * hotspot-idl-002: tool calls actually executed during the streaming
-   * session (mirrors LLMGenerationResult.tool_calls / .tool_results in
-   * llm_options.proto). Populated only on terminal events when the
-   * backend completed at least one tool call.
+   * Tool calls actually executed during the streaming session (mirrors
+   * LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
+   * Populated only on terminal events when the backend completed at least
+   * one tool call.
    */
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
@@ -283,10 +215,8 @@ export interface LLMStreamEvent {
   completionTokensGenerated: number;
   elapsedMs: number;
   /**
-   * hotspot-idl-002: structured tool-call payload emitted alongside an
-   * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
-   * field the tool-call event kind carries no proto-typed payload and
-   * SDK consumers must fall back to JSON-parsing the raw `token` text.
+   * Structured tool-call payload emitted when event_kind is
+   * LLM_STREAM_EVENT_KIND_TOOL_CALL.
    */
   toolCall?: ToolCall | undefined;
 }
@@ -294,29 +224,10 @@ export interface LLMStreamEvent {
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
   return {
     prompt: "",
-    maxTokens: 0,
-    temperature: 0,
-    topP: 0,
-    topK: 0,
-    systemPrompt: "",
     emitThoughts: false,
-    repetitionPenalty: 0,
-    stopSequences: [],
-    streamingEnabled: false,
-    preferredFramework: "",
-    jsonSchema: "",
-    executionTarget: "",
     requestId: "",
     modelId: "",
     conversationId: "",
-    seed: 0,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
-    minP: 0,
-    grammar: "",
-    responseFormat: "",
-    echoPrompt: false,
-    nThreads: 0,
     metadata: {},
     options: undefined,
     history: [],
@@ -328,41 +239,8 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.prompt !== "") {
       writer.uint32(10).string(message.prompt);
     }
-    if (message.maxTokens !== 0) {
-      writer.uint32(16).int32(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(29).float(message.temperature);
-    }
-    if (message.topP !== 0) {
-      writer.uint32(37).float(message.topP);
-    }
-    if (message.topK !== 0) {
-      writer.uint32(40).int32(message.topK);
-    }
-    if (message.systemPrompt !== "") {
-      writer.uint32(50).string(message.systemPrompt);
-    }
     if (message.emitThoughts !== false) {
       writer.uint32(56).bool(message.emitThoughts);
-    }
-    if (message.repetitionPenalty !== 0) {
-      writer.uint32(69).float(message.repetitionPenalty);
-    }
-    for (const v of message.stopSequences) {
-      writer.uint32(74).string(v!);
-    }
-    if (message.streamingEnabled !== false) {
-      writer.uint32(80).bool(message.streamingEnabled);
-    }
-    if (message.preferredFramework !== "") {
-      writer.uint32(90).string(message.preferredFramework);
-    }
-    if (message.jsonSchema !== "") {
-      writer.uint32(98).string(message.jsonSchema);
-    }
-    if (message.executionTarget !== "") {
-      writer.uint32(106).string(message.executionTarget);
     }
     if (message.requestId !== "") {
       writer.uint32(114).string(message.requestId);
@@ -372,30 +250,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     }
     if (message.conversationId !== "") {
       writer.uint32(130).string(message.conversationId);
-    }
-    if (message.seed !== 0) {
-      writer.uint32(136).int64(message.seed);
-    }
-    if (message.frequencyPenalty !== 0) {
-      writer.uint32(149).float(message.frequencyPenalty);
-    }
-    if (message.presencePenalty !== 0) {
-      writer.uint32(157).float(message.presencePenalty);
-    }
-    if (message.minP !== 0) {
-      writer.uint32(165).float(message.minP);
-    }
-    if (message.grammar !== "") {
-      writer.uint32(170).string(message.grammar);
-    }
-    if (message.responseFormat !== "") {
-      writer.uint32(178).string(message.responseFormat);
-    }
-    if (message.echoPrompt !== false) {
-      writer.uint32(184).bool(message.echoPrompt);
-    }
-    if (message.nThreads !== 0) {
-      writer.uint32(192).int32(message.nThreads);
     }
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
       LLMGenerateRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(202).fork()).join();
@@ -424,100 +278,12 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           message.prompt = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.topP = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.topK = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.systemPrompt = reader.string();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
           }
 
           message.emitThoughts = reader.bool();
-          continue;
-        }
-        case 8: {
-          if (tag !== 69) {
-            break;
-          }
-
-          message.repetitionPenalty = reader.float();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.stopSequences.push(reader.string());
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.streamingEnabled = reader.bool();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.preferredFramework = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.jsonSchema = reader.string();
-          continue;
-        }
-        case 13: {
-          if (tag !== 106) {
-            break;
-          }
-
-          message.executionTarget = reader.string();
           continue;
         }
         case 14: {
@@ -542,70 +308,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           }
 
           message.conversationId = reader.string();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.seed = longToNumber(reader.int64());
-          continue;
-        }
-        case 18: {
-          if (tag !== 149) {
-            break;
-          }
-
-          message.frequencyPenalty = reader.float();
-          continue;
-        }
-        case 19: {
-          if (tag !== 157) {
-            break;
-          }
-
-          message.presencePenalty = reader.float();
-          continue;
-        }
-        case 20: {
-          if (tag !== 165) {
-            break;
-          }
-
-          message.minP = reader.float();
-          continue;
-        }
-        case 21: {
-          if (tag !== 170) {
-            break;
-          }
-
-          message.grammar = reader.string();
-          continue;
-        }
-        case 22: {
-          if (tag !== 178) {
-            break;
-          }
-
-          message.responseFormat = reader.string();
-          continue;
-        }
-        case 23: {
-          if (tag !== 184) {
-            break;
-          }
-
-          message.echoPrompt = reader.bool();
-          continue;
-        }
-        case 24: {
-          if (tag !== 192) {
-            break;
-          }
-
-          message.nThreads = reader.int32();
           continue;
         }
         case 25: {
@@ -647,62 +349,11 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   fromJSON(object: any): LLMGenerateRequest {
     return {
       prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-      topP: isSet(object.topP)
-        ? globalThis.Number(object.topP)
-        : isSet(object.top_p)
-        ? globalThis.Number(object.top_p)
-        : 0,
-      topK: isSet(object.topK)
-        ? globalThis.Number(object.topK)
-        : isSet(object.top_k)
-        ? globalThis.Number(object.top_k)
-        : 0,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : "",
       emitThoughts: isSet(object.emitThoughts)
         ? globalThis.Boolean(object.emitThoughts)
         : isSet(object.emit_thoughts)
         ? globalThis.Boolean(object.emit_thoughts)
         : false,
-      repetitionPenalty: isSet(object.repetitionPenalty)
-        ? globalThis.Number(object.repetitionPenalty)
-        : isSet(object.repetition_penalty)
-        ? globalThis.Number(object.repetition_penalty)
-        : 0,
-      stopSequences: globalThis.Array.isArray(object?.stopSequences)
-        ? object.stopSequences.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.stop_sequences)
-        ? object.stop_sequences.map((e: any) => globalThis.String(e))
-        : [],
-      streamingEnabled: isSet(object.streamingEnabled)
-        ? globalThis.Boolean(object.streamingEnabled)
-        : isSet(object.streaming_enabled)
-        ? globalThis.Boolean(object.streaming_enabled)
-        : false,
-      preferredFramework: isSet(object.preferredFramework)
-        ? globalThis.String(object.preferredFramework)
-        : isSet(object.preferred_framework)
-        ? globalThis.String(object.preferred_framework)
-        : "",
-      jsonSchema: isSet(object.jsonSchema)
-        ? globalThis.String(object.jsonSchema)
-        : isSet(object.json_schema)
-        ? globalThis.String(object.json_schema)
-        : "",
-      executionTarget: isSet(object.executionTarget)
-        ? globalThis.String(object.executionTarget)
-        : isSet(object.execution_target)
-        ? globalThis.String(object.execution_target)
-        : "",
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
@@ -718,38 +369,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
         : isSet(object.conversation_id)
         ? globalThis.String(object.conversation_id)
         : "",
-      seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
-      frequencyPenalty: isSet(object.frequencyPenalty)
-        ? globalThis.Number(object.frequencyPenalty)
-        : isSet(object.frequency_penalty)
-        ? globalThis.Number(object.frequency_penalty)
-        : 0,
-      presencePenalty: isSet(object.presencePenalty)
-        ? globalThis.Number(object.presencePenalty)
-        : isSet(object.presence_penalty)
-        ? globalThis.Number(object.presence_penalty)
-        : 0,
-      minP: isSet(object.minP)
-        ? globalThis.Number(object.minP)
-        : isSet(object.min_p)
-        ? globalThis.Number(object.min_p)
-        : 0,
-      grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : "",
-      responseFormat: isSet(object.responseFormat)
-        ? globalThis.String(object.responseFormat)
-        : isSet(object.response_format)
-        ? globalThis.String(object.response_format)
-        : "",
-      echoPrompt: isSet(object.echoPrompt)
-        ? globalThis.Boolean(object.echoPrompt)
-        : isSet(object.echo_prompt)
-        ? globalThis.Boolean(object.echo_prompt)
-        : false,
-      nThreads: isSet(object.nThreads)
-        ? globalThis.Number(object.nThreads)
-        : isSet(object.n_threads)
-        ? globalThis.Number(object.n_threads)
-        : 0,
       metadata: isObject(object.metadata)
         ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
           (acc: { [key: string]: string }, [key, value]: [string, any]) => {
@@ -771,41 +390,8 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.prompt !== "") {
       obj.prompt = message.prompt;
     }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
-    if (message.topP !== 0) {
-      obj.topP = message.topP;
-    }
-    if (message.topK !== 0) {
-      obj.topK = Math.round(message.topK);
-    }
-    if (message.systemPrompt !== "") {
-      obj.systemPrompt = message.systemPrompt;
-    }
     if (message.emitThoughts !== false) {
       obj.emitThoughts = message.emitThoughts;
-    }
-    if (message.repetitionPenalty !== 0) {
-      obj.repetitionPenalty = message.repetitionPenalty;
-    }
-    if (message.stopSequences?.length) {
-      obj.stopSequences = message.stopSequences;
-    }
-    if (message.streamingEnabled !== false) {
-      obj.streamingEnabled = message.streamingEnabled;
-    }
-    if (message.preferredFramework !== "") {
-      obj.preferredFramework = message.preferredFramework;
-    }
-    if (message.jsonSchema !== "") {
-      obj.jsonSchema = message.jsonSchema;
-    }
-    if (message.executionTarget !== "") {
-      obj.executionTarget = message.executionTarget;
     }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
@@ -815,30 +401,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     }
     if (message.conversationId !== "") {
       obj.conversationId = message.conversationId;
-    }
-    if (message.seed !== 0) {
-      obj.seed = Math.round(message.seed);
-    }
-    if (message.frequencyPenalty !== 0) {
-      obj.frequencyPenalty = message.frequencyPenalty;
-    }
-    if (message.presencePenalty !== 0) {
-      obj.presencePenalty = message.presencePenalty;
-    }
-    if (message.minP !== 0) {
-      obj.minP = message.minP;
-    }
-    if (message.grammar !== "") {
-      obj.grammar = message.grammar;
-    }
-    if (message.responseFormat !== "") {
-      obj.responseFormat = message.responseFormat;
-    }
-    if (message.echoPrompt !== false) {
-      obj.echoPrompt = message.echoPrompt;
-    }
-    if (message.nThreads !== 0) {
-      obj.nThreads = Math.round(message.nThreads);
     }
     if (message.metadata) {
       const entries = globalThis.Object.entries(message.metadata) as [string, string][];
@@ -864,29 +426,10 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest {
     const message = createBaseLLMGenerateRequest();
     message.prompt = object.prompt ?? "";
-    message.maxTokens = object.maxTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
-    message.topP = object.topP ?? 0;
-    message.topK = object.topK ?? 0;
-    message.systemPrompt = object.systemPrompt ?? "";
     message.emitThoughts = object.emitThoughts ?? false;
-    message.repetitionPenalty = object.repetitionPenalty ?? 0;
-    message.stopSequences = object.stopSequences?.map((e) => e) || [];
-    message.streamingEnabled = object.streamingEnabled ?? false;
-    message.preferredFramework = object.preferredFramework ?? "";
-    message.jsonSchema = object.jsonSchema ?? "";
-    message.executionTarget = object.executionTarget ?? "";
     message.requestId = object.requestId ?? "";
     message.modelId = object.modelId ?? "";
     message.conversationId = object.conversationId ?? "";
-    message.seed = object.seed ?? 0;
-    message.frequencyPenalty = object.frequencyPenalty ?? 0;
-    message.presencePenalty = object.presencePenalty ?? 0;
-    message.minP = object.minP ?? 0;
-    message.grammar = object.grammar ?? "";
-    message.responseFormat = object.responseFormat ?? "";
-    message.echoPrompt = object.echoPrompt ?? false;
-    message.nThreads = object.nThreads ?? 0;
     message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
       (acc: { [key: string]: string }, [key, value]: [string, string]) => {
         if (value !== undefined) {

@@ -8,25 +8,16 @@
 // Set to `true` to use local binaries from android/src/main/jniLibs/
 // Set to `false` to download binaries from GitHub releases (production mode)
 //
-// Legacy name `testLocal` is still accepted as an alias.
 // =============================================================================
 
+def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
+
 ext {
-    // Canonical name (matches Swift/Kotlin/RN).
-    // Set this to true for local development/testing.
-    // Set to false for production builds (downloads from GitHub releases).
-    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
-    useLocalNatives = localNativesProp != null ? localNativesProp.toString().toBoolean() : true
-
-    // Legacy alias — kept so existing code reading `testLocal` keeps working.
-    // Prefer `useLocalNatives`.
-    testLocal = useLocalNatives
-
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    commonsVersion = "0.1.6"
-    coreVersion = "0.1.6"
+    fallbackCoreVersion = "0.19.15"
+    coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : fallbackCoreVersion
 
     // =============================================================================
     // Remote binary URLs
@@ -34,14 +25,18 @@ ext {
     // =============================================================================
     commonsGitHubOrg = "RunanywhereAI"
     commonsRepo = "runanywhere-sdks"
-    commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
+    commonsBaseUrl = project.findProperty("runanywhere.releaseBaseUrl")?.toString()
+        ?: "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
 
     // Android native libraries packages
-    commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+    androidAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
+    commonsAndroidUrls = androidAbis.collectEntries { abi ->
+        [(abi): "${commonsBaseUrl}/v${coreVersion}/RACommons-android-${abi}-v${coreVersion}.zip"]
+    }
 
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->
-        return !testLocal
+        return !useLocalNatives
     }
 
     // Helper method to check if local RACommons libs exist.
@@ -60,4 +55,13 @@ ext {
         return commonsLib.exists() && commonsJniLib.exists()
     }
 
+    // Clean/public consumers default to the remote artifacts. A monorepo
+    // build auto-selects explicitly staged local binaries, and callers can
+    // override either behavior with -Prunanywhere.useLocalNatives=true|false.
+    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
+    if (localNativesProp != null) {
+        useLocalNatives = localNativesProp.toString().toBoolean()
+    } else {
+        useLocalNatives = checkLocalLibsExist()
+    }
 }

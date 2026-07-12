@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.rag
 
 import ai.runanywhere.proto.v1.RAGConfiguration
+import ai.runanywhere.proto.v1.RAGDocument
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -13,7 +14,7 @@ import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.data.rag.ExtractedDocument
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.defaults
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.extensions.ragCancelQuery
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
 import com.runanywhere.sdk.public.extensions.ragGetStatistics
@@ -120,7 +121,9 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
                 val indexedChunks = withPipeline(embeddingId, llmId) {
-                    RunAnywhere.ragIngest(doc.text, doc.metadataJSON)
+                    RunAnywhere.ragIngest(
+                        RAGDocument(text = doc.text, metadata = doc.metadata),
+                    )
                     runCatching { RunAnywhere.ragGetStatistics().indexed_chunks.toInt() }
                         .getOrDefault(0)
                 }
@@ -271,7 +274,9 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
 
     // Pipeline config: rerank layered onto the model defaults.
     private fun buildConfig(embeddingId: String, llmId: String): RAGConfiguration =
-        RAGConfiguration.defaults(embeddingModelId = embeddingId, llmModelId = llmId).copy(
+        RAGConfiguration.defaults().copy(
+            embedding_model_id = embeddingId,
+            llm_model_id = llmId,
             rerank_results = rerankEnabled,
         )
 
@@ -297,7 +302,11 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
             requestedIdentity = identity,
             create = { RunAnywhere.ragCreatePipeline(buildConfig(embeddingId, llmId)) },
             rehydrate = {
-                loadedDocs.toList().forEach { RunAnywhere.ragIngest(it.text, it.metadataJSON) }
+                loadedDocs.toList().forEach {
+                    RunAnywhere.ragIngest(
+                        RAGDocument(text = it.text, metadata = it.metadata),
+                    )
+                }
             },
         ) {
             pipelineKey = key

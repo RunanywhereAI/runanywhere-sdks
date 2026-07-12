@@ -533,7 +533,7 @@ void cpu_release_tensor(rac_runtime_tensor_t* tensor) {
  * -------------------------------------------------------------------------- */
 
 const rac_runtime_vtable_v2_t k_cpu_vtable_v2 = {
-    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION,
     /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
     /* .run_session_v2 = */ cpu_run_session_v2,
     /* .alloc_buffer   = */ cpu_alloc_buffer_v2,

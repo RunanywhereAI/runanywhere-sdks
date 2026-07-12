@@ -35,6 +35,12 @@ rac_add_engine_plugin(mlx
         ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
+if(RAC_BUILD_TESTS)
+    find_package(Threads REQUIRED)
+    add_executable(test_mlx_cancellation tests/test_mlx_cancellation.cpp)
+    target_link_libraries(test_mlx_cancellation PRIVATE rac_backend_mlx Threads::Threads)
+endif()
+
 message(STATUS "mlx engine Configuration:")
 message(STATUS "  Engine: mlx (Swift mlx-swift-lm callback bridge)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME} (Apple-only)")

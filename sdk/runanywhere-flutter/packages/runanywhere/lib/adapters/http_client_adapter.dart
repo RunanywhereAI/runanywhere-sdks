@@ -144,8 +144,10 @@ class HTTPClientAdapter {
     );
   }
 
-  void configureDev(
-      {required String supabaseURL, required String supabaseKey}) {
+  void configureDev({
+    required String supabaseURL,
+    required String supabaseKey,
+  }) {
     if (!DartBridgeDevConfig.isUsableHttpUrl(supabaseURL) ||
         !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
       _supabaseURL = '';
@@ -165,7 +167,8 @@ class HTTPClientAdapter {
 
   String? get accessToken => _accessToken;
 
-  String get baseURL => _supabaseURL.isNotEmpty &&
+  String get baseURL =>
+      _supabaseURL.isNotEmpty &&
           _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
       ? _supabaseURL
       : _baseURL;
@@ -226,8 +229,9 @@ class HTTPClientAdapter {
     //   - Desktop / other: libcurl fallback inside commons
     // The former Android-HTTPS bypass via `dart:io HttpClient` has been
     // removed now that commons HTTP is functional on Android (B02/H1).
-    final res =
-        await Isolate.run<_HttpRequestResult>(() => _sendBlocking(spec));
+    final res = await Isolate.run<_HttpRequestResult>(
+      () => _sendBlocking(spec),
+    );
     if (res.rc != 0) {
       throw HttpClientException(
         'rac_http_request_send failed with code ${res.rc}',
@@ -306,29 +310,27 @@ class HTTPClientAdapter {
     Map<String, String>? headers,
     bool requiresAuth = false,
     int? timeoutMs,
-  }) =>
-      send(
-        method: 'POST',
-        path: path,
-        body: body,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeoutMs: timeoutMs,
-      );
+  }) => send(
+    method: 'POST',
+    path: path,
+    body: body,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeoutMs: timeoutMs,
+  );
 
   Future<HttpClientResponse> get(
     String path, {
     Map<String, String>? headers,
     bool requiresAuth = false,
     int? timeoutMs,
-  }) =>
-      send(
-        method: 'GET',
-        path: path,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeoutMs: timeoutMs,
-      );
+  }) => send(
+    method: 'GET',
+    path: path,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeoutMs: timeoutMs,
+  );
 
   Future<HttpClientResponse> put(
     String path, {
@@ -336,29 +338,27 @@ class HTTPClientAdapter {
     Map<String, String>? headers,
     bool requiresAuth = false,
     int? timeoutMs,
-  }) =>
-      send(
-        method: 'PUT',
-        path: path,
-        body: body,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeoutMs: timeoutMs,
-      );
+  }) => send(
+    method: 'PUT',
+    path: path,
+    body: body,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeoutMs: timeoutMs,
+  );
 
   Future<HttpClientResponse> delete(
     String path, {
     Map<String, String>? headers,
     bool requiresAuth = false,
     int? timeoutMs,
-  }) =>
-      send(
-        method: 'DELETE',
-        path: path,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeoutMs: timeoutMs,
-      );
+  }) => send(
+    method: 'DELETE',
+    path: path,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeoutMs: timeoutMs,
+  );
 
   /// Reset for testing — clears config + token resolver hooks.
   void resetForTesting() {
@@ -456,31 +456,20 @@ class HTTPClientAdapter {
 
   /// Snapshot of commons' canonical `rac_http_default_headers` list.
   ///
-  /// Falls back to the hard-coded set when the symbol is unavailable in the
-  /// loaded RACommons binary so older bundled artifacts still link. The
-  /// returned map is mutable; callers append `X-Platform` and per-request
+  /// The returned map is mutable; callers append `X-Platform` and per-request
   /// overlays.
   Map<String, String> _commonsDefaultHeaders() {
-    final fallback = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-SDK-Client': 'RunAnywhereSDK',
-      'X-SDK-Version': SDKConstants.version,
-    };
     final defaultHeadersFn = RacNative.bindings.rac_http_default_headers;
-    if (defaultHeadersFn == null) {
-      return fallback;
-    }
     final kvsOut = calloc<ffi.Pointer<RacHttpHeaderKv>>();
     final countOut = calloc<ffi.Size>();
     try {
       final rc = defaultHeadersFn(kvsOut, countOut);
       if (rc != RacResultCode.success) {
-        return fallback;
+        throw StateError('rac_http_default_headers failed: $rc');
       }
       final kvs = kvsOut.value;
       if (kvs == ffi.nullptr) {
-        return fallback;
+        throw StateError('rac_http_default_headers returned a null list');
       }
       final count = countOut.value;
       final headers = <String, String>{};
@@ -489,7 +478,10 @@ class HTTPClientAdapter {
         if (kv.name == ffi.nullptr || kv.value == ffi.nullptr) continue;
         headers[kv.name.toDartString()] = kv.value.toDartString();
       }
-      return headers.isEmpty ? fallback : headers;
+      if (headers.isEmpty) {
+        throw StateError('rac_http_default_headers returned an empty list');
+      }
+      return headers;
     } finally {
       calloc.free(kvsOut);
       calloc.free(countOut);
@@ -513,7 +505,8 @@ class HTTPClientAdapter {
       return Uint8List.fromList(utf8.encode(json.encode(jsonable)));
     } catch (_) {
       throw ArgumentError(
-          'HTTPClientAdapter: unsupported body type ${body.runtimeType}');
+        'HTTPClientAdapter: unsupported body type ${body.runtimeType}',
+      );
     }
   }
 
@@ -523,7 +516,6 @@ class HTTPClientAdapter {
         ? match.group(1)!
         : url.substring(0, url.length.clamp(0, 30));
   }
-
 }
 
 /// Thrown when the underlying libcurl call fails before we have a
@@ -582,8 +574,9 @@ _HttpRequestResult _sendBlocking(_HttpRequestSpec spec) {
 
   final body = spec.body;
   final bodyLen = body?.length ?? 0;
-  final bodyPtr =
-      bodyLen == 0 ? ffi.nullptr.cast<ffi.Uint8>() : calloc<ffi.Uint8>(bodyLen);
+  final bodyPtr = bodyLen == 0
+      ? ffi.nullptr.cast<ffi.Uint8>()
+      : calloc<ffi.Uint8>(bodyLen);
   if (bodyLen > 0 && body != null) {
     bodyPtr.asTypedList(bodyLen).setAll(0, body);
   }
@@ -621,8 +614,8 @@ _HttpRequestResult _sendBlocking(_HttpRequestSpec spec) {
         for (var i = 0; i < ref.headerCount; i++) {
           final entry = ref.headers[i];
           if (entry.name == ffi.nullptr || entry.value == ffi.nullptr) continue;
-          h[entry.name.toDartString().toLowerCase()] =
-              entry.value.toDartString();
+          h[entry.name.toDartString().toLowerCase()] = entry.value
+              .toDartString();
         }
         headers = h;
       }

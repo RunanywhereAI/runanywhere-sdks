@@ -12,8 +12,7 @@ import Foundation
 
 extension CppBridge {
 
-    /// HTTP bridge - thin wrapper over HTTPClientAdapter
-    /// This provides C++ bridge compatibility while delegating to HTTPClientAdapter
+    /// HTTP bridge that delegates to `HTTPClientAdapter`.
     public enum HTTP {
 
         /// Shared HTTP service instance

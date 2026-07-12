@@ -160,26 +160,76 @@ copy_if_exists() {
     fi
 }
 
+qairt_identity_matches() {
+    local manifest_path="$1"
+    local qairt_root="$2"
+    python3 - "${manifest_path}" "${qairt_root}" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+manifest_path, qairt_root = Path(sys.argv[1]), Path(sys.argv[2]).resolve(strict=True)
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+identity = manifest["build"]["qnn_sdk"]
+if set(identity) != {"metadata_file", "metadata_sha256"}:
+    raise SystemExit(1)
+name = identity["metadata_file"]
+if not isinstance(name, str) or not name or name in {".", ".."} or "/" in name or "\\" in name:
+    raise SystemExit(1)
+metadata = qairt_root / name
+if metadata.is_symlink() or not metadata.is_file():
+    raise SystemExit(1)
+actual = hashlib.sha256(metadata.read_bytes()).hexdigest()
+raise SystemExit(0 if actual == identity["metadata_sha256"] else 1)
+PY
+}
+
 find_qairt_root() {
+    local manifest_path="$1"
     local candidate
-    for candidate in \
-        "${QAIRT_ROOT:-}" \
-        "${QNN_SDK_ROOT:-}" \
-        "${QNN_ROOT:-}" \
-        "${REPO_ROOT}/../qairt/2.47.0.260601" ; do
-        [ -n "${candidate}" ] || continue
-        if [ -d "${candidate}/lib/aarch64-android" ]; then
+
+    # An explicitly selected SDK is authoritative. Fail closed instead of
+    # silently staging a different installed runtime when its identity drifts.
+    if [ -n "${QNN_SDK_ROOT:-}" ]; then
+        candidate="${QNN_SDK_ROOT}"
+        if [ -d "${candidate}/lib/aarch64-android" ] && \
+           qairt_identity_matches "${manifest_path}" "${candidate}"; then
             echo "${candidate}"
             return 0
         fi
+        echo "error: QNN_SDK_ROOT does not match the selected QHexRT build identity: ${candidate}" >&2
+        return 2
+    fi
+
+    for candidate in \
+        "${QAIRT_ROOT:-}" \
+        "${QNN_ROOT:-}" ; do
+        [ -n "${candidate}" ] || continue
+        if [ -d "${candidate}/lib/aarch64-android" ] && \
+           qairt_identity_matches "${manifest_path}" "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+        echo "error: explicit QAIRT root does not match the selected QHexRT build identity: ${candidate}" >&2
+        return 2
     done
 
-    local found
-    found="$(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r | head -1 || true)"
-    if [ -n "${found}" ]; then
-        dirname "$(dirname "${found}")"
+    candidate="${REPO_ROOT}/../qairt/2.47.0.260601"
+    if [ -d "${candidate}/lib/aarch64-android" ] && \
+       qairt_identity_matches "${manifest_path}" "${candidate}"; then
+        echo "${candidate}"
         return 0
     fi
+
+    local found
+    while IFS= read -r found; do
+        candidate="$(dirname "$(dirname "${found}")")"
+        if qairt_identity_matches "${manifest_path}" "${candidate}"; then
+            echo "${candidate}"
+            return 0
+        fi
+    done < <(find "${REPO_ROOT}/.." -maxdepth 4 -type d -path "*/qairt/*/lib/aarch64-android" -print 2>/dev/null | sort -r)
 
     return 1
 }
@@ -215,7 +265,7 @@ stage_qhexrt_qnn_runtime_libs() {
     [ "${engine_available}" -eq 1 ] || return 0
 
     local qairt_root
-    qairt_root="$(find_qairt_root || true)"
+    qairt_root="$(find_qairt_root "${selected_prebuilt}/qhexrt-prebuilt.json" || true)"
     if [ -z "${qairt_root}" ]; then
         if [ "${engine_available}" -eq 1 ]; then
             echo "error: QHexRT engine is linked, but QAIRT/QNN runtime libs were not found." >&2
@@ -225,30 +275,10 @@ stage_qhexrt_qnn_runtime_libs() {
         return 0
     fi
 
-    python3 - "${selected_prebuilt}/qhexrt-prebuilt.json" "${qairt_root}" <<'PY'
-import hashlib
-import json
-from pathlib import Path
-import sys
-
-manifest_path, qairt_root = Path(sys.argv[1]), Path(sys.argv[2]).resolve(strict=True)
-manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-identity = manifest["build"]["qnn_sdk"]
-if set(identity) != {"metadata_file", "metadata_sha256"}:
-    raise SystemExit("error: selected QHexRT prebuilt has invalid QNN SDK identity")
-name = identity["metadata_file"]
-if not isinstance(name, str) or not name or name in {".", ".."} or "/" in name or "\\" in name:
-    raise SystemExit("error: selected QHexRT prebuilt has unsafe QNN SDK metadata filename")
-metadata = qairt_root / name
-if metadata.is_symlink() or not metadata.is_file():
-    raise SystemExit(f"error: selected QAIRT root lacks identity file {metadata}")
-actual = hashlib.sha256(metadata.read_bytes()).hexdigest()
-if actual != identity["metadata_sha256"]:
-    raise SystemExit(
-        "error: selected QAIRT/QNN runtime does not match the QHexRT build identity: "
-        f"expected={identity['metadata_sha256']} actual={actual} file={metadata}"
-    )
-PY
+    if ! qairt_identity_matches "${selected_prebuilt}/qhexrt-prebuilt.json" "${qairt_root}"; then
+        echo "error: selected QAIRT/QNN runtime changed after identity-aware discovery: ${qairt_root}" >&2
+        exit 1
+    fi
 
     local host_dir="${qairt_root}/lib/aarch64-android"
     local qnn_host_libs=(
@@ -367,7 +397,15 @@ for ABI in "${ABIS[@]}"; do
     OMP_ARCH="$(ndk_omp_arch_for_abi "${ABI}")"
     echo "▶ ${ABI} via preset '${PRESET}'"
 
-    CMAKE_CONFIGURE_ARGS=("--preset" "${PRESET}")
+    # Make release artifacts independent of the developer/runner checkout.
+    # `__FILE__`, debug tables, and assertion strings otherwise preserve the
+    # absolute source root inside every AAR/npm/Flutter native payload.
+    PREFIX_MAP_FLAGS="-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks -ffile-prefix-map=${ANDROID_NDK_HOME}=/android-ndk -fmacro-prefix-map=${ANDROID_NDK_HOME}=/android-ndk -fdebug-prefix-map=${ANDROID_NDK_HOME}=/android-ndk"
+    CMAKE_CONFIGURE_ARGS=(
+        "--preset" "${PRESET}"
+        "-DCMAKE_C_FLAGS=${PREFIX_MAP_FLAGS}"
+        "-DCMAKE_CXX_FLAGS=${PREFIX_MAP_FLAGS}"
+    )
     QHEXRT_ENABLED=0
     if [ "${ABI}" = "arm64-v8a" ]; then
         QHEXRT_PREFLIGHT="${REPO_ROOT}/scripts/build/validate-qhexrt-prebuilt.py"
@@ -413,11 +451,20 @@ for ABI in "${ABIS[@]}"; do
     FLUTTER_QHEXRT_SKEL_DEST="${FLUTTER_QHEXRT_SKEL_ASSET_DEST}/${ABI}"
 
     mkdir -p \
-        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" "${KOTLIN_QHEXRT_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" \
-        "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}"
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        mkdir -p \
+            "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}" \
+            "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
+    else
+        # QHexRT is ARM64-only. Do not leave empty/private package ABI roots or
+        # unrelated libc++ sidecars behind after building public non-ARM ABIs.
+        rm -rf \
+            "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}" \
+            "${KOTLIN_QHEXRT_SKEL_DEST}" "${RN_QHEXRT_SKEL_DEST}" "${FLUTTER_QHEXRT_SKEL_DEST}"
+    fi
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
@@ -468,7 +515,6 @@ for ABI in "${ABIS[@]}"; do
         LIB_QHEXRT=""
         LIB_QHEXRT_JNI=""
     fi
-    LIB_RAG_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_rag_jni.so"     -print -quit || true)"
     # New Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
     LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
 
@@ -477,8 +523,6 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_COMMONS_JNI}" "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     # Cloud STT engine — co-located with librunanywhere_jni.so (its NEEDED dep).
     copy_if_exists "${LIB_CLOUD}"       "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
-    copy_if_exists "${LIB_RAG_JNI}"     "${KOTLIN_DEST}"
-
     # Engine plugin entry-point libs (runanywhere_<engine>.so) — routed to
     # the appropriate backend module's jniLibs, NOT to core. The core module
     # only ships librac_commons.so + librunanywhere_jni.so + the libc++/libomp
@@ -528,12 +572,15 @@ for ABI in "${ABIS[@]}"; do
     fi
     for dst in \
         "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
-        "${KOTLIN_QHEXRT_DEST}" \
-        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" "${RN_QHEXRT_DEST}" \
-        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" \
-        "${FLUTTER_QHEXRT_DEST}" ; do
+        "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
+        "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"
     done
+    if [ "${QHEXRT_ENABLED}" -eq 1 ]; then
+        for dst in "${KOTLIN_QHEXRT_DEST}" "${RN_QHEXRT_DEST}" "${FLUTTER_QHEXRT_DEST}"; do
+            cp -v "${LIBCXX_SHARED}" "${dst}/"
+        done
+    fi
 
     # Some engine builds (notably ORT/Sherpa variants) require libomp.so at
     # runtime. Ship a single copy from the core package so every app that

@@ -5,154 +5,130 @@
 
 #include "openai_translation.h"
 
-#include <cstdlib>
+#include "tool_calling.pb.h"
+
 #include <random>
 #include <sstream>
+#include <unordered_set>
+#include <vector>
+
+#include "rac/features/llm/rac_tool_calling.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 namespace rac {
 namespace server {
 namespace translation {
 
+namespace {
+
+runanywhere::v1::ToolParameterType parameter_type(const Json& schema) {
+    const std::string type = schema.value("type", "string");
+    if (type == "number" || type == "integer") {
+        return runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER;
+    }
+    if (type == "boolean") {
+        return runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN;
+    }
+    if (type == "object") {
+        return runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT;
+    }
+    if (type == "array") {
+        return runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY;
+    }
+    return runanywhere::v1::TOOL_PARAMETER_TYPE_STRING;
+}
+
+void append_openai_tools(const Json& openai_tools, runanywhere::v1::ToolCallingOptions* options) {
+    if (!options || !openai_tools.is_array()) {
+        return;
+    }
+    for (const auto& tool : openai_tools) {
+        if (!tool.contains("function") || !tool["function"].is_object()) {
+            continue;
+        }
+        const auto& function = tool["function"];
+        if (!function.contains("name") || !function["name"].is_string()) {
+            continue;
+        }
+
+        auto* definition = options->add_tools();
+        definition->set_name(function["name"].get<std::string>());
+        definition->set_description(function.value("description", ""));
+
+        if (!function.contains("parameters") || !function["parameters"].is_object()) {
+            continue;
+        }
+        const auto& schema = function["parameters"];
+        definition->set_json_schema(schema.dump());
+
+        std::unordered_set<std::string> required;
+        if (schema.contains("required") && schema["required"].is_array()) {
+            for (const auto& name : schema["required"]) {
+                if (name.is_string()) {
+                    required.insert(name.get<std::string>());
+                }
+            }
+        }
+        if (!schema.contains("properties") || !schema["properties"].is_object()) {
+            continue;
+        }
+        for (const auto& [name, property] : schema["properties"].items()) {
+            if (!property.is_object()) {
+                continue;
+            }
+            auto* parameter = definition->add_parameters();
+            parameter->set_name(name);
+            parameter->set_type(parameter_type(property));
+            parameter->set_description(property.value("description", ""));
+            parameter->set_required(required.contains(name));
+            parameter->set_json_schema(property.dump());
+            if (property.contains("enum") && property["enum"].is_array()) {
+                for (const auto& value : property["enum"]) {
+                    if (value.is_string()) {
+                        parameter->add_enum_values(value.get<std::string>());
+                    }
+                }
+            }
+        }
+    }
+}
+
+}  // namespace
+
 // =============================================================================
 // OpenAI REQUEST -> Commons Format
 // =============================================================================
 
-std::string openaiToolsToCommonsJson(const Json& openaiTools) {
-    if (!openaiTools.is_array() || openaiTools.empty()) {
-        return "[]";
-    }
-
-    Json commonsTools = Json::array();
-
-    for (const auto& tool : openaiTools) {
-        if (!tool.contains("function") || !tool["function"].is_object()) {
-            continue;
-        }
-
-        const auto& func = tool["function"];
-        Json commonsTool;
-
-        // Name (required)
-        if (func.contains("name") && func["name"].is_string()) {
-            commonsTool["name"] = func["name"];
-        } else {
-            continue;  // Skip invalid tool
-        }
-
-        // Description
-        if (func.contains("description") && func["description"].is_string()) {
-            commonsTool["description"] = func["description"];
-        } else {
-            commonsTool["description"] = "";
-        }
-
-        // Parameters - convert from OpenAI JSON Schema to Commons format
-        Json commonsParams = Json::array();
-        if (func.contains("parameters") && func["parameters"].is_object()) {
-            const auto& params = func["parameters"];
-
-            if (params.contains("properties") && params["properties"].is_object()) {
-                // Get required fields
-                std::vector<std::string> required;
-                if (params.contains("required") && params["required"].is_array()) {
-                    for (const auto& r : params["required"]) {
-                        if (r.is_string()) {
-                            required.push_back(r.get<std::string>());
-                        }
-                    }
-                }
-
-                // Convert each property
-                for (auto& [propName, propValue] : params["properties"].items()) {
-                    Json param;
-                    param["name"] = propName;
-
-                    // Type
-                    if (propValue.contains("type") && propValue["type"].is_string()) {
-                        param["type"] = propValue["type"];
-                    } else {
-                        param["type"] = "string";
-                    }
-
-                    // Description
-                    if (propValue.contains("description") && propValue["description"].is_string()) {
-                        param["description"] = propValue["description"];
-                    } else {
-                        param["description"] = "";
-                    }
-
-                    // Required
-                    bool isRequired =
-                        std::find(required.begin(), required.end(), propName) != required.end();
-                    param["required"] = isRequired;
-
-                    // Enum values
-                    if (propValue.contains("enum") && propValue["enum"].is_array()) {
-                        param["enum"] = propValue["enum"];
-                    }
-
-                    commonsParams.push_back(param);
-                }
-            }
-        }
-        commonsTool["parameters"] = commonsParams;
-
-        commonsTools.push_back(commonsTool);
-    }
-
-    return commonsTools.dump();
-}
-
-std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
-                                  const rac_tool_calling_options_t* options) {
+std::string buildPromptFromOpenAI(const Json& messages, const Json& tools) {
     // If no tools, build simple prompt
     if (!tools.is_array() || tools.empty()) {
         return buildSimplePrompt(messages);
     }
 
-    // Convert OpenAI tools to Commons format
-    std::string commonsToolsJson = openaiToolsToCommonsJson(tools);
+    runanywhere::v1::ToolPromptFormatRequest request;
+    request.set_user_prompt(extractLastUserMessage(messages));
+    auto* options = request.mutable_options();
+    options->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    options->set_auto_execute(true);
+    append_openai_tools(tools, options);
 
-    // Extract user message
-    std::string userMessage = extractLastUserMessage(messages);
-
-    // Use Commons API to build prompt
-    char* prompt = nullptr;
-    rac_result_t result = rac_tool_call_build_initial_prompt(
-        userMessage.c_str(), commonsToolsJson.c_str(), options, &prompt);
-
-    if (result != RAC_SUCCESS || !prompt) {
-        // Fallback to simple prompt
+    std::vector<uint8_t> request_bytes(request.ByteSizeLong());
+    if (!request.SerializeToArray(request_bytes.data(), static_cast<int>(request_bytes.size()))) {
         return buildSimplePrompt(messages);
     }
 
-    std::string promptStr(prompt);
-    free(prompt);
-
-    return promptStr;
-}
-
-// =============================================================================
-// Commons Format -> OpenAI RESPONSE
-// =============================================================================
-
-Json commonsToolCallToOpenAI(const rac_tool_call_t& toolCall) {
-    Json toolCalls = Json::array();
-
-    if (toolCall.has_tool_call && toolCall.tool_name) {
-        Json tc;
-        tc["id"] = generateToolCallId();
-        tc["type"] = "function";
-
-        Json function;
-        function["name"] = toolCall.tool_name;
-        function["arguments"] = toolCall.arguments_json ? toolCall.arguments_json : "{}";
-
-        tc["function"] = function;
-        toolCalls.push_back(tc);
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_tool_call_format_prompt_proto(request_bytes.data(), request_bytes.size(), &out);
+    runanywhere::v1::ToolPromptFormatResult result;
+    const bool parsed = rc == RAC_SUCCESS && out.status == RAC_SUCCESS && out.data &&
+                        result.ParseFromArray(out.data, static_cast<int>(out.size));
+    rac_proto_buffer_free(&out);
+    if (!parsed || result.formatted_prompt().empty()) {
+        return buildSimplePrompt(messages);
     }
-
-    return toolCalls;
+    return result.formatted_prompt();
 }
 
 std::string generateToolCallId() {

@@ -4,7 +4,8 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
 namespace margelo::nitro::runanywhere {
 
@@ -32,27 +33,29 @@ std::shared_ptr<ArrayBuffer> emptyStorageProtoBuffer() {
     return ArrayBuffer::allocate(0);
 }
 
+using StorageProtoFn = decltype(&rac_storage_analyzer_info_proto);
+
 std::shared_ptr<ArrayBuffer> copyStorageProtoBuffer(rac_proto_buffer_t& protoBuffer) {
     if (protoBuffer.status != RAC_SUCCESS) {
         if (protoBuffer.error_message) {
             LOGE("storage proto error: %s", protoBuffer.error_message);
         }
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyStorageProtoBuffer();
     }
 
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyStorageProtoBuffer();
     }
 
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
 std::shared_ptr<ArrayBuffer> callStorageProto(const std::vector<uint8_t>& requestBytes,
-                                              const char* symbolName,
+                                              StorageProtoFn fn,
                                               const char* operation) {
     auto storageHandle = StorageBridge::shared().getHandle();
     auto registryHandle = ModelRegistryBridge::shared().getHandle();
@@ -61,14 +64,8 @@ std::shared_ptr<ArrayBuffer> callStorageProto(const std::vector<uint8_t>& reques
         return emptyStorageProtoBuffer();
     }
 
-    auto fn = proto_compat::symbol<proto_compat::StorageProtoFn>(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        return emptyStorageProtoBuffer();
-    }
-
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     const uint8_t* requestData = requestBytes.empty() ? nullptr : requestBytes.data();
     rac_result_t rc = fn(
         storageHandle,
@@ -78,7 +75,7 @@ std::shared_ptr<ArrayBuffer> callStorageProto(const std::vector<uint8_t>& reques
         &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         return emptyStorageProtoBuffer();
     }
 
@@ -123,7 +120,7 @@ HybridRunAnywhereCore::storageInfoProto(const std::shared_ptr<ArrayBuffer>& requ
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callStorageProto(
             bytes,
-            "rac_storage_analyzer_info_proto",
+            rac_storage_analyzer_info_proto,
             "storageInfoProto");
     });
 }
@@ -134,7 +131,7 @@ HybridRunAnywhereCore::storageAvailabilityProto(const std::shared_ptr<ArrayBuffe
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callStorageProto(
             bytes,
-            "rac_storage_analyzer_availability_proto",
+            rac_storage_analyzer_availability_proto,
             "storageAvailabilityProto");
     });
 }
@@ -145,7 +142,7 @@ HybridRunAnywhereCore::storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callStorageProto(
             bytes,
-            "rac_storage_analyzer_delete_plan_proto",
+            rac_storage_analyzer_delete_plan_proto,
             "storageDeletePlanProto");
     });
 }
@@ -156,7 +153,7 @@ HybridRunAnywhereCore::storageDeleteProto(const std::shared_ptr<ArrayBuffer>& re
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callStorageProto(
             bytes,
-            "rac_storage_analyzer_delete_proto",
+            rac_storage_analyzer_delete_proto,
             "storageDeleteProto");
     });
 }

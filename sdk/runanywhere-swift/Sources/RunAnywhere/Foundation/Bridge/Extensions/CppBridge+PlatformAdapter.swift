@@ -130,7 +130,9 @@ extension CppBridge {
 /// `PlatformAdapter`) to satisfy SwiftLint's max-1-level nesting rule; the
 /// `OSAllocatedUnfairLock` that owns it persists for the process lifetime, so
 /// the pointer handed to `rac_set_platform_adapter` stays valid for C++.
-private struct PlatformAdapterRegistrationState {
+/// The embedded C vtable is written and registered only while the enclosing
+/// unfair lock is held; its function pointers are immutable afterwards.
+private struct PlatformAdapterRegistrationState: @unchecked Sendable {
     var isRegistered = false
     var adapter = rac_platform_adapter_t()
 }
@@ -760,7 +762,7 @@ private func platformGetMemoryInfoCallback(
 // bridged via a shared flag map keyed on the task id the platform
 // callback hands to the C++ caller.
 
-private final class PlatformDownloadCancelFlag {
+private final class PlatformDownloadCancelFlag: Sendable {
     // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.
     private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
 
@@ -798,18 +800,24 @@ private func platformDownloadLookup(_ taskId: String) -> PlatformDownloadCancelF
 /// via an opaque pointer (`Unmanaged.passRetained`).
 private final class PlatformDownloadProgressState {
     let progressCallback: rac_http_progress_callback_fn?
-    let callbackUserData: UnsafeMutableRawPointer?
+    let callbackContext: PlatformDownloadCallbackContext
     let cancelFlag: PlatformDownloadCancelFlag
 
     init(
         progressCallback: rac_http_progress_callback_fn?,
-        callbackUserData: UnsafeMutableRawPointer?,
+        callbackContext: PlatformDownloadCallbackContext,
         cancelFlag: PlatformDownloadCancelFlag
     ) {
         self.progressCallback = progressCallback
-        self.callbackUserData = callbackUserData
+        self.callbackContext = callbackContext
         self.cancelFlag = cancelFlag
     }
+}
+
+/// Borrowed callback context whose lifetime is owned by the C download caller
+/// until its completion callback fires.
+private struct PlatformDownloadCallbackContext: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer?
 }
 
 private func platformDownloadProgressTrampoline(
@@ -827,7 +835,7 @@ private func platformDownloadProgressTrampoline(
     if let progressCallback = state.progressCallback {
         let written = Int64(min(UInt64(Int64.max), bytesWritten))
         let total = Int64(min(UInt64(Int64.max), totalBytes))
-        progressCallback(written, total, state.callbackUserData)
+        progressCallback(written, total, state.callbackContext.rawValue)
     }
     return RAC_TRUE
 }
@@ -863,6 +871,7 @@ private func platformHttpDownloadCallback(
 
     let taskId = UUID().uuidString
     outTaskId.pointee = rac_strdup(taskId)
+    let callbackContext = PlatformDownloadCallbackContext(rawValue: callbackUserData)
 
     let cancelFlag = PlatformDownloadCancelFlag()
     platformDownloadRegister(taskId, cancelFlag)
@@ -880,7 +889,7 @@ private func platformHttpDownloadCallback(
 
         let state = PlatformDownloadProgressState(
             progressCallback: progressCallback,
-            callbackUserData: callbackUserData,
+            callbackContext: callbackContext,
             cancelFlag: cancelFlag
         )
         let stateRef = Unmanaged.passRetained(state)
@@ -920,10 +929,10 @@ private func platformHttpDownloadCallback(
         if let completeCallback = completeCallback {
             if let finalPath = finalPath {
                 finalPath.withCString { cPath in
-                    completeCallback(result, cPath, callbackUserData)
+                    completeCallback(result, cPath, callbackContext.rawValue)
                 }
             } else {
-                completeCallback(result, nil, callbackUserData)
+                completeCallback(result, nil, callbackContext.rawValue)
             }
         }
     }

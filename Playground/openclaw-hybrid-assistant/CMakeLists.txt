@@ -18,22 +18,16 @@ find_package(Threads REQUIRED)
 # runanywhere-commons paths
 # =============================================================================
 
-# Get architecture
-execute_process(
-    COMMAND uname -m
-    OUTPUT_VARIABLE ARCH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 # Set paths relative to this CMakeLists.txt
 set(ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(RAC_COMMONS_DIR "${ROOT_DIR}/sdk/runanywhere-commons")
-set(RAC_DIST_DIR "${RAC_COMMONS_DIR}/dist/linux/${ARCH}")
+set(RAC_DIST_DIR "${RAC_COMMONS_DIR}/dist/linux")
+set(RAC_LIB_DIR "${RAC_DIST_DIR}/lib")
 set(SHERPA_DIR "${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux")
 
 # Verify directories exist
-if(NOT EXISTS "${RAC_DIST_DIR}")
-    message(FATAL_ERROR "runanywhere-commons not built. Run: cd ${RAC_COMMONS_DIR} && ./scripts/build-linux.sh --shared")
+if(NOT EXISTS "${RAC_LIB_DIR}/librac_commons.so")
+    message(FATAL_ERROR "runanywhere-commons not built. Run: cd ${RAC_COMMONS_DIR} && ./scripts/build-linux.sh")
 endif()
 
 if(NOT EXISTS "${SHERPA_DIR}")
@@ -56,7 +50,7 @@ include_directories(
 # =============================================================================
 
 link_directories(
-    ${RAC_DIST_DIR}
+    ${RAC_LIB_DIR}
     ${SHERPA_DIR}/lib
 )
 
@@ -93,8 +87,8 @@ target_link_libraries(openclaw-assistant PRIVATE
 
 # Set RPATH for finding shared libraries at runtime
 set_target_properties(openclaw-assistant PROPERTIES
-    BUILD_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
-    INSTALL_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
+    BUILD_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
+    INSTALL_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
 )
 
 # =============================================================================
@@ -126,8 +120,8 @@ target_link_libraries(test-components PRIVATE
 
 # Set RPATH for test binary
 set_target_properties(test-components PROPERTIES
-    BUILD_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
-    INSTALL_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
+    BUILD_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
+    INSTALL_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
 )
 
 # =============================================================================
@@ -168,8 +162,8 @@ target_link_libraries(test-integration PRIVATE
 
 # Set RPATH for integration test binary
 set_target_properties(test-integration PROPERTIES
-    BUILD_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
-    INSTALL_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
+    BUILD_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
+    INSTALL_RPATH "${RAC_LIB_DIR};${SHERPA_DIR}/lib"
 )
 
 # =============================================================================

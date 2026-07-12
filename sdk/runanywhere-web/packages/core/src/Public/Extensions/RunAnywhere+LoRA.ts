@@ -423,7 +423,6 @@ function toLoraArtifactModelInfo(entry: LoraAdapterCatalogEntry): ModelInfo {
     framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
     downloadUrl: entry.url,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    description: entry.description,
     singleFile: {
       requiredPatterns: [artifactFilename],
       expectedFiles,

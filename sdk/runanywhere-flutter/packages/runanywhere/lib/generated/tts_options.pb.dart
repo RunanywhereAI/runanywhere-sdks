@@ -256,7 +256,6 @@ class TTSOptions extends $pb.GeneratedMessage {
     $0.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? speakerId,
-    $core.double? speed,
     $core.String? style,
   }) {
     final result = create();
@@ -269,7 +268,6 @@ class TTSOptions extends $pb.GeneratedMessage {
     if (audioFormat != null) result.audioFormat = audioFormat;
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (speakerId != null) result.speakerId = speakerId;
-    if (speed != null) result.speed = speed;
     if (style != null) result.style = style;
     return result;
   }
@@ -298,7 +296,6 @@ class TTSOptions extends $pb.GeneratedMessage {
         enumValues: $0.AudioFormat.values)
     ..aI(8, _omitFieldNames ? '' : 'sampleRate')
     ..aI(9, _omitFieldNames ? '' : 'speakerId')
-    ..aD(10, _omitFieldNames ? '' : 'speed', fieldType: $pb.PbFieldType.OF)
     ..aOS(11, _omitFieldNames ? '' : 'style')
     ..hasRequiredFields = false;
 
@@ -417,23 +414,13 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearSpeakerId() => $_clearField(9);
 
-  /// Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate.
-  @$pb.TagNumber(10)
-  $core.double get speed => $_getN(9);
-  @$pb.TagNumber(10)
-  set speed($core.double value) => $_setFloat(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasSpeed() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearSpeed() => $_clearField(10);
-
   /// Optional style/emotion hint for voices that support style transfer.
   @$pb.TagNumber(11)
-  $core.String get style => $_getSZ(10);
+  $core.String get style => $_getSZ(9);
   @$pb.TagNumber(11)
-  set style($core.String value) => $_setString(10, value);
+  set style($core.String value) => $_setString(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasStyle() => $_has(10);
+  $core.bool hasStyle() => $_has(9);
   @$pb.TagNumber(11)
   void clearStyle() => $_clearField(11);
 }

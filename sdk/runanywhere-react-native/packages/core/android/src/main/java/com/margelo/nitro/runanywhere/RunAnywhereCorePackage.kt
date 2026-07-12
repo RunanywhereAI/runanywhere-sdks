@@ -32,18 +32,11 @@ class RunAnywhereCorePackage : BaseReactPackage() {
             //
             // Idempotent; the C++ adapter guards on its own initialized flag.
             // Runs BEFORE any Nitro bridge has a chance to fire HTTP.
-            try {
-                val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
-                if (rc == 0) {
-                    Log.i(TAG, "OkHttp HTTP transport registered")
-                } else {
-                    Log.w(TAG, "OkHttp HTTP transport registration returned rc=$rc")
-                }
-            } catch (t: Throwable) {
-                // Link errors here indicate the bundled librunanywhere_jni.so
-                // predates the racHttpTransportRegisterOkHttp symbol (commons
-                // versions below 0.2.0). Falls back to libcurl.
-                Log.w(TAG, "OkHttp HTTP transport unavailable: ${t.message}")
+            val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
+            if (rc == 0) {
+                Log.i(TAG, "OkHttp HTTP transport registered")
+            } else {
+                Log.w(TAG, "OkHttp HTTP transport registration returned rc=$rc")
             }
         }
     }

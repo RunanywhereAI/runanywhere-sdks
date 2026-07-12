@@ -104,28 +104,6 @@ static int json_add_string(char* buf, size_t buf_size, size_t* pos, const char* 
     return 0;
 }
 
-// Add int field to JSON buffer
-static int json_add_int(char* buf, size_t buf_size, size_t* pos, const char* key, int64_t value,
-                        bool comma) {
-    int written = snprintf(buf + *pos, buf_size - *pos, "%s\"%s\":%lld", comma ? "," : "", key,
-                           (long long)value);
-    if (written < 0 || (size_t)written >= buf_size - *pos)
-        return -1;
-    *pos += written;
-    return 0;
-}
-
-// Add bool field to JSON buffer
-static int json_add_bool(char* buf, size_t buf_size, size_t* pos, const char* key, bool value,
-                         bool comma) {
-    int written = snprintf(buf + *pos, buf_size - *pos, "%s\"%s\":%s", comma ? "," : "", key,
-                           value ? "true" : "false");
-    if (written < 0 || (size_t)written >= buf_size - *pos)
-        return -1;
-    *pos += written;
-    return 0;
-}
-
 // =============================================================================
 // JSON Parsing Helpers (Simple hand-rolled parser)
 // =============================================================================
@@ -213,19 +191,6 @@ static int64_t json_extract_int(const char* json, const char* key, int64_t defau
     if (end == value)
         return default_val;
     return result;
-}
-
-// Extract boolean value
-static bool json_extract_bool(const char* json, const char* key, bool default_val) {
-    const char* value = json_find_value(json, key);
-    if (!value)
-        return default_val;
-
-    if (strncmp(value, "true", 4) == 0)
-        return true;
-    if (strncmp(value, "false", 5) == 0)
-        return false;
-    return default_val;
 }
 
 // =============================================================================

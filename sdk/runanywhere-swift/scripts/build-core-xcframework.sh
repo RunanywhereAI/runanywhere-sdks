@@ -8,15 +8,16 @@
 #   sdk/runanywhere-swift/Binaries/RACommons.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
+#   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework       (skipped if RAC_BACKEND_SHERPA=OFF)
 #   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #
 # Engine plugins under engines/{llamacpp,onnx} use SHARED_ONLY inside
 # rac_add_engine_plugin(...), so on iOS (RAC_STATIC_PLUGINS=ON) they still
 # produce standalone `librac_backend_<name>.a` archives alongside
 # `librac_commons.a`. All three have to be re-packaged into
-# `.xcframework`s containing an ios-arm64 slice, an ios-arm64-simulator slice,
-# and (for RACommons, which the macOS Swift harness links directly) a
-# macos-arm64 slice, which is what this script does.
+# `.xcframework`s containing ios-arm64, ios-arm64-simulator, and macos-arm64
+# slices. Every product in Package.swift advertises macOS, so every binary
+# target in that product graph must carry the macOS slice.
 #
 # Environment knobs:
 #   RAC_BACKEND_ONNX=OFF     skip the ONNX backend (used when the operator
@@ -26,9 +27,14 @@
 #                            cmake/xcodebuild. Useful in CI preflight and
 #                            the `release-swift-binaries.sh DRY_RUN=1` path.
 set -euo pipefail
+export ZERO_AR_DATE=1
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-315532800}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/sdk/runanywhere-swift/Binaries"
+# The source path is anchored dynamically so the script works from any cwd.
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
 
 if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: build-core-xcframework.sh only runs on macOS" >&2
@@ -40,6 +46,7 @@ RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
+BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"
 
 run() {
     # Thin wrapper that either prints the command (DRY_RUN=1) or executes it.
@@ -80,7 +87,8 @@ prepare_archive_input() {
     fi
 
     run mkdir -p "${scratch_dir}"
-    local prepared="${scratch_dir}/$(basename "${input}").${arch}.a"
+    local prepared
+    prepared="${scratch_dir}/$(basename "${input}").${arch}.a"
     run xcrun lipo -thin "${arch}" "${input}" -output "${prepared}"
     echo "${prepared}"
 }
@@ -180,7 +188,9 @@ merge_commons_slice() {
         inputs+=("${bundled_curl}")
     fi
     collect_protobuf_static_deps "${build_root}"
-    inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
+    if [ -n "${RAC_PROTO_STATIC_DEPS[*]-}" ]; then
+        inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
+    fi
 
     local prepared=()
     local input
@@ -208,7 +218,9 @@ merge_commons_macos_slice() {
         inputs+=("${bundled_curl}")
     fi
     collect_protobuf_static_deps "${build_root}"
-    inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
+    if [ -n "${RAC_PROTO_STATIC_DEPS[*]-}" ]; then
+        inputs+=("${RAC_PROTO_STATIC_DEPS[@]}")
+    fi
 
     local prepared=()
     local input
@@ -217,6 +229,31 @@ merge_commons_macos_slice() {
     done
 
     merge_static_archives "${output}" "${prepared[@]}"
+}
+
+validate_isolated_protobuf_archive() {
+    local archive="$1"
+    local label="$2"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+
+    local symbols="${STAGING_DIR}/protobuf-symbols-${label}.txt"
+    if ! nm -gU "${archive}" 2>/dev/null | c++filt > "${symbols}"; then
+        echo "error: could not inspect external symbols in ${archive}" >&2
+        exit 1
+    fi
+    if grep -Fq "google::protobuf::" "${symbols}"; then
+        echo "error: ${label} RACommons exports the process-global google::protobuf namespace" >&2
+        echo "       Static ONNX/Sherpa consumers can carry a different protobuf runtime; rebuild with RAC_ISOLATE_PROTOBUF_NAMESPACE=ON." >&2
+        exit 1
+    fi
+    if ! grep -Fq "runanywhere_internal::protobuf::" "${symbols}"; then
+        echo "error: ${label} RACommons is missing the isolated RunAnywhere protobuf runtime" >&2
+        exit 1
+    fi
+    echo "  ✓ ${label} protobuf symbols are namespace-isolated"
 }
 
 find_onnxruntime_ios_archive() {
@@ -281,6 +318,40 @@ merge_llamacpp_backend_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
+merge_llamacpp_backend_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/llamacpp"
+    local inputs=(
+        "${build_root}/engines/llamacpp/librac_backend_llamacpp.a"
+        "${build_root}/_deps/llamacpp-build/src/libllama.a"
+        "${build_root}/_deps/llamacpp-build/common/libllama-common.a"
+        "${build_root}/_deps/llamacpp-build/common/libllama-common-base.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/libggml.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/libggml-base.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/libggml-cpu.a"
+    )
+
+    local optional
+    for optional in \
+        "${build_root}/_deps/llamacpp-build/ggml/src/ggml-metal/libggml-metal.a" \
+        "${build_root}/_deps/llamacpp-build/ggml/src/ggml-blas/libggml-blas.a" \
+        "${build_root}/_deps/llamacpp-build/vendor/cpp-httplib/libcpp-httplib.a"; do
+        if [ "${DRY_RUN}" = "1" ] || [ -f "${optional}" ]; then
+            inputs+=("${optional}")
+        fi
+    done
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
 merge_onnx_backend_slice() {
     local build_root="$1"
     local slice_dir="$2"
@@ -329,6 +400,26 @@ merge_onnx_backend_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
+merge_onnx_backend_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/onnx"
+    local inputs=(
+        "${build_root}/engines/onnx/librac_backend_onnx.a"
+        "${build_root}/runtimes/onnxrt/librac_runtime_onnxrt.a"
+        "${MACOS_SHERPA_ROOT}/lib/libonnxruntime.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
 # Sherpa engine slice. Fold in the sherpa-onnx prebuilt archives because this
 # xcframework owns the speech implementation objects and their static deps.
 merge_sherpa_backend_slice() {
@@ -356,6 +447,25 @@ merge_sherpa_backend_slice() {
             fi
         done
     fi
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+merge_sherpa_backend_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/sherpa"
+    local inputs=(
+        "${build_root}/engines/sherpa/librac_backend_sherpa.a"
+        "${MACOS_SHERPA_STATIC_DEPS[@]}"
+    )
 
     local prepared=()
     local input
@@ -443,15 +553,60 @@ EOF
     exit 1
 fi
 
+# The macOS ONNX and Sherpa slices are fully static. Both consume the pinned
+# inventory produced from the exact SHERPA_ONNX_COMMIT_MACOS revision; the
+# ONNX slice folds in libonnxruntime.a and the Sherpa slice folds in the speech
+# archives. Enumerate the contract instead of globbing so an incomplete
+# download/build cannot produce an apparently valid but link-broken release.
+MACOS_SHERPA_ROOT="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-macos"
+MACOS_SHERPA_STATIC_DEPS=(
+    "${MACOS_SHERPA_ROOT}/lib/libsherpa-onnx-c-api.a"
+    "${MACOS_SHERPA_ROOT}/lib/libsherpa-onnx-core.a"
+    "${MACOS_SHERPA_ROOT}/lib/libsherpa-onnx-fst.a"
+    "${MACOS_SHERPA_ROOT}/lib/libsherpa-onnx-fstfar.a"
+    "${MACOS_SHERPA_ROOT}/lib/libsherpa-onnx-kaldifst-core.a"
+    "${MACOS_SHERPA_ROOT}/lib/libkaldi-decoder-core.a"
+    "${MACOS_SHERPA_ROOT}/lib/libkaldi-native-fbank-core.a"
+    "${MACOS_SHERPA_ROOT}/lib/libpiper_phonemize.a"
+    "${MACOS_SHERPA_ROOT}/lib/libespeak-ng.a"
+    "${MACOS_SHERPA_ROOT}/lib/libucd.a"
+    "${MACOS_SHERPA_ROOT}/lib/libssentencepiece_core.a"
+    "${MACOS_SHERPA_ROOT}/lib/libkissfft-float.a"
+)
+if [ "${RAC_BACKEND_ONNX}" = "ON" ] && [ "${DRY_RUN}" != "1" ]; then
+    macos_required=(
+        "${MACOS_SHERPA_ROOT}/lib/libonnxruntime.a"
+        "${MACOS_SHERPA_ROOT}/include/onnxruntime_c_api.h"
+        "${MACOS_SHERPA_ROOT}/include/onnxruntime_cxx_api.h"
+        "${MACOS_SHERPA_ROOT}/include/sherpa-onnx/c-api/c-api.h"
+        "${MACOS_SHERPA_STATIC_DEPS[@]}"
+    )
+    for required in "${macos_required[@]}"; do
+        if [ ! -f "${required}" ]; then
+            echo "error: required pinned macOS static dependency not found: ${required}" >&2
+            echo "       Run ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh" >&2
+            exit 1
+        fi
+        if [[ "${required}" == *.a ]] && ! xcrun lipo "${required}" -verify_arch arm64 >/dev/null 2>&1; then
+            echo "error: required macOS archive is not arm64: ${required}" >&2
+            exit 1
+        fi
+    done
+fi
+
 mkdir -p "${DEST}"
 run rm -rf "${STAGING_DIR}"
 run mkdir -p "${STAGING_DIR}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 1 & 2. Configure + build iOS slices (device + simulator) plus the macOS
-#        commons slice used by `swift test` on local development machines.
+# 1 & 2. Configure + build iOS slices (device + simulator) and matching
+#        macOS slices for every advertised Swift binary target.
 # ────────────────────────────────────────────────────────────────────────────
 cmake_extra=(
+    "-DCMAKE_C_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_OBJC_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_OBJCXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DRAC_ENABLE_PROTOBUF=ON"
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
@@ -461,6 +616,8 @@ cmake_extra=(
 )
 ios_cmake_extra=(
     "-DRAC_BACKEND_COREML=OFF"
+    "-DGGML_NATIVE=OFF"
+    "-DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
 )
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
     cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
@@ -482,15 +639,19 @@ fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     ios_build_targets+=(rac_backend_mlx)
 fi
-run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}" --parallel 2
+run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}" --parallel "${BUILD_JOBS}"
 
 echo "▶ Configure ios-simulator"
 run cmake --preset ios-simulator "${cmake_extra[@]}" "${ios_cmake_extra[@]}"
 echo "▶ Build ios-simulator (Release)"
-run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}" --parallel 2
+run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}" --parallel "${BUILD_JOBS}"
 
 echo "▶ Configure macos-release"
 macos_cmake_args=(
+    "-DCMAKE_C_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_OBJC_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
+    "-DCMAKE_OBJCXX_FLAGS=-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     "-DRAC_BUILD_BACKENDS=ON"
     # The macOS slice ships inside the XCFramework and is linked statically by
     # SPM consumers (swift test, macOS apps) — there is no sibling shared-lib
@@ -499,14 +660,15 @@ macos_cmake_args=(
     # symbols (rac_backend_cloud_register) fail the consumer link.
     "-DRAC_STATIC_PLUGINS=ON"
     "-DRAC_BACKEND_RAG=ON"
-    "-DRAC_BACKEND_LLAMACPP=OFF"
-    "-DRAC_BACKEND_ONNX=OFF"
-    "-DRAC_BACKEND_SHERPA=OFF"
+    "-DRAC_BACKEND_LLAMACPP=ON"
+    "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
+    "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA:-ON}"
     "-DRAC_BACKEND_COREML=OFF"
+    "-DGGML_NATIVE=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
-    "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
-    "-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
+    "-DCMAKE_OSX_ARCHITECTURES=arm64"
+    "-DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOS_DEPLOYMENT_TARGET}"
     "-DRAC_ENABLE_PROTOBUF=ON"
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
@@ -514,11 +676,17 @@ macos_cmake_args=(
 )
 run cmake --preset macos-release "${macos_cmake_args[@]}"
 echo "▶ Build macos-release"
-macos_build_targets=(rac_commons)
+macos_build_targets=(rac_commons rac_backend_llamacpp)
+if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
+    macos_build_targets+=(rac_backend_onnx)
+fi
+if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+    macos_build_targets+=(rac_backend_sherpa)
+fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     macos_build_targets+=(rac_backend_mlx)
 fi
-run cmake --build --preset macos-release --target "${macos_build_targets[@]}" --parallel 2
+run cmake --build --preset macos-release --target "${macos_build_targets[@]}" --parallel "${BUILD_JOBS}"
 
 # ────────────────────────────────────────────────────────────────────────────
 # 3. Locate archives and package each target as an xcframework with both
@@ -619,20 +787,27 @@ COMMONS_MAC_LIB="${STAGING_DIR}/Release-macos/librac_commons.a"
 merge_commons_slice "${DEV_BIN}" "Release-iphoneos" "${COMMONS_DEV_LIB}" "arm64"
 merge_commons_slice "${SIM_BIN}" "Release-iphonesimulator" "${COMMONS_SIM_LIB}" "arm64"
 merge_commons_macos_slice "${MAC_BIN}" "${COMMONS_MAC_LIB}" "arm64"
+validate_isolated_protobuf_archive "${COMMONS_DEV_LIB}" "ios-device"
+validate_isolated_protobuf_archive "${COMMONS_SIM_LIB}" "ios-simulator"
+validate_isolated_protobuf_archive "${COMMONS_MAC_LIB}" "macos"
 
 LLAMACPP_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_llamacpp.a"
 LLAMACPP_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_llamacpp.a"
+LLAMACPP_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_llamacpp.a"
 merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
 merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
+merge_llamacpp_backend_macos_slice "${MAC_BIN}" "${LLAMACPP_MAC_LIB}" "arm64"
 
 build_xcframework_from_paths_with_macos "${COMMONS_DEV_LIB}" "${COMMONS_SIM_LIB}" "${COMMONS_MAC_LIB}" "RACommons.xcframework" --with-headers
-build_xcframework_from_paths "${LLAMACPP_DEV_LIB}" "${LLAMACPP_SIM_LIB}" "RABackendLLAMACPP.xcframework"
+build_xcframework_from_paths_with_macos "${LLAMACPP_DEV_LIB}" "${LLAMACPP_SIM_LIB}" "${LLAMACPP_MAC_LIB}" "RABackendLLAMACPP.xcframework"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     ONNX_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_onnx.a"
     ONNX_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_onnx.a"
+    ONNX_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_onnx.a"
     merge_onnx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${ONNX_DEV_LIB}" "arm64"
     merge_onnx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${ONNX_SIM_LIB}" "arm64"
-    build_xcframework_from_paths "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "RABackendONNX.xcframework"
+    merge_onnx_backend_macos_slice "${MAC_BIN}" "${ONNX_MAC_LIB}" "arm64"
+    build_xcframework_from_paths_with_macos "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "${ONNX_MAC_LIB}" "RABackendONNX.xcframework"
 else
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
 fi
@@ -641,10 +816,12 @@ fi
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     SHERPA_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_sherpa.a"
     SHERPA_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_sherpa.a"
+    SHERPA_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_sherpa.a"
     if [ "${DRY_RUN}" = "1" ] || [ -f "${DEV_BIN}/engines/sherpa/Release-iphoneos/librac_backend_sherpa.a" ]; then
         merge_sherpa_backend_slice "${DEV_BIN}" "Release-iphoneos" "${SHERPA_DEV_LIB}" "arm64"
         merge_sherpa_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${SHERPA_SIM_LIB}" "arm64"
-        build_xcframework_from_paths "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "RABackendSherpa.xcframework"
+        merge_sherpa_backend_macos_slice "${MAC_BIN}" "${SHERPA_MAC_LIB}" "arm64"
+        build_xcframework_from_paths_with_macos "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "${SHERPA_MAC_LIB}" "RABackendSherpa.xcframework"
     else
         echo "▶ Skipping RABackendSherpa.xcframework (target not built — engines/sherpa disabled?)"
     fi
@@ -704,10 +881,10 @@ sync_react_native_frameworks() {
     fi
 }
 
-# Copy locally built xcframeworks into each Flutter plugin's ios/Frameworks
-# directory so the example app (and any path-based consumer) builds against the
-# monorepo binaries without needing a GitHub release download. Mirrors the
-# sync_react_native_frameworks() pattern above.
+# Copy locally built xcframeworks next to each Flutter plugin's CocoaPods and
+# SwiftPM sources so both package managers resolve the same canonical binary.
+# Remove the superseded ios/Frameworks copies; current podspecs and Package.swift
+# manifests intentionally reference ios/<package>/Frameworks only.
 #
 # Plugin → xcframework mapping:
 #   runanywhere             ← RACommons.xcframework
@@ -721,9 +898,16 @@ sync_flutter_frameworks() {
 
     echo "▶ Sync Flutter local iOS binaries"
 
-    local flutter_core="${flutter_root}/runanywhere/ios/Frameworks"
-    local flutter_llama="${flutter_root}/runanywhere_llamacpp/ios/Frameworks"
-    local flutter_onnx="${flutter_root}/runanywhere_onnx/ios/Frameworks"
+    local flutter_core="${flutter_root}/runanywhere/ios/runanywhere/Frameworks"
+    local flutter_llama="${flutter_root}/runanywhere_llamacpp/ios/runanywhere_llamacpp/Frameworks"
+    local flutter_onnx="${flutter_root}/runanywhere_onnx/ios/runanywhere_onnx/Frameworks"
+
+    run rm -rf \
+        "${flutter_root}/runanywhere/ios/Frameworks/RACommons.xcframework" \
+        "${flutter_root}/runanywhere_llamacpp/ios/Frameworks/RABackendLLAMACPP.xcframework" \
+        "${flutter_root}/runanywhere_onnx/ios/Frameworks/RABackendONNX.xcframework" \
+        "${flutter_root}/runanywhere_onnx/ios/Frameworks/RABackendSherpa.xcframework" \
+        "${flutter_root}/runanywhere_onnx/ios/Frameworks/onnxruntime.xcframework"
 
     run mkdir -p "${flutter_core}" "${flutter_llama}" "${flutter_onnx}"
 

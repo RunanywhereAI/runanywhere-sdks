@@ -50,7 +50,7 @@ class Onnx {
   static const String version = '2.0.0';
 
   /// ONNX Runtime library version (underlying C library)
-  static const String onnxRuntimeVersion = '1.23.2';
+  static const String onnxRuntimeVersion = '1.24.3';
 
   // ============================================================================
   // Registration State

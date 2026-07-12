@@ -25,6 +25,7 @@
  */
 
 #include "hf_resolver.h"
+#include "bundle_policy_registry_internal.h"
 
 #include <cstdint>
 #include <cstring>
@@ -143,7 +144,7 @@ const rac_bundle_policy_t* bundle_policy_for(rac_inference_framework_t framework
     if (framework == RAC_FRAMEWORK_UNKNOWN) {
         return nullptr;
     }
-    return rac_bundle_policy_find(framework);
+    return rac::infra::bundle_policy::find(framework);
 }
 
 // Convert the optional proto framework once so downstream helpers can stay on
@@ -452,7 +453,7 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         made_model.set_context_length(request.context_length());
     }
     if (request.has_description()) {
-        made_model.set_description(request.description());
+        made_model.mutable_metadata()->set_description(request.description());
     }
     if (request.has_download_size_bytes()) {
         made_model.set_download_size_bytes(request.download_size_bytes());
@@ -606,7 +607,7 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
         model.set_supports_lora(request.supports_lora());
     }
     if (request.has_description()) {
-        model.set_description(request.description());
+        model.mutable_metadata()->set_description(request.description());
     }
     *model.mutable_multi_file()->mutable_files() = request.files();
     model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);

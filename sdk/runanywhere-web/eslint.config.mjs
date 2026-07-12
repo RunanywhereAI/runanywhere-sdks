@@ -110,6 +110,7 @@ export default tseslint.config(
     files: [
       'eslint.config.mjs',
       'playwright.config.ts',
+      'packages/core/src/Infrastructure/AudioCaptureProcessor.js',
       'scripts/**/*.{js,mjs,cjs}',
       'tests/browser/**/*.ts',
     ],

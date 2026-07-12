@@ -184,8 +184,7 @@ message TTSOptions {
     // depending on model convention.
     int32              speaker_id          = 9;
 
-    // Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate.
-    float              speed               = 10;
+    reserved 10;
 
     // Optional style/emotion hint for voices that support style transfer.
     optional string    style               = 11;

@@ -11,7 +11,6 @@ import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
-import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
@@ -31,7 +30,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   bool _isSDKInitialized = false;
   bool _isInitializing = true;
   String? _initializationError;
-  static bool _mlxRegistered = false;
 
   @override
   void initState() {
@@ -97,7 +95,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Model paths + registry must be ready before catalog registration.
       await RunAnywhere.completeServicesInitialization();
-      await ModelCatalogBootstrap.registerAll(mlxRegistered: _mlxRegistered);
+      await ModelCatalogBootstrap.registerAll();
       await _registerRagBackend();
       await RunAnywhere.refreshModelRegistry();
 
@@ -171,28 +169,16 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('⚠️ ONNX backend not available: $e');
     }
 
-    try {
-      _mlxRegistered = await MLX.register();
-      if (_mlxRegistered) {
-        debugPrint(
-          '✅ MLX backend registered (LLM + VLM + STT + TTS + Embeddings)',
-        );
-      } else {
-        debugPrint(
-          'ℹ️ MLX backend not available (Apple MLX runtime not linked)',
-        );
-      }
-    } catch (e) {
-      _mlxRegistered = false;
-      debugPrint('⚠️ MLX backend not available: $e');
-    }
-
     // QHexRT (Qualcomm Hexagon NPU). Safe no-op on non-Snapdragon / non-Android;
     // register() rejects internally on unsupported parts.
     if (QHexRT.isAvailable) {
       try {
-        await QHexRT.register();
-        debugPrint('✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)');
+        final registered = await QHexRT.register();
+        debugPrint(
+          registered
+              ? '✅ QHexRT NPU backend registered (LLM + VLM + STT + TTS)'
+              : 'ℹ️ QHexRT NPU backend registration was rejected',
+        );
       } catch (e) {
         debugPrint('⚠️ QHexRT backend not available: $e');
       }

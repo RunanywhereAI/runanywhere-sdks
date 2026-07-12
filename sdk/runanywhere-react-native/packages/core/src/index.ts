@@ -91,7 +91,6 @@ export {
   emptyStorageInfo,
   totalModelsSizeBytes,
   totalModelsSize,
-  storedModels,
   usagePercentage,
 } from './Public/Extensions/Storage/StorageProto+Helpers';
 
@@ -115,9 +114,7 @@ export { AudioPlaybackManager } from './Features/VoiceSession/AudioPlaybackManag
 // Mic-driven voice-agent ingress (capture → endpoint → processVoiceTurn → TTS
 // playback). Mirrors the Kotlin/Flutter VoiceAgentMicDriver; without it the
 // voice agent only observes output events and never receives audio.
-export {
-  VoiceAgentMicDriver,
-} from './Features/VoiceSession/VoiceAgentMicDriver';
+export { VoiceAgentMicDriver } from './Features/VoiceSession/VoiceAgentMicDriver';
 export type {
   VoiceAgentMicTurn,
   VoiceAgentMicPhase,

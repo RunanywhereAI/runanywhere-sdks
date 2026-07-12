@@ -151,7 +151,7 @@ export interface StreamWorkerModule {
     callbackPtr: number,
     userData: number,
   ): number | Promise<number>;
-  _rac_vlm_cancel_proto?(handle: number): number;
+  _rac_vlm_cancel_lifecycle_proto?(outEvent: number): number;
 }
 
 export type StreamModuleFactory = (wasmBytes: ArrayBuffer) => Promise<StreamWorkerModule>;
@@ -201,8 +201,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
    * best diagnostic noise and at worst a latent correctness bug once
    * any export becomes Asyncify-style interruptible.
    *
-   * `handle` is captured for VLM, which cancels per-instance via
-   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation requires a valid
+   * LLM and VLM lifecycle cancellation require a valid
    * `rac_proto_buffer_t*` output pointer — passing 0 (null) returns
    * `RAC_ERROR_NULL_POINTER` before the engine cancel ever runs.
    * STT/TTS have no cancel ABI yet — those entries are removed silently
@@ -372,9 +371,24 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
               break;
             }
             case 'stream.vlm.generate':
-              // Handle 0 routes the cancel to the lifecycle-owned VLM
-              // service (the typed stream ABI threads no handle).
-              mod._rac_vlm_cancel_proto?.(0);
+              if (
+                mod._rac_vlm_cancel_lifecycle_proto &&
+                mod._rac_wasm_sizeof_proto_buffer &&
+                mod._rac_proto_buffer_init &&
+                mod._rac_proto_buffer_free
+              ) {
+                const sz = mod._rac_wasm_sizeof_proto_buffer();
+                const bufPtr = mod._malloc(Math.max(sz, 1));
+                if (bufPtr) {
+                  try {
+                    mod._rac_proto_buffer_init(bufPtr);
+                    mod._rac_vlm_cancel_lifecycle_proto(bufPtr);
+                  } finally {
+                    mod._rac_proto_buffer_free(bufPtr);
+                    mod._free(bufPtr);
+                  }
+                }
+              }
               break;
             case 'stream.stt.transcribe':
             case 'stream.tts.synthesize':

@@ -16,7 +16,11 @@ import 'package:runanywhere/generated/errors.pbenum.dart'
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework, ModelCategory, ModelFileRole, ModelFormat,
+    show
+        InferenceFramework,
+        ModelCategory,
+        ModelFileRole,
+        ModelFormat,
         ModelSource;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
@@ -60,7 +64,8 @@ class RunAnywhereLoRACapability {
       );
     }
 
-    final effectiveScale = scale ??
+    final effectiveScale =
+        scale ??
         (entry.hasDefaultScale() && entry.defaultScale > 0
             ? entry.defaultScale
             : 1.0);
@@ -211,8 +216,8 @@ class RunAnywhereLoRACapability {
   /// Stable model-registry id used for an adapter's download artifact.
   String _loraArtifactModelId(LoraAdapterCatalogEntry entry) =>
       entry.id.startsWith(_loraArtifactModelIdPrefix)
-          ? entry.id
-          : '$_loraArtifactModelIdPrefix${entry.id}';
+      ? entry.id
+      : '$_loraArtifactModelIdPrefix${entry.id}';
 
   /// Convert a catalog entry into model-registry metadata used by the
   /// generic download path. Catalog filtering and completion state remain
@@ -266,7 +271,6 @@ class RunAnywhereLoRACapability {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
       downloadUrl: entry.url,
       source: ModelSource.MODEL_SOURCE_REMOTE,
-      description: entry.description,
       singleFile: model_pb.SingleFileArtifact(
         requiredPatterns: [artifactFilename],
         expectedFiles: expectedFiles,
@@ -290,8 +294,9 @@ class RunAnywhereLoRACapability {
   ) async {
     final registered = await register(entry);
     final artifact = _toLoraArtifactModelInfo(registered);
-    final saved =
-        await DartBridgeModelRegistry.instance.saveProtoModel(artifact);
+    final saved = await DartBridgeModelRegistry.instance.saveProtoModel(
+      artifact,
+    );
     if (!saved) {
       // Mirrors Swift CppBridge.ModelRegistry.save failure
       // (CppBridge+ModelRegistry.swift:160-162): `.processingFailed`.
@@ -316,8 +321,9 @@ class RunAnywhereLoRACapability {
     final artifact = await registerArtifact(entry);
 
     String localPath = '';
-    await for (final progress
-        in RunAnywhereDownloads.shared.start(artifact.id)) {
+    await for (final progress in RunAnywhereDownloads.shared.start(
+      artifact.id,
+    )) {
       onProgress?.call(progress.overallProgress);
       if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
         // Mirrors Swift's `RunAnywhere.downloadModel` terminal-failure throw
@@ -338,8 +344,9 @@ class RunAnywhereLoRACapability {
 
     if (localPath.isEmpty) {
       // The import step persisted the path on the registry record.
-      final lookup =
-          await DartBridgeModelRegistry.instance.getProtoModel(artifact.id);
+      final lookup = await DartBridgeModelRegistry.instance.getProtoModel(
+        artifact.id,
+      );
       localPath = lookup?.localPath ?? '';
     }
     if (localPath.isEmpty) {
@@ -353,10 +360,12 @@ class RunAnywhereLoRACapability {
       );
     }
 
-    await markDownloadCompleted(LoraAdapterDownloadCompletedRequest(
-      adapterId: entry.id,
-      localPath: localPath,
-    ));
+    await markDownloadCompleted(
+      LoraAdapterDownloadCompletedRequest(
+        adapterId: entry.id,
+        localPath: localPath,
+      ),
+    );
     return localPath;
   }
 }

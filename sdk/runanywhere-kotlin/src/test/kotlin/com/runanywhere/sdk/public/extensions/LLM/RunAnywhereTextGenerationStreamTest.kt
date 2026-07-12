@@ -101,7 +101,7 @@ class RunAnywhereTextGenerationStreamTest {
             assertEquals("stress-model", result.model_used)
             assertEquals("stress-framework", result.framework)
             assertNull(result.error_message)
-            assertEquals(1, cancelCalls.get())
+            assertEquals(0, cancelCalls.get())
         }
 
     @Test

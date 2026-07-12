@@ -206,7 +206,7 @@ int test_metadata_normalization_into_model_info() {
     runanywhere::v1::ModelInfo remote;
     remote.set_id("cpp03.normalized");
     remote.set_download_url("https://example.test/models/cpp03.normalized.gguf");
-    remote.set_description("remote catalog description");
+    remote.mutable_metadata()->set_description("remote catalog description");
     remote.set_download_size_bytes(4096);
 
     FakeAssignmentTransport fake;

@@ -150,10 +150,6 @@ inline const ModelConfig WAKEWORD_MODELS[] = {
 constexpr size_t NUM_REQUIRED_MODELS = sizeof(REQUIRED_MODELS) / sizeof(REQUIRED_MODELS[0]);
 constexpr size_t NUM_WAKEWORD_MODELS = sizeof(WAKEWORD_MODELS) / sizeof(WAKEWORD_MODELS[0]);
 
-// Backward compatibility alias
-inline const ModelConfig* MODELS = REQUIRED_MODELS;
-constexpr size_t NUM_MODELS = NUM_REQUIRED_MODELS;
-
 // =============================================================================
 // Model System Initialization
 // =============================================================================
@@ -242,8 +238,8 @@ inline std::string get_wakeword_melspec_path() {
 
 // Register all pre-configured models with the registry
 inline bool register_models(rac_model_registry_handle_t registry) {
-    for (size_t i = 0; i < NUM_MODELS; ++i) {
-        const ModelConfig& cfg = MODELS[i];
+    for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
+        const ModelConfig& cfg = REQUIRED_MODELS[i];
 
         rac_model_info_t* model = rac_model_info_alloc();
         if (!model) {

@@ -204,11 +204,9 @@ class VectorStoreUSearch::Impl {
             }
 
             SearchResult result;
-            result.chunk_id = it->second.id;
-            result.id = it->second.id;  // Alias
+            result.id = it->second.id;
             result.text = it->second.text;
-            result.similarity = similarity;
-            result.score = similarity;  // Alias
+            result.score = similarity;
             result.metadata = it->second.metadata;
             results.push_back(std::move(result));
         }

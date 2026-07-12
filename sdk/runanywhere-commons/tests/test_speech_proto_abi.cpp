@@ -3,13 +3,15 @@
  * @brief Generated-proto C ABI coverage for STT/TTS/VAD/VoiceAgent.
  */
 
-#include <cmath>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -254,6 +256,12 @@ std::string g_last_tts_input;
 std::atomic<int> g_stt_active_calls{0};
 std::atomic<int> g_stt_max_active_calls{0};
 std::atomic<int> g_stt_delay_ms{0};
+std::mutex g_llm_cancel_mutex;
+std::condition_variable g_llm_cancel_cv;
+bool g_llm_block_until_cancel{false};
+bool g_llm_generate_entered{false};
+bool g_llm_cancel_requested{false};
+std::atomic<int> g_llm_cancel_calls{0};
 
 rac_result_t mock_stt_create(const char*, const char*, void** out_impl) {
     *out_impl = new MockStt();
@@ -271,9 +279,7 @@ rac_result_t mock_stt_transcribe(void* impl, const void* audio_data, size_t audi
         return RAC_ERROR_INVALID_ARGUMENT;
     const int active = g_stt_active_calls.fetch_add(1) + 1;
     int observed = g_stt_max_active_calls.load();
-    while (active > observed &&
-           !g_stt_max_active_calls.compare_exchange_weak(observed, active)) {
-    }
+    while (active > observed && !g_stt_max_active_calls.compare_exchange_weak(observed, active)) {}
     const int delay_ms = g_stt_delay_ms.load();
     if (delay_ms > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
@@ -414,12 +420,31 @@ rac_result_t mock_llm_generate(void*, const char* prompt, const rac_llm_options_
                                rac_llm_result_t* out_result) {
     if (!prompt || !out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
+    {
+        std::unique_lock<std::mutex> lock(g_llm_cancel_mutex);
+        if (g_llm_block_until_cancel) {
+            g_llm_generate_entered = true;
+            g_llm_cancel_cv.notify_all();
+            g_llm_cancel_cv.wait(lock, [] { return g_llm_cancel_requested; });
+            return RAC_ERROR_CANCELLED;
+        }
+    }
     out_result->text = dup_cstr(g_mock_llm_response.c_str());
     out_result->prompt_tokens = 2;
     out_result->completion_tokens = 2;
     out_result->total_tokens = 4;
     out_result->total_time_ms = 9;
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+}
+
+rac_result_t mock_llm_cancel(void*) {
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_cancel_requested = true;
+    }
+    g_llm_cancel_calls.fetch_add(1);
+    g_llm_cancel_cv.notify_all();
+    return RAC_SUCCESS;
 }
 
 void mock_llm_destroy(void* impl) {
@@ -462,6 +487,7 @@ void install_mock_plugin() {
     g_llm_ops.create = mock_llm_create;
     g_llm_ops.initialize = mock_llm_initialize;
     g_llm_ops.generate = mock_llm_generate;
+    g_llm_ops.cancel = mock_llm_cancel;
     g_llm_ops.destroy = mock_llm_destroy;
 
     g_speech_vtable = {};
@@ -958,6 +984,142 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     return 0;
 }
 
+int test_voice_agent_d7_queued_cancel_and_next_request_isolation() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 queued-cancel voice agent creates");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
+    CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
+          "D-7 queued-cancel voice agent initializes");
+
+    VoiceCapture handle_capture;
+    CHECK(rac_voice_agent_set_proto_callback(agent, voice_callback, &handle_capture) == RAC_SUCCESS,
+          "D-7 queued-cancel handle callback registers");
+
+    runanywhere::v1::VoiceAgentTurnRequest cancelled_request;
+    cancelled_request.set_request_id("req-cancel-queued");
+    cancelled_request.set_session_id("session-cancel-queued");
+    const int16_t audio[] = {0, 1, 2, 3};
+    cancelled_request.set_audio_data(audio, sizeof(audio));
+    cancelled_request.set_sample_rate_hz(16000);
+    cancelled_request.set_channels(1);
+    cancelled_request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
+    std::vector<uint8_t> cancelled_bytes;
+    CHECK(serialize(cancelled_request, &cancelled_bytes), "D-7 queued-cancel request serializes");
+
+    g_llm_cancel_calls = 0;
+    CHECK(rac_voice_agent_cancel_turn_proto(agent, cancelled_bytes.data(),
+                                            cancelled_bytes.size()) == RAC_SUCCESS,
+          "D-7 accepts cancellation before worker turn starts");
+    CHECK(g_llm_cancel_calls.load() == 0,
+          "D-7 cancel-before-start latches without interrupting an inactive backend");
+
+    VoiceCapture turn_capture;
+    const rac_result_t cancelled_rc = rac_voice_agent_process_turn_proto(
+        agent, cancelled_bytes.data(), cancelled_bytes.size(), voice_callback, &turn_capture);
+    CHECK(cancelled_rc == RAC_ERROR_CANCELLED, "D-7 queued request exits with RAC_ERROR_CANCELLED");
+    CHECK(g_llm_cancel_calls.load() == 0, "D-7 latched cancellation refuses backend admission");
+
+    bool saw_app_stop = false;
+    bool saw_stopped = false;
+    for (const auto& event : turn_capture.events) {
+        saw_app_stop = saw_app_stop ||
+                       (event.has_interrupted() &&
+                        event.interrupted().reason() == runanywhere::v1::INTERRUPT_REASON_APP_STOP);
+        saw_stopped =
+            saw_stopped || (event.has_state() &&
+                            event.state().current() == runanywhere::v1::PIPELINE_STATE_STOPPED);
+    }
+    CHECK(saw_app_stop, "D-7 queued cancellation emits structured APP_STOP interruption");
+    CHECK(saw_stopped, "D-7 queued cancellation emits STOPPED pipeline state");
+    CHECK(saw_turn_kind(handle_capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_CANCELLED),
+          "D-7 queued cancellation emits TURN_CANCELLED lifecycle event");
+
+    runanywhere::v1::VoiceAgentTurnRequest next_request = cancelled_request;
+    next_request.set_request_id("req-after-cancel");
+    next_request.set_session_id("session-after-cancel");
+    std::vector<uint8_t> next_bytes;
+    CHECK(serialize(next_request, &next_bytes), "D-7 post-cancel request serializes");
+    VoiceCapture next_capture;
+    const rac_result_t next_rc = rac_voice_agent_process_turn_proto(
+        agent, next_bytes.data(), next_bytes.size(), voice_callback, &next_capture);
+    CHECK(next_rc == RAC_SUCCESS, "D-7 cancellation is isolated and the next request completes");
+
+    (void)rac_voice_agent_set_proto_callback(agent, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_active_llm_cancel() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 active-cancel voice agent creates");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
+    CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
+          "D-7 active-cancel voice agent initializes");
+
+    VoiceCapture handle_capture;
+    CHECK(rac_voice_agent_set_proto_callback(agent, voice_callback, &handle_capture) == RAC_SUCCESS,
+          "D-7 active-cancel handle callback registers");
+
+    runanywhere::v1::VoiceAgentTurnRequest request;
+    request.set_request_id("req-cancel-active-llm");
+    request.set_session_id("session-cancel-active-llm");
+    const int16_t audio[] = {0, 1, 2, 3};
+    request.set_audio_data(audio, sizeof(audio));
+    request.set_sample_rate_hz(16000);
+    request.set_channels(1);
+    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
+    std::vector<uint8_t> request_bytes;
+    CHECK(serialize(request, &request_bytes), "D-7 active-cancel request serializes");
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_block_until_cancel = true;
+        g_llm_generate_entered = false;
+        g_llm_cancel_requested = false;
+    }
+    g_llm_cancel_calls = 0;
+
+    VoiceCapture turn_capture;
+    std::atomic<rac_result_t> process_rc{RAC_ERROR_UNKNOWN};
+    std::thread worker([&] {
+        process_rc = rac_voice_agent_process_turn_proto(
+            agent, request_bytes.data(), request_bytes.size(), voice_callback, &turn_capture);
+    });
+
+    bool entered_llm = false;
+    {
+        std::unique_lock<std::mutex> lock(g_llm_cancel_mutex);
+        entered_llm = g_llm_cancel_cv.wait_for(lock, std::chrono::seconds(2),
+                                               [] { return g_llm_generate_entered; });
+    }
+    CHECK(entered_llm, "D-7 active-cancel fixture reaches blocking LLM stage");
+    CHECK(rac_voice_agent_cancel_turn_proto(agent, request_bytes.data(), request_bytes.size()) ==
+              RAC_SUCCESS,
+          "D-7 active LLM cancellation request is accepted");
+    worker.join();
+
+    CHECK(g_llm_cancel_calls.load() == 1,
+          "D-7 active LLM cancellation forwards exactly one backend interrupt");
+    CHECK(process_rc.load() == RAC_ERROR_CANCELLED,
+          "D-7 active LLM turn exits with RAC_ERROR_CANCELLED");
+    CHECK(saw_turn_kind(handle_capture, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_CANCELLED),
+          "D-7 active LLM cancellation emits TURN_CANCELLED lifecycle event");
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_cancel_mutex);
+        g_llm_block_until_cancel = false;
+        g_llm_generate_entered = false;
+        g_llm_cancel_requested = false;
+    }
+    (void)rac_voice_agent_set_proto_callback(agent, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
 int test_voice_agent_d7_transcribe_proto() {
     rac_voice_agent_handle_t agent = nullptr;
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 transcribe agent creates");
@@ -1044,6 +1206,8 @@ int main() {
         test_mocked_vad_and_activity();
         test_voice_agent_proto_sequence_and_component_failure();
         test_voice_agent_d7_process_turn_proto_full_flow();
+        test_voice_agent_d7_queued_cancel_and_next_request_isolation();
+        test_voice_agent_d7_active_llm_cancel();
         test_voice_agent_d7_transcribe_proto();
         test_voice_agent_d7_synthesize_speech_proto();
         test_voice_agent_d7_component_create_destroy_proto();

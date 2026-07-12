@@ -10,6 +10,7 @@
 # Output: third_party/sherpa-onnx-macos/
 #   lib/libsherpa-onnx-c-api.a (and dependency .a files)
 #   include/sherpa-onnx/c-api/c-api.h
+#   include/onnxruntime_{c,cxx}_api.h (and the matching ORT support headers)
 #
 # Prerequisites: cmake, git, clang (Xcode Command Line Tools)
 # Build time: ~5-10 minutes on Apple Silicon
@@ -29,6 +30,10 @@ if [ -z "${SHERPA_ONNX_VERSION_MACOS:-}" ]; then
     echo "ERROR: SHERPA_ONNX_VERSION_MACOS not loaded from VERSIONS file" >&2
     exit 1
 fi
+if [ -z "${SHERPA_ONNX_COMMIT_MACOS:-}" ]; then
+    echo "ERROR: SHERPA_ONNX_COMMIT_MACOS not loaded from VERSIONS file" >&2
+    exit 1
+fi
 
 SHERPA_VERSION="${SHERPA_ONNX_VERSION_MACOS}"
 
@@ -39,8 +44,13 @@ echo ""
 echo "Version: ${SHERPA_VERSION}"
 echo "Architecture: arm64 (Apple Silicon)"
 
-# Check if already built
-if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ]; then
+# Check if the complete release inventory is already built. Older runs copied
+# only Sherpa's C API header and would force the Swift build to discover a
+# separate ONNX Runtime dylib, so they must be rebuilt once.
+if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ] && \
+   [ -f "${SHERPA_DIR}/lib/libonnxruntime.a" ] && \
+   [ -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] && \
+   [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
     echo "✅ Sherpa-ONNX macOS static libs already exist at ${SHERPA_DIR}"
     echo "   To force rebuild, remove: rm -rf ${SHERPA_DIR}"
     exit 0
@@ -64,6 +74,12 @@ git clone --depth 1 --branch "v${SHERPA_VERSION}" \
     https://github.com/k2-fsa/sherpa-onnx.git \
     "${BUILD_TEMP}/sherpa-onnx"
 
+ACTUAL_COMMIT="$(git -C "${BUILD_TEMP}/sherpa-onnx" rev-parse HEAD)"
+if [ "${ACTUAL_COMMIT}" != "${SHERPA_ONNX_COMMIT_MACOS}" ]; then
+    echo "Error: sherpa-onnx v${SHERPA_VERSION} resolved to ${ACTUAL_COMMIT}, expected ${SHERPA_ONNX_COMMIT_MACOS}" >&2
+    exit 1
+fi
+
 # Build static libraries
 echo ""
 echo "==> Building static libraries for macOS arm64..."
@@ -76,7 +92,9 @@ cd "${BUILD_DIR}"
 cmake "${BUILD_TEMP}/sherpa-onnx" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_OSX_ARCHITECTURES="arm64" \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET="14.0" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOS_DEPLOYMENT_TARGET}" \
+    -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG -ffile-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build -fmacro-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build -fdebug-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build" \
+    -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -ffile-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build -fmacro-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build -fdebug-prefix-map=${BUILD_TEMP}=/runanywhere-sdks/sdk/runanywhere-commons/build/sherpa-onnx-macos-build" \
     -DBUILD_SHARED_LIBS=OFF \
     -DSHERPA_ONNX_ENABLE_C_API=ON \
     -DSHERPA_ONNX_ENABLE_BINARY=OFF \
@@ -108,10 +126,18 @@ for lib in \
     fi
 done
 
-# Copy ONNX Runtime static lib if built by sherpa-onnx
+# Copy ONNX Runtime static lib and its matching headers. The Swift release
+# packager consumes this exact static runtime for the macOS ONNX slice; using
+# headers from a separately downloaded dylib package would allow the compile
+# and link inputs to drift apart.
 ONNX_LIB=$(find "${BUILD_DIR}" -name "libonnxruntime.a" 2>/dev/null | head -1)
 if [ -n "${ONNX_LIB}" ]; then
     cp "${ONNX_LIB}" "${SHERPA_DIR}/lib/"
+fi
+
+ONNX_INCLUDE_DIR=$(find "${BUILD_DIR}" -type d -path "*/onnxruntime-src/include" 2>/dev/null | head -1)
+if [ -n "${ONNX_INCLUDE_DIR}" ]; then
+    cp -R "${ONNX_INCLUDE_DIR}/." "${SHERPA_DIR}/include/"
 fi
 
 # Copy headers
@@ -130,7 +156,10 @@ fi
 
 # Verify build
 echo ""
-if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ]; then
+if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ] && \
+   [ -f "${SHERPA_DIR}/lib/libonnxruntime.a" ] && \
+   [ -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] && \
+   [ -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
     echo "✅ Sherpa-ONNX macOS static build complete!"
     echo ""
     echo "Output: ${SHERPA_DIR}"
@@ -141,7 +170,7 @@ if [ -f "${SHERPA_DIR}/lib/libsherpa-onnx-c-api.a" ]; then
     echo "Headers:"
     find "${SHERPA_DIR}/include" -name "*.h" 2>/dev/null || echo "  (none found)"
 else
-    echo "❌ Build failed - libsherpa-onnx-c-api.a not found"
+    echo "❌ Build failed - complete Sherpa/ONNX static inventory not found"
     echo ""
     echo "Build directory: ${BUILD_DIR}"
     echo "Check build logs above for errors."

@@ -12,8 +12,8 @@ topics:
   - speech-recognition
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
-  flutter: '>=3.24.0'
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0'
 
 resolution: workspace
 
@@ -46,7 +46,7 @@ dependencies:
   # example apps). Mirrors Swift Features/STT/AudioCaptureManager and
   # Features/TTS/AudioPlaybackManager.
   audioplayers: ^6.0.0
-  record: ^6.1.0
+  record: ^7.1.1
   # Device info — previous cap `<11.3.2` removed 2026-05-19 (dep bump).
   # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
   # 13.x is now the latest stable and the cap is no longer warranted.

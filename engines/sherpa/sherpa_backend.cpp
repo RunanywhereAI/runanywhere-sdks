@@ -699,14 +699,11 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         // and by transducer models). NaN when the model emits no per-token
         // probs, which the hybrid router reads as "no quality signal".
         //
-        // ys_log_probs only exists on SherpaOnnxOfflineRecognizerResult in the
-        // confidence-patched fork (Android prebuilt). On the stock upstream
-        // prebuilt (iOS/macOS pod-archive) the field is absent, so the whole
-        // confidence path is compiled out and we report NaN — the same "no
-        // signal" outcome the patched path produces when probs are missing.
-        // SHERPA_HAS_YS_LOG_PROBS is set by engines/sherpa/CMakeLists.txt via a
-        // check_struct_has_member probe of the actual sherpa header.
-#if defined(SHERPA_HAS_YS_LOG_PROBS) && SHERPA_HAS_YS_LOG_PROBS
+        // The field is part of the upstream C API, but stock Whisper decoders
+        // leave it null. The pinned Android build patches Whisper to populate
+        // it. SHERPA_HEADER_HAS_YS_LOG_PROBS only protects builds using older
+        // headers; the pointer check below is the runtime capability check.
+#if defined(SHERPA_HEADER_HAS_YS_LOG_PROBS) && SHERPA_HEADER_HAS_YS_LOG_PROBS
         SHERPA_CONF_LOG(
             "fields: count=%d text_len=%zu lang=%s "
             "ys_log_probs=%s timestamps=%s tokens_arr=%s durations=%s",
@@ -1611,10 +1608,8 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
 
     // Clear any stale cancel signal from a prior
     // synthesis so cancel() observed during THIS call's blocking
-    // SherpaOnnxOfflineTtsGenerate is what we react to. The Sherpa-ONNX C TTS
-    // API has no cancellation hook, so the flag is consulted post-generate to
-    // suppress the result instead of preempting compute. With the mutex held
-    // across the whole call, this reset cannot race a concurrent synthesize().
+    // generation is what we react to. With the mutex held across the whole
+    // call, this reset cannot race a concurrent synthesize().
     cancel_requested_.store(false, std::memory_order_release);
 
     if (!sherpa_tts_ || !model_loaded_) {
@@ -1637,9 +1632,19 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
 
     RAC_LOG_DEBUG("Sherpa.TTS", "Speaker ID: %d, Speed: %.2f", speaker_id, speed);
 
+    SherpaOnnxGenerationConfig generation_config{};
+    generation_config.sid = speaker_id;
+    generation_config.speed = speed;
+
     const SherpaOnnxGeneratedAudio* audio = nullptr;
     try {
-        audio = SherpaOnnxOfflineTtsGenerate(tts_ptr, request.text.c_str(), speaker_id, speed);
+        audio = SherpaOnnxOfflineTtsGenerateWithConfig(
+            tts_ptr, request.text.c_str(), &generation_config,
+            [](const float*, int32_t, float, void* user_data) -> int32_t {
+                const auto* cancelled = static_cast<const std::atomic<bool>*>(user_data);
+                return cancelled->load(std::memory_order_acquire) ? 0 : 1;
+            },
+            &cancel_requested_);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("Sherpa.TTS", "Exception during TTS synthesis: %s", e.what());
         RAC_LOG_ERROR("Sherpa.TTS", "Model dir: %s, espeak data was: %s", model_dir_.c_str(),
@@ -1659,21 +1664,19 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
     }
 
     // Drop the post-stop
-    // result if cancel() fired while SherpaOnnxOfflineTtsGenerate was running
+    // result if cancel() fired while Sherpa-ONNX generation was running
     // OR before we acquired the mutex (epoch bumped past entry_epoch). We
-    // can't preempt the blocking Piper generator, but we MUST NOT surface its
-    // chunk/completion through the stream wrapper after the SDK requested a
-    // stop — empty audio_samples here makes the rac_tts_sherpa_synthesize
-    // wrapper return RAC_ERROR_INFERENCE_FAILED so the lifecycle stream/
-    // one-shot path does not deliver phantom audio.
+    // The progress callback requests an early stop, and this postcondition also
+    // covers models that only invoke the callback after a large generation
+    // unit. Empty audio_samples makes the wrapper return an inference failure
+    // instead of delivering post-cancel audio.
     if (cancel_requested_.load(std::memory_order_acquire) ||
         cancel_epoch_.load(std::memory_order_acquire) != entry_epoch) {
         int dropped_samples = audio->n;
         SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
         RAC_LOG_WARNING("Sherpa.TTS",
                         "Dropping %d-sample synthesis result; cancel was "
-                        "requested during blocking generation (Sherpa-ONNX TTS "
-                        "compute cannot be preempted)",
+                        "requested during Sherpa-ONNX TTS generation",
                         dropped_samples);
         return result;
     }

@@ -64,6 +64,10 @@ fi
 
 cd "$REPO_ROOT"
 
+# Package.swift defaults to remote release artifacts for external consumers.
+# This build contract has just staged local XCFrameworks, so opt in explicitly.
+export RUNANYWHERE_USE_LOCAL_NATIVES=1
+
 echo ">> swift package resolve"
 swift package resolve
 

@@ -237,14 +237,6 @@ EMSCRIPTEN_KEEPALIVE
 int rac_wasm_sizeof_vlm_image(void) { return (int)sizeof(rac_vlm_image_t); }
 
 /**
- * Helper: Get sizeof rac_structured_output_config_t for JS allocation.
- */
-EMSCRIPTEN_KEEPALIVE
-int rac_wasm_sizeof_structured_output_config(void) {
-  return (int)sizeof(rac_structured_output_config_t);
-}
-
-/**
  * Helper: Get sizeof rac_diffusion_options_t for JS allocation.
  */
 EMSCRIPTEN_KEEPALIVE
@@ -517,31 +509,6 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_total_time_ms(void) {
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_tokens_per_second(void) {
   return (int)offsetof(rac_vlm_result_t, tokens_per_second);
-}
-
-// ---- rac_structured_output_config_t ----
-EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_structured_output_config_json_schema(void) {
-  return (int)offsetof(rac_structured_output_config_t, json_schema);
-}
-EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_structured_output_config_include_schema_in_prompt(void) {
-  return (int)offsetof(rac_structured_output_config_t,
-                       include_schema_in_prompt);
-}
-
-// ---- rac_structured_output_validation_t ----
-EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_structured_output_validation_is_valid(void) {
-  return (int)offsetof(rac_structured_output_validation_t, is_valid);
-}
-EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_structured_output_validation_error_message(void) {
-  return (int)offsetof(rac_structured_output_validation_t, error_message);
-}
-EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_structured_output_validation_extracted_json(void) {
-  return (int)offsetof(rac_structured_output_validation_t, extracted_json);
 }
 
 // ---- rac_embeddings_options_t ----

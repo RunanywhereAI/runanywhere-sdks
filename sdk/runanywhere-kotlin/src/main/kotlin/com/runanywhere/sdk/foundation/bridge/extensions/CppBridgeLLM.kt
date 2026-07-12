@@ -69,25 +69,9 @@ internal fun RALLMGenerationOptions?.toGenerateRequest(
             repetition_penalty = options.repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
             streaming_enabled = streaming || options.streaming_enabled,
         )
-    val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = requestOptions.max_tokens,
-        temperature = requestOptions.temperature,
-        top_p = requestOptions.top_p,
-        top_k = requestOptions.top_k,
-        system_prompt = options.system_prompt.orEmpty(),
         emit_thoughts = options.thinking_pattern != null,
-        repetition_penalty = requestOptions.repetition_penalty,
-        stop_sequences = options.stop_sequences,
-        streaming_enabled = requestOptions.streaming_enabled,
-        preferred_framework = options.preferred_framework.name,
-        json_schema = schema,
-        // Constrained-decoding grammar. Prefer the structured_output grammar, fall back to the top-level
-        // field; without this the grammar set on the options was silently dropped on the public generate
-        // path (C++ options_from_request already forwards it to rac_llm_options_t.grammar).
-        grammar = options.structured_output?.grammar ?: options.grammar.orEmpty(),
-        execution_target = options.execution_target?.name.orEmpty(),
         options = requestOptions,
     )
 }

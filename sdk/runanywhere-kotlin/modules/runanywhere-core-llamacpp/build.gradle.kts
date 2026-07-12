@@ -120,16 +120,6 @@ android {
         jniLibs.keepDebugSymbols += "**/*.so"
     }
 
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
-        }
-        getByName("test") {
-            java.srcDirs("src/test/kotlin")
-        }
-    }
-
     publishing {
         singleVariant("release") {
             withSourcesJar()
@@ -155,7 +145,7 @@ dependencies {
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
-        ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
+        ?: rootProject.version.toString()
 
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
@@ -260,9 +250,7 @@ group =
         else -> "io.github.sanchitmonga22"
     }
 
-version = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
+version = rootProject.version
 
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
@@ -279,6 +267,9 @@ val signingPassword: String? =
 val signingKey: String? =
     System.getenv("GPG_SIGNING_KEY")
         ?: project.findProperty("signing.key") as String?
+val skipSigning: Boolean =
+    rootProject.findProperty("runanywhere.skipSigning")?.toString()?.toBoolean()
+        ?: false
 
 afterEvaluate {
     publishing {
@@ -354,6 +345,7 @@ afterEvaluate {
 
 tasks.withType<Sign>().configureEach {
     onlyIf {
-        project.hasProperty("signing.gnupg.keyName") || signingKey != null
+        !skipSigning &&
+            (project.hasProperty("signing.gnupg.keyName") || signingKey != null)
     }
 }

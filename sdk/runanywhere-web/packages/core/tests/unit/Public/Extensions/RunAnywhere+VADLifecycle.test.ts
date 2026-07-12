@@ -15,6 +15,7 @@ import {
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
 interface LifecycleCounters {
   componentCreates: number;
@@ -172,7 +173,8 @@ function fakeLifecycleModule(): { module: FakeModule; counters: LifecycleCounter
     },
   };
 
-  return { module: partial as unknown as FakeModule, counters };
+  const module = installCurrentModelRegistryExports(partial) as unknown as FakeModule;
+  return { module, counters };
 }
 
 async function* chunks(count: number): AsyncIterable<Float32Array> {

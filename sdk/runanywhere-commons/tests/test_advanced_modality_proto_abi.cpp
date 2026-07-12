@@ -475,15 +475,6 @@ int test_missing_component_and_parse_error() {
           "missing embeddings component marks buffer error");
     rac_proto_buffer_free(&out);
 
-    DummyVlm impl;
-    rac_vlm_service_ops_t vlm_ops = make_vlm_ops();
-    rac_vlm_service_t service{&vlm_ops, &impl, "mock-vlm"};
-    const uint8_t bad[] = {0xff, 0xff, 0xff};
-    rac_proto_buffer_init(&out);
-    rc = rac_vlm_process_proto(&service, bad, sizeof(bad), bad, sizeof(bad), &out);
-    CHECK(rc == RAC_ERROR_DECODING_ERROR, "invalid VLM request returns decoding error");
-    CHECK(out.status == RAC_ERROR_DECODING_ERROR, "invalid VLM request marks buffer error");
-    rac_proto_buffer_free(&out);
     return 0;
 }
 
@@ -499,9 +490,6 @@ rac_bool_t vlm_stream_capture(const uint8_t* bytes, size_t size, void* user_data
 
 int test_vlm_process_stream_events() {
     rac_sdk_event_clear_queue();
-    DummyVlm impl;
-    rac_vlm_service_ops_t ops = make_vlm_ops();
-    rac_vlm_service_t service{&ops, &impl, "mock-vlm"};
 
     runanywhere::v1::VLMImage image;
     image.set_file_path("/tmp/test-image.png");
@@ -509,27 +497,8 @@ int test_vlm_process_stream_events() {
     runanywhere::v1::VLMGenerationOptions options;
     options.set_prompt("describe");
     options.set_max_tokens(16);
-    std::vector<uint8_t> image_bytes;
-    std::vector<uint8_t> options_bytes;
-    CHECK(serialize(image, &image_bytes), "VLMImage serializes");
-    CHECK(serialize(options, &options_bytes), "VLMGenerationOptions serializes");
-
     rac_proto_buffer_t out;
-    rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_vlm_process_proto(&service, image_bytes.data(), image_bytes.size(),
-                                            options_bytes.data(), options_bytes.size(), &out);
-    runanywhere::v1::VLMResult result;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VLM process returns VLMResult");
-    CHECK(result.text() == "vlm:describe", "VLM process preserves prompt path");
-    CHECK(impl.last_temperature == 0.0f, "VLM process preserves explicit greedy temperature");
-    CHECK(result.image_tokens() == 256, "VLM process preserves image token count");
-    CHECK(result.time_to_first_token_ms() == 4, "VLM process preserves time to first token");
-    CHECK(result.image_encode_time_ms() == 6, "VLM process preserves image encode time");
-    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED),
-          "VLM process emits started capability event");
-    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED),
-          "VLM process emits completed capability event");
-    rac_proto_buffer_free(&out);
+    rac_result_t rc = RAC_SUCCESS;
 
     // Typed stream ABI (rac_vlm_stream_proto) uses the lifecycle-owned VLM,
     // so register a llamacpp-named mock plugin + multimodal model and load
@@ -583,6 +552,21 @@ int test_vlm_process_stream_events() {
     std::vector<uint8_t> stream_request_bytes;
     CHECK(serialize(stream_request, &stream_request_bytes), "VLMGenerationRequest serializes");
 
+    rac_sdk_event_clear_queue();
+    rac_proto_buffer_init(&out);
+    rc = rac_vlm_generate_proto(stream_request_bytes.data(), stream_request_bytes.size(), &out);
+    runanywhere::v1::VLMResult result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VLM generate returns VLMResult");
+    CHECK(result.text() == "vlm:describe", "VLM generate preserves prompt path");
+    CHECK(result.image_tokens() == 256, "VLM generate preserves image token count");
+    CHECK(result.time_to_first_token_ms() == 4, "VLM generate preserves time to first token");
+    CHECK(result.image_encode_time_ms() == 6, "VLM generate preserves image encode time");
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED),
+          "VLM generate emits started capability event");
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED),
+          "VLM generate emits completed capability event");
+    rac_proto_buffer_free(&out);
+
     StreamCapture capture;
     rc = rac_vlm_stream_proto(stream_request_bytes.data(), stream_request_bytes.size(),
                               vlm_stream_capture, &capture);
@@ -607,6 +591,17 @@ int test_vlm_process_stream_events() {
               terminal_event.is_final() && terminal_event.result().text() == "hello vision",
           "VLM typed stream terminal COMPLETED carries the aggregate result");
 
+    rac_proto_buffer_init(&out);
+    rc = rac_vlm_cancel_lifecycle_proto(&out);
+    runanywhere::v1::SDKEvent cancel_event;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &cancel_event),
+          "VLM lifecycle cancel returns SDKEvent");
+    CHECK(cancel_event.has_cancellation() &&
+              cancel_event.cancellation().kind() ==
+                  runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
+          "VLM lifecycle cancel returns completed cancellation event");
+    rac_proto_buffer_free(&out);
+
     // Unload + teardown so later tests don't observe a lifecycle VLM.
     runanywhere::v1::ModelUnloadRequest stream_unload;
     stream_unload.set_model_id("mock-vlm-stream");
@@ -620,8 +615,6 @@ int test_vlm_process_stream_events() {
     (void)rac_plugin_unregister("llamacpp");
     rac_model_registry_destroy(stream_registry);
 
-    CHECK(rac_vlm_cancel_proto(&service) == RAC_SUCCESS, "VLM cancel proto succeeds");
-    CHECK(impl.cancel_count == 1, "VLM cancel dispatches backend cancel");
     return 0;
 }
 
@@ -889,9 +882,19 @@ int test_rag_ingest_query_mocked_path() {
     // the real RAGBackend/provider path and require the portable result.
     rac_handle_t sink_embed_handle = nullptr;
     rac_handle_t sink_llm_handle = nullptr;
-    CHECK(rac_embeddings_create(embedding_path_str.c_str(), &sink_embed_handle) == RAC_SUCCESS &&
-              sink_embed_handle != nullptr,
+    runanywhere::v1::EmbeddingsCreateRequest embed_create_request;
+    embed_create_request.set_model_id(embedding_path_str);
+    std::vector<uint8_t> embed_create_bytes;
+    CHECK(serialize(embed_create_request, &embed_create_bytes),
+          "RAG sink-cancel embeddings request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_embeddings_create_proto(embed_create_bytes.data(), embed_create_bytes.size(), &out);
+    runanywhere::v1::EmbeddingsCreateResult embed_create_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &embed_create_result) &&
+              embed_create_result.error_code() == 0 && embed_create_result.handle() != 0,
           "RAG sink-cancel embeddings service creates");
+    sink_embed_handle = reinterpret_cast<rac_handle_t>(embed_create_result.handle());
+    rac_proto_buffer_free(&out);
     CHECK(rac_llm_create(llm_path_str.c_str(), &sink_llm_handle) == RAC_SUCCESS &&
               sink_llm_handle != nullptr,
           "RAG sink-cancel LLM service creates");

@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
+    "typecheck:installed": "tsc --noEmit -p tsconfig.installed-sdk.json",
     "test": "vitest run",
     "release:vendor": "npm --prefix ../../../sdk/runanywhere-web run vendor:wasm:speech",
     "release:wasm": "npm run release:vendor && npm --prefix ../../../sdk/runanywhere-web run build:wasm:all",
@@ -19,7 +20,7 @@
     "sync-solutions": "node scripts/sync-solutions.mjs"
   },
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "devDependencies": {
     "@bufbuild/protobuf": "^2.12.1",

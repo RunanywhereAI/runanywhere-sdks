@@ -39,7 +39,7 @@ void loader_destroy() {
 }
 
 const rac_runtime_vtable_v2_t k_loader_vtable_v2 = {
-    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION,
     /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
     /* .run_session_v2 = */ nullptr,
     /* .alloc_buffer   = */ nullptr,

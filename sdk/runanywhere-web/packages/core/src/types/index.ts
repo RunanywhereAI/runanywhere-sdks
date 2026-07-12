@@ -295,7 +295,6 @@ export type {
   ModelInfo,
   SDKInitOptions,
   StorageInfo,
-  StoredModel,
 } from './models.js';
 export type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
 export type { ModelInfoMetadata } from '@runanywhere/proto-ts/model_types';

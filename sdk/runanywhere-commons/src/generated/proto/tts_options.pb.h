@@ -1314,7 +1314,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
     kAudioFormatFieldNumber = 7,
     kSampleRateFieldNumber = 8,
     kSpeakerIdFieldNumber = 9,
-    kSpeedFieldNumber = 10,
   };
   // string voice = 1;
   void clear_voice() ;
@@ -1433,21 +1432,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
   void _internal_set_speaker_id(::int32_t value);
 
   public:
-  // float speed = 10;
-  void clear_speed() ;
-  [[nodiscard]] float speed() const;
-  void set_speed(float value);
-
-  private:
-  float _internal_speed() const;
-  void _internal_set_speed(float value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TTSOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 11,
+      ::google::protobuf::internal::TcParseTable<4, 10,
                           0, 65,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -1486,7 +1475,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TTSOptions final : public ::google:
     int audio_format_;
     ::int32_t sample_rate_;
     ::int32_t speaker_id_;
-    float speed_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4378,30 +4366,6 @@ inline ::int32_t TTSOptions::_internal_speaker_id() const {
 inline void TTSOptions::_internal_set_speaker_id(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.speaker_id_ = value;
-}
-
-// float speed = 10;
-inline void TTSOptions::clear_speed() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.speed_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline float TTSOptions::speed() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.TTSOptions.speed)
-  return _internal_speed();
-}
-inline void TTSOptions::set_speed(float value) {
-  _internal_set_speed(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.TTSOptions.speed)
-}
-inline float TTSOptions::_internal_speed() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.speed_;
-}
-inline void TTSOptions::_internal_set_speed(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.speed_ = value;
 }
 
 // optional string style = 11;

@@ -295,7 +295,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_proto_buffer_copy"
     "_rac_proto_buffer_set_error"
     "_rac_proto_buffer_free"
-    "_rac_proto_buffer_copy_to_raw"
     "_rac_proto_buffer_free_data"
 
     # HTTP client / download (Web SDK migration off hand-rolled
@@ -321,10 +320,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_transport_register"
     "_rac_http_transport_is_registered"
     "_rac_http_transport_register_emscripten"
-    # JS-side adapter registration. JS provides function-table
-    # indices (from Module.addFunction) that implement the transport
-    # vtable directly in JS. See FetchHttpTransport.ts.
-    "_rac_http_transport_register_from_js"
 
     # Device registration bridge. TypeScript supplies browser device metadata,
     # registration-state callbacks, and the synchronous control-plane POST
@@ -566,32 +561,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_llm_component_destroy"
 
     # Tool Calling
-    "_rac_tool_call_parse"
-    "_rac_tool_call_parse_with_format"
     "_rac_tool_call_parse_proto"
-    "_rac_tool_call_free"
     "_rac_tool_call_validate_proto"
-    "_rac_tool_call_format_name"
-    "_rac_tool_call_detect_format"
-    "_rac_tool_call_format_from_name"
-    # Derive tool-call format from RAModelInfo proto.
-    "_rac_tool_call_format_from_model_info_proto"
-    "_rac_tool_call_format_prompt"
-    "_rac_tool_call_format_prompt_with_format"
-    "_rac_tool_call_format_prompt_json"
-    "_rac_tool_call_format_prompt_json_with_format"
-    "_rac_tool_call_format_prompt_json_with_format_name"
-    "_rac_tool_call_build_initial_prompt"
-    "_rac_tool_call_build_followup_prompt"
     "_rac_tool_call_format_prompt_proto"
-    "_rac_tool_call_normalize_json"
-    "_rac_tool_call_definitions_to_json"
-    "_rac_tool_call_result_to_json"
     # ToolValue <-> JSON bridge (Swift ToolValueJSONABI parity) — backs the
     # Web executeTool argument parsing / result serialization.
     "_rac_tool_value_to_json_proto"
     "_rac_tool_value_from_json_proto"
-    "_rac_tool_calling_run_loop_proto"
     # Session-based orchestration so the Web SDK can delegate
     # the tool-calling run loop to commons even when TS executors are async
     # (the run-loop-proto callback is synchronous and cannot await a JS Promise).
@@ -601,8 +577,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # Cancel ABI so AbortSignal-driven Web hosts can interrupt
     # the in-flight tool-calling session generate from JS.
     "_rac_tool_calling_session_cancel_proto"
-    "_rac_tool_calling_run_loop_with_handle_proto"
-    "_rac_tool_calling_run_loop_cancel_proto"
 
     # STT service
     "_rac_stt_create"
@@ -690,18 +664,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tts_component_get_metrics"
     "_rac_tts_component_destroy"
 
-    # VAD service
-    "_rac_vad_create"
-    "_rac_vad_initialize"
-    "_rac_vad_set_activity_callback"
-    "_rac_vad_set_audio_callback"
-    "_rac_vad_pause"
-    "_rac_vad_resume"
-    "_rac_vad_process_samples"
-    "_rac_vad_set_energy_threshold"
-    "_rac_vad_get_info"
-    "_rac_vad_destroy"
-
     # VAD component
     # rac_vad_{start,stop,reset} bare-service decls deleted;
     # use rac_vad_component_{start,stop,reset} / *_lifecycle_proto.
@@ -747,7 +709,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_audio_pipeline_can_play_tts"
     "_rac_audio_pipeline_is_valid_transition"
     "_rac_voice_agent_create_standalone"
-    "_rac_voice_agent_create"
     "_rac_voice_agent_destroy"
     "_rac_voice_agent_initialize"
     "_rac_voice_agent_initialize_with_loaded_models"
@@ -837,11 +798,11 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vlm_process_stream"
     "_rac_vlm_get_info"
     "_rac_vlm_cancel"
-    "_rac_vlm_process_proto"
+    "_rac_vlm_generate_proto"
     # Typed stream ABI (VLMGenerationRequest in, VLMStreamEvent out) — the
     # canonical cross-SDK VLM streaming surface.
     "_rac_vlm_stream_proto"
-    "_rac_vlm_cancel_proto"
+    "_rac_vlm_cancel_lifecycle_proto"
     "_rac_vlm_cleanup"
     "_rac_vlm_destroy"
 
@@ -862,67 +823,24 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vlm_component_destroy"
 
     # Structured Output
-    "_rac_structured_output_extract_json"
-    "_rac_structured_output_find_complete_json"
-    "_rac_structured_output_find_matching_brace"
-    "_rac_structured_output_find_matching_bracket"
-    "_rac_structured_output_prepare_prompt"
     "_rac_structured_output_prepare_prompt_proto"
-    "_rac_structured_output_get_system_prompt"
-    "_rac_structured_output_validate"
     "_rac_structured_output_validate_proto"
-    "_rac_structured_output_validation_free"
     "_rac_structured_output_parse_proto"
     "_rac_structured_output_generate_proto"
     "_rac_structured_output_generate_stream_proto"
     "_rac_structured_output_schema_to_json_proto"
 
-    # Diffusion component
+    # Diffusion proto ABI
     "_rac_diffusion_generate_proto"
     "_rac_diffusion_generate_with_progress_proto"
     "_rac_diffusion_cancel_proto"
-    "_rac_diffusion_component_create"
-    "_rac_diffusion_component_configure"
-    "_rac_diffusion_component_is_loaded"
-    "_rac_diffusion_component_get_model_id"
-    "_rac_diffusion_component_load_model"
-    "_rac_diffusion_component_unload"
-    "_rac_diffusion_component_cleanup"
-    "_rac_diffusion_component_cancel"
-    "_rac_diffusion_component_generate"
-    "_rac_diffusion_component_generate_with_callbacks"
-    "_rac_diffusion_component_get_capabilities"
-    "_rac_diffusion_component_get_info"
-    "_rac_diffusion_component_get_state"
-    "_rac_diffusion_component_get_metrics"
-    "_rac_diffusion_component_destroy"
     "_rac_diffusion_result_free"
 
-    # Embeddings service
-    "_rac_embeddings_create"
-    "_rac_embeddings_initialize"
-    "_rac_embeddings_embed"
-    "_rac_embeddings_embed_batch"
+    # Embeddings proto ABI
+    "_rac_embeddings_create_proto"
     "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_embed_batch_lifecycle_proto"
-    "_rac_embeddings_get_info"
-    "_rac_embeddings_cleanup"
-    "_rac_embeddings_destroy"
     "_rac_embeddings_result_free"
-
-    # Embeddings component
-    "_rac_embeddings_component_create"
-    "_rac_embeddings_component_configure"
-    "_rac_embeddings_component_is_loaded"
-    "_rac_embeddings_component_get_model_id"
-    "_rac_embeddings_component_load_model"
-    "_rac_embeddings_component_unload"
-    "_rac_embeddings_component_cleanup"
-    "_rac_embeddings_component_embed"
-    "_rac_embeddings_component_embed_batch"
-    "_rac_embeddings_component_get_state"
-    "_rac_embeddings_component_get_metrics"
-    "_rac_embeddings_component_destroy"
 
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
@@ -1040,7 +958,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_sizeof_vlm_options"
     "_rac_wasm_sizeof_vlm_result"
     "_rac_wasm_sizeof_vlm_image"
-    "_rac_wasm_sizeof_structured_output_config"
     "_rac_wasm_sizeof_diffusion_options"
     "_rac_wasm_sizeof_diffusion_result"
     "_rac_wasm_sizeof_embeddings_options"
@@ -1199,7 +1116,7 @@ set(RAC_JSPI_EXPORTS
     "rac_vlm_component_process"
     "rac_vlm_component_process_stream"
     "rac_vlm_component_unload"
-    "rac_vlm_process_proto"
+    "rac_vlm_generate_proto"
     "rac_vlm_stream_proto"
 )
 

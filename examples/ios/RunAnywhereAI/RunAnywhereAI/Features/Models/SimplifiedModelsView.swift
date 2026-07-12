@@ -89,7 +89,7 @@ struct SimplifiedModelsView: View {
     // MARK: - Data
 
     private func loadInitialData() async {
-        await viewModel.loadModels()
+        await viewModel.loadModelsFromRegistry()
         await storageViewModel.loadData()
     }
 
@@ -120,7 +120,7 @@ struct SimplifiedModelsView: View {
     }
 
     private func refreshAfterChange() async {
-        await viewModel.loadModels()
+        await viewModel.loadModelsFromRegistry()
         await storageViewModel.refreshData()
     }
 

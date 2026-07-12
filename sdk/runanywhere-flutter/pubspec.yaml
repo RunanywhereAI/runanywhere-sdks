@@ -2,12 +2,11 @@ name: runanywhere_flutter_workspace
 publish_to: none
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
+  sdk: '>=3.12.0 <4.0.0'
 
 workspace:
   - packages/runanywhere
   - packages/runanywhere_llamacpp
-  - packages/runanywhere_mlx
   - packages/runanywhere_onnx
   - packages/runanywhere_qhexrt
 
@@ -52,7 +51,7 @@ melos:
       description: Run dart format in all packages
 
     test:
-      run: melos exec -- flutter test
+      run: melos exec -c 1 --dir-exists=test -- flutter test --no-pub
       description: Run tests in all packages
 
     clean:

@@ -15,10 +15,8 @@
  *   - Proto-byte APIs (rac_embeddings_embed_batch_proto,
  *     rac_embeddings_embed_batch_lifecycle_proto): `SDK-facing default`
  *     over runanywhere.v1.EmbeddingsRequest / EmbeddingsResult bytes.
- *   - Struct APIs (rac_embeddings_create, create_with_config,
- *     initialize, embed, embed_batch, get_info, cleanup, destroy):
- *     `delete after SDK migration` for SDK callers; keep only as
- *     backend smoke-test entry points.
+ *   - Remaining struct operations are internal service-handle mechanics.
+ *     SDK callers create sessions through rac_embeddings_create_proto.
  */
 
 #ifndef RAC_EMBEDDINGS_SERVICE_H
@@ -86,30 +84,6 @@ typedef struct rac_embeddings_service {
 // =============================================================================
 
 /**
- * @brief Create an embeddings service
- *
- * @param model_id Model identifier
- * @param out_handle Output: Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle);
-
-/**
- * @brief Create an embeddings service with additional configuration JSON.
- *
- * Same as rac_embeddings_create but forwards config_json (e.g. {"vocab_path":"..."})
- * to the embedding provider so it can locate companion files.
- *
- * @param model_id   Model identifier or path
- * @param config_json JSON string with provider-specific config (can be NULL)
- * @param out_handle  Output: Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
-                                                       const char* config_json,
-                                                       rac_handle_t* out_handle);
-
-/**
  * @brief Initialize the service with a model
  *
  * @param handle Service handle
@@ -173,8 +147,6 @@ RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* r
  * @brief Create an embeddings session from serialized
  *        runanywhere.v1.EmbeddingsCreateRequest bytes.
  *
- * Replaces the legacy rac_embeddings_create / rac_embeddings_create_with_config
- * paths used by RN/Kotlin/Web bridges with a canonical proto-byte ABI.
  * The result carries an opaque uint64 handle (rac_handle_t) the SDK uses
  * for subsequent rac_embeddings_embed_batch_proto / cleanup / destroy
  * calls. On failure the handle is zero and error_code/error_message are

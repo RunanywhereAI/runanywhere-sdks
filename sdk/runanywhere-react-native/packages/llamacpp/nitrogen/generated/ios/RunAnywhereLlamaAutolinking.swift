@@ -12,5 +12,5 @@ import NitroModules
 public final class RunAnywhereLlamaAutolinking {
   public typealias bridge = margelo.nitro.runanywhere.llama.bridge.swift
 
-
+  
 }

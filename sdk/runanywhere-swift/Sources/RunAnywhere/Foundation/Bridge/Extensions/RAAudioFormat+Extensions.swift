@@ -9,16 +9,15 @@
 //
 //  `RAAudioFormat` is the proto3-generated enum (idl/model_types.proto);
 //  call sites reference it directly (no `AudioFormat` typealias is exported).
-//  This extension preserves Codable conformance for JSON wire compatibility
-//  with payloads that pre-date the proto canonical string form.
+//  This extension provides Codable conformance using the annotated canonical
+//  JSON wire names.
 //
 
 
 // MARK: - Codable (wire format = lowercase short name)
 //
-// Existing JSON payloads use lowercase short names ("pcm", "wav", …). The
-// proto3 canonical string form would be uppercase `AUDIO_FORMAT_*`. We keep
-// the wire format compatible via the codegen-generated `wireString` /
+// The canonical JSON names are lowercase ("pcm", "wav", …), supplied by the
+// codegen-generated `wireString` /
 // `from(wireString:)` accessors (Generated/RAConvenience.swift) which are
 // emitted from the `rac_wire_string` annotations in idl/model_types.proto.
 

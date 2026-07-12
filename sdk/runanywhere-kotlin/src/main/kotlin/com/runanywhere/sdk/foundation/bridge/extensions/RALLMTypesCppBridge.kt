@@ -18,7 +18,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.ExecutionTarget
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import com.runanywhere.sdk.public.types.RAExecutionTarget
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
@@ -44,14 +43,8 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
 /**
  * Build a `RALLMGenerateRequest` from these options + a prompt.
  *
- * Mirrors Swift `RALLMGenerationOptions.toRALLMGenerateRequest(prompt:)`:
- * - Copies all sampling fields (max_tokens, temperature, top_p, top_k,
- *   repetition_penalty, stop_sequences, streaming_enabled,
- *   preferred_framework, system_prompt).
- * - When `structured_output` is set, prefers its embedded schema +
- *   response_format + grammar over the bare `json_schema` field.
- * - Promotes `execution_target` and `preferred_framework` to their wire
- *   string forms.
+ * Generation controls remain in the canonical `options` envelope; the
+ * request itself carries only prompt, identity, metadata, and history.
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
     val requestOptions =
@@ -64,34 +57,9 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
             top_p = top_p.takeIf { it > 0.0f } ?: 1.0f,
             repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
         )
-    val so = structured_output
-    val schema =
-        when {
-            so != null -> so.json_schema.orEmpty()
-            else -> json_schema.orEmpty()
-        }
-    val responseFormat =
-        when (so?.mode) {
-            StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT -> "json_object"
-            StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA -> "json_schema"
-            else -> ""
-        }
-    val effectiveGrammar = so?.grammar?.takeIf { it.isNotBlank() } ?: grammar.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
-        max_tokens = requestOptions.max_tokens,
-        temperature = requestOptions.temperature,
-        top_p = requestOptions.top_p,
-        top_k = requestOptions.top_k,
-        repetition_penalty = requestOptions.repetition_penalty,
-        stop_sequences = stop_sequences,
-        streaming_enabled = streaming_enabled,
-        preferred_framework = preferred_framework.wireString,
-        system_prompt = system_prompt.orEmpty(),
-        json_schema = schema,
-        response_format = responseFormat,
-        grammar = effectiveGrammar,
-        execution_target = execution_target?.wireString.orEmpty(),
+        emit_thoughts = requestOptions.thinking_pattern != null,
         options = requestOptions,
     )
 }
@@ -145,10 +113,9 @@ val RAExecutionTarget.wireString: String
 
 /**
  * Canonical wire string for an inference framework — the lowercase short name
- * (e.g. "llamacpp", "onnx", "qhexrt"). Used when serializing to the canonical
- * `RALLMGenerateRequest.preferred_framework` field. The Swift SDK gets this
- * for free from the `rac_wire_string` codegen in `RAConvenience.swift`; Kotlin
- * has no equivalent codegen so we maintain the table by hand.
+ * (e.g. "llamacpp", "onnx", "qhexrt"). Used by non-proto bridge surfaces.
+ * The Swift SDK gets this from `rac_wire_string` codegen; Kotlin maintains the
+ * same table here.
  */
 val InferenceFramework.wireString: String
     get() =

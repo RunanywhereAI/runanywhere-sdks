@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 
 // MARK: - Text Generation
 
@@ -63,15 +64,19 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
 
     ensureServicesReady()
 
+    val requestOptions = request.options
+    val systemPrompt = requestOptions?.system_prompt
     val systemPromptDesc =
-        if (request.system_prompt.isBlank()) {
+        if (systemPrompt.isNullOrBlank()) {
             "nil"
         } else {
-            "set(${request.system_prompt.length} chars)"
+            "set(${systemPrompt.length} chars)"
         }
     llmLogger.info(
-        "[PARAMS] generate: temperature=${request.temperature}, topP=${request.top_p}, " +
-            "maxTokens=${request.max_tokens}, systemPrompt=$systemPromptDesc, streaming=${request.streaming_enabled}",
+        "[PARAMS] generate: temperature=${requestOptions?.temperature ?: "default"}, " +
+            "topP=${requestOptions?.top_p ?: "default"}, " +
+            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
+            "streaming=${requestOptions?.streaming_enabled ?: false}",
     )
     return CppBridgeLLM.generate(request)
 }
@@ -99,15 +104,19 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
         throw SDKException.notInitialized("SDK not initialized")
     }
 
+    val requestOptions = request.options
+    val systemPrompt = requestOptions?.system_prompt
     val systemPromptDesc =
-        if (request.system_prompt.isBlank()) {
+        if (systemPrompt.isNullOrBlank()) {
             "nil"
         } else {
-            "set(${request.system_prompt.length} chars)"
+            "set(${systemPrompt.length} chars)"
         }
     llmLogger.info(
-        "[PARAMS] generateStream: temperature=${request.temperature}, topP=${request.top_p}, " +
-            "maxTokens=${request.max_tokens}, systemPrompt=$systemPromptDesc, streaming=${request.streaming_enabled}",
+        "[PARAMS] generateStream: temperature=${requestOptions?.temperature ?: "default"}, " +
+            "topP=${requestOptions?.top_p ?: "default"}, " +
+            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
+            "streaming=${requestOptions?.streaming_enabled ?: false}",
     )
 
     return losslessLLMStreamFlow(
@@ -134,6 +143,7 @@ internal fun losslessLLMStreamFlow(
 ): Flow<RALLMStreamEvent> =
     callbackFlow {
         prepare()
+        val completedNormally = AtomicBoolean(false)
         val driver =
             launch(Dispatchers.IO) {
                 try {
@@ -141,13 +151,16 @@ internal fun losslessLLMStreamFlow(
                         val delivered = trySend(event).isSuccess
                         delivered && !event.is_final
                     }
+                    completedNormally.set(true)
                 } finally {
                     close()
                 }
             }
         awaitClose {
             driver.cancel()
-            runBlocking { cancel() }
+            if (!completedNormally.get()) {
+                runBlocking { cancel() }
+            }
         }
     }.buffer(Channel.UNLIMITED)
         .flowOn(Dispatchers.IO)

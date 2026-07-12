@@ -7,7 +7,12 @@
  * engine's `rac_plugin_entry_<name>()` returns a `rac_engine_vtable_t`
  * whose `embedding_ops` slot points at the ops struct defined by the
  * backend (e.g. `g_onnx_embeddings_ops` in
- * `sdk/runanywhere-commons/src/features/rag/rac_onnx_embeddings_register.cpp`).
+ * `engines/onnx/rac_onnx_embeddings_register.cpp`).
+ *
+ * Classification:
+ *   - `rac_embeddings_service_ops_t` and `rac_embeddings_service_t` are
+ *     internal service mechanics.
+ *   - The proto-byte APIs are the SDK-facing surface.
  */
 
 #ifndef RAC_EMBEDDINGS_SERVICE_H
@@ -16,6 +21,7 @@
 #include "rac_error.h"
 #include "rac_types.h"
 #include "rac_embeddings_types.h"
+#include "rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,30 +80,6 @@ typedef struct rac_embeddings_service {
 // =============================================================================
 
 /**
- * @brief Create an embeddings service
- *
- * @param model_id Model identifier
- * @param out_handle Output: Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle);
-
-/**
- * @brief Create an embeddings service with additional configuration JSON.
- *
- * Same as rac_embeddings_create but forwards config_json (e.g. {"vocab_path":"..."})
- * to the embedding provider so it can locate companion files.
- *
- * @param model_id   Model identifier or path
- * @param config_json JSON string with provider-specific config (can be NULL)
- * @param out_handle  Output: Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
-                                                       const char* config_json,
-                                                       rac_handle_t* out_handle);
-
-/**
  * @brief Initialize the service with a model
  *
  * @param handle Service handle
@@ -133,6 +115,32 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
                                                 size_t num_texts,
                                                 const rac_embeddings_options_t* options,
                                                 rac_embeddings_result_t* out_result);
+
+/**
+ * @brief Generate embeddings for a proto-carried batch.
+ *
+ * request_proto_bytes encodes runanywhere.v1.EmbeddingsRequest.
+ * out_result receives serialized runanywhere.v1.EmbeddingsResult bytes.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
+                                                      const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Generate embeddings using the lifecycle-loaded embeddings model.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                                size_t request_proto_size,
+                                                                rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Create an embeddings session from a serialized
+ *        runanywhere.v1.EmbeddingsCreateRequest.
+ */
+RAC_API rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
+                                                 size_t request_proto_size,
+                                                 rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information

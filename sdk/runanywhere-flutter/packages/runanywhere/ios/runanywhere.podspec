@@ -3,19 +3,12 @@
 #
 # Vendors the locally built RACommons.xcframework into Flutter iOS apps.
 #
-# The xcframework is staged into this plugin's ios/Frameworks/ directory by
+# The xcframework is staged into this plugin's ios/runanywhere/Frameworks/ directory by
 # sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
 # script once after checkout, and re-run it whenever the native layer changes.
 #
 
 Pod::Spec.new do |s|
-  flutter_root = ENV['FLUTTER_ROOT']
-  if flutter_root.nil? || flutter_root.empty?
-    flutter_bin = `which flutter`.strip
-    flutter_root = File.expand_path('..', File.dirname(File.realpath(flutter_bin))) unless flutter_bin.empty?
-  end
-  dart_sdk_include = flutter_root.nil? || flutter_root.empty? ? nil : File.join(flutter_root, 'bin/cache/dart-sdk/include')
-
   s.name             = 'runanywhere'
   s.version          = '0.19.15'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
@@ -29,23 +22,28 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '17.0'
-  s.swift_version = '5.0'
+  s.ios.deployment_target = '17.5'
+  s.swift_version = '6.2'
 
   # Source files: Swift plugin entry point + URLSession HTTP transport.
-  # The URLSession ObjC++ wrapper at Classes/URLSessionHttpTransport.mm
+  # The URLSession ObjC++ wrapper in the shared CocoaPods/SwiftPM source tree
   # `#include`s the canonical implementation at
   # sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
   # (shared with React Native) via a path RELATIVE to the .mm file on disk,
   # so no additional HEADER_SEARCH_PATHS entry is needed.
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'runanywhere/Sources/**/*.{h,m,mm,swift}'
+  s.resource_bundles = {
+    'runanywhere_privacy' => [
+      'runanywhere/Sources/runanywhere/PrivacyInfo.xcprivacy',
+    ],
+  }
 
   s.dependency 'Flutter'
 
   # =============================================================================
   # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
   # =============================================================================
-  s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
+  s.vendored_frameworks = 'runanywhere/Frameworks/RACommons.xcframework'
 
   # Keep the xcframework next to the installed pod so downstream toolchains
   # can resolve headers. The canonical shared URLSessionHttpTransportImpl.inc.mm
@@ -53,7 +51,7 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   # is reached through a source-relative `#include`, no HEADER_SEARCH_PATHS
   # entry required).
   s.preserve_paths = [
-    'Frameworks/**/*',
+    'runanywhere/Frameworks/**/*',
     '../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm',
   ]
 
@@ -93,13 +91,12 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
     # baked into RACommons transitively needs zlib.
     'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -lz',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
-    'ENABLE_BITCODE' => 'NO',
-    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++20',
     'HEADER_SEARCH_PATHS' => [
-      '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64/Headers"',
-      '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64-simulator/Headers"',
-      dart_sdk_include.nil? ? nil : "\"#{dart_sdk_include}\"",
-    ].compact.join(' '),
+      '"${PODS_TARGET_SRCROOT}/runanywhere/Frameworks/RACommons.xcframework/ios-arm64/Headers"',
+      '"${PODS_TARGET_SRCROOT}/runanywhere/Frameworks/RACommons.xcframework/ios-arm64-simulator/Headers"',
+      '"${PODS_TARGET_SRCROOT}/runanywhere/Sources/runanywhere_native/include"',
+    ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited)',
   }
 

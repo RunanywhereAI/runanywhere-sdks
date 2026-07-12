@@ -1,5 +1,4 @@
 import { Colors } from '../theme/colors';
-import { RunAnywhere } from '@runanywhere/core';
 import { QHexRT } from '@runanywhere/qhexrt';
 import type { IconName } from '../theme/system/icons';
 import {
@@ -10,12 +9,6 @@ import {
 
 export const DEFAULT_INFERENCE_FRAMEWORK =
   InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED;
-
-// Display-name table lives in the SDK (`RunAnywhere.formatFramework`),
-// proxying the canonical `rac_framework_display_name` C ABI in
-// runanywhere-commons. Re-export for backward compatibility with the
-// existing view code that imported `getFrameworkDisplayName` from here.
-export const getFrameworkDisplayName = RunAnywhere.formatFramework;
 
 export const getFrameworkColor = (
   framework?: InferenceFramework | null

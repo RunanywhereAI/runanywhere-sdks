@@ -1,13 +1,14 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 
 import { ModelRegistryAdapter } from '../../../src/Adapters/ModelRegistryAdapter';
+import { ModelLifecycleAdapter } from '../../../src/Adapters/ModelLifecycleAdapter';
 import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
   clearRunanywhereModule,
   registerWasmModule,
-  setRunanywhereModule,
   type EmscriptenRunanywhereModule,
+  unregisterWasmModule,
 } from '../../../src/runtime/EmscriptenModule';
 
 interface SolutionCallCounters {
@@ -48,6 +49,25 @@ function fakeModule(counters?: SolutionCallCounters): EmscriptenRunanywhereModul
     _rac_voice_agent_set_proto_callback: () => 0,
     _rac_llm_set_stream_proto_callback: () => 0,
     _rac_llm_unset_stream_proto_callback: () => 0,
+    _rac_proto_buffer_init: () => undefined,
+    _rac_proto_buffer_free: () => undefined,
+    _rac_wasm_sizeof_proto_buffer: () => 16,
+    _rac_wasm_offsetof_proto_buffer_data: () => 0,
+    _rac_wasm_offsetof_proto_buffer_size: () => 4,
+    _rac_wasm_offsetof_proto_buffer_status: () => 8,
+    _rac_wasm_offsetof_proto_buffer_error_message: () => 12,
+    _rac_get_model_registry: () => 1,
+    _rac_model_registry_refresh_proto: () => 0,
+    _rac_model_registry_register_proto: () => 0,
+    _rac_model_registry_update_proto: () => 0,
+    _rac_model_registry_update_download_status: () => 0,
+    _rac_model_registry_get_proto: () => 0,
+    _rac_model_registry_list_proto: () => 0,
+    _rac_model_registry_query_proto: () => 0,
+    _rac_model_registry_list_downloaded_proto: () => 0,
+    _rac_model_registry_remove_proto: () => 0,
+    _rac_model_registry_import_proto: () => 0,
+    _rac_model_registry_proto_free: () => undefined,
     _rac_solution_create_from_proto: (_bytesPtr, _bytesLen, outHandlePtr) => {
       if (counters) counters.creates += 1;
       heapU32[outHandlePtr >>> 2] = 123;
@@ -72,14 +92,14 @@ function fakeModule(counters?: SolutionCallCounters): EmscriptenRunanywhereModul
   };
 }
 
-describe('Emscripten module singleton wiring', () => {
+describe('Emscripten module capability wiring', () => {
   afterEach(() => {
     clearRunanywhereModule();
     ModelRegistryAdapter.clearDefaultModule();
   });
 
-  it('allows SolutionAdapter to use the singleton module', () => {
-    setRunanywhereModule(fakeModule());
+  it('allows SolutionAdapter to use the registered commons module', () => {
+    registerWasmModule(['commons'], fakeModule());
     const handle = SolutionAdapter.run({ yaml: 'name: test' });
     expect(handle.isAlive).toBe(true);
     handle.destroy();
@@ -94,7 +114,7 @@ describe('Emscripten module singleton wiring', () => {
     ragModule._rac_rag_session_create_proto = () => 0;
     ragModule._rac_rag_query_proto = () => 0;
 
-    setRunanywhereModule(commonsModule);
+    registerWasmModule(['commons'], commonsModule);
     // Registry replay is unrelated to this routing contract and the minimal
     // fake modules intentionally omit model-registry proto exports.
     ModelRegistryAdapter.clearDefaultModule();
@@ -127,7 +147,7 @@ describe('Emscripten module singleton wiring', () => {
   });
 
   it('fails every RAG input form honestly when no module has RAG exports', () => {
-    setRunanywhereModule(fakeModule());
+    registerWasmModule(['commons'], fakeModule());
     expect(() => SolutionAdapter.run({ yaml: 'rag:\n  embed_model_id: minilm' }))
       .toThrow(/Backend not available for: RAG solution YAML/);
     const ragConfig = SolutionConfig.fromPartial({ rag: { embedModelId: 'minilm' } });
@@ -139,12 +159,40 @@ describe('Emscripten module singleton wiring', () => {
   });
 
   it('clears ModelRegistryAdapter default module', () => {
-    ModelRegistryAdapter.setDefaultModule({
-      _rac_get_model_registry: () => 1,
-      _rac_model_registry_refresh_proto: () => 0,
-    });
+    ModelRegistryAdapter.setDefaultModule(fakeModule());
     expect(ModelRegistryAdapter.tryDefault()).not.toBeNull();
     ModelRegistryAdapter.clearDefaultModule();
     expect(ModelRegistryAdapter.tryDefault()).toBeNull();
+  });
+
+  it('re-elects live registry and lifecycle adapters after backend teardown', () => {
+    const commons = fakeModule();
+    const backendA = fakeModule();
+    const backendB = fakeModule();
+    const resetCommons = vi.fn();
+    const resetA = vi.fn();
+    const resetB = vi.fn();
+    commons._rac_model_lifecycle_reset = resetCommons;
+    backendA._rac_model_lifecycle_reset = resetA;
+    backendB._rac_model_lifecycle_reset = resetB;
+
+    registerWasmModule(['commons'], commons);
+    registerWasmModule(['llm'], backendA, ['llamacpp']);
+    registerWasmModule(['stt'], backendB, ['sherpa']);
+
+    unregisterWasmModule(backendB);
+
+    expect(ModelRegistryAdapter.tryDefault()).not.toBeNull();
+    expect(ModelLifecycleAdapter.tryDefault()?.reset()).toBe(true);
+    expect(resetA).toHaveBeenCalledOnce();
+    expect(resetB).not.toHaveBeenCalled();
+
+    unregisterWasmModule(backendA);
+
+    expect(ModelRegistryAdapter.tryDefault()).not.toBeNull();
+    expect(ModelLifecycleAdapter.tryDefault()?.reset()).toBe(true);
+    expect(resetCommons).toHaveBeenCalledOnce();
+    expect(resetA).toHaveBeenCalledOnce();
+    expect(resetB).not.toHaveBeenCalled();
   });
 });

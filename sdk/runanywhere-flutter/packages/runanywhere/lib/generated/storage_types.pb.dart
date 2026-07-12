@@ -225,10 +225,8 @@ class AppStorageInfo extends $pb.GeneratedMessage {
 /// model_types.proto. This avoids circular embeds and keeps the wire payload
 /// for storage queries small.
 ///
-/// `last_used_ms` (epoch ms, optional) preserves the field that lived on the
-/// older Kotlin `StoredModel` (`models/storage/StorageInfo.kt:131`). All
-/// other SDKs lacked it pre-IDL; canonicalizing it here lets the SDK surface
-/// LRU eviction without another type round-trip.
+/// `last_used_ms` supports LRU presentation and eviction without another type
+/// round-trip.
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
@@ -557,117 +555,6 @@ class StorageAvailability extends $pb.GeneratedMessage {
   $core.bool hasRequiredToAvailableRatio() => $_has(6);
   @$pb.TagNumber(7)
   void clearRequiredToAvailableRatio() => $_clearField(7);
-}
-
-/// ---------------------------------------------------------------------------
-/// Backward-compatible "stored model" projection. Older Swift / Kotlin / Dart
-/// surfaces (`StoredModel`) wrapped a full `ModelInfo`; this canonical form
-/// flattens to the columns those SDKs actually exposed via computed
-/// properties (id, name, size, local path, downloaded-at), so RN / Web can
-/// emit the same shape without round-tripping through `ModelInfo`.
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
-class StoredModel extends $pb.GeneratedMessage {
-  factory StoredModel({
-    $core.String? modelId,
-    $core.String? name,
-    $fixnum.Int64? sizeBytes,
-    $core.String? localPath,
-    $fixnum.Int64? downloadedAtMs,
-  }) {
-    final result = create();
-    if (modelId != null) result.modelId = modelId;
-    if (name != null) result.name = name;
-    if (sizeBytes != null) result.sizeBytes = sizeBytes;
-    if (localPath != null) result.localPath = localPath;
-    if (downloadedAtMs != null) result.downloadedAtMs = downloadedAtMs;
-    return result;
-  }
-
-  StoredModel._();
-
-  factory StoredModel.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory StoredModel.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'StoredModel',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOS(2, _omitFieldNames ? '' : 'name')
-    ..aInt64(3, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(4, _omitFieldNames ? '' : 'localPath')
-    ..aInt64(5, _omitFieldNames ? '' : 'downloadedAtMs')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  StoredModel clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  StoredModel copyWith(void Function(StoredModel) updates) =>
-      super.copyWith((message) => updates(message as StoredModel))
-          as StoredModel;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static StoredModel create() => StoredModel._();
-  @$core.override
-  StoredModel createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static StoredModel getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<StoredModel>(create);
-  static StoredModel? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get modelId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set modelId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasModelId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearModelId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get name => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set name($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasName() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearName() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $fixnum.Int64 get sizeBytes => $_getI64(2);
-  @$pb.TagNumber(3)
-  set sizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSizeBytes() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSizeBytes() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get localPath => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set localPath($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasLocalPath() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearLocalPath() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get downloadedAtMs => $_getI64(4);
-  @$pb.TagNumber(5)
-  set downloadedAtMs($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasDownloadedAtMs() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearDownloadedAtMs() => $_clearField(5);
 }
 
 class StorageInfoRequest extends $pb.GeneratedMessage {

@@ -14,7 +14,7 @@ struct PlaygroundView: View {
 
     var body: some View {
         ZStack {
-            AppColors.backgroundPrimaryDark.ignoresSafeArea()
+            AppColors.backgroundPrimary.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header
@@ -242,7 +242,7 @@ struct PlaygroundView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.backgroundPrimaryDark.opacity(0.85))
+        .background(AppColors.backgroundPrimary.opacity(0.85))
     }
 
     // MARK: - Helpers

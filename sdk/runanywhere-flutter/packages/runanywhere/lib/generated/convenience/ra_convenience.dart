@@ -244,13 +244,13 @@ extension EmbeddingsConfigurationValidate on EmbeddingsConfiguration {
     }
     if (embeddingDimension < 1) {
       throw SDKException.validationFailed(
-        'embedding_dimension must be in >= 1 (got $embeddingDimension)',
+        'embedding_dimension must be >= 1 (got $embeddingDimension)',
         fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
       );
     }
     if (maxSequenceLength < 1) {
       throw SDKException.validationFailed(
-        'max_sequence_length must be in >= 1 (got $maxSequenceLength)',
+        'max_sequence_length must be >= 1 (got $maxSequenceLength)',
         fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
       );
     }
@@ -379,7 +379,7 @@ extension RAGConfigurationValidate on RAGConfiguration {
   void validate() {
     if (topK < 1) {
       throw SDKException.validationFailed(
-        'top_k must be in >= 1 (got $topK)',
+        'top_k must be >= 1 (got $topK)',
         fieldPath: 'RAGConfiguration.top_k',
       );
     }
@@ -391,13 +391,13 @@ extension RAGConfigurationValidate on RAGConfiguration {
     }
     if (chunkSize < 1) {
       throw SDKException.validationFailed(
-        'chunk_size must be in >= 1 (got $chunkSize)',
+        'chunk_size must be >= 1 (got $chunkSize)',
         fieldPath: 'RAGConfiguration.chunk_size',
       );
     }
     if (chunkOverlap < 0) {
       throw SDKException.validationFailed(
-        'chunk_overlap must be in >= 0 (got $chunkOverlap)',
+        'chunk_overlap must be >= 0 (got $chunkOverlap)',
         fieldPath: 'RAGConfiguration.chunk_overlap',
       );
     }
@@ -417,9 +417,9 @@ extension RAGQueryOptionsConvenience on RAGQueryOptions {
 
 extension RAGQueryOptionsValidate on RAGQueryOptions {
   void validate() {
-    if (multiQueryCount < 1) {
+    if (multiQueryCount < 1 || multiQueryCount > 8) {
       throw SDKException.validationFailed(
-        'multi_query_count must be in >= 1 (got $multiQueryCount)',
+        'multi_query_count must be in 1...8 (got $multiQueryCount)',
         fieldPath: 'RAGQueryOptions.multi_query_count',
       );
     }

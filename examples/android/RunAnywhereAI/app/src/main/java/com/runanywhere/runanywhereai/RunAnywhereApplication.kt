@@ -12,7 +12,6 @@ import com.runanywhere.runanywhereai.tools.BuiltInTools
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.runanywhereai.util.RACLogTelemetry
 import com.runanywhere.sdk.core.onnx.ONNX
-import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
@@ -73,18 +72,15 @@ class RunAnywhereApplication : Application() {
         RACLog.i("RAC SDK Setup initialization... Recording Time")
         val startTime = System.currentTimeMillis()
 
-        //Starting Setup Work
-        AndroidPlatformContext.initialize(this@RunAnywhereApplication)
         // Note: ADSP_LIBRARY_PATH (Hexagon DSP skel discovery for QHexRT/QNN) is set
         // automatically by the engine before its first runtime create — no app glue needed.
-        // Register backends with the C++ registry BEFORE initialize(): once initialize() runs,
-        // a concurrent caller can hit loadModel() while only the platform backend is registered
-        // and fail with -422 "No provider could handle the request" (same ordering as iOS).
+        // Register the CPU backends with the C++ registry before initialize(): once initialize()
+        // runs, a concurrent caller can hit loadModel() while only the platform backend is
+        // registered and fail with -422 "No provider could handle the request" (same ordering
+        // as iOS). QHexRT is registered below because its skel installer needs the application
+        // Context installed by the public RunAnywhere.initialize(context = ...) overload.
         LlamaCPP.register()
         ONNX.register()
-        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on
-        // parts outside the device-validated V75/V79/V81 set.
-        QHexRT.register()
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
@@ -94,6 +90,7 @@ class RunAnywhereApplication : Application() {
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
         }
         RunAnywhere.initialize(
+            context = this@RunAnywhereApplication,
             apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
@@ -104,6 +101,10 @@ class RunAnywhereApplication : Application() {
             // Unconfigured local builds retain the SDK development fallback.
             environment = environment,
         )
+        // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on parts outside
+        // the device-validated V75/V79/V81 set. RunAnywhere initialization must happen first so
+        // the module can extract its DSP skels through the SDK-owned application Context.
+        QHexRT.register()
         RACLogTelemetry.markSDKInitialized()
         // Production env disables SDK console logging entirely; without this
         // debug builds emit zero SDK logs to logcat, which makes on-device

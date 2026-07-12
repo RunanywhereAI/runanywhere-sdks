@@ -57,7 +57,7 @@ extension CppBridge {
                 var outBuffer = rac_proto_buffer_t()
                 defer { NativeProtoABI.free(&outBuffer) }
                 let status = try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                    load(registry, bytes, size, &outBuffer)
+                    load(registry.rawValue, bytes, size, &outBuffer)
                 }
                 guard status == RAC_SUCCESS else {
                     var result = RAModelLoadResult()

@@ -12,9 +12,9 @@
  * transitions to downloaded inside the canonical layout, a serialized
  * ModelInfo is written to
  *   {base_dir}/RunAnywhere/Models/{framework}/{modelId}/<manifest>
- * (filename from rac_model_folder_manifest_filename(), currently
- * ".rac-manifest.binpb"). At cold launch the discover/refresh paths read the
- * sidecars back and re-register entries that no consumer re-seeded, after
+ * (the private `.rac-manifest.binpb` sidecar). At cold launch the
+ * discover/refresh paths read the sidecars back and re-register entries that
+ * no consumer re-seeded, after
  * validating the folder is complete. Volatile absolute paths are stripped on
  * write and re-derived on restore, so the sidecar survives iOS
  * container-UUID changes and RUNANYWHERE_HOME moves unchanged.
@@ -25,6 +25,7 @@
  * one implementation for every modality and every consumer.
  */
 
+#include "model_manifest_internal.h"
 #include "model_registry_internal.h"
 
 #include <cstring>
@@ -49,7 +50,7 @@ namespace {
 constexpr const char* LOG_CAT = "ModelRegistryManifest";
 
 std::string manifest_path_for_folder(const std::string& folder) {
-    return folder + "/" + rac_model_folder_manifest_filename();
+    return folder + "/" + rac::infra::model_manifest::kFilename;
 }
 
 bool read_file_bytes(const std::string& path, std::string* out) {
@@ -363,7 +364,7 @@ bool try_restore_model_manifest_by_id(rac_model_registry_handle_t handle,
             continue;
         }
         const fs::path folder = framework_dir.path() / model_id;
-        if (!fs::exists(folder / rac_model_folder_manifest_filename(), ec)) {
+        if (!fs::exists(folder / rac::infra::model_manifest::kFilename, ec)) {
             continue;
         }
         return restore_manifest_folder(handle, folder.generic_string(), model_id);
@@ -437,12 +438,12 @@ int32_t restore_models_from_folder_manifests(rac_model_registry_handle_t handle)
 #endif  // RAC_HAVE_PROTOBUF
 
 // =============================================================================
-// PUBLIC API
+// PRIVATE CROSS-TU API
 // =============================================================================
 
-extern "C" rac_result_t
-rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,
-                                           const char* model_id) {
+namespace rac::infra::model_manifest {
+
+rac_result_t persist(rac_model_registry_handle_t handle, const char* model_id) {
 #ifndef RAC_HAVE_PROTOBUF
     (void)handle;
     (void)model_id;
@@ -483,3 +484,5 @@ rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,
     return RAC_SUCCESS;
 #endif
 }
+
+}  // namespace rac::infra::model_manifest

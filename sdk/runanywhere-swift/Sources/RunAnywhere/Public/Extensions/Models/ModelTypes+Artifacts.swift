@@ -277,7 +277,7 @@ public extension RAModelInfo {
             responseType: RAModelInfo.self
         )) ?? RAModelInfo()
 
-        // Caller-supplied id always wins (matches the legacy Swift contract);
+        // Caller-supplied id always wins;
         // commons would otherwise derive it from the URL via rac_model_generate_id.
         model.id = id
         // Caller-supplied scalar fields not part of the make request.
@@ -292,13 +292,13 @@ public extension RAModelInfo {
         }
         // Thinking is gated by category; the commons factory leaves the
         // per-call flag false, so honor the caller override here. Match the
-        // legacy contract: when thinking is enabled and the caller did not
-        // supply a pattern, fall back to the default pattern.
+        // When thinking is enabled and the caller did not supply a pattern,
+        // use the default pattern.
         model.supportsThinking = category.supportsThinking ? supportsThinking : false
         if model.supportsThinking {
             model.thinkingPattern = thinkingPattern ?? .defaultPattern
         }
-        model.description_p = description ?? ""
+        model.metadata.description_p = description ?? ""
         model.createdAtUnixMs = unixMilliseconds(from: createdAt)
         model.updatedAtUnixMs = unixMilliseconds(from: updatedAt)
         // Caller-supplied artifact override re-runs the artifact-type sync.
@@ -360,12 +360,7 @@ public extension RAModelInfo {
     }
 
     var archiveArtifact: RAArchiveArtifact? {
-        if let archive = artifact?.archiveArtifact { return archive }
-        guard let archiveType = artifactType.legacyArchiveType else { return nil }
-        var fallback = RAArchiveArtifact()
-        fallback.type = archiveType
-        fallback.structure = .unknown
-        return fallback
+        artifact?.archiveArtifact
     }
 
     var multiFileDescriptors: [RAModelFileDescriptor] {
@@ -373,8 +368,8 @@ public extension RAModelInfo {
     }
 
     /// Canonical expected-files manifest. Routes through
-    /// `rac_artifact_expected_files_proto` which mirrors the legacy
-    /// Swift fall-through (top-level manifest → artifact-attached manifest →
+    /// `rac_artifact_expected_files_proto`, using the canonical precedence
+    /// (top-level manifest → artifact-attached manifest →
     /// pattern shorthand → multi-file descriptor seed).
     var expectedArtifactFiles: RAExpectedModelFiles {
         if hasExpectedFiles { return expectedFiles }
@@ -427,20 +422,6 @@ public extension RAModelInfo {
 }
 
 // MARK: - Private helpers
-
-private extension RAModelArtifactType {
-    /// Map the legacy archive enum cases to their equivalent `RAArchiveType`.
-    /// Returns `nil` for non-archive cases.
-    var legacyArchiveType: RAArchiveType? {
-        switch self {
-        case .archive, .zipArchive: return .zip
-        case .tarGzArchive:         return .tarGz
-        case .tarBz2Archive:        return .tarBz2
-        case .tarXzArchive:         return .tarXz
-        default:                    return nil
-        }
-    }
-}
 
 private extension RAArchiveType {
     var artifactType: RAModelArtifactType {

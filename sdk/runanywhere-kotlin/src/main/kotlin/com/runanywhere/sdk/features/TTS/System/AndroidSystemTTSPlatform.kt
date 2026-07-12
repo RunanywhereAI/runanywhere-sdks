@@ -168,8 +168,16 @@ private class AndroidSystemTTSService(
                             done.countDown()
                         }
 
-                        @Deprecated("Deprecated in Android framework")
+                        @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
                         override fun onError(utteranceId: String?) {
+                            completeWithError()
+                        }
+
+                        override fun onError(utteranceId: String?, errorCode: Int) {
+                            completeWithError()
+                        }
+
+                        private fun completeWithError() {
                             result.set(RAC_ERROR_INTERNAL)
                             done.countDown()
                         }

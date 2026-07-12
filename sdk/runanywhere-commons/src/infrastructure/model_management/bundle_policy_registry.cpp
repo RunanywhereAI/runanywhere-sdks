@@ -8,7 +8,7 @@
  * .rodata / function-local statics).
  */
 
-#include "rac/infrastructure/model_management/rac_bundle_policy.h"
+#include "bundle_policy_registry_internal.h"
 
 #include <map>
 #include <mutex>
@@ -49,10 +49,13 @@ extern "C" rac_result_t rac_bundle_policy_unregister(rac_inference_framework_t f
     return RAC_SUCCESS;
 }
 
-extern "C" const rac_bundle_policy_t*
-rac_bundle_policy_find(rac_inference_framework_t framework) {
+namespace rac::infra::bundle_policy {
+
+const rac_bundle_policy_t* find(rac_inference_framework_t framework) {
     Registry& r = registry();
     std::lock_guard<std::mutex> lock(r.mutex);
     const auto it = r.policies.find(framework);
     return it == r.policies.end() ? nullptr : it->second;
 }
+
+}  // namespace rac::infra::bundle_policy

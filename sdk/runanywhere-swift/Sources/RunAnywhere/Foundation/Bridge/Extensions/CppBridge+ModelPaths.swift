@@ -19,6 +19,11 @@ extension CppBridge {
         private static let logger = SDKLogger(category: "CppBridge.ModelPaths")
         private static let pathBufferSize = 1024
 
+        private static func decodeCStringBuffer(_ buffer: [CChar]) -> String {
+            let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+            return String(bytes: bytes, encoding: .utf8) ?? ""
+        }
+
         // MARK: - Configuration
 
         /// Set the base directory for model storage
@@ -57,7 +62,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the framework directory
@@ -70,7 +75,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the model folder
@@ -85,7 +90,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the expected model path (folder for directory-based, file for single-file)
@@ -109,7 +114,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the cache directory
@@ -121,7 +126,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the downloads directory
@@ -133,7 +138,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         /// Get the temp directory
@@ -145,7 +150,7 @@ extension CppBridge {
                 throw SDKException(code: .initializationFailed, message: "Base directory not configured", category: .internal)
             }
 
-            return URL(fileURLWithPath: String(cString: buffer))
+            return URL(fileURLWithPath: decodeCStringBuffer(buffer))
         }
 
         // MARK: - Path Analysis
@@ -158,7 +163,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else { return nil }
-            return String(cString: buffer)
+            return decodeCStringBuffer(buffer)
         }
 
         /// Extract framework from a file path

@@ -492,7 +492,6 @@ function createBaseDiffusionConfiguration() {
         maxMemoryMb: 0,
         modelId: undefined,
         preferredFramework: undefined,
-        reduceMemory: false,
     };
 }
 exports.DiffusionConfiguration = {
@@ -514,9 +513,6 @@ exports.DiffusionConfiguration = {
         }
         if (message.preferredFramework !== undefined) {
             writer.uint32(48).int32(message.preferredFramework);
-        }
-        if (message.reduceMemory !== false) {
-            writer.uint32(56).bool(message.reduceMemory);
         }
         return writer;
     },
@@ -569,13 +565,6 @@ exports.DiffusionConfiguration = {
                     message.preferredFramework = reader.int32();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.reduceMemory = reader.bool();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -616,11 +605,6 @@ exports.DiffusionConfiguration = {
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
                     : undefined,
-            reduceMemory: isSet(object.reduceMemory)
-                ? globalThis.Boolean(object.reduceMemory)
-                : isSet(object.reduce_memory)
-                    ? globalThis.Boolean(object.reduce_memory)
-                    : false,
         };
     },
     toJSON(message) {
@@ -643,9 +627,6 @@ exports.DiffusionConfiguration = {
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
         }
-        if (message.reduceMemory !== false) {
-            obj.reduceMemory = message.reduceMemory;
-        }
         return obj;
     },
     create(base) {
@@ -661,7 +642,6 @@ exports.DiffusionConfiguration = {
         message.maxMemoryMb = object.maxMemoryMb ?? 0;
         message.modelId = object.modelId ?? undefined;
         message.preferredFramework = object.preferredFramework ?? undefined;
-        message.reduceMemory = object.reduceMemory ?? false;
         return message;
     },
 };

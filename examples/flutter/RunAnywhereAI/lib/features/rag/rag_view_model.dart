@@ -126,7 +126,7 @@ class RAGViewModel extends ChangeNotifier {
         llmModel: llmModel,
         baseConfiguration: RAGConfiguration(rerankResults: _rerankEnabled),
       );
-      await RunAnywhere.rag.ingest(extractedText);
+      await RunAnywhere.rag.ragIngest(proto.RAGDocument(text: extractedText));
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;

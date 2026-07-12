@@ -65,7 +65,7 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
  * The registered callback fires once per VoiceEvent emitted by the agent's
  * streaming / per-turn paths.
  *
- * @param handle     Voice agent handle obtained from rac_voice_agent_create().
+ * @param handle     Voice agent handle obtained from rac_voice_agent_create_standalone().
  * @param callback   Proto-byte event callback function. Pass NULL to clear.
  * @param user_data  Opaque pointer passed back on every invocation.
  *

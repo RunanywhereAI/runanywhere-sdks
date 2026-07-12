@@ -243,14 +243,16 @@ RunAnywhere.registerTool(
 #### Generate with Tools
 
 ```typescript
+import { ToolCallFormatName } from '@runanywhere/proto-ts/tool_calling';
+
 const result = await RunAnywhere.generateWithTools(
   'What is the weather in San Francisco?',
   {
     autoExecute: true,         // Automatically execute tool calls
-    maxIterations: 3,          // Max tool invocations per turn
+    maxToolCalls: 3,           // Max tool invocations per turn
     temperature: 0.7,
     maxTokens: 512,
-    formatHint: 'default',     // 'default' or 'lfm2' for Liquid AI models
+    format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
     keepToolsAvailable: false, // Remove tools after first call
   }
 );
@@ -470,7 +472,7 @@ for stable observability.
 import { SDKLogger, LogLevel } from '@runanywhere/core/internal';
 
 // Set global log level
-RunAnywhere.setLogLevel(LogLevel.Debug);
+RunAnywhere.setLogLevel(LogLevel.LOG_LEVEL_DEBUG);
 
 // Create custom logger
 const logger = new SDKLogger('MyModule');

@@ -37,32 +37,32 @@ class LoggingConfigurations {
 
   /// Default configuration: local logging on, INFO floor, device metadata on.
   static LoggingConfiguration get defaults => LoggingConfiguration(
-        enableLocalLogging: true,
-        minLogLevel: LogLevel.LOG_LEVEL_INFO,
-        includeDeviceMetadata: true,
-      );
+    enableLocalLogging: true,
+    minLogLevel: LogLevel.LOG_LEVEL_INFO,
+    includeDeviceMetadata: true,
+  );
 
   /// Development preset — verbose logging (matches Swift).
   static LoggingConfiguration get development => LoggingConfiguration(
-        enableLocalLogging: true,
-        minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
-        includeDeviceMetadata: false,
-      );
+    enableLocalLogging: true,
+    minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
+    includeDeviceMetadata: false,
+  );
 
   /// Staging preset — info-level logging (matches Swift).
   static LoggingConfiguration get staging => LoggingConfiguration(
-        enableLocalLogging: true,
-        minLogLevel: LogLevel.LOG_LEVEL_INFO,
-        includeDeviceMetadata: true,
-      );
+    enableLocalLogging: true,
+    minLogLevel: LogLevel.LOG_LEVEL_INFO,
+    includeDeviceMetadata: true,
+  );
 
   /// Production preset — warnings + errors only, local logging off
   /// (matches Swift).
   static LoggingConfiguration get production => LoggingConfiguration(
-        enableLocalLogging: false,
-        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
-        includeDeviceMetadata: true,
-      );
+    enableLocalLogging: false,
+    minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+    includeDeviceMetadata: true,
+  );
 
   /// Preset for an SDK environment. Mirrors Swift
   /// `RALoggingConfiguration.forEnvironment(_:)` (unknown → development).
@@ -257,8 +257,12 @@ class SDKLogger {
   }
 
   /// Log an error message
-  void error(String message,
-      {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
+  void error(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? metadata,
+  }) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     if (error != null) {
       enrichedMetadata['error'] = error.toString();
@@ -271,8 +275,12 @@ class SDKLogger {
   }
 
   /// Log a fault message (highest severity)
-  void fault(String message,
-      {Object? error, StackTrace? stackTrace, Map<String, dynamic>? metadata}) {
+  void fault(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? metadata,
+  }) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     if (error != null) {
       enrichedMetadata['error'] = error.toString();
@@ -281,8 +289,8 @@ class SDKLogger {
       enrichedMetadata['stackTrace'] = stackTrace.toString();
     }
 
-    // `fault` is the legacy name; the generated enum's highest severity is
-    // LOG_LEVEL_FATAL.
+    // The public `fault` convenience maps to the generated enum's highest
+    // severity, LOG_LEVEL_FATAL.
     _log(LogLevel.LOG_LEVEL_FATAL, message, metadata: enrichedMetadata);
   }
 
@@ -294,15 +302,21 @@ class SDKLogger {
   // MARK: - Performance Logging
 
   /// Log performance metrics
-  void performance(String metric, double value,
-      {Map<String, dynamic>? metadata}) {
+  void performance(
+    String metric,
+    double value, {
+    Map<String, dynamic>? metadata,
+  }) {
     final enrichedMetadata = metadata ?? <String, dynamic>{};
     enrichedMetadata['metric'] = metric;
     enrichedMetadata['value'] = value;
     enrichedMetadata['type'] = 'performance';
 
-    _log(LogLevel.LOG_LEVEL_INFO, '$metric: $value',
-        metadata: enrichedMetadata);
+    _log(
+      LogLevel.LOG_LEVEL_INFO,
+      '$metric: $value',
+      metadata: enrichedMetadata,
+    );
   }
 
   // MARK: - Private Methods

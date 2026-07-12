@@ -20,7 +20,7 @@ extension CppBridge {
 
         // MARK: - Callback Storage (must persist for C++ to call)
 
-        private static var callbacksRegistered = false
+        private static let callbacksRegistered = OSAllocatedUnfairLock(initialState: false)
 
         /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
         private static let deviceInfoStrings =
@@ -75,7 +75,8 @@ extension CppBridge {
             }
 
             if result == RAC_SUCCESS {
-                return String(cString: buffer)
+                let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                return String(bytes: bytes, encoding: .utf8) ?? ""
             }
 
             // Fallback: commons resolver unavailable (e.g. platform adapter
@@ -92,7 +93,12 @@ extension CppBridge {
         // Must be called during SDK initialization.
         // swiftlint:disable:next function_body_length
         public static func register() {
-            guard !callbacksRegistered else { return }
+            let shouldRegister = callbacksRegistered.withLock { registered in
+                guard !registered else { return false }
+                registered = true
+                return true
+            }
+            guard shouldRegister else { return }
 
             var callbacks = rac_device_callbacks_t()
 
@@ -106,7 +112,7 @@ extension CppBridge {
                 // Commons reads these `const char*` fields after this callback
                 // returns, so back them with strdup'd storage that outlives the
                 // call. The previous fill is freed before this one is staged.
-                CppBridge.Device.deviceInfoStrings.withLock { store in
+                CppBridge.Device.deviceInfoStrings.withLockUnchecked { store in
                     store.reset()
 
                     // Required fields (backend schema)
@@ -139,7 +145,7 @@ extension CppBridge {
             // Get device ID callback
             callbacks.get_device_id = { _ in
                 let deviceId = CppBridge.Device.persistentId
-                return CppBridge.Device.deviceIdString.withLock { store in
+                return CppBridge.Device.deviceIdString.withLockUnchecked { store in
                     store.reset()
                     return store.dup(deviceId)
                 }
@@ -186,20 +192,16 @@ extension CppBridge {
                 )
 
                 Task.detached {
-                    var payload = DeviceHTTPResult.failure(
-                        result: RAC_ERROR_NETWORK_ERROR,
-                        message: "Device registration HTTP request failed"
-                    )
-                    defer {
-                        resultBox.withLock { $0 = payload }
-                        semaphore.signal()
-                    }
+                    let payload: DeviceHTTPResult
                     do {
                         guard let jsonData = jsonStr.data(using: .utf8) else {
-                            payload = .failure(
-                                result: RAC_ERROR_INVALID_ARGUMENT,
-                                message: "Invalid JSON data"
-                            )
+                            resultBox.withLock {
+                                $0 = .failure(
+                                    result: RAC_ERROR_INVALID_ARGUMENT,
+                                    message: "Invalid JSON data"
+                                )
+                            }
+                            semaphore.signal()
                             return
                         }
 
@@ -219,6 +221,8 @@ extension CppBridge {
                             message: error.localizedDescription
                         )
                     }
+                    resultBox.withLock { $0 = payload }
+                    semaphore.signal()
                 }
 
                 let payload: DeviceHTTPResult
@@ -239,9 +243,9 @@ extension CppBridge {
 
             let setResult = rac_device_manager_set_callbacks(&callbacks)
             if setResult == RAC_SUCCESS {
-                callbacksRegistered = true
                 SDKLogger(category: "CppBridge.Device").debug("Device manager callbacks registered")
             } else {
+                callbacksRegistered.withLock { $0 = false }
                 SDKLogger(category: "CppBridge.Device").error("Failed to register device manager callbacks: \(setResult)")
             }
         }
@@ -258,7 +262,7 @@ extension CppBridge {
             body: String?,
             error: String?
         ) {
-            httpResponseStrings.withLock { store in
+            httpResponseStrings.withLockUnchecked { store in
                 store.reset()
                 outResponse.pointee.result = result
                 outResponse.pointee.status_code = statusCode
@@ -309,7 +313,10 @@ extension CppBridge {
 /// `(NSString).utf8String` is only valid until the autorelease pool drains;
 /// these copies survive the callback and are freed when the next fill calls
 /// `reset()`, bounding the lifetime to one outstanding generation.
-private final class DeviceCStringStore {
+/// The stores are private and every access is serialized by their enclosing
+/// `OSAllocatedUnfairLock`; the pointers never escape except as borrowed C ABI
+/// string storage with the documented generation lifetime.
+private final class DeviceCStringStore: @unchecked Sendable {
     private var buffers: [UnsafeMutablePointer<CChar>] = []
 
     /// Duplicate `value` into long-lived storage and return a pointer valid

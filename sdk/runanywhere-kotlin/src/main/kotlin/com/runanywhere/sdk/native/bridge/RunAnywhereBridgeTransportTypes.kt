@@ -6,23 +6,6 @@
 package com.runanywhere.sdk.native.bridge
 
 /**
- * Listener for native HTTP download progress. Invoked from the worker
- * thread that called `RunAnywhereBridge.racHttpDownloadExecute(...)`
- * on every libcurl chunk.
- *
- * Kept as a top-level type in this package so the
- * JNI `FindClass(..., "onProgress", "(JJ)Z")` contract stays stable while
- * RunAnywhereBridge retains the external function declarations.
- *
- * Return `false` to cancel the download — the native runner will
- * abort libcurl, close the partial file, and return
- * `RAC_HTTP_DL_CANCELLED`.
- */
-fun interface NativeDownloadProgressListener {
-    fun onProgress(bytesWritten: Long, totalBytes: Long): Boolean
-}
-
-/**
  * Listener for native proto-byte callbacks. The byte array is an owned copy of
  * the native callback payload and is safe to decode or dispatch asynchronously.
  */
@@ -32,7 +15,7 @@ fun interface NativeProtoProgressListener {
 
 /**
  * Synchronous tool-execute callback invoked by
- * [RunAnywhereBridge.racToolCallingRunLoopWithHandleAndCbProto] from the
+ * [RunAnywhereBridge.racToolCallingRunLoopProto] from the
  * thread that called it. Receives a serialized `runanywhere.v1.ToolCall` and
  * MUST return a serialized `runanywhere.v1.ToolResult`. Mirrors Swift's
  * `toolExecuteTrampoline` — the C run loop blocks on this call until the
@@ -44,7 +27,7 @@ fun interface NativeToolExecuteListener {
 
 /**
  * Synchronous handle-publication callback invoked by
- * [RunAnywhereBridge.racToolCallingRunLoopWithHandleAndCbProto] the moment
+ * [RunAnywhereBridge.racToolCallingRunLoopProto] the moment
  * the cancellable run-loop handle is minted (before the first generate
  * iteration). Lets the Kotlin caller route the handle into a thread-safe sink
  * (e.g. `CompletableDeferred`) so a cancel coroutine can fan a cancel into

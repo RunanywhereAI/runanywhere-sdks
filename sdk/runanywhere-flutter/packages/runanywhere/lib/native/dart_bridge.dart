@@ -16,7 +16,6 @@ import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/native/dart_bridge_model_assignment.dart';
 import 'package:runanywhere/native/dart_bridge_model_lifecycle.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
@@ -175,8 +174,7 @@ class DartBridge {
     // Step 4: Initialize SDK with configuration (Phase 1 proto-based path)
     // Matches Swift: CppBridge.SdkInit.phase1(...) in
     // sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+SdkInit.swift
-    // Routes through rac_sdk_init_phase1_proto in commons; supersedes the
-    // legacy struct-based rac_sdk_init entry point.
+    // Routes through rac_sdk_init_phase1_proto in commons.
     try {
       DartBridgeSdkInit.phase1(
         SdkInitPhase1Request(
@@ -294,16 +292,6 @@ class DartBridge {
     await DartBridgePlatform.registerServices();
     _logger.debug('Platform services registered');
 
-    // Model assignment callbacks are legacy callback plumbing. Keep them
-    // available for explicit callers but disable auto-fetch because commons
-    // Phase 2 now owns assignment fetch through rac_http_transport.
-    await DartBridgeModelAssignment.register(
-      environment: _environment,
-      baseURL: baseURL,
-      autoFetch: false,
-    );
-    _logger.debug('Model assignment callbacks registered (autoFetch: false)');
-
     // Step 3: Install auth secure storage now that platform async caches are
     // ready. Commons Phase 1 already owns rac_state_initialize with the
     // resolved credentials/device ID.
@@ -367,7 +355,7 @@ class DartBridge {
   ///
   /// Async because per-modality component destroy() paths must complete
   /// before Telemetry/Events teardown so commons-side handles created via
-  /// the lifecycle ABIs (and legacy `getHandle()`-based paths like
+  /// the lifecycle ABIs and current component-handle paths like
   /// TTS `listVoicesProto`, `synthesizeProto`, `synthesizeStreamProto`)
   /// do not leak across `RunAnywhere.reset()` -> `initialize()` cycles.
   ///
@@ -431,9 +419,6 @@ class DartBridge {
   static DartBridgeLLM get llm => DartBridgeLLM.shared;
 
   /// Model assignment bridge
-  static DartBridgeModelAssignment get modelAssignment =>
-      DartBridgeModelAssignment.instance;
-
   /// Model paths bridge
   static DartBridgeModelPaths get modelPaths => DartBridgeModelPaths.instance;
 

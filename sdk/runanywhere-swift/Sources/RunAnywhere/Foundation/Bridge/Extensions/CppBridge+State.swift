@@ -13,6 +13,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - State Bridge (Centralized SDK State)
 
@@ -23,7 +24,7 @@ extension CppBridge {
     /// rac_secure_storage_t vtable installed here.
     public enum State {
 
-        private static var authStorageInstalled = false
+        private static let authStorageInstalled = OSAllocatedUnfairLock(initialState: false)
 
         // MARK: - Initialization
 
@@ -72,7 +73,7 @@ extension CppBridge {
         public static func shutdown() {
             rac_state_shutdown()
             rac_auth_reset()
-            authStorageInstalled = false
+            authStorageInstalled.withLock { $0 = false }
         }
 
         // MARK: - Environment Queries
@@ -160,7 +161,12 @@ extension CppBridge {
         /// wiring, rac_auth_save_tokens / rac_auth_clear are no-ops and
         /// tokens are lost on every process restart.
         private static func installAuthSecureStorage() {
-            guard !authStorageInstalled else { return }
+            let shouldInstall = authStorageInstalled.withLock { installed in
+                guard !installed else { return false }
+                installed = true
+                return true
+            }
+            guard shouldInstall else { return }
 
             var storage = rac_secure_storage_t(
                 store: authSecureStorageStore,
@@ -174,7 +180,6 @@ extension CppBridge {
             // Restore any previously persisted tokens.
             _ = rac_auth_load_stored_tokens()
 
-            authStorageInstalled = true
             SDKLogger(category: "CppBridge.State").debug("Keychain secure storage installed into rac_auth_manager")
         }
     }

@@ -155,8 +155,15 @@ rac_result_t serialize_proto_to_owned_buffer(const ProtoMessage& message, uint8_
         return RAC_ERROR_UNKNOWN;
     }
 
-    return rac_proto_buffer_copy_to_raw(reinterpret_cast<const uint8_t*>(bytes.data()),
-                                        bytes.size(), proto_bytes_out, proto_size_out);
+    rac_proto_buffer_t buffer{};
+    rac_proto_buffer_init(&buffer);
+    rac_result_t result = rac_proto_buffer_copy(
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &buffer);
+    if (result == RAC_SUCCESS) {
+        result = rac_proto_buffer_take_data(&buffer, proto_bytes_out, proto_size_out);
+    }
+    rac_proto_buffer_free(&buffer);
+    return result;
 }
 
 template <typename ProtoMessage>

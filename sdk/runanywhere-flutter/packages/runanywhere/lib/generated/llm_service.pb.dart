@@ -26,79 +26,25 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'llm_service.pbenum.dart';
 
-/// pass3-syn-025: the inline scalar fields below historically existed to avoid
-/// importing llm_options.proto. The cycle-avoidance rationale no longer holds
-/// (sdk_events.proto has no transitive dependency on llm_options.proto), so
-/// idl-005 introduces the canonical `LLMGenerationOptions options` embedded
-/// message at field 26. The inline scalar fields are RETAINED for wire-format
-/// backwards compatibility but are deprecated; new code SHOULD populate
-/// `options.*` and consumers SHOULD prefer `options.*` when set (falling back
-/// to the inline fields for legacy callers). The companion fix for
-/// VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
-/// proto carries tts_model_id but not tts_voice_id" issue) lives in
-/// idl/solutions.proto where VoiceAgentConfig is declared.
+/// Generation settings live exclusively in `options`. Reserved field numbers
+/// prevent unsafe wire reuse.
 class LLMGenerateRequest extends $pb.GeneratedMessage {
   factory LLMGenerateRequest({
     $core.String? prompt,
-    @$core.Deprecated('This field is deprecated.') $core.int? maxTokens,
-    @$core.Deprecated('This field is deprecated.') $core.double? temperature,
-    @$core.Deprecated('This field is deprecated.') $core.double? topP,
-    @$core.Deprecated('This field is deprecated.') $core.int? topK,
-    @$core.Deprecated('This field is deprecated.') $core.String? systemPrompt,
     $core.bool? emitThoughts,
-    @$core.Deprecated('This field is deprecated.')
-    $core.double? repetitionPenalty,
-    @$core.Deprecated('This field is deprecated.')
-    $core.Iterable<$core.String>? stopSequences,
-    @$core.Deprecated('This field is deprecated.') $core.bool? streamingEnabled,
-    @$core.Deprecated('This field is deprecated.')
-    $core.String? preferredFramework,
-    @$core.Deprecated('This field is deprecated.') $core.String? jsonSchema,
-    @$core.Deprecated('This field is deprecated.')
-    $core.String? executionTarget,
     $core.String? requestId,
     $core.String? modelId,
     $core.String? conversationId,
-    @$core.Deprecated('This field is deprecated.') $fixnum.Int64? seed,
-    @$core.Deprecated('This field is deprecated.')
-    $core.double? frequencyPenalty,
-    @$core.Deprecated('This field is deprecated.')
-    $core.double? presencePenalty,
-    @$core.Deprecated('This field is deprecated.') $core.double? minP,
-    @$core.Deprecated('This field is deprecated.') $core.String? grammar,
-    @$core.Deprecated('This field is deprecated.') $core.String? responseFormat,
-    @$core.Deprecated('This field is deprecated.') $core.bool? echoPrompt,
-    @$core.Deprecated('This field is deprecated.') $core.int? nThreads,
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
     $0.LLMGenerationOptions? options,
     $core.Iterable<$1.ChatMessage>? history,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
-    if (maxTokens != null) result.maxTokens = maxTokens;
-    if (temperature != null) result.temperature = temperature;
-    if (topP != null) result.topP = topP;
-    if (topK != null) result.topK = topK;
-    if (systemPrompt != null) result.systemPrompt = systemPrompt;
     if (emitThoughts != null) result.emitThoughts = emitThoughts;
-    if (repetitionPenalty != null) result.repetitionPenalty = repetitionPenalty;
-    if (stopSequences != null) result.stopSequences.addAll(stopSequences);
-    if (streamingEnabled != null) result.streamingEnabled = streamingEnabled;
-    if (preferredFramework != null)
-      result.preferredFramework = preferredFramework;
-    if (jsonSchema != null) result.jsonSchema = jsonSchema;
-    if (executionTarget != null) result.executionTarget = executionTarget;
     if (requestId != null) result.requestId = requestId;
     if (modelId != null) result.modelId = modelId;
     if (conversationId != null) result.conversationId = conversationId;
-    if (seed != null) result.seed = seed;
-    if (frequencyPenalty != null) result.frequencyPenalty = frequencyPenalty;
-    if (presencePenalty != null) result.presencePenalty = presencePenalty;
-    if (minP != null) result.minP = minP;
-    if (grammar != null) result.grammar = grammar;
-    if (responseFormat != null) result.responseFormat = responseFormat;
-    if (echoPrompt != null) result.echoPrompt = echoPrompt;
-    if (nThreads != null) result.nThreads = nThreads;
     if (metadata != null) result.metadata.addEntries(metadata);
     if (options != null) result.options = options;
     if (history != null) result.history.addAll(history);
@@ -119,32 +65,10 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'prompt')
-    ..aI(2, _omitFieldNames ? '' : 'maxTokens')
-    ..aD(3, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
-    ..aI(5, _omitFieldNames ? '' : 'topK')
-    ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(7, _omitFieldNames ? '' : 'emitThoughts')
-    ..aD(8, _omitFieldNames ? '' : 'repetitionPenalty',
-        fieldType: $pb.PbFieldType.OF)
-    ..pPS(9, _omitFieldNames ? '' : 'stopSequences')
-    ..aOB(10, _omitFieldNames ? '' : 'streamingEnabled')
-    ..aOS(11, _omitFieldNames ? '' : 'preferredFramework')
-    ..aOS(12, _omitFieldNames ? '' : 'jsonSchema')
-    ..aOS(13, _omitFieldNames ? '' : 'executionTarget')
     ..aOS(14, _omitFieldNames ? '' : 'requestId')
     ..aOS(15, _omitFieldNames ? '' : 'modelId')
     ..aOS(16, _omitFieldNames ? '' : 'conversationId')
-    ..aInt64(17, _omitFieldNames ? '' : 'seed')
-    ..aD(18, _omitFieldNames ? '' : 'frequencyPenalty',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(19, _omitFieldNames ? '' : 'presencePenalty',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(20, _omitFieldNames ? '' : 'minP', fieldType: $pb.PbFieldType.OF)
-    ..aOS(21, _omitFieldNames ? '' : 'grammar')
-    ..aOS(22, _omitFieldNames ? '' : 'responseFormat')
-    ..aOB(23, _omitFieldNames ? '' : 'echoPrompt')
-    ..aI(24, _omitFieldNames ? '' : 'nThreads')
     ..m<$core.String, $core.String>(25, _omitFieldNames ? '' : 'metadata',
         entryClassName: 'LLMGenerateRequest.MetadataEntry',
         keyFieldType: $pb.PbFieldType.OS,
@@ -184,327 +108,71 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPrompt() => $_clearField(1);
 
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(2)
-  $core.int get maxTokens => $_getIZ(1);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(2)
-  set maxTokens($core.int value) => $_setSignedInt32(1, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(2)
-  $core.bool hasMaxTokens() => $_has(1);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(2)
-  void clearMaxTokens() => $_clearField(2);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(3)
-  $core.double get temperature => $_getN(2);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(3)
-  set temperature($core.double value) => $_setFloat(2, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(3)
-  $core.bool hasTemperature() => $_has(2);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(3)
-  void clearTemperature() => $_clearField(3);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(4)
-  $core.double get topP => $_getN(3);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(4)
-  set topP($core.double value) => $_setFloat(3, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(4)
-  $core.bool hasTopP() => $_has(3);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(4)
-  void clearTopP() => $_clearField(4);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(5)
-  $core.int get topK => $_getIZ(4);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(5)
-  set topK($core.int value) => $_setSignedInt32(4, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(5)
-  $core.bool hasTopK() => $_has(4);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(5)
-  void clearTopK() => $_clearField(5);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(6)
-  $core.String get systemPrompt => $_getSZ(5);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(6)
-  set systemPrompt($core.String value) => $_setString(5, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(6)
-  $core.bool hasSystemPrompt() => $_has(5);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(6)
-  void clearSystemPrompt() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $core.bool get emitThoughts => $_getBF(6);
+  $core.bool get emitThoughts => $_getBF(1);
   @$pb.TagNumber(7)
-  set emitThoughts($core.bool value) => $_setBool(6, value);
+  set emitThoughts($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(7)
-  $core.bool hasEmitThoughts() => $_has(6);
+  $core.bool hasEmitThoughts() => $_has(1);
   @$pb.TagNumber(7)
   void clearEmitThoughts() => $_clearField(7);
 
-  /// Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
-  ///
-  /// Streaming gaps below remain intentional: a streaming consumer that
-  /// requires these advanced knobs MUST set them on `options.*` rather than
-  /// inline (no inline duplicate exists):
-  ///   - thinking_pattern (LLMGenerationOptions field 11)
-  ///   - structured_output (LLMGenerationOptions field 13)
-  ///   - enable_real_time_tracking (LLMGenerationOptions field 14)
-  ///   - repeat_last_n (LLMGenerationOptions field 18)
-  ///   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
-  ///     is not yet supported on the LLM.Generate rpc; tool sessions must
-  ///     use the non-streaming generation path with LLMGenerationOptions.
-  /// Note the inline `preferred_framework` (field 11) and `execution_target`
-  /// (field 13) are degraded to `string` for backwards compatibility;
-  /// `options.preferred_framework` and `options.execution_target` carry the
-  /// canonical InferenceFramework / ExecutionTarget enums.
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(8)
-  $core.double get repetitionPenalty => $_getN(7);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(8)
-  set repetitionPenalty($core.double value) => $_setFloat(7, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(8)
-  $core.bool hasRepetitionPenalty() => $_has(7);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(8)
-  void clearRepetitionPenalty() => $_clearField(8);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(9)
-  $pb.PbList<$core.String> get stopSequences => $_getList(8);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(10)
-  $core.bool get streamingEnabled => $_getBF(9);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(10)
-  set streamingEnabled($core.bool value) => $_setBool(9, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(10)
-  $core.bool hasStreamingEnabled() => $_has(9);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(10)
-  void clearStreamingEnabled() => $_clearField(10);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(11)
-  $core.String get preferredFramework => $_getSZ(10);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(11)
-  set preferredFramework($core.String value) => $_setString(10, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(11)
-  $core.bool hasPreferredFramework() => $_has(10);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(11)
-  void clearPreferredFramework() => $_clearField(11);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(12)
-  $core.String get jsonSchema => $_getSZ(11);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(12)
-  set jsonSchema($core.String value) => $_setString(11, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(12)
-  $core.bool hasJsonSchema() => $_has(11);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(12)
-  void clearJsonSchema() => $_clearField(12);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(13)
-  $core.String get executionTarget => $_getSZ(12);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(13)
-  set executionTarget($core.String value) => $_setString(12, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(13)
-  $core.bool hasExecutionTarget() => $_has(12);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(13)
-  void clearExecutionTarget() => $_clearField(13);
-
   @$pb.TagNumber(14)
-  $core.String get requestId => $_getSZ(13);
+  $core.String get requestId => $_getSZ(2);
   @$pb.TagNumber(14)
-  set requestId($core.String value) => $_setString(13, value);
+  set requestId($core.String value) => $_setString(2, value);
   @$pb.TagNumber(14)
-  $core.bool hasRequestId() => $_has(13);
+  $core.bool hasRequestId() => $_has(2);
   @$pb.TagNumber(14)
   void clearRequestId() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.String get modelId => $_getSZ(14);
+  $core.String get modelId => $_getSZ(3);
   @$pb.TagNumber(15)
-  set modelId($core.String value) => $_setString(14, value);
+  set modelId($core.String value) => $_setString(3, value);
   @$pb.TagNumber(15)
-  $core.bool hasModelId() => $_has(14);
+  $core.bool hasModelId() => $_has(3);
   @$pb.TagNumber(15)
   void clearModelId() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.String get conversationId => $_getSZ(15);
+  $core.String get conversationId => $_getSZ(4);
   @$pb.TagNumber(16)
-  set conversationId($core.String value) => $_setString(15, value);
+  set conversationId($core.String value) => $_setString(4, value);
   @$pb.TagNumber(16)
-  $core.bool hasConversationId() => $_has(15);
+  $core.bool hasConversationId() => $_has(4);
   @$pb.TagNumber(16)
   void clearConversationId() => $_clearField(16);
 
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(17)
-  $fixnum.Int64 get seed => $_getI64(16);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(17)
-  set seed($fixnum.Int64 value) => $_setInt64(16, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(17)
-  $core.bool hasSeed() => $_has(16);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(17)
-  void clearSeed() => $_clearField(17);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(18)
-  $core.double get frequencyPenalty => $_getN(17);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(18)
-  set frequencyPenalty($core.double value) => $_setFloat(17, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(18)
-  $core.bool hasFrequencyPenalty() => $_has(17);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(18)
-  void clearFrequencyPenalty() => $_clearField(18);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(19)
-  $core.double get presencePenalty => $_getN(18);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(19)
-  set presencePenalty($core.double value) => $_setFloat(18, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(19)
-  $core.bool hasPresencePenalty() => $_has(18);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(19)
-  void clearPresencePenalty() => $_clearField(19);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(20)
-  $core.double get minP => $_getN(19);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(20)
-  set minP($core.double value) => $_setFloat(19, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(20)
-  $core.bool hasMinP() => $_has(19);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(20)
-  void clearMinP() => $_clearField(20);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(21)
-  $core.String get grammar => $_getSZ(20);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(21)
-  set grammar($core.String value) => $_setString(20, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(21)
-  $core.bool hasGrammar() => $_has(20);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(21)
-  void clearGrammar() => $_clearField(21);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(22)
-  $core.String get responseFormat => $_getSZ(21);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(22)
-  set responseFormat($core.String value) => $_setString(21, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(22)
-  $core.bool hasResponseFormat() => $_has(21);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(22)
-  void clearResponseFormat() => $_clearField(22);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(23)
-  $core.bool get echoPrompt => $_getBF(22);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(23)
-  set echoPrompt($core.bool value) => $_setBool(22, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(23)
-  $core.bool hasEchoPrompt() => $_has(22);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(23)
-  void clearEchoPrompt() => $_clearField(23);
-
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(24)
-  $core.int get nThreads => $_getIZ(23);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(24)
-  set nThreads($core.int value) => $_setSignedInt32(23, value);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(24)
-  $core.bool hasNThreads() => $_has(23);
-  @$core.Deprecated('This field is deprecated.')
-  @$pb.TagNumber(24)
-  void clearNThreads() => $_clearField(24);
-
   @$pb.TagNumber(25)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(24);
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(5);
 
-  /// idl-005: canonical generation options. When set, consumers SHOULD use
-  /// the values here in preference to the legacy inline scalar fields above.
-  /// The wire schema retains the inline fields to avoid breaking existing
-  /// serialized requests; new callers should only populate `options`.
+  /// Canonical generation settings. When absent, commons applies its SDK
+  /// defaults; callers that need explicit controls populate this message.
   @$pb.TagNumber(26)
-  $0.LLMGenerationOptions get options => $_getN(25);
+  $0.LLMGenerationOptions get options => $_getN(6);
   @$pb.TagNumber(26)
   set options($0.LLMGenerationOptions value) => $_setField(26, value);
   @$pb.TagNumber(26)
-  $core.bool hasOptions() => $_has(25);
+  $core.bool hasOptions() => $_has(6);
   @$pb.TagNumber(26)
   void clearOptions() => $_clearField(26);
   @$pb.TagNumber(26)
-  $0.LLMGenerationOptions ensureOptions() => $_ensure(25);
+  $0.LLMGenerationOptions ensureOptions() => $_ensure(6);
 
-  /// idl-chat: PRIOR conversation turns (excludes the current `prompt`, which
-  /// stays the live user turn, and `system_prompt`, which stays separate).
+  /// Prior conversation turns (excludes the current `prompt`, which
+  /// stays the live user turn, and `options.system_prompt`, which stays
+  /// separate).
   /// Alternating user/assistant ChatMessages in chronological order. An engine
   /// that owns its chat template renders {system_prompt, history, prompt} from
   /// its model's markers; engines that don't simply ignore this field.
   @$pb.TagNumber(27)
-  $pb.PbList<$1.ChatMessage> get history => $_getList(26);
+  $pb.PbList<$1.ChatMessage> get history => $_getList(7);
 }
 
-/// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
-/// duplicates the scalar result fields instead of importing llm_options.proto:
-/// Square Wire treats files with/without go_package as different Kotlin
-/// packages, and that import creates a package cycle through sdk_events.
+/// Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
+/// stream-native token, timing, and error fields distinct from the unary
+/// LLMGenerationResult shape.
 class LLMStreamFinalResult extends $pb.GeneratedMessage {
   factory LLMStreamFinalResult({
     $core.String? text,
@@ -712,10 +380,10 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearDecodeTimeMs() => $_clearField(13);
 
-  /// hotspot-idl-002: tool calls actually executed during the streaming
-  /// session (mirrors LLMGenerationResult.tool_calls / .tool_results in
-  /// llm_options.proto). Populated only on terminal events when the
-  /// backend completed at least one tool call.
+  /// Tool calls actually executed during the streaming session (mirrors
+  /// LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
+  /// Populated only on terminal events when the backend completed at least
+  /// one tool call.
   @$pb.TagNumber(14)
   $pb.PbList<$2.ToolCall> get toolCalls => $_getList(13);
 
@@ -1008,10 +676,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearElapsedMs() => $_clearField(17);
 
-  /// hotspot-idl-002: structured tool-call payload emitted alongside an
-  /// event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
-  /// field the tool-call event kind carries no proto-typed payload and
-  /// SDK consumers must fall back to JSON-parsing the raw `token` text.
+  /// Structured tool-call payload emitted when event_kind is
+  /// LLM_STREAM_EVENT_KIND_TOOL_CALL.
   @$pb.TagNumber(18)
   $2.ToolCall get toolCall => $_getN(17);
   @$pb.TagNumber(18)
@@ -1033,12 +699,9 @@ class LLMApi {
   /// until is_final=true. Cancellation aborts the underlying generation
   /// via the existing rac_llm_cancel() C ABI.
   ///
-  /// idl-002: tool-calling generation is NOT supported on this streaming
-  /// entry point. LLMGenerateRequest does not carry ToolCallingOptions
-  /// (see comment on LLMGenerateRequest). Use the non-streaming
-  /// generation path that carries LLMGenerationOptions when a session
-  /// requires tools / structured output / thinking-tag patterns /
-  /// repeat_last_n / enable_real_time_tracking.
+  /// Tool-driven streaming is not supported on this entry point even when
+  /// options.tool_calling is populated. Use the non-streaming tool-session
+  /// generation path for tool calling.
   $async.Future<LLMStreamEvent> generate(
           $pb.ClientContext? ctx, LLMGenerateRequest request) =>
       _client.invoke<LLMStreamEvent>(

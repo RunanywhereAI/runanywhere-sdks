@@ -57,6 +57,8 @@ export function modelDisplaySizeBytes(model: {
     : model.memoryRequiredBytes ?? 0;
 }
 
+const BACKEND_FORMAT_TOKENS = new Set(['(ONNX)', '(GGUF)', '(MLX)']);
+
 /**
  * Consumer-facing model name with quantization/technical suffixes stripped
  * (e.g. "SmolLM2 360M Q8_0" → "SmolLM2 360M", "Qwen3 4B Q4_K_M" → "Qwen3 4B").
@@ -64,10 +66,11 @@ export function modelDisplaySizeBytes(model: {
  */
 export function cleanModelName(name: string): string {
   return name
+    .split(/\s+/)
+    .filter((token) => !BACKEND_FORMAT_TOKENS.has(token.toUpperCase()))
+    .join(' ')
     // Quant tokens: Q8_0, Q4_K_M, Q6_K, F16, BF16, DWQ, 4bit/8-bit, int8…
     .replace(/\b(?:Q\d+(?:_[A-Z0-9]+)*|BF16|F16|F32|DWQ|INT[48]|\d+\s?-?bits?)\b/gi, '')
-    // Parenthesized backend/format tokens — the backend shows as its own pill.
-    .replace(/\((?:ONNX|GGUF|MLX)\)/gi, '')
     // Collapse leftover separators/whitespace from the removal.
     .replace(/\s{2,}/g, ' ')
     .replace(/[\s\-·(]+$/g, '')

@@ -325,7 +325,7 @@ message ModelInfo {
     int32              context_length      = 9;
     bool               supports_thinking   = 10;
     bool               supports_lora       = 11;
-    string             description         = 12;
+    reserved 12;
 
     ModelSource        source              = 13;
     int64              created_at_unix_ms  = 14;
@@ -343,9 +343,7 @@ message ModelInfo {
     // capability flag; this optional pattern declares model-specific tags.
     optional ThinkingTagPattern thinking_pattern = 18;
 
-    // Structured public catalog metadata. `description` (field 12) is kept for
-    // backward compatibility and should mirror metadata.description when both
-    // are populated.
+    // Structured public catalog metadata, including the model description.
     optional ModelInfoMetadata metadata = 19;
 
     oneof artifact {
@@ -425,10 +423,7 @@ message ModelFileDescriptor {
     // newer SDK sources maps onto it (default true, mirrored in Swift).
     optional int64  size_bytes = 4;
 
-    // Tag 5 reserved — previously `optional string checksum` (legacy).
-    // Deleted in favour of the typed `checksum_sha256` field below.
     reserved 5;
-    reserved "checksum";
 
     // Path fields used by SDK-local wrappers/catalogs. `filename` is the
     // storage name for simple cases; relative_path/destination_path preserve
@@ -663,7 +658,6 @@ message CurrentModelRequest {
 
 message CurrentModelResult {
     reserved 1;
-    reserved "has_model";
     string    model_id          = 2;
     ModelInfo model             = 3;
     int64     loaded_at_unix_ms = 4;

@@ -54,6 +54,7 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "Loaded versions from ${VERSIONS_FILE}:"
     echo "  Platform targets:"
     echo "    IOS_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
+    echo "    MACOS_DEPLOYMENT_TARGET=${MACOS_DEPLOYMENT_TARGET}"
     echo "    ANDROID_MIN_SDK=${ANDROID_MIN_SDK}"
     echo "    XCODE_VERSION=${XCODE_VERSION}"
     echo "  ONNX Runtime:"
@@ -70,6 +71,7 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "  Data / serialization:"
     echo "    NLOHMANN_JSON_VERSION=${NLOHMANN_JSON_VERSION}"
     echo "    PROTOBUF_VERSION=${PROTOBUF_VERSION}"
+    echo "    ABSEIL_VERSION=${ABSEIL_VERSION}"
     echo "  Retrieval / vector search:"
     echo "    USEARCH_VERSION=${USEARCH_VERSION}"
     echo "  Compression / archives:"
@@ -85,7 +87,6 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "    EMSCRIPTEN_VERSION=${EMSCRIPTEN_VERSION}"
     echo "    NODE_VERSION=${NODE_VERSION}"
     echo "    JAVA_VERSION=${JAVA_VERSION}"
-    echo "    GRADLE_VERSION=${GRADLE_VERSION}"
     echo "    CMAKE_VERSION=${CMAKE_VERSION}"
     echo "    MIN_CMAKE_VERSION=${MIN_CMAKE_VERSION}"
 fi

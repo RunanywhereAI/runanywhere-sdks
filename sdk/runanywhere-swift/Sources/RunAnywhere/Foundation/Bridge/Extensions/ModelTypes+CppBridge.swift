@@ -98,7 +98,7 @@ extension RAModelInfo {
         if supportsThinking {
             thinkingPattern = .defaultPattern
         }
-        description_p = cModel.description.map { String(cString: $0) } ?? ""
+        metadata.description_p = cModel.description.map { String(cString: $0) } ?? ""
         source = ModelSource(from: cModel.source)
         createdAtUnixMs = cModel.created_at * 1_000
         updatedAtUnixMs = cModel.updated_at * 1_000

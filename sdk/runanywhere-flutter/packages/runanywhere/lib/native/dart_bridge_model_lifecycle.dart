@@ -231,8 +231,9 @@ class DartBridgeModelLifecycle {
     if (out.ref.data == nullptr || out.ref.size == 0) {
       return decode(const <int>[]);
     }
-    final resultBytes =
-        out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+    final resultBytes = out.ref.data
+        .asTypedList(out.ref.size)
+        .toList(growable: false);
     return decode(resultBytes);
   }
 

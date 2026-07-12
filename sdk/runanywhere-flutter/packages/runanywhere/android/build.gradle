@@ -5,28 +5,18 @@
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
-//   - testLocal = true:  Use local .so files from android/src/main/jniLibs/ (for development)
-//   - testLocal = false: Download from GitHub releases (for production)
+//   - useLocalNatives = true:  Use local .so files from android/src/main/jniLibs/
+//   - useLocalNatives = false: Download from GitHub releases
 //
 // Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
 
-group 'ai.runanywhere.sdk'
-version '0.19.15'
+group = 'ai.runanywhere.sdk'
+version = '0.19.15'
 
 // Load binary configuration
 apply from: 'binary_config.gradle'
 
-buildscript {
-    ext.kotlin_version = '1.9.10'
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.0'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
-}
+apply plugin: 'com.android.library'
 
 // Repositories for module-level dependencies (OkHttp, kotlin-stdlib)
 repositories {
@@ -34,11 +24,8 @@ repositories {
     mavenCentral()
 }
 
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
-
 def runAnywhereAndroidAbis = ['arm64-v8a', 'armeabi-v7a', 'x86_64']
-if (testLocal) {
+if (useLocalNatives) {
     def localAbiDirs = file('src/main/jniLibs').listFiles()?.findAll { candidate ->
         candidate.isDirectory() && new File(candidate, 'librac_commons.so').isFile()
     }?.collect { it.name }?.sort()
@@ -48,17 +35,18 @@ if (testLocal) {
 }
 
 android {
-    namespace 'ai.runanywhere.sdk'
-    compileSdk 36
+    namespace = 'ai.runanywhere.sdk'
+    compileSdk = 36
 
-    // NDK pin: canonical version from sdk/runanywhere-commons/VERSIONS (NDK_VERSION=27.3.13750724).
-    // 27.3.13750724 is r27d (LTS); required for Android 15+ 16 KiB page-alignment.
-    // External apps may override via racFlutterNdkVersion in their root gradle.properties.
-    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.3.13750724"
+    // Flutter 3.44's Android toolchain pin. Prebuilt SDK libraries produced
+    // with the repo's r27d native toolchain remain ABI-compatible; this NDK
+    // compiles the Flutter JNI wrapper and satisfies the app's other plugins.
+    // External apps may override via racFlutterNdkVersion.
+    ndkVersion = rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "28.2.13676358"
 
     defaultConfig {
-        minSdk 24
-        targetSdk 36
+        minSdk = 24
+        targetSdk = 36
 
         // ABI filters for native libraries
         ndk {
@@ -69,7 +57,7 @@ android {
             cmake {
                 abiFilters(*runAnywhereAndroidAbis)
                 cppFlags '-frtti -fexceptions'
-                arguments "-DRAC_FLUTTER_JNILIBS_DIR=${testLocal ? file('src/main/jniLibs').absolutePath : file('build/jniLibs').absolutePath}"
+                arguments "-DRAC_FLUTTER_JNILIBS_DIR=${useLocalNatives ? file('src/main/jniLibs').absolutePath : file('build/jniLibs').absolutePath}"
             }
         }
 
@@ -78,18 +66,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = '1.8'
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     sourceSets {
         main {
             // Native libraries location - use downloaded libs or local libs based on config
-            jniLibs.srcDirs = [testLocal ? 'src/main/jniLibs' : 'build/jniLibs']
+            jniLibs.srcDirs = [useLocalNatives ? 'src/main/jniLibs' : 'build/jniLibs']
         }
     }
 
@@ -101,7 +85,7 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
         }
     }
 
@@ -116,9 +100,13 @@ android {
     }
 }
 
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
 
+dependencies {
     // OkHttp backs the platform HTTP transport. Routes `rac_http_request_*`
     // through the system trust store + HTTP/2 + proxies + NetworkSecurityConfig
     // instead of libcurl (deleted in Stage 5). Version must match the Kotlin
@@ -143,8 +131,28 @@ def calculateChecksum(File file) {
     return digest.digest().collect { String.format("%02x", it) }.join('')
 }
 
+def verifyDownloadedArchive(File archive, String downloadUrl) {
+    def checksumFile = new File(archive.parentFile, "${archive.name}.sha256")
+    ant.get(src: "${downloadUrl}.sha256", dest: checksumFile)
+    def matcher = checksumFile.text.trim() =~ /^([0-9a-fA-F]{64})\s+\*?(.+)$/
+    if (!matcher.matches()) {
+        throw new GradleException("Malformed checksum sidecar for ${archive.name}")
+    }
+    def declaredName = new File(matcher.group(2)).name
+    def expectedName = new File(new URI(downloadUrl).path).name
+    if (declaredName != expectedName) {
+        throw new GradleException("Checksum sidecar names ${declaredName}, expected ${expectedName}")
+    }
+    def expected = matcher.group(1).toLowerCase()
+    def actual = calculateChecksum(archive)
+    if (actual != expected) {
+        throw new GradleException("Checksum mismatch for ${archive.name}: expected ${expected}, got ${actual}")
+    }
+    delete(checksumFile)
+}
+
 // =============================================================================
-// Binary Download Task: RACommons (runs when testLocal = false)
+// Binary Download Task: RACommons (runs when useLocalNatives = false)
 // =============================================================================
 task downloadNativeLibs {
     group = 'runanywhere'
@@ -160,52 +168,40 @@ task downloadNativeLibs {
             }
             jniLibsDir.mkdirs()
 
-            // Ensure build directory exists
             buildDir.mkdirs()
+            def requiredLibs = [
+                'librac_commons.so',
+                'librunanywhere_jni.so',
+                'librac_backend_cloud.so',
+                'libomp.so',
+                'libc++_shared.so',
+            ]
+            commonsAndroidUrls.each { abi, downloadUrl ->
+                def zipFile = file("${buildDir}/racommons-${abi}.zip")
+                def tempDir = file("${buildDir}/racommons-${abi}-temp")
+                delete(zipFile, tempDir)
+                tempDir.mkdirs()
 
-            def downloadUrl = commonsAndroidUrl
-            def zipFile = file("${buildDir}/racommons-android.zip")
-
-            println "Downloading from: ${downloadUrl}"
-
-            // Download the zip file
-            ant.get(src: downloadUrl, dest: zipFile)
-
-            println "✅ Downloaded successfully"
-
-            // Extract to temp directory first
-            def tempDir = file("${buildDir}/racommons-temp")
-            if (tempDir.exists()) {
-                delete(tempDir)
-            }
-            tempDir.mkdirs()
-
-            copy {
-                from zipTree(zipFile)
-                into tempDir
-            }
-
-            // Copy .so files from jniLibs structure
-            tempDir.eachFileRecurse { file ->
-                if (file.isDirectory() && file.name in ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86']) {
-                    def targetAbiDir = new File(jniLibsDir, file.name)
-                    targetAbiDir.mkdirs()
-                    file.eachFile { soFile ->
-                        if (soFile.name.endsWith('.so')) {
-                            copy {
-                                from soFile
-                                into targetAbiDir
-                            }
-                            println "  ✓ ${file.name}/${soFile.name}"
-                        }
-                    }
+                println "Downloading from: ${downloadUrl}"
+                ant.get(src: downloadUrl, dest: zipFile)
+                verifyDownloadedArchive(zipFile, downloadUrl)
+                copy {
+                    from zipTree(zipFile)
+                    into tempDir
                 }
-            }
 
-            // Clean up
-            zipFile.delete()
-            if (tempDir.exists()) {
-                delete(tempDir)
+                def sourceDir = new File(tempDir, "${abi}/jni")
+                def targetAbiDir = new File(jniLibsDir, abi)
+                targetAbiDir.mkdirs()
+                requiredLibs.each { libName ->
+                    def source = new File(sourceDir, libName)
+                    if (!source.isFile()) {
+                        throw new GradleException("Release archive is missing ${abi}/${libName}")
+                    }
+                    copy { from source; into targetAbiDir }
+                    println "  ✓ ${abi}/${libName}"
+                }
+                delete(zipFile, tempDir)
             }
 
             println "✅ RACommons native libraries downloaded successfully"
@@ -218,8 +214,7 @@ task downloadNativeLibs {
                     For local mode, please build and copy the libraries:
                       1. cd runanywhere-commons && ./scripts/build-android.sh
                       2. Copy the .so files to packages/runanywhere/android/src/main/jniLibs/
-                    Or switch to remote mode by editing binary_config.gradle:
-                      testLocal = false
+                    Or use remote mode with -Prunanywhere.useLocalNatives=false.
                 """)
             } else {
                 println "✅ Using local native libraries"

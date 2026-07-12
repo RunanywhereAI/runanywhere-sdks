@@ -16,8 +16,8 @@ This module enables on-device text generation with support for:
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 17.0+           |
-| macOS    | 14.0+           |
+| iOS      | 17.5+           |
+| macOS    | 14.5+           |
 
 The module requires the `RABackendLlamaCPP.xcframework` binary, which is automatically included when you add the SDK as a dependency.
 

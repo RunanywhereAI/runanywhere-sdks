@@ -34,7 +34,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run clean && tsc",
+    "build": "npm run clean && tsc && cp src/Infrastructure/AudioCaptureProcessor.js dist/Infrastructure/AudioCaptureProcessor.js",
     "dev": "tsc --watch",
     "lint": "eslint src tests --max-warnings 0",
     "lint:ts": "tsc --noEmit",
@@ -75,9 +75,10 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "^0.19.15",
     "long": "^5.3.2",
     "protobufjs": "^7.5.8"

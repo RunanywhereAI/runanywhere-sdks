@@ -318,34 +318,9 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
- * @brief Create a voice agent instance with externally-managed component handles.
- *
- * Use this when you already have LLM/STT/TTS/VAD ComponentActors loaded and want
- * to compose them into a voice-agent session sharing their handles. The
- * voice-agent owns the resulting composite but does NOT take ownership of the
- * child component handles.
- *
- * For a fully-managed voice agent that creates its own children, use
- * `rac_voice_agent_create_standalone()`.
- *
- * @param llm_component_handle Handle to LLM component (rac_llm_component)
- * @param stt_component_handle Handle to STT component (rac_stt_component)
- * @param tts_component_handle Handle to TTS component (rac_tts_component)
- * @param vad_component_handle Handle to VAD component (rac_vad_component)
- * @param out_handle Output: Handle to the created voice agent
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
-                                            rac_handle_t stt_component_handle,
-                                            rac_handle_t tts_component_handle,
-                                            rac_handle_t vad_component_handle,
-                                            rac_voice_agent_handle_t* out_handle);
-
-/**
  * @brief Destroy a voice agent instance.
  *
- * If created with rac_voice_agent_create_standalone(), this also destroys
- * the owned component handles.
+ * Also destroys the component handles owned by the voice agent.
  *
  * @param handle Voice agent handle
  */
@@ -528,6 +503,20 @@ typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_byte
 RAC_API rac_result_t rac_voice_agent_process_turn_proto(
     rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
     rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);
+
+/**
+ * @brief Cancel one request-scoped voice turn.
+ *
+ * @p request_bytes contains a serialized `VoiceAgentTurnRequest`; only its
+ * non-empty `request_id` is consumed. Cancellation is cooperative: an active
+ * LLM/TTS backend receives its native interrupt immediately, while a
+ * non-interruptible STT call is allowed to return and the pipeline exits at
+ * the next stage boundary. A cancel that arrives just before the turn starts
+ * remains keyed to that request id and cannot affect a later turn.
+ */
+RAC_API rac_result_t rac_voice_agent_cancel_turn_proto(rac_voice_agent_handle_t handle,
+                                                       const uint8_t* request_bytes,
+                                                       size_t request_size);
 
 /**
  * @brief Streaming raw-frame audio ingress with in-core segmentation.

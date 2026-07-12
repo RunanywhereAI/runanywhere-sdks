@@ -5,8 +5,6 @@
 //  Ergonomic helpers for canonical Storage proto types.
 //
 
-import Foundation
-
 // MARK: - RADeviceStorageInfo
 
 extension RADeviceStorageInfo {
@@ -80,15 +78,6 @@ extension RAStorageInfo {
 
     public var modelCount: Int { models.count }
 
-    public var storedModels: [RAStoredModel] {
-        models.map { metrics in
-            var model = RAStoredModel()
-            model.modelID = metrics.modelID
-            model.name = metrics.modelID
-            model.sizeBytes = metrics.sizeOnDiskBytes
-            return model
-        }
-    }
 }
 
 // MARK: - RAModelStorageMetrics
@@ -104,29 +93,6 @@ extension RAModelStorageMetrics {
     // `modelId` / `sizeOnDisk` / `lastUsed` aliases removed — pure renames of
     // canonical proto field names (`modelID`/`sizeOnDiskBytes`/`lastUsedMs`)
     // with no consumer usage. Per swift.md SWIFT-DUP-STORAGE-ALIASES.
-}
-
-// MARK: - RAStoredModel
-
-extension RAStoredModel: Identifiable {
-    public var id: String { modelID }
-
-    public var size: Int64 {
-        get { sizeBytes }
-        set { sizeBytes = newValue }
-    }
-
-    public var path: URL { URL(fileURLWithPath: localPath.isEmpty ? "/unknown" : localPath) }
-
-    public var createdDate: Date {
-        guard hasDownloadedAtMs else { return Date(timeIntervalSince1970: 0) }
-        return Date(timeIntervalSince1970: TimeInterval(downloadedAtMs) / 1000.0)
-    }
-
-    // `checksum` / `format` / `framework` / `modelDescription` aliases removed —
-    // proto `StoredModel` (idl/storage_types.proto) has no such fields. These
-    // always returned `nil` / `.unknown`, leaking dead UI rows into consumers.
-    // Per swift.md SWIFT-DUP-STORAGE-ALIASES.
 }
 
 // MARK: - RAStorageAvailability

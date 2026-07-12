@@ -1356,7 +1356,6 @@ function createBaseModelInfo() {
         contextLength: 0,
         supportsThinking: false,
         supportsLora: false,
-        description: "",
         source: 0,
         createdAtUnixMs: 0,
         updatedAtUnixMs: 0,
@@ -1418,9 +1417,6 @@ exports.ModelInfo = {
         }
         if (message.supportsLora !== false) {
             writer.uint32(88).bool(message.supportsLora);
-        }
-        if (message.description !== "") {
-            writer.uint32(98).string(message.description);
         }
         if (message.source !== 0) {
             writer.uint32(104).int32(message.source);
@@ -1581,13 +1577,6 @@ exports.ModelInfo = {
                         break;
                     }
                     message.supportsLora = reader.bool();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.description = reader.string();
                     continue;
                 }
                 case 13: {
@@ -1810,7 +1799,6 @@ exports.ModelInfo = {
                 : isSet(object.supports_lora)
                     ? globalThis.Boolean(object.supports_lora)
                     : false,
-            description: isSet(object.description) ? globalThis.String(object.description) : "",
             source: isSet(object.source) ? modelSourceFromJSON(object.source) : 0,
             createdAtUnixMs: isSet(object.createdAtUnixMs)
                 ? globalThis.Number(object.createdAtUnixMs)
@@ -1957,9 +1945,6 @@ exports.ModelInfo = {
         if (message.supportsLora !== false) {
             obj.supportsLora = message.supportsLora;
         }
-        if (message.description !== "") {
-            obj.description = message.description;
-        }
         if (message.source !== 0) {
             obj.source = modelSourceToJSON(message.source);
         }
@@ -2053,7 +2038,6 @@ exports.ModelInfo = {
         message.contextLength = object.contextLength ?? 0;
         message.supportsThinking = object.supportsThinking ?? false;
         message.supportsLora = object.supportsLora ?? false;
-        message.description = object.description ?? "";
         message.source = object.source ?? 0;
         message.createdAtUnixMs = object.createdAtUnixMs ?? 0;
         message.updatedAtUnixMs = object.updatedAtUnixMs ?? 0;

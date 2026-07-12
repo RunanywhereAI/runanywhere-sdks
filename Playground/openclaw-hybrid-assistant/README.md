@@ -294,7 +294,7 @@ file ~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/embedding_mod
 
 ```bash
 cd /path/to/runanywhere-sdks/sdk/runanywhere-commons
-./scripts/build-linux.sh --shared
+./scripts/build-linux.sh
 ```
 
 This builds `librac_backend_onnx.so` and other shared libraries that the hybrid assistant links against. You must rebuild this whenever the SDK's C++ backends change (e.g., wake word fixes).

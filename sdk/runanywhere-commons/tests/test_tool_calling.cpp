@@ -1,9 +1,9 @@
 /**
  * @file test_tool_calling.cpp
- * @brief Behavioral tests for the rac_tool_call_* C ABI.
+ * @brief Behavioral tests for the private tool parser primitives.
  *
- * Phase G-1 close-out. Covers the cross-SDK surface that Swift, Kotlin,
- * Flutter, Web, and React Native all rely on as a single source of truth:
+ * The public SDK contract is generated protobuf. These tests exercise the
+ * parser implementation used behind that contract:
  *
  *   1. Parse (default <tool_call>JSON</tool_call> format)
  *   2. Parse (LFM2 <|tool_call_start|>[func(arg)]<|tool_call_end|> format)
@@ -25,6 +25,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
+#include "features/llm/tool_calling_internal.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
@@ -442,7 +443,7 @@ int test_parse_proto_round_trip() {
     request.set_text(
         "checking "
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>");
-    request.mutable_options()->set_format_hint("default");
+    request.mutable_options()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
 
     std::string request_bytes;
     ASSERT_TRUE(request.SerializeToString(&request_bytes));
@@ -476,7 +477,7 @@ int test_format_prompt_proto_round_trip() {
 #if !defined(RAC_HAVE_PROTOBUF)
     return 0;
 #else
-    for (const auto format : {runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC,
+    for (const auto format : {runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2,
                               runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON}) {
         runanywhere::v1::ToolPromptFormatRequest request;
         request.set_user_prompt("Invoke the typed tool with every required argument.");
@@ -527,8 +528,8 @@ int test_format_prompt_proto_round_trip() {
         rac_proto_buffer_free(&result_bytes);
 
         std::string model_output;
-        if (format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC) {
-            ASSERT_EQ_STR(format_result.format_hint().c_str(), "lfm2");
+        if (format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2) {
+            ASSERT_EQ_INT(format_result.format(), runanywhere::v1::TOOL_CALL_FORMAT_NAME_LFM2);
             ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "score=0");
             ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "enabled=true");
             ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "metadata={}");
@@ -536,7 +537,7 @@ int test_format_prompt_proto_round_trip() {
             model_output =
                 R"(<|tool_call_start|>[typed_tool(text="hello, world", score=12.5, enabled=true, metadata={"nested":{"values":[1,2]},"label":"x,y"}, items=[{"id":1},{"id":2}], fallback="plain")]<|tool_call_end|>)";
         } else {
-            ASSERT_EQ_STR(format_result.format_hint().c_str(), "default");
+            ASSERT_EQ_INT(format_result.format(), runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
             ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"metadata\":{}");
             ASSERT_SUBSTR(format_result.formatted_prompt().c_str(), "\"items\":[]");
             model_output =

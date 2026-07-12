@@ -14,13 +14,19 @@
  *     CppBridge.EmbeddingsProto.embedBatchLifecycle).
  */
 #include "HybridRunAnywhereCore+Common.hpp"
-#include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <future>
 #include <stdexcept>
+
+#include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/llm/rac_llm_schema_to_json.h"
+#include "rac/features/llm/rac_llm_structured_output.h"
+#include "rac/features/llm/rac_tool_calling.h"
+#include "rac/features/rag/rac_rag.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 namespace margelo::nitro::runanywhere {
 
@@ -60,15 +66,15 @@ std::shared_ptr<ArrayBuffer> copyToolsProtoBuffer(rac_proto_buffer_t& protoBuffe
         if (protoBuffer.error_message) {
             LOGE("%s proto error: %s", operation, protoBuffer.error_message);
         }
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyToolsProtoBuffer();
     }
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         return emptyToolsProtoBuffer();
     }
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
@@ -78,7 +84,7 @@ void setToolRunLoopError(rac_proto_buffer_t* out,
     if (!out) {
         return;
     }
-    proto_compat::initBuffer(out);
+    rac_proto_buffer_init(out);
     out->status = status;
     out->error_message = ::strdup(message.c_str());
 }
@@ -120,7 +126,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
         setToolRunLoopError(
             outToolResultBytes,
             RAC_ERROR_INVALID_ARGUMENT,
-            "toolRunLoopProto executor callback is not available");
+            "tool run-loop executor callback is not available");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -138,7 +144,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_TIMEOUT,
-                "toolRunLoopProto executor did not return a ToolResult promise in time");
+                "tool run-loop executor did not return a ToolResult promise in time");
             return RAC_ERROR_TIMEOUT;
         }
 
@@ -147,7 +153,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_TIMEOUT,
-                "toolRunLoopProto executor did not resolve ToolResult bytes in time");
+                "tool run-loop executor did not resolve ToolResult bytes in time");
             return RAC_ERROR_TIMEOUT;
         }
 
@@ -157,17 +163,17 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_INVALID_ARGUMENT,
-                "toolRunLoopProto executor returned empty ToolResult bytes");
+                "tool run-loop executor returned empty ToolResult bytes");
             return RAC_ERROR_INVALID_ARGUMENT;
         }
 
-        proto_compat::initBuffer(outToolResultBytes);
+        rac_proto_buffer_init(outToolResultBytes);
         outToolResultBytes->data = static_cast<uint8_t*>(std::malloc(resultSize));
         if (!outToolResultBytes->data) {
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_INTERNAL,
-                "toolRunLoopProto failed to allocate ToolResult buffer");
+                "tool run-loop failed to allocate ToolResult buffer");
             return RAC_ERROR_INTERNAL;
         }
         std::memcpy(outToolResultBytes->data, resultData, resultSize);
@@ -182,7 +188,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
         setToolRunLoopError(
             outToolResultBytes,
             RAC_ERROR_INTERNAL,
-            "toolRunLoopProto executor failed with an unknown error");
+            "tool run-loop executor failed with an unknown error");
         return RAC_ERROR_INTERNAL;
     }
 }
@@ -194,34 +200,32 @@ std::shared_ptr<ArrayBuffer> copyRequiredToolsProtoBuffer(rac_proto_buffer_t& pr
             ? protoBuffer.error_message
             : "unknown proto error";
         LOGE("%s proto error: %s", operation, error.c_str());
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         throw std::runtime_error(std::string(operation) + ": " + error);
     }
     if (!protoBuffer.data || protoBuffer.size == 0) {
-        proto_compat::freeBuffer(&protoBuffer);
+        rac_proto_buffer_free(&protoBuffer);
         throw std::runtime_error(std::string(operation) + ": empty proto result");
     }
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
-    proto_compat::freeBuffer(&protoBuffer);
+    rac_proto_buffer_free(&protoBuffer);
     return buffer;
 }
 
+using BufferProtoFn = decltype(&rac_tool_call_parse_proto);
+using RagBufferProtoFn = decltype(&rac_rag_ingest_proto);
+using RagStatsProtoFn = decltype(&rac_rag_stats_proto);
+
 std::shared_ptr<ArrayBuffer> callCommonsBufferProto(const std::vector<uint8_t>& bytes,
-                                                    const char* symbolName,
+                                                    BufferProtoFn fn,
                                                     const char* operation) {
-    auto fn = proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        throw std::runtime_error(
-            std::string(operation) + ": commons export " + symbolName + " unavailable");
-    }
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
     rac_result_t rc = fn(data, bytes.size(), &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         throw std::runtime_error(
             std::string(operation) + ": commons call failed rc=" + std::to_string(rc));
     }
@@ -245,7 +249,7 @@ void toolsProtoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* 
 }
 
 std::shared_ptr<ArrayBuffer> callRagBufferProto(const std::vector<uint8_t>& bytes,
-                                                const char* symbolName,
+                                                RagBufferProtoFn fn,
                                                 const char* operation) {
     rac_handle_t session = nullptr;
     {
@@ -256,24 +260,19 @@ std::shared_ptr<ArrayBuffer> callRagBufferProto(const std::vector<uint8_t>& byte
         LOGE("%s: RAG proto session not created", operation);
         return emptyToolsProtoBuffer();
     }
-    auto fn = proto_compat::symbol<proto_compat::RAGBufferProtoFn>(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        return emptyToolsProtoBuffer();
-    }
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
     rac_result_t rc = fn(session, data, bytes.size(), &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         return emptyToolsProtoBuffer();
     }
     return copyToolsProtoBuffer(out, operation);
 }
 
-std::shared_ptr<ArrayBuffer> callRagStatsProto(const char* symbolName,
+std::shared_ptr<ArrayBuffer> callRagStatsProto(RagStatsProtoFn fn,
                                                const char* operation) {
     rac_handle_t session = nullptr;
     {
@@ -284,29 +283,15 @@ std::shared_ptr<ArrayBuffer> callRagStatsProto(const char* symbolName,
         LOGE("%s: RAG proto session not created", operation);
         return emptyToolsProtoBuffer();
     }
-    auto fn = proto_compat::symbol<proto_compat::RAGStatsProtoFn>(symbolName);
-    if (!fn) {
-        LOGE("%s: %s unavailable", operation, symbolName);
-        return emptyToolsProtoBuffer();
-    }
     rac_proto_buffer_t out;
-    proto_compat::initBuffer(&out);
+    rac_proto_buffer_init(&out);
     rac_result_t rc = fn(session, &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
-        proto_compat::freeBuffer(&out);
+        rac_proto_buffer_free(&out);
         return emptyToolsProtoBuffer();
     }
     return copyToolsProtoBuffer(out, operation);
-}
-
-rac_handle_t handleFromDouble(double handle) {
-    return reinterpret_cast<rac_handle_t>(
-        static_cast<uintptr_t>(static_cast<int64_t>(handle)));
-}
-
-double doubleFromHandle(rac_handle_t handle) {
-    return static_cast<double>(reinterpret_cast<uintptr_t>(handle));
 }
 
 } // namespace
@@ -327,7 +312,7 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        return callCommonsBufferProto(bytes, "rac_tool_call_parse_proto", "toolParseProto");
+        return callCommonsBufferProto(bytes, rac_tool_call_parse_proto, "toolParseProto");
     });
 }
 
@@ -336,7 +321,7 @@ HybridRunAnywhereCore::toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>&
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
-            bytes, "rac_tool_call_format_prompt_proto", "toolFormatPromptProto");
+            bytes, rac_tool_call_format_prompt_proto, "toolFormatPromptProto");
     });
 }
 
@@ -345,53 +330,14 @@ HybridRunAnywhereCore::toolValidateProto(const std::shared_ptr<ArrayBuffer>& req
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
-            bytes, "rac_tool_call_validate_proto", "toolValidateProto");
+            bytes, rac_tool_call_validate_proto, "toolValidateProto");
     });
 }
 
-std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereCore::toolRunLoopProto(
-    const std::shared_ptr<ArrayBuffer>& requestBytes,
-    const ToolRunLoopExecuteCallback& onExecuteToolBytes) {
-    auto bytes = copyToolsArrayBufferBytes(requestBytes);
-    return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [bytes = std::move(bytes), onExecuteToolBytes]() {
-            auto runLoopFn = proto_compat::symbol<proto_compat::ToolRunLoopProtoFn>(
-                "rac_tool_calling_run_loop_proto");
-            if (!runLoopFn) {
-                LOGE("toolRunLoopProto: rac_tool_calling_run_loop_proto unavailable");
-                throw std::runtime_error(
-                    "toolRunLoopProto: commons export rac_tool_calling_run_loop_proto unavailable");
-            }
-
-            ToolRunLoopExecutorState state{onExecuteToolBytes};
-            rac_proto_buffer_t out;
-            proto_compat::initBuffer(&out);
-
-            const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            rac_result_t rc = runLoopFn(
-                data,
-                bytes.size(),
-                toolRunLoopExecuteCallback,
-                &state,
-                &out);
-
-            if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-                LOGE("toolRunLoopProto: rc=%d", rc);
-                proto_compat::freeBuffer(&out);
-                throw std::runtime_error(
-                    "toolRunLoopProto: commons call failed rc=" + std::to_string(rc));
-            }
-
-            return copyRequiredToolsProtoBuffer(out, "toolRunLoopProto");
-        });
-}
-
-// Cancellation-aware variant of toolRunLoopProto. Binds to the
-// commons `rac_tool_calling_run_loop_with_handle_and_cb_proto` ABI, which
-// fires `on_handle_published(handle, user_data)` SYNCHRONOUSLY on the worker
+// Binds to the canonical commons `rac_tool_calling_run_loop_proto` ABI, which
+// fires `on_handle_published(handle, user_data)` synchronously on the worker
 // thread the moment the cancellable handle is minted and BEFORE the first
-// iteration runs (rac_tool_calling.h:761-770). The callback forwards the
+// iteration runs. The callback forwards the
 // handle straight to the JS `onHandle` callback, mirroring the Swift
 // `HandleBox.set` (RunAnywhere+ToolCalling.swift:374-449), Kotlin
 // `CompletableDeferred.complete`, Flutter `Completer.complete`, and Web
@@ -405,21 +351,9 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
         [bytes = std::move(bytes), onExecuteToolBytes, onHandle]() {
-            auto runLoopFn =
-                proto_compat::symbol<proto_compat::ToolRunLoopWithHandleAndCbProtoFn>(
-                    "rac_tool_calling_run_loop_with_handle_and_cb_proto");
-            if (!runLoopFn) {
-                LOGE(
-                    "toolRunLoopProtoWithHandle: "
-                    "rac_tool_calling_run_loop_with_handle_and_cb_proto unavailable");
-                throw std::runtime_error(
-                    "toolRunLoopProtoWithHandle: commons export "
-                    "rac_tool_calling_run_loop_with_handle_and_cb_proto unavailable");
-            }
-
             ToolRunLoopExecutorState state{onExecuteToolBytes};
             rac_proto_buffer_t out;
-            proto_compat::initBuffer(&out);
+            rac_proto_buffer_init(&out);
 
             struct OnHandleCtx {
                 const ToolRunLoopHandleCallback& cb;
@@ -437,21 +371,19 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
                 }
             };
 
-            uint64_t runLoopHandle = 0;
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-            rac_result_t rc = runLoopFn(
+            rac_result_t rc = rac_tool_calling_run_loop_proto(
                 data,
                 bytes.size(),
                 toolRunLoopExecuteCallback,
                 &state,
                 onHandlePublished,
                 &ctx,
-                &runLoopHandle,
                 &out);
 
             if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
                 LOGE("toolRunLoopProtoWithHandle: rc=%d", rc);
-                proto_compat::freeBuffer(&out);
+                rac_proto_buffer_free(&out);
                 throw std::runtime_error(
                     "toolRunLoopProtoWithHandle: commons call failed rc=" +
                     std::to_string(rc));
@@ -467,17 +399,8 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::toolRunLoopCancelProto(
     double runLoopHandle) {
     return Promise<bool>::async([runLoopHandle]() -> bool {
-        auto cancelFn =
-            proto_compat::symbol<proto_compat::ToolRunLoopCancelProtoFn>(
-                "rac_tool_calling_run_loop_cancel_proto");
-        if (!cancelFn) {
-            LOGE(
-                "toolRunLoopCancelProto: "
-                "rac_tool_calling_run_loop_cancel_proto unavailable");
-            return false;
-        }
         const auto handle = static_cast<uint64_t>(runLoopHandle);
-        rac_result_t rc = cancelFn(handle);
+        rac_result_t rc = rac_tool_calling_run_loop_cancel_proto(handle);
         if (rc != RAC_SUCCESS) {
             LOGE("toolRunLoopCancelProto: rc=%d", rc);
             return false;
@@ -492,7 +415,7 @@ HybridRunAnywhereCore::structuredOutputParseProto(
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
-            bytes, "rac_structured_output_parse_proto", "structuredOutputParseProto");
+            bytes, rac_structured_output_parse_proto, "structuredOutputParseProto");
     });
 }
 
@@ -503,7 +426,7 @@ HybridRunAnywhereCore::structuredOutputPreparePromptProto(
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
             bytes,
-            "rac_structured_output_prepare_prompt_proto",
+            rac_structured_output_prepare_prompt_proto,
             "structuredOutputPreparePromptProto");
     });
 }
@@ -514,7 +437,7 @@ HybridRunAnywhereCore::structuredOutputValidateProto(
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
-            bytes, "rac_structured_output_validate_proto", "structuredOutputValidateProto");
+            bytes, rac_structured_output_validate_proto, "structuredOutputValidateProto");
     });
 }
 
@@ -524,7 +447,7 @@ HybridRunAnywhereCore::structuredOutputGenerateProto(
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
-            bytes, "rac_structured_output_generate_proto", "structuredOutputGenerateProto");
+            bytes, rac_structured_output_generate_proto, "structuredOutputGenerateProto");
     });
 }
 
@@ -534,16 +457,11 @@ HybridRunAnywhereCore::structuredOutputGenerateStreamProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
-        auto fn = proto_compat::symbol<proto_compat::StructuredOutputStreamProtoFn>(
-            "rac_structured_output_generate_stream_proto");
-        if (!fn) {
-            LOGE("structuredOutputGenerateStreamProto: lifecycle stream ABI unavailable");
-            return;
-        }
         auto callback = std::make_unique<
             std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        rac_result_t rc = fn(data, bytes.size(), toolsProtoBytesCallback, callback.get());
+        rac_result_t rc = rac_structured_output_generate_stream_proto(
+            data, bytes.size(), toolsProtoBytesCallback, callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("structuredOutputGenerateStreamProto: rc=%d", rc);
         }
@@ -557,7 +475,7 @@ HybridRunAnywhereCore::structuredOutputSchemaToJsonProto(
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
             bytes,
-            "rac_structured_output_schema_to_json_proto",
+            rac_structured_output_schema_to_json_proto,
             "structuredOutputSchemaToJsonProto");
     });
 }
@@ -570,28 +488,18 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) {
     auto bytes = copyToolsArrayBufferBytes(configBytes);
     return Promise<bool>::async([bytes = std::move(bytes)]() -> bool {
-        auto createFn = proto_compat::symbol<proto_compat::RAGSessionCreateProtoFn>(
-            "rac_rag_session_create_proto");
-        if (!createFn) {
-            LOGE("ragCreatePipelineProto: rac_rag_session_create_proto unavailable");
-            return false;
-        }
-
-        auto destroyFn = proto_compat::symbol<proto_compat::RAGSessionDestroyProtoFn>(
-            "rac_rag_session_destroy_proto");
-
         // Hold the mutex across destroy + create + install so concurrent
         // callers cannot interleave and leak a session (Kotlin CppBridgeRAG
         // serializes the same sequence with @Synchronized).
         std::lock_guard<std::mutex> lock(g_ragProtoMutex);
-        if (g_ragProtoSession && destroyFn) {
-            destroyFn(g_ragProtoSession);
+        if (g_ragProtoSession) {
+            rac_rag_session_destroy_proto(g_ragProtoSession);
             g_ragProtoSession = nullptr;
         }
 
         rac_handle_t session = nullptr;
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        rac_result_t rc = createFn(data, bytes.size(), &session);
+        rac_result_t rc = rac_rag_session_create_proto(data, bytes.size(), &session);
         if (rc != RAC_SUCCESS || !session) {
             LOGE("ragCreatePipelineProto: rc=%d", rc);
             return false;
@@ -603,12 +511,6 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragDestroyPipelineProto() {
     return Promise<bool>::async([]() -> bool {
-        auto destroyFn = proto_compat::symbol<proto_compat::RAGSessionDestroyProtoFn>(
-            "rac_rag_session_destroy_proto");
-        if (!destroyFn) {
-            LOGE("ragDestroyPipelineProto: rac_rag_session_destroy_proto unavailable");
-            return false;
-        }
         rac_handle_t session = nullptr;
         {
             std::lock_guard<std::mutex> lock(g_ragProtoMutex);
@@ -616,7 +518,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragDestroyPipelineProto() 
             g_ragProtoSession = nullptr;
         }
         if (session) {
-            destroyFn(session);
+            rac_rag_session_destroy_proto(session);
         }
         return true;
     });
@@ -626,7 +528,7 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::ragIngestProto(const std::shared_ptr<ArrayBuffer>& documentBytes) {
     auto bytes = copyToolsArrayBufferBytes(documentBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        return callRagBufferProto(bytes, "rac_rag_ingest_proto", "ragIngestProto");
+        return callRagBufferProto(bytes, rac_rag_ingest_proto, "ragIngestProto");
     });
 }
 
@@ -634,21 +536,21 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) {
     auto bytes = copyToolsArrayBufferBytes(queryBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        return callRagBufferProto(bytes, "rac_rag_query_proto", "ragQueryProto");
+        return callRagBufferProto(bytes, rac_rag_query_proto, "ragQueryProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::ragClearProto() {
     return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
-        return callRagStatsProto("rac_rag_clear_proto", "ragClearProto");
+        return callRagStatsProto(rac_rag_clear_proto, "ragClearProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::ragStatsProto() {
     return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
-        return callRagStatsProto("rac_rag_stats_proto", "ragStatsProto");
+        return callRagStatsProto(rac_rag_stats_proto, "ragStatsProto");
     });
 }
 
@@ -657,19 +559,14 @@ HybridRunAnywhereCore::embeddingsEmbedBatchLifecycleProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) {
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        auto fn = proto_compat::symbol<proto_compat::EmbeddingsEmbedBatchLifecycleProtoFn>(
-            "rac_embeddings_embed_batch_lifecycle_proto");
-        if (!fn) {
-            LOGE("embeddingsEmbedBatchLifecycleProto: lifecycle proto ABI unavailable");
-            return emptyToolsProtoBuffer();
-        }
         rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
+        rac_proto_buffer_init(&out);
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        rac_result_t rc = fn(data, bytes.size(), &out);
+        rac_result_t rc = rac_embeddings_embed_batch_lifecycle_proto(
+            data, bytes.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("embeddingsEmbedBatchLifecycleProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
+            rac_proto_buffer_free(&out);
             return emptyToolsProtoBuffer();
         }
         return copyToolsProtoBuffer(out, "embeddingsEmbedBatchLifecycleProto");

@@ -6,10 +6,8 @@
  * handles plus a `RunAnywhere.tts.synthesizeAuto(text, options)` shortcut.
  *
  * Low-level proto-byte adapter methods take a numeric component handle. The
- * auto shortcut instead uses commons' lifecycle-owned TTS ABI whenever a
- * voice is already loaded, so synthesis cannot evict that canonical model.
- * An explicit `voicePath` remains as a compatibility fallback only when model
- * lifecycle does not currently own a TTS voice.
+ * auto shortcut uses commons' lifecycle-owned TTS ABI so synthesis cannot
+ * evict the canonical model.
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
@@ -85,7 +83,7 @@ function defaultTTSOptions(overrides?: Partial<TTSOptions>): TTSOptions {
 
 function autoTTSOptions(options?: SynthesizeOptions): TTSOptions {
   if (!options) return defaultTTSOptions();
-  const { voiceId, voicePath: _voicePath, ...overrides } = options;
+  const { voiceId, ...overrides } = options;
   return defaultTTSOptions({
     ...overrides,
     voice: overrides.voice || voiceId || '',
@@ -190,8 +188,6 @@ export function stopTTSPlayback(): void {
 export interface SynthesizeOptions extends Partial<TTSOptions> {
   /** Optional explicit voice id. */
   voiceId?: string;
-  /** Optional explicit voice file path. Required when no voice has been loaded yet. */
-  voicePath?: string;
 }
 
 export const TTS = {
@@ -337,15 +333,13 @@ export const TTS = {
 
 /**
  * Top-level ergonomic shortcut. A lifecycle-owned TTS voice is synthesized
- * directly through commons and remains loaded after this call. The legacy
- * create/load/destroy path is used only for an explicit voicePath when no
- * lifecycle voice exists.
+ * directly through commons and remains loaded after this call.
  */
 export async function synthesize(
   text: string,
   options?: SynthesizeOptions,
 ): Promise<TTSOutput> {
-  const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
+  requireTTSModule('RunAnywhere.tts.synthesizeAuto');
   const resolvedOptions = autoTTSOptions(options);
   if (currentLifecycleVoiceId()) {
     const adapter = TTSProtoAdapter.tryDefault();
@@ -364,19 +358,10 @@ export async function synthesize(
     return output;
   }
 
-  const voicePath = options?.voicePath;
-  if (!voicePath) {
-    // Swift parity: RunAnywhere+TTS.swift:36 throws `.notInitialized` ("TTS voice not loaded").
-    throw SDKException.notInitialized(
-      'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
-    );
-  }
-
-  const handle = callCreate(module);
-  try {
-    callLoadVoice(module, handle, voicePath, options?.voiceId);
-    return TTS.synthesize(handle, text, resolvedOptions);
-  } finally {
-    TTS.destroy(handle);
-  }
+  // Swift parity: RunAnywhere+TTS.swift throws `.notInitialized` when no
+  // lifecycle voice is loaded. Explicit component handles remain available
+  // through the low-level TTS namespace for callers that own that lifecycle.
+  throw SDKException.notInitialized(
+    'No TTS voice is loaded. Call RunAnywhere.loadModel(...) before RunAnywhere.synthesize().',
+  );
 }

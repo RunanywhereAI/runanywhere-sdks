@@ -12,8 +12,9 @@
 #      present. Run:
 #        ./sdk/runanywhere-commons/scripts/ios/download-onnx.sh
 #      (or set RAC_BACKEND_ONNX=OFF to skip the ONNX backend.)
-#   3. `gh` CLI authenticated (only needed for the actual upload, which
-#      this script does NOT perform — see "Next steps" at the end).
+#   3. Pinned iOS Sherpa and macOS static Sherpa/ONNX inventories present. Run:
+#        ./sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+#        ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
 #
 # Usage:
 #   sdk/runanywhere-swift/scripts/release-swift-binaries.sh <version>          # builds + checksums
@@ -23,19 +24,15 @@
 # placeholders — only used to validate the pipeline end-to-end in CI):
 #   DRY_RUN=1 sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
 #
-# Skip ONNX (for dev iteration when onnxruntime-ios isn't extracted):
-#   RAC_BACKEND_ONNX=OFF sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
-#
 # Outputs:
 #   release-artifacts/native-ios-macos/RACommons-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendLLAMACPP-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip    (if ONNX enabled)
+#   release-artifacts/native-ios-macos/RABackendSherpa-ios-v${VERSION}.zip (if ONNX enabled)
 #   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip     (if MLX enabled)
 #
-# Why this isn't fully automated (no `gh release upload` here):
-#   - Publishing requires `gh auth` on a release machine with the proper
-#     repo permissions; we intentionally keep the upload step operator-gated.
-#   - Same reason the tag/push steps happen outside this script.
+# Tagging and publication stay outside this build helper. The Release workflow
+# rebuilds and verifies these archives from the pushed tag before publishing.
 
 set -euo pipefail
 
@@ -47,25 +44,45 @@ VERSION="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/release-artifacts/native-ios-macos"
 
+MANIFEST_VERSION="$(sed -nE 's/^let sdkVersion = "([^"]+)"$/\1/p' "${REPO_ROOT}/Package.swift")"
+if [ -z "${MANIFEST_VERSION}" ]; then
+    echo "error: could not read sdkVersion from Package.swift" >&2
+    exit 1
+fi
+if [ "${VERSION}" != "${MANIFEST_VERSION}" ]; then
+    echo "error: requested version ${VERSION} does not match Package.swift sdkVersion ${MANIFEST_VERSION}" >&2
+    exit 1
+fi
+
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
 export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_MLX
+
+if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
+    echo "error: a Swift release requires all five binary targets (ONNX and MLX must be ON)" >&2
+    exit 1
+fi
 
 if [ "$(uname -s)" != "Darwin" ]; then
     echo "error: $0 only runs on macOS" >&2
     exit 1
 fi
 
-# Xcode version sanity: 15.0 minimum. Anything older lacks the
-# `-create-xcframework` flags we use below.
-if command -v xcodebuild >/dev/null 2>&1; then
-    xcver="$(xcodebuild -version 2>/dev/null | awk '/^Xcode /{print $2; exit}')"
-    xcmajor="${xcver%%.*}"
-    if [ -n "${xcmajor}" ] && [ "${xcmajor}" -lt 15 ]; then
-        echo "error: Xcode ${xcver} is too old; need Xcode 15.0 or newer" >&2
-        exit 1
-    fi
+# Archive hashes are committed before tagging and rebuilt in release CI, so a
+# merely compatible Xcode is insufficient: the exact canonical build must match.
+VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+XCODE_VERSION="$(sed -nE 's/^XCODE_VERSION=(.+)$/\1/p' "${VERSIONS_FILE}")"
+XCODE_BUILD="$(sed -nE 's/^XCODE_BUILD=(.+)$/\1/p' "${VERSIONS_FILE}")"
+if ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "error: xcodebuild is required" >&2
+    exit 1
+fi
+actual_xcode_version="$(xcodebuild -version | awk '/^Xcode / { print $2; exit }')"
+actual_xcode_build="$(xcodebuild -version | awk '/^Build version / { print $3; exit }')"
+if [ "${actual_xcode_version}" != "${XCODE_VERSION}" ] || [ "${actual_xcode_build}" != "${XCODE_BUILD}" ]; then
+    echo "error: expected Xcode ${XCODE_VERSION} (${XCODE_BUILD}), found ${actual_xcode_version} (${actual_xcode_build})" >&2
+    exit 1
 fi
 
 # ONNX prereq check. The actual path lives inside the commons submodule,
@@ -88,9 +105,10 @@ fi
 mkdir -p "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 1. Build all three xcframeworks (RACommons + per-backend).
+# 1. Build all five xcframeworks (RACommons + per-backend).
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}, RAC_BACKEND_MLX=${RAC_BACKEND_MLX})"
+export ZERO_AR_DATE=1
 "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -100,6 +118,8 @@ echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=
 #      ${DEST}/RACommons-ios-v${VERSION}.zip
 #      ${DEST}/RABackendLLAMACPP-ios-v${VERSION}.zip
 #      ${DEST}/RABackendONNX-ios-v${VERSION}.zip
+#      ${DEST}/RABackendSherpa-ios-v${VERSION}.zip
+#      ${DEST}/RABackendMLX-ios-v${VERSION}.zip
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [2/3] Zipping xcframeworks"
 
@@ -128,7 +148,8 @@ zip_target() {
         exit 1
     fi
     echo "  ▶ ${zip}"
-    (cd "$(dirname "${xcf}")" && zip -qry "${zip}" "$(basename "${xcf}")")
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-xcframework-zip.sh" \
+        "${xcf}" "${zip}"
 }
 
 zip_target "RACommons.xcframework"          "RACommons-ios"
@@ -169,15 +190,16 @@ echo ""
 echo "Next steps (operator):"
 echo "  1. Review Package.swift diff:"
 echo "       git diff Package.swift"
-echo "  2. Verify swift build is green:"
-echo "       swift package resolve && swift build -c release"
-echo "  3. Create the GitHub release (and upload zips in the same call):"
-echo "       gh release create v${VERSION} ${DEST}/*.zip \\"
-echo "           --title 'v${VERSION}' --generate-notes"
-echo "  4. Commit the checksum bump + push:"
+echo "  2. Verify checksums and the local-native Swift build:"
+echo "       sdk/runanywhere-swift/scripts/sync-checksums.sh --check ${DEST}"
+echo "       RUNANYWHERE_USE_LOCAL_NATIVES=1 swift package resolve && RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build -c release"
+echo "  3. Commit and push the checksum manifest before creating the tag:"
 echo "       git add Package.swift && \\"
 echo "           git commit -m 'release: bump xcframework checksums for v${VERSION}' && \\"
 echo "           git push origin HEAD"
+echo "  4. Tag that exact commit and push the tag; the Release workflow rebuilds,"
+echo "     verifies these deterministic checksums, validates consumers, and publishes:"
+echo "       git tag v${VERSION} && git push origin v${VERSION}"
 echo ""
 if [ "${DRY_RUN}" = "1" ]; then
     echo "NOTE: DRY_RUN=1 was set. Checksums in Package.swift now correspond"

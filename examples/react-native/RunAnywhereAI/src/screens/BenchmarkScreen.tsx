@@ -41,7 +41,6 @@ import {
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
-  getFrameworkDisplayName,
   getFrameworkSystemIcon,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
@@ -580,7 +579,7 @@ export const BenchmarkScreen: React.FC = () => {
                               { color: frameworkColor },
                             ]}
                           >
-                            {getFrameworkDisplayName(framework)}
+                            {RunAnywhere.formatFramework(framework)}
                           </Text>
                         </View>
                       </View>

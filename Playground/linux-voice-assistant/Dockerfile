@@ -39,7 +39,7 @@ RUN cd /workspace/sdk/runanywhere-commons && \
 # Step 2: Build runanywhere-commons
 RUN cd /workspace/sdk/runanywhere-commons && \
     chmod +x scripts/*.sh && \
-    ./scripts/build-linux.sh --shared
+    ./scripts/build-linux.sh
 
 # Step 3: Build the voice assistant (compilation check)
 RUN mkdir -p build && cd build && \

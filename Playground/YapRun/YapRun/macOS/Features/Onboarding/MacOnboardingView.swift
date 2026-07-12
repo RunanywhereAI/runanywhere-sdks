@@ -14,7 +14,7 @@ struct MacOnboardingView: View {
 
     var body: some View {
         ZStack {
-            AppColors.backgroundPrimaryDark.ignoresSafeArea()
+            AppColors.backgroundPrimary.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Status indicators (visible after welcome step)

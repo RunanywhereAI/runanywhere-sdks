@@ -24,7 +24,6 @@ import type {
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import {
-  executionTargetToJSON,
   LLMGenerationOptions as LLMGenerationOptionsMessage,
 } from '@runanywhere/proto-ts/llm_options';
 import {
@@ -45,44 +44,29 @@ function buildLLMGenerateRequest(
   options?: LLMGenerationOptions,
   streamingEnabled: boolean = false
 ): LLMGenerateRequest {
-  const canonicalOptions = options
-    ? LLMGenerationOptionsMessage.fromPartial({
-        ...options,
-        streamingEnabled,
-      })
-    : undefined;
+  const canonicalOptions = generationOptionsForRequest(options, streamingEnabled);
 
   return LLMGenerateRequest.fromPartial({
     prompt,
-    // Defaults mirror Swift RALLMTypes+CppBridge.swift (maxTokens 100,
-    // temperature 0.8, topP 1.0, topK 0, repetitionPenalty 1.0).
+    emitThoughts: !!options?.thinkingPattern,
+    options: canonicalOptions,
+  });
+}
+
+function generationOptionsForRequest(
+  options: LLMGenerationOptions | undefined,
+  streamingEnabled: boolean
+): LLMGenerationOptions {
+  return LLMGenerationOptionsMessage.fromPartial({
     maxTokens: options?.maxTokens ?? 100,
     temperature: options?.temperature ?? 0.8,
     topP: options?.topP ?? 1.0,
     topK: options?.topK ?? 0,
-    systemPrompt: options?.systemPrompt ?? '',
-    emitThoughts: !!options?.thinkingPattern,
     repetitionPenalty: options?.repetitionPenalty ?? 1.0,
-    stopSequences: options?.stopSequences ?? [],
+    ...options,
     streamingEnabled,
-    preferredFramework:
-      options?.preferredFramework !== undefined
-        ? inferenceFrameworkToJSON(options.preferredFramework)
-        : '',
-    jsonSchema: options?.jsonSchema ?? options?.structuredOutput?.jsonSchema ?? '',
-    executionTarget:
-      options?.executionTarget !== undefined
-        ? executionTargetToJSON(options.executionTarget)
-        : '',
-    seed: options?.seed ?? 0,
-    frequencyPenalty: options?.frequencyPenalty ?? 0,
-    presencePenalty: options?.presencePenalty ?? 0,
-    minP: options?.minP ?? 0,
-    grammar: options?.grammar ?? '',
-    responseFormat: options?.responseFormat ?? '',
-    echoPrompt: options?.echoPrompt ?? false,
-    nThreads: options?.nThreads ?? 0,
-    options: canonicalOptions,
+    jsonSchema: options?.jsonSchema ?? options?.structuredOutput?.jsonSchema,
+    grammar: options?.grammar ?? options?.structuredOutput?.grammar,
   });
 }
 
@@ -108,7 +92,7 @@ function normalizeLLMGenerateRequest(
   }
   return LLMGenerateRequest.fromPartial({
     ...requestOrPrompt,
-    streamingEnabled,
+    options: generationOptionsForRequest(requestOrPrompt.options, streamingEnabled),
   });
 }
 

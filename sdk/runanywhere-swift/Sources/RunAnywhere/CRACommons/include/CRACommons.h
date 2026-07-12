@@ -16,7 +16,7 @@
 // =============================================================================
 
 #include "rac_audio_utils.h"
-#include "rac_benchmark.h"
+#include "rac/core/rac_benchmark.h"
 #include "rac_component_types.h"
 #include "rac_core.h"
 #include "rac_error.h"
@@ -42,12 +42,12 @@
 // LLM (Large Language Model)
 #include "rac_llm.h"
 #include "rac_llm_analytics.h"
-#include "rac_llm_component.h"
+#include "rac/features/llm/rac_llm_component.h"
 #include "rac_llm_metrics.h"
 #include "rac_llm_schema_to_json.h" // rac_structured_output_schema_to_json_proto
-#include "rac_llm_service.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac_llm_structured_output.h"
-#include "rac_llm_types.h"
+#include "rac/features/llm/rac_llm_types.h"
 // proto-byte LLM stream ABI.
 #include "rac_llm_stream.h"
 #include "rac_tool_calling.h"
@@ -56,7 +56,7 @@
 #include "rac_stt.h"
 #include "rac_stt_analytics.h"
 #include "rac_stt_component.h"
-#include "rac_stt_service.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac_stt_stream.h"
 #include "rac_stt_types.h"
 
@@ -85,7 +85,6 @@
 
 // Diffusion (Image Generation)
 #include "rac_diffusion.h"
-#include "rac_diffusion_component.h"
 #include "rac_diffusion_model_registry.h"
 #include "rac_diffusion_service.h"
 #include "rac_diffusion_tokenizer.h"

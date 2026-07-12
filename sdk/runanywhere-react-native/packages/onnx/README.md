@@ -11,8 +11,8 @@ and ships the `RABackendONNX` plus `RABackendSherpa` native binaries.
 ## Requirements
 
 - `@runanywhere/core` peer dependency
-- React Native 0.74+
-- iOS 17.0+ / Android API 24+
+- React Native 0.83.1+
+- iOS 17.5+ / Android API 24+
 - Microphone permission in the host app for live audio capture
 
 ## Installation
@@ -70,9 +70,6 @@ await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
 ```typescript
 import { ONNX } from '@runanywhere/onnx';
 ```
-
-`ONNXProvider` remains exported for lower-level compatibility, but app code
-should use `ONNX`. Neither surface owns model lifecycle or inference APIs.
 
 ### `ONNX.register()`
 

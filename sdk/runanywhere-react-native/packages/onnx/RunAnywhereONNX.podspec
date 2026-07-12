@@ -11,7 +11,8 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = "RunAnywhere AI"
 
-  s.platforms    = { :ios => "17.0" }
+  s.platforms    = { :ios => "17.5" }
+  s.swift_version = "6.0"
   s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================

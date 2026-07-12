@@ -9,6 +9,8 @@
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
 
+#include "embeddings_service_internal.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -45,10 +47,8 @@ const rac_embeddings_service_ops_t* embedding_ops(const rac_engine_vtable_t* vt)
 // SERVICE CREATION - Routes through Service Registry
 // =============================================================================
 
-extern "C" {
-
-static rac_result_t embeddings_create_internal(const char* model_id, const char* config_json,
-                                               rac_handle_t* out_handle) {
+rac_result_t rac::embeddings::create_service(const char* model_id, const char* config_json,
+                                             rac_handle_t* out_handle) {
     if (!model_id || !out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -107,18 +107,11 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle) {
-    return embeddings_create_internal(model_id, nullptr, out_handle);
-}
-
-rac_result_t rac_embeddings_create_with_config(const char* model_id, const char* config_json,
-                                               rac_handle_t* out_handle) {
-    return embeddings_create_internal(model_id, config_json, out_handle);
-}
-
 // =============================================================================
 // GENERIC API - Simple vtable dispatch
 // =============================================================================
+
+extern "C" {
 
 rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* model_path) {
     if (!handle)

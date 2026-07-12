@@ -26,12 +26,6 @@
 
 namespace margelo::nitro::runanywhere {
 
-int initialize(JavaVM* vm) {
-  return facebook::jni::initialize(vm, []() {
-    ::margelo::nitro::runanywhere::registerAllNatives();
-  });
-}
-
 void registerAllNatives() {
   using namespace margelo::nitro;
   using namespace margelo::nitro::runanywhere;

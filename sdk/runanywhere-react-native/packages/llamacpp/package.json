@@ -33,7 +33,7 @@
     "clean": "tsc -b --clean && rm -rf lib",
     "lint": "eslint \"src/**/*.ts\" --max-warnings 0",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "nitrogen": "nitrogen",
+    "nitrogen": "nitrogen && node ../../scripts/fix-nitrogen-output.js",
     "prepublishOnly": "npm run typecheck && npm run lint"
   },
   "keywords": [
@@ -49,6 +49,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {

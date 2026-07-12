@@ -23,7 +23,7 @@ struct FlowActivationView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [AppColors.backgroundPrimaryDark, AppColors.backgroundSecondaryDark],
+                colors: [AppColors.backgroundPrimary, AppColors.backgroundSecondary],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -135,7 +135,7 @@ private struct PhoneIllustrationView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(AppColors.backgroundTertiaryDark)
+                .fill(AppColors.backgroundTertiary)
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .strokeBorder(
@@ -158,14 +158,14 @@ private struct PhoneIllustrationView: View {
                     VStack(spacing: 0) {
                         Spacer()
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(AppColors.backgroundGray5Dark)
+                            .fill(AppColors.backgroundGray5)
                             .frame(height: 70)
                             .padding(.horizontal, 12)
                             .overlay(
                                 HStack(spacing: 6) {
                                     ForEach(0..<4, id: \.self) { _ in
                                         RoundedRectangle(cornerRadius: 4)
-                                            .fill(AppColors.backgroundSecondaryDark)
+                                            .fill(AppColors.backgroundSecondary)
                                             .frame(height: 28)
                                     }
                                 }

@@ -14,6 +14,19 @@ def findNodeBinary() {
         }
     }
 
+    // Honor the active toolchain before probing machine-global installations.
+    def configuredNode = System.getenv("NODE_BINARY")
+    if (configuredNode && new File(configuredNode).canExecute()) {
+        return configuredNode
+    }
+    def pathNode = System.getenv("PATH")
+        ?.split(File.pathSeparator)
+        ?.collect { new File(it, "node") }
+        ?.find { it.canExecute() }
+    if (pathNode) {
+        return pathNode.canonicalPath
+    }
+
     // Check common node installation paths
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
@@ -38,13 +51,13 @@ def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereONNX_' + name]
 }
 
-// Supported ABIs - arm64-v8a for physical devices, x86_64 for emulators
+// Public packages ship the same three Android ABIs as the canonical native bundle.
 // Can be overridden via gradle.properties: reactNativeArchitectures=arm64-v8a
 def reactNativeArchitectures() {
     def value = rootProject.hasProperty("reactNativeArchitectures")
         ? rootProject.property("reactNativeArchitectures")
         : null
-    return value ? value.split(",").collect { it.trim() } : ["arm64-v8a", "x86_64"]
+    return value ? value.split(",").collect { it.trim() } : ["arm64-v8a", "armeabi-v7a", "x86_64"]
 }
 
 apply plugin: 'com.android.library'
@@ -82,10 +95,11 @@ def getExtOrIntegerDefault(name) {
 }
 
 // =============================================================================
-// Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// Version Constants — read from sdk/runanywhere-commons/VERSION (single source of truth)
 // RABackendONNX from runanywhere-sdks
 // =============================================================================
-def coreVersion = "0.19.13"
+def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
+def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.19.15"
 
 // =============================================================================
 // Binary Source - RABackendONNX from runanywhere-sdks
@@ -94,15 +108,48 @@ def githubOrg = "RunanywhereAI"
 def coreRepo = "runanywhere-sdks"
 
 // =============================================================================
-// useLocalNatives Toggle (canonical name; testLocal kept as legacy alias)
+// Local native source
 // =============================================================================
-def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoolean() ?:
-                    project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
-                    System.getenv("RA_TEST_LOCAL") == "1" ?: false
+def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoolean() ?: false
 
 // Native libraries directory
 def jniLibsDir = file("src/main/jniLibs")
 def downloadedLibsDir = file("build/downloaded-libs")
+def expectedOnnxNativeLibraries = [
+    "libonnxruntime.so",
+    "librac_backend_onnx.so",
+    "librac_backend_onnx_jni.so",
+    "librac_backend_sherpa.so",
+    "librunanywhere_onnx.so",
+    "librunanywhere_sherpa.so",
+    "libsherpa-onnx-c-api.so",
+    "libsherpa-onnx-jni.so"
+] as Set
+
+def onnxNativeInventory = { File rootDir, String abi ->
+    def abiDir = new File(rootDir, abi)
+    return abiDir.isDirectory()
+        ? abiDir.listFiles()
+            ?.findAll { it.name.endsWith(".so") && it.name != "libc++_shared.so" }
+            ?.collect { it.name }
+            ?.toSet() ?: [] as Set
+        : [] as Set
+}
+
+def hasExactOnnxNativeInventory = { File rootDir, String abi ->
+    onnxNativeInventory(rootDir, abi) == expectedOnnxNativeLibraries
+}
+
+def validateOnnxNativeInventory = { File rootDir, String abi ->
+    def actual = onnxNativeInventory(rootDir, abi)
+    if (actual != expectedOnnxNativeLibraries) {
+        throw new GradleException(
+            "ONNX native inventory mismatch for ${abi}: " +
+                "missing=${(expectedOnnxNativeLibraries - actual).sort()}, " +
+                "unexpected=${(actual - expectedOnnxNativeLibraries).sort()}"
+        )
+    }
+}
 
 def androidNdkHomeForRuntime() {
     def explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
@@ -162,7 +209,7 @@ android {
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
 
         ndk {
-            abiFilters 'arm64-v8a'
+            abiFilters(*reactNativeArchitectures())
         }
 
         externalNativeBuild {
@@ -171,7 +218,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared",
                           // Fix NitroModules prefab path - use app's build directory
                           "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
-                abiFilters 'arm64-v8a'
+                abiFilters(*reactNativeArchitectures())
             }
         }
     }
@@ -199,9 +246,6 @@ android {
             "**/libfbjni.so",
             "**/libfolly_runtime.so"
         ]
-        jniLibs {
-            useLegacyPackaging = true
-        }
     }
 
     buildFeatures {
@@ -252,11 +296,16 @@ task downloadNativeLibs {
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
-        versionFile.exists() && versionFile.text.trim() == expectedVersion
+        versionFile.exists() &&
+            versionFile.text.trim() == expectedVersion &&
+            reactNativeArchitectures().every { abi -> hasExactOnnxNativeInventory(jniLibsDir, abi) }
     }
 
     doLast {
+        def requestedAbis = reactNativeArchitectures()
+
         if (useLocalBuild) {
+            requestedAbis.each { abi -> validateOnnxNativeInventory(jniLibsDir, abi) }
             logger.lifecycle("[RunAnywhereONNX] Skipping download - using local build mode")
             return
         }
@@ -267,26 +316,16 @@ task downloadNativeLibs {
             }
         }
 
-        // Check if libs are already bundled for ALL requested ABIs (npm install case)
-        def requestedAbis = reactNativeArchitectures()
-        def allAbisBundled = requestedAbis.every { abi ->
-            def abiDir = file("${jniLibsDir}/${abi}")
-            def libs = abiDir.exists() ? abiDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
-            return libs?.size() > 0
-        }
+        // Check if the exact native contract is already bundled for every requested ABI.
+        def allAbisBundled = requestedAbis.every { abi -> hasExactOnnxNativeInventory(jniLibsDir, abi) }
         if (allAbisBundled) {
             logger.lifecycle("[RunAnywhereONNX] ✅ Using bundled native libraries from npm package for ABIs: ${requestedAbis.join(', ')}")
             return
         }
-        // Check if at least arm64-v8a is bundled (partial bundle - need to download missing ABIs)
-        def arm64Dir = file("${jniLibsDir}/arm64-v8a")
-        def arm64Bundled = arm64Dir.exists() && arm64Dir.listFiles()?.any { it.name.endsWith(".so") }
+        // A valid arm64 bundle may be supplemented with other requested ABIs.
+        def arm64Bundled = hasExactOnnxNativeInventory(jniLibsDir, "arm64-v8a")
         if (arm64Bundled) {
-            def missingAbis = requestedAbis.findAll { abi ->
-                def abiDir = file("${jniLibsDir}/${abi}")
-                def libs = abiDir.exists() ? abiDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
-                return !libs || libs.size() == 0
-            }
+            def missingAbis = requestedAbis.findAll { abi -> !hasExactOnnxNativeInventory(jniLibsDir, abi) }
             if (missingAbis.size() > 0) {
                 logger.lifecycle("[RunAnywhereONNX] ⚠️ Bundled libs found for arm64-v8a but missing for: ${missingAbis.join(', ')}")
                 logger.lifecycle("[RunAnywhereONNX] Attempting to download missing ABIs from GitHub releases...")
@@ -319,18 +358,13 @@ task downloadNativeLibs {
                         includeEmptyDirs = false
                     }
                     tempZip.delete()
+                    requestedAbis.each { abi -> validateOnnxNativeInventory(jniLibsDir, abi) }
+                    versionFile.text = expectedVersion
                     logger.lifecycle("[RunAnywhereONNX] ✅ Downloaded missing ABIs successfully")
                 } catch (Exception e) {
-                    logger.warn("[RunAnywhereONNX] ⚠️ Could not download missing ABIs: ${e.message}")
-                    logger.warn("[RunAnywhereONNX] Building with available ABIs only (arm64-v8a)")
+                    throw new GradleException("Failed to download or validate requested ONNX ABIs", e)
                 }
             }
-            return
-        }
-
-        def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
-        if (currentVersion == expectedVersion) {
-            logger.lifecycle("[RunAnywhereONNX] RABackendONNX version $expectedVersion already downloaded")
             return
         }
 
@@ -416,6 +450,8 @@ task downloadNativeLibs {
                 includeEmptyDirs = false
             }
             logger.lifecycle("   ✅ RABackendONNX headers installed")
+
+            requestedAbis.each { abi -> validateOnnxNativeInventory(jniLibsDir, abi) }
 
         } catch (Exception e) {
             logger.error("❌ Failed to download RABackendONNX: ${e.message}")

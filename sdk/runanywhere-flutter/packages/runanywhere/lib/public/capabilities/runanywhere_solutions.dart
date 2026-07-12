@@ -122,6 +122,7 @@ class RunAnywhereSolutions {
       throw SDKException.validationFailed(
         'RunAnywhereSolutions.run requires exactly one of '
         'config / configBytes / yaml (got $supplied)',
+        fieldPath: 'RunAnywhereSolutions.run.input',
       );
     }
 
@@ -136,6 +137,7 @@ class RunAnywhereSolutions {
       throw SDKException.validationFailed(
         'Solution config bytes are empty — refusing to call '
         'rac_solution_create_from_proto',
+        fieldPath: 'SolutionConfig',
       );
     }
 

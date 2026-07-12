@@ -2,10 +2,6 @@
  * @file rac_http_download.h
  * @brief Blocking file download runner built on `rac_http_client_*`.
  *
- * Owns the end-to-end download primitive that
- * used to live in Kotlin's CppBridgeDownload.kt (HttpURLConnection
- * loop + FileOutputStream + SHA-256 verify + Range-based resume).
- *
  * Single entry point: `rac_http_download_execute`. Synchronous —
  * callers spawn their own thread. Progress callback fires on every
  * chunk (throttled inside the runner to at most every 100 ms), and
@@ -32,9 +28,7 @@ extern "C" {
 // =============================================================================
 // STATUS
 // =============================================================================
-// Status codes match the Kotlin `DownloadError` enum in
-// CppBridgeDownload.kt so the JNI bridge can forward them verbatim.
-// Do not reorder without updating the Kotlin side.
+// Stable status values returned by rac_http_download_execute.
 typedef enum {
     RAC_HTTP_DL_OK = 0,
     RAC_HTTP_DL_NETWORK_ERROR = 1,

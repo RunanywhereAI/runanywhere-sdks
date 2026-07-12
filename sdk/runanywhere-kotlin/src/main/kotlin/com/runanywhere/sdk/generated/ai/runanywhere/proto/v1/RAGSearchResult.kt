@@ -118,8 +118,7 @@ public class RAGSearchResult(
 ) : Message<RAGSearchResult, Nothing>(ADAPTER, unknownFields) {
   /**
    * Free-form metadata associated with the chunk (e.g. page number, section,
-   * ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-   * canonicalized here as a typed map so consumers don't re-parse.
+   * ingestion timestamp).
    */
   @field:WireField(
     tag = 5,

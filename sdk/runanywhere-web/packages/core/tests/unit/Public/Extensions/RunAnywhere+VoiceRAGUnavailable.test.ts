@@ -58,7 +58,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('keeps RAG unavailable when native exports exist but no provider/session is registered', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
 
     const availability = RAG.availability();
 
@@ -79,7 +79,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('rejects native Web RAG persistence until a browser storage-backed provider exists', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
     setRAGProvider(createRAGNativeProvider());
 
     await expect(ragCreatePipeline(createDefaultRAGConfiguration({
@@ -97,7 +97,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('rejects persistent config at native Web RAG provider construction', () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
 
     expect(() => createRAGNativeProvider({
       config: {
@@ -110,7 +110,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('keeps native RAG document listing and removal unavailable without native APIs', async () => {
-    ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
+    ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
     setRAGSessionHandle(7);
 
     expect(RAG.availability()).toMatchObject({

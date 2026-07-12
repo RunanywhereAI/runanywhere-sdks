@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.24+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" /></a>
-  <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.5+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/iOS-15.1+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 15.1+" /></a>
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.44.6+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.44.6+" /></a>
+  <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.12.2+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.12.2+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-API%2024+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" /></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
 </p>
@@ -74,11 +74,11 @@
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **Flutter** | 3.10.0+ | 3.24.0+ |
-| **Dart** | 3.0.0+ | 3.5.0+ |
-| **iOS** | 15.1+ | 16.0+ |
+| **Flutter** | 3.44.6+ | 3.44.6+ |
+| **Dart** | 3.12.2+ | 3.12.2+ |
+| **iOS** | 17.5+ | 17.5+ |
 | **Android** | API 24 (7.0) | API 28+ |
-| **Xcode** | 15.0+ | 15.0+ |
+| **Xcode** | 26.0+ | 26.0+ |
 | **RAM** | 2GB | 4GB+ for larger models |
 | **Storage** | Variable | Models: 100MB–8GB |
 
@@ -134,8 +134,8 @@ After adding the packages, update your iOS Podfile:
 **1. Update `ios/Podfile`:**
 
 ```ruby
-# Set minimum iOS version to 15.1
-platform :ios, '15.1'
+# Set minimum iOS version to 17.5
+platform :ios, '17.5'
 
 target 'Runner' do
   # REQUIRED: Add static linkage
@@ -148,7 +148,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.5'
       # Required for microphone permission (STT/Voice features)
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
@@ -582,7 +582,7 @@ await RunAnywhere.downloads.delete('old-model-id');
 **A:** No. All inference happens on-device. Only anonymous analytics (latency, error rates) are collected in production mode, and this can be disabled.
 
 ### Q: Which devices are supported?
-**A:** iOS 15.1+ and Android API 24+. ARM64 devices are recommended for best performance.
+**A:** iOS 17.5+ and Android API 24+. ARM64 devices are recommended for best performance.
 
 ### Q: Can I use custom models?
 **A:** Yes! Any GGUF model works with LlamaCpp backend. ONNX models work for STT/TTS with the appropriate format.
@@ -598,9 +598,9 @@ Contributions are welcome. This section explains how to set up your development 
 
 ### Prerequisites
 
-- **Flutter** 3.24.0 or later
-- **Xcode** 15+ (for iOS builds)
-- **Android Studio** with NDK 27.0.12077973 (for Android builds)
+- **Flutter** 3.44.6 or later (includes Dart 3.12.2)
+- **Xcode** 26+ (for iOS builds)
+- **Android Studio** with NDK 28.2.13676358 (for Android builds)
 - **CMake** 3.22+
 
 ### First-Time Setup (Build from Source)
@@ -625,7 +625,7 @@ melos bootstrap
 
 - `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` builds `RACommons`, `RABackendLLAMACPP`,
   `RABackendONNX`, and `RABackendSherpa` XCFrameworks and stages them into
-  `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
+  each package-owned `sdk/runanywhere-flutter/packages/*/ios/<package>/Frameworks/` directory.
 - `scripts/build/build-core-android.sh <ABI>` builds `librac_commons.so` +
   per-backend `.so` libraries and stages them into
   `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
@@ -685,7 +685,7 @@ Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
 
 | Script | Description |
 |--------|-------------|
-| `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages into Flutter packages' `ios/Frameworks/`. |
+| `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages them into package-owned `ios/<package>/Frameworks/` directories shared by CocoaPods and SwiftPM. |
 | `scripts/build/build-core-android.sh <ABI>` | Android: builds backend `.so` files and stages into Flutter packages' `android/src/main/jniLibs/<ABI>/`. |
 | `sdk/runanywhere-web/scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
 | `sdk/runanywhere-flutter/scripts/package-sdk.sh` | Validate all 4 Flutter packages via `pub publish --dry-run`. |

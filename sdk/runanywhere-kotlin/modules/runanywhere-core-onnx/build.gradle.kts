@@ -123,16 +123,6 @@ android {
         }
     }
 
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-            jniLibs.srcDirs("src/main/jniLibs", "src/androidMain/jniLibs")
-        }
-        getByName("test") {
-            java.srcDirs("src/test/kotlin")
-        }
-    }
-
     publishing {
         singleVariant("release") {
             withSourcesJar()
@@ -158,7 +148,7 @@ dependencies {
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
-        ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
+        ?: rootProject.version.toString()
 
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
@@ -175,19 +165,41 @@ tasks.register("downloadJniLibs") {
 
     val onnxLibs =
         setOf(
+            "libc++_shared.so",
+            "libonnxruntime.so",
             "librac_backend_onnx.so",
             "librac_backend_onnx_jni.so",
-            "libonnxruntime.so",
+            "librac_backend_sherpa.so",
+            "librunanywhere_onnx.so",
+            "librunanywhere_sherpa.so",
             "libsherpa-onnx-c-api.so",
-            "libsherpa-onnx-cxx-api.so",
             "libsherpa-onnx-jni.so",
         )
 
     outputs.dir(outputDir)
 
     doLast {
-        val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
-        if (existingLibs > 0) return@doLast
+        fun validateAbiInventory(abi: String) {
+            val abiDir = file("$outputDir/$abi")
+            val actual =
+                abiDir
+                    .listFiles { file -> file.extension == "so" }
+                    ?.map { it.name }
+                    ?.toSet()
+                    .orEmpty()
+            if (actual != onnxLibs) {
+                throw GradleException(
+                    "ONNX native inventory mismatch for $abi: " +
+                        "missing=${(onnxLibs - actual).sorted()}, unexpected=${(actual - onnxLibs).sorted()}",
+                )
+            }
+        }
+
+        val existingLibs = outputDir.walkTopDown().any { it.extension == "so" }
+        if (existingLibs) {
+            targetAbis.forEach(::validateAbiInventory)
+            return@doLast
+        }
 
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
@@ -224,13 +236,18 @@ tasks.register("downloadJniLibs") {
                         totalDownloaded++
                     }
 
+                validateAbiInventory(abi)
                 tempZip.delete()
             } catch (e: Exception) {
-                logger.warn("Failed to download $packageName: ${e.message}")
+                throw GradleException("Failed to download or validate $packageName", e)
             }
         }
 
         tempDir.deleteRecursively()
+        val expectedTotal = targetAbis.size * onnxLibs.size
+        if (totalDownloaded != expectedTotal) {
+            throw GradleException("ONNX downloaded $totalDownloaded libraries; expected $expectedTotal")
+        }
         logger.lifecycle("ONNX: $totalDownloaded .so files downloaded")
     }
 }
@@ -266,9 +283,7 @@ group =
         else -> "io.github.sanchitmonga22"
     }
 
-version = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
+version = rootProject.version
 
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
@@ -285,6 +300,9 @@ val signingPassword: String? =
 val signingKey: String? =
     System.getenv("GPG_SIGNING_KEY")
         ?: project.findProperty("signing.key") as String?
+val skipSigning: Boolean =
+    rootProject.findProperty("runanywhere.skipSigning")?.toString()?.toBoolean()
+        ?: false
 
 afterEvaluate {
     publishing {
@@ -360,6 +378,7 @@ afterEvaluate {
 
 tasks.withType<Sign>().configureEach {
     onlyIf {
-        project.hasProperty("signing.gnupg.keyName") || signingKey != null
+        !skipSigning &&
+            (project.hasProperty("signing.gnupg.keyName") || signingKey != null)
     }
 }

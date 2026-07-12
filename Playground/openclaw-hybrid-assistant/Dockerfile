@@ -68,7 +68,7 @@ RUN cd /workspace/sdk/runanywhere-commons && \
 # Step 2: Build runanywhere-commons
 RUN cd /workspace/sdk/runanywhere-commons && \
     chmod +x scripts/*.sh && \
-    ./scripts/build-linux.sh --shared
+    ./scripts/build-linux.sh
 
 # Step 3: Download models (NO LLM)
 RUN chmod +x scripts/*.sh tests/scripts/*.sh && \
@@ -86,7 +86,7 @@ RUN mkdir -p build && cd build && \
     cmake --build . -j$(nproc)
 
 # Set library path for runtime
-ENV LD_LIBRARY_PATH=/workspace/sdk/runanywhere-commons/dist/linux/x86_64:/workspace/sdk/runanywhere-commons/dist/linux/aarch64:/workspace/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib
+ENV LD_LIBRARY_PATH=/workspace/sdk/runanywhere-commons/dist/linux/lib:/workspace/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib
 
 # Verify the build
 RUN ls -la build/ && \

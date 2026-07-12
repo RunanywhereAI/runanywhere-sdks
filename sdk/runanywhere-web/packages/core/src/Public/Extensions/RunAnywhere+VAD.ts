@@ -167,16 +167,12 @@ function callLoadModel(
 export interface DetectVoiceOptions extends Partial<VADOptions> {
   /** Optional explicit model id. */
   modelId?: string;
-  /** Optional explicit model file path (only needed for non-energy VAD). */
-  modelPath?: string;
   /** Optional configuration override. */
   config?: Partial<VADConfiguration>;
 }
 
 interface ResolvedVADModel {
-  path: string;
-  id?: string;
-  name?: string;
+  id: string;
 }
 
 function currentLifecycleVADModel(): ResolvedVADModel | null {
@@ -186,24 +182,7 @@ function currentLifecycleVADModel(): ResolvedVADModel | null {
     includeModelMetadata: true,
   });
   if (!current?.modelId) return null;
-  return {
-    path: current.resolvedPath || current.modelId,
-    id: current.modelId,
-    name: current.model?.name,
-  };
-}
-
-function resolveVADModel(options?: DetectVoiceOptions): ResolvedVADModel {
-  if (options?.modelPath) {
-    return { path: options.modelPath, id: options.modelId };
-  }
-
-  const current = currentLifecycleVADModel();
-  if (current) return current;
-
-  throw SDKException.notInitialized(
-    'No VAD model is loaded. Call RunAnywhere.loadModel(...) with a VAD model before voice activity detection.',
-  );
+  return { id: current.modelId };
 }
 
 function lifecycleVADAdapter(feature: string): VADProtoAdapter {
@@ -243,25 +222,6 @@ function assertRequestedModelMatches(
     throw SDKException.invalidConfiguration(
       `VAD model "${options.modelId}" was requested, but lifecycle model "${current.id}" is loaded.`,
     );
-  }
-}
-
-function createConfiguredVADHandle(options?: DetectVoiceOptions): number {
-  const module = requireVADModule('RunAnywhere.vad');
-  const model = resolveVADModel(options);
-  const handle = callCreate(module);
-  try {
-    callLoadModel(module, handle, model.path, model.id, model.name);
-    if (!VAD.configure(handle, options?.config)) {
-      throw SDKException.processingFailed('Failed to configure the VAD component');
-    }
-    if (!VAD.initialize(handle)) {
-      throw SDKException.processingFailed('Failed to initialize the VAD component');
-    }
-    return handle;
-  } catch (error) {
-    VAD.destroy(handle);
-    throw error;
   }
 }
 
@@ -439,43 +399,37 @@ export const VAD = {
 /**
  * Top-level ergonomic shortcut. When ModelLifecycle owns a VAD model this
  * routes directly through that canonical service, preserving the detector's
- * recurrent state and avoiding a second ONNX Runtime session. An explicit
- * `modelPath` remains a compatibility fallback only when no lifecycle model
- * is loaded.
+ * recurrent state and avoiding a second ONNX Runtime session.
  */
 export async function detectVoice(
   audio: Float32Array,
   options?: DetectVoiceOptions,
 ): Promise<VADResult> {
   const current = currentLifecycleVADModel();
-  if (current) {
-    assertRequestedModelMatches(current, options);
-    const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoiceAuto');
-    const config = lifecycleConfiguration(options);
-    if (!adapter.configureLifecycle(config)) {
-      throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
-    }
-    // The threshold was applied by configureLifecycle. Keeping the per-frame
-    // override at zero avoids rebuilding Sherpa's detector for this frame.
-    const result = adapter.processLifecycle(
-      audio,
-      callOptions(options, 0),
-      config.sampleRate || 16_000,
+  if (!current) {
+    throw SDKException.notInitialized(
+      'No VAD model is loaded. Call RunAnywhere.loadModel(...) with a VAD model before voice activity detection.',
     );
-    if (!result) {
-      throw SDKException.processingFailed(
-        'rac_vad_process_lifecycle_proto returned no VADResult bytes.',
-      );
-    }
-    return result;
   }
-
-  const handle = createConfiguredVADHandle(options);
-  try {
-    return VAD.process(handle, audio, options);
-  } finally {
-    VAD.destroy(handle);
+  assertRequestedModelMatches(current, options);
+  const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoiceAuto');
+  const config = lifecycleConfiguration(options);
+  if (!adapter.configureLifecycle(config)) {
+    throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
+  // The threshold was applied by configureLifecycle. Keeping the per-frame
+  // override at zero avoids rebuilding Sherpa's detector for this frame.
+  const result = adapter.processLifecycle(
+    audio,
+    callOptions(options, 0),
+    config.sampleRate || 16_000,
+  );
+  if (!result) {
+    throw SDKException.processingFailed(
+      'rac_vad_process_lifecycle_proto returned no VADResult bytes.',
+    );
+  }
+  return result;
 }
 
 /**
@@ -498,60 +452,41 @@ export async function* streamVoiceActivity(
   }
 
   const current = currentLifecycleVADModel();
-  if (current) {
-    assertRequestedModelMatches(current, options);
-    const adapter = lifecycleVADAdapter('VAD.streamVoiceAuto');
-    const config = lifecycleConfiguration(options);
-    if (!adapter.configureLifecycle(config)) {
-      throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
-    }
-
-    let started = false;
-    try {
-      if (!adapter.startLifecycle()) {
-        throw SDKException.processingFailed('Failed to start the lifecycle VAD service');
-      }
-      started = true;
-      const frameOptions = callOptions(options, 0);
-      for await (const chunk of audio) {
-        if (chunk.length === 0) continue;
-        const result = adapter.processLifecycle(chunk, frameOptions, configuredRate);
-        if (!result) {
-          throw SDKException.processingFailed(
-            'rac_vad_process_lifecycle_proto returned no VADResult bytes.',
-          );
-        }
-        yield result;
-      }
-    } finally {
-      if (started && !adapter.stopLifecycle()) {
-        logger.warning('Failed to stop the lifecycle VAD service during stream cleanup');
-      }
-      if (!adapter.resetLifecycle()) {
-        logger.warning('Failed to reset the lifecycle VAD service during stream cleanup');
-      }
-    }
-    return;
+  if (!current) {
+    throw SDKException.notInitialized(
+      'No VAD model is loaded. Call RunAnywhere.loadModel(...) with a VAD model before voice activity detection.',
+    );
+  }
+  assertRequestedModelMatches(current, options);
+  const adapter = lifecycleVADAdapter('VAD.streamVoiceAuto');
+  const config = lifecycleConfiguration(options);
+  if (!adapter.configureLifecycle(config)) {
+    throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
   }
 
-  const handle = createConfiguredVADHandle(options);
   let started = false;
   try {
-    if (!VAD.start(handle)) {
-      throw SDKException.processingFailed('Failed to start the VAD component');
+    if (!adapter.startLifecycle()) {
+      throw SDKException.processingFailed('Failed to start the lifecycle VAD service');
     }
     started = true;
-
-    const adapter = VADProtoAdapter.tryDefault();
-    if (!adapter || !adapter.supportsProtoVADStream()) {
-      throw SDKException.backendNotAvailable(
-        'VAD.streamVoiceAuto',
-        'The registered VAD backend does not expose the persistent VAD stream-session ABI.',
-      );
+    const frameOptions = callOptions(options, 0);
+    for await (const chunk of audio) {
+      if (chunk.length === 0) continue;
+      const result = adapter.processLifecycle(chunk, frameOptions, configuredRate);
+      if (!result) {
+        throw SDKException.processingFailed(
+          'rac_vad_process_lifecycle_proto returned no VADResult bytes.',
+        );
+      }
+      yield result;
     }
-    yield* adapter.stream(handle, audio, defaultVADOptions(options));
   } finally {
-    if (started) VAD.stop(handle);
-    VAD.destroy(handle);
+    if (started && !adapter.stopLifecycle()) {
+      logger.warning('Failed to stop the lifecycle VAD service during stream cleanup');
+    }
+    if (!adapter.resetLifecycle()) {
+      logger.warning('Failed to reset the lifecycle VAD service during stream cleanup');
+    }
   }
 }

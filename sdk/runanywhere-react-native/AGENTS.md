@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Yarn Berry (3.6.1) workspaces monorepo containing one core package and four backend packages for on-device AI in React Native. Version `0.19.15`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
 
-Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especially §4 folder layout, §12 generated proto code, and §15 build/deployment. React Native follows that iOS 17.0+ minimum and native/proto-byte ownership model; JavaScript is the facade, not the owner of model registry, downloads, storage paths, or native HTTP routing.
+Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especially §4 folder layout, §12 generated proto code, and §15 build/deployment. React Native follows that iOS 17.5+ minimum and native/proto-byte ownership model; JavaScript is the facade, not the owner of model registry, downloads, storage paths, or native HTTP routing.
 
 ### Packages
 
@@ -16,7 +16,6 @@ Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especi
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM inference) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
 | `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend registration and capability probe |
-| `packages/mlx` | `@runanywhere/mlx` | Apple MLX runtime registration facade |
 
 Additional workspace dependency: `../shared/proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
 
@@ -45,10 +44,6 @@ yarn llamacpp:download-ios      # pod install for llamacpp
 yarn llamacpp:download-android
 yarn onnx:download-ios
 yarn onnx:download-android
-
-# Local native flag helpers
-yarn native:local               # Sets RA_TEST_LOCAL=1 (use bundled libs)
-yarn native:remote              # Unsets RA_TEST_LOCAL
 
 # Release
 yarn release                    # lerna publish (npm, main branch only)

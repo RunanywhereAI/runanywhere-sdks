@@ -187,27 +187,6 @@ RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registr
                                                                const char* model_id,
                                                                const char* local_path);
 
-/**
- * @brief Persist the durable model-folder manifest sidecar for a model.
- *
- * Best-effort and idempotent: serializes the registry entry (volatile
- * absolute paths stripped) into
- * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/` under the filename
- * from rac_model_folder_manifest_filename(), creating the folder if needed.
- * The download orchestrator calls this when a download STARTS so a process
- * death mid-download still leaves a restorable identity on disk — cold-launch
- * and lookup-miss restore then re-register the entry as incomplete and a
- * pull/download by id resumes from the partial bytes. Also refreshed
- * automatically on download completion.
- *
- * @param handle Registry handle
- * @param model_id Model identifier
- * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND when the id is unknown, or an
- *         error code when the folder cannot be created.
- */
-RAC_API rac_result_t rac_model_registry_persist_folder_manifest(rac_model_registry_handle_t handle,
-                                                                const char* model_id);
-
 // =============================================================================
 // PROTO-BYTE MODEL INFO API
 // =============================================================================

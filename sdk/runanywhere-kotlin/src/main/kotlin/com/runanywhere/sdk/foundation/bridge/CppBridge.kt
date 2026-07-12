@@ -24,7 +24,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
@@ -434,11 +433,6 @@ object CppBridge {
             CppBridgeVoiceAgent.destroy()
         } catch (t: Throwable) {
             logger.warn("CppBridgeVoiceAgent.destroy() failed during shutdown: ${t.message}")
-        }
-        try {
-            CppBridgeVLM.destroy()
-        } catch (t: Throwable) {
-            logger.warn("CppBridgeVLM.destroy() failed during shutdown: ${t.message}")
         }
 
         synchronized(lock) {

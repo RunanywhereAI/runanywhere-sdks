@@ -134,15 +134,20 @@ public enum DeviceInfoFactory {
         sysctlbyname("hw.machine", nil, &size, nil, 0)
         var machine = [CChar](repeating: 0, count: size)
         sysctlbyname("hw.machine", &machine, &size, nil, 0)
-        return String(cString: machine)
+        return decodeCStringBuffer(machine)
         #elseif os(macOS)
         sysctlbyname("hw.model", nil, &size, nil, 0)
         var model = [CChar](repeating: 0, count: size)
         sysctlbyname("hw.model", &model, &size, nil, 0)
-        return String(cString: model)
+        return decodeCStringBuffer(model)
         #else
         return "Unknown"
         #endif
+    }
+
+    private static func decodeCStringBuffer(_ buffer: [CChar]) -> String {
+        let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        return String(bytes: bytes, encoding: .utf8) ?? ""
     }
 
     private static func cleanVersion(_ version: String) -> String {

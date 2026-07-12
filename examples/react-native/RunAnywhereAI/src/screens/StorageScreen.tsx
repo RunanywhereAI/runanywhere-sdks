@@ -18,7 +18,6 @@ import { Spacing, Padding, BorderRadius } from '../theme/spacing';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
-  getFrameworkDisplayName,
   getFrameworkIcon,
   getModelDownloadSizeBytes,
   getPrimaryFramework,
@@ -169,7 +168,7 @@ export const StorageScreen: React.FC = () => {
                           color={frameworkColor}
                         />
                         <Text style={[styles.backendText, { color: frameworkColor }]}>
-                          {getFrameworkDisplayName(framework)}
+                          {RunAnywhere.formatFramework(framework)}
                         </Text>
                       </View>
                     </View>

@@ -8,7 +8,6 @@
 #ifndef RAC_EMBEDDINGS_H
 #define RAC_EMBEDDINGS_H
 
-#include "rac_embeddings_component.h"
 #include "rac_embeddings_service.h"
 #include "rac_embeddings_types.h"
 

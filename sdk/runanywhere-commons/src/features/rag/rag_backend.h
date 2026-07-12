@@ -77,7 +77,7 @@ class RAGBackend {
      *
      * @param config Pipeline configuration
      * @param llm_service Handle to LLM service (from rac_llm_create)
-     * @param embeddings_service Handle to embeddings service (from rac_embeddings_create)
+     * @param embeddings_service Handle to an embeddings service
      * @param owns_services If true, pipeline will destroy services on cleanup
      */
     explicit RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,

@@ -11,10 +11,8 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.Models.wireString
 import java.io.File
 
 /**
@@ -130,54 +128,14 @@ object CppBridgeModelPaths {
      * @return The model folder path
      */
     fun getModelPath(modelId: String, framework: Int): String {
-        // Ensure base dir is materialised both locally and in C++ before the call.
-        val base = getBaseDirectory()
-        val jniPath =
-            try {
-                RunAnywhereBridge.racModelPathsGetModelFolder(modelId, framework)
-            } catch (t: Throwable) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.WARN,
-                    TAG,
-                    "racModelPathsGetModelFolder unavailable: ${t.message}",
-                )
-                null
-            }
-        if (jniPath != null) return jniPath
-
-        // JNI not available (e.g. pure JVM unit tests). Fall back to a local
-        // computation that still uses the canonical schema. The string segment
-        // is sourced from the codegen-driven `InferenceFramework.wireString`
-        // helper (see commonMain/.../Models/ModelTypes.kt) so any future
-        // framework added to the proto picks up its path name automatically.
-        val frameworkName = racFrameworkIntToProto(framework).wireString
-        return File(File(File(base, "RunAnywhere"), "Models"), "$frameworkName${File.separator}$modelId").absolutePath
+        getBaseDirectory()
+        return RunAnywhereBridge.racModelPathsGetModelFolder(modelId, framework)
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Failed to resolve model path",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
     }
-
-    /**
-     * Map a C++ `RAC_FRAMEWORK_*` int (the values defined in
-     * [CppBridgeModelRegistry.Framework]) to the corresponding proto
-     * [InferenceFramework] enum. The C++ ABI numbering does NOT match the
-     * proto wire numbering, so a small adapter is required.
-     *
-     * Unknown / unmapped ints fall through to [InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN]
-     * which yields the string "Unknown" via the codegen `wireString` helper.
-     */
-    private fun racFrameworkIntToProto(framework: Int): InferenceFramework =
-        when (framework) {
-            CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-            CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-            CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
-            CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
-            CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
-            CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.INFERENCE_FRAMEWORK_NONE
-            CppBridgeModelRegistry.Framework.MLX -> InferenceFramework.INFERENCE_FRAMEWORK_MLX
-            CppBridgeModelRegistry.Framework.COREML -> InferenceFramework.INFERENCE_FRAMEWORK_COREML
-            CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
-            CppBridgeModelRegistry.Framework.QHEXRT -> InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-            else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
-        }
 
     // Swift-parity wrappers (mirror CppBridge+ModelPaths.swift)
     //
@@ -352,8 +310,6 @@ object CppBridgeModelPaths {
                 }
             }
 
-        baseDirectory = basePath
-
         // Create the directory
         try {
             val dir = File(basePath)
@@ -368,26 +324,7 @@ object CppBridgeModelPaths {
             )
         }
 
-        // Push base dir into C++ core so rac_model_paths_get_model_folder can work.
-        // Swallow any linkage failure here: JNI may not be loaded yet in pure-JVM
-        // test contexts.
-        try {
-            val rc = RunAnywhereBridge.racModelPathsSetBaseDir(basePath)
-            if (rc != 0) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.WARN,
-                    TAG,
-                    "racModelPathsSetBaseDir returned $rc",
-                )
-            }
-        } catch (t: Throwable) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
-                TAG,
-                "racModelPathsSetBaseDir unavailable: ${t.message}",
-            )
-        }
-
+        setBaseDirectory(basePath)
         return basePath
     }
 }

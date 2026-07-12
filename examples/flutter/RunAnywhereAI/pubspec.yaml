@@ -4,10 +4,8 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
-  # Relaxed for local builds (host has 3.38.3 active).
-  # Canonical CI Flutter version is 3.44.0+ (P3 of dep-bump 2026-05-19).
-  flutter: '>=3.38.0 <4.0.0'
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -20,10 +18,6 @@ dependencies:
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
 
-  # RunAnywhere SDK - MLX Backend (Apple Metal)
-  runanywhere_mlx:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
-
   # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
@@ -34,8 +28,8 @@ dependencies:
   # Int64 proto scalars (LoRA catalog sizeBytes) — already transitive via
   # protobuf; declared directly because the app constructs proto messages.
   fixnum: ^1.1.1
-  flutter_markdown: ^0.6.18
-  permission_handler: ^11.1.0
+  flutter_markdown_plus: ^1.0.7
+  permission_handler: ^12.0.3
   shared_preferences: ^2.5.5
   # Secure storage (iOS Keychain, Android Keystore)
   flutter_secure_storage: ^10.2.0
@@ -52,8 +46,6 @@ dependencies:
   url_launcher: ^6.2.0
   # HTTP client for API calls
   http: ^1.2.0
-  # Camera access for VLM
-  camera: ^0.11.0
   # Image picker for gallery photos
   image_picker: ^1.0.0
   # File picker for PDF/JSON document selection (RAG) — bumped 2026-05-19
@@ -79,8 +71,6 @@ dev_dependencies:
 dependency_overrides:
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
-  runanywhere_mlx:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   runanywhere_qhexrt:

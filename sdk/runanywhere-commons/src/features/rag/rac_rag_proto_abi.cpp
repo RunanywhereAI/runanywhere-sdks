@@ -6,7 +6,7 @@
  * runanywhere.v1.RAGConfiguration bytes, without going through the
  * deleted legacy struct API (`rac_rag_pipeline_*` / `rac_rag_config_t`).
  * Model ids are resolved to filesystem paths via the global model
- * registry, then passed through rac_embeddings_create_with_config() /
+ * registry, then passed through the internal embeddings service factory and
  * rac_llm_create() before handing the service handles to RAGBackend
  * (which owns them and destroys on session destroy).
  */
@@ -35,6 +35,8 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/rag/rac_rag.h"
+
+#include "../embeddings/embeddings_service_internal.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
@@ -408,7 +410,7 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // D-6: RAGConfiguration carries model ids. embedding_model_id is required;
     // llm_model_id is optional (embed-only pipelines are legal). Commons
     // resolves each id to a filesystem path via rac_get_model() before
-    // handing them to rac_embeddings_create_with_config / rac_llm_create.
+    // handing them to the internal embeddings factory / rac_llm_create.
     const std::string embedding_model_id = proto.embedding_model_id();
     const std::string llm_model_id = proto.llm_model_id();
 
@@ -466,8 +468,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     LOGI("sessionCreate: embed_path=%s, llm_path=%s", embedding_path.c_str(),
          llm_path.empty() ? "(none)" : llm_path.c_str());
 
-    rac_result_t rc = rac_embeddings_create_with_config(embedding_path.c_str(),
-                                                        embedding_config_json, &embed_handle);
+    rac_result_t rc = rac::embeddings::create_service(
+        embedding_path.c_str(), embedding_config_json, &embed_handle);
     if (rc != RAC_SUCCESS || !embed_handle) {
         rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
         publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));

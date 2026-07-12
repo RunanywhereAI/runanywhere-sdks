@@ -688,7 +688,7 @@ export interface RunAnywhereCore extends HybridObject<{
    * filter phase — the predicate logic stays host-side, the decision stays in
    * commons. The native side blocks the (background) routing thread on the JS
    * promise, mirroring the synchronous JS-executor pattern used by
-   * `toolRunLoopProto`.
+   * `toolRunLoopProtoWithHandle`.
    *
    * @param name      Wire identity (`CustomFilter.name`); non-empty, unique.
    * @param predicate `(candidateModelId) => Promise<boolean>` — true keeps the
@@ -758,7 +758,8 @@ export interface RunAnywhereCore extends HybridObject<{
    * request host-side (build + HTTP + parse) and resolves the provider's
    * result JSON (`{"text", "language_code", "confidence", "error_code",
    * "error_message"}`). Invoked on the router's request thread; the native
-   * side blocks on the returned promise like `toolRunLoopProto`'s executor.
+   * side blocks on the returned promise like
+   * `toolRunLoopProtoWithHandle`'s executor.
    * Mirrors Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
    *
    * @param name         Provider name (ties to `CloudSTT.registerModel`'s
@@ -1009,36 +1010,17 @@ export interface RunAnywhereCore extends HybridObject<{
   toolValidateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Run the complete native tool-calling loop from serialized
-   * runanywhere.v1.ToolCallingSessionCreateRequest bytes.
+   * Run the complete cancellation-aware native tool-calling loop from
+   * serialized runanywhere.v1.ToolCallingSessionCreateRequest bytes.
    *
-   * The callback receives serialized runanywhere.v1.ToolCall bytes and must
-   * return serialized runanywhere.v1.ToolResult bytes. C++ owns prompt
-   * formatting, generation, parsing, validation, follow-up prompts, and loop
-   * termination; React Native owns only the JS executor registry.
-   *
-   * Implemented by HybridRunAnywhereCore+Tools.cpp with
-   * rac_tool_calling_run_loop_proto. The native bridge waits on the Nitro
-   * promise returned by the JS executor callback so commons can keep the
-   * canonical synchronous run-loop ABI.
-   */
-  toolRunLoopProto(
-    requestBytes: ArrayBuffer,
-    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
-  ): Promise<ArrayBuffer>;
-
-  /**
-   * Cancellation-aware variant of toolRunLoopProto.
-   *
-   * Backed by `rac_tool_calling_run_loop_with_handle_proto`. Commons publishes
+   * Backed by `rac_tool_calling_run_loop_proto`. Commons publishes
    * an opaque `run_loop_handle` synchronously, before the iteration loop
    * begins; the bridge surfaces it to JS via `onHandle(handle)` so a fan-out
    * `AbortSignal.abort()` can call `toolRunLoopCancelProto(handle)` to
    * interrupt the in-flight loop from another thread.
    *
    * The handle is owned by commons and reclaimed when this Promise resolves;
-   * callers MUST NOT use it past resolution. A handle of `0` indicates the
-   * with-handle ABI is unavailable on this commons build.
+   * callers MUST NOT use it past resolution.
    *
    * Mirrors Swift `generateWithToolsCancellable` in
    * `RunAnywhere+ToolCalling.swift`.

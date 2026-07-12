@@ -10,6 +10,7 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "features/llm/structured_output_internal.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 
 #if defined(RAC_HAVE_PROTOBUF)

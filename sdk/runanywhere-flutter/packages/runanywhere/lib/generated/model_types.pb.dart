@@ -215,7 +215,6 @@ class ModelInfo extends $pb.GeneratedMessage {
     $core.int? contextLength,
     $core.bool? supportsThinking,
     $core.bool? supportsLora,
-    $core.String? description,
     ModelSource? source,
     $fixnum.Int64? createdAtUnixMs,
     $fixnum.Int64? updatedAtUnixMs,
@@ -254,7 +253,6 @@ class ModelInfo extends $pb.GeneratedMessage {
     if (contextLength != null) result.contextLength = contextLength;
     if (supportsThinking != null) result.supportsThinking = supportsThinking;
     if (supportsLora != null) result.supportsLora = supportsLora;
-    if (description != null) result.description = description;
     if (source != null) result.source = source;
     if (createdAtUnixMs != null) result.createdAtUnixMs = createdAtUnixMs;
     if (updatedAtUnixMs != null) result.updatedAtUnixMs = updatedAtUnixMs;
@@ -323,7 +321,6 @@ class ModelInfo extends $pb.GeneratedMessage {
     ..aI(9, _omitFieldNames ? '' : 'contextLength')
     ..aOB(10, _omitFieldNames ? '' : 'supportsThinking')
     ..aOB(11, _omitFieldNames ? '' : 'supportsLora')
-    ..aOS(12, _omitFieldNames ? '' : 'description')
     ..aE<ModelSource>(13, _omitFieldNames ? '' : 'source',
         enumValues: ModelSource.values)
     ..aInt64(14, _omitFieldNames ? '' : 'createdAtUnixMs')
@@ -504,139 +501,128 @@ class ModelInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearSupportsLora() => $_clearField(11);
 
-  @$pb.TagNumber(12)
-  $core.String get description => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set description($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasDescription() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearDescription() => $_clearField(12);
-
   @$pb.TagNumber(13)
-  ModelSource get source => $_getN(12);
+  ModelSource get source => $_getN(11);
   @$pb.TagNumber(13)
   set source(ModelSource value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasSource() => $_has(12);
+  $core.bool hasSource() => $_has(11);
   @$pb.TagNumber(13)
   void clearSource() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $fixnum.Int64 get createdAtUnixMs => $_getI64(13);
+  $fixnum.Int64 get createdAtUnixMs => $_getI64(12);
   @$pb.TagNumber(14)
-  set createdAtUnixMs($fixnum.Int64 value) => $_setInt64(13, value);
+  set createdAtUnixMs($fixnum.Int64 value) => $_setInt64(12, value);
   @$pb.TagNumber(14)
-  $core.bool hasCreatedAtUnixMs() => $_has(13);
+  $core.bool hasCreatedAtUnixMs() => $_has(12);
   @$pb.TagNumber(14)
   void clearCreatedAtUnixMs() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $fixnum.Int64 get updatedAtUnixMs => $_getI64(14);
+  $fixnum.Int64 get updatedAtUnixMs => $_getI64(13);
   @$pb.TagNumber(15)
-  set updatedAtUnixMs($fixnum.Int64 value) => $_setInt64(14, value);
+  set updatedAtUnixMs($fixnum.Int64 value) => $_setInt64(13, value);
   @$pb.TagNumber(15)
-  $core.bool hasUpdatedAtUnixMs() => $_has(14);
+  $core.bool hasUpdatedAtUnixMs() => $_has(13);
   @$pb.TagNumber(15)
   void clearUpdatedAtUnixMs() => $_clearField(15);
 
   /// Separate from download_size_bytes: this is the estimated runtime RAM
   /// requirement used by compatibility checks and model selection UIs.
   @$pb.TagNumber(16)
-  $fixnum.Int64 get memoryRequiredBytes => $_getI64(15);
+  $fixnum.Int64 get memoryRequiredBytes => $_getI64(14);
   @$pb.TagNumber(16)
-  set memoryRequiredBytes($fixnum.Int64 value) => $_setInt64(15, value);
+  set memoryRequiredBytes($fixnum.Int64 value) => $_setInt64(14, value);
   @$pb.TagNumber(16)
-  $core.bool hasMemoryRequiredBytes() => $_has(15);
+  $core.bool hasMemoryRequiredBytes() => $_has(14);
   @$pb.TagNumber(16)
   void clearMemoryRequiredBytes() => $_clearField(16);
 
   /// Lowercase hex SHA-256 checksum for the primary artifact. Per-file
   /// checksums for multi-file artifacts live on ModelFileDescriptor.
   @$pb.TagNumber(17)
-  $core.String get checksumSha256 => $_getSZ(16);
+  $core.String get checksumSha256 => $_getSZ(15);
   @$pb.TagNumber(17)
-  set checksumSha256($core.String value) => $_setString(16, value);
+  set checksumSha256($core.String value) => $_setString(15, value);
   @$pb.TagNumber(17)
-  $core.bool hasChecksumSha256() => $_has(16);
+  $core.bool hasChecksumSha256() => $_has(15);
   @$pb.TagNumber(17)
   void clearChecksumSha256() => $_clearField(17);
 
   /// Thinking/reasoning metadata. `supports_thinking` remains the boolean
   /// capability flag; this optional pattern declares model-specific tags.
   @$pb.TagNumber(18)
-  $0.ThinkingTagPattern get thinkingPattern => $_getN(17);
+  $0.ThinkingTagPattern get thinkingPattern => $_getN(16);
   @$pb.TagNumber(18)
   set thinkingPattern($0.ThinkingTagPattern value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasThinkingPattern() => $_has(17);
+  $core.bool hasThinkingPattern() => $_has(16);
   @$pb.TagNumber(18)
   void clearThinkingPattern() => $_clearField(18);
   @$pb.TagNumber(18)
-  $0.ThinkingTagPattern ensureThinkingPattern() => $_ensure(17);
+  $0.ThinkingTagPattern ensureThinkingPattern() => $_ensure(16);
 
-  /// Structured public catalog metadata. `description` (field 12) is kept for
-  /// backward compatibility and should mirror metadata.description when both
-  /// are populated.
+  /// Structured public catalog metadata, including the model description.
   @$pb.TagNumber(19)
-  ModelInfoMetadata get metadata => $_getN(18);
+  ModelInfoMetadata get metadata => $_getN(17);
   @$pb.TagNumber(19)
   set metadata(ModelInfoMetadata value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasMetadata() => $_has(18);
+  $core.bool hasMetadata() => $_has(17);
   @$pb.TagNumber(19)
   void clearMetadata() => $_clearField(19);
   @$pb.TagNumber(19)
-  ModelInfoMetadata ensureMetadata() => $_ensure(18);
+  ModelInfoMetadata ensureMetadata() => $_ensure(17);
 
   @$pb.TagNumber(20)
-  SingleFileArtifact get singleFile => $_getN(19);
+  SingleFileArtifact get singleFile => $_getN(18);
   @$pb.TagNumber(20)
   set singleFile(SingleFileArtifact value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasSingleFile() => $_has(19);
+  $core.bool hasSingleFile() => $_has(18);
   @$pb.TagNumber(20)
   void clearSingleFile() => $_clearField(20);
   @$pb.TagNumber(20)
-  SingleFileArtifact ensureSingleFile() => $_ensure(19);
+  SingleFileArtifact ensureSingleFile() => $_ensure(18);
 
   @$pb.TagNumber(21)
-  ArchiveArtifact get archive => $_getN(20);
+  ArchiveArtifact get archive => $_getN(19);
   @$pb.TagNumber(21)
   set archive(ArchiveArtifact value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasArchive() => $_has(20);
+  $core.bool hasArchive() => $_has(19);
   @$pb.TagNumber(21)
   void clearArchive() => $_clearField(21);
   @$pb.TagNumber(21)
-  ArchiveArtifact ensureArchive() => $_ensure(20);
+  ArchiveArtifact ensureArchive() => $_ensure(19);
 
   @$pb.TagNumber(22)
-  MultiFileArtifact get multiFile => $_getN(21);
+  MultiFileArtifact get multiFile => $_getN(20);
   @$pb.TagNumber(22)
   set multiFile(MultiFileArtifact value) => $_setField(22, value);
   @$pb.TagNumber(22)
-  $core.bool hasMultiFile() => $_has(21);
+  $core.bool hasMultiFile() => $_has(20);
   @$pb.TagNumber(22)
   void clearMultiFile() => $_clearField(22);
   @$pb.TagNumber(22)
-  MultiFileArtifact ensureMultiFile() => $_ensure(21);
+  MultiFileArtifact ensureMultiFile() => $_ensure(20);
 
   @$pb.TagNumber(23)
-  $core.String get customStrategyId => $_getSZ(22);
+  $core.String get customStrategyId => $_getSZ(21);
   @$pb.TagNumber(23)
-  set customStrategyId($core.String value) => $_setString(22, value);
+  set customStrategyId($core.String value) => $_setString(21, value);
   @$pb.TagNumber(23)
-  $core.bool hasCustomStrategyId() => $_has(22);
+  $core.bool hasCustomStrategyId() => $_has(21);
   @$pb.TagNumber(23)
   void clearCustomStrategyId() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  $core.bool get builtIn => $_getBF(23);
+  $core.bool get builtIn => $_getBF(22);
   @$pb.TagNumber(24)
-  set builtIn($core.bool value) => $_setBool(23, value);
+  set builtIn($core.bool value) => $_setBool(22, value);
   @$pb.TagNumber(24)
-  $core.bool hasBuiltIn() => $_has(23);
+  $core.bool hasBuiltIn() => $_has(22);
   @$pb.TagNumber(24)
   void clearBuiltIn() => $_clearField(24);
 
@@ -644,131 +630,131 @@ class ModelInfo extends $pb.GeneratedMessage {
   /// oneof above. Allows catalog entries to carry a coarse type tag without
   /// resolving the full strategy variant.
   @$pb.TagNumber(25)
-  ModelArtifactType get artifactType => $_getN(24);
+  ModelArtifactType get artifactType => $_getN(23);
   @$pb.TagNumber(25)
   set artifactType(ModelArtifactType value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasArtifactType() => $_has(24);
+  $core.bool hasArtifactType() => $_has(23);
   @$pb.TagNumber(25)
   void clearArtifactType() => $_clearField(25);
 
   /// Manifest of files that are expected on disk after fetch/extraction.
   @$pb.TagNumber(26)
-  ExpectedModelFiles get expectedFiles => $_getN(25);
+  ExpectedModelFiles get expectedFiles => $_getN(24);
   @$pb.TagNumber(26)
   set expectedFiles(ExpectedModelFiles value) => $_setField(26, value);
   @$pb.TagNumber(26)
-  $core.bool hasExpectedFiles() => $_has(25);
+  $core.bool hasExpectedFiles() => $_has(24);
   @$pb.TagNumber(26)
   void clearExpectedFiles() => $_clearField(26);
   @$pb.TagNumber(26)
-  ExpectedModelFiles ensureExpectedFiles() => $_ensure(25);
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(24);
 
   /// Preferred hardware acceleration backend for this model.
   @$pb.TagNumber(27)
-  $1.AccelerationPreference get accelerationPreference => $_getN(26);
+  $1.AccelerationPreference get accelerationPreference => $_getN(25);
   @$pb.TagNumber(27)
   set accelerationPreference($1.AccelerationPreference value) =>
       $_setField(27, value);
   @$pb.TagNumber(27)
-  $core.bool hasAccelerationPreference() => $_has(26);
+  $core.bool hasAccelerationPreference() => $_has(25);
   @$pb.TagNumber(27)
   void clearAccelerationPreference() => $_clearField(27);
 
   /// Hybrid (on-device vs cloud) routing policy for this entry.
   @$pb.TagNumber(28)
-  RoutingPolicy get routingPolicy => $_getN(27);
+  RoutingPolicy get routingPolicy => $_getN(26);
   @$pb.TagNumber(28)
   set routingPolicy(RoutingPolicy value) => $_setField(28, value);
   @$pb.TagNumber(28)
-  $core.bool hasRoutingPolicy() => $_has(27);
+  $core.bool hasRoutingPolicy() => $_has(26);
   @$pb.TagNumber(28)
   void clearRoutingPolicy() => $_clearField(28);
 
   /// Framework/format compatibility declarations. `framework` (field 5) is
   /// the canonical/preferred runtime when no explicit preferred_framework is set.
   @$pb.TagNumber(29)
-  ModelRuntimeCompatibility get compatibility => $_getN(28);
+  ModelRuntimeCompatibility get compatibility => $_getN(27);
   @$pb.TagNumber(29)
   set compatibility(ModelRuntimeCompatibility value) => $_setField(29, value);
   @$pb.TagNumber(29)
-  $core.bool hasCompatibility() => $_has(28);
+  $core.bool hasCompatibility() => $_has(27);
   @$pb.TagNumber(29)
   void clearCompatibility() => $_clearField(29);
   @$pb.TagNumber(29)
-  ModelRuntimeCompatibility ensureCompatibility() => $_ensure(28);
+  ModelRuntimeCompatibility ensureCompatibility() => $_ensure(27);
 
   @$pb.TagNumber(30)
-  InferenceFramework get preferredFramework => $_getN(29);
+  InferenceFramework get preferredFramework => $_getN(28);
   @$pb.TagNumber(30)
   set preferredFramework(InferenceFramework value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasPreferredFramework() => $_has(29);
+  $core.bool hasPreferredFramework() => $_has(28);
   @$pb.TagNumber(30)
   void clearPreferredFramework() => $_clearField(30);
 
   /// Durable registry state. Live byte progress belongs to
   /// download_service.DownloadProgress, not ModelInfo.
   @$pb.TagNumber(31)
-  ModelRegistryStatus get registryStatus => $_getN(30);
+  ModelRegistryStatus get registryStatus => $_getN(29);
   @$pb.TagNumber(31)
   set registryStatus(ModelRegistryStatus value) => $_setField(31, value);
   @$pb.TagNumber(31)
-  $core.bool hasRegistryStatus() => $_has(30);
+  $core.bool hasRegistryStatus() => $_has(29);
   @$pb.TagNumber(31)
   void clearRegistryStatus() => $_clearField(31);
 
   @$pb.TagNumber(32)
-  $core.bool get isDownloaded => $_getBF(31);
+  $core.bool get isDownloaded => $_getBF(30);
   @$pb.TagNumber(32)
-  set isDownloaded($core.bool value) => $_setBool(31, value);
+  set isDownloaded($core.bool value) => $_setBool(30, value);
   @$pb.TagNumber(32)
-  $core.bool hasIsDownloaded() => $_has(31);
+  $core.bool hasIsDownloaded() => $_has(30);
   @$pb.TagNumber(32)
   void clearIsDownloaded() => $_clearField(32);
 
   @$pb.TagNumber(33)
-  $core.bool get isAvailable => $_getBF(32);
+  $core.bool get isAvailable => $_getBF(31);
   @$pb.TagNumber(33)
-  set isAvailable($core.bool value) => $_setBool(32, value);
+  set isAvailable($core.bool value) => $_setBool(31, value);
   @$pb.TagNumber(33)
-  $core.bool hasIsAvailable() => $_has(32);
+  $core.bool hasIsAvailable() => $_has(31);
   @$pb.TagNumber(33)
   void clearIsAvailable() => $_clearField(33);
 
   @$pb.TagNumber(34)
-  $fixnum.Int64 get lastUsedAtUnixMs => $_getI64(33);
+  $fixnum.Int64 get lastUsedAtUnixMs => $_getI64(32);
   @$pb.TagNumber(34)
-  set lastUsedAtUnixMs($fixnum.Int64 value) => $_setInt64(33, value);
+  set lastUsedAtUnixMs($fixnum.Int64 value) => $_setInt64(32, value);
   @$pb.TagNumber(34)
-  $core.bool hasLastUsedAtUnixMs() => $_has(33);
+  $core.bool hasLastUsedAtUnixMs() => $_has(32);
   @$pb.TagNumber(34)
   void clearLastUsedAtUnixMs() => $_clearField(34);
 
   @$pb.TagNumber(35)
-  $core.int get usageCount => $_getIZ(34);
+  $core.int get usageCount => $_getIZ(33);
   @$pb.TagNumber(35)
-  set usageCount($core.int value) => $_setSignedInt32(34, value);
+  set usageCount($core.int value) => $_setSignedInt32(33, value);
   @$pb.TagNumber(35)
-  $core.bool hasUsageCount() => $_has(34);
+  $core.bool hasUsageCount() => $_has(33);
   @$pb.TagNumber(35)
   void clearUsageCount() => $_clearField(35);
 
   @$pb.TagNumber(36)
-  $core.bool get syncPending => $_getBF(35);
+  $core.bool get syncPending => $_getBF(34);
   @$pb.TagNumber(36)
-  set syncPending($core.bool value) => $_setBool(35, value);
+  set syncPending($core.bool value) => $_setBool(34, value);
   @$pb.TagNumber(36)
-  $core.bool hasSyncPending() => $_has(35);
+  $core.bool hasSyncPending() => $_has(34);
   @$pb.TagNumber(36)
   void clearSyncPending() => $_clearField(36);
 
   @$pb.TagNumber(37)
-  $core.String get statusMessage => $_getSZ(36);
+  $core.String get statusMessage => $_getSZ(35);
   @$pb.TagNumber(37)
-  set statusMessage($core.String value) => $_setString(36, value);
+  set statusMessage($core.String value) => $_setString(35, value);
   @$pb.TagNumber(37)
-  $core.bool hasStatusMessage() => $_has(36);
+  $core.bool hasStatusMessage() => $_has(35);
   @$pb.TagNumber(37)
   void clearStatusMessage() => $_clearField(37);
 }

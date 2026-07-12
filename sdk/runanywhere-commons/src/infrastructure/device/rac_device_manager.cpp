@@ -81,10 +81,6 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks) {
-    return rac_device_manager_set_callbacks(callbacks);
-}
-
 void rac_device_manager_clear_callbacks(void) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);

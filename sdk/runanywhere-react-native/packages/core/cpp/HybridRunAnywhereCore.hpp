@@ -434,9 +434,6 @@ public:
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   toolValidateProto(const std::shared_ptr<ArrayBuffer> &requestBytes) override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolRunLoopProto(
-      const std::shared_ptr<ArrayBuffer> &requestBytes,
-      const ToolRunLoopExecuteCallback &onExecuteToolBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   toolRunLoopProtoWithHandle(
       const std::shared_ptr<ArrayBuffer> &requestBytes,

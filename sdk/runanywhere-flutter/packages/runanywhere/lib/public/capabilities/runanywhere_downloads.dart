@@ -3,17 +3,14 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
-
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
-import 'package:runanywhere/generated/model_types.pb.dart'
-    show ModelInfo;
+import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 // §15 type-discipline: `DownloadStage` + `DownloadProgress` from
@@ -71,9 +68,9 @@ class RunAnywhereDownloads {
 
     final models = await RunAnywhereModels.shared.available();
     final model = models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
+      (m) => m?.id == modelId,
+      orElse: () => null,
+    );
     if (model == null) {
       yield DownloadProgress(
         modelId: modelId,
@@ -83,16 +80,18 @@ class RunAnywhereDownloads {
       return;
     }
 
-    final planResult = await plan(DownloadPlanRequest(
-      modelId: modelId,
-      model: model,
-      resumeExisting: true,
-      // Commons self-heals oversize partials at plan time and verifies
-      // declared checksums during transfer (Swift parity).
-      validateExistingBytes: true,
-      verifyChecksums: model.checksumSha256.isNotEmpty,
-      allowMeteredNetwork: true,
-    ));
+    final planResult = await plan(
+      DownloadPlanRequest(
+        modelId: modelId,
+        model: model,
+        resumeExisting: true,
+        // Commons self-heals oversize partials at plan time and verifies
+        // declared checksums during transfer (Swift parity).
+        validateExistingBytes: true,
+        verifyChecksums: model.checksumSha256.isNotEmpty,
+        allowMeteredNetwork: true,
+      ),
+    );
     if (!planResult.canStart) {
       yield DownloadProgress(
         modelId: modelId,
@@ -106,19 +105,22 @@ class RunAnywhereDownloads {
 
     // Subscribe BEFORE starting so we don't lose early native callbacks.
     // Filter the process-wide stream down to this model id.
-    final progressStream = DartBridgeDownload.instance.progressStream
-        .where((p) => p.modelId == modelId);
+    final progressStream = DartBridgeDownload.instance.progressStream.where(
+      (p) => p.modelId == modelId,
+    );
 
-    final startResult = await startDownload(DownloadStartRequest(
-      modelId: modelId,
-      plan: planResult,
-      resume: planResult.canResume,
-      // Commons owns the completion registry mutation: the orchestrator's
-      // self-heal calls rac_model_registry_update_download_status, which
-      // also persists the durable .rac-manifest.binpb sidecar restored on
-      // the next cold launch.
-      updateRegistryOnCompletion: true,
-    ));
+    final startResult = await startDownload(
+      DownloadStartRequest(
+        modelId: modelId,
+        plan: planResult,
+        resume: planResult.canResume,
+        // Commons owns the completion registry mutation: the orchestrator's
+        // self-heal calls rac_model_registry_update_download_status, which
+        // also persists the durable .rac-manifest.binpb sidecar restored on
+        // the next cold launch.
+        updateRegistryOnCompletion: true,
+      ),
+    );
     if (!startResult.accepted) {
       yield DownloadProgress(
         modelId: modelId,
@@ -130,9 +132,7 @@ class RunAnywhereDownloads {
       return;
     }
 
-    logger.info(
-      'Download accepted for $modelId (task=${startResult.taskId})',
-    );
+    logger.info('Download accepted for $modelId (task=${startResult.taskId})');
 
     if (startResult.hasInitialProgress()) {
       yield startResult.initialProgress;
@@ -174,11 +174,13 @@ class RunAnywhereDownloads {
     } finally {
       if (!reachedTerminal) {
         try {
-          await DartBridgeDownload.instance.cancelProto(DownloadCancelRequest(
-            modelId: modelId,
-            taskId: startResult.taskId,
-            deletePartialBytes: false,
-          ));
+          await DartBridgeDownload.instance.cancelProto(
+            DownloadCancelRequest(
+              modelId: modelId,
+              taskId: startResult.taskId,
+              deletePartialBytes: false,
+            ),
+          );
           logger.info(
             'Download cancelled for $modelId (task=${startResult.taskId})',
           );
@@ -204,10 +206,12 @@ class RunAnywhereDownloads {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final result = await cancel(DownloadCancelRequest(
-      modelId: modelId,
-      taskId: _activeTaskIdsByModel[modelId] ?? '',
-    ));
+    final result = await cancel(
+      DownloadCancelRequest(
+        modelId: modelId,
+        taskId: _activeTaskIdsByModel[modelId] ?? '',
+      ),
+    );
     _activeTaskIdsByModel.remove(modelId);
     return result;
   }
@@ -247,13 +251,15 @@ class RunAnywhereDownloads {
       throw SDKException.notInitialized();
     }
 
-    return DartBridgeStorage.instance.deleteProto(StorageDeleteRequest(
-      modelIds: [modelId],
-      deleteFiles: true,
-      clearRegistryPaths: true,
-      unloadIfLoaded: true,
-      allowPlatformDelete: true,
-    ));
+    return DartBridgeStorage.instance.deleteProto(
+      StorageDeleteRequest(
+        modelIds: [modelId],
+        deleteFiles: true,
+        clearRegistryPaths: true,
+        unloadIfLoaded: true,
+        allowPlatformDelete: true,
+      ),
+    );
   }
 
   /// Delete every downloaded model while keeping registry entries available.
@@ -261,14 +267,16 @@ class RunAnywhereDownloads {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final storedModels = await list();
-    return DartBridgeStorage.instance.deleteProto(StorageDeleteRequest(
-      modelIds: storedModels.map((m) => m.modelId),
-      deleteFiles: true,
-      clearRegistryPaths: true,
-      unloadIfLoaded: true,
-      allowPlatformDelete: true,
-    ));
+    final metrics = await list();
+    return DartBridgeStorage.instance.deleteProto(
+      StorageDeleteRequest(
+        modelIds: metrics.map((m) => m.modelId),
+        deleteFiles: true,
+        clearRegistryPaths: true,
+        unloadIfLoaded: true,
+        allowPlatformDelete: true,
+      ),
+    );
   }
 
   /// Clear cached files managed by the native file manager.
@@ -289,7 +297,9 @@ class RunAnywhereDownloads {
   ]) async {
     if (!DartBridge.isInitialized) {
       return StorageInfoResult(
-          success: false, errorMessage: 'SDK not initialized');
+        success: false,
+        errorMessage: 'SDK not initialized',
+      );
     }
 
     return DartBridgeStorage.instance.infoProto(
@@ -308,44 +318,22 @@ class RunAnywhereDownloads {
   }
 
   /// List downloaded models with per-model on-disk size.
-  Future<List<StoredModel>> list() async {
+  Future<List<ModelStorageMetrics>> list() async {
     if (!DartBridge.isInitialized) {
       return [];
     }
 
     try {
-      final result = await getStorageInfoResult(StorageInfoRequest(
-        includeModels: true,
-      ));
-      if (result.hasInfo() && result.info.models.isNotEmpty) {
-        final downloaded =
-            await DartBridgeModelRegistry.instance.listDownloadedProtoModels();
-        final byId = {for (final model in downloaded) model.id: model};
-        return result.info.models.map((metric) {
-          final model = byId[metric.modelId];
-          return StoredModel(
-            modelId: metric.modelId,
-            name: model?.name ?? metric.modelId,
-            sizeBytes: metric.sizeOnDiskBytes,
-            localPath: model?.localPath ?? '',
-            downloadedAtMs: metric.lastUsedMs,
-          );
-        }).toList(growable: false);
-      }
-
-      final downloaded =
-          await DartBridgeModelRegistry.instance.listDownloadedProtoModels();
-      return downloaded
-          .map((model) => StoredModel(
-                modelId: model.id,
-                name: model.name,
-                sizeBytes: model.downloadSizeBytes,
-                localPath: model.localPath,
-              ))
-          .toList(growable: false);
+      final result = await getStorageInfoResult(
+        StorageInfoRequest(includeModels: true),
+      );
+      return result.hasInfo()
+          ? List<ModelStorageMetrics>.unmodifiable(result.info.models)
+          : const <ModelStorageMetrics>[];
     } catch (e) {
-      SDKLogger('RunAnywhere.Storage')
-          .error('Failed to get downloaded models: $e');
+      SDKLogger(
+        'RunAnywhere.Storage',
+      ).error('Failed to get downloaded models: $e');
       return [];
     }
   }

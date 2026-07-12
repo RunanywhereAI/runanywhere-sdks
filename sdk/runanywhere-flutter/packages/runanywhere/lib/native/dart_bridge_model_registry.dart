@@ -58,8 +58,10 @@ class DartBridgeModelRegistry {
       // Use the GLOBAL C++ model registry - same as Swift does
       // This is critical: C++ code (rac_get_model, rac_llm_component_load_model)
       // looks up models in the GLOBAL registry, not a separate instance
-      final getGlobalRegistryFn = lib.lookupFunction<Pointer<Void> Function(),
-          Pointer<Void> Function()>('rac_get_model_registry');
+      final getGlobalRegistryFn = lib
+          .lookupFunction<Pointer<Void> Function(), Pointer<Void> Function()>(
+            'rac_get_model_registry',
+          );
 
       final globalRegistry = getGlobalRegistryFn();
 
@@ -129,17 +131,11 @@ class DartBridgeModelRegistry {
       return false;
     }
 
-    final protoResult = _writeProtoModel(
+    return _writeProtoModel(
       model,
       RacNative.bindings.rac_model_registry_register_proto,
       'rac_model_registry_register_proto',
     );
-    if (protoResult != null) {
-      return protoResult;
-    }
-
-    _logger.debug('rac_model_registry_register_proto unavailable');
-    return false;
   }
 
   /// Update an existing generated proto ModelInfo in the C++ registry.
@@ -149,16 +145,11 @@ class DartBridgeModelRegistry {
       return false;
     }
 
-    final protoResult = _writeProtoModel(
+    return _writeProtoModel(
       model,
       RacNative.bindings.rac_model_registry_update_proto,
       'rac_model_registry_update_proto',
     );
-    if (protoResult != null) {
-      return protoResult;
-    }
-
-    return saveProtoModel(model);
   }
 
   /// Get all models from C++ registry as generated ModelInfo protos.
@@ -176,28 +167,20 @@ class DartBridgeModelRegistry {
   Future<List<model_pb.ModelInfo>> queryProtoModels(
     model_pb.ModelQuery query,
   ) async {
-    final protoModels = _queryProtoModels(query);
-    if (protoModels != null) return protoModels;
-
-    _logger.debug('rac_model_registry_query_proto unavailable');
-    return const [];
+    return _queryProtoModels(query) ?? const [];
   }
 
   /// List downloaded models via the registry proto-byte ABI.
   Future<List<model_pb.ModelInfo>> listDownloadedProtoModels() async {
-    final protoModels = _listDownloadedProtoModels();
-    if (protoModels != null) return protoModels;
-
-    _logger.debug('rac_model_registry_list_downloaded_proto unavailable');
-    return const [];
+    return _listDownloadedProtoModels() ?? const [];
   }
 
-  bool? _writeProtoModel(
+  bool _writeProtoModel(
     model_pb.ModelInfo model,
-    int Function(Pointer<Void>, Pointer<Uint8>, int)? fn,
+    int Function(Pointer<Void>, Pointer<Uint8>, int) fn,
     String symbol,
   ) {
-    if (_registryHandle == null || fn == null) return null;
+    if (_registryHandle == null) return false;
 
     final bytes = model.writeToBuffer();
     final bytesPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
@@ -207,16 +190,13 @@ class DartBridgeModelRegistry {
       }
 
       final result = fn(_registryHandle!, bytesPtr, bytes.length);
-      if (result == RacResultCode.errorFeatureNotAvailable) {
-        return null;
-      }
       if (result != RacResultCode.success) {
         _logger.debug('$symbol failed for ${model.id}: result=$result');
       }
       return result == RacResultCode.success;
     } catch (e) {
       _logger.debug('$symbol error: $e');
-      return null;
+      return false;
     } finally {
       calloc.free(bytesPtr);
     }
@@ -228,19 +208,23 @@ class DartBridgeModelRegistry {
     final bindings = RacNative.bindings;
     final getFn = bindings.rac_model_registry_get_proto;
     final freeFn = bindings.rac_model_registry_proto_free;
-    if (getFn == null || freeFn == null) return null;
 
     final modelIdPtr = modelId.toNativeUtf8();
     final outBytesPtr = calloc<Pointer<Uint8>>();
     final outSizePtr = calloc<Size>();
 
     try {
-      final result =
-          getFn(_registryHandle!, modelIdPtr, outBytesPtr, outSizePtr);
+      final result = getFn(
+        _registryHandle!,
+        modelIdPtr,
+        outBytesPtr,
+        outSizePtr,
+      );
       if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
         if (result != RacResultCode.errorNotFound) {
           _logger.debug(
-              'rac_model_registry_get_proto failed for $modelId: result=$result');
+            'rac_model_registry_get_proto failed for $modelId: result=$result',
+          );
         }
         return null;
       }
@@ -248,8 +232,9 @@ class DartBridgeModelRegistry {
       final bytes = outBytesPtr.value
           .asTypedList(outSizePtr.value)
           .toList(growable: false);
-      return DartBridgeModelFormat.shared
-          .applyInferredArtifact(model_pb.ModelInfo.fromBuffer(bytes));
+      return DartBridgeModelFormat.shared.applyInferredArtifact(
+        model_pb.ModelInfo.fromBuffer(bytes),
+      );
     } catch (e) {
       _logger.debug('rac_model_registry_get_proto error: $e');
       return null;
@@ -269,7 +254,6 @@ class DartBridgeModelRegistry {
     final bindings = RacNative.bindings;
     final listFn = bindings.rac_model_registry_list_proto;
     final freeFn = bindings.rac_model_registry_proto_free;
-    if (listFn == null || freeFn == null) return null;
 
     final outBytesPtr = calloc<Pointer<Uint8>>();
     final outSizePtr = calloc<Size>();
@@ -306,7 +290,6 @@ class DartBridgeModelRegistry {
     final bindings = RacNative.bindings;
     final queryFn = bindings.rac_model_registry_query_proto;
     final freeFn = bindings.rac_model_registry_proto_free;
-    if (queryFn == null || freeFn == null) return null;
 
     final bytes = query.writeToBuffer();
     final bytesPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
@@ -355,7 +338,6 @@ class DartBridgeModelRegistry {
     final bindings = RacNative.bindings;
     final listFn = bindings.rac_model_registry_list_downloaded_proto;
     final freeFn = bindings.rac_model_registry_proto_free;
-    if (listFn == null || freeFn == null) return null;
 
     final outBytesPtr = calloc<Pointer<Uint8>>();
     final outSizePtr = calloc<Size>();
@@ -364,7 +346,8 @@ class DartBridgeModelRegistry {
       final result = listFn(_registryHandle!, outBytesPtr, outSizePtr);
       if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
         _logger.debug(
-            'rac_model_registry_list_downloaded_proto failed: result=$result');
+          'rac_model_registry_list_downloaded_proto failed: result=$result',
+        );
         return null;
       }
 
@@ -396,10 +379,6 @@ class DartBridgeModelRegistry {
     model_pb.RegisterModelFromUrlRequest request,
   ) async {
     final fn = RacNative.bindings.rac_register_model_from_url_proto;
-    if (fn == null) {
-      _logger.debug('rac_register_model_from_url_proto unavailable');
-      return null;
-    }
     try {
       return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
         request: request,
@@ -423,10 +402,6 @@ class DartBridgeModelRegistry {
     model_pb.RegisterMultiFileModelRequest request,
   ) async {
     final fn = RacNative.bindings.rac_register_multi_file_model_proto;
-    if (fn == null) {
-      _logger.debug('rac_register_multi_file_model_proto unavailable');
-      return null;
-    }
     try {
       return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
         request: request,
@@ -457,15 +432,10 @@ class DartBridgeModelRegistry {
       );
     }
     final fn = RacNative.bindings.rac_model_registry_import_proto;
-    if (fn == null) {
-      return model_pb.ModelImportResult(
-        success: false,
-        errorMessage: 'rac_model_registry_import_proto unavailable',
-      );
-    }
     try {
       return DartBridgeProtoUtils.callRequestWithHandle<
-          model_pb.ModelImportResult>(
+        model_pb.ModelImportResult
+      >(
         handle: handle,
         request: request,
         invoke: fn,
@@ -489,31 +459,20 @@ class DartBridgeModelRegistry {
     }
 
     final bindings = RacNative.bindings;
-    if (bindings.rac_model_registry_get_proto != null &&
-        bindings.rac_model_registry_update_proto != null &&
-        bindings.rac_model_registry_proto_free != null) {
-      final model = _getProtoModel(modelId);
-      if (model != null) {
-        final updated = model.deepCopy();
-        if (localPath == null || localPath.isEmpty) {
-          updated.clearLocalPath();
-        } else {
-          updated.localPath = localPath;
-        }
-
-        final protoResult = _writeProtoModel(
-          updated,
-          bindings.rac_model_registry_update_proto,
-          'rac_model_registry_update_proto',
-        );
-        if (protoResult != null) {
-          return protoResult;
-        }
-      }
+    final model = _getProtoModel(modelId);
+    if (model == null) return false;
+    final updated = model.deepCopy();
+    if (localPath == null || localPath.isEmpty) {
+      updated.clearLocalPath();
+    } else {
+      updated.localPath = localPath;
     }
 
-    _logger.debug('registry download-status proto update unavailable');
-    return false;
+    return _writeProtoModel(
+      updated,
+      bindings.rac_model_registry_update_proto,
+      'rac_model_registry_update_proto',
+    );
   }
 
   /// Remove a model from registry
@@ -521,28 +480,21 @@ class DartBridgeModelRegistry {
     if (_registryHandle == null) return false;
 
     final removeProtoFn = RacNative.bindings.rac_model_registry_remove_proto;
-    if (removeProtoFn != null) {
-      final modelIdPtr = modelId.toNativeUtf8();
-      try {
-        final result = removeProtoFn(_registryHandle!, modelIdPtr);
-        if (result == RacResultCode.errorFeatureNotAvailable) {
-          // Fall back to the legacy struct/string remove ABI below.
-        } else {
-          if (result != RacResultCode.success) {
-            _logger.debug(
-                'rac_model_registry_remove_proto failed for $modelId: result=$result');
-          }
-          return result == RacResultCode.success;
-        }
-      } catch (e) {
-        _logger.debug('rac_model_registry_remove_proto error: $e');
-      } finally {
-        calloc.free(modelIdPtr);
+    final modelIdPtr = modelId.toNativeUtf8();
+    try {
+      final result = removeProtoFn(_registryHandle!, modelIdPtr);
+      if (result != RacResultCode.success) {
+        _logger.debug(
+          'rac_model_registry_remove_proto failed for $modelId: result=$result',
+        );
       }
+      return result == RacResultCode.success;
+    } catch (e) {
+      _logger.debug('rac_model_registry_remove_proto error: $e');
+      return false;
+    } finally {
+      calloc.free(modelIdPtr);
     }
-
-    _logger.debug('rac_model_registry_remove_proto unavailable');
-    return false;
   }
 
   /// Update last used timestamp
@@ -551,10 +503,11 @@ class DartBridgeModelRegistry {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final updateFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Utf8>),
-          int Function(Pointer<Void>,
-              Pointer<Utf8>)>('rac_model_registry_update_last_used');
+      final updateFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Void>, Pointer<Utf8>),
+            int Function(Pointer<Void>, Pointer<Utf8>)
+          >('rac_model_registry_update_last_used');
 
       final modelIdPtr = modelId.toNativeUtf8();
       try {
@@ -590,10 +543,6 @@ class DartBridgeModelRegistry {
     final handle = _registryHandle;
     if (handle == null) return false;
     final fn = RacNative.bindings.rac_model_registry_refresh_proto;
-    if (fn == null) {
-      _logger.debug('rac_model_registry_refresh_proto unavailable');
-      return false;
-    }
     try {
       // Full request mirrors Swift RunAnywhere+ModelRegistry.swift
       // refreshModelRegistry: rescanLocal is forwarded and
@@ -601,18 +550,19 @@ class DartBridgeModelRegistry {
       // carries downloaded-state reconciliation.
       final result =
           DartBridgeProtoUtils.callRequestWithHandle<
-              model_pb.ModelRegistryRefreshResult>(
-        handle: handle,
-        request: model_pb.ModelRegistryRefreshRequest(
-          rescanLocal: rescanLocal,
-          includeRemoteCatalog: includeRemoteCatalog,
-          pruneOrphans: pruneOrphans,
-          includeDownloadedState: true,
-        ),
-        invoke: fn,
-        decode: model_pb.ModelRegistryRefreshResult.fromBuffer,
-        symbol: 'rac_model_registry_refresh_proto',
-      );
+            model_pb.ModelRegistryRefreshResult
+          >(
+            handle: handle,
+            request: model_pb.ModelRegistryRefreshRequest(
+              rescanLocal: rescanLocal,
+              includeRemoteCatalog: includeRemoteCatalog,
+              pruneOrphans: pruneOrphans,
+              includeDownloadedState: true,
+            ),
+            invoke: fn,
+            decode: model_pb.ModelRegistryRefreshResult.fromBuffer,
+            symbol: 'rac_model_registry_refresh_proto',
+          );
       return result.success;
     } catch (e) {
       _logger.debug('rac_model_registry_refresh_proto error: $e');
@@ -641,18 +591,12 @@ class DartBridgeModelRegistry {
     }
 
     final discoverFn = RacNative.bindings.rac_model_registry_discover_proto;
-    if (discoverFn == null) {
-      _logger.debug('rac_model_registry_discover_proto unavailable');
-      return model_pb.ModelDiscoveryResult(
-        success: false,
-        errorMessage: 'rac_model_registry_discover_proto unavailable',
-      );
-    }
 
     final discoveryRequest = request ?? _defaultDiscoveryRequest();
     try {
       return DartBridgeProtoUtils.callRequestWithHandle<
-          model_pb.ModelDiscoveryResult>(
+        model_pb.ModelDiscoveryResult
+      >(
         handle: handle,
         request: discoveryRequest,
         invoke: discoverFn,
@@ -692,25 +636,16 @@ class DartBridgeModelFormat {
 
   static final DartBridgeModelFormat shared = DartBridgeModelFormat._();
 
-  static final _formatLogger = SDKLogger('DartBridge.ModelFormat');
-
-  /// URL → ModelFormat via commons. Returns
-  /// [model_pb.ModelFormat.MODEL_FORMAT_UNKNOWN] when the native proto ABI is
-  /// unavailable (e.g. pre-init, unit tests).
+  /// URL → ModelFormat via commons.
   model_pb.ModelFormat formatFromUrl(String url) {
     final fn = RacNative.bindings.rac_model_format_from_url_proto;
-    if (fn == null) {
-      _formatLogger.warning(
-          'rac_model_format_from_url_proto unavailable; returning UNKNOWN');
-      return model_pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
-    }
     final result =
         DartBridgeProtoUtils.callRequest<model_pb.ModelFormatFromUrlResult>(
-      request: model_pb.ModelFormatFromUrlRequest(url: url),
-      invoke: fn,
-      decode: model_pb.ModelFormatFromUrlResult.fromBuffer,
-      symbol: 'rac_model_format_from_url_proto',
-    );
+          request: model_pb.ModelFormatFromUrlRequest(url: url),
+          invoke: fn,
+          decode: model_pb.ModelFormatFromUrlResult.fromBuffer,
+          symbol: 'rac_model_format_from_url_proto',
+        );
     // Commons returns the archive-wrapper format for archive URLs; the inner
     // format (e.g. ONNX inside .tar.gz) is in result.innerFormat. For the
     // "what format is this model?" question the SDK asks, the inner format is
@@ -722,20 +657,15 @@ class DartBridgeModelFormat {
     return result.format;
   }
 
-  /// URL → ArtifactInferFromUrlResult via commons. Returns `null` when the
-  /// native proto ABI is unavailable.
-  model_pb.ArtifactInferFromUrlResult? inferArtifact(
+  /// URL → ArtifactInferFromUrlResult via commons.
+  model_pb.ArtifactInferFromUrlResult inferArtifact(
     String url, {
     String modelId = '',
   }) {
     final fn = RacNative.bindings.rac_artifact_infer_from_url_proto;
-    if (fn == null) {
-      _formatLogger.warning(
-          'rac_artifact_infer_from_url_proto unavailable; returning null');
-      return null;
-    }
     return DartBridgeProtoUtils.callRequest<
-        model_pb.ArtifactInferFromUrlResult>(
+      model_pb.ArtifactInferFromUrlResult
+    >(
       request: model_pb.ArtifactInferFromUrlRequest(url: url, modelId: modelId),
       invoke: fn,
       decode: model_pb.ArtifactInferFromUrlResult.fromBuffer,
@@ -745,9 +675,8 @@ class DartBridgeModelFormat {
 
   /// Populate the artifact-classification fields on a copy of [model] based on
   /// its `downloadUrl` via commons. Preserves caller-supplied artifact fields
-  /// when already set, handles the built-in short-circuit (DIRECTORY), and
-  /// falls back to [model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE]
-  /// when the native ABI is unavailable. Mirrors Kotlin
+  /// when already set and handles the built-in short-circuit (DIRECTORY).
+  /// Mirrors Kotlin
   /// `CppBridgeModelFormat.applyInferredArtifact`.
   model_pb.ModelInfo applyInferredArtifact(
     model_pb.ModelInfo model, [
@@ -773,20 +702,21 @@ class DartBridgeModelFormat {
     if (effectiveUrl.isEmpty) return _asSingleFile(model);
 
     final inference = inferArtifact(effectiveUrl, modelId: model.id);
-    if (inference == null) return _asSingleFile(model);
 
     final copy = model.deepCopy()..artifactType = inference.artifactType;
     switch (inference.artifactType) {
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
       case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
         copy.archive = model_pb.ArchiveArtifact(
-          type: inference.archiveType ==
+          type:
+              inference.archiveType ==
                   model_pb.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED
               ? (inference.artifactType ==
-                      model_pb
-                          .ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-                  ? model_pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ
-                  : model_pb.ArchiveType.ARCHIVE_TYPE_ZIP)
+                        model_pb
+                            .ModelArtifactType
+                            .MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+                    ? model_pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ
+                    : model_pb.ArchiveType.ARCHIVE_TYPE_ZIP)
               : inference.archiveType,
           structure: inference.archiveStructure,
         );

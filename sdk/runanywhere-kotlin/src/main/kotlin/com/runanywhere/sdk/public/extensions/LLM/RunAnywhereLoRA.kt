@@ -274,7 +274,6 @@ fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
         download_url = url,
         download_size_bytes = size_bytes,
         supports_lora = false,
-        description = description,
         source = ModelSource.MODEL_SOURCE_REMOTE,
         created_at_unix_ms = timestampUnixMs,
         updated_at_unix_ms = timestampUnixMs,

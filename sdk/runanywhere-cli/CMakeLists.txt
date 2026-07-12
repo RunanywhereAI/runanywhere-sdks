@@ -66,7 +66,12 @@ target_compile_features(rcli_core PUBLIC cxx_std_20)
 
 # Version string: single source of truth is sdk/runanywhere-commons/VERSION,
 # already read into PROJECT_VERSION by the root CMakeLists.
-target_compile_definitions(rcli_core PUBLIC RCLI_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(rcli_core PUBLIC
+    RCLI_VERSION="${PROJECT_VERSION}"
+    # CLI11's current C++20 default still selects std::wstring_convert /
+    # <codecvt>, which the standard library deprecated in C++17. Use CLI11's
+    # maintained locale-conversion path instead.
+    CLI11_HAS_CODECVT=0)
 
 # Proto-byte ABI access (DownloadProgress, ModelInfo, Register* requests).
 # Same internal-consumer pattern as commons tests' rac_test_define_have_protobuf:
@@ -78,6 +83,12 @@ if(NOT RAC_PROTOBUF_RUNTIME_ENABLED
                         "for the model-lifecycle proto ABI")
 endif()
 target_compile_definitions(rcli_core PUBLIC RAC_HAVE_PROTOBUF=1)
+if(RAC_PROTOBUF_NAMESPACE_ISOLATED)
+    # Generated messages and the statically bundled runtime must use the same
+    # private namespace token rewrite. rac_commons keeps this definition
+    # private, so attach it explicitly to the CLI and its test consumers.
+    target_compile_definitions(rcli_core PUBLIC google=runanywhere_internal)
+endif()
 target_include_directories(rcli_core PUBLIC
     ${_RCLI_COMMONS_DIR}/src/generated/proto
     ${_RCLI_COMMONS_DIR}/src/generated

@@ -17,10 +17,8 @@
  * Shared types and helpers (`ModalityProtoModule`, `ProtoEventHandler`,
  * `streamCallback`, etc.) live in `./ProtoAdapterTypes.ts`.
  *
- * The {@link ModalityProtoAdapter} aggregator class retains its default-module
- * lifecycle (`setDefaultModule` / `clearDefaultModule` / `tryDefault`) and
- * its per-modality factory methods so callers that prefer a single entry
- * point keep working unchanged.
+ * The {@link ModalityProtoAdapter} aggregator class owns capability-aware
+ * module registration plus its per-modality factory methods.
  */
 
 import { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
@@ -79,24 +77,10 @@ export type {
 
 export class ModalityProtoAdapter {
   /**
-   * @deprecated Prefer `registerModuleCapabilities([...], mod)` so each
-   * backend registers only the modalities it actually serves. This shim
-   * registers `module` for EVERY modality slot, replicating the pre-P4
-   * monolithic behavior — useful only when a single artifact really does
-   * own every modality (legacy tests, embedded apps).
-   */
-  static setDefaultModule(module: ModalityProtoModule): void {
-    adapterState.defaultModule = module;
-    for (const cap of MODALITY_CAPABILITIES) {
-      adapterState.modalitySlots[cap as ModalityCapabilityName] = module;
-    }
-  }
-
-  /**
    * Push `module` into each capability slot in `capabilities` that
    * corresponds to a modality. Non-modality entries (e.g. `'commons'`)
-   * are filtered out. Also updates the legacy aggregate `defaultModule`
-   * pointer so `ModalityProtoAdapter.tryDefault()` still returns a useful
+   * are filtered out. Also updates the aggregate `defaultModule`
+   * pointer so `ModalityProtoAdapter.tryDefault()` returns a useful
    * module — preferring `'llm'`-owning then the first claimed slot.
    *
    * Called by `registerWasmModule(...)` in `EmscriptenModule.ts`.
@@ -110,7 +94,7 @@ export class ModalityProtoAdapter {
         adapterState.modalitySlots[cap as ModalityCapabilityName] = module;
       }
     }
-    // Keep the legacy `defaultModule` non-null so `tryDefault()` returns
+    // Keep the aggregate `defaultModule` non-null so `tryDefault()` returns
     // something usable — prefer the LLM-owning module (the historical
     // anchor) then fall back to any non-null slot.
     adapterState.defaultModule =

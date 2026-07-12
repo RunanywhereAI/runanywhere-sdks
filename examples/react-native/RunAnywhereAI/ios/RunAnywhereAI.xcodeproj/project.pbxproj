@@ -12,7 +12,6 @@
 		131BD3E69C56FB3D2407D933 /* libPods-RunAnywhereAI-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 22B57BB26B1AA1AAAD263C4E /* libPods-RunAnywhereAI-RunAnywhereAITests.a */; };
 		13B07FBC1A68108700A75B9A /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		2337350580B24B47AB311C71 /* RunAnywhereMLX in Frameworks */ = {isa = PBXBuildFile; productRef = 0E4353DAE3384B84B32B72FE /* RunAnywhereMLX */; };
 		2E85DD22A18E406887A7C196 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
 		31FE98DC2C9C407FB812B3C9 /* Figtree-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C93356376CC9457C9AC44F86 /* Figtree-Italic.ttf */; };
 		36293524965A46A4B5A96AA5 /* Figtree.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8BF95992387943D3A4344FFE /* Figtree.ttf */; };
@@ -74,7 +73,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2337350580B24B47AB311C71 /* RunAnywhereMLX in Frameworks */,
 				5B7EAD8CABC3ABC09C3EBCB0 /* libPods-RunAnywhereAI.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -221,7 +219,6 @@
 			);
 			name = RunAnywhereAI;
 			packageProductDependencies = (
-				0E4353DAE3384B84B32B72FE /* RunAnywhereMLX */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 13B07F961A680F5B00A75B9A /* RunAnywhereAI.app */;
@@ -254,7 +251,6 @@
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
 			packageReferences = (
-				3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */,
 			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
@@ -464,7 +460,7 @@
 					"$(inherited)",
 				);
 				INFOPLIST_FILE = RunAnywhereAITests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -489,7 +485,7 @@
 				COPY_PHASE_STRIP = NO;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				INFOPLIST_FILE = RunAnywhereAITests/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -531,7 +527,7 @@
 				PRODUCT_NAME = RunAnywhereAI;
 				SWIFT_OBJC_BRIDGING_HEADER = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -559,7 +555,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.runanywhereai;
 				PRODUCT_NAME = RunAnywhereAI;
 				SWIFT_OBJC_BRIDGING_HEADER = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h";
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
@@ -615,7 +611,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD = "";
 				LDPLUSPLUS = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -698,7 +694,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 				LD = "";
 				LDPLUSPLUS = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -768,20 +764,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../..;
-		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		0E4353DAE3384B84B32B72FE /* RunAnywhereMLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 3ED127FFF6CD4917AD48F6A2 /* XCLocalSwiftPackageReference ".." */;
-			productName = RunAnywhereMLX;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
 }

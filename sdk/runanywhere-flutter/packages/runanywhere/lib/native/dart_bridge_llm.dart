@@ -169,9 +169,7 @@ class DartBridgeLLM {
   /// the Flutter plugin exports a native-port helper that copies proto bytes
   /// inside the C callback and posts owned `Uint8List` messages to the main
   /// isolate. That path is safe for MLX/Swift async and for native backends
-  /// that invoke stream callbacks from worker threads. Older or unsupported
-  /// binaries fall back to the worker-owned `NativeCallable.isolateLocal` path,
-  /// which is valid only for same-thread backend callbacks.
+  /// that invoke stream callbacks from worker threads.
   ///
   /// Cancellation: `onCancel` → `rac_llm_cancel_proto` sets the lifecycle
   /// cancel flag checked per token; the engine aborts, the worker's blocking
@@ -185,6 +183,14 @@ class DartBridgeLLM {
     if (RacNative.bindings.rac_llm_generate_stream_proto == null) {
       return Stream<LLMStreamEvent>.error(
         UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
+      );
+    }
+    if (RacNative.bindings.ra_flutter_llm_generate_stream_proto_native_port ==
+        null) {
+      return Stream<LLMStreamEvent>.error(
+        UnsupportedError(
+          'ra_flutter_llm_generate_stream_proto_native_port is unavailable',
+        ),
       );
     }
 
@@ -238,13 +244,10 @@ class DartBridgeLLM {
     });
 
     final requestBytes = request.writeToBuffer();
-    final sendPort = receivePort.sendPort;
-    final useNativePortWorker =
-        RacNative.bindings.ra_flutter_llm_generate_stream_proto_native_port !=
-        null;
-    final worker = useNativePortWorker
-        ? _runLlmStreamNativePortWorker(requestBytes, sendPort.nativePort)
-        : _runLlmStreamWorker(requestBytes, sendPort);
+    final worker = _runLlmStreamNativePortWorker(
+      requestBytes,
+      receivePort.sendPort.nativePort,
+    );
 
     unawaited(
       worker.catchError((Object e, StackTrace st) {
@@ -321,15 +324,6 @@ class DartBridgeLLM {
 // this path, fix it in the platform adapter/native bridge layer before moving
 // the blocking call back onto the main isolate.
 
-/// Runs [_llmStreamWorker] in a worker isolate. Hoisted to top level so the
-/// `Isolate.run` closure captures ONLY its two sendable parameters
-/// (`Uint8List` + `SendPort`). Inlined in [DartBridgeLLM.generateStreamProto],
-/// the closure captured that method's whole local context — including the
-/// unsendable `ReceivePort`/`StreamController` — which fails the isolate spawn
-/// with "object is unsendable".
-Future<int> _runLlmStreamWorker(Uint8List requestBytes, SendPort port) =>
-    Isolate.run(() => _llmStreamWorker(requestBytes, port));
-
 /// Runs the Flutter native-port stream helper in a worker isolate. The helper
 /// itself posts copied token bytes to [nativePort] and posts the return code as
 /// the final sentinel.
@@ -356,52 +350,6 @@ int _llmStreamNativePortWorker(Uint8List requestBytes, int nativePort) {
       NativeApi.postCObject,
     );
   } finally {
-    calloc.free(requestPtr);
-  }
-}
-
-/// Blocking body of [DartBridgeLLM.generateStreamProto]. Runs the single-call
-/// streaming ABI on the worker isolate; the worker-owned `isolateLocal`
-/// callback fires synchronously per token (commons requires a synchronous
-/// same-thread callback because it passes a pointer into a `thread_local`
-/// scratch buffer), copies the bytes eagerly, and forwards the copy to the
-/// main isolate. The rc is sent LAST on the same port so it is FIFO-ordered
-/// after every token.
-int _llmStreamWorker(Uint8List requestBytes, SendPort port) {
-  final bindings = RacNative.bindings;
-  final fn = bindings.rac_llm_generate_stream_proto;
-  if (fn == null) {
-    throw UnsupportedError('rac_llm_generate_stream_proto is unavailable');
-  }
-
-  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
-  NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
-  try {
-    callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal((
-      Pointer<Uint8> bytesPtr,
-      int bytesLen,
-      Pointer<Void> _,
-    ) {
-      if (bytesPtr == nullptr || bytesLen <= 0) return;
-      // Copy INSIDE the synchronous callback — commons reuses the scratch
-      // buffer the moment we return. The copy is what crosses isolates.
-      port.send(Uint8List.fromList(bytesPtr.asTypedList(bytesLen)));
-    });
-
-    final rc = fn(
-      requestPtr,
-      requestBytes.length,
-      callback.nativeFunction,
-      nullptr,
-    );
-    port.send(rc);
-    return rc;
-  } finally {
-    // Defensive quiesce (no-op for the single-call ABI today), then close the
-    // callable on its owning isolate AFTER the blocking call has returned —
-    // no emission can occur past this point.
-    bindings.rac_llm_proto_quiesce?.call();
-    callback?.close();
     calloc.free(requestPtr);
   }
 }

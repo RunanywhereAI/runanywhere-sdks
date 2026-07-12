@@ -2055,6 +2055,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/core@workspace:packages/core"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     "@types/jest": ^29.5.12
     "@types/react": ~19.2.14
@@ -2087,6 +2088,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:packages/llamacpp"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     eslint: ^9.39.4
     nitrogen: ^0.34.1
@@ -2100,24 +2102,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/mlx@workspace:packages/mlx":
-  version: 0.0.0-use.local
-  resolution: "@runanywhere/mlx@workspace:packages/mlx"
-  dependencies:
-    eslint: ^9.39.4
-    typescript: ^5.9.3
-  peerDependencies:
-    "@runanywhere/core": ">=0.19.15"
-    react: ">=19.0.0"
-    react-native: ">=0.83.1"
-    react-native-nitro-modules: ^0.33.9
-  languageName: unknown
-  linkType: soft
-
 "@runanywhere/onnx@workspace:packages/onnx":
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:packages/onnx"
   dependencies:
+    "@bufbuild/protobuf": ^2.12.1
     "@runanywhere/proto-ts": "workspace:*"
     eslint: ^9.39.4
     nitrogen: ^0.34.1

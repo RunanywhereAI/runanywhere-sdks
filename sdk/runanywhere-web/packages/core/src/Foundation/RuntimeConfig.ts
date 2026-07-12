@@ -46,7 +46,6 @@ export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
  *   - `'main'`   — force the main-thread path even when a Worker factory
  *                  is registered. Useful for debugging perf regressions.
  *
- * See `docs/STREAM_DELIVERY_DESIGN.md` for the architectural framing.
  */
 export type StreamingMode = 'auto' | 'worker' | 'main';
 

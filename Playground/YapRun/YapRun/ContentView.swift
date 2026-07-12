@@ -33,7 +33,7 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 40)
             }
-            .background(AppColors.backgroundPrimaryDark.ignoresSafeArea())
+            .background(AppColors.backgroundPrimary.ignoresSafeArea())
             .navigationBarHidden(true)
             .task { await viewModel.refresh() }
             .refreshable { await viewModel.refresh() }

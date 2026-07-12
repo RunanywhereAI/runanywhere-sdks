@@ -463,7 +463,6 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     }
 
     model.set_supports_lora(false);
-    model.set_description("");
     model.set_source(source);
     const int64_t now_ms = now_unix_ms();
     model.set_created_at_unix_ms(now_ms);

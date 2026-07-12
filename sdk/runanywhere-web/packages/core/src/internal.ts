@@ -1,7 +1,7 @@
 /**
  * Internal Web SDK entrypoint.
  *
- * Legacy harnesses use this broad surface for low-level diagnostics. Backend
+ * SDK harnesses use this broad surface for low-level diagnostics. Backend
  * packages use the narrower `@runanywhere/web/backend` contract; app code
  * should import from `@runanywhere/web`.
  */
@@ -10,7 +10,6 @@ export {
   clearRunanywhereModule,
   getModuleForCapability,
   registerWasmModule,
-  setRunanywhereModule,
   tryRunanywhereModule,
   unregisterWasmModule,
 } from './runtime/EmscriptenModule.js';
@@ -107,7 +106,7 @@ export {
 export { EventBus } from './Foundation/EventBus.js';
 export type { EventListener, SDKEventEnvelope, Unsubscribe } from './Foundation/EventBus.js';
 
-export { HTTPAdapter, DownloadStatus, HTTP_FETCH_CARVE_OUTS } from './Adapters/HTTPAdapter.js';
+export { HTTPAdapter, HTTP_FETCH_CARVE_OUTS } from './Adapters/HTTPAdapter.js';
 export type {
   ChunkHandler,
   DownloadProgressHandler,
@@ -117,8 +116,6 @@ export type {
   HTTPRequest,
   HTTPResponse,
 } from './Adapters/HTTPAdapter.js';
-export { FetchHttpTransport } from './Adapters/FetchHttpTransport.js';
-export type { FetchHttpTransportModule } from './Adapters/FetchHttpTransport.js';
 
 export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter.js';
 export type {

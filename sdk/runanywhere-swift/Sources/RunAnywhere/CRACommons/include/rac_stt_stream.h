@@ -25,8 +25,8 @@
  * an arena-backed proto message across events.
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `SDK-facing default`.
- * The legacy struct callback path remains for backend smoke tests; SDKs
- * MUST migrate to this proto-byte stream ABI.
+ * `rac_stt_stream_callback_t` remains the backend-facing engine contract;
+ * SDK consumers use this proto-byte stream ABI.
  */
 
 #ifndef RAC_FEATURES_STT_RAC_STT_STREAM_H

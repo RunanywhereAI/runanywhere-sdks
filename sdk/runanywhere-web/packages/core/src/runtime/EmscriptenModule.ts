@@ -196,12 +196,9 @@ export interface EmscriptenRunanywhereModule {
   ): number;
   _rac_voice_agent_component_destroy_proto?(handle: number): number;
 
-  _rac_vlm_process_proto?(
-    handle: number,
-    imageBytes: number,
-    imageSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+  _rac_vlm_generate_proto?(
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   /** Typed stream ABI: serialized VLMGenerationRequest in, VLMStreamEvent
@@ -212,7 +209,7 @@ export interface EmscriptenRunanywhereModule {
     callbackPtr: number,
     userData: number,
   ): number;
-  _rac_vlm_cancel_proto?(handle: number): number;
+  _rac_vlm_cancel_lifecycle_proto?(outEvent: number): number;
 
   _rac_embeddings_embed_batch_proto?(
     handle: number,
@@ -362,19 +359,20 @@ export interface EmscriptenRunanywhereModule {
    * TypeScript executors returning `Promise<ToolResult>` can be awaited
    * between commons-driven generate -> parse -> validate cycles.
    *
-   * `_rac_tool_calling_session_create_proto(requestBytes, requestSize, callbackPtr, userData, outSessionHandle)`:
+   * `_rac_tool_calling_session_create_proto(requestBytes, requestSize, eventCallbackPtr, eventUserData, handleCallbackPtr, handleUserData)`:
    *   callbackPtr is a function-table index obtained from `addFunction(fn, 'viii')`
    *   whose JS implementation receives `(eventBytesPtr, eventSize, userData)` and
-   *   decodes a serialized `runanywhere.v1.ToolCallingSessionEvent`. Out-handle is
-   *   written via the proto-buffer-or-uint64 contract (we pass a malloc'd 8-byte
-   *   slot and read low/high 32-bit halves to reconstruct the uint64).
+   *   decodes a serialized `runanywhere.v1.ToolCallingSessionEvent`.
+   *   handleCallbackPtr uses `addFunction(fn, 'vji')`; commons invokes it
+   *   synchronously with the uint64 session handle before initial generation.
    */
   _rac_tool_calling_session_create_proto?(
     requestBytes: number,
     requestSize: number,
     callbackPtr: number,
     userData: number,
-    outSessionHandlePtr: number,
+    handleCallbackPtr: number,
+    handleUserData: number,
   ): number;
   /**
    * `_rac_tool_calling_session_step_with_result_proto(requestBytes, requestSize)`:
@@ -473,6 +471,7 @@ export interface EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_sdk_retry_http_proto?(outResult: number): number;
   _rac_wasm_set_client_info?(
     sdkBinding: number,
     appIdentifier: number,
@@ -527,75 +526,66 @@ export interface EmscriptenRunanywhereModule {
   _rac_solution_destroy(handle: number): void;
 
   // -----------------------------------------------------------------------------
-  // HTTP transport registry (JS-side fetch adapter)
-  // -----------------------------------------------------------------------------
-  // The JS layer installs function-table indices (from `addFunction`) for the
-  // transport vtable so HTTP requests route through `window.fetch()` directly
-  // instead of bouncing through `emscripten_fetch`. See
-  // `sdk/runanywhere-web/packages/core/src/Adapters/FetchHttpTransport.ts`
-  // for the scaffold and `sdk/runanywhere-commons/src/infrastructure/http/
-  // rac_http_client_emscripten.cpp` for the C side.
-  //
-  // Pass 0 for any slot to fall back to the emscripten_fetch adapter for
-  // that op; all-zero unregisters and restores the libcurl/emscripten_fetch
-  // default. Optional at type level: older WASM builds without the JS-side
-  // export will simply be missing this symbol — callers check with
-  // `typeof mod._rac_http_transport_register_from_js === 'function'`.
-  _rac_http_transport_register_from_js?(
-    requestSendPtr: number,
-    requestStreamPtr: number,
-    requestResumePtr: number,
-  ): number;
-
-  // -----------------------------------------------------------------------------
   // Model registry proto-byte ABI
   // -----------------------------------------------------------------------------
-  // Optional because older Web WASM builds may only export the legacy struct
-  // registry functions. ModelRegistryAdapter checks presence before calling.
-  _rac_get_model_registry?(): number;
-  _rac_model_registry_register_proto?(
+  // These are mandatory for every current RunAnywhere WASM artifact.
+  _rac_get_model_registry(): number;
+  _rac_model_registry_refresh_proto(
+    handle: number,
+    requestBytes: number,
+    requestSize: number,
+    protoBytesOut: number,
+    protoSizeOut: number,
+  ): number;
+  _rac_model_registry_register_proto(
     handle: number,
     protoBytes: number,
     protoSize: number,
   ): number;
-  _rac_model_registry_update_proto?(
+  _rac_model_registry_update_proto(
     handle: number,
     protoBytes: number,
     protoSize: number,
   ): number;
-  _rac_model_registry_update_download_status?(
+  _rac_model_registry_update_download_status(
     handle: number,
     modelId: number,
     localPath: number,
   ): number;
-  _rac_model_registry_get_proto?(
+  _rac_model_registry_get_proto(
     handle: number,
     modelId: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_list_proto?(
+  _rac_model_registry_list_proto(
     handle: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_query_proto?(
+  _rac_model_registry_query_proto(
     handle: number,
     queryProtoBytes: number,
     queryProtoSize: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_list_downloaded_proto?(
+  _rac_model_registry_list_downloaded_proto(
     handle: number,
     protoBytesOut: number,
     protoSizeOut: number,
   ): number;
-  _rac_model_registry_remove_proto?(
+  _rac_model_registry_remove_proto(
     handle: number,
     modelId: number,
   ): number;
-  _rac_model_registry_proto_free?(protoBytes: number): void;
+  _rac_model_registry_import_proto(
+    handle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_model_registry_proto_free(protoBytes: number): void;
 
   // -----------------------------------------------------------------------------
   // Model lifecycle proto-byte ABI
@@ -833,27 +823,6 @@ export type WasmCapability =
   | 'lora'              // LoRA registry/apply/state
   | 'voice-agent';      // Voice-agent component (lives in same module as STT/TTS/VAD)
 
-/**
- * Complete set of capabilities — used as the default for the legacy
- * `setRunanywhereModule()` alias, which registers a single module against
- * everything (matches the original monolithic behavior).
- */
-const ALL_CAPABILITIES: readonly WasmCapability[] = [
-  'commons',
-  'llm',
-  'vlm',
-  'stt',
-  'tts',
-  'vad',
-  'embedding',
-  'rag',
-  'diffusion',
-  'structured-output',
-  'tool-calling',
-  'lora',
-  'voice-agent',
-];
-
 /** Capability → module map. Backends register; facade looks up. */
 const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>();
 
@@ -866,6 +835,37 @@ const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>
  */
 const _moduleByFramework = new Map<string, EmscriptenRunanywhereModule>();
 
+const BACKEND_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
+  'llm',
+  'vlm',
+  'stt',
+  'tts',
+  'vad',
+  'embedding',
+  'rag',
+  'diffusion',
+];
+
+function reelectLifecycleAndRegistryPrimary(): void {
+  let primary: EmscriptenRunanywhereModule | null = null;
+  for (const capability of BACKEND_CAPABILITY_PRECEDENCE) {
+    const candidate = _moduleByCapability.get(capability);
+    if (candidate) {
+      primary = candidate;
+      break;
+    }
+  }
+  primary ??= _moduleByCapability.get('commons') ?? null;
+
+  if (primary) {
+    ModelLifecycleAdapter.setDefaultModule(primary);
+    ModelRegistryAdapter.setDefaultModule(primary);
+  } else {
+    ModelLifecycleAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+  }
+}
+
 /** Look up which WASM owns the registered plugin for a model framework. */
 export function getModuleForFramework(framework: string): EmscriptenRunanywhereModule | null {
   if (!framework) return null;
@@ -875,7 +875,7 @@ export function getModuleForFramework(framework: string): EmscriptenRunanywhereM
 /**
  * Register a module against one or more capabilities. Replaces any prior
  * owner of those capabilities (last-writer-wins per capability). Also
- * forwards the module to the legacy `setDefaultModule()` adapter slots,
+ * forwards the module to the applicable adapter slots,
  * keyed by which capabilities are claimed — so e.g. an LLM-only bridge no
  * longer overwrites the commons-installed `ModelRegistryAdapter`.
  *
@@ -919,10 +919,7 @@ export function registerWasmModule(
   // an empty registry. When any backend bridge (LlamaCPP, ONNX) registers,
   // repoint BOTH adapters at THAT module. Last-writer-wins per
   // registration.
-  const backendCapabilities: readonly WasmCapability[] = [
-    'llm', 'vlm', 'stt', 'tts', 'vad', 'embedding', 'rag', 'diffusion',
-  ];
-  if (backendCapabilities.some((cap) => capabilities.includes(cap))) {
+  if (BACKEND_CAPABILITY_PRECEDENCE.some((cap) => capabilities.includes(cap))) {
     ModelLifecycleAdapter.setDefaultModule(mod);
     ModelRegistryAdapter.setDefaultModule(mod);
   }
@@ -952,17 +949,17 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
   }
   // Drop THIS module from the ModelRegistryAdapter broadcast set
   // regardless of which capability it owned — the broadcast list mirrors
-  // every WASM that has ever called `setDefaultModule`. If commons was
-  // released we also clear the other commons-level adapters (Download,
-  // ModelLifecycle, SDKEventStream) because they still track a
-  // single primary slot. Re-registration by another module reinstalls them.
+  // every WASM that has registered. If commons was
+  // released we also clear the commons-only adapters. Lifecycle and registry
+  // primaries are re-elected below because a sibling backend or commons module
+  // may still be alive.
   ModelRegistryAdapter.unregisterModule(mod);
   if (releasedCapabilities.includes('commons')) {
     DownloadAdapter.clearDefaultModule();
-    ModelLifecycleAdapter.clearDefaultModule();
     SDKEventStreamAdapter.clearDefaultModule();
   }
   ModalityProtoAdapter.unregisterModuleCapabilities(releasedCapabilities, mod);
+  reelectLifecycleAndRegistryPrimary();
 }
 
 /**
@@ -993,17 +990,6 @@ export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
     unique.add(mod);
   }
   return Array.from(unique);
-}
-
-/**
- * @deprecated Prefer `registerWasmModule(capabilities, mod)` — calling
- * `setRunanywhereModule` claims every capability for the supplied module,
- * which collides with sibling backends that register their own narrower
- * capability sets. Kept for backwards compatibility with external apps that
- * used this API before the per-capability registry landed.
- */
-export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
-  registerWasmModule(ALL_CAPABILITIES, mod);
 }
 
 /** Clear the entire registry during full SDK shutdown. */
@@ -1087,8 +1073,7 @@ export const runanywhereModule: EmscriptenRunanywhereModule = new Proxy(
       if (mod == null) {
         throw new Error(
           `RunAnywhere WASM module is not initialized. Call ` +
-            `registerWasmModule(capabilities, mod) (or the legacy ` +
-            `setRunanywhereModule(mod)) during app init before touching ` +
+            `registerWasmModule(capabilities, mod) during app init before touching ` +
             `any RunAnywhere.* API that reaches into C++. Property accessed: ${String(prop)}`,
         );
       }

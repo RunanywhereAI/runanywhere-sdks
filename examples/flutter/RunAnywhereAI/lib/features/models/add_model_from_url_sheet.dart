@@ -39,7 +39,8 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
           .where(
             (f) =>
                 f !=
-                    sdk.InferenceFramework
+                    sdk
+                        .InferenceFramework
                         .INFERENCE_FRAMEWORK_FOUNDATION_MODELS &&
                 f != sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS &&
                 f != sdk.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
@@ -79,8 +80,9 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
 
     try {
       final sizeText = _sizeController.text.trim();
-      final memoryRequirement =
-          sizeText.isNotEmpty ? int.tryParse(sizeText) : null;
+      final memoryRequirement = sizeText.isNotEmpty
+          ? int.tryParse(sizeText)
+          : null;
 
       final model = await sdk.RunAnywhere.models.register(
         name: name,
@@ -90,7 +92,8 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
         supportsThinking: _supportsThinking,
       );
 
-      await ModelListViewModel.shared.loadModels();
+      await ModelListViewModel.shared.loadModelsFromRegistry();
+      await ModelListViewModel.shared.loadAvailableFrameworks();
 
       widget.onModelAdded(model);
       if (mounted) Navigator.pop(context);
@@ -121,103 +124,88 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSection(
-                    context,
-                    'Model Information',
-                    [
-                      TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Model Name',
-                          border: OutlineInputBorder(),
-                        ),
-                        textCapitalization: TextCapitalization.none,
-                        autocorrect: false,
-                        enabled: !_isAdding,
+                  _buildSection(context, 'Model Information', [
+                    TextField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Model Name',
+                        border: OutlineInputBorder(),
                       ),
-                      const SizedBox(height: AppSpacing.mediumLarge),
-                      TextField(
-                        controller: _urlController,
-                        decoration: const InputDecoration(
-                          labelText: 'Download URL',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.url,
-                        textCapitalization: TextCapitalization.none,
-                        autocorrect: false,
-                        enabled: !_isAdding,
+                      textCapitalization: TextCapitalization.none,
+                      autocorrect: false,
+                      enabled: !_isAdding,
+                    ),
+                    const SizedBox(height: AppSpacing.mediumLarge),
+                    TextField(
+                      controller: _urlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Download URL',
+                        border: OutlineInputBorder(),
                       ),
-                    ],
-                  ),
+                      keyboardType: TextInputType.url,
+                      textCapitalization: TextCapitalization.none,
+                      autocorrect: false,
+                      enabled: !_isAdding,
+                    ),
+                  ]),
                   const SizedBox(height: AppSpacing.xLarge),
-                  _buildSection(
-                    context,
-                    'Framework',
-                    [
-                      DropdownButtonFormField<LLMFramework>(
-                        initialValue: _selectedFramework,
-                        decoration: const InputDecoration(
-                          labelText: 'Target Framework',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _availableFrameworks
-                            .map(
-                              (f) => DropdownMenuItem(
-                                value: f,
-                                child: Text(f.displayName),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: _isAdding
-                            ? null
-                            : (f) {
-                                if (f != null) {
-                                  setState(() => _selectedFramework = f);
-                                }
-                              },
+                  _buildSection(context, 'Framework', [
+                    DropdownButtonFormField<LLMFramework>(
+                      initialValue: _selectedFramework,
+                      decoration: const InputDecoration(
+                        labelText: 'Target Framework',
+                        border: OutlineInputBorder(),
                       ),
-                    ],
-                  ),
+                      items: _availableFrameworks
+                          .map(
+                            (f) => DropdownMenuItem(
+                              value: f,
+                              child: Text(f.displayName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _isAdding
+                          ? null
+                          : (f) {
+                              if (f != null) {
+                                setState(() => _selectedFramework = f);
+                              }
+                            },
+                    ),
+                  ]),
                   const SizedBox(height: AppSpacing.xLarge),
-                  _buildSection(
-                    context,
-                    'Thinking Support',
-                    [
-                      SwitchListTile(
-                        title: Text(
-                          'Model Supports Thinking',
-                          style: AppTypography.body(context),
-                        ),
-                        value: _supportsThinking,
-                        onChanged: _isAdding
-                            ? null
-                            : (v) => setState(() => _supportsThinking = v),
-                        contentPadding: EdgeInsets.zero,
+                  _buildSection(context, 'Thinking Support', [
+                    SwitchListTile(
+                      title: Text(
+                        'Model Supports Thinking',
+                        style: AppTypography.body(context),
                       ),
-                    ],
-                  ),
+                      value: _supportsThinking,
+                      onChanged: _isAdding
+                          ? null
+                          : (v) => setState(() => _supportsThinking = v),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ]),
                   const SizedBox(height: AppSpacing.xLarge),
-                  _buildSection(
-                    context,
-                    'Advanced (Optional)',
-                    [
-                      TextField(
-                        controller: _sizeController,
-                        decoration: const InputDecoration(
-                          labelText: 'Estimated Size (bytes)',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        enabled: !_isAdding,
+                  _buildSection(context, 'Advanced (Optional)', [
+                    TextField(
+                      controller: _sizeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Estimated Size (bytes)',
+                        border: OutlineInputBorder(),
                       ),
-                    ],
-                  ),
+                      keyboardType: TextInputType.number,
+                      enabled: !_isAdding,
+                    ),
+                  ]),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: AppSpacing.mediumLarge),
                     Text(
                       _errorMessage!,
-                      style: AppTypography.caption(context)
-                          .copyWith(color: AppColors.primaryRed),
+                      style: AppTypography.caption(
+                        context,
+                      ).copyWith(color: AppColors.primaryRed),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.xLarge),
@@ -226,10 +214,10 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
                     child: ElevatedButton(
                       onPressed:
                           _isAdding ||
-                                  _nameController.text.trim().isEmpty ||
-                                  _urlController.text.trim().isEmpty
-                              ? null
-                              : _addModel,
+                              _nameController.text.trim().isEmpty ||
+                              _urlController.text.trim().isEmpty
+                          ? null
+                          : _addModel,
                       child: _isAdding
                           ? const SizedBox(
                               width: 20,
@@ -252,9 +240,7 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.separator(context)),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.separator(context))),
       ),
       child: Row(
         children: [

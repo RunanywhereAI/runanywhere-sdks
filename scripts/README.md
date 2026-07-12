@@ -59,7 +59,6 @@ sdk/runanywhere-swift/scripts/
     build-core-xcframework.sh          # builds the Apple xcframeworks (cmake presets) → Binaries/ (+ stages RN/Flutter iOS)
     release-swift-binaries.sh          # local iOS/macOS release packager (zip + checksums)
     sync-checksums.sh                  # patches the root Package.swift checksum: lines
-    create-onnxruntime-xcframework.sh  # one-shot helper for the combined ONNXRuntime xcframework
 
 sdk/runanywhere-kotlin/scripts/
     package-sdk.sh                     # unified contract; Gradle drives the rest
@@ -75,17 +74,20 @@ sdk/runanywhere-react-native/scripts/
     package-sdk.sh                     # unified contract; yarn workspaces drive the rest
 ```
 
-For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` (Apple), or `sdk/runanywhere-web/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
+For day-to-day iteration, build natives via `scripts/build/build-core-android.sh` (Android), `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` (Apple), or `sdk/runanywhere-web/scripts/build-core-wasm.sh` (Web), then drive the SDK's own toolchain (`RUNANYWHERE_USE_LOCAL_NATIVES=1 swift build`, `./gradlew assembleDebug`, `npm run build:ts`, `flutter pub get`, `yarn typecheck`).
 
 ## `sdk/runanywhere-commons/scripts/` (C++ native build helpers)
 
-Most native builds now go through the repo-root `scripts/build/build-core-*.sh`. The files in `sdk/runanywhere-commons/scripts/` are either thin compatibility wrappers (still referenced from `.github/workflows/release.yml` for byte-identical contracts) or one-shot platform-specific helpers (Windows batch script + third-party downloaders).
+Day-to-day native builds use the platform core builders. The release entry
+points in `sdk/runanywhere-commons/scripts/` call those builders and add the
+strict, deterministic archive staging consumed by `release.yml`; the remaining
+files are platform-specific helpers.
 
 ```
 sdk/runanywhere-commons/scripts/
-    build-ios.sh                     # COMPAT: forwards to sdk/runanywhere-swift/scripts/build-core-xcframework.sh
-    build-android.sh                 # COMPAT: forwards to scripts/build/build-core-android.sh
-    build-linux.sh                   # COMPAT: forwards to the linux-release CMake preset
+    build-ios.sh                     # canonical Apple release build + versioned XCFramework archives
+    build-android.sh                 # canonical per-ABI Android release build + public archive
+    build-linux.sh                   # canonical Linux release build + versioned tarball
     build-windows.bat                # Windows MSVC .lib/.dll (no root-level equivalent yet)
     lint-cpp.sh                      # clang-format gate; --fix for in-place edits
     load-versions.sh                 # sources VERSIONS file into $ENV; sourced by every build helper
@@ -99,7 +101,11 @@ sdk/runanywhere-commons/scripts/
     windows/download-sherpa-onnx.bat # Sherpa-ONNX for Windows
 ```
 
-The `build-{ios,android,linux}.sh` shims are kept temporarily so `release.yml` and existing docs continue to work — new callers should invoke the repo-root scripts directly. Output convention: native artifacts land under `sdk/runanywhere-swift/Binaries/` (Apple) or each SDK's `jniLibs/` tree (Android); the COMPAT shims additionally stage zips/tars into `sdk/runanywhere-commons/dist/<platform>/` for `release.yml`.
+Use the core builders for local iteration and these three release entry points
+when producing publishable archives. Native artifacts land under
+`sdk/runanywhere-swift/Binaries/` (Apple) or each SDK's `jniLibs/` tree
+(Android); release archives and checksums land under
+`sdk/runanywhere-commons/dist/`.
 
 ## Test scripts — `sdk/runanywhere-commons/tests/scripts/`
 
@@ -139,5 +145,5 @@ relatively.
 ## CI workflows that call these scripts
 
 - `.github/workflows/pr-build.yml` — calls the repo-root `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` and `scripts/build/build-core-android.sh` for native matrix jobs; calls each SDK's build/gradle/npm tooling for SDK jobs. (Linux/Windows/WASM are exercised via CMake presets directly.)
-- `.github/workflows/release.yml` — invokes the legacy `sdk/runanywhere-commons/scripts/build-{ios,android,linux}.sh` shims (which forward to the repo-root scripts), the WASM build via `npm run build:wasm` (→ `wasm/scripts/build.sh`), and `package-sdk.sh` per SDK plus `sync-checksums.sh` after iOS builds land. Migrating release.yml to call the repo-root scripts directly is tracked separately.
+- `.github/workflows/release.yml` — invokes the canonical `sdk/runanywhere-commons/scripts/build-{ios,android,linux}.sh` release packagers, the WASM build via `npm run build:wasm` (→ `wasm/scripts/build.sh`), and `package-sdk.sh` per SDK plus `sync-checksums.sh` after iOS builds land.
 - `.github/actions/setup-toolchain/action.yml` — loads `sdk/runanywhere-commons/VERSIONS` into `$GITHUB_ENV` so every script sees the same pinned tool versions.

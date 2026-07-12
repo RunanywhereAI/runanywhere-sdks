@@ -288,9 +288,10 @@ def _emit_message_validate(
                 range_desc = f">= {min_int}"
             else:
                 range_desc = f"<= {max_int}"
+            range_phrase = f"in {range_desc}" if "..." in range_desc else range_desc
             checks.append(f"    if ({cond}) {{")
             checks.extend(_throw(
-                f"\"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
+                f"\"{field.name} must be {range_phrase} (got ${{{kt_field}}})\""
             ))
             checks.append("    }")
 
@@ -311,9 +312,10 @@ def _emit_message_validate(
                 range_desc = f">= {min_f}"
             else:
                 range_desc = f"<= {max_f}"
+            range_phrase = f"in {range_desc}" if "..." in range_desc else range_desc
             checks.append(f"    if ({cond}) {{")
             checks.extend(_throw(
-                f"\"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
+                f"\"{field.name} must be {range_phrase} (got ${{{kt_field}}})\""
             ))
             checks.append("    }")
 

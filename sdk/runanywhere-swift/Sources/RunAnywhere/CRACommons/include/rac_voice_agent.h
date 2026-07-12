@@ -16,7 +16,7 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
-#include "rac_llm_types.h"
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac_stt_types.h"
 #include "rac_tts_types.h"
 #include "rac_vad_types.h"
@@ -381,29 +381,9 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
- * @brief Create a voice agent instance with external component handles.
- *
- * DEPRECATED: Prefer rac_voice_agent_create_standalone().
- * This API is for backward compatibility when you need to share handles.
- *
- * @param llm_component_handle Handle to LLM component (rac_llm_component)
- * @param stt_component_handle Handle to STT component (rac_stt_component)
- * @param tts_component_handle Handle to TTS component (rac_tts_component)
- * @param vad_component_handle Handle to VAD component (rac_vad_component)
- * @param out_handle Output: Handle to the created voice agent
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
-                                            rac_handle_t stt_component_handle,
-                                            rac_handle_t tts_component_handle,
-                                            rac_handle_t vad_component_handle,
-                                            rac_voice_agent_handle_t* out_handle);
-
-/**
  * @brief Destroy a voice agent instance.
  *
- * If created with rac_voice_agent_create_standalone(), this also destroys
- * the owned component handles.
+ * Also destroys the component handles owned by the voice agent.
  *
  * @param handle Voice agent handle
  */

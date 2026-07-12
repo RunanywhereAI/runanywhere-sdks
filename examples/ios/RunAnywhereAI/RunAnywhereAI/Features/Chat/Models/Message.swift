@@ -170,11 +170,9 @@ public struct ToolCallInfo: Codable, Sendable {
         for toolCall: RAToolCall,
         in results: [RAToolResult]
     ) -> RAToolResult? {
-        let callID = toolCall.hasCallID ? toolCall.callID : toolCall.id
+        let callID = toolCall.id
         if !callID.isEmpty {
-            return results.first { result in
-                result.toolCallID == callID || (result.hasCallID && result.callID == callID)
-            }
+            return results.first { $0.toolCallID == callID }
         }
         return results.first { $0.name == toolCall.name }
     }
@@ -195,7 +193,7 @@ public struct ToolCallInfo: Codable, Sendable {
     private static func callsJSON(_ calls: [RAToolCall]) -> String {
         let payload = calls.map { call in
             [
-                "id": call.hasCallID ? call.callID : call.id,
+                "id": call.id,
                 "name": call.name,
                 "arguments": jsonObject(from: call.argumentsJson) ?? call.argumentsJson
             ] as [String: Any]
@@ -206,7 +204,7 @@ public struct ToolCallInfo: Codable, Sendable {
     private static func resultsJSON(_ results: [RAToolResult]) -> String {
         let payload = results.map { result in
             [
-                "id": result.hasCallID ? result.callID : result.toolCallID,
+                "id": result.toolCallID,
                 "name": result.name,
                 "success": result.success,
                 "result": jsonObject(from: result.resultJson) ?? result.resultJson,

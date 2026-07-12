@@ -78,9 +78,12 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
         generationOptions.structuredOutput = .defaults(schema: schema)
 
         let request = generationOptions.toRALLMGenerateRequest(prompt: "Return a value")
-        let json = try parseObject(request.jsonSchema)
+        let structuredOutput = request.options.structuredOutput
+        let json = try parseObject(structuredOutput.jsonSchema)
 
-        XCTAssertEqual(request.responseFormat, "json_schema")
+        XCTAssertTrue(request.hasOptions)
+        XCTAssertTrue(request.options.hasStructuredOutput)
+        XCTAssertEqual(structuredOutput.mode, .jsonSchema)
         XCTAssertEqual(json["type"] as? String, "object")
         XCTAssertNotNil(json["properties"] as? [String: Any])
     }

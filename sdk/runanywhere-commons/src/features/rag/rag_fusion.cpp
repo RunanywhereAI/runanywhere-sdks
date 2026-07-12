@@ -41,9 +41,7 @@ std::vector<SearchResult> fuse_rankings(const std::vector<std::vector<std::strin
         normalized = std::min(1.0f, std::max(0.0f, normalized));
         SearchResult result;
         result.id = id;
-        result.chunk_id = id;
         result.score = normalized;
-        result.similarity = normalized;
         if (vector_store) {
             auto chunk = vector_store->get_chunk(id);
             if (chunk) {

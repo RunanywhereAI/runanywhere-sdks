@@ -706,15 +706,6 @@ static void normalize_assignment_model(ModelInfo* model) {
         model->set_download_size_bytes(0);
     }
 
-    if (model->description().empty() && model->has_metadata() &&
-        !model->metadata().description().empty()) {
-        model->set_description(model->metadata().description());
-    }
-    if (!model->description().empty() &&
-        (!model->has_metadata() || model->metadata().description().empty())) {
-        model->mutable_metadata()->set_description(model->description());
-    }
-
     if (model->artifact_case() == ModelInfo::ARTIFACT_NOT_SET) {
         model->mutable_single_file();
     }
@@ -1120,7 +1111,11 @@ static bool parse_assignment_json_models(const char* data, size_t len,
         model.set_id(json_first_string(object, {"id", "model_id", "modelId"}));
         model.set_name(json_first_string(object, {"name", "display_name", "displayName"}));
         model.set_download_url(json_first_string(object, {"download_url", "downloadUrl", "url"}));
-        model.set_description(json_first_string(object, {"description"}));
+        const std::string top_level_description =
+            json_first_string(object, {"description"});
+        if (!top_level_description.empty()) {
+            model.mutable_metadata()->set_description(top_level_description);
+        }
         model.set_download_size_bytes(
             json_first_int(object, 0, {"download_size_bytes", "download_size", "downloadSize"}));
         model.set_context_length(

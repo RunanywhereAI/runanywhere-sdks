@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';

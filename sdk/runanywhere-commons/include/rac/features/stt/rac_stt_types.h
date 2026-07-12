@@ -14,13 +14,15 @@
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
  *   - Public structs/callbacks (rac_stt_config_t, rac_stt_options_t,
- *     rac_stt_input_t, rac_stt_output_t / rac_stt_transcription_result_t,
+ *     rac_stt_input_t, rac_stt_output_t,
  *     rac_stt_result_t, rac_stt_word_t, rac_stt_info_t,
- *     rac_transcription_metadata_t, rac_transcription_alternative_t,
- *     rac_stt_stream_callback_t): `delete after SDK migration`.
+ *     rac_transcription_metadata_t, rac_transcription_alternative_t):
+ *     `delete after SDK migration`.
  *     Replaced by serialized runanywhere.v1.STTOptions / STTOutput /
  *     STTStreamEvent bytes via rac_stt_component_transcribe_proto and
  *     rac_stt_component_transcribe_stream_proto.
+ *   - rac_stt_stream_callback_t: `internal` backend emission contract used
+ *     by both one-shot and persistent streaming engine vtables.
  *   - rac_audio_format_enum_t and the RAC_STT_* numeric constants are
  *     `internal` shared audio plumbing.
  */
@@ -371,17 +373,6 @@ typedef struct rac_stt_output {
     /** Timestamp in milliseconds since epoch */
     int64_t timestamp_ms;
 } rac_stt_output_t;
-
-// =============================================================================
-// TRANSCRIPTION RESULT - Alias for compatibility
-// =============================================================================
-
-/**
- * @brief STT transcription result (alias for rac_stt_output_t)
- *
- * For compatibility with existing code that uses "result" terminology.
- */
-typedef rac_stt_output_t rac_stt_transcription_result_t;
 
 // =============================================================================
 // MEMORY MANAGEMENT

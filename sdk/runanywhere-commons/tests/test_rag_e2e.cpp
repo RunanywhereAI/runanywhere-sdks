@@ -18,6 +18,8 @@
  * scoping) extends.
  */
 
+#include "rag.pb.h"
+
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -27,31 +29,28 @@
 #include <string>
 #include <vector>
 
+#include "rac/backends/rac_llm_llamacpp.h"
+#include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
-#include "rac/backends/rac_llm_llamacpp.h"
-#include "rac/backends/rac_vad_onnx.h"
-
-#include "rag.pb.h"
-
 namespace {
 
 int g_checks = 0;
 int g_failures = 0;
 
-#define CHECK(cond, label)                                                              \
-    do {                                                                                \
-        ++g_checks;                                                                     \
-        if (cond) {                                                                     \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                \
-        } else {                                                                        \
-            ++g_failures;                                                               \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__);    \
-        }                                                                               \
+#define CHECK(cond, label)                                                           \
+    do {                                                                             \
+        ++g_checks;                                                                  \
+        if (cond) {                                                                  \
+            std::fprintf(stdout, "  ok:   %s\n", label);                             \
+        } else {                                                                     \
+            ++g_failures;                                                            \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__); \
+        }                                                                            \
     } while (0)
 
 // --------------------------------------------------------------------------
@@ -425,14 +424,9 @@ void run_scoping_case(const std::string& embed_id, const std::string& llm_id,
 int main() {
     std::fprintf(stdout, "=== RAG end-to-end test ===\n");
 
-    const std::string embed_model =
-        env_or("RAG_TEST_EMBED_MODEL",
-               "/home/home/Downloads/rag-test-models/all-MiniLM-L6-v2/model.onnx");
-    const std::string embed_vocab =
-        env_or("RAG_TEST_EMBED_VOCAB",
-               "/home/home/Downloads/rag-test-models/all-MiniLM-L6-v2/vocab.txt");
-    const std::string llm_model =
-        env_or("RAG_TEST_LLM_MODEL", "/home/home/Downloads/LFM2.5-1.2B-Instruct-Q4_K_M.gguf");
+    const std::string embed_model = env_or("RAG_TEST_EMBED_MODEL", "");
+    const std::string embed_vocab = env_or("RAG_TEST_EMBED_VOCAB", "");
+    const std::string llm_model = env_or("RAG_TEST_LLM_MODEL", "");
     const std::string sample_doc = env_or("RAG_TEST_SAMPLE_DOC", RAG_SAMPLE_DOC_PATH);
 
     if (!file_present(embed_model) || !file_present(embed_vocab) || !file_present(llm_model)) {

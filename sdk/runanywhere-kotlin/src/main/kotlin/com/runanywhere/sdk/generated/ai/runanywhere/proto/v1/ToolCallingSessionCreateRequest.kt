@@ -83,20 +83,19 @@ public class ToolCallingSessionCreateRequest(
   tools: List<ToolDefinition> = emptyList(),
   @field:WireField(
     tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "ai.runanywhere.proto.v1.ToolCallFormatName#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "formatHint",
     schemaIndex = 6,
   )
-  public val format_hint: String = "",
+  public val format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxIterations",
+    jsonName = "maxToolCalls",
     schemaIndex = 7,
   )
-  public val max_iterations: Int = 0,
+  public val max_tool_calls: Int = 0,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -107,9 +106,8 @@ public class ToolCallingSessionCreateRequest(
   public val keep_tools_available: Boolean = false,
   /**
    * proto3 `optional` enables presence detection (has_validate_calls()).
-   * When unset, commons defaults to validate_calls=true (preserves the
-   * historical hard-coded behavior and the native run-loop / session
-   * contract that unknown tool calls short-circuit before host execution).
+   * When unset, commons defaults to validate_calls=true so unknown tool
+   * calls short-circuit before host execution.
    * Callers that delegate validation/authorization to their executor or
    * use dynamic tool registries must explicitly set validate_calls=false.
    */
@@ -155,6 +153,33 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 12,
   )
   public val disable_thinking: Boolean = false,
+  /**
+   * Default true when absent. False returns the parsed ToolCall without
+   * invoking the host executor.
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "autoExecute",
+    schemaIndex = 13,
+  )
+  public val auto_execute: Boolean? = null,
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "replaceSystemPrompt",
+    schemaIndex = 14,
+  )
+  public val replace_system_prompt: Boolean = false,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requireJsonArguments",
+    schemaIndex = 15,
+  )
+  public val require_json_arguments: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -181,13 +206,16 @@ public class ToolCallingSessionCreateRequest(
     if (top_p != other.top_p) return false
     if (system_prompt != other.system_prompt) return false
     if (tools != other.tools) return false
-    if (format_hint != other.format_hint) return false
-    if (max_iterations != other.max_iterations) return false
+    if (format != other.format) return false
+    if (max_tool_calls != other.max_tool_calls) return false
     if (keep_tools_available != other.keep_tools_available) return false
     if (validate_calls != other.validate_calls) return false
     if (tool_choice != other.tool_choice) return false
     if (forced_tool_name != other.forced_tool_name) return false
     if (disable_thinking != other.disable_thinking) return false
+    if (auto_execute != other.auto_execute) return false
+    if (replace_system_prompt != other.replace_system_prompt) return false
+    if (require_json_arguments != other.require_json_arguments) return false
     return true
   }
 
@@ -201,13 +229,16 @@ public class ToolCallingSessionCreateRequest(
       result = result * 37 + top_p.hashCode()
       result = result * 37 + system_prompt.hashCode()
       result = result * 37 + tools.hashCode()
-      result = result * 37 + format_hint.hashCode()
-      result = result * 37 + max_iterations.hashCode()
+      result = result * 37 + format.hashCode()
+      result = result * 37 + max_tool_calls.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
       result = result * 37 + (validate_calls?.hashCode() ?: 0)
       result = result * 37 + (tool_choice?.hashCode() ?: 0)
       result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
       result = result * 37 + disable_thinking.hashCode()
+      result = result * 37 + (auto_execute?.hashCode() ?: 0)
+      result = result * 37 + replace_system_prompt.hashCode()
+      result = result * 37 + require_json_arguments.hashCode()
       super.hashCode = result
     }
     return result
@@ -221,13 +252,16 @@ public class ToolCallingSessionCreateRequest(
     result += """top_p=$top_p"""
     result += """system_prompt=${sanitize(system_prompt)}"""
     if (tools.isNotEmpty()) result += """tools=$tools"""
-    result += """format_hint=${sanitize(format_hint)}"""
-    result += """max_iterations=$max_iterations"""
+    result += """format=$format"""
+    result += """max_tool_calls=$max_tool_calls"""
     result += """keep_tools_available=$keep_tools_available"""
     if (validate_calls != null) result += """validate_calls=$validate_calls"""
     if (tool_choice != null) result += """tool_choice=$tool_choice"""
     if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
     result += """disable_thinking=$disable_thinking"""
+    if (auto_execute != null) result += """auto_execute=$auto_execute"""
+    result += """replace_system_prompt=$replace_system_prompt"""
+    result += """require_json_arguments=$require_json_arguments"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -238,15 +272,18 @@ public class ToolCallingSessionCreateRequest(
     top_p: Float = this.top_p,
     system_prompt: String = this.system_prompt,
     tools: List<ToolDefinition> = this.tools,
-    format_hint: String = this.format_hint,
-    max_iterations: Int = this.max_iterations,
+    format: ToolCallFormatName = this.format,
+    max_tool_calls: Int = this.max_tool_calls,
     keep_tools_available: Boolean = this.keep_tools_available,
     validate_calls: Boolean? = this.validate_calls,
     tool_choice: ToolChoiceMode? = this.tool_choice,
     forced_tool_name: String? = this.forced_tool_name,
     disable_thinking: Boolean = this.disable_thinking,
+    auto_execute: Boolean? = this.auto_execute,
+    replace_system_prompt: Boolean = this.replace_system_prompt,
+    require_json_arguments: Boolean = this.require_json_arguments,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format_hint, max_iterations, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, unknownFields)
+  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format, max_tool_calls, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, auto_execute, replace_system_prompt, require_json_arguments, unknownFields)
 
   public companion object {
     @JvmField
@@ -277,11 +314,11 @@ public class ToolCallingSessionCreateRequest(
           size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.system_prompt)
         }
         size += ToolDefinition.ADAPTER.asRepeated().encodedSizeWithTag(2, value.tools)
-        if (value.format_hint != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.format_hint)
+        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
+          size += ToolCallFormatName.ADAPTER.encodedSizeWithTag(3, value.format)
         }
-        if (value.max_iterations != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.max_iterations)
+        if (value.max_tool_calls != 0) {
+          size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.max_tool_calls)
         }
         if (value.keep_tools_available != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.keep_tools_available)
@@ -291,6 +328,13 @@ public class ToolCallingSessionCreateRequest(
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.forced_tool_name)
         if (value.disable_thinking != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.disable_thinking)
+        }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(16, value.auto_execute)
+        if (value.replace_system_prompt != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(17, value.replace_system_prompt)
+        }
+        if (value.require_json_arguments != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(18, value.require_json_arguments)
         }
         return size
       }
@@ -312,11 +356,11 @@ public class ToolCallingSessionCreateRequest(
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.system_prompt)
         }
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.tools)
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.format_hint)
+        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
+          ToolCallFormatName.ADAPTER.encodeWithTag(writer, 3, value.format)
         }
-        if (value.max_iterations != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_iterations)
+        if (value.max_tool_calls != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_tool_calls)
         }
         if (value.keep_tools_available != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.keep_tools_available)
@@ -326,12 +370,26 @@ public class ToolCallingSessionCreateRequest(
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
         if (value.disable_thinking != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
+        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.auto_execute)
+        if (value.replace_system_prompt != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.replace_system_prompt)
+        }
+        if (value.require_json_arguments != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.require_json_arguments != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
+        }
+        if (value.replace_system_prompt != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.replace_system_prompt)
+        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.auto_execute)
         if (value.disable_thinking != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
         }
@@ -341,11 +399,11 @@ public class ToolCallingSessionCreateRequest(
         if (value.keep_tools_available != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.keep_tools_available)
         }
-        if (value.max_iterations != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_iterations)
+        if (value.max_tool_calls != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.max_tool_calls)
         }
-        if (value.format_hint != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.format_hint)
+        if (value.format != ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED) {
+          ToolCallFormatName.ADAPTER.encodeWithTag(writer, 3, value.format)
         }
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.tools)
         if (value.system_prompt != "") {
@@ -372,13 +430,16 @@ public class ToolCallingSessionCreateRequest(
         var top_p: Float = 0f
         var system_prompt: String = ""
         val tools = mutableListOf<ToolDefinition>()
-        var format_hint: String = ""
-        var max_iterations: Int = 0
+        var format: ToolCallFormatName = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED
+        var max_tool_calls: Int = 0
         var keep_tools_available: Boolean = false
         var validate_calls: Boolean? = null
         var tool_choice: ToolChoiceMode? = null
         var forced_tool_name: String? = null
         var disable_thinking: Boolean = false
+        var auto_execute: Boolean? = null
+        var replace_system_prompt: Boolean = false
+        var require_json_arguments: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -387,8 +448,12 @@ public class ToolCallingSessionCreateRequest(
             13 -> top_p = ProtoAdapter.FLOAT.decode(reader)
             14 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             2 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
-            3 -> format_hint = ProtoAdapter.STRING.decode(reader)
-            4 -> max_iterations = ProtoAdapter.UINT32.decode(reader)
+            3 -> try {
+              format = ToolCallFormatName.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            4 -> max_tool_calls = ProtoAdapter.UINT32.decode(reader)
             5 -> keep_tools_available = ProtoAdapter.BOOL.decode(reader)
             6 -> validate_calls = ProtoAdapter.BOOL.decode(reader)
             7 -> try {
@@ -398,6 +463,9 @@ public class ToolCallingSessionCreateRequest(
             }
             8 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
             15 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
+            16 -> auto_execute = ProtoAdapter.BOOL.decode(reader)
+            17 -> replace_system_prompt = ProtoAdapter.BOOL.decode(reader)
+            18 -> require_json_arguments = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -408,13 +476,16 @@ public class ToolCallingSessionCreateRequest(
           top_p = top_p,
           system_prompt = system_prompt,
           tools = tools,
-          format_hint = format_hint,
-          max_iterations = max_iterations,
+          format = format,
+          max_tool_calls = max_tool_calls,
           keep_tools_available = keep_tools_available,
           validate_calls = validate_calls,
           tool_choice = tool_choice,
           forced_tool_name = forced_tool_name,
           disable_thinking = disable_thinking,
+          auto_execute = auto_execute,
+          replace_system_prompt = replace_system_prompt,
+          require_json_arguments = require_json_arguments,
           unknownFields = unknownFields
         )
       }

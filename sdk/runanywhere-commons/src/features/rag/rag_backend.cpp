@@ -470,14 +470,11 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
         if (dense_it != dense_map.end()) {
             SearchResult result = *(dense_it->second);
             result.score = normalized;
-            result.similarity = normalized;
             fused.push_back(std::move(result));
         } else {
             SearchResult result;
             result.id = id;
-            result.chunk_id = id;
             result.score = normalized;
-            result.similarity = normalized;
 
             if (vector_store_) {
                 auto chunk = vector_store_->get_chunk(id);

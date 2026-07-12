@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VLMImageFormat
@@ -452,7 +453,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 ) {
                     replaceRagCorpus(
                         clear = { RunAnywhere.ragClearDocuments() },
-                        ingest = { RunAnywhere.ragIngest(doc.text, doc.metadataJSON) },
+                        ingest = {
+                            RunAnywhere.ragIngest(
+                                RAGDocument(text = doc.text, metadata = doc.metadata),
+                            )
+                        },
                     )
                     runCatching { RunAnywhere.ragGetStatistics() }
                     // The coordinator lease prevents another screen from

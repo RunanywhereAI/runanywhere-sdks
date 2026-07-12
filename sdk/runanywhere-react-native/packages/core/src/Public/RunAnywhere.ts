@@ -82,40 +82,29 @@ let servicesInitPromise: Promise<void> | null = null;
 // Mirrors Swift's `guard !isInitializedFlag else { return }` + Kotlin's `synchronized` guard.
 let initializingPromise: Promise<void> | null = null;
 
-type NativePhase2Module = {
-  completeServicesInitialization?: () => Promise<unknown>;
-};
-
 /**
  * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
  * HTTP-retry bridge. Mirrors Swift, which reads `hasCompletedHttpSetup ||
  * httpConfigured` and `httpApplicable` from the same proto.
  *
- * Returns `null` for the offline/deferred outcomes: an empty buffer (the
- * packaged commons lacks the symbol) or an unrecognized payload. A literal
- * `true` from a stale packaged native still resolving the legacy boolean is
- * preserved as fully-configured.
  */
-function decodeSdkInitResultPayload(
-  payload: unknown
-): { httpConfigured: boolean; httpApplicable: boolean } | null {
-  if (payload instanceof ArrayBuffer) {
-    if (payload.byteLength === 0) {
-      return null;
-    }
-    const decoded = SdkInitResult.decode(new Uint8Array(payload));
-    return {
-      httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
-      httpApplicable: decoded.httpApplicable,
-    };
+function decodeSdkInitResultPayload(payload: ArrayBuffer): {
+  httpConfigured: boolean;
+  httpApplicable: boolean;
+} {
+  if (payload.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('sdkInitResult');
   }
-  if (payload === true) {
-    return { httpConfigured: true, httpApplicable: true };
-  }
-  return null;
+  const decoded = SdkInitResult.decode(new Uint8Array(payload));
+  return {
+    httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
+    httpApplicable: decoded.httpApplicable,
+  };
 }
 
-function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
+function mapSdkInitEnvironment(
+  environment: SDKEnvironment
+): SdkInitEnvironment {
   switch (environment) {
     case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
@@ -191,7 +180,8 @@ export const RunAnywhere = {
 
     initializingPromise = (async () => {
       try {
-        const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+        const environment =
+          options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
@@ -199,10 +189,12 @@ export const RunAnywhere = {
         const requiresCredentials =
           environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
           environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-        if (!isUsableHTTPURL(effectiveBaseURL, {
-          requireHTTPS:
-            environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-        })) {
+        if (
+          !isUsableHTTPURL(effectiveBaseURL, {
+            requireHTTPS:
+              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+          })
+        ) {
           throw SDKException.validationFailed({
             fieldPath: 'SDKInitOptions.baseURL',
             message:
@@ -214,10 +206,12 @@ export const RunAnywhere = {
         if (requiresCredentials && !effectiveApiKey) {
           throw SDKException.validationFailed({
             fieldPath: 'SDKInitOptions.apiKey',
-            message: 'apiKey must be non-empty and must not be a placeholder outside development',
+            message:
+              'apiKey must be non-empty and must not be a placeholder outside development',
           });
         }
-        const phase1Request: SdkInitPhase1RequestMessage = SdkInitPhase1Request.create();
+        const phase1Request: SdkInitPhase1RequestMessage =
+          SdkInitPhase1Request.create();
         phase1Request.environment = mapSdkInitEnvironment(environment);
         phase1Request.apiKey = effectiveApiKey;
         phase1Request.baseUrl = effectiveBaseURL;
@@ -225,11 +219,14 @@ export const RunAnywhere = {
         phase1Request.platform = SDKConstants.platform;
         phase1Request.sdkVersion = SDKConstants.version;
 
-        const phase2Request: SdkInitPhase2RequestMessage = SdkInitPhase2Request.create();
+        const phase2Request: SdkInitPhase2RequestMessage =
+          SdkInitPhase2Request.create();
         phase2Request.buildToken = options.buildToken?.trim() ?? '';
-        phase2Request.forceRefreshAssignments = options.forceRefreshAssignments ?? false;
+        phase2Request.forceRefreshAssignments =
+          options.forceRefreshAssignments ?? false;
         phase2Request.flushTelemetry = options.flushTelemetry ?? true;
-        phase2Request.discoverDownloadedModels = options.discoverDownloadedModels ?? true;
+        phase2Request.discoverDownloadedModels =
+          options.discoverDownloadedModels ?? true;
         phase2Request.rescanLocalModels = options.rescanLocalModels ?? true;
 
         const initParams: SDKInitOptions = {
@@ -249,13 +246,18 @@ export const RunAnywhere = {
         try {
           await initializeNitroModulesGlobally();
         } catch (error) {
-          logger.warning('NitroModules global initialization failed', { error });
+          logger.warning('NitroModules global initialization failed', {
+            error,
+          });
         }
 
         if (!isNativeModuleAvailable()) {
           logger.warning('Native module not available');
           const nativeUnavailableError = SDKException.nativeModuleUnavailable();
-          initState = markInitializationFailed(initState, nativeUnavailableError);
+          initState = markInitializationFailed(
+            initState,
+            nativeUnavailableError
+          );
           throw nativeUnavailableError;
         }
 
@@ -280,7 +282,9 @@ export const RunAnywhere = {
 
           const initialized = await native.initialize(configJson);
           if (initialized === false) {
-            throw SDKException.notInitialized('Native SDK initialization failed');
+            throw SDKException.notInitialized(
+              'Native SDK initialization failed'
+            );
           }
 
           initState = markCoreInitialized(initState, initParams);
@@ -290,7 +294,7 @@ export const RunAnywhere = {
           // completeServicesInitialization() manages servicesInitPromise internally.
           // Do NOT wipe it here — an unconditional null would destroy any in-flight
           // Phase 2 promise from a concurrent ensureServicesReady caller.
-          void this.completeServicesInitialization().catch(err => {
+          void this.completeServicesInitialization().catch((err) => {
             logger.warning(
               `Phase 2 services initialization failed (non-fatal): ${
                 err instanceof Error ? err.message : String(err)
@@ -368,31 +372,28 @@ export const RunAnywhere = {
 
     servicesInitPromise = (async () => {
       const native = requireNativeModule();
-      const nativePhase2 = native as NativePhase2Module;
 
       initState = markServicesInitializing(initState);
 
-      let phase2Result: unknown = undefined;
-      if (typeof nativePhase2.completeServicesInitialization === 'function') {
-        phase2Result = await nativePhase2.completeServicesInitialization.call(native);
-      } else {
-        const initialized = await native.isInitialized();
-        if (!initialized) {
-          throw SDKException.notInitialized('Native core is not initialized');
-        }
-        logger.debug('Native phase 2 bridge not available; core native init is already complete.');
-      }
+      const phase2Result = await native.completeServicesInitialization();
       const decoded = decodeSdkInitResultPayload(phase2Result);
-      const httpConfigured = decoded?.httpConfigured ?? false;
-      const httpApplicable = decoded?.httpApplicable ?? true;
+      const { httpConfigured, httpApplicable } = decoded;
 
-      initState = markServicesInitialized(initState, httpConfigured, httpApplicable);
+      initState = markServicesInitialized(
+        initState,
+        httpConfigured,
+        httpApplicable
+      );
       if (httpConfigured) {
         logger.info('Services initialisation completed.');
       } else if (!httpApplicable) {
-        logger.info('Services initialisation completed (HTTP setup not applicable for this configuration).');
+        logger.info(
+          'Services initialisation completed (HTTP setup not applicable for this configuration).'
+        );
       } else {
-        logger.info('Services initialisation completed (HTTP/auth deferred — will retry on next online call).');
+        logger.info(
+          'Services initialisation completed (HTTP/auth deferred — will retry on next online call).'
+        );
       }
     })();
 
@@ -520,7 +521,11 @@ export const RunAnywhere = {
   async getDeviceId(): Promise<string> {
     if (!isNativeModuleAvailable()) return '';
     const native = requireNativeModule();
-    return (await native.getDeviceId()) || (await native.getPersistentDeviceUUID()) || '';
+    return (
+      (await native.getDeviceId()) ||
+      (await native.getPersistentDeviceUUID()) ||
+      ''
+    );
   },
 
   /**
@@ -591,7 +596,8 @@ export const RunAnywhere = {
   // ============================================================================
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
-  initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
+  initializeVoiceAgentWithLoadedModels:
+    VoiceAgent.initializeVoiceAgentWithLoadedModels,
   defaultVADModelID: VoiceAgent.defaultVADModelID,
   ensureDefaultVAD: VoiceAgent.ensureDefaultVAD,
   getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
@@ -722,7 +728,6 @@ export const RunAnywhere = {
   currentModel: Lifecycle.currentModel,
   modelInfoForCategory: Lifecycle.modelInfoForCategory,
   componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
-
 };
 
 // ============================================================================
@@ -742,22 +747,21 @@ async function retryHTTPSetupInternal(): Promise<void> {
   const native = requireNativeModule();
   logger.debug('Retrying HTTP/auth setup...');
   try {
-    const retryResult: unknown = await native.retryHTTPSetupProto();
+    const retryResult = await native.retryHTTPSetupProto();
     const decoded = decodeSdkInitResultPayload(retryResult);
-    if (decoded) {
-      initState = markHTTPSetupResult(
-        initState,
-        decoded.httpConfigured,
-        decoded.httpApplicable
+    initState = markHTTPSetupResult(
+      initState,
+      decoded.httpConfigured,
+      decoded.httpApplicable
+    );
+    if (decoded.httpConfigured) {
+      logger.info('HTTP/Auth setup succeeded on retry.');
+    } else if (!decoded.httpApplicable) {
+      logger.info(
+        'HTTP setup not applicable for this configuration; retries stopped.'
       );
-      if (decoded.httpConfigured) {
-        logger.info('HTTP/Auth setup succeeded on retry.');
-      } else if (!decoded.httpApplicable) {
-        logger.info('HTTP setup not applicable for this configuration; retries stopped.');
-      }
-      return;
     }
-    logger.debug('HTTP/Auth retry did not complete; commons reported deferred setup.');
+    return;
   } catch (error) {
     logger.debug(
       `HTTP/Auth retry failed (still offline?): ${

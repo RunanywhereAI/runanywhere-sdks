@@ -19,43 +19,8 @@
 //   - RAGResult          (full query result: answer + chunks + timings)
 //   - RAGStatistics      (index-level counters)
 //
-// Pre-IDL drift table (motivation for this schema):
-//
-//   RAGConfiguration:
-//     Swift   RAGTypes.swift:15        (11 fields, similarityThreshold default 0.12,
-//                                        chunkSize 180, chunkOverlap 30, topK 3)
-//     Kotlin  RAGTypes.kt:19           (11 fields, similarityThreshold default 0.15f,
-//                                        chunkSize 512, chunkOverlap 50, topK 3)
-//     Dart    rag_types.dart:13        (11 fields, similarityThreshold default 0.15,
-//                                        chunkSize 180, chunkOverlap 30, topK 10)
-//     RN      RAGTypes.ts:9            (11 fields, all numerics optional)
-//     Web     RAGTypes.ts:6            (11 fields, copy of RN)
-//
-//   RAGQueryOptions:
-//     Swift / Kotlin / Dart / RN / Web all define the same 6-field shape with
-//     consistent defaults (maxTokens 512, temperature 0.7, topP 0.9, topK 40).
-//
-//   RAGSearchResult:
-//     Swift / Kotlin / Dart       — metadataJSON as a single optional string
-//     RN / Web                    — metadataJson (lowercase j) optional string
-//     Note: pre-IDL all SDKs encoded metadata as a JSON *string*. The proto
-//     canonicalizes to map<string,string> so consumers don't all re-parse JSON
-//     and source_document is hoisted to a first-class field.
-//
-//   RAGResult:
-//     Swift / Kotlin / Dart       — timing fields are double (ms, fractional)
-//     RN / Web                    — timing fields are number
-//     Note: proto canonicalizes timings to int64 millis (matches the C ABI
-//     rac_rag_result_t which already uses fixed millis at the boundary).
-//
-//   RAGStatistics:
-//     Dart    rag_types.dart:241      ({statsJson} only — JSON blob)
-//     RN      RAGTypes.ts:59          ({documentCount, chunkCount, vectorStoreSize, statsJson})
-//     Web     RAGTypes.ts:45          (copy of RN)
-//     Swift / Kotlin                  — not yet defined pre-IDL
-//     Note: proto canonicalizes to typed counters (indexed_documents,
-//     indexed_chunks, total_tokens_indexed, last_updated_ms, index_path) so
-//     the JSON-blob escape hatch isn't needed.
+// All SDKs consume these generated messages directly so configuration,
+// metadata, results, and statistics have one portable shape.
 
 import SwiftProtobuf
 
@@ -516,8 +481,7 @@ public nonisolated struct RARAGSearchResult: Sendable {
   public mutating func clearSourceDocument() {self._sourceDocument = nil}
 
   /// Free-form metadata associated with the chunk (e.g. page number, section,
-  /// ingestion timestamp). Pre-IDL all SDKs encoded this as a JSON string;
-  /// canonicalized here as a typed map so consumers don't re-parse.
+  /// ingestion timestamp).
   public var metadata: Dictionary<String,String> = [:]
 
   public var rank: Int32 = 0
@@ -954,7 +918,7 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{b}metadata_json\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1201,7 +1165,7 @@ nonisolated extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{b}metadata_json\0\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

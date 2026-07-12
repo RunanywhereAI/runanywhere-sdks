@@ -5,9 +5,11 @@
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "bridges/ExternalConfigGuard.hpp"
+#include "rac/core/rac_error_proto.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/http/rac_http_client.h"
 
 #include <cstdlib>
-#include <dlfcn.h>
 #include <stdexcept>
 #include <utility>
 
@@ -69,10 +71,6 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         // Idempotent: subsequent calls are no-ops. Android's OkHttp transport
         // is registered separately from Kotlin's RNHttpTransportBridge.
         //
-        // Note: if the bundled librac_commons is older than commons v0.2.0
-        // (no rac_http_transport_register symbol), this call will fail to
-        // link. A rebuild of the bundled natives is required for the
-        // transport vtable to take effect.
 #if defined(__APPLE__)
         rn_register_urlsession_transport();
 #endif
@@ -325,7 +323,7 @@ HybridRunAnywhereCore::retryHTTPSetupProto() {
             setLastError("HTTP retry failed: " + std::to_string(result));
             return ArrayBuffer::allocate(0);
         }
-        // Serialized RASdkInitResult; empty when the retry symbol is missing.
+        // Serialized RASdkInitResult; empty when no retry result is produced.
         if (resultBytes.empty()) {
             return ArrayBuffer::allocate(0);
         }
@@ -342,23 +340,16 @@ HybridRunAnywhereCore::resultToProtoErrorProto(double code) {
         if (rc == RAC_SUCCESS) {
             return ArrayBuffer::allocate(0);
         }
-        using ResultToProtoErrorFn = rac_result_t (*)(rac_result_t, rac_proto_buffer_t*);
-        auto fn = reinterpret_cast<ResultToProtoErrorFn>(
-            dlsym(RTLD_DEFAULT, "rac_result_to_proto_error"));
-        if (!fn) {
-            LOGW("resultToProtoErrorProto: rac_result_to_proto_error unavailable");
-            return ArrayBuffer::allocate(0);
-        }
-        rac_proto_buffer_t out{};
-        rac_result_t status = fn(rc, &out);
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t status = rac_result_to_proto_error(rc, &out);
         std::shared_ptr<ArrayBuffer> buffer;
         if (status == RAC_SUCCESS && out.data && out.size > 0) {
             buffer = ArrayBuffer::copy(out.data, out.size);
         } else {
             buffer = ArrayBuffer::allocate(0);
         }
-        std::free(out.data);
-        std::free(out.error_message);
+        rac_proto_buffer_free(&out);
         return buffer;
     });
 }
@@ -369,13 +360,7 @@ HybridRunAnywhereCore::resultToProtoErrorProto(double code) {
 // and disables the HF_TOKEN env fallback.
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::setHfToken(const std::string& token) {
     return Promise<void>::async([token]() {
-        using SetHfTokenFn = void (*)(const char*);
-        auto fn = reinterpret_cast<SetHfTokenFn>(dlsym(RTLD_DEFAULT, "rac_http_hf_token_set"));
-        if (!fn) {
-            LOGW("setHfToken: rac_http_hf_token_set unavailable");
-            return;
-        }
-        fn(token.c_str());
+        rac_http_hf_token_set(token.c_str());
     });
 }
 

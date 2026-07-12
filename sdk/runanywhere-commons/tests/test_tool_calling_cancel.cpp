@@ -4,7 +4,7 @@
  *        cancel ABIs.
  *
  * The pass-2/pass-3 fix commits (a2de2a4d6) added three new C ABI symbols:
- *   - rac_tool_calling_run_loop_with_handle_proto    (pass2-syn-007)
+ *   - rac_tool_calling_run_loop_proto                (pass2-syn-007)
  *   - rac_tool_calling_run_loop_cancel_proto         (pass2-syn-007)
  *   - rac_tool_calling_session_cancel_proto          (pass2-syn-007)
  *
@@ -90,17 +90,9 @@ int fail_count = 0;
 // "blocking generate" mode the cancel-during-publish test uses to hold the
 // generate call until a sibling thread fires cancel).
 //
-// The lifecycle-cancel path (request_lifecycle_llm_cancel, used by
-// rac_tool_calling_run_loop_cancel_proto / rac_tool_calling_session_cancel_proto)
-// only flips an atomic on the LoadedModel — it does NOT directly invoke
-// `ops->cancel`. Real backends interrupt their inner generate loop by
-// polling that flag (engines/llamacpp/llamacpp_backend.cpp:988) or via a
-// separate cancel API. To keep the test independent of that internal flag
-// (which the mock cannot reach through the void* impl), we use an explicit
-// `g_test_cancel_signal` atomic that the test thread sets immediately after
-// calling the cancel ABI. The mock polls it; the assertion that matters is
-// that the cancel ABI is concurrent-safe and the loop returns in bounded
-// time, not the specific internal propagation channel.
+// The mock's ops->cancel toggles the same signal mock_generate polls. This
+// proves the public cancel ABI reaches the active backend instead of relying
+// on a synthetic test-only release path.
 // ---------------------------------------------------------------------------
 
 struct MockLlm {
@@ -187,12 +179,9 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
 }
 
 rac_result_t mock_cancel(void*) {
-    // ops->cancel is registered for completeness but is NOT invoked by the
-    // run_loop / session cancel paths under test (those flip an atomic on
-    // LoadedModel instead). The counter exists so we can assert the
-    // negative — that cancel-after-completion does NOT spuriously fire
-    // ops->cancel for a stale handle.
     g_cancel_calls.fetch_add(1, std::memory_order_relaxed);
+    g_test_cancel_signal.store(true, std::memory_order_release);
+    g_state_cv.notify_all();
     return RAC_SUCCESS;
 }
 
@@ -256,12 +245,6 @@ void set_responses(std::vector<std::string> responses) {
     g_generate_resume = false;
     g_test_cancel_signal.store(false, std::memory_order_release);
     g_cancel_calls.store(0, std::memory_order_release);
-}
-
-void raise_test_cancel_signal() {
-    g_test_cancel_signal.store(true, std::memory_order_release);
-    std::lock_guard<std::mutex> lk(g_state_mutex);
-    g_state_cv.notify_all();
 }
 
 void enable_blocking_generate(bool enable) {
@@ -347,15 +330,15 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
 }
 
 runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
-                                                              uint32_t max_iterations = 0) {
+                                                              uint32_t max_tool_calls = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
     request.set_max_tokens(64);
     request.set_temperature(0.5f);
     *request.add_tools() = make_weather_tool();
-    request.set_format_hint("default");
-    if (max_iterations > 0)
-        request.set_max_iterations(max_iterations);
+    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    if (max_tool_calls > 0)
+        request.set_max_tool_calls(max_tool_calls);
     return request;
 }
 
@@ -381,7 +364,6 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
 
     runanywhere::v1::ToolResult tr;
     tr.set_tool_call_id(received.id());
-    tr.set_call_id(received.id());
     tr.set_name(received.name());
     tr.set_success(true);
     tr.set_result_json("{\"ok\":true}");
@@ -390,6 +372,16 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     serialize(tr, &bytes);
     rac_proto_buffer_init(out_result);
     return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
+}
+
+void capture_run_loop_handle(uint64_t handle, void* user_data) {
+    static_cast<std::atomic<uint64_t>*>(user_data)->store(handle, std::memory_order_release);
+}
+
+void capture_session_handle(uint64_t handle, void* user_data) {
+    if (user_data) {
+        *static_cast<uint64_t*>(user_data) = handle;
+    }
 }
 
 // Session event sink. Sessions emit error_bytes on cancel; we only need to
@@ -449,16 +441,12 @@ int test_run_loop_cancel_during_publish() {
 
     std::atomic<bool> loop_returned{false};
     std::atomic<rac_result_t> loop_rc{RAC_SUCCESS};
+    std::atomic<uint64_t> published_handle{0};
 
     std::thread loop_thread([&] {
-        // The handle is published into the loop_registry synchronously
-        // BEFORE generate is called (see register_loop_state in
-        // tool_calling_run_loop.cpp:72). We do not need to capture it in
-        // the test thread — the cancel-by-handle scan below will land on
-        // it idempotently for non-matching handles.
-        uint64_t handle = 0;
-        rac_result_t rc = rac_tool_calling_run_loop_with_handle_proto(
-            bytes.data(), bytes.size(), executor_callback, &exec, &handle, &out);
+        rac_result_t rc =
+            rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec,
+                                            capture_run_loop_handle, &published_handle, &out);
         loop_rc.store(rc, std::memory_order_release);
         loop_returned.store(true, std::memory_order_release);
     });
@@ -469,27 +457,13 @@ int test_run_loop_cancel_during_publish() {
     const bool started = wait_for_generate_started(std::chrono::milliseconds(2000));
     CHECK(started, "generate started before cancel");
 
-    // Fire the cancel ABI from the test thread. The loop_registry's
-    // next_handle starts at 1 and is per-process — within this test binary
-    // the run-loop tests run sequentially, so the active handle is the
-    // first unretired value. We brute-force the first 16 handles which is
-    // safely above any plausible counter value in this test process and
-    // exercises the idempotent stale-handle path for the rest. Adapters
-    // fan structured-concurrency cancels in similarly without coordinating
-    // on the exact handle value, so this is the realistic shape.
-    rac_result_t any_cancel_rc = RAC_ERROR_INVALID_HANDLE;
-    for (uint64_t h = 1; h <= 16; ++h) {
-        rac_result_t rc = rac_tool_calling_run_loop_cancel_proto(h);
-        if (rc == RAC_SUCCESS) {
-            any_cancel_rc = RAC_SUCCESS;
-        }
-    }
-    CHECK(any_cancel_rc == RAC_SUCCESS, "cancel returned RAC_SUCCESS while loop in-flight");
+    const uint64_t handle = published_handle.load(std::memory_order_acquire);
+    CHECK(handle != 0, "run-loop handle published before generation");
+    CHECK(rac_tool_calling_run_loop_cancel_proto(handle) == RAC_SUCCESS,
+          "cancel returned RAC_SUCCESS while loop in-flight");
 
-    // The cancel ABI does not call ops->cancel directly — it sets an
-    // atomic on the LoadedModel that real backends poll. To simulate that
-    // polling and let the mock bail out, raise the test cancel signal.
-    raise_test_cancel_signal();
+    CHECK(g_cancel_calls.load(std::memory_order_acquire) == 1,
+          "cancel reached the active backend exactly once");
 
     // The loop must return within a bounded time. Without the cancel
     // signal the mock would wait the full 5s timeout, so a join inside
@@ -535,9 +509,10 @@ int test_run_loop_cancel_after_completion() {
     ExecutorState exec;
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_run_loop_with_handle_proto(
-        bytes.data(), bytes.size(), executor_callback, &exec, &handle, &out);
+    std::atomic<uint64_t> published_handle{0};
+    rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec,
+                                        capture_run_loop_handle, &published_handle, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS");
 
     runanywhere::v1::ToolCallingResult result;
@@ -550,6 +525,8 @@ int test_run_loop_cancel_after_completion() {
     // returned. Cancel must still report RAC_SUCCESS for the now-stale
     // handle (idempotent semantics — adapters cannot coordinate with the
     // loop's exit).
+    const uint64_t handle = published_handle.load(std::memory_order_acquire);
+    CHECK(handle != 0, "run-loop handle was published");
     rc = rac_tool_calling_run_loop_cancel_proto(handle);
     CHECK(rc == RAC_SUCCESS, "cancel post-completion is idempotent RAC_SUCCESS");
 
@@ -602,8 +579,8 @@ int test_session_cancel_sticky_blocks_step() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            session_sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), session_sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
     CHECK(handle != 0, "handle non-zero");
 
@@ -658,8 +635,8 @@ int test_session_cancel_idempotent_on_stale_handle() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            session_sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), session_sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
     CHECK(handle != 0, "handle non-zero");
 

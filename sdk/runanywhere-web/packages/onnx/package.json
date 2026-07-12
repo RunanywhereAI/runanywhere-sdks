@@ -59,7 +59,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "peerDependencies": {
     "@runanywhere/web": ">=0.19.15 <1"

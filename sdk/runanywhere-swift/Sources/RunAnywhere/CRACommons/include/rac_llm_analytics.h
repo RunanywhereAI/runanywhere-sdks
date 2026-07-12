@@ -16,7 +16,7 @@
 
 #include "rac_types.h"
 #include "rac_llm_metrics.h"
-#include "rac_llm_types.h"
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac_model_types.h"
 
 #ifdef __cplusplus

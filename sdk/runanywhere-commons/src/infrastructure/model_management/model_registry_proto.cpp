@@ -60,7 +60,6 @@ bool model_matches_search_text(const ModelInfo& model, const std::string& needle
 
     if (contains_text_case_insensitive(model.id(), needle_lower) ||
         contains_text_case_insensitive(model.name(), needle_lower) ||
-        contains_text_case_insensitive(model.description(), needle_lower) ||
         contains_text_case_insensitive(model.download_url(), needle_lower) ||
         contains_text_case_insensitive(model.local_path(), needle_lower) ||
         contains_text_case_insensitive(model.checksum_sha256(), needle_lower) ||

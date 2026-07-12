@@ -19,8 +19,9 @@ PROJECT_VERSION=0.19.15
 # =============================================================================
 # Platform Deployment Targets
 # =============================================================================
-# iOS minimum deployment target
-IOS_DEPLOYMENT_TARGET=17.0
+# Apple deployment floors used by SwiftPM and every packaged XCFramework.
+IOS_DEPLOYMENT_TARGET=17.5
+MACOS_DEPLOYMENT_TARGET=14.5
 
 # Android minimum SDK version
 ANDROID_MIN_SDK=24
@@ -29,8 +30,10 @@ ANDROID_MIN_SDK=24
 # Build Tools
 # =============================================================================
 # Xcode version for CI/CD builds
-# (2026-05-19 build-toolchain bump): 15.4 -> 26.5 (host).
-XCODE_VERSION=26.5
+# (2026-07-11 build-toolchain bump): 26.5 -> 26.6. GitHub's macos-26
+# image and the release host both provide this exact stable build.
+XCODE_VERSION=26.6
+XCODE_BUILD=17F113
 
 # Android NDK (matches what scripts/build-android.sh and Kotlin SDK expect)
 # (2026-05-19 build-toolchain bump): 27.0.12077973 -> 27.3.13750724.
@@ -47,22 +50,24 @@ EMSCRIPTEN_VERSION=6.0.2
 
 # Node (Web SDK + React Native SDK builds)
 # (2026-05-19 build-toolchain bump): 20 -> 22 (LTS).
-NODE_VERSION=22
+NODE_VERSION=24
 
 # JDK (Kotlin SDK + Android builds)
 JAVA_VERSION=17
-
-# Gradle wrapper version baseline
-# T-P3 (2026-05-19 build-toolchain bump): 8.11.1 -> 8.14.5 (latest stable 8.x).
-GRADLE_VERSION=8.14.5
 
 # Flutter SDK version. Single source of truth for:
 #   - .github/workflows/pr-build.yml (flutter-pubget job)
 #   - .github/workflows/release.yml (validate_consumer_flutter job)
 #   - sdk/runanywhere-flutter/.fvm/fvm_config.json (local FVM)
 # Bump here, then run setup-toolchain with platform=flutter (or sdk-only).
-# (2026-05-19 build-toolchain bump): 3.27.0 -> 3.44.0 (latest stable).
-FLUTTER_VERSION=3.44.0
+# (2026-07-11 stable patch bump): 3.44.0 -> 3.44.6.
+FLUTTER_VERSION=3.44.6
+FLUTTER_GRADLE_VERSION=9.1.0
+FLUTTER_AGP_VERSION=9.0.1
+FLUTTER_KOTLIN_VERSION=2.3.20
+FLUTTER_ANDROID_COMPILE_SDK=36
+FLUTTER_ANDROID_TARGET_SDK=36
+FLUTTER_NDK_VERSION=28.2.13676358
 
 # =============================================================================
 # IDL Codegen Toolchain (single source of truth)
@@ -130,11 +135,11 @@ MIN_CMAKE_VERSION=3.24
 # pinned to 1.24.3 (ABI-compatible with sherpa 1.13.2 across 1.24.x patches).
 ONNX_VERSION_IOS=1.24.3
 
-# Android version - used by Sherpa-ONNX, must be compatible.
-# Android ONNX Runtime ships INSIDE the vendored sherpa-onnx-android prebuilt
-# (third_party/sherpa-onnx-android/jniLibs/<abi>/libonnxruntime.so). Re-vendor
-# sherpa-onnx-android in lockstep with this bump.
-ONNX_VERSION_ANDROID=1.24.4
+# Android ONNX Runtime ships inside the pinned Sherpa-ONNX Android archive.
+# The archive's ELF version definition is VERS_1.24.3; keep this source/header
+# commit and the runtime declaration aligned with that inspected binary.
+ONNX_VERSION_ANDROID=1.24.3
+ONNX_COMMIT_ANDROID=3a728b75062256951b6e19ce718907cf1a1d4cf0
 
 # macOS version (can use latest)
 # ORT v1.24+ ships per-arch tarballs only (no more osx-universal2). The
@@ -153,36 +158,41 @@ ONNX_VERSION_WINDOWS=1.24.4
 # v1.27.1, while the shipped iOS/Android binaries remain on their validated
 # platform-specific versions.
 ONNX_VERSION_WEB=1.27.1
+ONNX_COMMIT_WEB=df2ba1cf8108aa63627cf4cdf8f807880b938616
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
-# iOS version (matched set with ONNX_VERSION_IOS — sherpa-onnx links ORT
-# statically into its xcframework on iOS, so the two must move together).
-# (2026-05-27): the matching v1.13.2 iOS xcframework was never
-# published to runanywhere-binaries (only v1.12.18 is available there). Pin
-# back to v1.12.18 so `scripts/ios/download-sherpa-onnx.sh` can actually
-# resolve the prebuilt; without it, build-core-xcframework.sh ships a
-# non-routable RABackendSherpa.xcframework (RAC_SHERPA_ROUTABLE=0) and
-# every STT/TTS load with `framework=sherpa` fails the router with
-# "no backend route". Sherpa C-API is ABI-stable across 1.12→1.13 so this
-# lag is safe; bump back to 1.13.2 when the iOS xcframework is published.
-SHERPA_ONNX_VERSION_IOS=1.12.18
+# iOS version. Consume the upstream release archive directly so every native
+# platform compiles against the same current C API instead of retaining an old
+# integration solely because a mirrored binary lagged behind upstream.
+SHERPA_ONNX_VERSION_IOS=1.13.2
+SHERPA_ONNX_IOS_SHA256=2886a04df4f8d5066c6c8b6e712278d65d7b60fc9e45990223df50262861d38b
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
-# ⚠️  IMPORTANT: When changing this version, you MUST re-download BOTH the
-# prebuilt .so files AND the C API headers to avoid ABI/struct mismatch:
-#   rm -rf third_party/sherpa-onnx-android
-#   ./scripts/android/download-sherpa-onnx.sh
-# The download script auto-validates header vs .so version consistency.
+# The downloader invalidates its cache whenever the repository, version,
+# source/header commit, runtime commit, patch hash, or archive digest changes.
 SHERPA_ONNX_VERSION_ANDROID=1.13.2
-# Android prebuilt source repo. RunAnywhere fork patches the Whisper greedy
-# decoder to populate the per-token ys_log_probs C-API field (hybrid-router
-# confidence); ABI/header-identical to upstream k2-fsa v1.13.2.
+# Android prebuilt source repo. This personal-repository release is retained
+# temporarily because its Whisper greedy decoder populates per-token
+# ys_log_probs for hybrid-router confidence. The downloader verifies the exact
+# inspected archive; these pins do not constitute build provenance or an
+# upstream attestation.
 SHERPA_ONNX_REPO_ANDROID=Siddhesh2377/sherpa-onnx-rac
+SHERPA_ONNX_COMMIT_ANDROID=707ffc40b0fd59c04f50998e72989dd816b1dd37
+SHERPA_ONNX_ANDROID_SHA256=6ce931ffb49605cf1448e5fa98f9804fb7fdc5bb72efded3048a84080eea477b
+# The fork commit is one behavior-only patch over this signed upstream commit.
+# The SHA-256 is for the exact three-file git diff, not the release archive.
+SHERPA_ONNX_UPSTREAM_COMMIT_ANDROID=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
+SHERPA_ONNX_PATCH_SHA256_ANDROID=f71a4ee115b72871c2ef821b7bf1eaed9eeddd2d9c9d59ee002b8fca507dbb35
+# Public C/C++ headers are unchanged by the patch; fetch them from the signed
+# upstream source commit instead of the fork's mutable release tag.
+SHERPA_ONNX_HEADER_REPO_ANDROID=k2-fsa/sherpa-onnx
+SHERPA_ONNX_HEADER_COMMIT_ANDROID=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
 
 # macOS version
 SHERPA_ONNX_VERSION_MACOS=1.13.2
+SHERPA_ONNX_COMMIT_MACOS=13d0ae6c539d2809d32f5eaa3ef1db0c459d0b24
 
 # Linux version
 SHERPA_ONNX_VERSION_LINUX=1.13.2
@@ -193,6 +203,7 @@ SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 # Web/WASM matched set with ONNX_VERSION_WEB. Do not reuse Android/iOS
 # prebuilts for this target; the Web vendor scripts validate provenance.
 SHERPA_ONNX_VERSION_WEB=1.13.4
+SHERPA_ONNX_COMMIT_WEB=142807252687d81b40d6315f23470a1512a00de3
 
 # =============================================================================
 # llama.cpp (LLM inference)
@@ -233,6 +244,12 @@ BZIP2_VERSION=1.0.8
 # sdk/runanywhere-commons/src/generated/proto/ were emitted by (Protobuf C++
 # 7.35.1 → upstream tag v35.1). Bumping requires regenerating those headers.
 PROTOBUF_VERSION=35.1
+
+# Protobuf 35.1 is built and distributed by the supported Homebrew toolchain
+# against this Abseil release. Pre-fetch the exact same source for the private
+# static protobuf runtime so generated-header consumers and packaged symbols
+# share one Abseil inline namespace without linking host dylibs.
+ABSEIL_VERSION=20260107.1
 
 # =============================================================================
 # GoogleTest (test framework for commons + RAG unit tests)

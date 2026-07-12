@@ -69,10 +69,6 @@ class RunAnywhereModels {
   /// Mirrors Swift `RunAnywhere.queryModels(_:)`.
   Future<ModelListResult> queryModels(ModelQuery query) => list(query: query);
 
-  /// Generated-proto registry query surface. Backwards-compatible shim that
-  /// forwards to [queryModels]; prefer [queryModels] for new code.
-  Future<ModelListResult> query(ModelQuery query) => queryModels(query);
-
   /// Generated-proto registry get-by-id surface.
   ///
   /// Mirrors Swift `RunAnywhere.getModel(_:)`.
@@ -242,8 +238,10 @@ class RunAnywhereModels {
     required String filename,
     required ModelCategory modality,
   }) {
-    final roleValue =
-        DartBridge.modelPaths.inferFileRole(filename, modality.value);
+    final roleValue = DartBridge.modelPaths.inferFileRole(
+      filename,
+      modality.value,
+    );
     return ModelFileRole.valueOf(roleValue) ??
         ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
   }
@@ -355,5 +353,4 @@ class RunAnywhereModels {
     }
     return Future.value(path);
   }
-
 }

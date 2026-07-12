@@ -48,8 +48,7 @@ typedef int32_t rac_mlx_session_kind_t;
 #define RAC_MLX_SESSION_KIND_EMBEDDINGS 8
 
 typedef rac_result_t (*rac_mlx_create_fn)(rac_mlx_session_kind_t kind, const char* model_id,
-                                          const char* config_json, rac_handle_t* out_handle,
-                                          void* user_data);
+                                          rac_handle_t* out_handle, void* user_data);
 
 typedef rac_result_t (*rac_mlx_initialize_fn)(rac_handle_t handle, const char* model_path,
                                               void* user_data);

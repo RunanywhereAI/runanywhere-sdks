@@ -162,7 +162,7 @@
             "cacheVariables": {
                 "CMAKE_SYSTEM_NAME": "iOS",
                 "CMAKE_OSX_ARCHITECTURES": "arm64",
-                "CMAKE_OSX_DEPLOYMENT_TARGET": "17.0",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "17.5",
                 "CMAKE_OSX_SYSROOT": "iphoneos",
                 "CMAKE_BUILD_TYPE": "Release",
                 "RAC_STATIC_PLUGINS": "ON",

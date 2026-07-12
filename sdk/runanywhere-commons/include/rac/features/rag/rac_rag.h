@@ -76,8 +76,8 @@ RAC_API void rac_rag_session_destroy_proto(rac_handle_t session);
 /**
  * @brief Ingest one document from serialized runanywhere.v1.RAGDocument bytes.
  *
- * RAGDocument.text is the document body. RAGDocument.id, metadata_json, and
- * metadata are persisted as ingestion metadata. out_stats receives
+ * RAGDocument.text is the document body. RAGDocument.id and metadata are
+ * persisted as ingestion metadata. out_stats receives
  * runanywhere.v1.RAGStatistics.
  */
 RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_proto_bytes,

@@ -23,6 +23,7 @@ import {
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
 interface TTSCallCounters {
   lifecycleSyntheses: number;
@@ -74,7 +75,6 @@ describe('lifecycle-owned Web TTS', () => {
 
     const output = await synthesize('Keep this voice loaded.', {
       voiceId: 'speaker-2',
-      voicePath: '/models/must-not-be-loaded.onnx',
       speakingRate: 1.1,
     });
 
@@ -100,24 +100,20 @@ describe('lifecycle-owned Web TTS', () => {
     });
   });
 
-  it('uses the explicit voicePath fallback only when no lifecycle voice exists', async () => {
+  it('requires a lifecycle-owned voice', async () => {
     const harness = fakeTTSModule();
     install(harness.module);
     mockNoLifecycleVoice();
 
-    const output = await synthesize('Fallback voice.', {
-      voiceId: 'fallback-id',
-      voicePath: '/models/fallback-voice.onnx',
+    await expect(synthesize('No loaded voice.')).rejects.toMatchObject({
+      message: expect.stringContaining('No TTS voice is loaded'),
     });
-
-    expect(new TextDecoder().decode(output.audioData)).toBe('component-audio');
-    expect(harness.componentTexts).toEqual(['Fallback voice.']);
     expect(harness.counters).toMatchObject({
       lifecycleSyntheses: 0,
-      componentCreates: 1,
-      componentLoads: 1,
-      componentSyntheses: 1,
-      componentDestroys: 1,
+      componentCreates: 0,
+      componentLoads: 0,
+      componentSyntheses: 0,
+      componentDestroys: 0,
     });
   });
 
@@ -379,6 +375,8 @@ function fakeTTSModule(): FakeTTSHarness {
       counters.componentDestroys += 1;
     },
   };
+
+  installCurrentModelRegistryExports(module);
 
   return {
     module,

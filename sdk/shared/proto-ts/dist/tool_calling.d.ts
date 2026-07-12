@@ -18,30 +18,14 @@ export declare function toolParameterTypeFromJSON(object: any): ToolParameterTyp
 export declare function toolParameterTypeToJSON(object: ToolParameterType): string;
 /**
  * ---------------------------------------------------------------------------
- * Tool-call wire formats various LLM families emit. Strongly-typed counterpart
- * to `ToolCallingOptions.format_hint` (which remains a free-form string for
- * back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
- * 1:1 to this enum).
- *
- * Drift across SDKs:
- *   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
- *     today only exposes `default` and `lfm2` constants on a string-typed
- *     field — it is not yet an enum.
- *   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
- * This enum is the union of formats LLM families actually emit; SDK frontends
- * should map their existing strings onto these values when surfacing the
- * strongly-typed field. Keep `format_hint` (string) populated for legacy
- * consumers until all SDKs migrate.
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
  * ---------------------------------------------------------------------------
  */
 export declare enum ToolCallFormatName {
     TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
     TOOL_CALL_FORMAT_NAME_JSON = 1,
-    TOOL_CALL_FORMAT_NAME_XML = 2,
-    TOOL_CALL_FORMAT_NAME_NATIVE = 3,
-    TOOL_CALL_FORMAT_NAME_PYTHONIC = 4,
-    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5,
-    TOOL_CALL_FORMAT_NAME_HERMES = 6,
+    TOOL_CALL_FORMAT_NAME_LFM2 = 7,
     UNRECOGNIZED = -1
 }
 export declare function toolCallFormatNameFromJSON(object: any): ToolCallFormatName;
@@ -170,8 +154,6 @@ export interface ToolCall {
      * value at the moment). Empty = unset.
      */
     type: string;
-    /** Alias for id used by pre-proto SDK surfaces. */
-    callId?: string | undefined;
     createdAtMs: number;
     rawText?: string | undefined;
 }
@@ -199,8 +181,6 @@ export interface ToolResult {
      * consumers should fall back to result_json/error semantics.
      */
     success: boolean;
-    /** Alias for tool_call_id used by pre-proto SDK surfaces. */
-    callId?: string | undefined;
     startedAtMs: number;
     completedAtMs: number;
 }
@@ -215,11 +195,6 @@ export interface ToolCallingOptions {
      * its registered tools (per-SDK convention).
      */
     tools: ToolDefinition[];
-    /**
-     * Maximum tool-call iterations in one conversation turn. 0 = SDK default
-     * (typically 5).
-     */
-    maxIterations: number;
     /** Whether to auto-execute tools or hand them back to the caller. */
     autoExecute: boolean;
     /** Sampling temperature override (Swift: optional Float). */
@@ -238,32 +213,15 @@ export interface ToolCallingOptions {
      * tool calls in one generation.
      */
     keepToolsAvailable: boolean;
-    /**
-     * Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
-     * Empty = SDK default.
-     */
-    formatHint: string;
-    /**
-     * Strongly-typed tool-call format. Preferred over `format_hint` when set;
-     * `format_hint` remains for legacy callers and per-SDK custom strings
-     * that don't round-trip through this enum.
-     */
+    /** Typed tool-call format. Unset lets commons select the model default. */
     format?: ToolCallFormatName | undefined;
     /**
-     * Caller-supplied system prompt that fully replaces the SDK-injected
-     * tool-calling system prompt (rather than being merged with it).
-     * Distinct from `system_prompt` (field 6), which is merged unless
-     * `replace_system_prompt` is true.
-     */
-    customSystemPrompt?: string | undefined;
-    /**
-     * C ABI / SDK field name for max_iterations. 0 = use max_iterations or
-     * SDK default.
+     * Maximum tool calls in one conversation turn. Unset/0 = SDK default
+     * (typically 5).
      */
     maxToolCalls?: number | undefined;
     toolChoice: ToolChoiceMode;
     forcedToolName?: string | undefined;
-    parallelToolCalls: boolean;
     requireJsonArguments: boolean;
     /**
      * When true, suppress the model's thinking/reasoning phase during
@@ -289,7 +247,7 @@ export interface ToolCallingResult {
     isComplete: boolean;
     /** Conversation ID for continuing with tool results. */
     conversationId?: string | undefined;
-    /** Number of tool-call iterations actually used. */
+    /** Number of LLM generation turns used, including the final synthesis turn. */
     iterationsUsed: number;
     errorMessage?: string | undefined;
     errorCode: number;
@@ -327,7 +285,6 @@ export interface ToolPromptFormatRequest {
 export interface ToolPromptFormatResult {
     formattedPrompt: string;
     format: ToolCallFormatName;
-    formatHint: string;
     errorMessage?: string | undefined;
     errorCode: number;
 }
@@ -371,14 +328,13 @@ export interface ToolCallingSessionCreateRequest {
     topP: number;
     systemPrompt: string;
     tools: ToolDefinition[];
-    formatHint: string;
-    maxIterations: number;
+    format: ToolCallFormatName;
+    maxToolCalls: number;
     keepToolsAvailable: boolean;
     /**
      * proto3 `optional` enables presence detection (has_validate_calls()).
-     * When unset, commons defaults to validate_calls=true (preserves the
-     * historical hard-coded behavior and the native run-loop / session
-     * contract that unknown tool calls short-circuit before host execution).
+     * When unset, commons defaults to validate_calls=true so unknown tool
+     * calls short-circuit before host execution.
      * Callers that delegate validation/authorization to their executor or
      * use dynamic tool registries must explicitly set validate_calls=false.
      */
@@ -399,6 +355,13 @@ export interface ToolCallingSessionCreateRequest {
      * contract as LLMGenerationOptions.disable_thinking). Default false.
      */
     disableThinking: boolean;
+    /**
+     * Default true when absent. False returns the parsed ToolCall without
+     * invoking the host executor.
+     */
+    autoExecute?: boolean | undefined;
+    replaceSystemPrompt: boolean;
+    requireJsonArguments: boolean;
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;

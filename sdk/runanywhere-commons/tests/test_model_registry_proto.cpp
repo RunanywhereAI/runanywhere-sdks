@@ -58,7 +58,7 @@ runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const s
     model.set_context_length(4096);
     model.set_supports_thinking(true);
     model.set_supports_lora(true);
-    model.set_description("test chat model");
+    model.mutable_metadata()->set_description("test chat model");
     model.set_source(runanywhere::v1::MODEL_SOURCE_REMOTE);
     model.set_created_at_unix_ms(1000);
     model.set_updated_at_unix_ms(2000);
@@ -126,7 +126,7 @@ runanywhere::v1::ModelInfo build_minimal_update_proto(const std::string& id,
     model.set_context_length(2048);
     model.set_supports_thinking(true);
     model.set_supports_lora(false);
-    model.set_description("updated model");
+    model.mutable_metadata()->set_description("updated model");
     model.set_source(runanywhere::v1::MODEL_SOURCE_REMOTE);
     model.set_created_at_unix_ms(1000);
     model.set_updated_at_unix_ms(4000);
@@ -150,7 +150,7 @@ build_query_model(const std::string& id, const std::string& name,
         model.set_local_path("/models/" + id);
     }
     model.set_download_size_bytes(size_bytes);
-    model.set_description(name + " searchable description");
+    model.mutable_metadata()->set_description(name + " searchable description");
     model.mutable_metadata()->add_tags(name);
     model.set_source(source);
     model.set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
@@ -308,7 +308,7 @@ runanywhere::v1::ModelInfo build_expanded_enum_model() {
     model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE);
     model.set_download_url("builtin://expanded.tflite");
     model.set_download_size_bytes(9);
-    model.set_description("expanded enum preservation");
+    model.mutable_metadata()->set_description("expanded enum preservation");
     model.set_source(runanywhere::v1::MODEL_SOURCE_BUILT_IN);
     model.set_created_at_unix_ms(10);
     model.set_updated_at_unix_ms(20);

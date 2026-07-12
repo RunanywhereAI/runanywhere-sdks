@@ -110,7 +110,8 @@ import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.j
  * Persistent storage backend active for the current SDK session.
  * - `fsAccess`: File System Access API (user picked a real directory, Chrome 122+).
  * - `opfs`: Origin Private File System (default persistent fallback).
- * - `memory`: No persistent backend — models live in volatile MEMFS.
+ * - `memory`: No persistent backend — model downloads are unavailable because
+ *   independent backend WASMs cannot share their private MEMFS instances.
  */
 export type StorageBackend = 'fsAccess' | 'opfs' | 'memory';
 
@@ -138,6 +139,7 @@ const logger = new SDKLogger('RunAnywhere');
 let _isInitialized = false;
 let _initOptions: SDKInitOptions | null = null;
 let _initializingPromise: Promise<void> | null = null;
+let _shutdownPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
@@ -166,7 +168,6 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
-  _rac_sdk_retry_http_proto?(outResult: number): number;
   _rac_wasm_set_client_info?(
     sdkBinding: number,
     appIdentifier: number,
@@ -230,7 +231,7 @@ function ensureDeviceId(): string {
     }
   } catch { /* fall through to TS fallback */ }
 
-  // TS fallback: keep backwards-compat key so existing installs keep their ID.
+  // TS fallback: persist one stable browser-local device identity.
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('runanywhere.deviceId');
@@ -542,8 +543,21 @@ function attachSignalToCancel(
       cancel();
     } catch { /* best-effort; native cancel may not be wired yet */ }
   };
-  signal.addEventListener('abort', onAbort);
+  if (signal.aborted) {
+    onAbort();
+    return () => undefined;
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
   return () => signal.removeEventListener('abort', onAbort);
+}
+
+function throwIfStaleLifecycle(generation: number, operation: string): void {
+  if (generation !== _lifecycleGeneration) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_CANCELLED,
+      `${operation} cancelled because the SDK lifetime ended`,
+    );
+  }
 }
 
 /**
@@ -827,38 +841,33 @@ async function planDownloadWithSelfHeal(
 async function retryHTTPSetup(): Promise<void> {
   if (_hasCompletedHTTPSetup) return;
   const module = tryRunanywhereModule() as SdkInitModule | null;
-  if (!module) return;
-
-  if (typeof module._rac_sdk_retry_http_proto === 'function') {
-    const result = invokeSdkResultProto(
-      module,
-      module._rac_sdk_retry_http_proto.bind(module),
-      'rac_sdk_retry_http_proto',
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'No active commons WASM module is available for HTTP setup retry.',
     );
-    throwIfSdkInitFailed(result, 'SDK HTTP retry');
-    _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
-    if (result?.warning) {
-      logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
-    }
-    if (_hasCompletedHTTPSetup) {
-      logger.info('HTTP/Auth setup succeeded on retry');
-    }
-    return;
+  }
+  const retry = module._rac_sdk_retry_http_proto;
+  if (typeof retry !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'The loaded WASM artifact does not export _rac_sdk_retry_http_proto. ' +
+        'Rebuild and package the current Web native artifacts.',
+    );
   }
 
-  // Backward compatibility for stale WASM artifacts that predate
-  // rac_sdk_retry_http_proto. New builds export the commons-owned retry path.
-  const authFn = module._rac_auth_is_authenticated;
-  if (typeof authFn !== 'function') return;
-
-  try {
-    const authenticated = authFn.call(module) !== 0;
-    if (authenticated) {
-      _hasCompletedHTTPSetup = true;
-      logger.info('HTTP/Auth setup succeeded on retry');
-    }
-  } catch {
-    // Still offline or auth state unavailable — leave _hasCompletedHTTPSetup false.
+  const result = invokeSdkResultProto(
+    module,
+    retry.bind(module),
+    'rac_sdk_retry_http_proto',
+  );
+  throwIfSdkInitFailed(result, 'SDK HTTP retry');
+  _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+  if (result?.warning) {
+    logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
+  }
+  if (_hasCompletedHTTPSetup) {
+    logger.info('HTTP/Auth setup succeeded on retry');
   }
 }
 
@@ -974,6 +983,9 @@ export const RunAnywhere = {
    * deterministic init phases once a WASM module is available.
    */
   async initialize(options: SDKInitOptions = {}): Promise<void> {
+    if (_shutdownPromise) {
+      await _shutdownPromise;
+    }
     if (_isInitialized) {
       logger.debug('Already initialized');
       return;
@@ -984,7 +996,8 @@ export const RunAnywhere = {
       return _initializingPromise;
     }
 
-    _initializingPromise = (async () => {
+    const lifecycleGeneration = _lifecycleGeneration;
+    const initializingPromise = (async () => {
       try {
         const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         _initOptions = { ...options, environment: env };
@@ -1010,8 +1023,10 @@ export const RunAnywhere = {
         } catch (err) {
           logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
         }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         await requestPersistentStorage();
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native
@@ -1024,6 +1039,7 @@ export const RunAnywhere = {
           environment: env,
           sdkVersion: SDK_VERSION,
         });
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
 
         _isInitialized = true;
 
@@ -1064,7 +1080,12 @@ export const RunAnywhere = {
             `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
           );
         }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
       } catch (error) {
+        if (lifecycleGeneration !== _lifecycleGeneration) {
+          logger.debug('Discarding initialization work from a shut-down SDK lifetime');
+          throw error;
+        }
         // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
         // reset init state fully and rethrow so callers observe the failure.
         logger.error(
@@ -1076,12 +1097,16 @@ export const RunAnywhere = {
         _hasCompletedHTTPSetup = false;
         _servicesInitPromise = null;
         throw error;
-      } finally {
-        _initializingPromise = null;
       }
     })();
+    _initializingPromise = initializingPromise;
+    void initializingPromise.finally(() => {
+      if (_initializingPromise === initializingPromise) {
+        _initializingPromise = null;
+      }
+    }).catch(() => undefined);
 
-    return _initializingPromise;
+    return initializingPromise;
   },
 
   /**
@@ -1103,6 +1128,9 @@ export const RunAnywhere = {
         const module = tryRunanywhereModule() as SdkInitModule | null;
         if (!module) {
           logger.debug('Services initialization deferred until a Web backend registers a WASM module');
+          if (_servicesInitPromise === servicesInitPromise) {
+            _servicesInitPromise = null;
+          }
           return;
         }
 
@@ -1170,6 +1198,14 @@ export const RunAnywhere = {
       // gets a resolved promise rather than re-entering the init logic.
     });
     _servicesInitPromise = servicesInitPromise;
+    void servicesInitPromise.finally(() => {
+      if (!_hasCompletedServicesInit && _servicesInitPromise === servicesInitPromise) {
+        // A no-module/deferred path must remain retryable. Keeping this
+        // resolved no-op promise would permanently suppress Phase 2 after a
+        // module is registered later in the same SDK lifetime.
+        _servicesInitPromise = null;
+      }
+    }).catch(() => undefined);
     return servicesInitPromise;
   },
 
@@ -1181,6 +1217,11 @@ export const RunAnywhere = {
    *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
    */
   async ensureServicesReady(): Promise<void> {
+    if (!_isInitialized && !tryRunanywhereModule()) {
+      throw SDKException.notInitialized(
+        'RunAnywhere.initialize() must complete before services can be used.',
+      );
+    }
     if (_hasCompletedServicesInit && _hasCompletedHTTPSetup) {
       return;
     }
@@ -1424,6 +1465,21 @@ export const RunAnywhere = {
       throw SDKException.backendNotAvailable(
         'downloadModel',
         `Model metadata for '${request.modelId}' is not registered.`,
+      );
+    }
+
+    // The split Web SDK downloads through the commons WASM, while inference
+    // runs in a separate backend WASM with its own private MEMFS. OPFS (or a
+    // user-approved directory routed through OPFSBridge) is the transfer
+    // medium between those modules. Reject before planning or starting the
+    // network request when no such medium exists; downloading into the
+    // commons MEMFS would leave bytes that no inference backend can read.
+    if (!OPFSBridge.isSupported) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+        'Model download requires persistent browser storage.',
+        'This browser provides neither OPFS nor an approved local directory. '
+          + 'Use a browser with OPFS support or choose a local storage folder, then retry.',
       );
     }
 
@@ -1776,6 +1832,7 @@ export const RunAnywhere = {
   ): ReturnType<typeof TextGenerationCapability.generate> {
     throwIfAborted(extra.signal, 'generate');
     await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generate');
     // Mirror Swift's Task cancellation: bridge the abort signal to commons
     // cancelGeneration so the synchronous WASM call returns early.
     const detach = attachSignalToCancel(extra.signal, () => TextGenerationCapability.cancelGeneration());
@@ -1788,27 +1845,22 @@ export const RunAnywhere = {
   ): Promise<Awaited<ReturnType<typeof TextGenerationCapability.generateStream>>> {
     throwIfAborted(extra.signal, 'generateStream');
     await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateStream');
     const stream = await TextGenerationCapability.generateStream(options);
+    if (extra.signal?.aborted) {
+      stream.cancel();
+      throwIfAborted(extra.signal, 'generateStream');
+    }
     const detach = attachSignalToCancel(extra.signal, () => stream.cancel());
-    void stream.result.finally(detach);
+    void stream.result.finally(detach).catch(() => undefined);
     return stream;
   },
 
   transcribeStream(
     audio: Parameters<typeof STTCapability.transcribeStreamAuto>[0],
     options?: Parameters<typeof STTCapability.transcribeStreamAuto>[1],
-    extra: CancellableCall = {},
   ): ReturnType<typeof STTCapability.transcribeStreamAuto> {
-    throwIfAborted(extra.signal, 'transcribeStream');
-    const iterable = STTCapability.transcribeStreamAuto(audio, options);
-    if (!extra.signal) return iterable;
-    const signal = extra.signal;
-    return (async function* () {
-      for await (const partial of iterable) {
-        throwIfAborted(signal, 'transcribeStream');
-        yield partial;
-      }
-    })();
+    return STTCapability.transcribeStreamAuto(audio, options);
   },
 
   synthesizeStream(
@@ -1884,6 +1936,7 @@ export const RunAnywhere = {
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
+    throwIfAborted(extra.signal, 'processImage');
     const detach = attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
@@ -1908,6 +1961,7 @@ export const RunAnywhere = {
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
+    throwIfAborted(extra.signal, 'processImageStream');
     const stream = promptForm
       ? await VisionLanguageCapability.processImageStream(
         image,
@@ -1915,47 +1969,74 @@ export const RunAnywhere = {
         maybeOptionsOrExtra as VLMGenerationOptions | undefined,
       )
       : await VisionLanguageCapability.processImageStream(image, optionsOrPrompt);
-    attachSignalToCancel(
+    if (extra.signal?.aborted) {
+      void VisionLanguageCapability.cancelVLMGeneration();
+      throwIfAborted(extra.signal, 'processImageStream');
+    }
+    const detach = attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
     );
-    return stream;
+    return {
+      async *[Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {
+        try {
+          yield* stream;
+        } finally {
+          detach();
+        }
+      },
+    };
   },
 
   // =========================================================================
   // Shutdown
   // =========================================================================
 
-  async shutdown(): Promise<void> {
+  shutdown(): Promise<void> {
+    if (_shutdownPromise) return _shutdownPromise;
+
     // Invalidate Phase 2 before its fetch can settle and before teardown starts.
     // The generation check prevents this lifetime from mutating flags after a
     // subsequent initialize has begun.
     _lifecycleGeneration += 1;
-    logger.info('Shutting down RunAnywhere Web SDK...');
+    const initializingPromise = _initializingPromise;
+    const shutdownPromise = (async () => {
+      logger.info('Shutting down RunAnywhere Web SDK...');
 
-    // Stop admitting destructive storage work and drain every delete accepted
-    // by this runtime before destroying its analyzer callbacks or WASM module.
-    await StorageAdapter.prepareForShutdown();
+      // Initialization owns module registration and state publication. Join
+      // the invalidated lifetime before tearing those resources down so stale
+      // async work cannot resurrect them after shutdown returns.
+      if (initializingPromise) {
+        try {
+          await initializingPromise;
+        } catch {
+          // Expected when the generation guard cancels stale initialization.
+        }
+      }
+
+      // Stop admitting destructive storage work and drain every delete accepted
+      // by this runtime before destroying its analyzer callbacks or WASM module.
+      await StorageAdapter.prepareForShutdown();
 
     // Voice-agent providers may own native handles, stream subscribers, and
     // cross-WASM conversation state. Release them before their backend modules.
-    try {
-      await resetVoiceAgentFacadeState();
-    } catch (err) {
-      logger.warning(`Voice-agent teardown failed during SDK shutdown: ${String(err)}`);
-    }
+      try {
+        await resetVoiceAgentFacadeState();
+      } catch (err) {
+        logger.warning(`Voice-agent teardown failed during SDK shutdown: ${String(err)}`);
+      }
 
     // RAG owns provider state outside the WASM adapter registry (including
     // the cross-WASM in-memory vector index). Destroy it while backend modules
     // are still available when possible, then synchronously invalidate the
     // facade even if a caller already unregistered a backend or destroy fails.
-    try {
-      await ragDestroyPipeline();
-    } catch (err) {
-      logger.warning(`RAG teardown failed during SDK shutdown: ${String(err)}`);
-    } finally {
-      resetRAGFacadeState();
-    }
+      try {
+        await ragDestroyPipeline();
+      } catch (err) {
+        logger.warning(`RAG teardown failed during SDK shutdown: ${String(err)}`);
+      } finally {
+        resetRAGFacadeState();
+      }
 
     // Release the core WASM singleton itself, not only the adapter registry.
     // `initialize()` obtains this singleton again on the next SDK lifetime;
@@ -1963,23 +2044,23 @@ export const RunAnywhere = {
     // initialize() skip module registration and produced a half-initialized
     // runtime. Backend packages still own and unregister their modules before
     // callers invoke this full SDK shutdown.
-    try {
-      CommonsModule.shared.shutdown();
-    } catch (err) {
-      logger.warning(`CommonsModule.shutdown threw during SDK shutdown: ${String(err)}`);
-    }
+      try {
+        CommonsModule.shared.shutdown();
+      } catch (err) {
+        logger.warning(`CommonsModule.shutdown threw during SDK shutdown: ${String(err)}`);
+      }
 
-    // Clear every WASM adapter singleton that `setRunanywhereModule()`
+    // Clear every WASM adapter singleton that module registration
     // installed (DownloadAdapter, ModelLifecycleAdapter,
     // ModelRegistryAdapter, ModalityProtoAdapter, SDKEventStreamAdapter)
     // and null the global module so post-shutdown calls into
     // ModalityProtoAdapter / tryRunanywhereModule()
     // can't acquire stale references to a torn-down backend.
-    clearRunanywhereModule();
-    // HTTPAdapter and StorageAdapter are owned outside setRunanywhereModule(),
+      clearRunanywhereModule();
+    // HTTPAdapter and StorageAdapter are owned outside the capability registry,
     // so they must be cleared explicitly to complete the ownership boundary.
-    HTTPAdapter.clearDefaultModule();
-    StorageAdapter.clearDefaultHandles();
+      HTTPAdapter.clearDefaultModule();
+      StorageAdapter.clearDefaultHandles();
 
     // Tear down the Worker streaming pipeline. The WASM ownership boundary
     // is `clearRunanywhereModule()`, but the Worker singletons
@@ -1989,27 +2070,34 @@ export const RunAnywhere = {
     // mirror Emscripten module + loaded model weights alive across
     // logout / account-switch / test reset, and the next `initialize()`
     // would reuse the stale bridge.
-    try {
-      OffscreenRuntimeBridge.disposeShared();
-    } catch (err) {
-      logger.warning(`OffscreenRuntimeBridge.disposeShared threw during shutdown: ${String(err)}`);
-    }
-    setStreamWorkerFactory(null);
-    setStreamWorkerInit(null);
+      try {
+        OffscreenRuntimeBridge.disposeShared();
+      } catch (err) {
+        logger.warning(`OffscreenRuntimeBridge.disposeShared threw during shutdown: ${String(err)}`);
+      }
+      setStreamWorkerFactory(null);
+      setStreamWorkerInit(null);
 
-    EventBus.reset();
+      EventBus.reset();
 
-    _isInitialized = false;
-    _initOptions = null;
-    _initializingPromise = null;
-    OPFSBridge.setPersistentRoot(null);
-    _localFileStorage = null;
-    _hasCompletedNativePhase1 = false;
-    _hasCompletedServicesInit = false;
-    _hasCompletedHTTPSetup = false;
-    _servicesInitPromise = null;
+      _isInitialized = false;
+      _initOptions = null;
+      OPFSBridge.setPersistentRoot(null);
+      _localFileStorage = null;
+      _hasCompletedNativePhase1 = false;
+      _hasCompletedServicesInit = false;
+      _hasCompletedHTTPSetup = false;
+      _servicesInitPromise = null;
 
-    logger.info('RunAnywhere Web SDK shut down');
+      logger.info('RunAnywhere Web SDK shut down');
+    })();
+    _shutdownPromise = shutdownPromise;
+    void shutdownPromise.finally(() => {
+      if (_shutdownPromise === shutdownPromise) {
+        _shutdownPromise = null;
+      }
+    }).catch(() => undefined);
+    return shutdownPromise;
   },
 
   reset(): Promise<void> {

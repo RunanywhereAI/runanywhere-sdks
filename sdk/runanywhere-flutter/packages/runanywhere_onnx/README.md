@@ -45,7 +45,7 @@ flutter pub get
 
 | Platform | Minimum Version | Requirements |
 |----------|-----------------|--------------|
-| iOS      | 17.0+           | Microphone permission |
+| iOS      | 17.5+           | Microphone permission |
 | Android  | API 24+         | RECORD_AUDIO permission |
 
 ---
@@ -57,7 +57,7 @@ flutter pub get
 Update `ios/Podfile`:
 
 ```ruby
-platform :ios, '17.0'
+platform :ios, '17.5'
 
 target 'Runner' do
   use_frameworks! :linkage => :static  # Required!

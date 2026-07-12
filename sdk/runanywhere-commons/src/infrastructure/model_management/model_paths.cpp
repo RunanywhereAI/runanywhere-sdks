@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "infrastructure/rac_path_safety_internal.h"
+#include "model_manifest_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
@@ -155,7 +156,7 @@ static bool should_skip_model_entry(const fs::path& path) {
         return true;
     if (name == "__MACOSX" || name == ".DS_Store")
         return true;
-    if (name == rac_model_folder_manifest_filename())
+    if (name == rac::infra::model_manifest::kFilename)
         return true;  // registry metadata sidecar, never a model artifact
     if (name.size() >= 2 && name[0] == '.' && name[1] == '_')
         return true;
@@ -874,14 +875,6 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
         default:
             return "Unknown";
     }
-}
-
-const char* rac_model_folder_manifest_filename(void) {
-    // Durable per-model registry sidecar written into the canonical model
-    // folder on download completion (see model_registry_manifest.cpp). Dotted
-    // so casual folder listings de-emphasize it; skipped by artifact scans via
-    // should_skip_model_entry above.
-    return ".rac-manifest.binpb";
 }
 
 // =============================================================================

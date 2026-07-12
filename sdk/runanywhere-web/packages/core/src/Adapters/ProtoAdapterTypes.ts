@@ -179,12 +179,9 @@ export interface ModalityProtoModule extends ProtoWasmModule {
   ): number;
   _rac_voice_agent_component_destroy_proto?(handle: number): number;
 
-  _rac_vlm_process_proto?(
-    handle: number,
-    imageBytes: number,
-    imageSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+  _rac_vlm_generate_proto?(
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   /** Typed stream ABI: serialized VLMGenerationRequest in, VLMStreamEvent
@@ -195,7 +192,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
-  _rac_vlm_cancel_proto?(handle: number): number;
+  _rac_vlm_cancel_lifecycle_proto?(outEvent: number): number;
 
   _rac_embeddings_embed_batch_proto?(
     handle: number,
@@ -351,7 +348,7 @@ export type ModalityCapabilityName = keyof ModalityCapabilitySlots;
 
 export const adapterState = {
   /**
-   * Legacy aggregate slot — kept so `ModalityProtoAdapter.tryDefault()`
+   * Aggregate slot used by `ModalityProtoAdapter.tryDefault()`
    * still returns a single module for callers that don't care which
    * capability they're talking to. Populated by whichever module last
    * registered the 'commons' capability, falling back to any module if no
@@ -433,8 +430,7 @@ export const DEFAULT_STREAM_YIELD_EVERY = 16;
  * Purely synchronous Emscripten exports do not need to call this — they
  * cannot be preempted from JS, and `streamCallback` already defers them
  * onto a microtask so the AsyncIterable handle is observable before the
- * blocking call begins. See `docs/STREAM_DELIVERY_DESIGN.md` for the full
- * architectural picture and migration path to true live delivery.
+ * blocking call begins.
  */
 export function streamYield(): Promise<void> {
   return new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -451,8 +447,8 @@ export function streamYield(): Promise<void> {
  * still holds and is worth documenting so SDK-internal adapters stay correct
  * when:
  *
- *   1. The Asyncify / Worker backend lands (see
- *      docs/STREAM_DELIVERY_DESIGN.md) — at that point the callback can
+ *   1. An Asyncify / Worker backend invokes the callback while a JS
+ *      microtask is queued — at that point the callback can
  *      be invoked while a JS microtask is queued, and the closure capturing
  *      `this` / `userData` MUST remain alive until `streamYield()` /
  *      Asyncify's resumption point completes.
@@ -533,8 +529,7 @@ export function streamCallback<T>(
         } else {
           queue.push(event);
         }
-        // Callback yield (option (b) in STREAM_DELIVERY_DESIGN.md): after
-        // every `yieldThreshold` emissions, post an empty microtask. This
+        // After every `yieldThreshold` emissions, post an empty microtask. This
         // is the cooperative scheduling boundary an async call wrapper
         // can synchronise against via `await streamYield()` — at that
         // point any pending consumer waiter resolutions (queued by the

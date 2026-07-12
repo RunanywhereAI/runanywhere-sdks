@@ -96,7 +96,7 @@ internal object ToolCallingExecutionPolicy {
     // marker with an independent 192-token safety ceiling. Final synthesis
     // remains concise while retaining enough room for an answer and source URL.
     const val MAX_FINAL_RESPONSE_TOKENS: Int = 96
-    const val MAX_ITERATIONS: Int = 2
+    const val MAX_TOOL_CALLS: Int = 2
     const val TIMEOUT_MILLIS: Long = 45_000L
     const val PROGRESS_MESSAGE: String = "Using web & tools…"
 
@@ -133,8 +133,7 @@ internal object ToolCallingExecutionPolicy {
         finalResponseMaxTokens: Int,
     ): RAToolCallingOptions = RAToolCallingOptions(
         tools = tools,
-        max_iterations = MAX_ITERATIONS,
-        max_tool_calls = MAX_ITERATIONS,
+        max_tool_calls = MAX_TOOL_CALLS,
         max_tokens = finalResponseMaxTokens,
         temperature = 0f,
         auto_execute = true,

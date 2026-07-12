@@ -54,20 +54,8 @@ class ToolParameterType extends $pb.ProtobufEnum {
 }
 
 /// ---------------------------------------------------------------------------
-/// Tool-call wire formats various LLM families emit. Strongly-typed counterpart
-/// to `ToolCallingOptions.format_hint` (which remains a free-form string for
-/// back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
-/// 1:1 to this enum).
-///
-/// Drift across SDKs:
-///   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
-///     today only exposes `default` and `lfm2` constants on a string-typed
-///     field — it is not yet an enum.
-///   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
-/// This enum is the union of formats LLM families actually emit; SDK frontends
-/// should map their existing strings onto these values when surfacing the
-/// strongly-typed field. Keep `format_hint` (string) populated for legacy
-/// consumers until all SDKs migrate.
+/// Tool-call wire formats various LLM families emit. This enum is the single
+/// portable format selector across commons and every generated SDK binding.
 /// ---------------------------------------------------------------------------
 class ToolCallFormatName extends $pb.ProtobufEnum {
   static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_UNSPECIFIED =
@@ -76,36 +64,19 @@ class ToolCallFormatName extends $pb.ProtobufEnum {
   static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_JSON =
       ToolCallFormatName._(
           1, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_JSON');
-  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_XML =
+  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_LFM2 =
       ToolCallFormatName._(
-          2, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_XML');
-  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_NATIVE =
-      ToolCallFormatName._(
-          3, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_NATIVE');
-  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_PYTHONIC =
-      ToolCallFormatName._(
-          4, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_PYTHONIC');
-  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS =
-      ToolCallFormatName._(
-          5, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS');
-  static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_HERMES =
-      ToolCallFormatName._(
-          6, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_HERMES');
+          7, _omitEnumNames ? '' : 'TOOL_CALL_FORMAT_NAME_LFM2');
 
   static const $core.List<ToolCallFormatName> values = <ToolCallFormatName>[
     TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
     TOOL_CALL_FORMAT_NAME_JSON,
-    TOOL_CALL_FORMAT_NAME_XML,
-    TOOL_CALL_FORMAT_NAME_NATIVE,
-    TOOL_CALL_FORMAT_NAME_PYTHONIC,
-    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS,
-    TOOL_CALL_FORMAT_NAME_HERMES,
+    TOOL_CALL_FORMAT_NAME_LFM2,
   ];
 
-  static final $core.List<ToolCallFormatName?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
-  static ToolCallFormatName? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
+  static final $core.Map<$core.int, ToolCallFormatName> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static ToolCallFormatName? valueOf($core.int value) => _byValue[value];
 
   const ToolCallFormatName._(super.value, super.name);
 }

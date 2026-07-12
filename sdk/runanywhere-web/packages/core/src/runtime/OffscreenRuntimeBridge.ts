@@ -21,17 +21,11 @@
  *   `setStreamWorkerFactory(...)` + `setStreamWorkerInit(...)` from its
  *   `register()`, at which point this file flips to a stable public
  *   surface (drop the `@internal @experimental` tag) — OR (b) the
- *   Worker streaming path is abandoned in favour of the documented
- *   SAB ring-buffer follow-up (Option C in
- *   `docs/STREAM_DELIVERY_DESIGN.md`), at which point this file plus
+ *   Worker streaming path is abandoned in favour of a shared-memory
+ *   ring-buffer design, at which point this file plus
  *   `StreamWorker.ts` + `StreamWorkerFactoryRegistry.ts` are deleted
  *   wholesale. Do NOT build new SDK features against the
  *   `OffscreenRuntimeBridge` API surface until that disposition lands.
- *
- *   Tracked by:
- *     - `comments/pr-494/addressing/comments/pass2-syn-027.json` —
- *       "T6.1 Worker streaming path is dead code in production"
- *     - `docs/STREAM_DELIVERY_DESIGN.md` — DECISION-3 + Recommended-next-step
  *
  * Owns a lazily-spawned `Worker` and routes per-call streaming requests
  * (`stream.llm.generate`, `stream.stt.transcribe`, `stream.tts.synthesize`,
@@ -46,7 +40,7 @@
  *  - The Worker holds its own Emscripten module instance for STREAMING
  *    ONLY (DECISION-3): non-streaming exports stay on the main-thread
  *    `EmscriptenModule` singleton. Accepts ~2× memory for the streaming
- *    WASM. Documented in `docs/STREAM_DELIVERY_DESIGN.md`.
+ *    WASM.
  *  - Cancellation is deterministic on the main thread: `cancel(requestId)`
  *    posts a `cancel` message to the worker and immediately ends the
  *    iterator. Any further `callback` messages for that requestId are

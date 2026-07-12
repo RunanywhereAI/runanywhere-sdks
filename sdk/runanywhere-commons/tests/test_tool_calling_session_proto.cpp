@@ -281,6 +281,114 @@ void sink_callback(const uint8_t* bytes, size_t size, void* user_data) {
     }
 }
 
+void capture_session_handle(uint64_t handle, void* user_data) {
+    if (user_data) {
+        *static_cast<uint64_t*>(user_data) = handle;
+    }
+}
+
+struct DestroyOnFirstEventSink {
+    const uint64_t* handle = nullptr;
+    int callback_count = 0;
+    int tool_call_count = 0;
+    bool destroy_called = false;
+    rac_result_t destroy_result = RAC_ERROR_INVALID_STATE;
+};
+
+void destroy_on_first_event_callback(const uint8_t* bytes, size_t size, void* user_data) {
+    auto* sink = static_cast<DestroyOnFirstEventSink*>(user_data);
+    runanywhere::v1::ToolCallingSessionEvent event;
+    if (size > 0 && event.ParseFromArray(bytes, static_cast<int>(size)) &&
+        event.kind_case() == runanywhere::v1::ToolCallingSessionEvent::kToolCall) {
+        ++sink->tool_call_count;
+    }
+    ++sink->callback_count;
+    if (!sink->destroy_called && sink->handle && *sink->handle != 0) {
+        sink->destroy_called = true;
+        sink->destroy_result = rac_tool_calling_session_destroy_proto(*sink->handle);
+    }
+}
+
+struct NestedStepDestroySink {
+    const uint64_t* handle = nullptr;
+    int callback_count = 0;
+    int tool_call_count = 0;
+    int final_result_count = 0;
+    bool step_started = false;
+    bool step_serialized = false;
+    bool in_step = false;
+    bool destroy_called = false;
+    rac_result_t step_result = RAC_ERROR_INVALID_STATE;
+    rac_result_t destroy_result = RAC_ERROR_INVALID_STATE;
+};
+
+void nested_step_destroy_callback(const uint8_t* bytes, size_t size, void* user_data) {
+    auto* sink = static_cast<NestedStepDestroySink*>(user_data);
+    runanywhere::v1::ToolCallingSessionEvent event;
+    if (size == 0 || !event.ParseFromArray(bytes, static_cast<int>(size))) {
+        return;
+    }
+
+    ++sink->callback_count;
+    if (event.kind_case() == runanywhere::v1::ToolCallingSessionEvent::kFinalResult) {
+        ++sink->final_result_count;
+    }
+
+    if (sink->in_step && !sink->destroy_called && sink->handle && *sink->handle != 0) {
+        sink->destroy_called = true;
+        sink->destroy_result = rac_tool_calling_session_destroy_proto(*sink->handle);
+        return;
+    }
+
+    if (event.kind_case() != runanywhere::v1::ToolCallingSessionEvent::kToolCall ||
+        sink->step_started || !sink->handle || *sink->handle == 0) {
+        return;
+    }
+
+    ++sink->tool_call_count;
+    sink->step_started = true;
+    runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+    step.set_session_handle(*sink->handle);
+    step.set_tool_call_id(event.tool_call().id());
+    step.set_result_json(R"({"temperature":25})");
+    std::vector<uint8_t> step_bytes;
+    sink->step_serialized = serialize(step, &step_bytes);
+    if (!sink->step_serialized) {
+        return;
+    }
+
+    sink->in_step = true;
+    sink->step_result =
+        rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+    sink->in_step = false;
+}
+
+struct CancelBeforeToolDispatchSink {
+    const uint64_t* handle = nullptr;
+    int callback_count = 0;
+    int tool_side_effect_count = 0;
+    bool cancel_called = false;
+    rac_result_t cancel_result = RAC_ERROR_INVALID_STATE;
+};
+
+void cancel_before_tool_dispatch_callback(const uint8_t* bytes, size_t size, void* user_data) {
+    auto* sink = static_cast<CancelBeforeToolDispatchSink*>(user_data);
+    runanywhere::v1::ToolCallingSessionEvent event;
+    if (size == 0 || !event.ParseFromArray(bytes, static_cast<int>(size))) {
+        return;
+    }
+
+    ++sink->callback_count;
+    if (event.kind_case() == runanywhere::v1::ToolCallingSessionEvent::kToolCall) {
+        ++sink->tool_side_effect_count;
+    }
+    if (event.kind_case() == runanywhere::v1::ToolCallingSessionEvent::kLlmStreamEventBytes &&
+        !sink->cancel_called && sink->handle && *sink->handle != 0) {
+        sink->cancel_called = true;
+        sink->cancel_result = rac_tool_calling_session_cancel_proto(*sink->handle);
+    }
+}
+
 bool parse_first_error(EventSink& sink, runanywhere::v1::SDKError* out_error) {
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
     const auto* event = sink.find_first(EvCase::kErrorBytes);
@@ -311,15 +419,15 @@ runanywhere::v1::ToolDefinition make_calculate_tool() {
 }
 
 runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
-                                                              uint32_t max_iterations = 0) {
+                                                              uint32_t max_tool_calls = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
     request.set_max_tokens(64);
     request.set_temperature(0.5f);
     *request.add_tools() = make_weather_tool();
-    request.set_format_hint("default");
-    if (max_iterations > 0)
-        request.set_max_iterations(max_iterations);
+    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    if (max_tool_calls > 0)
+        request.set_max_tool_calls(max_tool_calls);
     return request;
 }
 
@@ -339,8 +447,8 @@ int test_session_emits_tool_call() {
 
     uint64_t handle = 0;
     sink.published_handle = &handle;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
     CHECK(handle != 0, "handle non-zero");
     CHECK(sink.saw_published_handle(), "handle published before event callback");
@@ -377,8 +485,8 @@ int test_step_with_result_emits_final() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -417,23 +525,24 @@ int test_step_with_result_emits_final() {
     return 0;
 }
 
-int test_iteration_cap_respected() {
+int test_max_tool_calls_allows_final_synthesis() {
     if (!load_mock_llm())
         return 1;
     set_responses({
         R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
         R"(<tool_call>{"tool":"get_weather","arguments":{"location":"B"}}</tool_call>)",
-        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"C"}}</tool_call>)",
+        "Final answer after two tool calls.",
     });
 
     EventSink sink;
     auto request = make_request("weather everywhere", 2);
+    request.set_keep_tools_available(true);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -456,11 +565,18 @@ int test_iteration_cap_respected() {
     rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
     CHECK(rc == RAC_SUCCESS, "second step resumed");
 
-    CHECK(sink.count_kind(EvCase::kFinalResult) == 1, "final emitted after max_iterations");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 1,
+          "final synthesis emitted after max_tool_calls");
     const auto* final_ev = sink.find_first(EvCase::kFinalResult);
     if (final_ev) {
-        CHECK(final_ev->final_result().iterations_used() == 2, "iterations_used == max_iterations");
+        CHECK(final_ev->final_result().iterations_used() == 3,
+              "two tool calls plus final synthesis use three generations");
+        CHECK(final_ev->final_result().tool_calls_size() == 2,
+              "max_tool_calls limits invocations, not generation turns");
+        CHECK(final_ev->final_result().text() == "Final answer after two tool calls.",
+              "final synthesis text is preserved");
     }
+    CHECK(generate_calls() == 3, "final synthesis runs after second tool result");
 
     rac_tool_calling_session_destroy_proto(handle);
     cleanup_environment();
@@ -482,8 +598,8 @@ int test_forced_tool_name_only_promotes_session_to_specific() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                                  sink_callback, &sink, &handle);
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "forced-name-only session create succeeds");
     CHECK(handle != 0, "forced-name-only session publishes handle");
 
@@ -519,8 +635,8 @@ int test_none_vetoes_forced_name_in_session() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                                  sink_callback, &sink, &handle);
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "NONE plus forced name session create succeeds");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -554,8 +670,8 @@ int test_none_blocks_session_call_when_validation_disabled() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                                  sink_callback, &sink, &handle);
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "NONE session policy failure is emitted asynchronously");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -595,8 +711,8 @@ int test_forced_target_blocks_wrong_session_call_when_validation_disabled() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    const rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                                  sink_callback, &sink, &handle);
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "wrong forced-target session call emits asynchronously");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -629,9 +745,9 @@ int test_specific_session_target_must_be_nonempty_and_present() {
         EventSink sink;
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
-        uint64_t handle = 99;
+        uint64_t handle = 0;
         const rac_result_t rc = rac_tool_calling_session_create_proto(
-            bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
         CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, label);
         CHECK(handle == 0, "invalid SPECIFIC session does not publish handle");
         using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -670,7 +786,7 @@ int test_specific_and_required_sessions_reject_initial_no_call() {
         serialize(request, &bytes);
         uint64_t handle = 0;
         const rac_result_t rc = rac_tool_calling_session_create_proto(
-            bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
         CHECK(rc == RAC_SUCCESS, label);
 
         using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -703,6 +819,154 @@ int test_specific_and_required_sessions_reject_initial_no_call() {
     return 0;
 }
 
+int test_step_rejects_mismatched_tool_call_id_without_mutation() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+
+    EventSink sink;
+    auto request = make_request("What's the weather in Tokyo?");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+    CHECK(rc == RAC_SUCCESS, "identity test session create succeeds");
+
+    using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+    const auto* tool_event = sink.find_first(EvCase::kToolCall);
+    CHECK(tool_event != nullptr, "identity test captures pending tool call");
+    const std::string pending_tool_call_id = tool_event ? tool_event->tool_call().id() : "";
+
+    runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+    step.set_session_handle(handle);
+    step.set_tool_call_id("different-call-id");
+    step.set_result_json(R"({"temperature":25})");
+    std::vector<uint8_t> step_bytes;
+    serialize(step, &step_bytes);
+    rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+    CHECK(rc == RAC_ERROR_VALIDATION_FAILED, "mismatched tool_call_id is rejected");
+    CHECK(generate_calls() == 1, "mismatched result does not start another generation");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 0,
+          "mismatched result does not complete the session");
+
+    if (tool_event) {
+        step.set_tool_call_id(pending_tool_call_id);
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "correct pending tool_call_id remains accepted");
+        CHECK(generate_calls() == 2, "correct result resumes generation exactly once");
+        const auto* final_event = sink.find_first(EvCase::kFinalResult);
+        CHECK(final_event != nullptr, "correct result completes the session");
+        if (final_event) {
+            CHECK(final_event->final_result().tool_results_size() == 1,
+                  "rejected result did not mutate accumulated tool results");
+            if (final_event->final_result().tool_results_size() == 1) {
+                CHECK(final_event->final_result().tool_results(0).tool_call_id() ==
+                          pending_tool_call_id,
+                      "accepted result retains pending call identity");
+            }
+        }
+    }
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
+int test_reentrant_destroy_stops_remaining_queued_events() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    auto request = make_request("What's the weather in Tokyo?");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    DestroyOnFirstEventSink sink;
+    sink.handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), destroy_on_first_event_callback, &sink, capture_session_handle,
+        &handle);
+
+    CHECK(rc == RAC_SUCCESS, "create returns after reentrant destroy");
+    CHECK(sink.destroy_called, "first queued callback destroys its own session");
+    CHECK(sink.destroy_result == RAC_SUCCESS, "reentrant destroy succeeds");
+    CHECK(sink.callback_count == 1, "reentrant destroy stops the remaining payload batch");
+    CHECK(sink.tool_call_count == 0, "destroyed session publishes no queued tool call");
+
+    cleanup_environment();
+    return 0;
+}
+
+int test_nested_reentrant_step_and_destroy_does_not_deadlock() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+
+    auto request = make_request("What's the weather in Tokyo?");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    NestedStepDestroySink sink;
+    sink.handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), nested_step_destroy_callback, &sink, capture_session_handle,
+        &handle);
+
+    CHECK(rc == RAC_SUCCESS, "create returns after nested reentrant step/destroy");
+    CHECK(sink.step_started, "tool callback starts a nested step");
+    CHECK(sink.step_serialized, "nested step request serializes");
+    CHECK(sink.step_result == RAC_SUCCESS, "nested step returns after nested destroy");
+    CHECK(sink.destroy_called, "nested step callback destroys its session");
+    CHECK(sink.destroy_result == RAC_SUCCESS, "nested reentrant destroy succeeds");
+    CHECK(sink.tool_call_count == 1, "only the admitted outer tool call is published");
+    CHECK(sink.final_result_count == 0, "destroy suppresses the nested queued final result");
+
+    cleanup_environment();
+    return 0;
+}
+
+int test_cancel_before_tool_dispatch_prevents_host_side_effect() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+    });
+
+    auto request = make_request("What's the weather in Tokyo?");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    uint64_t handle = 0;
+    CancelBeforeToolDispatchSink sink;
+    sink.handle = &handle;
+    const rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), cancel_before_tool_dispatch_callback, &sink,
+        capture_session_handle, &handle);
+
+    CHECK(rc == RAC_SUCCESS, "create returns after cancel from earlier queued event");
+    CHECK(sink.cancel_called, "LLM event cancels before queued tool dispatch");
+    CHECK(sink.cancel_result == RAC_SUCCESS, "cancel before tool dispatch succeeds");
+    CHECK(sink.callback_count == 1, "cancelled queued tool event is not published");
+    CHECK(sink.tool_side_effect_count == 0, "cancel prevents host tool side effects");
+
+    rac_tool_calling_session_destroy_proto(handle);
+    cleanup_environment();
+    return 0;
+}
+
 int test_destroy_clears_state() {
     if (!load_mock_llm())
         return 1;
@@ -713,8 +977,8 @@ int test_destroy_clears_state() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
-                                                            sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create succeeds");
     CHECK(handle != 0, "handle non-zero");
 
@@ -753,13 +1017,17 @@ int main() {
 #else
         test_session_emits_tool_call();
         test_step_with_result_emits_final();
-        test_iteration_cap_respected();
+        test_max_tool_calls_allows_final_synthesis();
         test_forced_tool_name_only_promotes_session_to_specific();
         test_none_vetoes_forced_name_in_session();
         test_none_blocks_session_call_when_validation_disabled();
         test_forced_target_blocks_wrong_session_call_when_validation_disabled();
         test_specific_session_target_must_be_nonempty_and_present();
         test_specific_and_required_sessions_reject_initial_no_call();
+        test_step_rejects_mismatched_tool_call_id_without_mutation();
+        test_reentrant_destroy_stops_remaining_queued_events();
+        test_nested_reentrant_step_and_destroy_does_not_deadlock();
+        test_cancel_before_tool_dispatch_prevents_host_side_effect();
         test_destroy_clears_state();
         if (g_registry) {
             rac_model_registry_destroy(g_registry);

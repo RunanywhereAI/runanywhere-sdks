@@ -17,7 +17,6 @@ import ai.runanywhere.proto.v1.DeviceStorageInfo
 import ai.runanywhere.proto.v1.ModelStorageMetrics
 import ai.runanywhere.proto.v1.StorageAvailability
 import ai.runanywhere.proto.v1.StorageInfo
-import ai.runanywhere.proto.v1.StoredModel
 import com.runanywhere.sdk.public.types.RAStorageInfo
 
 // MARK: - DeviceStorageInfo
@@ -112,20 +111,6 @@ val RAStorageInfo.totalModelsSize: Long
 val RAStorageInfo.modelCount: Int
     get() = models.size
 
-/**
- * Project the per-model storage rows into the legacy `StoredModel` view
- * Swift, Flutter, and React Native call sites consume.
- */
-val RAStorageInfo.storedModels: List<StoredModel>
-    get() =
-        models.map { metrics ->
-            StoredModel(
-                model_id = metrics.model_id,
-                name = metrics.model_id,
-                size_bytes = metrics.size_on_disk_bytes,
-            )
-        }
-
 // MARK: - ModelStorageMetrics
 
 /**
@@ -142,27 +127,6 @@ fun ModelStorageMetrics.Companion.create(
         size_on_disk_bytes = sizeOnDiskBytes,
         last_used_ms = lastUsedMs,
     )
-
-// MARK: - StoredModel
-
-/** Alias for `size_bytes` to match the Swift `size` accessor. */
-val StoredModel.size: Long
-    get() = size_bytes
-
-/**
- * Local file path string. Returns `"/unknown"` when the underlying
- * `local_path` is empty, matching the Swift fallback.
- */
-val StoredModel.path: String
-    get() = if (local_path.isEmpty()) "/unknown" else local_path
-
-/**
- * Created (download-completed) timestamp as Unix epoch ms. Returns 0L when
- * the proto field is absent — Kotlin can't return a `Date` here, so the
- * consumer can convert to `Instant`/`Date` itself.
- */
-val StoredModel.createdDate: Long
-    get() = downloaded_at_ms ?: 0L
 
 // MARK: - StorageAvailability
 

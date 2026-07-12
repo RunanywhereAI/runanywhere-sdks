@@ -278,16 +278,17 @@ build_target() {
     # stale `-pthread` values behind when a target build directory was first
     # configured in threaded mode, producing a falsely-labelled shared-memory
     # artifact.
+    local prefix_map_flags="-ffile-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fmacro-prefix-map=${REPO_ROOT}=/runanywhere-sdks -fdebug-prefix-map=${REPO_ROOT}=/runanywhere-sdks"
     local cmake_thread_args=(
-        -DCMAKE_C_FLAGS=""
-        -DCMAKE_CXX_FLAGS=""
+        "-DCMAKE_C_FLAGS=${prefix_map_flags}"
+        "-DCMAKE_CXX_FLAGS=${prefix_map_flags}"
     )
     if [ "$pthreads_for_target" = "ON" ]; then
         # pthreads must be present on every object that is linked into the final
         # shared-memory module, not just on the final Emscripten executable target.
         cmake_thread_args=(
-            -DCMAKE_C_FLAGS="-pthread"
-            -DCMAKE_CXX_FLAGS="-pthread"
+            "-DCMAKE_C_FLAGS=-pthread ${prefix_map_flags}"
+            "-DCMAKE_CXX_FLAGS=-pthread ${prefix_map_flags}"
         )
     fi
 
@@ -300,16 +301,11 @@ build_target() {
     # OFF for the zlib FetchContent block. Passing it as a CMake variable is
     # enough — the variable is read inside zlib's own CMakeLists.txt.
     #
-    # Also explicitly pass ZLIB_VERSION in its
-    # purely-numeric form so libarchive's nested `FIND_PACKAGE(ZLIB 1.2.1)`
-    # accepts it. The VERSIONS file holds `v1.3.2` (the GIT_TAG madler/zlib
-    # uses); CMake's FindZLIB rejects 'v1.3.2' against the `>= 1.2.1` request
-    # and leaves HAVE_ZLIB_H undefined, which silently re-enables libarchive's
-    # `program("gzip -d")` fallback. Emscripten/OPFS cannot fork+exec, so
-    # every .tar.gz extraction fails with "Can't initialize filter; unable
-    # to run program 'gzip -d'". Forcing the numeric form on the command
-    # line guarantees the value is correct even when the commons CMakeLists
-    # in-tree pre-normalization races a stale FetchContent cache.
+    # Commons points FindZLIB's singular include probe at the fetched source
+    # directory, where zlib.h carries the canonical numeric version, and keeps
+    # the generated zconf.h directory in the plural include path. Do not seed
+    # FindZLIB's result variables here; a clean configure must derive them from
+    # the dependency itself.
     # The Web example exposes RunAnywhere.solutions.run for the canonical
     # Voice Agent and RAG YAMLs. Compile the real protobuf-backed runtime;
     # OFF links rac_solution_stub.cpp and guarantees both visible buttons
@@ -325,8 +321,6 @@ build_target() {
         -DRAC_BUILD_PLATFORM=OFF \
         -DRAC_BUILD_SHARED=OFF \
         -DZLIB_BUILD_SHARED=OFF \
-        -DZLIB_VERSION="1.3.2" \
-        -DZLIB_VERSION_STRING="1.3.2" \
         -DRAC_WASM_PTHREADS="${pthreads_for_target}" \
         -DRAC_WASM_DEBUG="${DEBUG}" \
         -DRAC_WASM_BUILD_CORE="${wasm_core}" \

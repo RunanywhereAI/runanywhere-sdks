@@ -3285,9 +3285,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
     kModelIdFieldNumber = 5,
     kTokenizerSourceFieldNumber = 2,
     kModelVariantFieldNumber = 1,
-    kMaxMemoryMbFieldNumber = 4,
     kEnableSafetyCheckerFieldNumber = 3,
-    kReduceMemoryFieldNumber = 7,
+    kMaxMemoryMbFieldNumber = 4,
     kPreferredFrameworkFieldNumber = 6,
   };
   // optional string model_id = 5;
@@ -3333,16 +3332,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
   void _internal_set_model_variant(::runanywhere::v1::DiffusionModelVariant value);
 
   public:
-  // int32 max_memory_mb = 4;
-  void clear_max_memory_mb() ;
-  [[nodiscard]] ::int32_t max_memory_mb() const;
-  void set_max_memory_mb(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_memory_mb() const;
-  void _internal_set_max_memory_mb(::int32_t value);
-
-  public:
   // bool enable_safety_checker = 3;
   void clear_enable_safety_checker() ;
   [[nodiscard]] bool enable_safety_checker() const;
@@ -3353,14 +3342,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
   void _internal_set_enable_safety_checker(bool value);
 
   public:
-  // bool reduce_memory = 7;
-  void clear_reduce_memory() ;
-  [[nodiscard]] bool reduce_memory() const;
-  void set_reduce_memory(bool value);
+  // int32 max_memory_mb = 4;
+  void clear_max_memory_mb() ;
+  [[nodiscard]] ::int32_t max_memory_mb() const;
+  void set_max_memory_mb(::int32_t value);
 
   private:
-  bool _internal_reduce_memory() const;
-  void _internal_set_reduce_memory(bool value);
+  ::int32_t _internal_max_memory_mb() const;
+  void _internal_set_max_memory_mb(::int32_t value);
 
   public:
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
@@ -3379,7 +3368,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
+      ::google::protobuf::internal::TcParseTable<3, 6,
                           1, 54,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -3411,9 +3400,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::runanywhere::v1::DiffusionTokenizerSource* PROTOBUF_NULLABLE tokenizer_source_;
     int model_variant_;
-    ::int32_t max_memory_mb_;
     bool enable_safety_checker_;
-    bool reduce_memory_;
+    ::int32_t max_memory_mb_;
     int preferred_framework_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -3941,7 +3929,7 @@ inline void DiffusionConfiguration::set_allocated_tokenizer_source(::runanywhere
 inline void DiffusionConfiguration::clear_enable_safety_checker() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_safety_checker_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool DiffusionConfiguration::enable_safety_checker() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionConfiguration.enable_safety_checker)
@@ -3949,7 +3937,7 @@ inline bool DiffusionConfiguration::enable_safety_checker() const {
 }
 inline void DiffusionConfiguration::set_enable_safety_checker(bool value) {
   _internal_set_enable_safety_checker(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionConfiguration.enable_safety_checker)
 }
 inline bool DiffusionConfiguration::_internal_enable_safety_checker() const {
@@ -3965,7 +3953,7 @@ inline void DiffusionConfiguration::_internal_set_enable_safety_checker(bool val
 inline void DiffusionConfiguration::clear_max_memory_mb() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_memory_mb_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t DiffusionConfiguration::max_memory_mb() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionConfiguration.max_memory_mb)
@@ -3973,7 +3961,7 @@ inline ::int32_t DiffusionConfiguration::max_memory_mb() const {
 }
 inline void DiffusionConfiguration::set_max_memory_mb(::int32_t value) {
   _internal_set_max_memory_mb(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionConfiguration.max_memory_mb)
 }
 inline ::int32_t DiffusionConfiguration::_internal_max_memory_mb() const {
@@ -4055,13 +4043,13 @@ inline void DiffusionConfiguration::set_allocated_model_id(::std::string* PROTOB
 
 // optional .runanywhere.v1.InferenceFramework preferred_framework = 6;
 inline bool DiffusionConfiguration::has_preferred_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void DiffusionConfiguration::clear_preferred_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preferred_framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::InferenceFramework DiffusionConfiguration::preferred_framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionConfiguration.preferred_framework)
@@ -4069,7 +4057,7 @@ inline ::runanywhere::v1::InferenceFramework DiffusionConfiguration::preferred_f
 }
 inline void DiffusionConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_preferred_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionConfiguration.preferred_framework)
 }
 inline ::runanywhere::v1::InferenceFramework DiffusionConfiguration::_internal_preferred_framework() const {
@@ -4079,30 +4067,6 @@ inline ::runanywhere::v1::InferenceFramework DiffusionConfiguration::_internal_p
 inline void DiffusionConfiguration::_internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preferred_framework_ = value;
-}
-
-// bool reduce_memory = 7;
-inline void DiffusionConfiguration::clear_reduce_memory() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.reduce_memory_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline bool DiffusionConfiguration::reduce_memory() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionConfiguration.reduce_memory)
-  return _internal_reduce_memory();
-}
-inline void DiffusionConfiguration::set_reduce_memory(bool value) {
-  _internal_set_reduce_memory(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionConfiguration.reduce_memory)
-}
-inline bool DiffusionConfiguration::_internal_reduce_memory() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.reduce_memory_;
-}
-inline void DiffusionConfiguration::_internal_set_reduce_memory(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.reduce_memory_ = value;
 }
 
 // -------------------------------------------------------------------

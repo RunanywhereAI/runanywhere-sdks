@@ -191,7 +191,7 @@ static void onnx_embed_vtable_destroy(void* impl) {
 
 // ONNX embeddings `create` adapter. Allocates an
 // onnx_embeddings_handle wrapping ONNXEmbeddingProvider. Called by
-// commons rac_embeddings_create() via rac_plugin_find → g_onnx_engine_vtable
+// commons embeddings service factory via rac_plugin_find → g_onnx_engine_vtable
 // (embedding_ops slot).
 static rac_result_t onnx_embed_create_impl(const char* model_id, const char* config_json,
                                            void** out_impl) {

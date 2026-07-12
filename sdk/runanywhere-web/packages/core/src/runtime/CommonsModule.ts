@@ -20,7 +20,7 @@
  *
  * This bridge is intentionally MINIMAL — it loads the core WASM, runs
  * `rac_init`, completes native Phase 1, then installs the module via
- * `setRunanywhereModule(...)` so the proto-byte adapters can reach it.
+ * `registerWasmModule(...)` so the proto-byte adapters can reach it.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';

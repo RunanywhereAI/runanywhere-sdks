@@ -137,7 +137,7 @@ export class SDKException extends Error {
     return new SDKException(proto);
   }
 
-  // ── Convenience factories (mirror legacy `notInitializedError` etc.) ──
+  // ── Convenience factories ──
 
   static notInitialized(component?: string): SDKException {
     const message = component

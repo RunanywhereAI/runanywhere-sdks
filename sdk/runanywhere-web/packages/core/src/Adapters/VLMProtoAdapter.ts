@@ -1,7 +1,5 @@
 import {
-  VLMGenerationOptions,
   VLMGenerationRequest,
-  VLMImage,
   VLMResult,
   VLMStreamEvent,
   type VLMGenerationOptions as ProtoVLMGenerationOptions,
@@ -11,7 +9,7 @@ import {
 } from '@runanywhere/proto-ts/vlm_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
-import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   ensureExports,
@@ -31,47 +29,37 @@ export class VLMProtoAdapter {
 
   supportsProtoVLM(): boolean {
     return missingExports(this.module, [
-      '_rac_vlm_process_proto',
+      '_rac_vlm_generate_proto',
       '_rac_vlm_stream_proto',
-      '_rac_vlm_cancel_proto',
+      '_rac_vlm_cancel_lifecycle_proto',
     ]).length === 0;
   }
 
   async process(
-    handle: number,
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
   ): Promise<ProtoVLMResult | null> {
-    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_process_proto'])) {
+    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_generate_proto'])) {
       return null;
     }
-    const imageBytes = VLMImage.encode(image).finish();
-    const optionsBytes = VLMGenerationOptions.encode(options).finish();
+    const requestBytes = VLMGenerationRequest.encode(
+      VLMGenerationRequest.fromPartial({ images: [image], options }),
+    ).finish();
     const bridge = this.bridge();
-    return bridge.withHeapBytesAsync(imageBytes, (imagePtr, imageSize) => (
-      bridge.withHeapBytesAsync(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProtoAsync(
-          VLMResult,
-          (outResult) => this.callProcess(
-            handle,
-            imagePtr,
-            imageSize,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_vlm_process_proto',
-        )
-      ))
+    return bridge.withHeapBytesAsync(requestBytes, (requestPtr, requestSize) => (
+      bridge.callResultProtoAsync(
+        VLMResult,
+        (outResult) => this.callProcess(requestPtr, requestSize, outResult),
+        'rac_vlm_generate_proto',
+      )
     ));
   }
 
   async processAsync(
-    handle: number,
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
   ): Promise<ProtoVLMResult | null> {
-    return this.process(handle, image, options);
+    return this.process(image, options);
   }
 
   /**
@@ -79,11 +67,9 @@ export class VLMProtoAdapter {
    * `rac_vlm_stream_proto` (STARTED → TOKEN* → exactly one terminal
    * COMPLETED/ERROR; COMPLETED carries the full VLMResult). The canonical
    * cross-SDK streaming shape — serialized VLMGenerationRequest in, no
-   * handle, no out-result buffer. `handle` is retained only for cancel
-   * routing (0 falls back to the lifecycle-owned service).
+   * handle, no out-result buffer.
    */
   streamEvents(
-    handle: number,
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
   ): AsyncIterable<ProtoVLMStreamEvent> {
@@ -102,7 +88,7 @@ export class VLMProtoAdapter {
           requestBytes,
         },
         VLMStreamEvent,
-        { onCancel: () => { this.cancel(handle); } },
+        { onCancel: () => { this.cancel(); } },
       );
     }
     if (!ensureExports(this.module, 'vlm.processImageStream', ['_rac_vlm_stream_proto'])) {
@@ -120,7 +106,7 @@ export class VLMProtoAdapter {
       ),
       undefined,
       () => {
-        this.cancel(handle);
+        this.cancel();
       },
       // Swift parity (CppBridge+ModalityProtoABI.swift VLM stream): no
       // synthetic terminal event — a non-success rc finishes the stream
@@ -130,11 +116,15 @@ export class VLMProtoAdapter {
     );
   }
 
-  cancel(handle: number): boolean {
-    if (!ensureExports(this.module, 'vlm.cancel', ['_rac_vlm_cancel_proto'])) return false;
-    const rc = this.module._rac_vlm_cancel_proto!(handle);
-    if (rc !== 0) logger.warning(`rac_vlm_cancel_proto returned ${formatRacResult(rc)}`);
-    return rc === 0;
+  cancel(): boolean {
+    if (!ensureExports(this.module, 'vlm.cancel', ['_rac_vlm_cancel_lifecycle_proto'])) {
+      return false;
+    }
+    const bytes = this.bridge().readResultProto(
+      (outEvent) => this.module._rac_vlm_cancel_lifecycle_proto!(outEvent),
+      'rac_vlm_cancel_lifecycle_proto',
+    );
+    return bytes !== null;
   }
 
   private bridge(): ProtoWasmBridge {
@@ -142,26 +132,16 @@ export class VLMProtoAdapter {
   }
 
   private callProcess(
-    handle: number,
-    imagePtr: number,
-    imageSize: number,
-    optionsPtr: number,
-    optionsSize: number,
+    requestPtr: number,
+    requestSize: number,
     outResult: number,
   ): Promise<number> {
     return callEmscriptenAsyncNumber(
       this.module,
-      'rac_vlm_process_proto',
-      ['number', 'number', 'number', 'number', 'number', 'number'],
-      [handle, imagePtr, imageSize, optionsPtr, optionsSize, outResult],
-      () => this.module._rac_vlm_process_proto!(
-        handle,
-        imagePtr,
-        imageSize,
-        optionsPtr,
-        optionsSize,
-        outResult,
-      ),
+      'rac_vlm_generate_proto',
+      ['number', 'number', 'number'],
+      [requestPtr, requestSize, outResult],
+      () => this.module._rac_vlm_generate_proto!(requestPtr, requestSize, outResult),
     );
   }
 

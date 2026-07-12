@@ -239,9 +239,6 @@ class DartBridgeSTT {
       return;
     }
     final fn = RacNative.bindings.rac_stt_component_load_model;
-    if (fn == null) {
-      throw UnsupportedError('rac_stt_component_load_model is unavailable');
-    }
     final handle = getHandle();
     final pathPtr = path.toNativeUtf8();
     final idPtr = id.toNativeUtf8();
@@ -273,16 +270,12 @@ class DartBridgeSTT {
   /// On iOS and Android, events are delivered through a native-port helper
   /// that copies bytes before posting to Dart, so MLX/Swift async and native
   /// worker-thread callbacks do not need to enter a Dart `isolateLocal`
-  /// trampoline from a non-Dart thread. Older or unsupported binaries fall
-  /// back to `NativeCallable.isolateLocal`, valid only for same-thread backend
-  /// callbacks. Teardown follows the header contract: unset callback →
-  /// `rac_stt_proto_quiesce()` → free callback context.
+  /// trampoline from a non-Dart thread.
   Stream<STTPartialResult> transcribeSessionStream(
     Stream<Uint8List> audio,
     STTOptions options,
   ) {
     final controller = StreamController<STTPartialResult>();
-    NativeCallable<RacSttStreamEventCallbackNative>? nativeCb;
     ReceivePort? nativePortEvents;
     var cancelled = false;
     var sessionId = 0;
@@ -295,8 +288,6 @@ class DartBridgeSTT {
     controller
       ..onListen = () async {
         final bindings = RacNative.bindings;
-        final setCallback = bindings.rac_stt_set_stream_proto_callback;
-        final unsetCallback = bindings.rac_stt_unset_stream_proto_callback;
         final setNativePortCallback =
             bindings.ra_flutter_stt_set_stream_proto_native_port;
         final unsetNativePortCallback =
@@ -305,16 +296,11 @@ class DartBridgeSTT {
         final feed = bindings.rac_stt_stream_feed_audio_proto;
         final stop = bindings.rac_stt_stream_stop_proto;
         final cancel = bindings.rac_stt_stream_cancel_proto;
-        if ((setCallback == null && setNativePortCallback == null) ||
-            (unsetCallback == null && unsetNativePortCallback == null) ||
-            start == null ||
-            feed == null ||
-            stop == null ||
-            cancel == null) {
+        if (setNativePortCallback == null || unsetNativePortCallback == null) {
           controller.addError(
             UnsupportedError(
-              'rac_stt_stream_*_proto session ABI is unavailable in this '
-              'commons binary',
+              'The Flutter STT native-port helper is unavailable on this '
+              'platform',
             ),
           );
           unawaited(controller.close());
@@ -365,41 +351,17 @@ class DartBridgeSTT {
             }
           }
 
-          final registerCode = setNativePortCallback != null
-              ? (() {
-                  nativePortEvents = ReceivePort();
-                  nativePortEvents!.listen((Object? message) {
-                    if (message is Uint8List) {
-                      dispatchEventBytes(message);
-                    }
-                  });
-                  return setNativePortCallback(
-                    handle!,
-                    nativePortEvents!.sendPort.nativePort,
-                    NativeApi.postCObject,
-                  );
-                })()
-              : (() {
-                  nativeCb =
-                      NativeCallable<
-                        RacSttStreamEventCallbackNative
-                      >.isolateLocal((
-                        Pointer<Uint8> bytesPtr,
-                        int bytesLen,
-                        Pointer<Void> _,
-                      ) {
-                        if (bytesPtr == nullptr || bytesLen <= 0) return;
-                        final copy = Uint8List.fromList(
-                          bytesPtr.asTypedList(bytesLen),
-                        );
-                        dispatchEventBytes(copy);
-                      });
-                  return setCallback!(
-                    handle!,
-                    nativeCb!.nativeFunction,
-                    nullptr,
-                  );
-                })();
+          nativePortEvents = ReceivePort();
+          nativePortEvents!.listen((Object? message) {
+            if (message is Uint8List) {
+              dispatchEventBytes(message);
+            }
+          });
+          final registerCode = setNativePortCallback(
+            handle,
+            nativePortEvents!.sendPort.nativePort,
+            NativeApi.postCObject,
+          );
           if (registerCode != RAC_SUCCESS) {
             emitFailure(
               'STT stream callback registration failed: $registerCode',
@@ -456,25 +418,17 @@ class DartBridgeSTT {
           controller.addError(e, st);
         } finally {
           if (handle != null) {
-            if (unsetNativePortCallback != null &&
-                setNativePortCallback != null) {
-              unsetNativePortCallback(handle);
-            } else {
-              unsetCallback?.call(handle);
-              bindings.rac_stt_proto_quiesce?.call();
-            }
+            unsetNativePortCallback(handle);
           }
           nativePortEvents?.close();
           nativePortEvents = null;
-          nativeCb?.close();
-          nativeCb = null;
           unawaited(controller.close());
         }
       }
       ..onCancel = () {
         cancelled = true;
         if (sessionId != 0) {
-          RacNative.bindings.rac_stt_stream_cancel_proto?.call(sessionId);
+          RacNative.bindings.rac_stt_stream_cancel_proto(sessionId);
           sessionId = 0;
         }
       };

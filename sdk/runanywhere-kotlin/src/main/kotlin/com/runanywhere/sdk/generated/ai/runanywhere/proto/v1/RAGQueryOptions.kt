@@ -161,6 +161,7 @@ public class RAGQueryOptions(
   public val enable_multi_query: Boolean = false,
   @RacDefaultOption("3")
   @RacMinOption(1)
+  @RacMaxOption(8)
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

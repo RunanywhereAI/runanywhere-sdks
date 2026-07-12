@@ -9,10 +9,8 @@
 // in C++ — Dart only packs the request proto, drives the C ABI through
 // DartBridgeProtoUtils, and unpacks the SdkInitResult envelope.
 //
-// This is the canonical SDK init path: DartBridge.initialize() invokes
-// [phase1] during Phase 1 and DartBridge.initializeServices() invokes
-// [phase2] during Phase 2. The legacy rac_sdk_init + RacSdkConfigStruct
-// path has been removed.
+// DartBridge.initialize() invokes [phase1] during Phase 1 and
+// DartBridge.initializeServices() invokes [phase2] during Phase 2.
 library;
 
 import 'dart:ffi' as ffi;

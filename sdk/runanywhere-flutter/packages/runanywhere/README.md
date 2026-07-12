@@ -29,8 +29,8 @@ After adding the packages, you **must** update your iOS Podfile for the SDK to w
 Make these **two critical changes**:
 
 ```ruby
-# Change 1: Set minimum iOS version to 15.1
-platform :ios, '15.1'
+# Change 1: Set minimum iOS version to 17.5
+platform :ios, '17.5'
 
 # ... (keep existing flutter_root function and setup) ...
 
@@ -45,7 +45,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.5'
       # Required for microphone permission (STT/Voice features)
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
@@ -128,7 +128,7 @@ print(result.text);
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 15.1+           |
+| iOS      | 17.5+           |
 | Android  | API 24+         |
 
 ## Documentation

@@ -6,12 +6,6 @@
 //
 
 
-// MARK: - RATTSConfiguration
-
-extension RATTSConfiguration {
-    public var modelId: String? { modelID.isEmpty ? nil : modelID }
-}
-
 // MARK: - RATTSOptions: C-bridge + convenience
 
 public extension RATTSOptions {

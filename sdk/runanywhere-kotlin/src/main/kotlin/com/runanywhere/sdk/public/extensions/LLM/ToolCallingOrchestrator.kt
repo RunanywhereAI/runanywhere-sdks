@@ -7,14 +7,14 @@
  *
  * All orchestration — generate, parse, validate, execute loop,
  * follow-up prompt construction — lives in commons via the single-call
- * run-loop ABI `rac_tool_calling_run_loop_with_handle_and_cb_proto`. Kotlin
+ * run-loop ABI `rac_tool_calling_run_loop_proto`. Kotlin
  * keeps only the tool registry + a synchronous executor callback, and fans
  * coroutine cancellation into `rac_tool_calling_run_loop_cancel_proto`.
  *
  * Mirrors Swift's RunAnywhere+ToolCalling.swift `generateWithToolsCancellable`
- * exactly (the with-handle-and-cb variant publishes the cancel handle the
- * moment it is minted so a cancel coroutine on another thread can interrupt
- * the in-flight loop). The `actual` extension surface lives in
+ * exactly: the required callback publishes the cancel handle the moment it is
+ * minted so a cancel coroutine on another thread can interrupt the in-flight
+ * loop. The `actual` extension surface lives in
  * RunAnywhereToolCalling.jvmAndroid.kt and delegates here.
  */
 
@@ -165,8 +165,10 @@ internal fun makeToolCallingRunLoopRequest(
             options.system_prompt?.takeIf { it.isNotEmpty() }
                 ?: llmOptions.system_prompt?.takeIf { it.isNotEmpty() }
                 ?: "",
-        format_hint = options.effectiveToolFormatHint(),
-        max_iterations = options.effectiveMaxIterations(),
+        format =
+            options.format
+                ?: ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
+        max_tool_calls = options.effectiveMaxToolCalls(),
         keep_tools_available = options.keep_tools_available,
         // Suppress thinking when either options surface asks for it (commons
         // prepends the no-think directive).
@@ -178,6 +180,9 @@ internal fun makeToolCallingRunLoopRequest(
                 it != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
             },
         forced_tool_name = options.forced_tool_name?.takeIf { it.isNotEmpty() },
+        auto_execute = options.auto_execute,
+        replace_system_prompt = options.replace_system_prompt,
+        require_json_arguments = options.require_json_arguments,
     )
 
 /**
@@ -264,12 +269,7 @@ internal object ToolCallingOrchestrator {
         }
     }
 
-    /**
-     * Mirrors Swift's `toolCallIdentifier(_:)` helper: prefer `id`, fall back
-     * to `call_id`, otherwise an empty string.
-     */
-    private fun toolCallIdentifier(toolCall: ToolCall): String =
-        toolCall.id.ifBlank { toolCall.call_id?.ifBlank { null } ?: "" }
+    private fun toolCallIdentifier(toolCall: ToolCall): String = toolCall.id
 
     /**
      * Build a `ToolResult` proto from a typed result map. Mirrors Swift's
@@ -291,7 +291,6 @@ internal object ToolCallingOrchestrator {
             result_json = RAToolValue.jsonString(from = result),
             error = error,
             success = success,
-            call_id = toolCallId.takeIf { it.isNotEmpty() },
             started_at_ms = startedAtMs,
             completed_at_ms = completedAtMs,
         )
@@ -301,14 +300,14 @@ internal object ToolCallingOrchestrator {
     /**
      * Generates a response with tool calling support. The entire generate →
      * parse → validate → execute → loop cycle lives in commons via
-     * `rac_tool_calling_run_loop_with_handle_and_cb_proto`; Kotlin only
+     * `rac_tool_calling_run_loop_proto`; Kotlin only
      * supplies a synchronous tool executor and fans coroutine cancellation
      * into `rac_tool_calling_run_loop_cancel_proto`.
      *
-     * Mirrors Swift's `generateWithToolsCancellable` (the with-handle-and-cb
-     * variant publishes the cancel handle the moment it is minted, so the
+     * Mirrors Swift's `generateWithToolsCancellable`: the required handle
+     * callback publishes the cancel handle the moment it is minted, so the
      * cancel watcher running on another thread can interrupt the in-flight
-     * native loop). The executor trampoline runs on the JNI thread that owns
+     * native loop. The executor trampoline runs on the JNI thread that owns
      * the run loop and bridges the suspend [ToolExecutor] synchronously via a
      * parent-linked blocking bridge — the native loop blocks on it, exactly
      * like Swift's `NSCondition`-backed `ToolResultBox`, while coroutine
@@ -390,7 +389,7 @@ internal object ToolCallingOrchestrator {
             try {
                 val resultBytes =
                     withContext(Dispatchers.IO) {
-                        RunAnywhereBridge.racToolCallingRunLoopWithHandleAndCbProto(
+                        RunAnywhereBridge.racToolCallingRunLoopProto(
                             ToolCallingSessionCreateRequest.ADAPTER.encode(request),
                             executor,
                             onHandle,
@@ -400,7 +399,7 @@ internal object ToolCallingOrchestrator {
                     ?: ToolCallingResult(
                         text = "",
                         is_complete = false,
-                        error_message = "racToolCallingRunLoopWithHandleAndCbProto returned null",
+                        error_message = "racToolCallingRunLoopProto returned null",
                         error_code = -1,
                     )
             } finally {

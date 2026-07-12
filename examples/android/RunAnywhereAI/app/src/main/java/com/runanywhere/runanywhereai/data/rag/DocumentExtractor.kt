@@ -16,11 +16,8 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 
 data class ExtractedDocument(val name: String, val text: String) {
-    val metadataJSON: String
-        get() = JSONObject()
-            .put("source", name)
-            .put("filename", name)
-            .toString()
+    val metadata: Map<String, String>
+        get() = mapOf("source" to name, "filename" to name)
 }
 
 // Pulls plain text out of a picked file for RAG ingestion. Supports PDF, JSON and any text/* file.

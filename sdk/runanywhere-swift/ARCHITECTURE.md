@@ -1,9 +1,8 @@
 # RunAnywhere Swift SDK — Architecture (Source of Truth)
 
-> Updated: 2026-05-11
-> Branch: feat/v2-architecture @ 40c668d86
+> Updated: 2026-07-11
 > Purpose: The Swift SDK is the canonical reference for the cross-platform RunAnywhere SDKs. All other SDKs (Kotlin, Flutter, React Native, Web) align to this document for folder structure, naming, public API surface, bridge organization, and business logic.
-> Status: 95 hand-written .swift files (16,918 LOC) + 31 generated files (~47,432 LOC). flutter analyze / swift build clean.
+> Status: Generated proto types and canonical case names are the public source of truth; hand-written aliases are not retained.
 
 **How to read this document:** To align a folder structure in another SDK, read §4. To align the public API surface, read §5. To align bridge slice organization, read §6. To align cross-cutting foundation utilities, read §7. To align streaming adapters, read §8. To align infrastructure (device/download/logging), read §9. To align HTTP transport plumbing, read §10. To align native plumbing patterns for system-backed features, read §11. To understand what is codegen vs. hand-written, read §12. To understand the Swift↔C++ contract end-to-end, read §13. To align conventions (naming, concurrency, errors, logging), read §14. For build/packaging, read §15. For a complete LOC inventory, read §16. For terminology, see Appendix A. For cross-SDK mapping, see Appendix B.
 
@@ -38,8 +37,8 @@ The Swift SDK (`sdk/runanywhere-swift/`) is a thin platform bridge that adapts A
 
 ### §1.2 Platform requirements
 
-- iOS deployment target: 17.0 (`Package.swift:24`)
-- macOS deployment target: 14.0 (`Package.swift:25`)
+- iOS deployment target: 17.5
+- macOS deployment target: 14.5
 - Swift tools version: 5.9 (`Package.swift:1`)
 - Xcode required: 15+
 - Current SDK version: `0.19.15` (`sdk/runanywhere-swift/VERSION:1`)
@@ -327,12 +326,12 @@ The LLM extensions (`Public/Extensions/LLM/`) form the public LLM surface of the
 | `cancelGeneration` | `static func cancelGeneration() async` | 54 | `CppBridge.LLM.shared.cancel()` | No-ops if not initialized |
 | `extractStructuredOutput` | `static func extractStructuredOutput(text: String, schema: RAJSONSchema) throws -> RAStructuredOutputResult` | 68 | `CppBridge.StructuredOutput.parse(...)`, `CppBridge.StructuredOutput.makeParseRequest(text:schema:)` | Sync; parses raw text against a JSON schema via C++ |
 
-`generate` and `generateStream` log generation parameters (temperature, top_p, max_tokens, system_prompt presence, streaming flag) at `SDKLogger.llm.info` level before delegating to `CppBridge.LLM.shared`. The `RALLMGenerateRequest` proto is passed directly — no Swift-side modification. `extractStructuredOutput` is the only synchronous public method.
+`generate` and `generateStream` log generation parameters from the canonical `request.options` envelope (temperature, top_p, max_tokens, system_prompt presence, streaming flag) at `SDKLogger.llm.info` level before delegating to `CppBridge.LLM.shared`. The `RALLMGenerateRequest` proto is passed directly — no Swift-side modification. `extractStructuredOutput` is the only synchronous public method.
 
 ##### §5.4.1.2 RunAnywhere+ToolCalling.swift
 
 **File:** `Public/Extensions/LLM/RunAnywhere+ToolCalling.swift` (LOC: 442)
-**Mirrors C ABI:** `rac_tool_calling_run_loop_proto` (loaded dynamically via `NativeProtoABI.load`), `rac_proto_buffer_init`, `rac_proto_buffer_copy`, `rac_proto_buffer_set_error`, `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`
+**Mirrors C ABI:** `rac_tool_calling_run_loop_proto` and `rac_tool_calling_run_loop_cancel_proto` (loaded dynamically via `NativeProtoABI.load`), `rac_proto_buffer_init`, `rac_proto_buffer_copy`, `rac_proto_buffer_set_error`, `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`
 
 | Symbol | Signature | Line | Calls | Notes |
 |---|---|---|---|---|
@@ -343,7 +342,7 @@ The LLM extensions (`Public/Extensions/LLM/`) form the public LLM surface of the
 | `executeTool` | `static func executeTool(_ toolCall: RAToolCall) async -> RAToolResult` | 139 | `ToolRegistry.shared.get`, executor, `makeToolResult` | Dispatches one tool call |
 | `generateWithTools` | `static func generateWithTools(prompt:options:toolOptions:) async throws -> RAToolCallingResult` | 187 | `ToolCallingRunLoopProtoABI.runLoop` (C), `NativeProtoABI.require`, `NativeProtoABI.decode` | Delegates entire loop to C++; Swift provides trampoline |
 
-`ToolRegistry` is a private Swift `actor` (line 26) keyed by tool name. `generateWithTools` serializes a `RAToolCallingSessionCreateRequest` proto, looks up the `rac_tool_calling_run_loop_proto` C symbol at runtime via `NativeProtoABI.load`, then calls it synchronously on `DispatchQueue.global(qos: .userInitiated)` wrapped in `withCheckedThrowingContinuation`. `toolExecuteTrampoline` (line 351) is a `@convention(c)` free function (no captures); it deserializes incoming `RAToolCall` proto bytes, then uses a `DispatchSemaphore` + `Task.detached` to bridge from the synchronous C callback to the async `executeTool` Swift method. `ToolResultBox` (line 398) is an `@unchecked Sendable` wrapper for ferrying the async `RAToolResult` across the semaphore boundary.
+`ToolRegistry` is a private Swift `actor` (line 26) keyed by tool name. `generateWithTools` serializes a `RAToolCallingSessionCreateRequest` proto, looks up the run-loop and cancel symbols at runtime via `NativeProtoABI.load`, then calls the loop synchronously on `DispatchQueue.global(qos: .userInitiated)` wrapped in `withCheckedThrowingContinuation`. Commons publishes the cancellation handle through the required synchronous callback before generation begins; Swift stores it in `HandleBox`, and task cancellation forwards it to `rac_tool_calling_run_loop_cancel_proto`. `toolExecuteTrampoline` is a `@convention(c)` free function (no captures); it deserializes incoming `RAToolCall` proto bytes, then uses a `DispatchSemaphore` + `Task.detached` to bridge from the synchronous C callback to the async `executeTool` Swift method.
 
 ##### §5.4.1.3 RunAnywhere+StructuredOutput.swift
 
@@ -557,7 +556,7 @@ Typealiases: `VoiceAgentResult = RAVoiceAgentResult`, `VoiceAgentComponentStates
 
 ##### §5.4.3.1 ModelTypes.swift
 
-**Path:** `Public/Extensions/Models/ModelTypes.swift` (LOC: 331)
+**Path:** `Public/Extensions/Models/ModelTypes.swift` (LOC: 356)
 **Calls:** `rac_model_format_wire_string`, `rac_inference_framework_*`, `rac_model_category_*`, `rac_archive_type_*`
 
 Type aliases: `ModelSource = RAModelSource`, `ModelFormat = RAModelFormat`, `ModelCategory = RAModelCategory`, `InferenceFramework = RAInferenceFramework`, `ArchiveType = RAArchiveType`, `ArchiveStructure = RAArchiveStructure`.
@@ -570,17 +569,17 @@ Public symbols:
 | `RAModelFormat.fromWireString(_:)` | 110 | — (case-insensitive scan) |
 | `RAModelCategory.requiresContextLength` | 140 | `rac_model_category_requires_context_length` |
 | `RAModelCategory.supportsThinking` | 145 | `rac_model_category_supports_thinking` |
-| `RAInferenceFramework.wireString` | 173 | `rac_inference_framework_wire_string` |
-| `RAInferenceFramework.displayName` | 180 | `rac_inference_framework_display_name` |
-| `RAInferenceFramework.analyticsKey` | 187 | `rac_inference_framework_analytics_key` |
-| `RAInferenceFramework.toCFramework()` | 198 | `rac_inference_framework_from_proto` |
-| `RAInferenceFramework.fromCFramework(_:)` | 207 | `rac_inference_framework_to_proto` |
-| `RAInferenceFramework.init?(caseInsensitive:)` | 218 | `rac_inference_framework_from_string` |
-| `RAInferenceFramework.knownCases` | 225 | 23 concrete cases |
-| `RAArchiveType.fileExtension` | 298 | `rac_archive_type_extension` |
-| `RAArchiveType.from(url:)` | 307 | `rac_archive_type_from_path` |
+| `RAInferenceFramework.wireString` | 180 | `rac_inference_framework_wire_string` |
+| `RAInferenceFramework.displayName` | 187 | `rac_inference_framework_display_name` |
+| `RAInferenceFramework.analyticsKey` | 195 | `rac_inference_framework_analytics_key` |
+| `RAInferenceFramework.toCFramework()` | 205 | `rac_inference_framework_from_proto` |
+| `RAInferenceFramework.fromCFramework(_:)` | 214 | `rac_inference_framework_to_proto` |
+| `RAInferenceFramework.init?(caseInsensitive:)` | 225 | `rac_inference_framework_from_string` |
+| `RAInferenceFramework.knownCases` | 232 | 23 concrete cases |
+| `RAArchiveType.fileExtension` | 323 | `rac_archive_type_extension` |
+| `RAArchiveType.from(url:)` | 332 | `rac_archive_type_from_path` |
 
-`Codable` conformances on every enum round-trip through `wireString` / `from(wireString:)`. Pre-IDL case aliases (`systemTTS`, `picoLLM`, `piperTTS`, etc.) forward to the renamed proto cases.
+`Codable` conformances on every enum round-trip through `wireString` / `from(wireString:)`. Callers use generated proto case names directly (`systemTts`, `picoLlm`, `piperTts`, `executorch`, and `mediapipe`).
 
 ##### §5.4.3.2 ModelTypes+Artifacts.swift
 
@@ -659,7 +658,7 @@ Public symbols — storage management:
 
 ##### §5.4.3.6 StorageProto+Helpers.swift
 
-**Path:** `Public/Extensions/Storage/StorageProto+Helpers.swift` (LOC: 152)
+**Path:** `Public/Extensions/Storage/StorageProto+Helpers.swift` (LOC: 118)
 **Calls:** none (pure Swift ergonomics)
 
 | Symbol | Line |
@@ -672,10 +671,13 @@ Public symbols — storage management:
 | `RAStorageInfo.appStorage` / `.deviceStorage` | 67 |
 | `RAStorageInfo.totalModelsSize` | 77 |
 | `RAStorageInfo.modelCount` | 81 |
-| `RAStorageInfo.storedModels` | 83 |
-| `RAModelStorageMetrics.init(modelID:sizeOnDiskBytes:lastUsedMs:)` | 97 |
-| `RAStoredModel.id`/`.size`/`.path`/`.createdDate` | 112–121 |
-| `RAStorageAvailability.make(...)` | 139 |
+| `RAModelStorageMetrics.init(modelID:sizeOnDiskBytes:lastUsedMs:)` | 86 |
+| `RAStorageAvailability.make(...)` | 105 |
+
+Storage consumers use `RAStorageInfo.models` directly. Each
+`RAModelStorageMetrics.modelID` is cross-referenced against the model registry
+for presentation metadata such as display name and local path;
+`lastUsedMs` represents last use, not creation or download time.
 
 ##### §5.4.3.7 RunAnywhere+Solutions.swift
 
@@ -706,39 +708,39 @@ All call private `ensureReady()` gating on `RunAnywhere.isInitialized`.
 
 ##### §5.4.3.8 RunAnywhere+RAG.swift
 
-**Path:** `Public/Extensions/RAG/RunAnywhere+RAG.swift` (LOC: 237)
+**Path:** `Public/Extensions/RAG/RunAnywhere+RAG.swift` (LOC: 211)
 **Calls:** `CppBridge.RAG.shared.createPipeline/setProtoSession/destroy/requireProtoSession/ingest/statsProto/clearProto/query`, `loadModel(_:)`
 
-13 public RAG entry points (line numbers in source):
+12 public RAG entry points (line numbers in source):
 
 | Symbol | Line |
 |---|---|
-| `ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)` | 24 |
-| `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)` | 44 |
-| `ragCreatePipeline(config:)` | 59 (canonical) |
-| `ragDestroyPipeline()` | 72 |
-| `ragIngest(text:metadataJSON:)` | 87 |
-| `ragIngest(_ document:)` | 103 |
-| `ragAddDocumentsBatch(documents:)` | 121 |
-| `ragGetDocumentCount()` | 140 |
-| `ragGetStatistics()` | 154 |
-| `ragClearDocuments()` | 165 |
-| `ragDocumentCount` (computed) | 174 |
-| `ragQuery(question:options:)` | 193 |
-| `ragQuery(_ options:)` | 202 |
+| `ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)` | 19 |
+| `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)` | 39 |
+| `ragCreatePipeline(config:)` | 58 (canonical) |
+| `ragDestroyPipeline()` | 68 |
+| `ragIngest(_ document:)` | 76 |
+| `ragAddDocumentsBatch(documents:)` | 92 |
+| `ragGetDocumentCount()` | 108 |
+| `ragGetStatistics()` | 121 |
+| `ragClearDocuments()` | 131 |
+| `ragDocumentCount` (computed) | 139 |
+| `ragQuery(question:options:)` | 158 |
+| `ragQuery(_ options:)` | 167 |
 
 ##### §5.4.3.9 RAGProto+Helpers.swift
 
-**Path:** `Public/Extensions/RAG/RAGProto+Helpers.swift` (LOC: 80)
+**Path:** `Public/Extensions/RAG/RAGProto+Helpers.swift` (LOC: 62)
 **Calls:** none (pure Swift ergonomics; `defaults()` comes from `Generated/RAConvenience.swift`)
 
 | Symbol | Line |
 |---|---|
 | `RARAGConfiguration.resolvingLifecycleArtifacts(embedding:llm:)` | 25 |
-| `RARAGDocument.init(text:metadataJSON:)` | 39 |
-| `RARAGQueryOptions.defaults(question:)` | 60 |
-| `RARAGResult.totalTime` | 71 |
-| `RARAGStatistics.lastUpdated` | 76 |
+| `RARAGQueryOptions.defaults(question:)` | 42 |
+| `RARAGResult.totalTime` | 52 |
+| `RARAGStatistics.lastUpdated` | 58 |
+
+RAG callers construct `RARAGDocument` directly and populate its canonical typed `metadata` map before calling `ragIngest(_:)`.
 
 ##### §5.4.3.10 RunAnywhere+SDKEvents.swift
 
@@ -1216,21 +1218,20 @@ Deleted: model assignment no longer needs Swift-side callbacks. Commons (`model_
 
 #### §6.5.14 CppBridge+NativeProtoABI.swift
 
-**LOC:** 178 — `NativeProtoABI` — `internal enum` (not nested under `CppBridge`); central shared ABI utility
+**LOC:** 149 — `NativeProtoABI` — `internal enum` (not nested under `CppBridge`); central shared ABI utility
 
 | Method | Line |
 |---|---|
-| `load<T>(_:as:)` | 33 |
-| `freeBuffer` (static let) | 40 |
-| `canReceiveProtoBuffer` | 42 |
-| `missingSymbolMessage(_:)` | 46 |
-| `require<T>(_:named:)` throws | 50 |
-| `withSerializedBytes<Req,Res>(_:_:)` throws | 57 |
-| `decode<Resp>(_:from:)` throws | 70 |
-| `free(_:)` | 84 |
-| `invoke<Req,Res>(_:symbol:symbolName:responseType:)` throws | 88 |
-| `getBytes<Res>(symbol:...)` throws | 113 |
-| `invoke<Ctx,Req,Res>(_:on:symbol:...)` throws | 157 (context-threaded) |
+| `load<T>(_:as:)` | 22 |
+| `freeBuffer` (static let) | 29 |
+| `canReceiveProtoBuffer` | 31 |
+| `missingSymbolMessage(_:)` | 35 |
+| `require<T>(_:named:)` throws | 39 |
+| `withSerializedBytes<Req,Res>(_:_:)` throws | 46 |
+| `decode<Resp>(_:from:)` throws | 59 |
+| `free(_:)` | 92 |
+| `invoke<Req,Res>(_:symbol:symbolName:responseType:)` throws | 96 |
+| `invoke<Ctx,Req,Res>(_:on:symbol:...)` throws | 127 (context-threaded) |
 
 `load` resolves symbols at call time using `dlsym(bitPattern: -2)` (Darwin `RTLD_DEFAULT`). The unary `invoke` orchestrates the standard round-trip: serialize → call → decode → `defer free`.
 
@@ -1266,7 +1267,7 @@ C symbol type declarations (private enums with `@convention(c)` typealiases and 
 |---|---|
 | `VADComponentProtoABI` | `rac_vad_component_process_proto`, `rac_vad_component_set_activity_proto_callback` |
 | `VoiceAgentStateProtoABI` | `rac_voice_agent_process_voice_turn_proto` |
-| `VLMCustomProtoABI` | `rac_vlm_process_proto`, `rac_vlm_process_stream_proto` |
+| `VLMCustomProtoABI` | `rac_vlm_generate_proto`, `rac_vlm_stream_proto`, `rac_vlm_cancel_lifecycle_proto` |
 | `RAGSessionProtoABI` | `rac_rag_session_destroy_proto` |
 
 Shared streaming scaffolding:
@@ -1282,8 +1283,8 @@ Shared streaming scaffolding:
 | `CppBridge.VAD.process` | 258 | `rac_vad_component_process_proto` |
 | `CppBridge.VAD.setActivityCallbackProto` | 283 | `rac_vad_component_set_activity_proto_callback` |
 | `CppBridge.VoiceAgent.processVoiceTurnProto` | 315 | `rac_voice_agent_process_voice_turn_proto` |
-| `CppBridge.VLM.process` | 335 | `rac_vlm_process_proto` |
-| `CppBridge.VLM.processStream` | 361 | `rac_vlm_process_stream_proto` |
+| `CppBridge.VLM.process` | 599 | `rac_vlm_generate_proto` |
+| `CppBridge.VLM.processStream` | 625 | `rac_vlm_stream_proto` |
 | `destroyRAGProtoSessionIfAvailable` | 251 | `rac_rag_session_destroy_proto` |
 
 `CppBridge.EmbeddingsProto` is declared as an empty enum at line 419; its methods are generated into `ModalityProtoABI+Generated.swift`.
@@ -1421,19 +1422,7 @@ All Keychain callbacks use service identifier `"com.runanywhere.sdk"` and `kSecC
 
 `telemetryHttpCallback` (line 162) receives endpoint, jsonBody, requiresAuth from C++ and launches a `Task` calling `performTelemetryHTTP`.
 
-#### §6.5.26 CppBridge+ToolCalling.swift
-
-**LOC:** 83 — `CppBridge.ToolCalling` (pure namespace enum). Request-builder bridge; no parsing logic in Swift.
-
-| Method | Line |
-|---|---|
-| `makePromptFormatRequest(...)` | 31 |
-| `makeValidationRequest(...)` | 39 |
-| `bridgeOptions(_:tools:)` | 51 |
-
-`bridgeOptions` maps the format hint string to `RAToolCallFormatName` enum value: `lfm/liquid/pythonic/hermes` → `.pythonic`; `openai/openai_functions` → `.openaiFunctions`; `xml` → `.xml`; `native` → `.native`; `json/default/auto` → `.json`.
-
-#### §6.5.27 CppBridge+STT.swift
+#### §6.5.26 CppBridge+STT.swift
 
 **LOC:** 112 — `CppBridge.STT` — `public actor`. `ComponentActor(vtable: .stt)` wrapper with STT-specific model load.
 
@@ -1449,7 +1438,7 @@ All Keychain callbacks use service identifier `"com.runanywhere.sdk"` and `kSecC
 
 Mirrors `loadedModelId: String?` as actor-private state for the same-model fast-path. Before `inner.loadModel`, if `framework != RAC_FRAMEWORK_UNKNOWN`, configures the component via `rac_stt_component_configure(handle, &config)`.
 
-#### §6.5.28 CppBridge+TTS.swift
+#### §6.5.27 CppBridge+TTS.swift
 
 **LOC:** 77 — `CppBridge.TTS` — `public actor`. Voice-terminology API.
 
@@ -1464,7 +1453,7 @@ Mirrors `loadedModelId: String?` as actor-private state for the same-model fast-
 
 The `.tts` vtable's `loadModel` slot forwards to `rac_tts_component_load_voice`.
 
-#### §6.5.29 CppBridge+VAD.swift
+#### §6.5.28 CppBridge+VAD.swift
 
 **LOC:** 148 — `CppBridge.VAD` — `public actor`. Extended lifecycle API.
 
@@ -1483,33 +1472,29 @@ The `.tts` vtable's `loadModel` slot forwards to `rac_tts_component_load_voice`.
 
 `loadModel` clears `loadedModelId = nil` before the C call so a failed load does not prevent retry. `unloadModel` reverts to energy-based VAD.
 
-#### §6.5.30 CppBridge+VLM.swift
+#### §6.5.29 CppBridge+VLM.swift
 
-**LOC:** 102 — `CppBridge.VLM` — `public actor`. Lifecycle-routing actor.
+**LOC:** 44 — `CppBridge.VLM` — `public actor`. Lifecycle-routing actor.
 
 | Method/Property | Line | C ABI |
 |---|---|---|
-| `getHandle()` async throws | 53 | via `ComponentActor.getHandle()` |
-| `cancel()` async | 66 | `cancelLifecycle()` |
-| `supportsStreaming` { get async } | 79 | `rac_vlm_component_supports_streaming` |
-| `state` { get async } | 85 | `rac_vlm_component_get_state` |
-| `destroy()` async | 98 | via `ComponentActor` |
+| `cancel()` async | 39 | `rac_vlm_cancel_lifecycle_proto` |
 
-In V2 the per-handle component is not loaded with a model; `rac_vlm_process_proto` routes through the lifecycle-owned VLM service.
+Generation, streaming, and cancellation route directly through the lifecycle-owned VLM service; Swift does not maintain a parallel component handle.
 
-#### §6.5.31 CppBridge+VoiceAgent.swift
+#### §6.5.30 CppBridge+VoiceAgent.swift
 
 **LOC:** 90 — `CppBridge.VoiceAgent` — `public actor`. Composite handle actor.
 
 | Method/Property | Line | C ABI |
 |---|---|---|
-| `getHandle()` async throws | 31 | `rac_voice_agent_create` |
+| `getHandle()` async throws | 31 | `rac_voice_agent_create_standalone` |
 | `requireExistingHandle()` throws | 54 | — |
 | `isReady` | 64 | `rac_voice_agent_is_ready` |
 | `cleanup()` | 74 | `rac_voice_agent_cleanup` |
 | `destroy()` | 81 | `rac_voice_agent_cleanup`, `_destroy` |
 
-`getHandle()` composite creation: concurrently gathers four handles via `async throws` (`LLM.shared.getHandle`, `STT`, `TTS`, `VAD`), then calls `rac_voice_agent_create(llm, stt, tts, vad, &newHandle)`.
+`getHandle()` creates one standalone voice-agent handle. Commons owns its child component handles, while proto operations resolve loaded models through the canonical lifecycle store.
 
 ### §6.6 Type-Helper Extensions
 
@@ -1548,31 +1533,28 @@ Seven files under `Foundation/Bridge/Extensions/` form the type-conversion layer
 
 #### §6.6.5 RASTTTypes+CppBridge.swift
 
-**LOC:** 97 — Extends `RASTTConfiguration`, `RASTTOptions`, `RASTTOutput`, `RASTTPartialResult`.
+**LOC:** 90 — Extends `RASTTOptions`, `RASTTOutput`, `RASTTPartialResult`.
 
-- `RASTTConfiguration.modelId` (line 14) — nil-guard
-- `RASTTOptions.languageString` (line 20) — maps `RASTTLanguage` to BCP-47
-- `RASTTOptions.init(language:detectLanguage:...)` (line 39)
-- `languageFromString(_:)` (line 58) — splits on `-`
-- `RASTTOutput.timestamp` (line 83) — `Date()` at access
-- `RASTTPartialResult.transcript` (line 96) — alias for `text`
+- `RASTTOptions.languageString` (line 13) — maps `RASTTLanguage` to BCP-47
+- `RASTTOptions.init(language:detectLanguage:...)` (line 32)
+- `languageFromString(_:)` (line 51) — splits on `-`
+- `RASTTOutput.timestamp` (line 76) — `Date()` at access
+- `RASTTPartialResult.transcript` (line 89) — alias for `text`
 
 #### §6.6.6 RATTSTypes+CppBridge.swift
 
-**LOC:** 69 — Extends `RATTSConfiguration`, `RATTSOptions`, `RATTSOutput`.
+**LOC:** 62 — Extends `RATTSOptions`, `RATTSOutput`.
 
-- `RATTSConfiguration.modelId` (line 14)
-- `RATTSOptions.init(voice:language:rate:...)` (line 20)
-- `rate` / `language` / `useSSML` aliases (lines 41/45/49) — `speakingRate`/`languageCode`/`enableSsml`
-- `RATTSOutput.format` (line 61) — alias for `audioFormat`
+- `RATTSOptions.init(voice:language:rate:...)` (line 12)
+- `rate` / `language` / `useSSML` aliases (lines 34/39/44) — `speakingRate`/`languageCode`/`enableSsml`
+- `RATTSOutput.format` (line 54) — alias for `audioFormat`
 
 #### §6.6.7 RAVADTypes+CppBridge.swift
 
-**LOC:** 27 — Extends `RAVADConfiguration`, `RAVADResult`.
+**LOC:** 19 — Extends `RAVADResult`.
 
-- `RAVADConfiguration.modelId` (line 14)
-- `RAVADResult.isSpeechDetected` (line 25) — alias for `isSpeech`
-- `RAVADResult.energyLevel` (line 26) — alias for `energy`
+- `RAVADResult.isSpeechDetected` (line 17) — alias for `isSpeech`
+- `RAVADResult.energyLevel` (line 18) — alias for `energy`
 
 ---
 
@@ -1819,7 +1801,6 @@ public typealias VoiceAgentStreamAdapter = HandleStreamAdapter<rac_voice_agent_h
 
 #### `RADownloadProgress` extension
 
-- `percentage: Double` — returns `stageProgress` while in `.downloading` stage; `overallProgress` otherwise.
 - `speed: Double?`, `estimatedTimeRemaining: TimeInterval?`.
 - Factory methods: `extraction(modelId:progress:totalBytes:)`, `completed(modelId:totalBytes:)`, `failed(_:modelId:bytesDownloaded:totalBytes:)`.
 
@@ -1837,11 +1818,11 @@ public typealias VoiceAgentStreamAdapter = HandleStreamAdapter<rac_voice_agent_h
 
 **File:** `Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift`
 
-Three layers: `LogLevel` enum, `Logging` singleton (router), `SDKLogger` struct (per-component wrapper).
+Three layers: generated logging proto types, the `Logging` singleton (router), and the `SDKLogger` struct (per-component wrapper).
 
-**`LogLevel`** — `public enum LogLevel: Int, Comparable` with cases `.debug = 0`, `.info = 1`, `.warning = 2`, `.error = 3`, `.fault = 4`.
+**`RALogLevel`** — the generated canonical severity enum (`trace` through `fatal`), extended with `Comparable` using its wire value.
 
-**`LogEntry`** — `public struct LogEntry: Sendable` captures `timestamp`, `level`, `category`, `message`, `metadata`, `deviceInfo`.
+**`RALogEntry`** — the generated structured record containing timestamp, level, category, message, metadata, optional source location, error code, model, and framework fields.
 
 **`LogDestination` protocol** — `public protocol LogDestination: AnyObject, Sendable` with `identifier`, `isAvailable`, `write(_:)`, `flush()`.
 
@@ -1849,7 +1830,7 @@ Three layers: `LogLevel` enum, `Logging` singleton (router), `SDKLogger` struct 
 
 1. Snapshot `(config, destinations)`.
 2. Guard `level >= config.minLogLevel`.
-3. Assemble `LogEntry`.
+3. Assemble `RALogEntry`.
 4. Print to console if `enableLocalLogging`.
 5. Iterate `destinations`.
 
@@ -1983,7 +1964,7 @@ Published properties: `isRecording: Bool`, `audioLevel: Float`. Target sample ra
 
 #### `requestPermission() async -> Bool`
 
-Platform-conditional: iOS 17+ → `AVAudioApplication.requestRecordPermission()`; iOS <17 → `AVAudioSession.sharedInstance().requestRecordPermission` wrapped in `withCheckedContinuation`; macOS → `AVCaptureDevice.requestAccess(for: .audio)`.
+Platform-conditional: iOS uses `AVAudioApplication.requestRecordPermission()`; macOS uses `AVCaptureDevice.requestAccess(for: .audio)`. The retired pre-iOS-17 permission API is not carried because the package floor is iOS 17.5.
 
 #### `startRecording(onAudioData:)`
 
@@ -2382,7 +2363,7 @@ Triple-slash `///` is used for all public symbol documentation throughout the co
 
 The file at `sdk/runanywhere-swift/Package.swift` is the **local development manifest**. A second `Package.swift` exists at the repository root for external SPM consumers; that root-level file downloads XCFrameworks from GitHub releases. The local manifest references `Binaries/` directly.
 
-**Platform block** (`Package.swift:23-26`): `.iOS(.v17)`, `.macOS(.v14)`.
+**Platform block**: `.iOS("17.5")`, `.macOS("14.5")` in both manifests.
 
 **Products** (`Package.swift:27-47`):
 - `RunAnywhere` — library bundling `RunAnywhere`, `LlamaCPPRuntime`, `ONNXRuntime` (full stack)
@@ -2427,11 +2408,12 @@ All five XCFrameworks live in `sdk/runanywhere-swift/Binaries/` (git-ignored):
 | XCFramework | Slices | Disk size |
 |-------------|--------|-----------|
 | `RACommons.xcframework` | ios-arm64, ios-arm64-simulator, macos-arm64 | 56M |
-| `RABackendLLAMACPP.xcframework` | ios-arm64, ios-arm64-simulator | 34M |
-| `RABackendONNX.xcframework` | ios-arm64, ios-arm64-simulator | 60M |
-| `RABackendSherpa.xcframework` | ios-arm64, ios-arm64-simulator | 31M |
+| `RABackendLLAMACPP.xcframework` | ios-arm64, ios-arm64-simulator, macos-arm64 | build-dependent |
+| `RABackendONNX.xcframework` | ios-arm64, ios-arm64-simulator, macos-arm64 | build-dependent |
+| `RABackendSherpa.xcframework` | ios-arm64, ios-arm64-simulator, macos-arm64 | build-dependent |
+| `RABackendMLX.xcframework` | ios-arm64, ios-arm64-simulator, macos-arm64 | build-dependent |
 
-`RACommons` is the only framework with a macOS slice. Each xcframework is a static archive (`.a`) with a `Headers/` directory per slice.
+Every binary target carries a macOS slice because all four published library products advertise macOS 14.5. Each XCFramework contains static archives; the canonical C header tree is carried by `RACommons.xcframework` and shared by the backend bridge modules.
 
 ### §15.3 CRACommons module map
 
@@ -2466,7 +2448,7 @@ Six test files:
 
 **How to run:**
 ```bash
-swift test
+RUNANYWHERE_USE_LOCAL_NATIVES=1 swift test
 xcodebuild test -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_REQUIRED=NO
 ```
 

@@ -30,7 +30,6 @@ private enum TTSStreamSessionABI {
         UnsafeMutableRawPointer?
     ) -> rac_result_t
     typealias UnsetCallback = @convention(c) (rac_handle_t?) -> rac_result_t
-    typealias Quiesce = @convention(c) () -> Void
     typealias Start = @convention(c) (
         rac_handle_t?,
         UnsafePointer<UInt8>?,
@@ -47,10 +46,29 @@ private enum TTSStreamSessionABI {
         "rac_tts_unset_stream_proto_callback",
         as: UnsetCallback.self
     )
-    static let quiesce = NativeProtoABI.load("rac_tts_proto_quiesce", as: Quiesce.self)
     static let start = NativeProtoABI.load("rac_tts_stream_start_proto", as: Start.self)
     static let stop = NativeProtoABI.load("rac_tts_stream_stop_proto", as: Finish.self)
     static let cancel = NativeProtoABI.load("rac_tts_stream_cancel_proto", as: Finish.self)
+
+    struct Functions {
+        let setCallback: SetCallback
+        let unsetCallback: UnsetCallback
+        let start: Start
+        let stop: Finish
+        let cancel: Finish
+    }
+
+    static func resolve() -> Functions? {
+        guard let setCallback, let unsetCallback, let start,
+              let stop, let cancel else { return nil }
+        return Functions(
+            setCallback: setCallback,
+            unsetCallback: unsetCallback,
+            start: start,
+            stop: stop,
+            cancel: cancel
+        )
+    }
 }
 
 private final class TTSStreamSessionContext: @unchecked Sendable {
@@ -157,6 +175,34 @@ private let ttsStreamSessionTrampoline: TTSStreamSessionABI.Callback = { bytes, 
     context.yield(bytes: bytes, size: size)
 }
 
+/// Component handle borrowed by one detached TTS stream task. The component
+/// actor owns its lifetime; stream cancellation synchronously unregisters and
+/// quiesces callbacks before the task releases its context.
+private struct TTSStreamingHandle: @unchecked Sendable {
+    let rawValue: rac_handle_t
+}
+
+/// Retained stream context passed through the C callback ABI and released only
+/// after unregister + quiesce complete.
+private struct TTSStreamingContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
+}
+
+private func terminateTTSStream(
+    _ termination: AsyncStream<RATTSOutput>.Continuation.Termination,
+    task: Task<Void, Never>,
+    context: TTSStreamSessionContext,
+    handle: TTSStreamingHandle
+) {
+    guard case .cancelled = termination else { return }
+    task.cancel()
+    let sessionId = context.cancel()
+    if sessionId != 0 {
+        _ = TTSStreamSessionABI.cancel?(sessionId)
+    }
+    rac_tts_component_stop(handle.rawValue)
+}
+
 // MARK: - TTS Component Bridge
 
 extension CppBridge {
@@ -177,7 +223,7 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the TTS component handle
-        public func getHandle() async throws -> rac_handle_t {
+        func getHandle() async throws -> ComponentHandle {
             try await inner.getHandle()
         }
 
@@ -199,12 +245,10 @@ extension CppBridge {
             _ request: RATTSSynthesisRequest,
             loadedModel: RACurrentModelResult
         ) async throws -> AsyncStream<RATTSOutput> {
-            let handle = try await prepareStreamingHandle(from: loadedModel)
-            guard let setCallback = TTSStreamSessionABI.setCallback,
-                  let unsetCallback = TTSStreamSessionABI.unsetCallback,
-                  let start = TTSStreamSessionABI.start,
-                  let stop = TTSStreamSessionABI.stop,
-                  let cancel = TTSStreamSessionABI.cancel else {
+            let handle = TTSStreamingHandle(
+                rawValue: try await prepareStreamingHandle(from: loadedModel).rawValue
+            )
+            guard TTSStreamSessionABI.resolve() != nil else {
                 throw SDKException(
                     code: .notSupported,
                     message: NativeProtoABI.missingSymbolMessage("rac_tts_stream_start_proto"),
@@ -222,17 +266,29 @@ extension CppBridge {
             return AsyncStream { continuation in
                 let context = TTSStreamSessionContext(continuation)
                 context.setExpectedRequestId(requestId)
-                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                let contextPtr = TTSStreamingContextPointer(
+                    rawValue: Unmanaged.passRetained(context).toOpaque()
+                )
 
                 let task = Task.detached(priority: .userInitiated) {
+                    guard let functions = TTSStreamSessionABI.resolve() else {
+                        context.yieldFailure("TTS stream ABI became unavailable")
+                        Unmanaged<TTSStreamSessionContext>.fromOpaque(contextPtr.rawValue).release()
+                        continuation.finish()
+                        return
+                    }
                     defer {
-                        _ = unsetCallback(handle)
-                        TTSStreamSessionABI.quiesce?()
-                        Unmanaged<TTSStreamSessionContext>.fromOpaque(contextPtr).release()
+                        _ = functions.unsetCallback(handle.rawValue)
+                        rac_tts_proto_quiesce()
+                        Unmanaged<TTSStreamSessionContext>.fromOpaque(contextPtr.rawValue).release()
                         continuation.finish()
                     }
 
-                    let registerResult = setCallback(handle, ttsStreamSessionTrampoline, contextPtr)
+                    let registerResult = functions.setCallback(
+                        handle.rawValue,
+                        ttsStreamSessionTrampoline,
+                        contextPtr.rawValue
+                    )
                     guard registerResult == RAC_SUCCESS else {
                         context.yieldFailure("TTS stream callback registration failed: \(registerResult)", code: registerResult)
                         return
@@ -240,8 +296,8 @@ extension CppBridge {
 
                     var sessionId: UInt64 = 0
                     let startResult = requestData.withUnsafeBytes { rawBuffer in
-                        start(
-                            handle,
+                        functions.start(
+                            handle.rawValue,
                             rawBuffer.bindMemory(to: UInt8.self).baseAddress,
                             rawBuffer.count,
                             &sessionId
@@ -255,31 +311,19 @@ extension CppBridge {
                         return
                     }
                     if Task.isCancelled || context.isCancelled {
-                        _ = cancel(sessionId)
+                        _ = functions.cancel(sessionId)
                         return
                     }
                     context.waitForTerminal()
                     if Task.isCancelled || context.isCancelled {
-                        _ = cancel(sessionId)
+                        _ = functions.cancel(sessionId)
                     } else {
-                        _ = stop(sessionId)
+                        _ = functions.stop(sessionId)
                     }
                 }
 
                 continuation.onTermination = { @Sendable termination in
-                    switch termination {
-                    case .cancelled:
-                        task.cancel()
-                        let sessionId = context.cancel()
-                        if sessionId != 0 {
-                            _ = cancel(sessionId)
-                        }
-                        rac_tts_component_stop(handle)
-                    case .finished:
-                        break
-                    @unknown default:
-                        break
-                    }
+                    terminateTTSStream(termination, task: task, context: context, handle: handle)
                 }
             }
         }
@@ -292,7 +336,7 @@ extension CppBridge {
         /// Stop synthesis
         public func stop() async {
             guard let handle = await inner.existingHandle() else { return }
-            rac_tts_component_stop(handle)
+            rac_tts_component_stop(handle.rawValue)
         }
 
         // MARK: - Cleanup
@@ -302,7 +346,9 @@ extension CppBridge {
             await inner.destroy()
         }
 
-        private func prepareStreamingHandle(from snapshot: RACurrentModelResult) async throws -> rac_handle_t {
+        private func prepareStreamingHandle(
+            from snapshot: RACurrentModelResult
+        ) async throws -> ComponentHandle {
             guard snapshot.found else {
                 throw SDKException(code: .notInitialized, message: "TTS voice not loaded", category: .component)
             }

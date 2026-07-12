@@ -9,7 +9,6 @@
 library;
 
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -30,11 +29,6 @@ class DartBridgeStructuredOutput {
   /// Parse structured output from raw model text via commons.
   StructuredOutputResult parse(StructuredOutputParseRequest request) {
     final fn = RacNative.bindings.rac_structured_output_parse_proto;
-    if (fn == null) {
-      throw SDKException.featureNotAvailable(
-        'rac_structured_output_parse_proto is unavailable',
-      );
-    }
     return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
       request: request,
       invoke: fn,
@@ -48,11 +42,6 @@ class DartBridgeStructuredOutput {
   /// stripping, JSON extraction, and schema validation.
   StructuredOutputResult generate(StructuredOutputRequest request) {
     final fn = RacNative.bindings.rac_structured_output_generate_proto;
-    if (fn == null) {
-      throw SDKException.featureNotAvailable(
-        'rac_structured_output_generate_proto is unavailable',
-      );
-    }
     return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
       request: request,
       invoke: fn,
@@ -68,11 +57,6 @@ class DartBridgeStructuredOutput {
     String requestId = '',
   }) {
     final fn = RacNative.bindings.rac_structured_output_prepare_prompt_proto;
-    if (fn == null) {
-      throw SDKException.featureNotAvailable(
-        'rac_structured_output_prepare_prompt_proto is unavailable',
-      );
-    }
     final request = makeGenerateRequest(
       prompt: prompt,
       options: options,

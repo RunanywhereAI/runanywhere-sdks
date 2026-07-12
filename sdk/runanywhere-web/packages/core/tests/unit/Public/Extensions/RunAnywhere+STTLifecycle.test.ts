@@ -16,6 +16,7 @@ import {
   registerWasmModule,
   type EmscriptenRunanywhereModule,
 } from '../../../../src/runtime/EmscriptenModule';
+import { installCurrentModelRegistryExports } from '../../helpers/CurrentModelRegistryModule.js';
 
 interface STTLifecycleCounters {
   lifecycleBatchCalls: number;
@@ -102,6 +103,7 @@ describe('lifecycle-owned Web STT', () => {
       componentDestroys: 0,
     });
   });
+
 });
 
 function install(module: FakeSTTModule): void {
@@ -257,6 +259,8 @@ function fakeSTTModule(): FakeSTTHarness {
       currentLifecycleModelId = null;
     },
   };
+
+  installCurrentModelRegistryExports(module);
 
   return {
     module,

@@ -57,6 +57,12 @@ public enum URLSessionHttpTransport {
         )
     }()
 
+    /// Internal buffered-session override used by the URLSession transport
+    /// contract tests. Production callers always leave this nil and use
+    /// ``sharedSession``.
+    fileprivate static let bufferedSessionOverrideForTesting = // swiftlint:disable:this strict_fileprivate
+        OSAllocatedUnfairLock<URLSession?>(initialState: nil)
+
     /// Caller-provided override for the streaming session. When non-nil,
     /// `request_stream` / `request_resume` use this session instead of
     /// building a per-call one. Hosts that want a `.background(...)`
@@ -124,8 +130,15 @@ public enum URLSessionHttpTransport {
         guard wasRegistered else { return }
         _ = rac_http_transport_register(nil, nil)
         cancelAllStreams()
+        bufferedSessionOverrideForTesting.withLock { $0 = nil }
         streamingSessionOverride.withLock { $0 = nil }
         logger.info("URLSession HTTP transport unregistered")
+    }
+
+    /// Inject a buffered URLSession for hermetic transport contract tests.
+    /// Internal-only; nil preserves the production ``sharedSession`` path.
+    static func registerBufferedSessionForTesting(_ session: URLSession?) {
+        bufferedSessionOverrideForTesting.withLock { $0 = session }
     }
 
     /// Install a custom `URLSession` for streaming downloads (model
@@ -394,6 +407,19 @@ private final class RedirectSanitizingDelegate: NSObject, URLSessionTaskDelegate
 
 // MARK: - RequestExecutor
 
+/// Sendable snapshot produced by URLSession before the waiting C adapter
+/// resumes. Converting `URLResponse`/`Error` inside the callback keeps those
+/// Foundation reference types from crossing the concurrency boundary.
+private enum BufferedRequestResult: Sendable {
+    case success(
+        status: Int32,
+        body: Data?,
+        headers: [(name: String, value: String)],
+        finalURL: String?
+    )
+    case failure(rac_result_t)
+}
+
 /// Core logic that turns a `RequestSnapshot` into a URLSession call,
 /// blocks until completion, and writes the result back into the C
 /// response struct. Two entry points: `send` (buffered body) and
@@ -412,38 +438,48 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
         let startTime = DispatchTime.now()
 
         let semaphore = DispatchSemaphore(value: 0)
-        var capturedData: Data?
-        var capturedResponse: URLResponse?
-        var capturedError: Error?
+        let result = OSAllocatedUnfairLock<BufferedRequestResult>(
+            initialState: .failure(RAC_ERROR_NETWORK_ERROR)
+        )
 
-        let task = URLSessionHttpTransport.sharedSession.dataTask(with: urlRequest) { data, response, error in
-            capturedData = data
-            capturedResponse = response
-            capturedError = error
+        let session = URLSessionHttpTransport.bufferedSessionOverrideForTesting.withLock { $0 }
+            ?? URLSessionHttpTransport.sharedSession
+        let task = session.dataTask(with: urlRequest) { data, response, error in
+            let snapshot: BufferedRequestResult
+            if let error {
+                snapshot = .failure(mapTransportError(error))
+            } else if let response = response as? HTTPURLResponse {
+                snapshot = .success(
+                    status: Int32(response.statusCode),
+                    body: data,
+                    headers: ResponseWriter.extractHeaders(from: response),
+                    finalURL: response.url?.absoluteString
+                )
+            } else {
+                snapshot = .failure(RAC_ERROR_NETWORK_ERROR)
+            }
+            result.withLock { $0 = snapshot }
             semaphore.signal()
         }
         task.resume()
         semaphore.wait()
 
         let elapsedMs = elapsedMilliseconds(since: startTime)
-
-        if let error = capturedError {
-            return mapTransportError(error)
-        }
-
-        guard let httpResponse = capturedResponse as? HTTPURLResponse else {
+        let captured = result.withLock { $0 }
+        guard case let .success(status, body, headers, finalURL) = captured else {
+            if case let .failure(errorCode) = captured {
+                return errorCode
+            }
             return RAC_ERROR_NETWORK_ERROR
         }
 
-        let headers = ResponseWriter.extractHeaders(from: httpResponse)
-        let finalURL = httpResponse.url?.absoluteString
         let redirected = (finalURL != nil && finalURL != snapshot.url.absoluteString)
             ? finalURL
             : nil
 
         ResponseWriter.write(
-            status: Int32(httpResponse.statusCode),
-            bodyBytes: capturedData,
+            status: status,
+            bodyBytes: body,
             headers: headers,
             redirectedURL: redirected,
             elapsedMs: elapsedMs,

@@ -76,8 +76,7 @@ export function logLevelToJSON(object: LogLevel): string {
 
 /**
  * ---------------------------------------------------------------------------
- * SDK logging configuration. Union of the fields the per-SDK
- * LoggingConfiguration structs carry today; per-environment presets
+ * SDK logging configuration. Per-environment presets
  * (development/staging/production) stay in each SDK as factory helpers.
  * ---------------------------------------------------------------------------
  */
@@ -92,8 +91,6 @@ export interface LoggingConfiguration {
   includeDeviceMetadata: boolean;
   /** Forward records to the remote logging pipeline. */
   enableRemoteLogging: boolean;
-  /** Forward error/fatal records to Sentry. */
-  enableSentryLogging: boolean;
 }
 
 /**
@@ -136,7 +133,6 @@ function createBaseLoggingConfiguration(): LoggingConfiguration {
     includeSourceLocation: false,
     includeDeviceMetadata: false,
     enableRemoteLogging: false,
-    enableSentryLogging: false,
   };
 }
 
@@ -156,9 +152,6 @@ export const LoggingConfiguration: MessageFns<LoggingConfiguration> = {
     }
     if (message.enableRemoteLogging !== false) {
       writer.uint32(40).bool(message.enableRemoteLogging);
-    }
-    if (message.enableSentryLogging !== false) {
-      writer.uint32(48).bool(message.enableSentryLogging);
     }
     return writer;
   },
@@ -210,14 +203,6 @@ export const LoggingConfiguration: MessageFns<LoggingConfiguration> = {
           message.enableRemoteLogging = reader.bool();
           continue;
         }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.enableSentryLogging = reader.bool();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -254,11 +239,6 @@ export const LoggingConfiguration: MessageFns<LoggingConfiguration> = {
         : isSet(object.enable_remote_logging)
         ? globalThis.Boolean(object.enable_remote_logging)
         : false,
-      enableSentryLogging: isSet(object.enableSentryLogging)
-        ? globalThis.Boolean(object.enableSentryLogging)
-        : isSet(object.enable_sentry_logging)
-        ? globalThis.Boolean(object.enable_sentry_logging)
-        : false,
     };
   },
 
@@ -279,9 +259,6 @@ export const LoggingConfiguration: MessageFns<LoggingConfiguration> = {
     if (message.enableRemoteLogging !== false) {
       obj.enableRemoteLogging = message.enableRemoteLogging;
     }
-    if (message.enableSentryLogging !== false) {
-      obj.enableSentryLogging = message.enableSentryLogging;
-    }
     return obj;
   },
 
@@ -295,7 +272,6 @@ export const LoggingConfiguration: MessageFns<LoggingConfiguration> = {
     message.includeSourceLocation = object.includeSourceLocation ?? false;
     message.includeDeviceMetadata = object.includeDeviceMetadata ?? false;
     message.enableRemoteLogging = object.enableRemoteLogging ?? false;
-    message.enableSentryLogging = object.enableSentryLogging ?? false;
     return message;
   },
 };

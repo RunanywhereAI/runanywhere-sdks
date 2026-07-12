@@ -69,10 +69,10 @@ export const rAGQueryOptionsDefaults = (): RAGQueryOptions => ({
 });
 
 export const validateRAGQueryOptions = (m: RAGQueryOptions): void => {
-  if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1)) {
+  if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
     throw new ValidationError({
       fieldPath: 'RAGQueryOptions.multi_query_count',
-      message: `multi_query_count must be >= 1 (got ${m.multiQueryCount})`,
+      message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
     });
   }
 };

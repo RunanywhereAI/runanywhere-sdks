@@ -49,36 +49,8 @@ public extension RALLMGenerationOptions {
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
-        // Embed the full options envelope so typed controls such as
-        // disableThinking, thinkingPattern, toolCalling, grammar, and
-        // structured output reach commons as one canonical payload.
+        // LLM generation controls have one canonical wire location.
         request.options = self
-        request.maxTokens = maxTokens
-        request.temperature = temperature
-        request.topP = topP
-        request.topK = topK
-        request.repetitionPenalty = repetitionPenalty
-        request.stopSequences = stopSequences
-        request.streamingEnabled = streamingEnabled
-        request.preferredFramework = preferredFramework.wireString
-        if hasSystemPrompt {
-            request.systemPrompt = systemPrompt
-        }
-        if hasJsonSchema {
-            request.jsonSchema = jsonSchema
-        }
-        if hasStructuredOutput {
-            request.jsonSchema = structuredOutput.hasJsonSchema
-                ? structuredOutput.jsonSchema
-                : structuredOutput.schema.jsonSchemaString
-            request.responseFormat = structuredOutput.mode == .jsonObject ? "json_object" : "json_schema"
-            if !structuredOutput.grammar.isEmpty {
-                request.grammar = structuredOutput.grammar
-            }
-        }
-        if hasExecutionTarget {
-            request.executionTarget = executionTarget.wireString
-        }
         return request
     }
 }
@@ -105,16 +77,5 @@ public extension RAThinkingTagPattern {
         proto.openTag = "<think>"
         proto.closeTag = "</think>"
         return proto
-    }
-}
-
-public extension RAExecutionTarget {
-    var wireString: String {
-        switch self {
-        case .onDevice: return "on-device"
-        case .cloud: return "cloud"
-        case .auto: return "auto"
-        default: return ""
-        }
     }
 }

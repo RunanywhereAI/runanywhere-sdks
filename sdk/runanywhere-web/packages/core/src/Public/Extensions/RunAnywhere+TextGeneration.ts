@@ -83,47 +83,28 @@ function buildLLMGenerateRequest(
   streamingEnabled = false,
 ): LLMGenerateRequest {
   const { history, conversationId, ...generationOptions } = options;
-  return {
-    prompt,
-    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-    // (RALLMTypes+CppBridge.swift:13-21): maxTokens 100, temperature 0.8,
-    // topP 1.0, topK 0, repetitionPenalty 1.0.
+  const canonicalOptions = LLMGenerationOptionsMessage.fromPartial({
+    ...generationOptions,
     maxTokens: options.maxTokens ?? 100,
     temperature: options.temperature ?? 0.8,
     topP: options.topP ?? 1.0,
     topK: options.topK ?? 0,
-    systemPrompt: options.systemPrompt ?? '',
-    emitThoughts: options.thinkingPattern != null,
     repetitionPenalty: options.repetitionPenalty ?? 1.0,
-    stopSequences: options.stopSequences ?? [],
     streamingEnabled,
-    preferredFramework: options.preferredFramework == null
-      ? ''
-      : String(options.preferredFramework),
-    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema ?? '',
-    executionTarget: options.executionTarget == null
-      ? ''
-      : String(options.executionTarget),
+    jsonSchema: options.jsonSchema ?? options.structuredOutput?.jsonSchema,
+    grammar: options.grammar ?? options.structuredOutput?.grammar,
+    responseFormat: options.responseFormat
+      ?? structuredOutputResponseFormat(options.structuredOutput),
+  });
+  return {
+    prompt,
+    emitThoughts: options.thinkingPattern != null,
     requestId: '',
     modelId: '',
     conversationId: conversationId ?? '',
     history: history ?? [],
-    seed: options.seed ?? 0,
-    frequencyPenalty: options.frequencyPenalty ?? 0,
-    presencePenalty: options.presencePenalty ?? 0,
-    minP: options.minP ?? 0,
-    // Swift parity (RALLMTypes+CppBridge.swift:66-74): grammar and
-    // responseFormat fall back to the structured-output configuration.
-    grammar: options.grammar ?? options.structuredOutput?.grammar ?? '',
-    responseFormat: options.responseFormat
-      ?? structuredOutputResponseFormat(options.structuredOutput),
-    echoPrompt: options.echoPrompt ?? false,
-    nThreads: options.nThreads ?? 0,
-    // Canonical knob channel (llm_service.proto field 26): the inline scalar
-    // fields above are DEPRECATED; advanced knobs (disableThinking,
-    // thinkingPattern, …) only reach commons through `options.*`.
-    options: LLMGenerationOptionsMessage.fromPartial(generationOptions),
     metadata: {},
+    options: canonicalOptions,
   };
 }
 
@@ -141,11 +122,19 @@ function normalizeLLMGenerateRequest(
   streamingEnabled: boolean,
 ): LLMGenerateRequest {
   if (isLLMGenerateRequest(requestOrOptions)) {
-    // Proto-request overload — mirrors Swift `generate(_ request:)` /
-    // `generateStream(_ request:)` (RunAnywhere+TextGeneration.swift:43-87):
-    // bypass option-building and submit the request as-is, with only the
-    // streaming flag forced for the chosen entry point.
-    return { ...requestOrOptions, streamingEnabled };
+    const requestOptions = requestOrOptions.options;
+    return {
+      ...requestOrOptions,
+      options: LLMGenerationOptionsMessage.fromPartial({
+        maxTokens: requestOptions?.maxTokens ?? 100,
+        temperature: requestOptions?.temperature ?? 0.8,
+        topP: requestOptions?.topP ?? 1.0,
+        topK: requestOptions?.topK ?? 0,
+        repetitionPenalty: requestOptions?.repetitionPenalty ?? 1.0,
+        ...requestOptions,
+        streamingEnabled,
+      }),
+    };
   }
   return buildLLMGenerateRequest(requestOrOptions.prompt, requestOrOptions, streamingEnabled);
 }

@@ -80,7 +80,7 @@ cd ../../sdk/runanywhere-commons
 ./scripts/linux/download-sherpa-onnx.sh
 
 # Step 2: Build runanywhere-commons
-./scripts/build-linux.sh --shared
+./scripts/build-linux.sh
 
 # Step 3: Download models
 cd ../../Playground/linux-voice-assistant

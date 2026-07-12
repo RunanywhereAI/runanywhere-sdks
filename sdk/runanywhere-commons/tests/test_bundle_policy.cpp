@@ -17,6 +17,7 @@
 
 #include "rac/infrastructure/model_management/rac_bundle_policy.h"
 
+#include "../src/infrastructure/model_management/bundle_policy_registry_internal.h"
 #include "../src/infrastructure/model_management/hf_resolver.h"
 #include "qhexrt_bundle_policy.h"
 
@@ -58,19 +59,21 @@ void test_registry(std::vector<TestResult>& results) {
     static rac_bundle_policy_t policy_b = policy_a;
     policy_b.is_bundle_manifest = always_true;
 
-    results.push_back(expect("find before register is NULL",
-                             rac_bundle_policy_find(RAC_FRAMEWORK_SHERPA) == nullptr));
+    results.push_back(expect(
+        "find before register is NULL",
+        rac::infra::bundle_policy::find(RAC_FRAMEWORK_SHERPA) == nullptr));
     results.push_back(
         expect("register ok", rac_bundle_policy_register(&policy_a) == RAC_SUCCESS));
-    results.push_back(expect("find returns registrant",
-                             rac_bundle_policy_find(RAC_FRAMEWORK_SHERPA) == &policy_a));
+    results.push_back(expect(
+        "find returns registrant",
+        rac::infra::bundle_policy::find(RAC_FRAMEWORK_SHERPA) == &policy_a));
     results.push_back(
-        expect("re-register replaces", rac_bundle_policy_register(&policy_b) == RAC_SUCCESS &&
-                                           rac_bundle_policy_find(RAC_FRAMEWORK_SHERPA) ==
-                                               &policy_b));
+        expect("re-register replaces",
+               rac_bundle_policy_register(&policy_b) == RAC_SUCCESS &&
+                   rac::infra::bundle_policy::find(RAC_FRAMEWORK_SHERPA) == &policy_b));
     results.push_back(expect("unregister removes",
                              rac_bundle_policy_unregister(RAC_FRAMEWORK_SHERPA) == RAC_SUCCESS &&
-                                 rac_bundle_policy_find(RAC_FRAMEWORK_SHERPA) == nullptr));
+                                 rac::infra::bundle_policy::find(RAC_FRAMEWORK_SHERPA) == nullptr));
     results.push_back(expect("unregister absent is ok",
                              rac_bundle_policy_unregister(RAC_FRAMEWORK_SHERPA) == RAC_SUCCESS));
 }
@@ -103,9 +106,10 @@ void test_qhexrt_policy_shape(std::vector<TestResult>& results) {
                                  std::string(policy->manifest_extension) == ".json"));
     results.push_back(expect("qhexrt policy: device variant resolver installed",
                              policy->resolve_variant != nullptr));
-    results.push_back(expect("qhexrt policy: registers cleanly",
-                             rac_bundle_policy_register(policy) == RAC_SUCCESS &&
-                                 rac_bundle_policy_find(RAC_FRAMEWORK_QHEXRT) == policy));
+    results.push_back(expect(
+        "qhexrt policy: registers cleanly",
+        rac_bundle_policy_register(policy) == RAC_SUCCESS &&
+            rac::infra::bundle_policy::find(RAC_FRAMEWORK_QHEXRT) == policy));
     rac_bundle_policy_unregister(RAC_FRAMEWORK_QHEXRT);
 }
 

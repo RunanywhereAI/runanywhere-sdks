@@ -2,7 +2,9 @@ import Foundation
 import Security
 
 /// Keychain manager for secure storage of sensitive data
-public final class KeychainManager {
+/// This wrapper has no mutable Swift state; Security.framework serializes the
+/// keychain operations addressed by the immutable service/access-group keys.
+public final class KeychainManager: @unchecked Sendable {
 
     // MARK: - Singleton
 

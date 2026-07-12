@@ -222,7 +222,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
         // Ensure the catalog is loaded, then pre-select the best-for-device trio
         // so the user doesn't have to pick anything by hand.
-        await ModelListViewModel.shared.loadModels()
+        await ModelListViewModel.shared.loadModelsFromRegistry()
         preselectRecommendedPipeline()
 
         currentStatus = "Ready"

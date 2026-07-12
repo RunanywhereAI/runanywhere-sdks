@@ -12,8 +12,8 @@ providers and ships the `RABackendLLAMACPP` native binary.
 ## Requirements
 
 - `@runanywhere/core` peer dependency
-- React Native 0.74+
-- iOS 17.0+ / Android API 24+
+- React Native 0.83.1+
+- iOS 17.5+ / Android API 24+
 
 ## Installation
 
@@ -70,9 +70,6 @@ console.log(result.text);
 ```typescript
 import { LlamaCPP } from '@runanywhere/llamacpp';
 ```
-
-`LlamaCppProvider` remains exported for lower-level compatibility, but app code
-should use `LlamaCPP`. Neither surface owns model lifecycle or inference APIs.
 
 ### `LlamaCPP.register()`
 

@@ -31,9 +31,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * Session/handle creation request envelope. Mirrors the public SDK
- * `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
- * previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+ * Session/handle creation request envelope shared by every SDK.
  * The result carries an opaque uint64 handle the SDK uses for subsequent
  * embed / embed_batch invocations.
  * ---------------------------------------------------------------------------
@@ -62,9 +60,8 @@ public class EmbeddingsCreateRequest(
   )
   public val configuration: EmbeddingsConfiguration? = null,
   /**
-   * Provider-specific JSON config. Mirrors the legacy
-   * rac_embeddings_create_with_config(config_json) parameter for backends
-   * that need companion file paths (e.g. {"vocab_path":"..."}).
+   * Provider-specific JSON config for backends that need companion file
+   * paths (e.g. {"vocab_path":"..."}).
    */
   @field:WireField(
     tag = 3,

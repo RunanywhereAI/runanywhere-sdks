@@ -112,8 +112,8 @@ struct StreamSession {
     // Per-session backend recognizer handle. Lazily created on the
     // first accepted audio chunk via the new stream_create vtable slot.
     // Backends that don't implement the slot leave this nullptr and
-    // rac_stt_stream_feed_audio_proto falls back to the legacy per-chunk
-    // transcribe_stream path.
+    // rac_stt_stream_feed_audio_proto uses the one-shot per-chunk
+    // transcribe_stream engine path.
     std::shared_ptr<StreamOperationState> operations = std::make_shared<StreamOperationState>();
     // Fallback endpointing for engines (QHexRT/Whisper) that expose only
     // one-shot transcription. Feeding each 100 ms mic chunk as a fresh
@@ -1411,8 +1411,8 @@ namespace rac::stt {
  *        dispatcher per partial/final result. Serializes one
  *        STTStreamEvent and fires the registered callback.
  *
- * Available only when Protobuf is linked. Backends without Protobuf
- * fall back to the legacy struct callback path.
+ * Available only when Protobuf is linked. Non-Protobuf builds expose the
+ * backend-facing text callback directly and do not emit SDK proto events.
  *
  * Looks up the most recent active session bound to @p handle (if any) and
  * stamps its request_id on the emitted event so downstream consumers can

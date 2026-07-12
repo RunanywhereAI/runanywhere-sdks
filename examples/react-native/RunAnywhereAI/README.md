@@ -14,10 +14,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%2015.1%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 15.1+" />
+  <img src="https://img.shields.io/badge/Platform-iOS%2017.5%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" />
   <img src="https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 7.0+" />
-  <img src="https://img.shields.io/badge/React%20Native-0.81-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.81" />
-  <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.5" />
+  <img src="https://img.shields.io/badge/React%20Native-0.85.3-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.85.3" />
+  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.9" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
 </p>
 
@@ -33,7 +33,7 @@
 
 Prerequisites:
 
-- Node.js 18+ and Corepack-enabled Yarn 3 (`corepack enable`; this project uses `nodeLinker: node-modules`).
+- Node.js 22.12+ and Corepack-enabled Yarn 3 (`corepack enable`; this project uses `nodeLinker: node-modules`).
 - Xcode 15+ with iOS simulator runtimes and command line tools selected.
 - CocoaPods (`pod --version` should succeed).
 - Android Studio with Android SDK 24+, build tools, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
@@ -111,7 +111,9 @@ This Sample App → Local RN SDK packages (sdk/runanywhere-react-native/packages
 3. Copies JNI `.so` files into `packages/*/android/src/main/jniLibs/<abi>/`.
 4. Type-checks each package and produces `dist/sdk-rn/*.tgz` with matching `.sha256` files.
 
-`yarn native:local` writes the `.testlocal` marker files that enable local library consumption (use `yarn native:remote` to revert).
+The iOS packages consume the staged `ios/Binaries/*.xcframework` files
+directly. For an Android local-native build, set
+`runanywhere.useLocalNatives=true` in the app's `gradle.properties`.
 
 If you do not need to rebuild commons from source, run the per-package download helpers (`yarn core:download-ios`, `yarn core:download-android`, etc.) from `sdk/runanywhere-react-native/` to pull prebuilt natives from a GitHub release directly.
 
@@ -501,8 +503,8 @@ await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
   category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
 }));
 
-// Transcribe audio bytes or base64 captured by the platform recorder
-const result = await RunAnywhere.transcribe(audioBase64, {
+// Transcribe audio bytes captured by the platform recorder
+const result = await RunAnywhere.transcribe(audioBytes, {
   language: STTLanguage.STT_LANGUAGE_EN,
   audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
   sampleRate: 16000,
@@ -542,6 +544,7 @@ const result = await RunAnywhere.synthesize(text, {
 
 ```typescript
 import RNFS from 'react-native-fs';
+import { Buffer } from 'buffer';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 
@@ -551,9 +554,10 @@ const audioPath = await AudioService.startRecording();
 // 2. Stop and get audio
 const { uri } = await AudioService.stopRecording();
 
-// 3. Transcribe
+// 3. Decode the platform file into the SDK's canonical byte input
 const audioBase64 = await RNFS.readFile(uri, 'base64');
-const sttResult = await RunAnywhere.transcribe(audioBase64, {
+const audioBytes = Uint8Array.from(Buffer.from(audioBase64, 'base64'));
+const sttResult = await RunAnywhere.transcribe(audioBytes, {
   language: STTLanguage.STT_LANGUAGE_EN,
   audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
   sampleRate: 16000,
@@ -621,7 +625,7 @@ await RunAnywhere.cleanTempFiles();
 
 **What it demonstrates:**
 - **Batch mode**: Record full audio, then transcribe
-- **Live mode**: Pseudo-streaming with interval-based transcription
+- **Live mode**: Native streaming with an `AsyncIterable<Uint8Array>`
 - Audio level visualization during recording
 - Transcription metrics (confidence percentage)
 - Microphone permission handling
@@ -629,7 +633,8 @@ await RunAnywhere.cleanTempFiles();
 **Key SDK APIs:**
 - `RunAnywhere.loadModel(ModelLoadRequest)` — Load Whisper model
 - `RunAnywhere.currentModel(CurrentModelRequest)` — Check STT model status
-- `RunAnywhere.transcribe()` — Transcribe audio bytes/base64
+- `RunAnywhere.transcribe()` — Transcribe audio bytes
+- `RunAnywhere.transcribeStream()` — Stream PCM chunks through an `AsyncIterable`
 - Native audio recording via `AudioService`
 
 ### 3. Text-to-Speech Screen (`TTSScreen.tsx`)
@@ -787,7 +792,7 @@ RUNANYWHERE_BASE_URL=https://api.runanywhere.ai
 
 ### iOS Specific
 
-- **Minimum iOS**: 15.1
+- **Minimum iOS**: 17.5
 - **Bridgeless Mode**: Disabled (for Nitrogen compatibility)
 - **Architectures**: arm64 (device), x86_64/arm64 (simulator)
 

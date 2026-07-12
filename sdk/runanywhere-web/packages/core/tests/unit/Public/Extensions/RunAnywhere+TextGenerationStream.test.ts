@@ -317,11 +317,12 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'Say hi',
       maxTokens: 16,
+      temperature: 0,
     });
 
     // The public contract is that `await generateStream(...)` resolves
@@ -349,7 +350,11 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
     expect(result.finishReason).toBe('stop');
 
     expect(capturedRequest?.prompt).toBe('Say hi');
-    expect(capturedRequest?.streamingEnabled).toBe(true);
+    expect(capturedRequest?.options?.streamingEnabled).toBe(true);
+    expect(capturedRequest?.options?.maxTokens).toBe(16);
+    expect(capturedRequest?.options?.temperature).toBe(0);
+    expect(capturedRequest?.options?.topP).toBe(1);
+    expect(capturedRequest?.options?.repetitionPenalty).toBe(1);
     expect(module.streamCalls).toBe(1);
     expect(module.ccallCalls).toContainEqual({
       functionName: 'rac_llm_generate_stream_proto',
@@ -374,7 +379,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
       },
       generateStream: () => 0,
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const resultPromise = TextGeneration.generate({ prompt: 'async prompt' });
     await Promise.resolve();
@@ -402,7 +407,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return nativeGate;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({ prompt: 'hold memory' });
     const iterator = handle.stream[Symbol.asyncIterator]();
@@ -452,7 +457,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'two letters',
@@ -487,7 +492,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
         return 0;
       },
     });
-    ModalityProtoAdapter.setDefaultModule(module);
+    ModalityProtoAdapter.registerModuleCapabilities(['llm'], module);
 
     const handle = await TextGeneration.generateStream({
       prompt: 'cancel me',

@@ -1,12 +1,4 @@
-// swift-tools-version: 5.9
-// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
-// version forces Swift 6 language mode on all targets, which turns several
-// pre-existing patterns in the SDK (mutable static registration flags,
-// closure-captured locals in AVAudioConverter / URLSession callbacks,
-// etc.) into hard build errors. Migrating those requires non-trivial
-// source changes (sendable globals, actor isolation) that are out of
-// scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
-// Re-attempt once the Swift 6 strict-concurrency migration lands.
+// swift-tools-version: 6.2
 import PackageDescription
 import Foundation
 
@@ -193,6 +185,9 @@ let package = Package(
                 "Generated/router.pb.swift",
                 "Generated/diffusion_options.pb.swift",
             ],
+            resources: [
+                .process("PrivacyInfo.xcprivacy"),
+            ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE"),
             ],
@@ -302,7 +297,8 @@ let package = Package(
                 "RunAnywhere",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
-            path: "Tests/RunAnywhereTests"
+            path: "Tests/RunAnywhereTests",
+            exclude: ["Fixtures"]
         ),
 
         // -------------------------------------------------------------------

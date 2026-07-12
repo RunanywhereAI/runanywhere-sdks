@@ -2,8 +2,8 @@
  * @file rac_stream_adapter.h
  * @brief RunAnywhere Commons - Shared stream-callback adapter for plugin vtables
  *
- * Backend vtable adapters that forward token streaming to an underlying legacy
- * API frequently need a 2-field `{callback, user_data}` bridge struct. This
+ * Backend vtable adapters that forward token streaming to an engine API
+ * frequently need a 2-field `{callback, user_data}` bridge struct. This
  * header provides a single template so each primitive (LLM, VLM, STT, ...)
  * can parameterize the adapter on its own `rac_*_stream_callback_fn` type
  * instead of copy-pasting the struct.

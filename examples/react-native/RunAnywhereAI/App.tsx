@@ -42,6 +42,11 @@ import {
   registerAll,
   type BackendRegistrationState,
 } from './src/services/ModelCatalogBootstrap';
+import {
+  normalizeAPIConfiguration,
+  setAPIConfigurationApplyHandler,
+  type APIConfiguration,
+} from './src/services/APIConfiguration';
 
 /**
  * Minimal structural type for optional backend modules.
@@ -52,16 +57,6 @@ type OptionalBackend = {
   register: () => void | Promise<void | boolean>;
   isAvailable?: boolean;
 };
-
-function hasUsableBackendConfig(options: {
-  apiKey?: string | null;
-  baseURL?: string | null;
-}): boolean {
-  const apiKey = options.apiKey?.trim() ?? '';
-  const baseURL = options.baseURL?.trim() ?? '';
-  if (!apiKey || apiKey.length < 8 || !baseURL) return false;
-  return baseURL.startsWith('http://') || baseURL.startsWith('https://');
-}
 
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: OptionalBackend | null = null;
@@ -80,13 +75,6 @@ try {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
 }
 
-let MLX: OptionalBackend | null = null;
-try {
-  MLX = require('@runanywhere/mlx').MLX as OptionalBackend;
-} catch {
-  logDiagnostic('[App] MLX backend not available - Apple MLX disabled');
-}
-
 // QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
 // native hybrid is absent, so the app falls back.
 let QHexRT: OptionalBackend | null = null;
@@ -98,12 +86,6 @@ try {
     '[App] QHexRT backend not available - NPU disabled on this platform'
   );
 }
-import {
-  getStoredApiKey,
-  getStoredBaseURL,
-  getStoredHfToken,
-  hasCustomConfiguration,
-} from './src/screens/SettingsScreen';
 import { logDiagnostic } from './src/utils/diagnostics';
 import { RUNANYWHERE_BASE_URL, RUNANYWHERE_API_KEY } from '@env';
 
@@ -113,6 +95,16 @@ import { RUNANYWHERE_BASE_URL, RUNANYWHERE_API_KEY } from '@env';
 // no custom configuration has been saved in Settings.
 const DEFAULT_BASE_URL = RUNANYWHERE_BASE_URL ?? '';
 const DEFAULT_API_KEY = RUNANYWHERE_API_KEY ?? '';
+
+function buildTimeAPIConfiguration(): APIConfiguration | null {
+  try {
+    return normalizeAPIConfiguration(DEFAULT_API_KEY, DEFAULT_BASE_URL, {
+      allowInsecureLoopback: __DEV__,
+    });
+  } catch {
+    return null;
+  }
+}
 
 type InitState = 'loading' | 'ready' | 'error';
 
@@ -159,24 +151,6 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
-  let mlxRegistered = false;
-  if (MLX) {
-    try {
-      mlxRegistered = (await MLX.register()) !== false;
-      if (mlxRegistered) {
-        logDiagnostic(
-          '[App] MLX backend registered (LLM + VLM + STT + TTS + Embeddings)'
-        );
-      } else {
-        logDiagnostic(
-          '[App] MLX.register() returned false - Apple MLX unavailable'
-        );
-      }
-    } catch (error) {
-      logDiagnostic(`[App] MLX backend not available: ${String(error)}`);
-    }
-  }
-
   // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. The SDK
   // resolves logical HNPU URLs to the current Hexagon arch during registration.
   let qhexrtRegistered = false;
@@ -195,7 +169,7 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     }
   }
 
-  return { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered };
+  return { llamaRegistered, onnxRegistered, qhexrtRegistered };
 }
 
 const App: React.FC = () => {
@@ -206,84 +180,87 @@ const App: React.FC = () => {
    * Initialize the SDK
    * Matches iOS initializeSDK() in RunAnywhereAIApp.swift
    */
-  const initializeSDK = useCallback(async () => {
-    setInitState('loading');
-    setError(null);
+  const initializeSDK = useCallback(
+    async (configurationOverride?: APIConfiguration | null) => {
+      const isReconfiguration = configurationOverride !== undefined;
+      if (!isReconfiguration) {
+        setInitState('loading');
+        setError(null);
+      }
 
-    try {
-      const startTime = Date.now();
+      try {
+        const startTime = Date.now();
+        if (isReconfiguration) {
+          await RunAnywhere.reset();
+        }
 
-      /* eslint-disable no-console -- demo app bootstrap diagnostics */
-      const backendState = await registerBackends();
-      const customApiKey = await getStoredApiKey();
-      const customBaseURL = await getStoredBaseURL();
-      const hasCustomConfig = await hasCustomConfiguration();
+        /* eslint-disable no-console -- demo app bootstrap diagnostics */
+        const backendState = await registerBackends();
+        const configuration =
+          configurationOverride ?? buildTimeAPIConfiguration();
 
-      const effectiveApiKey =
-        hasCustomConfig && customApiKey ? customApiKey : DEFAULT_API_KEY;
-      const effectiveBaseURL =
-        hasCustomConfig && customBaseURL ? customBaseURL : DEFAULT_BASE_URL;
+        if (configuration) {
+          console.log('[App] Found backend configuration');
+          // Staging (not Production) so the custom base URL is honored AND
+          // local logging stays on — Production sets enableLocalLogging:false,
+          // hiding all SDK/telemetry logs. Development would ignore baseURL.
+          await RunAnywhere.initialize({
+            apiKey: configuration.apiKey,
+            baseURL: configuration.baseURL,
+            environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+          });
+          console.log(
+            '[App] SDK initialized with backend configuration (staging)'
+          );
+        } else {
+          await RunAnywhere.initialize({
+            apiKey: '',
+            baseURL: 'https://api.runanywhere.ai',
+            environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+          });
+          console.log('[App] SDK initialized in DEVELOPMENT mode');
+        }
 
-      if (
-        hasUsableBackendConfig({
-          apiKey: effectiveApiKey,
-          baseURL: effectiveBaseURL,
-        })
-      ) {
-        console.log('[App] Found backend configuration');
-        // Staging (not Production) so the custom base URL is honored AND
-        // local logging stays on — Production sets enableLocalLogging:false,
-        // hiding all SDK/telemetry logs. Development would ignore baseURL.
-        await RunAnywhere.initialize({
-          apiKey: effectiveApiKey,
-          baseURL: effectiveBaseURL,
-          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-        });
+        await registerAll(backendState);
+        await RunAnywhere.refreshModelRegistry();
+
+        const initTime = Date.now() - startTime;
+        const isInit = await RunAnywhere.isInitialized;
+        const version = RunAnywhere.version;
+        const sdkState = {
+          environment: RunAnywhere.environment,
+          servicesReady: RunAnywhere.areServicesReady,
+        };
+
         console.log(
-          '[App] SDK initialized with backend configuration (staging)'
+          `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, state: ${JSON.stringify(sdkState)}`
         );
-      } else {
-        await RunAnywhere.initialize({
-          apiKey: '',
-          baseURL: 'https://api.runanywhere.ai',
-          environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-        });
-        console.log('[App] SDK initialized in DEVELOPMENT mode');
+        /* eslint-enable no-console */
+
+        if (!isReconfiguration) {
+          setInitState('ready');
+        }
+      } catch (err) {
+        console.error('[App] SDK initialization failed:', err);
+        if (isReconfiguration) {
+          throw err;
+        }
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error occurred';
+        setError(errorMessage);
+        setInitState('error');
       }
+    },
+    []
+  );
 
-      // Re-apply the persisted HuggingFace token (Settings screen) so private
-      // HF model repos stay downloadable across app restarts.
-      const storedHfToken = (await getStoredHfToken())?.trim();
-      await RunAnywhere.setHfToken(storedHfToken ?? '');
-      if (storedHfToken) {
-        console.log('[App] Applied persisted HuggingFace token');
-      }
-
-      await registerAll(backendState);
-      await RunAnywhere.refreshModelRegistry();
-
-      const initTime = Date.now() - startTime;
-      const isInit = await RunAnywhere.isInitialized;
-      const version = RunAnywhere.version;
-      const sdkState = {
-        environment: RunAnywhere.environment,
-        servicesReady: RunAnywhere.areServicesReady,
-      };
-
-      console.log(
-        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, state: ${JSON.stringify(sdkState)}`
-      );
-      /* eslint-enable no-console */
-
-      setInitState('ready');
-    } catch (err) {
-      console.error('[App] SDK initialization failed:', err);
-      const errorMessage =
-        err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMessage);
-      setInitState('error');
-    }
-  }, []);
+  useEffect(
+    () =>
+      setAPIConfigurationApplyHandler((configuration) =>
+        initializeSDK(configuration)
+      ),
+    [initializeSDK]
+  );
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {

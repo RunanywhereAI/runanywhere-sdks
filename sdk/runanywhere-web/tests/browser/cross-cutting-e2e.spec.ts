@@ -4,7 +4,7 @@
  * Exercises every Web facade that does NOT require a model download. The
  * goal is to prove that the proto-byte adapters are wired in across all
  * cross-cutting surfaces once a backend (here: the llamacpp WASM module)
- * has installed itself via `setRunanywhereModule`. Together with
+ * has installed itself via `registerWasmModule`. Together with
  * `sdk-smoke`, `backend-readiness`, `llm-generate`, `vlm-generate`, and
  * `speech-rag-e2e`, this gives end-to-end coverage of every public surface
  * the Swift facade exposes:

@@ -2,9 +2,7 @@
 
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac_native.dart — Dart FFI bindings for commons C ABI surfaces not
-// covered by `lib/native/native_functions.dart` (the legacy binding
-// registry).
+// rac_native.dart — typed Dart FFI bindings for commons C ABI surfaces.
 //
 // Scope today:
 //   * Streaming proto callbacks (voice agent, LLM).
@@ -430,59 +428,8 @@ typedef RacVoiceAgentProcessTurnProtoDart =
       ffi.Pointer<RacProtoBuffer>,
     );
 
-typedef RacCreateWithModelNative =
-    ffi.Int32 Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Pointer<ffi.Void>>);
-typedef RacCreateWithModelDart =
-    int Function(ffi.Pointer<Utf8>, ffi.Pointer<ffi.Pointer<ffi.Void>>);
-
-typedef RacCreateWithModelConfigNative =
-    ffi.Int32 Function(
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Pointer<ffi.Void>>,
-    );
-typedef RacCreateWithModelConfigDart =
-    int Function(
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Pointer<ffi.Void>>,
-    );
-
-typedef RacCreateWithModelStructConfigNative =
-    ffi.Int32 Function(
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Pointer<ffi.Void>>,
-    );
-typedef RacCreateWithModelStructConfigDart =
-    int Function(
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Pointer<ffi.Void>>,
-    );
-
 typedef RacDestroyHandleNative = ffi.Void Function(ffi.Pointer<ffi.Void>);
 typedef RacDestroyHandleDart = void Function(ffi.Pointer<ffi.Void>);
-
-typedef RacHandleStatusNative = ffi.Int32 Function(ffi.Pointer<ffi.Void>);
-typedef RacHandleStatusDart = int Function(ffi.Pointer<ffi.Void>);
-
-typedef RacHandleCapabilitiesNative =
-    ffi.Uint32 Function(ffi.Pointer<ffi.Void>);
-typedef RacHandleCapabilitiesDart = int Function(ffi.Pointer<ffi.Void>);
-
-typedef RacDiffusionInitializeNative =
-    ffi.Int32 Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Void>,
-    );
-typedef RacDiffusionInitializeDart =
-    int Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<Utf8>,
-      ffi.Pointer<ffi.Void>,
-    );
 
 typedef RacHandleBytesToProtoNative =
     ffi.Int32 Function(
@@ -496,28 +443,6 @@ typedef RacHandleBytesToProtoDart =
       ffi.Pointer<ffi.Void>,
       ffi.Pointer<ffi.Uint8>,
       int,
-      ffi.Pointer<RacProtoBuffer>,
-    );
-
-typedef RacDiffusionProgressProtoCallbackNative =
-    ffi.Int32 Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
-
-typedef RacDiffusionGenerateWithProgressProtoNative =
-    ffi.Int32 Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Uint8>,
-      ffi.Size,
-      ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<RacProtoBuffer>,
-    );
-typedef RacDiffusionGenerateWithProgressProtoDart =
-    int Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Uint8>,
-      int,
-      ffi.Pointer<ffi.NativeFunction<RacDiffusionProgressProtoCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
       ffi.Pointer<RacProtoBuffer>,
     );
 
@@ -560,13 +485,21 @@ typedef RacToolCallProtoRequestDart =
 typedef RacToolCallingSessionEventCallbackNative =
     ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
 
+/// `void (*)(uint64_t, void*)` matching
+/// `rac_tool_calling_handle_published_callback_fn`.
+typedef RacToolCallingHandlePublishedCallbackNative =
+    ffi.Void Function(ffi.Uint64, ffi.Pointer<ffi.Void>);
+
 typedef RacToolCallingSessionCreateProtoNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Uint8>,
       ffi.Size,
       ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Uint64>,
+      ffi.Pointer<
+        ffi.NativeFunction<RacToolCallingHandlePublishedCallbackNative>
+      >,
+      ffi.Pointer<ffi.Void>,
     );
 typedef RacToolCallingSessionCreateProtoDart =
     int Function(
@@ -574,7 +507,10 @@ typedef RacToolCallingSessionCreateProtoDart =
       int,
       ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
       ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.Uint64>,
+      ffi.Pointer<
+        ffi.NativeFunction<RacToolCallingHandlePublishedCallbackNative>
+      >,
+      ffi.Pointer<ffi.Void>,
     );
 
 typedef RacToolCallingSessionStepWithResultProtoNative =
@@ -612,30 +548,6 @@ typedef RacArtifactInferFromUrlProtoNative =
 typedef RacArtifactInferFromUrlProtoDart =
     int Function(ffi.Pointer<ffi.Uint8>, int, ffi.Pointer<RacProtoBuffer>);
 
-// ============================================================================
-// STT stream lifecycle proto API
-// ============================================================================
-
-/// `void (*)(const uint8_t*, size_t, void*)` matching
-/// `rac_stt_stream_event_callback_fn`.
-typedef RacSttStreamEventCallbackNative =
-    ffi.Void Function(ffi.Pointer<ffi.Uint8>, ffi.Size, ffi.Pointer<ffi.Void>);
-
-typedef RacSttTranscribeStreamLifecycleProtoNative =
-    ffi.Int32 Function(
-      ffi.Pointer<ffi.Uint8>,
-      ffi.Size,
-      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
-    );
-typedef RacSttTranscribeStreamLifecycleProtoDart =
-    int Function(
-      ffi.Pointer<ffi.Uint8>,
-      int,
-      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
-    );
-
 // ---------------------------------------------------------------------------
 // Chunk-feed streaming STT sessions (rac_stt_stream.h). Mirrors Swift
 // STTStreamSessionABI in CppBridge+STT.swift: register a per-handle proto
@@ -658,24 +570,6 @@ typedef RacSttComponentLoadModelDart =
       ffi.Pointer<Utf8>,
       ffi.Pointer<Utf8>,
     );
-
-typedef RacSttSetStreamProtoCallbackNative =
-    ffi.Int32 Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
-    );
-typedef RacSttSetStreamProtoCallbackDart =
-    int Function(
-      ffi.Pointer<ffi.Void>,
-      ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
-      ffi.Pointer<ffi.Void>,
-    );
-
-typedef RacSttUnsetStreamProtoCallbackNative =
-    ffi.Int32 Function(ffi.Pointer<ffi.Void>);
-typedef RacSttUnsetStreamProtoCallbackDart =
-    int Function(ffi.Pointer<ffi.Void>);
 
 /// Flutter platform helper that registers an STT stream callback which posts
 /// copied events to a Dart ReceivePort. Exported by the Flutter pod/helper
@@ -741,6 +635,11 @@ typedef RacVoiceAgentProcessTurnProto2Dart =
       ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
       ffi.Pointer<ffi.Void>,
     );
+
+typedef RacVoiceAgentCancelTurnProtoNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, ffi.Size);
+typedef RacVoiceAgentCancelTurnProtoDart =
+    int Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, int);
 
 typedef RacVoiceAgentHelperProtoNative =
     ffi.Int32 Function(
@@ -920,9 +819,7 @@ typedef RacHttpDownloadExecuteDart =
 // Refresh is part of the proto-byte API: the only entry point is
 // `rac_model_registry_refresh_proto` (handle, ModelRegistryRefreshRequest
 // bytes, size, out ModelRegistryRefreshResult). It reuses the shared
-// `RacHandleBytesToProto` typedef. The legacy struct-opts
-// `rac_model_registry_refresh` / `rac_model_registry_refresh_opts_t` were
-// removed from commons.
+// `RacHandleBytesToProto` typedef.
 
 typedef RacModelRegistryRegisterProtoNative =
     ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Uint8>, ffi.Size);
@@ -1227,22 +1124,6 @@ typedef RacSdkEventPublishFailureDart =
     );
 
 // ============================================================================
-// Audio utils (rac_audio_utils.h)
-// ============================================================================
-
-/// Matches `rac_audio_compute_level_db(const float*, size_t, float*)` →
-/// `rac_result_t`. Centralises the RMS→dB DSP that used to be hand-rolled in
-/// each platform SDK.
-typedef RacAudioComputeLevelDbNative =
-    ffi.Int32 Function(
-      ffi.Pointer<ffi.Float>,
-      ffi.Size,
-      ffi.Pointer<ffi.Float>,
-    );
-typedef RacAudioComputeLevelDbDart =
-    int Function(ffi.Pointer<ffi.Float>, int, ffi.Pointer<ffi.Float>);
-
-// ============================================================================
 // SDK metadata + enum convenience helpers (rac_core.h / rac_environment.h /
 // rac_model_types.h / rac_tool_calling.h)
 // ============================================================================
@@ -1272,11 +1153,6 @@ typedef RacEnumToCStringDart =
 ///     rac_model_category_t)` — int-enum in, int out.
 typedef RacEnumToIntNative = ffi.Int32 Function(ffi.Int32);
 typedef RacEnumToIntDart = int Function(int);
-
-/// `const char* rac_tool_call_format_hint_from_format_name(int32_t)` —
-/// static lowercase hint string (do not free).
-typedef RacToolCallFormatHintNative = ffi.Pointer<Utf8> Function(ffi.Int32);
-typedef RacToolCallFormatHintDart = ffi.Pointer<Utf8> Function(int);
 
 // ============================================================================
 // Bindings facade
@@ -1322,13 +1198,11 @@ class RacBindings {
           .lookupFunction<RacProtoBufferFreeNative, RacProtoBufferFreeDart>(
             'rac_proto_buffer_free',
           ),
-      rac_result_to_proto_error = _lookupOptional<RacResultToProtoErrorDart>(
-        () =>
-            lib.lookupFunction<
-              RacResultToProtoErrorNative,
-              RacResultToProtoErrorDart
-            >('rac_result_to_proto_error'),
-      ),
+      rac_result_to_proto_error = lib
+          .lookupFunction<
+            RacResultToProtoErrorNative,
+            RacResultToProtoErrorDart
+          >('rac_result_to_proto_error'),
       rac_voice_agent_set_proto_callback = lib
           .lookupFunction<
             RacVoiceAgentSetProtoCallbackNative,
@@ -1569,19 +1443,13 @@ class RacBindings {
           'rac_vlm_cancel_lifecycle_proto',
         ),
       ),
-      rac_embeddings_create = _lookupOptional<RacCreateWithModelDart>(
-        () => lib
-            .lookupFunction<RacCreateWithModelNative, RacCreateWithModelDart>(
-              'rac_embeddings_create',
-            ),
-      ),
-      rac_embeddings_create_with_config =
-          _lookupOptional<RacCreateWithModelConfigDart>(
+      rac_embeddings_create_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
             () =>
                 lib.lookupFunction<
-                  RacCreateWithModelConfigNative,
-                  RacCreateWithModelConfigDart
-                >('rac_embeddings_create_with_config'),
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_embeddings_create_proto'),
           ),
       rac_embeddings_initialize = _lookupOptional<RacEmbeddingsInitializeDart>(
         () =>
@@ -1611,34 +1479,6 @@ class RacBindings {
           'rac_embeddings_destroy',
         ),
       ),
-      rac_diffusion_create = _lookupOptional<RacCreateWithModelDart>(
-        () => lib
-            .lookupFunction<RacCreateWithModelNative, RacCreateWithModelDart>(
-              'rac_diffusion_create',
-            ),
-      ),
-      rac_diffusion_create_with_config =
-          _lookupOptional<RacCreateWithModelStructConfigDart>(
-            () =>
-                lib.lookupFunction<
-                  RacCreateWithModelStructConfigNative,
-                  RacCreateWithModelStructConfigDart
-                >('rac_diffusion_create_with_config'),
-          ),
-      rac_diffusion_initialize = _lookupOptional<RacDiffusionInitializeDart>(
-        () =>
-            lib.lookupFunction<
-              RacDiffusionInitializeNative,
-              RacDiffusionInitializeDart
-            >('rac_diffusion_initialize'),
-      ),
-      rac_diffusion_generate_proto = _lookupOptional<RacHandleBytesToProtoDart>(
-        () =>
-            lib.lookupFunction<
-              RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart
-            >('rac_diffusion_generate_proto'),
-      ),
       rac_diffusion_generate_lifecycle_proto =
           _lookupOptional<RacLifecycleRequestProtoDart>(
             () =>
@@ -1647,32 +1487,6 @@ class RacBindings {
                   RacLifecycleRequestProtoDart
                 >('rac_diffusion_generate_lifecycle_proto'),
           ),
-      rac_diffusion_generate_with_progress_proto =
-          _lookupOptional<RacDiffusionGenerateWithProgressProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacDiffusionGenerateWithProgressProtoNative,
-                  RacDiffusionGenerateWithProgressProtoDart
-                >('rac_diffusion_generate_with_progress_proto'),
-          ),
-      rac_diffusion_cancel_proto = _lookupOptional<RacHandleStatusDart>(
-        () => lib.lookupFunction<RacHandleStatusNative, RacHandleStatusDart>(
-          'rac_diffusion_cancel_proto',
-        ),
-      ),
-      rac_diffusion_get_capabilities =
-          _lookupOptional<RacHandleCapabilitiesDart>(
-            () =>
-                lib.lookupFunction<
-                  RacHandleCapabilitiesNative,
-                  RacHandleCapabilitiesDart
-                >('rac_diffusion_get_capabilities'),
-          ),
-      rac_diffusion_destroy = _lookupOptional<RacDestroyHandleDart>(
-        () => lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-          'rac_diffusion_destroy',
-        ),
-      ),
       rac_rag_session_create_proto =
           _lookupOptional<RacRagSessionCreateProtoDart>(
             () =>
@@ -1814,122 +1628,81 @@ class RacBindings {
           .lookupFunction<RacHttpResponseFreeNative, RacHttpResponseFreeDart>(
             'rac_http_response_free',
           ),
-      rac_http_default_headers = _lookupOptional<RacHttpDefaultHeadersDart>(
-        () =>
-            lib.lookupFunction<
-              RacHttpDefaultHeadersNative,
-              RacHttpDefaultHeadersDart
-            >('rac_http_default_headers'),
-      ),
+      rac_http_default_headers = lib
+          .lookupFunction<
+            RacHttpDefaultHeadersNative,
+            RacHttpDefaultHeadersDart
+          >('rac_http_default_headers'),
       rac_http_download_execute = lib
           .lookupFunction<
             RacHttpDownloadExecuteNative,
             RacHttpDownloadExecuteDart
           >('rac_http_download_execute'),
-      rac_model_registry_refresh_proto =
-          _lookupOptional<RacHandleBytesToProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacHandleBytesToProtoNative,
-                  RacHandleBytesToProtoDart
-                >('rac_model_registry_refresh_proto'),
-          ),
-      rac_model_registry_register_proto =
-          _lookupOptional<RacModelRegistryRegisterProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryRegisterProtoNative,
-                  RacModelRegistryRegisterProtoDart
-                >('rac_model_registry_register_proto'),
-          ),
-      rac_model_registry_update_proto =
-          _lookupOptional<RacModelRegistryUpdateProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryUpdateProtoNative,
-                  RacModelRegistryUpdateProtoDart
-                >('rac_model_registry_update_proto'),
-          ),
-      rac_model_registry_get_proto =
-          _lookupOptional<RacModelRegistryGetProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryGetProtoNative,
-                  RacModelRegistryGetProtoDart
-                >('rac_model_registry_get_proto'),
-          ),
-      rac_model_registry_list_proto =
-          _lookupOptional<RacModelRegistryListProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryListProtoNative,
-                  RacModelRegistryListProtoDart
-                >('rac_model_registry_list_proto'),
-          ),
-      rac_model_registry_query_proto =
-          _lookupOptional<RacModelRegistryQueryProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryQueryProtoNative,
-                  RacModelRegistryQueryProtoDart
-                >('rac_model_registry_query_proto'),
-          ),
-      rac_model_registry_list_downloaded_proto =
-          _lookupOptional<RacModelRegistryListDownloadedProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryListDownloadedProtoNative,
-                  RacModelRegistryListDownloadedProtoDart
-                >('rac_model_registry_list_downloaded_proto'),
-          ),
-      rac_model_registry_remove_proto =
-          _lookupOptional<RacModelRegistryRemoveProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryRemoveProtoNative,
-                  RacModelRegistryRemoveProtoDart
-                >('rac_model_registry_remove_proto'),
-          ),
-      rac_model_registry_proto_free =
-          _lookupOptional<RacModelRegistryProtoFreeDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryProtoFreeNative,
-                  RacModelRegistryProtoFreeDart
-                >('rac_model_registry_proto_free'),
-          ),
-      rac_register_model_from_url_proto =
-          _lookupOptional<RacRegisterModelFromUrlProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacRegisterModelFromUrlProtoNative,
-                  RacRegisterModelFromUrlProtoDart
-                >('rac_register_model_from_url_proto'),
-          ),
-      rac_register_multi_file_model_proto =
-          _lookupOptional<RacRegisterModelFromUrlProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacRegisterModelFromUrlProtoNative,
-                  RacRegisterModelFromUrlProtoDart
-                >('rac_register_multi_file_model_proto'),
-          ),
-      rac_model_registry_import_proto =
-          _lookupOptional<RacModelRegistryImportProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelRegistryImportProtoNative,
-                  RacModelRegistryImportProtoDart
-                >('rac_model_registry_import_proto'),
-          ),
-      rac_model_registry_discover_proto =
-          _lookupOptional<RacHandleBytesToProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacHandleBytesToProtoNative,
-                  RacHandleBytesToProtoDart
-                >('rac_model_registry_discover_proto'),
-          ),
+      rac_model_registry_refresh_proto = lib
+          .lookupFunction<
+            RacHandleBytesToProtoNative,
+            RacHandleBytesToProtoDart
+          >('rac_model_registry_refresh_proto'),
+      rac_model_registry_register_proto = lib
+          .lookupFunction<
+            RacModelRegistryRegisterProtoNative,
+            RacModelRegistryRegisterProtoDart
+          >('rac_model_registry_register_proto'),
+      rac_model_registry_update_proto = lib
+          .lookupFunction<
+            RacModelRegistryUpdateProtoNative,
+            RacModelRegistryUpdateProtoDart
+          >('rac_model_registry_update_proto'),
+      rac_model_registry_get_proto = lib
+          .lookupFunction<
+            RacModelRegistryGetProtoNative,
+            RacModelRegistryGetProtoDart
+          >('rac_model_registry_get_proto'),
+      rac_model_registry_list_proto = lib
+          .lookupFunction<
+            RacModelRegistryListProtoNative,
+            RacModelRegistryListProtoDart
+          >('rac_model_registry_list_proto'),
+      rac_model_registry_query_proto = lib
+          .lookupFunction<
+            RacModelRegistryQueryProtoNative,
+            RacModelRegistryQueryProtoDart
+          >('rac_model_registry_query_proto'),
+      rac_model_registry_list_downloaded_proto = lib
+          .lookupFunction<
+            RacModelRegistryListDownloadedProtoNative,
+            RacModelRegistryListDownloadedProtoDart
+          >('rac_model_registry_list_downloaded_proto'),
+      rac_model_registry_remove_proto = lib
+          .lookupFunction<
+            RacModelRegistryRemoveProtoNative,
+            RacModelRegistryRemoveProtoDart
+          >('rac_model_registry_remove_proto'),
+      rac_model_registry_proto_free = lib
+          .lookupFunction<
+            RacModelRegistryProtoFreeNative,
+            RacModelRegistryProtoFreeDart
+          >('rac_model_registry_proto_free'),
+      rac_register_model_from_url_proto = lib
+          .lookupFunction<
+            RacRegisterModelFromUrlProtoNative,
+            RacRegisterModelFromUrlProtoDart
+          >('rac_register_model_from_url_proto'),
+      rac_register_multi_file_model_proto = lib
+          .lookupFunction<
+            RacRegisterModelFromUrlProtoNative,
+            RacRegisterModelFromUrlProtoDart
+          >('rac_register_multi_file_model_proto'),
+      rac_model_registry_import_proto = lib
+          .lookupFunction<
+            RacModelRegistryImportProtoNative,
+            RacModelRegistryImportProtoDart
+          >('rac_model_registry_import_proto'),
+      rac_model_registry_discover_proto = lib
+          .lookupFunction<
+            RacHandleBytesToProtoNative,
+            RacHandleBytesToProtoDart
+          >('rac_model_registry_discover_proto'),
       rac_model_lifecycle_load_proto =
           _lookupOptional<RacModelLifecycleLoadProtoDart>(
             () =>
@@ -2056,12 +1829,10 @@ class RacBindings {
               RacSdkEventUnsubscribeDart
             >('rac_sdk_event_unsubscribe'),
       ),
-      rac_sdk_event_quiesce = _lookupOptional<RacSdkEventQuiesceDart>(
-        () => lib
-            .lookupFunction<RacSdkEventQuiesceNative, RacSdkEventQuiesceDart>(
-              'rac_sdk_event_quiesce',
-            ),
-      ),
+      rac_sdk_event_quiesce = lib
+          .lookupFunction<RacSdkEventQuiesceNative, RacSdkEventQuiesceDart>(
+            'rac_sdk_event_quiesce',
+          ),
       rac_sdk_event_publish_proto =
           _lookupOptional<RacSdkEventPublishProtoDart>(
             () =>
@@ -2083,111 +1854,56 @@ class RacBindings {
                   RacSdkEventPublishFailureDart
                 >('rac_sdk_event_publish_failure'),
           ),
-      rac_tool_call_parse_proto = _lookupOptional<RacToolCallProtoRequestDart>(
-        () =>
-            lib.lookupFunction<
-              RacToolCallProtoRequestNative,
-              RacToolCallProtoRequestDart
-            >('rac_tool_call_parse_proto'),
-      ),
-      rac_tool_call_format_prompt_proto =
-          _lookupOptional<RacToolCallProtoRequestDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallProtoRequestNative,
-                  RacToolCallProtoRequestDart
-                >('rac_tool_call_format_prompt_proto'),
-          ),
-      rac_tool_call_validate_proto =
-          _lookupOptional<RacToolCallProtoRequestDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallProtoRequestNative,
-                  RacToolCallProtoRequestDart
-                >('rac_tool_call_validate_proto'),
-          ),
-      rac_tool_calling_session_create_proto =
-          _lookupOptional<RacToolCallingSessionCreateProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallingSessionCreateProtoNative,
-                  RacToolCallingSessionCreateProtoDart
-                >('rac_tool_calling_session_create_proto'),
-          ),
-      rac_tool_calling_session_step_with_result_proto =
-          _lookupOptional<RacToolCallingSessionStepWithResultProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallingSessionStepWithResultProtoNative,
-                  RacToolCallingSessionStepWithResultProtoDart
-                >('rac_tool_calling_session_step_with_result_proto'),
-          ),
-      rac_tool_calling_session_destroy_proto =
-          _lookupOptional<RacToolCallingSessionDestroyProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallingSessionDestroyProtoNative,
-                  RacToolCallingSessionDestroyProtoDart
-                >('rac_tool_calling_session_destroy_proto'),
-          ),
-      // Cancel ABI lookup. Optional so older xcframework
-      // bundles without the cancel symbol fall back to destroy-only.
-      rac_tool_calling_session_cancel_proto =
-          _lookupOptional<RacToolCallingSessionCancelProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallingSessionCancelProtoNative,
-                  RacToolCallingSessionCancelProtoDart
-                >('rac_tool_calling_session_cancel_proto'),
-          ),
-      rac_model_format_from_url_proto =
-          _lookupOptional<RacModelFormatFromUrlProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacModelFormatFromUrlProtoNative,
-                  RacModelFormatFromUrlProtoDart
-                >('rac_model_format_from_url_proto'),
-          ),
-      rac_artifact_infer_from_url_proto =
-          _lookupOptional<RacArtifactInferFromUrlProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacArtifactInferFromUrlProtoNative,
-                  RacArtifactInferFromUrlProtoDart
-                >('rac_artifact_infer_from_url_proto'),
-          ),
-      rac_stt_transcribe_stream_lifecycle_proto =
-          _lookupOptional<RacSttTranscribeStreamLifecycleProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttTranscribeStreamLifecycleProtoNative,
-                  RacSttTranscribeStreamLifecycleProtoDart
-                >('rac_stt_transcribe_stream_lifecycle_proto'),
-          ),
-      rac_stt_component_load_model =
-          _lookupOptional<RacSttComponentLoadModelDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttComponentLoadModelNative,
-                  RacSttComponentLoadModelDart
-                >('rac_stt_component_load_model'),
-          ),
-      rac_stt_set_stream_proto_callback =
-          _lookupOptional<RacSttSetStreamProtoCallbackDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttSetStreamProtoCallbackNative,
-                  RacSttSetStreamProtoCallbackDart
-                >('rac_stt_set_stream_proto_callback'),
-          ),
-      rac_stt_unset_stream_proto_callback =
-          _lookupOptional<RacSttUnsetStreamProtoCallbackDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttUnsetStreamProtoCallbackNative,
-                  RacSttUnsetStreamProtoCallbackDart
-                >('rac_stt_unset_stream_proto_callback'),
-          ),
+      rac_tool_call_parse_proto = lib
+          .lookupFunction<
+            RacToolCallProtoRequestNative,
+            RacToolCallProtoRequestDart
+          >('rac_tool_call_parse_proto'),
+      rac_tool_call_format_prompt_proto = lib
+          .lookupFunction<
+            RacToolCallProtoRequestNative,
+            RacToolCallProtoRequestDart
+          >('rac_tool_call_format_prompt_proto'),
+      rac_tool_call_validate_proto = lib
+          .lookupFunction<
+            RacToolCallProtoRequestNative,
+            RacToolCallProtoRequestDart
+          >('rac_tool_call_validate_proto'),
+      rac_tool_calling_session_create_proto = lib
+          .lookupFunction<
+            RacToolCallingSessionCreateProtoNative,
+            RacToolCallingSessionCreateProtoDart
+          >('rac_tool_calling_session_create_proto'),
+      rac_tool_calling_session_step_with_result_proto = lib
+          .lookupFunction<
+            RacToolCallingSessionStepWithResultProtoNative,
+            RacToolCallingSessionStepWithResultProtoDart
+          >('rac_tool_calling_session_step_with_result_proto'),
+      rac_tool_calling_session_destroy_proto = lib
+          .lookupFunction<
+            RacToolCallingSessionDestroyProtoNative,
+            RacToolCallingSessionDestroyProtoDart
+          >('rac_tool_calling_session_destroy_proto'),
+      rac_tool_calling_session_cancel_proto = lib
+          .lookupFunction<
+            RacToolCallingSessionCancelProtoNative,
+            RacToolCallingSessionCancelProtoDart
+          >('rac_tool_calling_session_cancel_proto'),
+      rac_model_format_from_url_proto = lib
+          .lookupFunction<
+            RacModelFormatFromUrlProtoNative,
+            RacModelFormatFromUrlProtoDart
+          >('rac_model_format_from_url_proto'),
+      rac_artifact_infer_from_url_proto = lib
+          .lookupFunction<
+            RacArtifactInferFromUrlProtoNative,
+            RacArtifactInferFromUrlProtoDart
+          >('rac_artifact_infer_from_url_proto'),
+      rac_stt_component_load_model = lib
+          .lookupFunction<
+            RacSttComponentLoadModelNative,
+            RacSttComponentLoadModelDart
+          >('rac_stt_component_load_model'),
       ra_flutter_stt_set_stream_proto_native_port =
           _lookupOptionalIn<RaFlutterSttSetStreamNativePortDart>(
             _helperLookupLibraries(lib, helperLib),
@@ -2206,36 +1922,26 @@ class RacBindings {
                   RaFlutterSttUnsetStreamNativePortDart
                 >('ra_flutter_stt_unset_stream_proto_native_port'),
           ),
-      rac_stt_stream_start_proto = _lookupOptional<RacSttStreamStartProtoDart>(
-        () =>
-            lib.lookupFunction<
-              RacSttStreamStartProtoNative,
-              RacSttStreamStartProtoDart
-            >('rac_stt_stream_start_proto'),
-      ),
-      rac_stt_stream_feed_audio_proto =
-          _lookupOptional<RacSttStreamFeedAudioProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttStreamFeedAudioProtoNative,
-                  RacSttStreamFeedAudioProtoDart
-                >('rac_stt_stream_feed_audio_proto'),
-          ),
-      rac_stt_stream_stop_proto = _lookupOptional<RacSttStreamFinishProtoDart>(
-        () =>
-            lib.lookupFunction<
-              RacSttStreamFinishProtoNative,
-              RacSttStreamFinishProtoDart
-            >('rac_stt_stream_stop_proto'),
-      ),
-      rac_stt_stream_cancel_proto =
-          _lookupOptional<RacSttStreamFinishProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacSttStreamFinishProtoNative,
-                  RacSttStreamFinishProtoDart
-                >('rac_stt_stream_cancel_proto'),
-          ),
+      rac_stt_stream_start_proto = lib
+          .lookupFunction<
+            RacSttStreamStartProtoNative,
+            RacSttStreamStartProtoDart
+          >('rac_stt_stream_start_proto'),
+      rac_stt_stream_feed_audio_proto = lib
+          .lookupFunction<
+            RacSttStreamFeedAudioProtoNative,
+            RacSttStreamFeedAudioProtoDart
+          >('rac_stt_stream_feed_audio_proto'),
+      rac_stt_stream_stop_proto = lib
+          .lookupFunction<
+            RacSttStreamFinishProtoNative,
+            RacSttStreamFinishProtoDart
+          >('rac_stt_stream_stop_proto'),
+      rac_stt_stream_cancel_proto = lib
+          .lookupFunction<
+            RacSttStreamFinishProtoNative,
+            RacSttStreamFinishProtoDart
+          >('rac_stt_stream_cancel_proto'),
       rac_voice_agent_process_turn_proto =
           _lookupOptional<RacVoiceAgentProcessTurnProto2Dart>(
             () =>
@@ -2243,6 +1949,14 @@ class RacBindings {
                   RacVoiceAgentProcessTurnProto2Native,
                   RacVoiceAgentProcessTurnProto2Dart
                 >('rac_voice_agent_process_turn_proto'),
+          ),
+      rac_voice_agent_cancel_turn_proto =
+          _lookupOptional<RacVoiceAgentCancelTurnProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacVoiceAgentCancelTurnProtoNative,
+                  RacVoiceAgentCancelTurnProtoDart
+                >('rac_voice_agent_cancel_turn_proto'),
           ),
       rac_voice_agent_transcribe_proto =
           _lookupOptional<RacVoiceAgentHelperProtoDart>(
@@ -2260,119 +1974,74 @@ class RacBindings {
                   RacVoiceAgentHelperProtoDart
                 >('rac_voice_agent_synthesize_speech_proto'),
           ),
-      rac_voice_agent_component_create_proto =
-          _lookupOptional<RacVoiceAgentComponentCreateProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacVoiceAgentComponentCreateProtoNative,
-                  RacVoiceAgentComponentCreateProtoDart
-                >('rac_voice_agent_component_create_proto'),
+      rac_voice_agent_component_create_proto = lib
+          .lookupFunction<
+            RacVoiceAgentComponentCreateProtoNative,
+            RacVoiceAgentComponentCreateProtoDart
+          >('rac_voice_agent_component_create_proto'),
+      rac_voice_agent_component_destroy_proto = lib
+          .lookupFunction<
+            RacVoiceAgentComponentDestroyProtoNative,
+            RacVoiceAgentComponentDestroyProtoDart
+          >('rac_voice_agent_component_destroy_proto'),
+      rac_structured_output_parse_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_structured_output_parse_proto'),
+      rac_structured_output_generate_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_structured_output_generate_proto'),
+      rac_structured_output_prepare_prompt_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_structured_output_prepare_prompt_proto'),
+      rac_structured_output_schema_to_json_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_structured_output_schema_to_json_proto'),
+      rac_tool_value_to_json_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_tool_value_to_json_proto'),
+      rac_tool_value_from_json_proto = lib
+          .lookupFunction<
+            RacLifecycleRequestProtoNative,
+            RacLifecycleRequestProtoDart
+          >('rac_tool_value_from_json_proto'),
+      rac_llm_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_llm_proto_quiesce',
           ),
-      rac_voice_agent_component_destroy_proto =
-          _lookupOptional<RacVoiceAgentComponentDestroyProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacVoiceAgentComponentDestroyProtoNative,
-                  RacVoiceAgentComponentDestroyProtoDart
-                >('rac_voice_agent_component_destroy_proto'),
+      rac_stt_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_stt_proto_quiesce',
           ),
-      rac_structured_output_parse_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_structured_output_parse_proto'),
+      rac_tts_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_tts_proto_quiesce',
           ),
-      rac_structured_output_generate_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_structured_output_generate_proto'),
+      rac_vad_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_vad_proto_quiesce',
           ),
-      rac_structured_output_prepare_prompt_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_structured_output_prepare_prompt_proto'),
+      rac_vlm_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_vlm_proto_quiesce',
           ),
-      rac_structured_output_schema_to_json_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_structured_output_schema_to_json_proto'),
+      rac_voice_agent_proto_quiesce = lib
+          .lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+            'rac_voice_agent_proto_quiesce',
           ),
-      rac_audio_compute_level_db = _lookupOptional<RacAudioComputeLevelDbDart>(
-        () =>
-            lib.lookupFunction<
-              RacAudioComputeLevelDbNative,
-              RacAudioComputeLevelDbDart
-            >('rac_audio_compute_level_db'),
-      ),
-      rac_tool_value_to_json_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_tool_value_to_json_proto'),
+      rac_sdk_get_version = lib
+          .lookupFunction<RacSdkGetVersionNative, RacSdkGetVersionDart>(
+            'rac_sdk_get_version',
           ),
-      rac_tool_value_from_json_proto =
-          _lookupOptional<RacLifecycleRequestProtoDart>(
-            () =>
-                lib.lookupFunction<
-                  RacLifecycleRequestProtoNative,
-                  RacLifecycleRequestProtoDart
-                >('rac_tool_value_from_json_proto'),
-          ),
-      rac_llm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_llm_proto_quiesce',
-        ),
-      ),
-      rac_stt_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_stt_proto_quiesce',
-        ),
-      ),
-      rac_tts_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_tts_proto_quiesce',
-        ),
-      ),
-      rac_vad_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_vad_proto_quiesce',
-        ),
-      ),
-      rac_vlm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_vlm_proto_quiesce',
-        ),
-      ),
-      rac_voice_agent_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
-        () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-          'rac_voice_agent_proto_quiesce',
-        ),
-      ),
-      rac_tool_calling_session_proto_quiesce =
-          _lookupOptional<RacProtoQuiesceDart>(
-            () =>
-                lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
-                  'rac_tool_calling_session_proto_quiesce',
-                ),
-          ),
-      rac_sdk_get_version = _lookupOptional<RacSdkGetVersionDart>(
-        () => lib.lookupFunction<RacSdkGetVersionNative, RacSdkGetVersionDart>(
-          'rac_sdk_get_version',
-        ),
-      ),
       rac_env_is_production = _lookupOptional<RacEnvPredicateDart>(
         () => lib.lookupFunction<RacEnvPredicateNative, RacEnvPredicateDart>(
           'rac_env_is_production',
@@ -2403,31 +2072,17 @@ class RacBindings {
           'rac_env_should_sync_with_backend',
         ),
       ),
-      rac_inference_framework_analytics_key =
-          _lookupOptional<RacEnumToCStringDart>(
-            () => lib
-                .lookupFunction<RacEnumToCStringNative, RacEnumToCStringDart>(
-                  'rac_inference_framework_analytics_key',
-                ),
+      rac_inference_framework_analytics_key = lib
+          .lookupFunction<RacEnumToCStringNative, RacEnumToCStringDart>(
+            'rac_inference_framework_analytics_key',
           ),
-      rac_model_category_default_framework = _lookupOptional<RacEnumToIntDart>(
-        () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
-          'rac_model_category_default_framework',
-        ),
-      ),
-      rac_model_category_requires_context_length =
-          _lookupOptional<RacEnumToIntDart>(
-            () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
-              'rac_model_category_requires_context_length',
-            ),
+      rac_model_category_default_framework = lib
+          .lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+            'rac_model_category_default_framework',
           ),
-      rac_tool_call_format_hint_from_format_name =
-          _lookupOptional<RacToolCallFormatHintDart>(
-            () =>
-                lib.lookupFunction<
-                  RacToolCallFormatHintNative,
-                  RacToolCallFormatHintDart
-                >('rac_tool_call_format_hint_from_format_name'),
+      rac_model_category_requires_context_length = lib
+          .lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+            'rac_model_category_requires_context_length',
           );
 
   // Shared proto buffers -----------------------------------------------------
@@ -2437,10 +2092,9 @@ class RacBindings {
   final RacProtoBufferFreeDart rac_proto_buffer_free;
 
   /// `rac_result_to_proto_error` — canonical rac_result_t → serialized
-  /// `SDKError` proto mapping. Null when the loaded commons binary predates
-  /// the export. Mirrors Swift's RASDKError+Helpers.swift path so the
-  /// translation lives in commons across every SDK.
-  final RacResultToProtoErrorDart? rac_result_to_proto_error;
+  /// `SDKError` proto mapping. Mirrors Swift's RASDKError+Helpers.swift path so
+  /// the translation lives in commons across every SDK.
+  final RacResultToProtoErrorDart rac_result_to_proto_error;
 
   // Streaming callbacks ------------------------------------------------------
 
@@ -2524,9 +2178,7 @@ class RacBindings {
   /// cancellation. Null on older commons binaries.
   final RacOutOnlyProtoDart? rac_vlm_cancel_lifecycle_proto;
 
-  final RacCreateWithModelDart? rac_embeddings_create;
-
-  final RacCreateWithModelConfigDart? rac_embeddings_create_with_config;
+  final RacLifecycleRequestProtoDart? rac_embeddings_create_proto;
 
   final RacEmbeddingsInitializeDart? rac_embeddings_initialize;
 
@@ -2537,24 +2189,7 @@ class RacBindings {
 
   final RacDestroyHandleDart? rac_embeddings_destroy;
 
-  final RacCreateWithModelDart? rac_diffusion_create;
-
-  final RacCreateWithModelStructConfigDart? rac_diffusion_create_with_config;
-
-  final RacDiffusionInitializeDart? rac_diffusion_initialize;
-
-  final RacHandleBytesToProtoDart? rac_diffusion_generate_proto;
-
   final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
-
-  final RacDiffusionGenerateWithProgressProtoDart?
-  rac_diffusion_generate_with_progress_proto;
-
-  final RacHandleStatusDart? rac_diffusion_cancel_proto;
-
-  final RacHandleCapabilitiesDart? rac_diffusion_get_capabilities;
-
-  final RacDestroyHandleDart? rac_diffusion_destroy;
 
   final RacRagSessionCreateProtoDart? rac_rag_session_create_proto;
 
@@ -2604,10 +2239,7 @@ class RacBindings {
   final RacHttpResponseFreeDart rac_http_response_free;
 
   /// Canonical SDK header list.
-  ///
-  /// Optional (older RACommons binaries may not export it) — falls back to
-  /// hard-coded defaults in adapters/http_client_adapter.dart when null.
-  final RacHttpDefaultHeadersDart? rac_http_default_headers;
+  final RacHttpDefaultHeadersDart rac_http_default_headers;
 
   // HTTP download ------------------------------------------------------------
 
@@ -2618,37 +2250,37 @@ class RacBindings {
   /// `rac_model_registry_refresh_proto` — the single refresh entry point.
   /// Takes a `ModelRegistryRefreshRequest` and returns a
   /// `ModelRegistryRefreshResult`.
-  final RacHandleBytesToProtoDart? rac_model_registry_refresh_proto;
+  final RacHandleBytesToProtoDart rac_model_registry_refresh_proto;
 
-  final RacModelRegistryRegisterProtoDart? rac_model_registry_register_proto;
+  final RacModelRegistryRegisterProtoDart rac_model_registry_register_proto;
 
-  final RacModelRegistryUpdateProtoDart? rac_model_registry_update_proto;
+  final RacModelRegistryUpdateProtoDart rac_model_registry_update_proto;
 
-  final RacModelRegistryGetProtoDart? rac_model_registry_get_proto;
+  final RacModelRegistryGetProtoDart rac_model_registry_get_proto;
 
-  final RacModelRegistryListProtoDart? rac_model_registry_list_proto;
+  final RacModelRegistryListProtoDart rac_model_registry_list_proto;
 
-  final RacModelRegistryQueryProtoDart? rac_model_registry_query_proto;
+  final RacModelRegistryQueryProtoDart rac_model_registry_query_proto;
 
-  final RacModelRegistryListDownloadedProtoDart?
+  final RacModelRegistryListDownloadedProtoDart
   rac_model_registry_list_downloaded_proto;
 
-  final RacModelRegistryRemoveProtoDart? rac_model_registry_remove_proto;
+  final RacModelRegistryRemoveProtoDart rac_model_registry_remove_proto;
 
-  final RacModelRegistryProtoFreeDart? rac_model_registry_proto_free;
+  final RacModelRegistryProtoFreeDart rac_model_registry_proto_free;
 
   /// `rac_register_model_from_url_proto` — Swift-parity URL-form
   /// `registerModel(...)` entry point. Builds and persists a ModelInfo from a
   /// `RegisterModelFromUrlRequest`.
-  final RacRegisterModelFromUrlProtoDart? rac_register_model_from_url_proto;
-  final RacRegisterModelFromUrlProtoDart? rac_register_multi_file_model_proto;
+  final RacRegisterModelFromUrlProtoDart rac_register_model_from_url_proto;
+  final RacRegisterModelFromUrlProtoDart rac_register_multi_file_model_proto;
 
   /// `rac_model_registry_import_proto` — local-import entry point used by
   /// file-picker / bookmark flows after the platform has handled sandbox
   /// access.
-  final RacModelRegistryImportProtoDart? rac_model_registry_import_proto;
+  final RacModelRegistryImportProtoDart rac_model_registry_import_proto;
 
-  final RacHandleBytesToProtoDart? rac_model_registry_discover_proto;
+  final RacHandleBytesToProtoDart rac_model_registry_discover_proto;
 
   // Model lifecycle proto-byte API ------------------------------------------
 
@@ -2699,7 +2331,7 @@ class RacBindings {
 
   final RacSdkEventUnsubscribeDart? rac_sdk_event_unsubscribe;
 
-  final RacSdkEventQuiesceDart? rac_sdk_event_quiesce;
+  final RacSdkEventQuiesceDart rac_sdk_event_quiesce;
 
   final RacSdkEventPublishProtoDart? rac_sdk_event_publish_proto;
 
@@ -2709,47 +2341,35 @@ class RacBindings {
 
   // Tool-calling proto APIs --------------------------
 
-  final RacToolCallProtoRequestDart? rac_tool_call_parse_proto;
+  final RacToolCallProtoRequestDart rac_tool_call_parse_proto;
 
-  final RacToolCallProtoRequestDart? rac_tool_call_format_prompt_proto;
+  final RacToolCallProtoRequestDart rac_tool_call_format_prompt_proto;
 
-  final RacToolCallProtoRequestDart? rac_tool_call_validate_proto;
+  final RacToolCallProtoRequestDart rac_tool_call_validate_proto;
 
-  final RacToolCallingSessionCreateProtoDart?
+  final RacToolCallingSessionCreateProtoDart
   rac_tool_calling_session_create_proto;
 
-  final RacToolCallingSessionStepWithResultProtoDart?
+  final RacToolCallingSessionStepWithResultProtoDart
   rac_tool_calling_session_step_with_result_proto;
 
-  final RacToolCallingSessionDestroyProtoDart?
+  final RacToolCallingSessionDestroyProtoDart
   rac_tool_calling_session_destroy_proto;
 
   // Cancel an in-flight tool-calling session.
-  final RacToolCallingSessionCancelProtoDart?
+  final RacToolCallingSessionCancelProtoDart
   rac_tool_calling_session_cancel_proto;
 
   // Model format + artifact inference proto APIs -----------------
 
-  final RacModelFormatFromUrlProtoDart? rac_model_format_from_url_proto;
+  final RacModelFormatFromUrlProtoDart rac_model_format_from_url_proto;
 
-  final RacArtifactInferFromUrlProtoDart? rac_artifact_infer_from_url_proto;
-
-  // STT stream lifecycle proto API -------------------------------
-
-  final RacSttTranscribeStreamLifecycleProtoDart?
-  rac_stt_transcribe_stream_lifecycle_proto;
+  final RacArtifactInferFromUrlProtoDart rac_artifact_infer_from_url_proto;
 
   // Chunk-feed streaming STT sessions (rac_stt_stream.h) ----------
-  // Null fields tolerate commons binaries that predate the exports.
 
   /// `rac_stt_component_load_model(handle, path, id, name)`.
-  final RacSttComponentLoadModelDart? rac_stt_component_load_model;
-
-  /// `rac_stt_set_stream_proto_callback(handle, callback, user_data)`.
-  final RacSttSetStreamProtoCallbackDart? rac_stt_set_stream_proto_callback;
-
-  /// `rac_stt_unset_stream_proto_callback(handle)`.
-  final RacSttUnsetStreamProtoCallbackDart? rac_stt_unset_stream_proto_callback;
+  final RacSttComponentLoadModelDart rac_stt_component_load_model;
 
   /// Flutter platform helper: register stream callback via Dart native port.
   final RaFlutterSttSetStreamNativePortDart?
@@ -2760,77 +2380,66 @@ class RacBindings {
   ra_flutter_stt_unset_stream_proto_native_port;
 
   /// `rac_stt_stream_start_proto(handle, options_bytes, size, out_session)`.
-  final RacSttStreamStartProtoDart? rac_stt_stream_start_proto;
+  final RacSttStreamStartProtoDart rac_stt_stream_start_proto;
 
   /// `rac_stt_stream_feed_audio_proto(session, audio_bytes, size)`.
-  final RacSttStreamFeedAudioProtoDart? rac_stt_stream_feed_audio_proto;
+  final RacSttStreamFeedAudioProtoDart rac_stt_stream_feed_audio_proto;
 
   /// `rac_stt_stream_stop_proto(session)` — flushes the final result.
-  final RacSttStreamFinishProtoDart? rac_stt_stream_stop_proto;
+  final RacSttStreamFinishProtoDart rac_stt_stream_stop_proto;
 
   /// `rac_stt_stream_cancel_proto(session)` — immediate teardown.
-  final RacSttStreamFinishProtoDart? rac_stt_stream_cancel_proto;
+  final RacSttStreamFinishProtoDart rac_stt_stream_cancel_proto;
 
   // Voice agent proto APIs -----------------------------------------
 
   final RacVoiceAgentProcessTurnProto2Dart? rac_voice_agent_process_turn_proto;
 
+  /// `rac_voice_agent_cancel_turn_proto(handle, VoiceAgentTurnRequest)` —
+  /// request-scoped cooperative cancellation for a blocking voice turn.
+  final RacVoiceAgentCancelTurnProtoDart? rac_voice_agent_cancel_turn_proto;
+
   final RacVoiceAgentHelperProtoDart? rac_voice_agent_transcribe_proto;
 
   final RacVoiceAgentHelperProtoDart? rac_voice_agent_synthesize_speech_proto;
 
-  final RacVoiceAgentComponentCreateProtoDart?
+  final RacVoiceAgentComponentCreateProtoDart
   rac_voice_agent_component_create_proto;
 
-  final RacVoiceAgentComponentDestroyProtoDart?
+  final RacVoiceAgentComponentDestroyProtoDart
   rac_voice_agent_component_destroy_proto;
 
   /// `rac_structured_output_parse_proto` — parses structured output JSON from
   /// raw model text. Takes a serialized `StructuredOutputParseRequest` and
-  /// returns a `StructuredOutputResult`. Null when the commons binary predates
-  /// the proto-byte structured-output API.
-  final RacLifecycleRequestProtoDart? rac_structured_output_parse_proto;
+  /// returns a `StructuredOutputResult`.
+  final RacLifecycleRequestProtoDart rac_structured_output_parse_proto;
 
   /// `rac_structured_output_generate_proto` — runs full structured-output
   /// generation against the lifecycle-owned LLM. Takes a serialized
   /// `StructuredOutputRequest` and returns a `StructuredOutputResult`.
-  /// Null when the commons binary predates the proto-byte API.
-  final RacLifecycleRequestProtoDart? rac_structured_output_generate_proto;
+  final RacLifecycleRequestProtoDart rac_structured_output_generate_proto;
 
   /// `rac_structured_output_prepare_prompt_proto` — builds the
   /// schema-instrumented prompt for structured output. Takes a serialized
   /// `StructuredOutputRequest` and returns a `StructuredOutputPromptResult`.
-  /// Null when the commons binary predates the proto-byte API.
-  final RacLifecycleRequestProtoDart?
-  rac_structured_output_prepare_prompt_proto;
+  final RacLifecycleRequestProtoDart rac_structured_output_prepare_prompt_proto;
 
   /// `rac_structured_output_schema_to_json_proto` — serializes a
   /// `JSONSchema` proto to canonical compact, key-sorted JSON Schema text.
   /// Mirrors Swift `RAJSONSchema.jsonSchemaString`. Output bytes
   /// are raw UTF-8 text, NOT a proto message; callers extract the string
-  /// directly from the `rac_proto_buffer_t` data field. Null when the
-  /// commons binary predates the export.
-  final RacLifecycleRequestProtoDart?
-  rac_structured_output_schema_to_json_proto;
-
-  // Audio utils (rac_audio_utils.h) -------------------------------
-
-  /// `rac_audio_compute_level_db` — RMS→dB DSP for level meters. Centralises
-  /// the hand-rolled DSP that used to live in each platform SDK's audio
-  /// capture manager. Null when the commons binary predates the export.
-  final RacAudioComputeLevelDbDart? rac_audio_compute_level_db;
+  /// directly from the `rac_proto_buffer_t` data field.
+  final RacLifecycleRequestProtoDart rac_structured_output_schema_to_json_proto;
 
   // Tool value ↔ JSON proto APIs (rac_tool_calling.h) -------------
 
   /// `rac_tool_value_to_json_proto` — serializes a `ToolValue` proto into a
-  /// `ToolValueJSON` wrapper carrying the canonical JSON text. Null when the
-  /// commons binary predates the export.
-  final RacLifecycleRequestProtoDart? rac_tool_value_to_json_proto;
+  /// `ToolValueJSON` wrapper carrying the canonical JSON text.
+  final RacLifecycleRequestProtoDart rac_tool_value_to_json_proto;
 
   /// `rac_tool_value_from_json_proto` — parses a `ToolValueJSON` wrapper back
-  /// into a `ToolValue` proto. Null when the commons binary predates the
-  /// export.
-  final RacLifecycleRequestProtoDart? rac_tool_value_from_json_proto;
+  /// into a `ToolValue` proto.
+  final RacLifecycleRequestProtoDart rac_tool_value_from_json_proto;
 
   // Per-modality proto-byte stream quiesce ABI ------------------------------
   //
@@ -2840,38 +2449,33 @@ class RacBindings {
   // backed the C dispatcher; otherwise the dispatcher (which copies the
   // callback slot under its internal mutex and releases it BEFORE invoking
   // the user callback — see commons `*_stream.cpp` lock-release-before-callback
-  // comment) can fire on a freed `user_data`. Null fields tolerate older
-  // commons binaries that predate the quiesce export. Mirrors Swift's
+  // comment) can fire on a freed `user_data`. Mirrors Swift's
   // `HandleStreamAdapter` lock-release-then-unregister pattern in
   // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
 
   /// `rac_llm_proto_quiesce` — spin-wait LLM stream dispatches to drain.
-  final RacProtoQuiesceDart? rac_llm_proto_quiesce;
+  final RacProtoQuiesceDart rac_llm_proto_quiesce;
 
   /// `rac_stt_proto_quiesce` — spin-wait STT stream dispatches to drain.
-  final RacProtoQuiesceDart? rac_stt_proto_quiesce;
+  final RacProtoQuiesceDart rac_stt_proto_quiesce;
 
   /// `rac_tts_proto_quiesce` — spin-wait TTS stream dispatches to drain.
-  final RacProtoQuiesceDart? rac_tts_proto_quiesce;
+  final RacProtoQuiesceDart rac_tts_proto_quiesce;
 
   /// `rac_vad_proto_quiesce` — spin-wait VAD activity dispatches to drain.
-  final RacProtoQuiesceDart? rac_vad_proto_quiesce;
+  final RacProtoQuiesceDart rac_vad_proto_quiesce;
 
   /// `rac_vlm_proto_quiesce` — spin-wait VLM stream dispatches to drain.
-  final RacProtoQuiesceDart? rac_vlm_proto_quiesce;
+  final RacProtoQuiesceDart rac_vlm_proto_quiesce;
 
   /// `rac_voice_agent_proto_quiesce` — spin-wait voice-agent dispatches.
-  final RacProtoQuiesceDart? rac_voice_agent_proto_quiesce;
-
-  /// `rac_tool_calling_session_proto_quiesce` — spin-wait tool-calling session
-  /// dispatches. Null when the loaded commons binary predates the export.
-  final RacProtoQuiesceDart? rac_tool_calling_session_proto_quiesce;
+  final RacProtoQuiesceDart rac_voice_agent_proto_quiesce;
 
   // SDK metadata + enum convenience helpers ----------------------------------
 
   /// `rac_sdk_get_version` — canonical SDK semver string from commons
-  /// (mirrors Swift `SDKConstants.version`). Null on older binaries.
-  final RacSdkGetVersionDart? rac_sdk_get_version;
+  /// (mirrors Swift `SDKConstants.version`).
+  final RacSdkGetVersionDart rac_sdk_get_version;
 
   /// `rac_env_is_production(rac_environment_t)` — true only for production.
   final RacEnvPredicateDart? rac_env_is_production;
@@ -2897,20 +2501,15 @@ class RacBindings {
   /// `rac_inference_framework_analytics_key` — snake_case analytics key for
   /// a C `rac_inference_framework_t` value (mirrors Swift
   /// `RAInferenceFramework.analyticsKey`). Out pointer is static — never free.
-  final RacEnumToCStringDart? rac_inference_framework_analytics_key;
+  final RacEnumToCStringDart rac_inference_framework_analytics_key;
 
   /// `rac_model_category_default_framework` — fallback
   /// `rac_inference_framework_t` for a C `rac_model_category_t` value.
-  final RacEnumToIntDart? rac_model_category_default_framework;
+  final RacEnumToIntDart rac_model_category_default_framework;
 
   /// `rac_model_category_requires_context_length` — `rac_bool_t` for a C
   /// `rac_model_category_t` value.
-  final RacEnumToIntDart? rac_model_category_requires_context_length;
-
-  /// `rac_tool_call_format_hint_from_format_name` — static lowercase hint
-  /// string for a `runanywhere.v1.ToolCallFormatName` enum int (mirrors
-  /// Swift `RAToolCallingOptions.resolvedFormatName`). Never free.
-  final RacToolCallFormatHintDart? rac_tool_call_format_hint_from_format_name;
+  final RacEnumToIntDart rac_model_category_requires_context_length;
 }
 
 /// Entry point for the typed commons FFI bindings.

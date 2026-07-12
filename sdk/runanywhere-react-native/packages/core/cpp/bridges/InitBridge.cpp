@@ -11,54 +11,23 @@
 #include "DeviceBridge.hpp"
 #include "ExternalConfigGuard.hpp"
 #include "PlatformDownloadBridge.h"
-#include "rac_dev_config.h"
-#include "rac_model_paths.h"
-#include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
+#include "rac/lifecycle/rac_sdk_init.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/device/rac_device_identity.h"  // rac_device_get_or_create_persistent_id
-#if __has_include("rac/infrastructure/network/rac_auth_manager.h")
 #include "rac/infrastructure/network/rac_auth_manager.h"
-#elif __has_include("rac_auth_manager.h")
-#include "rac_auth_manager.h"
-#endif
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 
 #include <algorithm>
 #include <cstddef>
-
-#if __has_include("rac/lifecycle/rac_sdk_init.h")
-#include "rac/lifecycle/rac_sdk_init.h"
-#define RN_HAS_RAC_SDK_INIT_HEADER 1
-#elif __has_include("rac_sdk_init.h")
-#include "rac_sdk_init.h"
-#define RN_HAS_RAC_SDK_INIT_HEADER 1
-#else
-#define RN_HAS_RAC_SDK_INIT_HEADER 0
-#endif
-
-#if __has_include("rac/foundation/rac_proto_buffer.h")
-#include "rac/foundation/rac_proto_buffer.h"
-#define RN_HAS_RAC_PROTO_BUFFER_HEADER 1
-#elif __has_include("rac_proto_buffer.h")
-#include "rac_proto_buffer.h"
-#define RN_HAS_RAC_PROTO_BUFFER_HEADER 1
-#else
-#define RN_HAS_RAC_PROTO_BUFFER_HEADER 0
-extern "C" {
-typedef struct rac_proto_buffer {
-    uint8_t* data;
-    size_t size;
-    rac_result_t status;
-    char* error_message;
-} rac_proto_buffer_t;
-}
-#endif
 
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
 #include <atomic>
 #include <cstdint>
-#include <dlfcn.h>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -830,27 +799,8 @@ struct SdkInitResultSummary {
     std::string warning;
 };
 
-using ProtoBufferInitFn = void (*)(rac_proto_buffer_t*);
-using ProtoBufferFreeFn = void (*)(rac_proto_buffer_t*);
 using SdkInitProtoFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
 using SdkRetryHttpProtoFn = rac_result_t (*)(rac_proto_buffer_t*);
-
-template <typename Fn>
-Fn loadOptionalSymbol(const char* name) {
-    return reinterpret_cast<Fn>(dlsym(RTLD_DEFAULT, name));
-}
-
-struct RNClientInfo {
-    const char* sdk_binding;
-    const char* app_identifier;
-    const char* app_name;
-    const char* app_version;
-    const char* app_build;
-    const char* locale;
-    const char* timezone;
-};
-
-using SetClientInfoFn = void (*)(const RNClientInfo*);
 
 static const char* nullableCString(const std::string& value) {
     return value.empty() ? nullptr : value.c_str();
@@ -935,12 +885,6 @@ static std::string getClientTimezone() {
 }
 
 static void configureClientInfo() {
-    auto setClientInfo = loadOptionalSymbol<SetClientInfoFn>("rac_sdk_set_client_info");
-    if (!setClientInfo) {
-        LOGD("rac_sdk_set_client_info unavailable; app metadata will be omitted");
-        return;
-    }
-
     const std::string sdkBinding = "react_native";
     const std::string appIdentifier = getClientAppIdentifier();
     const std::string appName = getClientAppName();
@@ -949,7 +893,7 @@ static void configureClientInfo() {
     const std::string locale = getClientLocale();
     const std::string timezone = getClientTimezone();
 
-    RNClientInfo info{};
+    rac_client_info_t info{};
     info.sdk_binding = sdkBinding.c_str();
     info.app_identifier = nullableCString(appIdentifier);
     info.app_name = nullableCString(appName);
@@ -957,42 +901,15 @@ static void configureClientInfo() {
     info.app_build = nullableCString(appBuild);
     info.locale = nullableCString(locale);
     info.timezone = nullableCString(timezone);
-    setClientInfo(&info);
+    rac_sdk_set_client_info(&info);
 }
 
 static void initProtoBuffer(rac_proto_buffer_t* buffer) {
-    if (!buffer) {
-        return;
-    }
-#if defined(__APPLE__) && RN_HAS_RAC_PROTO_BUFFER_HEADER
     rac_proto_buffer_init(buffer);
-    return;
-#endif
-    if (auto fn = loadOptionalSymbol<ProtoBufferInitFn>("rac_proto_buffer_init")) {
-        fn(buffer);
-        return;
-    }
-    buffer->data = nullptr;
-    buffer->size = 0;
-    buffer->status = RAC_SUCCESS;
-    buffer->error_message = nullptr;
 }
 
 static void freeProtoBuffer(rac_proto_buffer_t* buffer) {
-    if (!buffer) {
-        return;
-    }
-#if defined(__APPLE__) && RN_HAS_RAC_PROTO_BUFFER_HEADER
     rac_proto_buffer_free(buffer);
-    return;
-#endif
-    if (auto fn = loadOptionalSymbol<ProtoBufferFreeFn>("rac_proto_buffer_free")) {
-        fn(buffer);
-        return;
-    }
-    std::free(buffer->data);
-    std::free(buffer->error_message);
-    initProtoBuffer(buffer);
 }
 
 // Minimal protobuf wire writers/readers for the SdkInitPhase1/2Request and
@@ -1167,26 +1084,11 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
     return summary;
 }
 
-static rac_result_t callSdkInitProto(const char* symbolName,
+static rac_result_t callSdkInitProto(SdkInitProtoFn fn,
+                                     const char* symbolName,
                                      const std::vector<uint8_t>& requestBytes,
                                      SdkInitResultSummary* outSummary,
                                      std::vector<uint8_t>* outResultBytes = nullptr) {
-#if RN_HAS_RAC_SDK_INIT_HEADER
-    SdkInitProtoFn fn = nullptr;
-#if defined(__APPLE__)
-    if (std::strcmp(symbolName, "rac_sdk_init_phase1_proto") == 0) {
-        fn = rac_sdk_init_phase1_proto;
-    } else if (std::strcmp(symbolName, "rac_sdk_init_phase2_proto") == 0) {
-        fn = rac_sdk_init_phase2_proto;
-    }
-#else
-    fn = loadOptionalSymbol<SdkInitProtoFn>(symbolName);
-#endif
-    if (!fn) {
-        LOGW("%s unavailable in bundled RACommons; using legacy RN init path", symbolName);
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
-
     rac_proto_buffer_t out;
     initProtoBuffer(&out);
     const uint8_t* data = requestBytes.empty() ? nullptr : requestBytes.data();
@@ -1226,31 +1128,13 @@ static rac_result_t callSdkInitProto(const char* symbolName,
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
     return RAC_SUCCESS;
-#else
-    (void)symbolName;
-    (void)requestBytes;
-    (void)outSummary;
-    (void)outResultBytes;
-    LOGW("rac_sdk_init.h unavailable in bundled headers; using legacy RN init path");
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#endif
 }
 
 // rac_sdk_retry_http_proto takes no request bytes (output buffer only), so it
-// cannot reuse callSdkInitProto's request-bytes signature. Same buffer
-// lifecycle + feature-unavailable downgrade as the phase{1,2} path.
+// cannot reuse callSdkInitProto's request-bytes signature.
 static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary,
                                           std::vector<uint8_t>* outResultBytes = nullptr) {
-#if RN_HAS_RAC_SDK_INIT_HEADER
-#if defined(__APPLE__)
     SdkRetryHttpProtoFn fn = rac_sdk_retry_http_proto;
-#else
-    SdkRetryHttpProtoFn fn = loadOptionalSymbol<SdkRetryHttpProtoFn>("rac_sdk_retry_http_proto");
-#endif
-    if (!fn) {
-        LOGW("rac_sdk_retry_http_proto unavailable in bundled RACommons");
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-    }
 
     rac_proto_buffer_t out;
     initProtoBuffer(&out);
@@ -1275,12 +1159,6 @@ static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary,
     }
     freeProtoBuffer(&out);
     return status;
-#else
-    (void)outSummary;
-    (void)outResultBytes;
-    LOGW("rac_sdk_init.h unavailable in bundled headers; skipping HTTP retry");
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#endif
 }
 
 // =============================================================================
@@ -1924,38 +1802,14 @@ rac_result_t InitBridge::initialize(
         return initResult;
     }
 
-    // Step 4: Initialize SDK config with version (required for device registration)
-    // This populates rac_sdk_get_config() which device registration uses
-    // Matches Swift: CppBridge+State.swift initialize()
-    rac_sdk_config_t sdkConfig = {};
-    // Use actual platform (ios/android) as backend only accepts these values
-#if defined(__APPLE__)
-    sdkConfig.platform = "ios";
-#elif defined(ANDROID) || defined(__ANDROID__)
-    sdkConfig.platform = "android";
-#else
-    sdkConfig.platform = "ios"; // Default to ios for unknown platforms
-#endif
-    // Use the version supplied by the generated TypeScript Phase 1 envelope.
+    // Step 4: Build the canonical Phase 1 proto envelope.
     static std::string s_sdkVersion;
     s_sdkVersion = getSdkVersion();
-    sdkConfig.sdk_version = s_sdkVersion.c_str();
     static std::string s_deviceId;
     s_deviceId = deviceId_.empty() ? getPersistentDeviceUUID() : deviceId_;
-    sdkConfig.device_id = s_deviceId.c_str();
-
-    rac_validation_result_t validResult = rac_sdk_init(&sdkConfig);
-    if (validResult != RAC_VALIDATION_OK) {
-        LOGW("SDK config validation warning: %d (non-fatal)", validResult);
-        // Non-fatal - device registration can still work without this
-    } else {
-        LOGI("SDK config initialized with version: %s", sdkConfig.sdk_version);
-    }
     configureClientInfo();
 
-    // Step 5: Phase 1 proto (canonical commons owner for state init) when
-    // bundled headers/native symbols expose rac_sdk_init_phase1_proto. Older
-    // packaged natives continue through the legacy RN init path.
+    // Step 5: Phase 1 proto is the canonical commons owner for SDK state.
     {
         SdkInitResultSummary phase1Summary;
         std::vector<uint8_t> phase1Bytes = makePhase1RequestBytes(
@@ -1966,18 +1820,16 @@ rac_result_t InitBridge::initialize(
             platform_,
             s_sdkVersion);
         rac_result_t phase1Result = callSdkInitProto(
+            rac_sdk_init_phase1_proto,
             "rac_sdk_init_phase1_proto",
             phase1Bytes,
             &phase1Summary);
-        if (phase1Result != RAC_SUCCESS &&
-            phase1Result != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        if (phase1Result != RAC_SUCCESS) {
             LOGE("SDK Phase 1 proto initialization failed: %d", phase1Result);
             rac_shutdown();
             return phase1Result;
         }
-        if (phase1Result == RAC_SUCCESS) {
-            LOGI("SDK Phase 1 proto initialized");
-        }
+        LOGI("SDK Phase 1 proto initialized");
     }
 
     std::string effectiveBuildToken = buildToken;
@@ -2132,15 +1984,11 @@ rac_result_t InitBridge::completeServicesInitialization(std::vector<uint8_t>& ou
 
     SdkInitResultSummary phase2Summary;
     rac_result_t phase2Result = callSdkInitProto(
+        rac_sdk_init_phase2_proto,
         "rac_sdk_init_phase2_proto",
         phase2RequestBytes_,
         &phase2Summary,
         &outResultBytes);
-    // Feature-unavailable on older packaged natives is non-fatal; the empty
-    // result bytes tell TS that Phase 2 finished in deferred mode.
-    if (phase2Result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-        return RAC_SUCCESS;
-    }
     if (phase2Result != RAC_SUCCESS) {
         return phase2Result;
     }
@@ -2167,11 +2015,6 @@ rac_result_t InitBridge::retryHTTPSetup(std::vector<uint8_t>& outResultBytes) {
 
     SdkInitResultSummary summary;
     rac_result_t result = callSdkRetryHttpProto(&summary, &outResultBytes);
-    // Feature-unavailable on older packaged natives is non-fatal; callers will
-    // leave HTTP setup marked incomplete.
-    if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-        return RAC_SUCCESS;
-    }
     if (result != RAC_SUCCESS) {
         return result;
     }

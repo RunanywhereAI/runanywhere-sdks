@@ -83,7 +83,7 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
       );
     }
 
-    const result = await adapter.processAsync(0, image, options);
+    const result = await adapter.processAsync(image, options);
     if (!result) {
       // Swift taxonomy: failed operations throw `.processingFailed`.
       throw SDKException.processingFailed('Native VLM proto path returned no result.');
@@ -107,10 +107,10 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
       );
     }
 
-    return adapter.streamEvents(0, image, options);
+    return adapter.streamEvents(image, options);
   }
 
   cancelVLMGeneration(): void {
-    VLMProtoAdapter.tryDefault()?.cancel(0);
+    VLMProtoAdapter.tryDefault()?.cancel();
   }
 }

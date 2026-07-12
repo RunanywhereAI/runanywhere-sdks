@@ -107,15 +107,19 @@ class DartBridgeModelPaths {
     final dir = path ?? (await getApplicationDocumentsDirectory()).path;
 
     final lib = PlatformLoader.loadCommons();
-    final setBase = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-        int Function(Pointer<Utf8>)>('rac_model_paths_set_base_dir');
+    final setBase = lib
+        .lookupFunction<
+          Int32 Function(Pointer<Utf8>),
+          int Function(Pointer<Utf8>)
+        >('rac_model_paths_set_base_dir');
 
     final dirPtr = dir.toNativeUtf8();
     try {
       final result = setBase(dirPtr);
       if (result != RacResultCode.success) {
         throw SDKException.invalidConfiguration(
-            'rac_model_paths_set_base_dir failed: $result');
+          'rac_model_paths_set_base_dir failed: $result',
+        );
       }
       _logger.debug('C++ base directory set to: $dir');
     } finally {
@@ -131,10 +135,11 @@ class DartBridgeModelPaths {
   String? getModelsDirectory() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getDir = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, IntPtr),
-          int Function(
-              Pointer<Utf8>, int)>('rac_model_paths_get_models_directory');
+      final getDir = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>, IntPtr),
+            int Function(Pointer<Utf8>, int)
+          >('rac_model_paths_get_models_directory');
 
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
@@ -157,10 +162,11 @@ class DartBridgeModelPaths {
   String? getFrameworkDirectory(InferenceFramework framework) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getDir = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Utf8>, IntPtr),
-          int Function(int, Pointer<Utf8>,
-              int)>('rac_model_paths_get_framework_directory');
+      final getDir = lib
+          .lookupFunction<
+            Int32 Function(Int32, Pointer<Utf8>, IntPtr),
+            int Function(int, Pointer<Utf8>, int)
+          >('rac_model_paths_get_framework_directory');
 
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
@@ -183,16 +189,21 @@ class DartBridgeModelPaths {
   String? getModelFolder(String modelId, InferenceFramework framework) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getFolder = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Int32, Pointer<Utf8>, IntPtr),
-          int Function(Pointer<Utf8>, int, Pointer<Utf8>,
-              int)>('rac_model_paths_get_model_folder');
+      final getFolder = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>, Int32, Pointer<Utf8>, IntPtr),
+            int Function(Pointer<Utf8>, int, Pointer<Utf8>, int)
+          >('rac_model_paths_get_model_folder');
 
       final modelIdPtr = modelId.toNativeUtf8();
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
-        final result =
-            getFolder(modelIdPtr, framework.toC(), buffer, _pathBufferSize);
+        final result = getFolder(
+          modelIdPtr,
+          framework.toC(),
+          buffer,
+          _pathBufferSize,
+        );
         if (result == RacResultCode.success) {
           return buffer.toDartString();
         }
@@ -205,7 +216,6 @@ class DartBridgeModelPaths {
     }
     return null;
   }
-
 
   // MARK: - Model File Resolution
 
@@ -225,24 +235,26 @@ class DartBridgeModelPaths {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final resolveFn = lib.lookupFunction<
-          Int32 Function(
-            Pointer<RacModelInfoCStruct>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<RacModelPathResolutionStruct>,
-          ),
-          int Function(
-            Pointer<RacModelInfoCStruct>,
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<RacModelPathResolutionStruct>,
-          )>('rac_model_paths_resolve_artifact');
-      final freeResolutionFn = lib.lookupFunction<
-          Void Function(Pointer<RacModelPathResolutionStruct>),
-          void Function(Pointer<RacModelPathResolutionStruct>)>(
-        'rac_model_path_resolution_free',
-      );
+      final resolveFn = lib
+          .lookupFunction<
+            Int32 Function(
+              Pointer<RacModelInfoCStruct>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<RacModelPathResolutionStruct>,
+            ),
+            int Function(
+              Pointer<RacModelInfoCStruct>,
+              Pointer<Utf8>,
+              Pointer<Utf8>,
+              Pointer<RacModelPathResolutionStruct>,
+            )
+          >('rac_model_paths_resolve_artifact');
+      final freeResolutionFn = lib
+          .lookupFunction<
+            Void Function(Pointer<RacModelPathResolutionStruct>),
+            void Function(Pointer<RacModelPathResolutionStruct>)
+          >('rac_model_path_resolution_free');
 
       return _withCModelInfo(model, (modelPtr) {
         final rootPtr = artifactRoot.toNativeUtf8();
@@ -251,8 +263,12 @@ class DartBridgeModelPaths {
             : model.checksumSha256.toNativeUtf8();
         final resolutionPtr = calloc<RacModelPathResolutionStruct>();
         try {
-          final result =
-              resolveFn(modelPtr, rootPtr, checksumPtr, resolutionPtr);
+          final result = resolveFn(
+            modelPtr,
+            rootPtr,
+            checksumPtr,
+            resolutionPtr,
+          );
           if (result != RacResultCode.success) {
             _logger.debug(
               'rac_model_paths_resolve_artifact failed: '
@@ -282,10 +298,11 @@ class DartBridgeModelPaths {
   String? extractModelId(String path) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final extractFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<Utf8>, IntPtr),
-          int Function(Pointer<Utf8>, Pointer<Utf8>,
-              int)>('rac_model_paths_extract_model_id');
+      final extractFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>, Pointer<Utf8>, IntPtr),
+            int Function(Pointer<Utf8>, Pointer<Utf8>, int)
+          >('rac_model_paths_extract_model_id');
 
       final pathPtr = path.toNativeUtf8();
       final buffer = calloc<Uint8>(256).cast<Utf8>();
@@ -308,8 +325,11 @@ class DartBridgeModelPaths {
   bool isModelPath(String path) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final checkFn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-          int Function(Pointer<Utf8>)>('rac_model_paths_is_model_path');
+      final checkFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>),
+            int Function(Pointer<Utf8>)
+          >('rac_model_paths_is_model_path');
 
       final pathPtr = path.toNativeUtf8();
       try {
@@ -333,13 +353,15 @@ class DartBridgeModelPaths {
   int inferFileRole(String filename, int modalityProto) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final inferFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Int32, Pointer<Int32>),
-          int Function(Pointer<Utf8>, int,
-              Pointer<Int32>)>('rac_infer_model_file_role');
+      final inferFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>, Int32, Pointer<Int32>),
+            int Function(Pointer<Utf8>, int, Pointer<Int32>)
+          >('rac_infer_model_file_role');
 
       final filenamePtr = filename.toNativeUtf8();
-      final rolePtr = calloc<Int32>()..value = 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+      final rolePtr = calloc<Int32>()
+        ..value = 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
       try {
         inferFn(filenamePtr, modalityProto, rolePtr);
         return rolePtr.value;
@@ -358,25 +380,36 @@ class DartBridgeModelPaths {
     T? Function(Pointer<RacModelInfoCStruct>) body,
   ) {
     final lib = PlatformLoader.loadCommons();
-    final allocFn = lib.lookupFunction<Pointer<RacModelInfoCStruct> Function(),
-        Pointer<RacModelInfoCStruct> Function()>('rac_model_info_alloc');
-    final freeFn = lib.lookupFunction<
-        Void Function(Pointer<RacModelInfoCStruct>),
-        void Function(Pointer<RacModelInfoCStruct>)>('rac_model_info_free');
-    final strdupFn = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>),
-        Pointer<Utf8> Function(Pointer<Utf8>)>('rac_strdup');
+    final allocFn = lib
+        .lookupFunction<
+          Pointer<RacModelInfoCStruct> Function(),
+          Pointer<RacModelInfoCStruct> Function()
+        >('rac_model_info_alloc');
+    final freeFn = lib
+        .lookupFunction<
+          Void Function(Pointer<RacModelInfoCStruct>),
+          void Function(Pointer<RacModelInfoCStruct>)
+        >('rac_model_info_free');
+    final strdupFn = lib
+        .lookupFunction<
+          Pointer<Utf8> Function(Pointer<Utf8>),
+          Pointer<Utf8> Function(Pointer<Utf8>)
+        >('rac_strdup');
 
     final modelPtr = allocFn();
     if (modelPtr == nullptr) return null;
 
     final idPtr = model.id.toNativeUtf8();
     final namePtr = model.name.toNativeUtf8();
-    final downloadUrlPtr =
-        model.downloadUrl.isEmpty ? null : model.downloadUrl.toNativeUtf8();
-    final localPathPtr =
-        model.localPath.isEmpty ? null : model.localPath.toNativeUtf8();
-    final descriptionPtr =
-        model.description.isEmpty ? null : model.description.toNativeUtf8();
+    final downloadUrlPtr = model.downloadUrl.isEmpty
+        ? null
+        : model.downloadUrl.toNativeUtf8();
+    final localPathPtr = model.localPath.isEmpty
+        ? null
+        : model.localPath.toNativeUtf8();
+    final descriptionPtr = model.metadata.description.isEmpty
+        ? null
+        : model.metadata.description.toNativeUtf8();
 
     try {
       modelPtr.ref
@@ -385,16 +418,18 @@ class DartBridgeModelPaths {
         ..category = model.category.toC()
         ..format = model.format.toC()
         ..framework = model.framework.toC()
-        ..downloadUrl =
-            downloadUrlPtr == null ? nullptr : strdupFn(downloadUrlPtr)
+        ..downloadUrl = downloadUrlPtr == null
+            ? nullptr
+            : strdupFn(downloadUrlPtr)
         ..localPath = localPathPtr == null ? nullptr : strdupFn(localPathPtr)
         ..downloadSize = model.downloadSizeBytes.toInt()
         ..memoryRequired = model.memoryRequiredBytes.toInt()
         ..contextLength = model.contextLength
         ..supportsThinking = model.supportsThinking ? RAC_TRUE : RAC_FALSE
         ..supportsLora = model.supportsLora ? RAC_TRUE : RAC_FALSE
-        ..description =
-            descriptionPtr == null ? nullptr : strdupFn(descriptionPtr)
+        ..description = descriptionPtr == null
+            ? nullptr
+            : strdupFn(descriptionPtr)
         ..source = model.source.toC();
 
       _fillArtifactInfo(modelPtr.ref.artifactInfo, model);
@@ -409,10 +444,7 @@ class DartBridgeModelPaths {
     }
   }
 
-  void _fillArtifactInfo(
-    RacArtifactInfoStruct artifact,
-    ModelInfo model,
-  ) {
+  void _fillArtifactInfo(RacArtifactInfoStruct artifact, ModelInfo model) {
     artifact
       ..kind = _artifactKind(model)
       ..archiveType = _archiveType(model)

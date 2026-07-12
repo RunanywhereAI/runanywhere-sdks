@@ -361,17 +361,6 @@ typedef struct rac_stt_output {
 } rac_stt_output_t;
 
 // =============================================================================
-// TRANSCRIPTION RESULT - Alias for compatibility
-// =============================================================================
-
-/**
- * @brief STT transcription result (alias for rac_stt_output_t)
- *
- * For compatibility with existing code that uses "result" terminology.
- */
-typedef rac_stt_output_t rac_stt_transcription_result_t;
-
-// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

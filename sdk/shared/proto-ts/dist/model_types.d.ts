@@ -362,7 +362,6 @@ export interface ModelInfo {
     contextLength: number;
     supportsThinking: boolean;
     supportsLora: boolean;
-    description: string;
     source: ModelSource;
     createdAtUnixMs: number;
     updatedAtUnixMs: number;
@@ -381,11 +380,7 @@ export interface ModelInfo {
      * capability flag; this optional pattern declares model-specific tags.
      */
     thinkingPattern?: ThinkingTagPattern | undefined;
-    /**
-     * Structured public catalog metadata. `description` (field 12) is kept for
-     * backward compatibility and should mirror metadata.description when both
-     * are populated.
-     */
+    /** Structured public catalog metadata, including the model description. */
     metadata?: ModelInfoMetadata | undefined;
     singleFile?: SingleFileArtifact | undefined;
     archive?: ArchiveArtifact | undefined;

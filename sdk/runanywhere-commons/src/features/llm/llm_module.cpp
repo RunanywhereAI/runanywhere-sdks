@@ -45,6 +45,7 @@
 // `rac::llm::serialize_llm_stream_event()` directly.
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
+#include "features/llm/structured_output_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_logger.h"
@@ -825,13 +826,10 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
     // sentinel chunks are suppressed entirely so subscribers don't have
     // to filter empty events themselves.
     if (!cleaned_empty) {
-        rac::llm::dispatch_llm_stream_event(ctx->component_handle, cleaned,
-                                            /*is_final*/ false,
-                                            /*kind*/ 1 /* ANSWER */,
-                                            /*token_id*/ 0,
-                                            /*logprob*/ 0.0f,
-                                            /*finish_reason*/ nullptr,
-                                            /*error_message*/ nullptr);
+        rac::llm::LLMStreamEventParams event;
+        event.token = cleaned;
+        event.kind = 1;  // ANSWER
+        rac::llm::dispatch_llm_stream_event(ctx->component_handle, event);
     }
 
     // Forward only non-empty cleaned tokens to the user callback so the
@@ -874,9 +872,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         emit_llm_generation_failed(generation_id.c_str(), model_id, model_name, "No model loaded");
 #endif
 
-        rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, 0, 0, 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "No model loaded");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "No model loaded";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(result, "No model loaded", user_data);
@@ -896,9 +896,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                                    "Streaming not supported");
 #endif
 
-        rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, 0, 0, 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "Streaming not supported");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "Streaming not supported";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
@@ -957,14 +959,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 #endif
 
         // Terminal error event on the proto stream.
-        rac::llm::dispatch_llm_stream_event(handle,
-                                            /*token*/ "",
-                                            /*is_final*/ true,
-                                            /*kind*/ 0 /* UNSPECIFIED */,
-                                            /*token_id*/ 0,
-                                            /*logprob*/ 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "Streaming generation failed");
+        rac::llm::LLMStreamEventParams event;
+        event.is_final = true;
+        event.finish_reason = "error";
+        event.error_message = "Streaming generation failed";
+        rac::llm::dispatch_llm_stream_event(handle, event);
 
         if (error_callback) {
             error_callback(result, "Streaming generation failed", user_data);
@@ -1038,14 +1037,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
                ctx.token_count >= effective_options->max_tokens) {
         finish_reason_str = "length";
     }
-    rac::llm::dispatch_llm_stream_event(handle,
-                                        /*token*/ "",
-                                        /*is_final*/ true,
-                                        /*kind*/ 1 /* ANSWER */,
-                                        /*token_id*/ 0,
-                                        /*logprob*/ 0.0f,
-                                        /*finish_reason*/ finish_reason_str,
-                                        /*error_message*/ nullptr);
+    rac::llm::LLMStreamEventParams terminal_event;
+    terminal_event.is_final = true;
+    terminal_event.kind = 1;  // ANSWER
+    terminal_event.finish_reason = finish_reason_str;
+    rac::llm::dispatch_llm_stream_event(handle, terminal_event);
 
     // Free the duplicated text
     free(final_result.text);
@@ -1396,14 +1392,13 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
-// Pick the canonical system_prompt from the embedded
-// LLMGenerationOptions when set, falling back to the legacy inline field.
+// Pick the system prompt from the sole generation-settings envelope.
 std::string system_prompt_from_request(const LLMGenerateRequest& request) {
     if (request.has_options() && request.options().has_system_prompt() &&
         !request.options().system_prompt().empty()) {
         return request.options().system_prompt();
     }
-    return request.system_prompt();
+    return {};
 }
 
 void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
@@ -1437,8 +1432,8 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
 // into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
 // copies stopSequences into the canonical proto request.
 //
-// Prefer values from the canonical `request.options()` embedded
-// LLMGenerationOptions message when set; otherwise use direct request fields.
+// `request.options()` is the sole generation-settings contract. When absent,
+// retain RAC_LLM_OPTIONS_DEFAULT values.
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
@@ -1452,31 +1447,22 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     const auto& opts = request.options();
 
     // max_tokens proto3 zero means "unset → engine default" (idl/llm_options.proto:45-47).
-    const int max_tokens =
-        (has_options && opts.max_tokens() > 0) ? opts.max_tokens() : request.max_tokens();
-    if (max_tokens > 0) {
-        options.max_tokens = max_tokens;
+    if (has_options && opts.max_tokens() > 0) {
+        options.max_tokens = opts.max_tokens();
     }
 
     // temperature: when the canonical LLMGenerationOptions is set, pass its value through
     // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
-    // (idl/llm_options.proto:49). Mirrors RALLMTypes+CppBridge.swift:53. The legacy inline
-    // scalar still uses `> 0.0f` so an unmigrated caller that left the field zero gets the
-    // engine default (0.8) instead of accidental greedy decoding.
+    // (idl/llm_options.proto:49).
     if (has_options) {
         options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
-    } else if (request.temperature() > 0.0f) {
-        options.temperature = std::clamp(request.temperature(), 0.0f, 2.0f);
     }
 
     // top_p: proto3 zero is the unset sentinel, 1.0 means no truncation
-    // (idl/llm_options.proto:53). Gate both canonical and legacy fields so a
-    // canonical-only knob (for example disable_thinking) does not accidentally
-    // override the engine default with top_p=0.
+    // (idl/llm_options.proto:53). Gate the canonical field so an options
+    // envelope carrying only another knob does not override top_p with zero.
     if (has_options && opts.top_p() > 0.0f) {
         options.top_p = opts.top_p();
-    } else if (request.top_p() > 0.0f) {
-        options.top_p = request.top_p();
     }
 
     // Thread the remaining sampling knobs the proto exposes
@@ -1486,23 +1472,23 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     // struct default. repetition_penalty uses 1.0 = "no penalty"; proto3 zero
     // means unset, so only override when positive (mirrors Swift's
     // RALLMTypes+CppBridge defaults, which carry repetitionPenalty=1.0).
-    // Prefer the canonical embedded options; fall back to the legacy inline
-    // scalars for callers that have not migrated to `request.options()`.
-    options.top_k = has_options ? opts.top_k() : request.top_k();
-    const float repetition_penalty =
-        has_options ? opts.repetition_penalty() : request.repetition_penalty();
+    options.top_k = has_options ? opts.top_k() : 0;
+    const float repetition_penalty = has_options ? opts.repetition_penalty() : 0.0f;
     if (repetition_penalty > 0.0f) {
         options.repetition_penalty = repetition_penalty;
     }
-    options.frequency_penalty =
-        has_options ? opts.frequency_penalty() : request.frequency_penalty();
-    options.presence_penalty = has_options ? opts.presence_penalty() : request.presence_penalty();
-    options.min_p = has_options ? opts.min_p() : request.min_p();
-    options.seed = has_options ? opts.seed() : request.seed();
-    options.n_threads = has_options ? opts.n_threads() : request.n_threads();
+    options.frequency_penalty = has_options ? opts.frequency_penalty() : 0.0f;
+    options.presence_penalty = has_options ? opts.presence_penalty() : 0.0f;
+    options.min_p = has_options ? opts.min_p() : 0.0f;
+    options.seed = has_options ? opts.seed() : 0;
+    options.n_threads = has_options ? opts.n_threads() : 0;
     options.disable_thinking = (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
 
-    grammar_storage = has_options ? opts.grammar() : request.grammar();
+    grammar_storage = has_options ? opts.grammar() : std::string{};
+    if (grammar_storage.empty() && has_options && opts.has_structured_output() &&
+        opts.structured_output().has_grammar()) {
+        grammar_storage = opts.structured_output().grammar();
+    }
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
@@ -1510,13 +1496,10 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     stop_storage.clear();
     stop_ptrs.clear();
 
-    const auto& canonical_stop_sequences = (has_options && opts.stop_sequences_size() > 0)
-                                               ? opts.stop_sequences()
-                                               : request.stop_sequences();
-    const int stop_count = canonical_stop_sequences.size();
+    const int stop_count = has_options ? opts.stop_sequences_size() : 0;
     if (stop_count > 0) {
         stop_storage.reserve(static_cast<size_t>(stop_count));
-        for (const auto& seq : canonical_stop_sequences) {
+        for (const auto& seq : opts.stop_sequences()) {
             if (!seq.empty()) {
                 stop_storage.push_back(seq);
             }

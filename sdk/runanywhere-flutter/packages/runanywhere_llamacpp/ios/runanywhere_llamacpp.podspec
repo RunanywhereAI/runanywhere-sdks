@@ -4,7 +4,7 @@
 # Vendors the locally built RABackendLLAMACPP.xcframework (LLM text
 # generation via llama.cpp) into Flutter iOS apps.
 #
-# The xcframework is staged into this plugin's ios/Frameworks/ directory by
+# The xcframework is staged into this plugin's ios/runanywhere_llamacpp/Frameworks/ directory by
 # sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks().
 #
 
@@ -21,11 +21,11 @@ capabilities using llama.cpp via RABackendLLAMACPP.xcframework.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '17.0'
-  s.swift_version = '5.0'
+  s.ios.deployment_target = '17.5'
+  s.swift_version = '6.2'
 
   # Source files (plugin entry point only — native logic lives in xcframework).
-  s.source_files = 'Classes/**/*'
+  s.source_files = 'runanywhere_llamacpp/Sources/**/*.swift'
 
   s.dependency 'Flutter'
   # Depend on the core pod for RACommons (registry, tensor layer, etc).
@@ -34,8 +34,8 @@ capabilities using llama.cpp via RABackendLLAMACPP.xcframework.
   # =============================================================================
   # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
   # =============================================================================
-  s.vendored_frameworks = 'Frameworks/RABackendLLAMACPP.xcframework'
-  s.preserve_paths = 'Frameworks/**/*'
+  s.vendored_frameworks = 'runanywhere_llamacpp/Frameworks/RABackendLLAMACPP.xcframework'
+  s.preserve_paths = 'runanywhere_llamacpp/Frameworks/**/*'
 
   # Required frameworks
   s.frameworks = [
@@ -57,10 +57,9 @@ capabilities using llama.cpp via RABackendLLAMACPP.xcframework.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
     'OTHER_LDFLAGS' => '-lc++',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
-    'ENABLE_BITCODE' => 'NO',
     'HEADER_SEARCH_PATHS' => [
-      '"${PODS_TARGET_SRCROOT}/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64/Headers"',
-      '"${PODS_TARGET_SRCROOT}/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64-simulator/Headers"',
+      '"${PODS_TARGET_SRCROOT}/runanywhere_llamacpp/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64/Headers"',
+      '"${PODS_TARGET_SRCROOT}/runanywhere_llamacpp/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64-simulator/Headers"',
     ].join(' '),
   }
 

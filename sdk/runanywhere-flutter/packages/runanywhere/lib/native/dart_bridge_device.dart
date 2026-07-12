@@ -134,7 +134,7 @@ class DartBridgeDevice {
           .lookupFunction<
             Int32 Function(Pointer<RacDeviceCallbacksStruct>),
             int Function(Pointer<RacDeviceCallbacksStruct>)
-          >('rac_device_set_callbacks');
+          >('rac_device_manager_set_callbacks');
 
       final result = setCallbacks(callbacks);
       if (result != RacResultCode.success) {
@@ -150,7 +150,7 @@ class DartBridgeDevice {
       _callbacksRegistered = true;
       _logger.debug('Device callbacks registered (sync)');
     } catch (e) {
-      // librac_commons.so may not export rac_device_set_callbacks in some
+      // librac_commons.so may not export rac_device_manager_set_callbacks in some
       // configurations (B-FL-1-002). Log at warning so it's visible in
       // non-debug builds; SDK falls back to no device callbacks.
       _logger.warning('registerCallbacks unavailable: $e');
@@ -189,10 +189,9 @@ class DartBridgeDevice {
     await _refreshDeviceInfoSnapshot();
 
     // Callbacks are already registered (Phase 1 or the guard above).
-    // Re-register with the canonical C++ symbol so the device manager
-    // has them too (Phase 1 uses rac_device_set_callbacks; Phase 2 uses
-    // rac_device_manager_set_callbacks). Reuse the existing _callbacksPtr
-    // to avoid leaking the first allocation.
+    // Refresh the callback snapshot after the asynchronous device metadata
+    // caches are ready. Reuse the existing pointer to avoid leaking the
+    // Phase-1 allocation.
     try {
       final lib = PlatformLoader.loadCommons();
 

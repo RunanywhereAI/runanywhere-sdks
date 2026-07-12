@@ -12,9 +12,11 @@
 #define RAC_FEATURES_VOICE_AGENT_VOICE_AGENT_INTERNAL_H
 
 #include <atomic>
+#include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "rac/core/rac_types.h"
@@ -74,6 +76,34 @@ struct rac_voice_agent_feed_state {
     std::mutex mutex;
 };
 
+/// Stage owned by the currently executing voice turn. Cancellation reads this
+/// under `rac_voice_agent_turn_cancellation_state::mutex` so it only forwards
+/// an interrupt to the modality that belongs to the matching turn.
+enum class rac_voice_agent_turn_stage {
+    none,
+    vad,
+    stt,
+    llm,
+    tts,
+};
+
+/// Request-scoped cancellation state for `rac_voice_agent_process_turn_proto`.
+///
+/// A cancelled request id is retained until its turn scope exits. This keeps a
+/// cancel that wins the race with worker-isolate startup from being lost, while
+/// a later turn with a different request id never inherits stale cancellation.
+/// The set is bounded for callers that cancel an id which never starts.
+struct rac_voice_agent_turn_cancellation_state {
+    std::mutex mutex;
+    std::condition_variable interrupt_finished;
+    std::unordered_set<std::string> cancelled_request_ids;
+    std::deque<std::string> cancellation_order;
+    std::string active_request_id;
+    std::string interrupt_request_id;
+    rac_voice_agent_turn_stage active_stage{rac_voice_agent_turn_stage::none};
+    bool backend_started{false};
+};
+
 struct rac_voice_agent {
     /// Set true when initialize* has run successfully. Atomic so
     /// `is_ready()` checks don't need the mutex.
@@ -83,11 +113,6 @@ struct rac_voice_agent {
     /// (e.g. `detect_speech`) to drain before tearing the agent down.
     std::atomic<bool> is_shutting_down{false};
     std::atomic<int> in_flight{0};
-
-    /// True when the agent created its own component handles via
-    /// `rac_voice_agent_create_standalone()`. The destructor frees them
-    /// in reverse creation order.
-    bool owns_components{false};
 
     rac_handle_t llm_handle{nullptr};
     rac_handle_t stt_handle{nullptr};
@@ -99,6 +124,12 @@ struct rac_voice_agent {
 
     /// Streaming-ingress segmenter state (rac_voice_agent_feed_audio_proto).
     rac_voice_agent_feed_state feed;
+
+    /// Lock-independent, request-scoped turn cancellation. This must remain
+    /// separate from `mutex`: the executing turn holds `mutex` across the
+    /// blocking STT -> LLM -> TTS pipeline, while another thread must be able
+    /// to request cancellation immediately.
+    rac_voice_agent_turn_cancellation_state turn_cancellation;
 
     /// Multi-turn conversation history for the LLM in chronological order
     /// (excludes the system prompt + current turn). Flattened into

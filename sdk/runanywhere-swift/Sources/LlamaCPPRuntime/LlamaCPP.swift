@@ -62,7 +62,7 @@ public enum LlamaCPP {
 
     // MARK: - Registration State
 
-    private static var isRegistered = false
+    @MainActor private static var isRegistered = false
 
     // MARK: - Registration
 

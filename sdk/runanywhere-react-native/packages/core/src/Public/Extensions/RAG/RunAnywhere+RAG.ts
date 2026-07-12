@@ -37,7 +37,6 @@ import {
 } from '@runanywhere/proto-ts/rag';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
-import { isJsonObject } from '../../../services/JSONValidation';
 
 const logger = new SDKLogger('RunAnywhere.RAG');
 
@@ -72,7 +71,9 @@ function ensureNative() {
  * defaults can seed the input with the generated `rAGConfigurationDefaults()`
  * helper from `@runanywhere/proto-ts/convenience/rag_convenience`.
  */
-export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>;
+export async function ragCreatePipeline(
+  config: RAGConfiguration
+): Promise<void>;
 /**
  * Create the RAG pipeline from registry models. Model artifact layout is
  * resolved by commons lifecycle rather than by JS file-name heuristics.
@@ -132,63 +133,20 @@ export async function ragDestroyPipeline(): Promise<void> {
  * Primary overload — matches Swift: `RunAnywhere.ragIngest(_:)`.
  * Returns pipeline statistics after ingestion.
  */
-export async function ragIngest(document: RAGDocument): Promise<RAGStatistics>;
-/**
- * Ingest a text document into the RAG pipeline (convenience overload).
- *
- * Builds a `RAGDocument` proto from the text and optional JSON metadata,
- * then delegates to the primary overload. Matches Swift:
- * `RunAnywhere.ragIngest(text:metadataJSON:)`.
- */
-export async function ragIngest(
-  text: string,
-  metadataJson?: string
-): Promise<RAGStatistics>;
-export async function ragIngest(
-  textOrDocument: string | RAGDocument,
-  metadataJson?: string
-): Promise<RAGStatistics> {
+export async function ragIngest(document: RAGDocument): Promise<RAGStatistics> {
   // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:93-95).
   requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+RAG.swift:96 gates on ensureServicesReady.
   await ensureServicesReady();
-  let document: RAGDocument;
-  if (typeof textOrDocument === 'string') {
-    // The `metadata_json` proto field was deleted. Best-effort parse
-    // of the legacy JSON blob into the typed `metadata` map.
-    document = RAGDocument.create({
-      id: '',
-      text: textOrDocument,
-      metadata: parseRAGMetadataJSON(metadataJson),
-    });
-  } else {
-    document = textOrDocument;
-  }
   const statsBytes = await native.ragIngestProto(
     encodeProtoMessage(document, RAGDocument)
   );
-  return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragIngestProto');
-}
-
-/** Decode legacy JSON metadata after narrowing the external value to an object. */
-export function parseRAGMetadataJSON(json?: string): Record<string, string> {
-  if (!json) return {};
-  const trimmed = json.trim();
-  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return {};
-  }
-  if (!isJsonObject(parsed)) return {};
-
-  const entries = Object.entries(parsed).map(([key, value]) => [
-    key,
-    typeof value === 'string' ? value : String(value),
-  ] as const);
-  return Object.fromEntries(entries);
+  return decodeRequired(
+    statsBytes,
+    RAGStatisticsMessage.decode,
+    'ragIngestProto'
+  );
 }
 
 /**
@@ -198,30 +156,11 @@ export function parseRAGMetadataJSON(json?: string): Record<string, string> {
  */
 export async function ragAddDocumentsBatch(
   documents: RAGDocument[]
-): Promise<void>;
-/**
- * Ingest multiple text documents in batch (convenience overload).
- *
- * Builds `RAGDocument` protos from the ad-hoc shapes, then delegates to
- * the primary overload.
- */
-export async function ragAddDocumentsBatch(
-  documents: Array<{ text: string; metadataJson?: string }>
-): Promise<void>;
-export async function ragAddDocumentsBatch(
-  documents: RAGDocument[] | Array<{ text: string; metadataJson?: string }>
 ): Promise<void> {
   // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:110-112).
   requireInitialized();
   for (const doc of documents) {
-    // Distinguish RAGDocument proto (has typed `metadata` map) from the
-    // convenience ad-hoc shape (has `metadataJson` string).
-    if ('metadataJson' in doc) {
-      const adHoc = doc as { text: string; metadataJson?: string };
-      await ragIngest(adHoc.text, adHoc.metadataJson);
-    } else {
-      await ragIngest(doc as RAGDocument);
-    }
+    await ragIngest(doc);
   }
 }
 
@@ -300,7 +239,11 @@ export async function ragGetStatistics(): Promise<RAGStatistics> {
   requireInitialized();
   const native = ensureNative();
   const statsBytes = await native.ragStatsProto();
-  return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragStatsProto');
+  return decodeRequired(
+    statsBytes,
+    RAGStatisticsMessage.decode,
+    'ragStatsProto'
+  );
 }
 
 /**

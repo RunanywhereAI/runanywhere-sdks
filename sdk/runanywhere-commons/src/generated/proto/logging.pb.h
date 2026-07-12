@@ -304,7 +304,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoggingConfiguration final : public
     kIncludeSourceLocationFieldNumber = 3,
     kIncludeDeviceMetadataFieldNumber = 4,
     kEnableRemoteLoggingFieldNumber = 5,
-    kEnableSentryLoggingFieldNumber = 6,
   };
   // .runanywhere.v1.LogLevel min_log_level = 2;
   void clear_min_log_level() ;
@@ -356,21 +355,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoggingConfiguration final : public
   void _internal_set_enable_remote_logging(bool value);
 
   public:
-  // bool enable_sentry_logging = 6;
-  void clear_enable_sentry_logging() ;
-  [[nodiscard]] bool enable_sentry_logging() const;
-  void set_enable_sentry_logging(bool value);
-
-  private:
-  bool _internal_enable_sentry_logging() const;
-  void _internal_set_enable_sentry_logging(bool value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.LoggingConfiguration)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 5,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -404,7 +393,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoggingConfiguration final : public
     bool include_source_location_;
     bool include_device_metadata_;
     bool enable_remote_logging_;
-    bool enable_sentry_logging_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -951,30 +939,6 @@ inline bool LoggingConfiguration::_internal_enable_remote_logging() const {
 inline void LoggingConfiguration::_internal_set_enable_remote_logging(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_remote_logging_ = value;
-}
-
-// bool enable_sentry_logging = 6;
-inline void LoggingConfiguration::clear_enable_sentry_logging() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.enable_sentry_logging_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline bool LoggingConfiguration::enable_sentry_logging() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.LoggingConfiguration.enable_sentry_logging)
-  return _internal_enable_sentry_logging();
-}
-inline void LoggingConfiguration::set_enable_sentry_logging(bool value) {
-  _internal_set_enable_sentry_logging(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.LoggingConfiguration.enable_sentry_logging)
-}
-inline bool LoggingConfiguration::_internal_enable_sentry_logging() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.enable_sentry_logging_;
-}
-inline void LoggingConfiguration::_internal_set_enable_sentry_logging(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.enable_sentry_logging_ = value;
 }
 
 // -------------------------------------------------------------------
