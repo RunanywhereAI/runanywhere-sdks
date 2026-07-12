@@ -12,6 +12,10 @@
 # =============================================================================
 packages/*/ios/Frameworks/*.xcframework/
 packages/*/ios/Frameworks/*.xcframework.zip
+# Current package-owned CocoaPods/SwiftPM layout. These frameworks (including
+# their generated Headers trees) are staged only for local consumer validation;
+# published packages use the pinned remote-download/checksum contract.
+packages/*/ios/*/Frameworks/
 
 # =============================================================================
 # Native Binaries - Android JNI Libraries
@@ -51,6 +55,7 @@ packages/*/ios/Frameworks/LICENSE
 # =============================================================================
 packages/*/android/build/
 packages/*/ios/build/
+packages/*/ios/*/.build/
 packages/*/.dart_tool/
 packages/*/build/
 
