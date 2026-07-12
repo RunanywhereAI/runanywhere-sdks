@@ -98,10 +98,6 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         state.withLock { $0.isCancelled }
     }
 
-    var sessionId: UInt64 {
-        state.withLock { $0.sessionId }
-    }
-
     func setSessionId(_ sessionId: UInt64) {
         state.withLock { $0.sessionId = sessionId }
     }
@@ -224,13 +220,6 @@ extension CppBridge {
         private let logger = SDKLogger(category: "CppBridge.STT")
 
         private init() {}
-
-        // MARK: - Handle Management
-
-        /// Get or create the STT component handle
-        func getHandle() async throws -> ComponentHandle {
-            try await inner.getHandle()
-        }
 
         // MARK: - State
 

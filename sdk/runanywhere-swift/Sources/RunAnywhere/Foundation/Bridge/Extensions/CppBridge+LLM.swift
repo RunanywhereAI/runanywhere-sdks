@@ -27,13 +27,6 @@ extension CppBridge {
 
         private init() {}
 
-        // MARK: - Handle Management
-
-        /// Get or create the LLM component handle
-        func getHandle() async throws -> ComponentHandle {
-            try await inner.getHandle()
-        }
-
         // MARK: - State
 
         /// Check if a model is loaded

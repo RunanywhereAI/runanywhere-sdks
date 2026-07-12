@@ -39,6 +39,8 @@ export ZERO_AR_DATE=1
 # step, sync-checksums.sh, and the Package.swift binary targets all expect.
 # Version: RAC_RELEASE_VERSION (the release tag, passed by release.yml) or the
 # canonical PROJECT_VERSION from VERSIONS for standalone/local runs.
+# The sourced path is resolved from this script at runtime.
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/load-versions.sh" >/dev/null
 VERSION="${RAC_RELEASE_VERSION:-${PROJECT_VERSION}}"
 
@@ -68,4 +70,4 @@ for fw in "${xcframeworks[@]}"; do
 done
 (cd "${DEST_DIR}" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done)
 
-echo "✓ build-ios.sh complete; staged $(ls -1 "${DEST_DIR}"/*.zip 2>/dev/null | wc -l | tr -d ' ') versioned archive(s) under ${DEST_DIR}"
+echo "✓ build-ios.sh complete; staged ${#xcframeworks[@]} versioned archive(s) under ${DEST_DIR}"

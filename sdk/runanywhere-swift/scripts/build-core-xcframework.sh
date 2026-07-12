@@ -61,6 +61,70 @@ run() {
     fi
 }
 
+# xcodebuild does not preserve the -library argument order when it emits an
+# XCFramework Info.plist. Canonicalize that metadata before archiving so two
+# identical builds cannot acquire different SwiftPM checksums.
+normalize_xcframework_info_plist() {
+    local xcframework="$1"
+    local plist="${xcframework}/Info.plist"
+
+    if [ ! -f "${plist}" ]; then
+        echo "error: XCFramework Info.plist not found: ${plist}" >&2
+        exit 1
+    fi
+
+    python3 - "${plist}" <<'PY'
+import os
+import plistlib
+import sys
+import tempfile
+
+path = sys.argv[1]
+with open(path, "rb") as stream:
+    document = plistlib.load(stream)
+
+libraries = document.get("AvailableLibraries")
+if not isinstance(libraries, list) or not libraries:
+    raise SystemExit(f"error: {path} has no AvailableLibraries entries")
+
+identifiers = [entry.get("LibraryIdentifier") for entry in libraries]
+if any(not isinstance(identifier, str) or not identifier for identifier in identifiers):
+    raise SystemExit(f"error: {path} has an invalid LibraryIdentifier")
+if len(set(identifiers)) != len(identifiers):
+    raise SystemExit(f"error: {path} has duplicate LibraryIdentifier entries")
+
+def stable_key(entry):
+    canonical_entry = plistlib.dumps(
+        entry,
+        fmt=plistlib.FMT_XML,
+        sort_keys=True,
+    )
+    return entry["LibraryIdentifier"], canonical_entry
+
+document["AvailableLibraries"] = sorted(libraries, key=stable_key)
+
+directory = os.path.dirname(path)
+descriptor, temporary_path = tempfile.mkstemp(prefix="Info.plist.", dir=directory)
+try:
+    with os.fdopen(descriptor, "wb") as stream:
+        plistlib.dump(
+            document,
+            stream,
+            fmt=plistlib.FMT_XML,
+            sort_keys=True,
+        )
+    os.chmod(temporary_path, 0o644)
+    os.replace(temporary_path, path)
+except BaseException:
+    try:
+        os.unlink(temporary_path)
+    except FileNotFoundError:
+        pass
+    raise
+PY
+    plutil -lint "${plist}" >/dev/null
+}
+
 prepare_archive_input() {
     local input="$1"
     local arch="$2"
@@ -753,6 +817,7 @@ build_xcframework_from_paths() {
             -library "${sim_lib}" \
             -output  "${xcf}"
     fi
+    run normalize_xcframework_info_plist "${xcf}"
 }
 
 # build_xcframework_from_paths_with_macos <device-lib> <simulator-lib> <macos-lib> <xcframework-name> [--with-headers]
@@ -779,6 +844,7 @@ build_xcframework_from_paths_with_macos() {
             -library "${mac_lib}" \
             -output  "${xcf}"
     fi
+    run normalize_xcframework_info_plist "${xcf}"
 }
 
 COMMONS_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_commons.a"

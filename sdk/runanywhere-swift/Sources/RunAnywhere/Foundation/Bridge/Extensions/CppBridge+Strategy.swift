@@ -3,7 +3,6 @@
 //  RunAnywhere SDK
 //
 //  Archive type C++ conversion extensions.
-//  These are used by ModelTypes+CppBridge.swift for model artifact type handling.
 //
 
 import CRACommons
@@ -30,23 +29,6 @@ extension ArchiveType {
         guard rac_archive_type_to_proto(cType, &protoValue) == RAC_SUCCESS,
               let resolved = ArchiveType(rawValue: Int(protoValue)) else {
             return nil
-        }
-        self = resolved
-    }
-}
-
-// MARK: - ArchiveStructure C++ Conversion
-
-extension ArchiveStructure {
-    /// Initialize from C++ archive structure.
-    /// Delegates to commons' `rac_archive_structure_to_proto`. Falls back to
-    /// `.unknown` for unrecognized C values.
-    init(from cStructure: rac_archive_structure_t) {
-        var protoValue: Int32 = 0
-        guard rac_archive_structure_to_proto(cStructure, &protoValue) == RAC_SUCCESS,
-              let resolved = ArchiveStructure(rawValue: Int(protoValue)) else {
-            self = .unknown
-            return
         }
         self = resolved
     }

@@ -62,8 +62,6 @@ import SwiftProtobuf
 /// itself is thread-safe for transcribe + the slot setters.
 public final class HybridSTTRouter: @unchecked Sendable {
 
-    private static let logger = SDKLogger(category: "Hybrid.STTRouter")
-
     /// One attached STT service: the heap-stable `rac_stt_service_t` the router
     /// holds a pointer to, the engine ops that created it (to call `destroy`),
     /// and the strdup'd model id the struct's `model_id` field points at.

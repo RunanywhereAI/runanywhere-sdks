@@ -23,11 +23,11 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let onnxTarget = runAnywhereBinaryTarget(
     name: "RABackendONNX",
-    checksum: "545c8917899229924010499cc62615578efb3327bc40edc217fcdc86ac287959"
+    checksum: "a8094dfe7721ec6f79d54b337550d72a95a90fd06ec5c997a822176d2219d3ee"
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "854c1cd911289fc0c459bab3e9fa7e617e73ced3bf0f0ac3bffbbf302e9f0327"
+    checksum: "c7322c80d9c18d707fba41aef2ad09a211806977400050c388ccdc2a2301cf06"
 )
 
 let package = Package(

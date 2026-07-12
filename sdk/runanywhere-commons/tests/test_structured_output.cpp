@@ -5,12 +5,10 @@
 
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <string>
 
 #include "rac/core/rac_error.h"
-#include "features/llm/structured_output_internal.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -54,96 +52,6 @@ namespace {
         }                                                                                       \
     } while (0)
 
-int test_extract_object_from_mixed_text() {
-    char* json = nullptr;
-    size_t len = 0;
-    const rac_result_t rc =
-        rac_structured_output_extract_json("prefix {\"ok\":true} suffix", &json, &len);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_TRUE(json != nullptr);
-    ASSERT_EQ_STR(json, "{\"ok\":true}");
-    ASSERT_EQ_INT(len, std::strlen("{\"ok\":true}"));
-    std::free(json);
-    return 0;
-}
-
-int test_extract_array_with_braces_in_string() {
-    char* json = nullptr;
-    const rac_result_t rc =
-        rac_structured_output_extract_json(R"(answer [{"text":"brace } inside"}])", &json, nullptr);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_TRUE(json != nullptr);
-    ASSERT_EQ_STR(json, "[{\"text\":\"brace } inside\"}]");
-    std::free(json);
-    return 0;
-}
-
-int test_extract_skips_invalid_candidate() {
-    char* json = nullptr;
-    const rac_result_t rc =
-        rac_structured_output_extract_json("ignore {not json} then {\"ok\":true}", &json, nullptr);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_TRUE(json != nullptr);
-    ASSERT_EQ_STR(json, "{\"ok\":true}");
-    std::free(json);
-    return 0;
-}
-
-int test_validate_success_and_failure() {
-    rac_structured_output_validation_t validation{};
-    rac_result_t rc = rac_structured_output_validate("result {\"value\":42}", nullptr, &validation);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
-    ASSERT_TRUE(validation.extracted_json != nullptr);
-    ASSERT_EQ_STR(validation.extracted_json, "{\"value\":42}");
-    rac_structured_output_validation_free(&validation);
-
-    rc = rac_structured_output_validate("no json here", nullptr, &validation);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
-    ASSERT_TRUE(validation.extracted_json == nullptr);
-    ASSERT_TRUE(validation.error_message != nullptr);
-    rac_structured_output_validation_free(&validation);
-
-    rc = rac_structured_output_validate("bad {not json}", nullptr, &validation);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
-    ASSERT_TRUE(validation.extracted_json == nullptr);
-    ASSERT_TRUE(validation.error_message != nullptr);
-    rac_structured_output_validation_free(&validation);
-    return 0;
-}
-
-int test_parse_result_schema_validation() {
-    rac_structured_output_config_t config = RAC_STRUCTURED_OUTPUT_DEFAULT;
-    config.json_schema =
-        "{\"type\":\"object\",\"required\":[\"status\"],\"properties\":{"
-        "\"status\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},"
-        "\"additionalProperties\":false}";
-    config.include_schema_in_prompt = RAC_TRUE;
-
-    rac_structured_output_parse_result_t parsed{};
-    rac_result_t rc =
-        rac_structured_output_parse(R"(result {"status":"ok","count":2})", &config, &parsed);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(parsed.is_valid, RAC_TRUE);
-    ASSERT_EQ_INT(parsed.contains_json, RAC_TRUE);
-    ASSERT_TRUE(parsed.parsed_json != nullptr);
-    ASSERT_SUBSTR(parsed.parsed_json, "\"status\":\"ok\"");
-    ASSERT_SUBSTR(parsed.validation_errors_json, "[]");
-    rac_structured_output_parse_result_free(&parsed);
-
-    rc = rac_structured_output_parse(R"({"count":"two","extra":true})", &config, &parsed);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_EQ_INT(parsed.is_valid, RAC_FALSE);
-    ASSERT_TRUE(parsed.parsed_json != nullptr);
-    ASSERT_SUBSTR(parsed.validation_errors_json, "$.status is required");
-    ASSERT_SUBSTR(parsed.validation_errors_json, "$.count must be integer");
-    ASSERT_SUBSTR(parsed.validation_errors_json, "$.extra is not allowed");
-    rac_structured_output_parse_result_free(&parsed);
-    return 0;
-}
-
 #if defined(RAC_HAVE_PROTOBUF)
 int test_parse_proto_uses_generated_contract() {
     runanywhere::v1::StructuredOutputParseRequest request;
@@ -158,7 +66,7 @@ int test_parse_proto_uses_generated_contract() {
 
     rac_proto_buffer_t result_bytes{};
     rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc = rac_structured_output_parse_proto(
+    rac_result_t rc = rac_structured_output_parse_proto(
         reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result_bytes);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
@@ -171,6 +79,66 @@ int test_parse_proto_uses_generated_contract() {
     ASSERT_EQ_INT(result.validation().contains_json(), true);
     ASSERT_SUBSTR(result.parsed_json().c_str(), "\"status\":\"ok\"");
     ASSERT_EQ_INT(result.validation().validation_errors_size(), 0);
+
+    rac_proto_buffer_free(&result_bytes);
+
+    request.set_text(R"(ignore {not json} then {"status":"ok","count":2})");
+    bytes.clear();
+    ASSERT_TRUE(request.SerializeToString(&bytes));
+    rac_proto_buffer_init(&result_bytes);
+    rc = rac_structured_output_parse_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                           bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    result.Clear();
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.validation().is_valid(), true);
+    ASSERT_SUBSTR(result.parsed_json().c_str(), "\"status\":\"ok\"");
+    rac_proto_buffer_free(&result_bytes);
+
+    request.set_text(R"({"count":"two","extra":true})");
+    bytes.clear();
+    ASSERT_TRUE(request.SerializeToString(&bytes));
+    rac_proto_buffer_init(&result_bytes);
+    rc = rac_structured_output_parse_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                           bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    result.Clear();
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.validation().is_valid(), false);
+    ASSERT_EQ_INT(result.validation().validation_errors_size(), 3);
+    std::string validation_errors;
+    for (const auto& error : result.validation().validation_errors()) {
+        validation_errors += error;
+        validation_errors += '\n';
+    }
+    ASSERT_SUBSTR(validation_errors.c_str(), "$.status is required");
+    ASSERT_SUBSTR(validation_errors.c_str(), "$.count must be integer");
+    ASSERT_SUBSTR(validation_errors.c_str(), "$.extra is not allowed");
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+}
+
+int test_parse_proto_extracts_array_with_brace_in_string() {
+    runanywhere::v1::StructuredOutputParseRequest request;
+    request.set_text(R"(answer [{"text":"brace } inside"}])");
+
+    std::string bytes;
+    ASSERT_TRUE(request.SerializeToString(&bytes));
+
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_structured_output_parse_proto(
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+
+    runanywhere::v1::StructuredOutputResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.validation().is_valid(), true);
+    ASSERT_EQ_INT(result.validation().contains_json(), true);
+    ASSERT_EQ_STR(result.parsed_json().c_str(), "[{\"text\":\"brace } inside\"}]");
 
     rac_proto_buffer_free(&result_bytes);
     return 0;
@@ -225,7 +193,7 @@ int test_validate_proto_uses_generated_contract() {
 
     rac_proto_buffer_t result_bytes{};
     rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc = rac_structured_output_validate_proto(
+    rac_result_t rc = rac_structured_output_validate_proto(
         reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &result_bytes);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
@@ -242,32 +210,25 @@ int test_validate_proto_uses_generated_contract() {
     ASSERT_EQ_INT(result.validation_errors_size(), 0);
 
     rac_proto_buffer_free(&result_bytes);
+
+    request.set_text("no json here");
+    bytes.clear();
+    ASSERT_TRUE(request.SerializeToString(&bytes));
+    rac_proto_buffer_init(&result_bytes);
+    rc = rac_structured_output_validate_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                              bytes.size(), &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    result.Clear();
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.is_valid(), false);
+    ASSERT_EQ_INT(result.contains_json(), false);
+    ASSERT_TRUE(result.has_error_message());
+    ASSERT_TRUE(!result.has_extracted_json());
+    rac_proto_buffer_free(&result_bytes);
     return 0;
 }
 #endif
-
-int test_prepare_prompt_and_system_prompt() {
-    rac_structured_output_config_t config = RAC_STRUCTURED_OUTPUT_DEFAULT;
-    config.json_schema = R"({"type":"object"})";
-    config.include_schema_in_prompt = RAC_TRUE;
-
-    char* prepared = nullptr;
-    rac_result_t rc = rac_structured_output_prepare_prompt("Return a status", &config, &prepared);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_TRUE(prepared != nullptr);
-    ASSERT_SUBSTR(prepared, "Return a status");
-    ASSERT_SUBSTR(prepared, "{\"type\":\"object\"}");
-    std::free(prepared);
-
-    char* system = nullptr;
-    rc = rac_structured_output_get_system_prompt(config.json_schema, &system);
-    ASSERT_EQ_INT(rc, RAC_SUCCESS);
-    ASSERT_TRUE(system != nullptr);
-    ASSERT_SUBSTR(system, "outputs ONLY valid JSON");
-    ASSERT_SUBSTR(system, "{\"type\":\"object\"}");
-    std::free(system);
-    return 0;
-}
 
 struct TestCase {
     const char* name;
@@ -277,22 +238,19 @@ struct TestCase {
 }  // namespace
 
 int main() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    std::printf("[structured_output] skipped: protobuf runtime is disabled\n");
+    return 0;
+#else
     TestCase cases[] = {
-        {.name = "extract_object_from_mixed_text", .fn = test_extract_object_from_mixed_text},
-        {.name = "extract_array_with_braces_in_string",
-         .fn = test_extract_array_with_braces_in_string},
-        {.name = "extract_skips_invalid_candidate", .fn = test_extract_skips_invalid_candidate},
-        {.name = "validate_success_and_failure", .fn = test_validate_success_and_failure},
-        {.name = "parse_result_schema_validation", .fn = test_parse_result_schema_validation},
-#if defined(RAC_HAVE_PROTOBUF)
         {.name = "parse_proto_uses_generated_contract",
          .fn = test_parse_proto_uses_generated_contract},
+        {.name = "parse_proto_extracts_array_with_brace_in_string",
+         .fn = test_parse_proto_extracts_array_with_brace_in_string},
         {.name = "prepare_prompt_proto_uses_generated_contract",
          .fn = test_prepare_prompt_proto_uses_generated_contract},
         {.name = "validate_proto_uses_generated_contract",
          .fn = test_validate_proto_uses_generated_contract},
-#endif
-        {.name = "prepare_prompt_and_system_prompt", .fn = test_prepare_prompt_and_system_prompt},
     };
 
     int failed = 0;
@@ -310,4 +268,5 @@ int main() {
     }
     std::printf("\n[structured_output] %d/%d passed\n", count - failed, count);
     return failed == 0 ? 0 : 1;
+#endif
 }

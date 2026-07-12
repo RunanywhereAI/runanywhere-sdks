@@ -55,6 +55,17 @@ target_link_libraries(rac_server PUBLIC
     nlohmann_json::nlohmann_json
 )
 
+# rac_server directly includes generated Protobuf C++ message headers. Link the
+# runtime target privately so its Abseil/utf8-range usage requirements reach
+# every clean compiler invocation instead of relying on host include paths.
+if(TARGET protobuf::libprotobuf)
+    target_link_libraries(rac_server PRIVATE protobuf::libprotobuf)
+elseif(Protobuf_LIBRARIES)
+    target_link_libraries(rac_server PRIVATE ${Protobuf_LIBRARIES})
+else()
+    message(FATAL_ERROR "rac_server requires the Protobuf C++ runtime target")
+endif()
+
 # Threading support
 find_package(Threads REQUIRED)
 target_link_libraries(rac_server PUBLIC Threads::Threads)

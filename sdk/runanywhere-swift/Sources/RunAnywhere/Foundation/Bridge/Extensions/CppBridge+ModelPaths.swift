@@ -174,7 +174,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else { return nil }
-            return InferenceFramework(from: framework)
+            return InferenceFramework.fromCFramework(framework)
         }
 
         /// Check if a path is within the models directory

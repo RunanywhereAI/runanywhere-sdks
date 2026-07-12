@@ -1,6 +1,8 @@
 #ifndef RAC_FEATURES_LLM_TOOL_CALLING_RESULT_INTERNAL_H
 #define RAC_FEATURES_LLM_TOOL_CALLING_RESULT_INTERNAL_H
 
+#if defined(RAC_HAVE_PROTOBUF)
+
 #include <cctype>
 #include <string>
 #include <utility>
@@ -76,5 +78,7 @@ inline void ensure_web_search_attribution(runanywhere::v1::ToolCallingResult* re
 }
 
 }  // namespace rac::llm::tool_calling
+
+#endif  // RAC_HAVE_PROTOBUF
 
 #endif  // RAC_FEATURES_LLM_TOOL_CALLING_RESULT_INTERNAL_H

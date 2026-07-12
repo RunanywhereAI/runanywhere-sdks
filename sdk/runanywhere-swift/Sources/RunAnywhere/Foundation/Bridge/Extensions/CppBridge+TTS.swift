@@ -91,10 +91,6 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
         state.withLock { $0.isCancelled }
     }
 
-    var sessionId: UInt64 {
-        state.withLock { $0.sessionId }
-    }
-
     func setExpectedRequestId(_ requestId: String) {
         state.withLock { $0.expectedRequestId = requestId }
     }
@@ -219,13 +215,6 @@ extension CppBridge {
         private let inner = ComponentActor(vtable: .tts)
 
         private init() {}
-
-        // MARK: - Handle Management
-
-        /// Get or create the TTS component handle
-        func getHandle() async throws -> ComponentHandle {
-            try await inner.getHandle()
-        }
 
         // MARK: - State
 

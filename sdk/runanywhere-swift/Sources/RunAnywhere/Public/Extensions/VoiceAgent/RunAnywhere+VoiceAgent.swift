@@ -202,7 +202,7 @@ public extension RunAnywhere {
     /// voice agent.
     ///
     /// While the stream is consumed, a platform mic driver captures audio,
-    /// segments utterances, and submits them via `rac_voice_agent_process_turn_proto`.
+    /// forwards raw frames via `rac_voice_agent_feed_audio_proto`.
     /// Events fan out through the handle callback registered by
     /// `VoiceAgentStreamAdapter`.
     ///

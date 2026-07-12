@@ -27,6 +27,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # Load the shared build-mode detection
+# The sourced path is resolved from this script at runtime.
+# shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
