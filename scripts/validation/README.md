@@ -4,7 +4,8 @@ This folder is the command hub for source and pre-runtime validation, organized
 into three subfolders by concern:
 
 - **`gates/`** — CI rule-gates wired into `.github/workflows/pr-build.yml` (TS /
-  Flutter / Gradle centralization + the deprecated-surface regression guard).
+  Flutter / Gradle centralization, the deprecated-surface regression guard, and
+  the AGENTS.md ⇄ CLAUDE.md doc-sync guard).
 - **`commons/`** — C++ commons checks: RAC_API export drift, PII-logging guard,
   the commons proto/core CMake test runner, and the export-list sync tool.
 - **`e2e/`** — the seven-lane runtime-validation harness (invoked by the local
@@ -24,6 +25,7 @@ inventory and cleanup policy.
 | `gates/check_flutter_centralization.sh` | Flutter `pubspec.yaml` pins vs the central registry. | N/A |
 | `gates/check_gradle_centralization.sh` | Fails on hardcoded Maven coords outside `gradle/libs.versions.toml`. | N/A |
 | `gates/check_deprecated_surfaces.sh` | Regression guard against hand-written DTOs / string enums (allowlist beside it). | N/A |
+| `gates/check_agents_claude_sync.sh` | Every first-party `AGENTS.md` must have a committed sibling `CLAUDE.md` symlink → `AGENTS.md` (edit either, the same file changes). `--fix` (re)creates the symlinks and is run by `scripts/setup/setup.sh` + the post-checkout/post-merge hooks; check mode is the pre-commit + CI gate. | N/A |
 | `commons/check_rac_api_exports.sh` | RAC_API decls vs `sdk/runanywhere-commons/exports/*.exports` (pairs with `sync_rac_api_exports.sh`). | N/A |
 | `commons/check_no_pii_logging.sh` | Blocks signed-URL / per-user paths in commons INFO logs. | N/A |
 | `commons/run_commons_proto_checks.sh` | Configures, builds, and runs the commons proto/core CMake tests. | `build/validation/commons-proto/` |

@@ -3,6 +3,14 @@
 This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) when working with code in this repository.
 - Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
 
+> **`AGENTS.md` is the real file; each `CLAUDE.md` is a symlink to the `AGENTS.md` beside it.**
+> Editing either name edits the same bytes, so the two can never drift and Claude Code, Cursor, and every
+> other assistant read identical guidance. The symlinks are committed, so a fresh clone recreates them
+> automatically on macOS/Linux — and `scripts/setup/setup.sh` plus the post-checkout/post-merge git hooks
+> re-create any missing link (e.g. on Windows). To add the symlink in a new directory (or repair a broken
+> one), run `bash scripts/validation/gates/check_agents_claude_sync.sh --fix`; a pre-commit hook and the
+> `pr-build.yml` gate fail if any tracked `AGENTS.md` is missing its committed `CLAUDE.md` symlink.
+
 ### ⚠️ Resource discipline — use available capacity responsibly
 Use the machine's available capacity for local builds and verification instead of defaulting to low worker caps:
 - **Builds should use full local capacity by default.** Prefer explicit worker counts based on the host CPU count for reproducibility, e.g. `cmake --build <dir> -j "$(sysctl -n hw.logicalcpu)"`, `make -j"$(sysctl -n hw.logicalcpu)"`, `ninja -j "$(sysctl -n hw.logicalcpu)"`, Gradle `--max-workers="$(sysctl -n hw.logicalcpu)"`, and Xcode `-jobs "$(sysctl -n hw.logicalcpu)"`.

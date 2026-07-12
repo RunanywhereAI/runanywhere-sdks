@@ -51,6 +51,18 @@ err()  { printf "  ${C_BAD}✗${C_RESET} %s\n" "$*" >&2; }
 
 heading() { echo; printf "${C_BOLD}== %s ==${C_RESET}\n" "$*"; }
 
+# Repo-wide, not target-specific: make sure every AGENTS.md has its CLAUDE.md
+# symlink beside it. Committed symlinks already materialize on clone for
+# macOS/Linux; this covers Windows checkouts and any clobbered link.
+ensure_doc_symlinks() {
+    heading "AGENTS.md / CLAUDE.md symlinks"
+    if bash "${REPO_ROOT}/scripts/validation/gates/check_agents_claude_sync.sh" --fix; then
+        ok "CLAUDE.md symlinks ready"
+    else
+        warn "could not create CLAUDE.md symlinks (see above)"
+    fi
+}
+
 resolve_android_sdk() {
     for c in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Android/Sdk" "$HOME/Library/Android/sdk"; do
         [ -n "${c}" ] && [ -d "${c}" ] && { echo "${c}"; return 0; }
@@ -167,6 +179,8 @@ fi
 
 TARGETS=("$@")
 [ "${#TARGETS[@]}" -eq 0 ] && TARGETS=(all)
+
+ensure_doc_symlinks
 
 EXIT=0
 for t in "${TARGETS[@]}"; do

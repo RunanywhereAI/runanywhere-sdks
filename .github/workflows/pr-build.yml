@@ -42,6 +42,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+      # Cheapest gate first — needs only git + bash, no toolchain. Fails the PR
+      # if any tracked AGENTS.md is missing its committed CLAUDE.md -> AGENTS.md symlink.
+      - name: AGENTS.md / CLAUDE.md symlink check
+        run: bash scripts/validation/gates/check_agents_claude_sync.sh
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node

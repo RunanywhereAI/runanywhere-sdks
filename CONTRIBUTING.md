@@ -56,12 +56,18 @@ Flutter, Node/Yarn, Emscripten) and what is missing, so you only install what yo
 need for the SDK you are touching.
 
 **Install the pre-commit hooks** (runs gitleaks secret-scanning + SwiftLint on
-commit):
+commit, and keeps the `CLAUDE.md` → `AGENTS.md` symlinks in place):
 
 ```bash
 pip install pre-commit
 pre-commit install
 ```
+
+Each `CLAUDE.md` is a symlink to its sibling `AGENTS.md` (edit either — it's the
+same file), committed to the repo, so a fresh clone recreates them automatically
+on macOS/Linux. `pre-commit install` also wires post-checkout/post-merge hooks
+that re-create any missing link (e.g. on a Windows checkout); `scripts/setup/setup.sh`
+does the same on demand.
 
 ## 🧱 Building & Running
 

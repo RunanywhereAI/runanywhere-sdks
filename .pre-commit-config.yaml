@@ -44,6 +44,31 @@ repos:
         language: system
         pass_filenames: false
 
+      # CLAUDE.md is a symlink to its sibling AGENTS.md (editing either edits the
+      # same file, so they never drift). At commit time this guard fails if any
+      # tracked AGENTS.md lacks its committed CLAUDE.md symlink; run the script
+      # with --fix to create/repair them, then `git add`.
+      - id: agents-claude-md-sync
+        name: Check CLAUDE.md symlinks
+        entry: bash scripts/validation/gates/check_agents_claude_sync.sh
+        language: system
+        files: (^|/)(AGENTS|CLAUDE)\.md$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      # After a checkout or merge (including the first one after `pre-commit
+      # install` on a fresh clone), (re)create any missing CLAUDE.md symlinks on
+      # disk. Committed symlinks already materialize on clone for macOS/Linux;
+      # this self-heals a clobbered link or a checkout that didn't restore it.
+      # --fix only touches the filesystem — it never stages.
+      - id: agents-claude-md-link
+        name: Create CLAUDE.md symlinks
+        entry: bash scripts/validation/gates/check_agents_claude_sync.sh --fix
+        language: system
+        stages: [post-checkout, post-merge]
+        always_run: true
+        pass_filenames: false
+
   # Android Lint temporarily disabled due to compilation issues
   # - repo: local
   #   hooks:
@@ -106,6 +131,10 @@ repos:
 # Configuration
 default_language_version:
   python: python3
+
+# `pre-commit install` wires all three stages, so the CLAUDE.md symlink hooks
+# (check at commit, (re)create after checkout/merge) are installed in one step.
+default_install_hook_types: [pre-commit, post-checkout, post-merge]
 
 # Skip these hooks during CI (they run in dedicated CI jobs)
 ci:
