@@ -140,6 +140,12 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: android
+      # FetchONNXRuntime.cmake (via runtimes/onnxrt) requires the vendored
+      # Sherpa-ONNX + ONNX Runtime staged under third_party/sherpa-onnx-android
+      # before configure. pr-build.yml runs this same step; the release job was
+      # missing it, which failed configure with "Sherpa-ONNX not found".
+      - name: Download vendored Sherpa-ONNX (Android)
+        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - name: Build + package commons for Android (${{ matrix.abi }})
         # build-android.sh delegates the build to build-core-android.sh (the
         # same script pr-build.yml uses), then stages the per-ABI .so set
@@ -247,7 +253,10 @@ jobs:
 
   native_windows:
     needs: validate
-    runs-on: windows-latest
+    # Pin windows-2022: build-windows.bat hardcodes the "Visual Studio 17 2022"
+    # generator, and the floating windows-latest label has moved to an image
+    # (windows-2025) where VS 2022 is no longer installed, breaking configure.
+    runs-on: windows-2022
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -297,7 +306,11 @@ jobs:
   native_web:
     needs: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # The WASM build compiles Abseil + Protobuf from source (RAG/Solutions ON)
+    # and is forced to --parallel 1 to dodge a zlib static-lib race, then builds
+    # a second time for WebGPU. 60m is no longer enough (was cancelled mid-build);
+    # 180m covers both serial builds. TODO: restore parallelism / add object cache.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
@@ -525,7 +538,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: RunanywhereAI/swift-starter-example
-          ref: fe98b78a32f1acb25602a3ac32058d1ded9bbd9c
+          ref: c6e1262032c889cf0ed86ce9ced329a21acc7196
           path: consumer-swift
       - uses: actions/download-artifact@v8
         with:
