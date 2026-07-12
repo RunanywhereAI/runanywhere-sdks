@@ -303,6 +303,9 @@
 -keep,allowobfuscation class kotlinx.coroutines.CancellableContinuationImpl {
     <init>(kotlin.coroutines.Continuation, int);
 }
+-keep,allowobfuscation class kotlinx.coroutines.channels.ChannelKt {
+    kotlinx.coroutines.channels.Channel Channel$default(int, kotlinx.coroutines.channels.BufferOverflow, kotlin.jvm.functions.Function1, int, java.lang.Object);
+}
 -keep,allowobfuscation class kotlin.coroutines.jvm.internal.SuspendLambda {
     <init>(int, kotlin.coroutines.Continuation);
 }
