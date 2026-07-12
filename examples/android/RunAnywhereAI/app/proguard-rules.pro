@@ -66,8 +66,8 @@
 # acceptance. AndroidJUnitRunner calls this class before any test method runs.
 -keep class androidx.tracing.Trace { *; }
 
-# The separately packaged navigation test links this Compose scope while
-# reflecting its test method. Keep only that cross-APK type in the target APK.
+# The separately packaged navigation test links these Compose types while
+# reflecting its test method. Keep only those cross-APK types in the target APK.
 -keep class androidx.compose.animation.AnimatedContentScope { *; }
 -keep class androidx.compose.runtime.Composer { *; }
 
@@ -77,6 +77,10 @@
 # its return type; releaseAndroidTest's -applymapping cannot rewrite that
 # inherited-method call consistently. Keep this tiny facade hierarchy intact.
 -keep class kotlin.LazyKt** { *; }
+
+# The separately minified test APK also reads Duration.Companion. Prevent R8
+# from vertically merging that one field type into an unrelated Compose class.
+-keep class kotlin.time.Duration$Companion { *; }
 
 # Release instrumentation calls these coroutine entry-point facades directly
 # (runBlocking/launch/withContext and withTimeout). The release app can inline
