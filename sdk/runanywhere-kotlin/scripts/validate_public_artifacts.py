@@ -55,6 +55,11 @@ PRIVATE_MARKERS = ("qhexrt", "qnn")
 HOST_PATH_MARKERS = (b"/Users/", b"/home/", b"/var/folders/", b"\\Users\\")
 VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FIXED_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+MAVEN_LICENSE = (
+    "RunAnywhere License",
+    "https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE",
+    "repo",
+)
 
 
 class ArtifactValidationError(RuntimeError):
@@ -253,6 +258,21 @@ def _validate_pom(label: str, artifact: str, version: str, payload: bytes) -> No
         raise ArtifactValidationError(
             f"{label}: POM coordinate mismatch: "
             f"expected={expected_coordinate}, actual={coordinate}"
+        )
+
+    actual_licenses = [
+        tuple(
+            (
+                license_entry.findtext(f"m:{field}", namespaces=namespace) or ""
+            ).strip()
+            for field in ("name", "url", "distribution")
+        )
+        for license_entry in root.findall("m:licenses/m:license", namespace)
+    ]
+    if actual_licenses != [MAVEN_LICENSE]:
+        raise ArtifactValidationError(
+            f"{label}: POM license metadata mismatch: "
+            f"expected={[MAVEN_LICENSE]}, actual={actual_licenses}"
         )
 
     local_dependencies: set[tuple[str | None, str | None, str | None]] = set()

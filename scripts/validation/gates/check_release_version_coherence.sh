@@ -141,6 +141,14 @@ expect_literal "sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swi
 expect_literal "sdk/runanywhere-kotlin/gradle.properties" "runanywhere.nativeLibVersion=${VERSION}"
 expect_literal "sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
   "const val VERSION = \"${VERSION}\""
+for kotlin_publication in \
+  sdk/runanywhere-kotlin/build.gradle.kts \
+  sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts \
+  sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/build.gradle.kts; do
+  expect_literal "${kotlin_publication}" 'name.set("RunAnywhere License")'
+  expect_literal "${kotlin_publication}" \
+    'url.set("https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE")'
+done
 
 read_version_pin() {
   local key="$1"
@@ -170,6 +178,9 @@ else
 fi
 
 expect_literal "sdk/shared/proto-ts/package.json" "\"version\": \"${VERSION}\""
+expect_literal "sdk/shared/proto-ts/package.json" '"license": "SEE LICENSE IN LICENSE"'
+expect_literal "sdk/shared/proto-ts/package.json" '"LICENSE"'
+expect_literal "sdk/shared/proto-ts/LICENSE" 'RunAnywhere License Notice'
 expect_count "sdk/shared/proto-ts/package-lock.json" "\"version\": \"${VERSION}\"" 2
 expect_literal "dependencies/versions.json" "\"@runanywhere/proto-ts\": \"^${VERSION}\""
 
@@ -196,6 +207,7 @@ for package_json in \
   sdk/runanywhere-react-native/package.json \
   sdk/runanywhere-react-native/packages/core/package.json \
   sdk/runanywhere-react-native/packages/llamacpp/package.json \
+  sdk/runanywhere-react-native/packages/mlx/package.json \
   sdk/runanywhere-react-native/packages/onnx/package.json \
   sdk/runanywhere-react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"version\": \"${VERSION}\""
@@ -203,6 +215,7 @@ done
 expect_literal "sdk/runanywhere-react-native/lerna.json" "\"version\": \"${VERSION}\""
 for package_json in \
   sdk/runanywhere-react-native/packages/llamacpp/package.json \
+  sdk/runanywhere-react-native/packages/mlx/package.json \
   sdk/runanywhere-react-native/packages/onnx/package.json \
   sdk/runanywhere-react-native/packages/qhexrt/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/core\": \">=${VERSION}\""
@@ -218,18 +231,20 @@ for gradle_file in \
     "def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : \"${VERSION}\""
 done
 expect_count "sdk/runanywhere-react-native/yarn.lock" \
-  "\"@runanywhere/core\": \">=${VERSION}\"" 3
-expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 3
+  "\"@runanywhere/core\": \">=${VERSION}\"" 4
+expect_count "yarn.lock" "\"@runanywhere/core\": \">=${VERSION}\"" 4
 
 for pubspec in \
   sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
+  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "version: ${VERSION}"
 done
 for pubspec in \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml \
+  sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml; do
   expect_literal "${pubspec}" "runanywhere: ^${VERSION}"
@@ -245,6 +260,7 @@ expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/qhexrt.d
 for changelog in \
   sdk/runanywhere-flutter/packages/runanywhere/CHANGELOG.md \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/CHANGELOG.md \
+  sdk/runanywhere-flutter/packages/runanywhere_mlx/CHANGELOG.md \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/CHANGELOG.md \
   sdk/runanywhere-flutter/packages/runanywhere_qhexrt/CHANGELOG.md; do
   expect_literal "${changelog}" "## [${VERSION}] -"
@@ -278,6 +294,7 @@ expect_literal "sdk/runanywhere-flutter/packages/runanywhere_qhexrt/android/src/
 for podspec in \
   sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec \
+  sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec; do
   expect_literal "${podspec}" "s.version          = '${VERSION}'"
 done
@@ -291,10 +308,12 @@ done
 
 for release_doc in \
   sdk/runanywhere-react-native/AGENTS.md \
+  sdk/runanywhere-react-native/packages/mlx/README.md \
   sdk/runanywhere-flutter/AGENTS.md \
   sdk/runanywhere-flutter/README.md \
   sdk/runanywhere-flutter/packages/runanywhere/README.md \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/README.md \
+  sdk/runanywhere-flutter/packages/runanywhere_mlx/README.md \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/README.md \
   sdk/runanywhere-flutter/docs/ARCHITECTURE.md \
   sdk/runanywhere-flutter/docs/Documentation.md \

@@ -55,11 +55,12 @@ For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` 
 
 ## SDK Dependency Chain
 
-The app depends on four local Flutter SDK packages via `path:` dependencies in `pubspec.yaml`:
+The app depends on five local Flutter SDK packages via `path:` dependencies in `pubspec.yaml`:
 
 ```
 runanywhere           → ../../../sdk/runanywhere-flutter/packages/runanywhere
 runanywhere_llamacpp  → ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+runanywhere_mlx       → ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
 runanywhere_qhexrt    → ../../../sdk/runanywhere-flutter/packages/runanywhere_qhexrt
 runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
 ```
@@ -67,7 +68,7 @@ runanywhere_onnx      → ../../../sdk/runanywhere-flutter/packages/runanywhere_
 These packages wrap pre-built native C++ libraries via Dart FFI (`dart:ffi`), not method channels. AI inference calls go directly from Dart → native `.so`/xcframework without any platform channel hop.
 
 - **Android**: `.so` files live in each SDK package's `android/src/main/jniLibs/` dirs. The Gradle property `runanywhere.useLocalNatives=true` (in `android/gradle.properties`) tells the build to use these local files instead of downloading from GitHub releases.
-- **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendONNX`, `RABackendSherpa`) are staged in each SDK package's `ios/<package>/Frameworks/` directory. Static linkage (`use_frameworks! :linkage => :static` in Podfile) is required so `DynamicLibrary.executable()` can find the symbols at runtime.
+- **iOS**: xcframeworks (`RACommons`, `RABackendLLAMACPP`, `RABackendMLX`, `RunAnywhereMLXRuntime`, `RunAnywhereMLXMetal`, `RABackendONNX`, `RABackendSherpa`) are staged in each SDK package's `ios/<package>/Frameworks/` directory. MLX intentionally uses CocoaPods so Hub/Crypto are app-root bundles; the other plugins can use SwiftPM. CocoaPods statically links the MLX core/backend archives and embeds the tiny dynamic `RunAnywhereMLXMetal` framework carrying the selected `default.metallib`. The loader uses `DynamicLibrary.process()` with `executable()` fallback. MLX executes only on a physical iOS device; its arm64 simulator slices support package, compile, link, and startup validation.
 
 If native binaries are missing (fresh clone), they must be staged first — see README's "Clean-Clone Bring-Up" or use `scripts/verify.sh` with `REFRESH_ANDROID_NATIVE=1` / `REFRESH_IOS_NATIVE=1`.
 
@@ -78,8 +79,9 @@ If native binaries are missing (fresh clone), they must be staged first — see 
 App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback`:
 
 1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
-2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
-3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), QHexRT NPU (Android/Snapdragon only, chip-conditional HNPU models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
+2. **Backend registration** — guarded by a static flag to survive hot-reload. Registers LlamaCpp, physical-device-only Apple MLX, QHexRT NPU (Android/Snapdragon only), and ONNX/Sherpa; MLX reports unavailable in the iOS Simulator
+3. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
+4. **Catalog registration** — after services initialization, seeds only the successfully registered backends' model catalogs and then registers RAG
 
 ### State Management
 
@@ -145,5 +147,5 @@ All AI calls go through `RunAnywhere`:
 
 - Flutter `>=3.44.0`, Dart `>=3.12.0 <4.0.0` (validated with Flutter 3.44.6 / Dart 3.12.2)
 - Android: compileSdk 36, targetSdk 36, minSdk 24, JVM 17, NDK 28.2.13676358
-- iOS: deployment target 17.5 (enforced by Podfile), Xcode 15+
+- iOS: deployment target 17.5 (enforced by Podfile), Xcode 26+ / Swift 6.2
 - Physical ARM64 device recommended — native libs are optimized for arm64

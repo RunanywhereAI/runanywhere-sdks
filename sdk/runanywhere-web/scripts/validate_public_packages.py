@@ -11,6 +11,8 @@ from pathlib import Path, PurePosixPath
 
 
 PROTO_PACKAGE = "@runanywhere/proto-ts"
+PROTO_LICENSE_METADATA = "SEE LICENSE IN LICENSE"
+PROTO_LICENSE_PATH = Path(__file__).resolve().parents[2] / "shared/proto-ts/LICENSE"
 EXPECTED_PACKAGES = {
     PROTO_PACKAGE,
     "@runanywhere/web",
@@ -228,6 +230,32 @@ def _assert_matching_proto(
     )
 
 
+def _validate_proto_license(
+    archive: Path, metadata: dict[str, object], package_hashes: dict[str, str]
+) -> None:
+    if metadata.get("license") != PROTO_LICENSE_METADATA:
+        raise PackageValidationError(
+            f"{archive.name}: proto-ts license metadata must be "
+            f"{PROTO_LICENSE_METADATA!r}"
+        )
+    actual_digest = package_hashes.get("LICENSE")
+    if actual_digest is None:
+        raise PackageValidationError(
+            f"{archive.name}: proto-ts package is missing LICENSE"
+        )
+    try:
+        expected_digest = hashlib.sha256(PROTO_LICENSE_PATH.read_bytes()).hexdigest()
+    except OSError as error:
+        raise PackageValidationError(
+            f"canonical proto-ts license notice is unavailable: {PROTO_LICENSE_PATH}"
+        ) from error
+    if actual_digest != expected_digest:
+        raise PackageValidationError(
+            f"{archive.name}: proto-ts LICENSE does not match "
+            "sdk/shared/proto-ts/LICENSE"
+        )
+
+
 def validate_public_packages(
     dist_dir: Path, expected_version: str | None = None
 ) -> None:
@@ -254,7 +282,8 @@ def validate_public_packages(
             f"public packages do not share one release version: {sorted(versions)}"
         )
 
-    proto_archive, _, proto_hashes, _ = packages[PROTO_PACKAGE]
+    proto_archive, proto_metadata, proto_hashes, _ = packages[PROTO_PACKAGE]
+    _validate_proto_license(proto_archive, proto_metadata, proto_hashes)
     expected_proto_hashes = {
         path: digest
         for path, digest in proto_hashes.items()

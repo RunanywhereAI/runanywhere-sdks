@@ -35,14 +35,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RunanywhereAI/sdks.git"
+    "url": "git+https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-react-native"
   },
-  "author": "RunAnywhere AI <support@runanywhere.com> (https://runanywhere.com)",
-  "license": "MIT",
+  "author": "RunAnywhere AI <team@runanywhere.ai> (https://runanywhere.ai)",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "bugs": {
-    "url": "https://github.com/RunanywhereAI/sdks/issues"
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
   },
-  "homepage": "https://github.com/RunanywhereAI/sdks#readme",
+  "homepage": "https://runanywhere.ai",
   "devDependencies": {
     "@commitlint/config-conventional": "^21.0.0",
     "@evilmartians/lefthook": "^1.13.2",

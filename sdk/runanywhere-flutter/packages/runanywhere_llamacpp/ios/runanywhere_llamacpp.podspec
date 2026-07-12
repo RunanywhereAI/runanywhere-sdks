@@ -27,7 +27,7 @@ LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation
 capabilities using llama.cpp via RABackendLLAMACPP.xcframework.
                        DESC
   s.homepage         = 'https://runanywhere.ai'
-  s.license          = { :type => 'MIT' }
+  s.license          = { :type => 'RunAnywhere License', :file => '../LICENSE' }
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 

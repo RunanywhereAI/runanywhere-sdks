@@ -14,10 +14,11 @@ Android. It is a thin Dart FFI bridge over the shared C++ core
 Design goals:
 
 - **Modular backends**: separate Flutter plugin packages per backend. LlamaCPP,
-  ONNX/Sherpa, and QHexRT use thin Flutter package wrappers over the shared
-  native C ABI.
-- **C++ commons does the work**: registries, event publisher, plugin router, HTTP,
-  download orchestration, and all inference live in the C ABI (`rac_*`).
+  Apple MLX, ONNX/Sherpa, and QHexRT use thin Flutter package wrappers over the
+  shared native C ABI.
+- **Native layers do the work**: C++ commons owns registries, events, routing,
+  HTTP, and downloads. Backend execution remains native (C++ engines or the
+  canonical Swift MLX runtime), and every Dart call crosses a stable C ABI.
 - **Dart orchestration**: the SDK exposes a static namespace + capability accessors and
   ferries proto messages between C++ and the app.
 - **No platform channels for AI**: all inference calls go through `dart:ffi`.
@@ -45,6 +46,7 @@ sdk/runanywhere-flutter/
     │   ├── ios/                     # podspec + RACommons.xcframework + URLSession transport
     │   └── android/                 # gradle + RunAnywherePlugin.kt + OkHttp transport
     ├── runanywhere_llamacpp/        # LLM + VLM (GGUF via llama.cpp)
+    ├── runanywhere_mlx/             # Apple MLX (LLM + VLM + embeddings + STT + TTS, physical iOS)
     ├── runanywhere_onnx/            # STT + TTS + VAD (Sherpa-ONNX)
     └── runanywhere_qhexrt/          # Qualcomm Hexagon NPU (Android-only)
 ```
@@ -52,7 +54,8 @@ sdk/runanywhere-flutter/
 Backend packages depend on `runanywhere ^0.20.0`. Source checkouts prefer
 package-owned XCFramework/JNI staging, while public pub archives omit those
 large binaries and resolve versioned, checksum-verified release archives through
-CocoaPods/SwiftPM on iOS and Gradle on Android.
+CocoaPods/SwiftPM on iOS and Gradle on Android. MLX is CocoaPods-only because
+its precompiled Hub/Crypto accessors require app-root resource bundles.
 
 ### 2.2 Layer Stack
 
@@ -74,11 +77,12 @@ CocoaPods/SwiftPM on iOS and Gradle on Android.
 ├─────────────────────────────────────────────────────────────────────┤
 │        runanywhere-commons (C++ core)                                │
 │        ModuleRegistry · ServiceRegistry · EventPublisher · Router    │
-├──────────────┬───────────────┬────────────────────────────────────┬─┘
-│  LlamaCpp    │   Sherpa /    │       QHexRT HNPU                  │
-│ (LLM, VLM)   │    ONNX       │       (LLM,VLM,STT,TTS Android)    │
-│              │ (STT,TTS,VAD) │                                    │
-└──────────────┴───────────────┴────────────────────────────────────┘
+├────────────┬────────────┬──────────────┬──────────────────────────┬─┘
+│ LlamaCpp   │ Apple MLX  │  Sherpa /   │       QHexRT HNPU        │
+│ (LLM,VLM)  │ (LLM,VLM,  │   ONNX      │ (LLM,VLM,STT,TTS Android)│
+│            │ embed,STT, │(STT,TTS,VAD)│                          │
+│            │ TTS iOS)   │             │                          │
+└────────────┴────────────┴──────────────┴──────────────────────────┘
 ```
 
 ### 2.3 Binary Size
@@ -87,6 +91,7 @@ CocoaPods/SwiftPM on iOS and Gradle on Android.
 |---------|------|---------|----------|
 | `runanywhere` | ~5 MB | ~3 MB | Core SDK, registries, events, FFI bridge |
 | `runanywhere_llamacpp` | ~15–25 MB | ~10–15 MB | LLM + VLM (GGUF) |
+| `runanywhere_mlx` | varies with Swift MLX dependencies | n/a | Apple MLX LLM, VLM, embeddings, STT, TTS on physical iOS devices |
 | `runanywhere_onnx` | ~50–70 MB | ~40–60 MB | STT, TTS, VAD (Sherpa-ONNX + Piper) |
 | `runanywhere_qhexrt` | n/a | varies | Private QHexRT NPU package |
 
@@ -305,6 +310,7 @@ runtime + format compatibility on inference.
 | Module | Package | Capabilities | Priority |
 |--------|---------|--------------|----------|
 | `LlamaCpp` | `runanywhere_llamacpp` | LLM, VLM | 100 |
+| `MLX` | `runanywhere_mlx` | LLM, VLM, embeddings, STT, TTS on physical iOS devices | 110 |
 | `Onnx` | `runanywhere_onnx` | STT, TTS, VAD | 90 |
 | `QHexRT` | `runanywhere_qhexrt` | LLM, VLM, STT, TTS via QNN-context bundles | 150 (when registered) |
 | `RAGModule` | core extension | RAG pipelines | — |
@@ -342,7 +348,7 @@ scripts/build/build-core-android.sh       # Android .so → packages/*/android/s
 ### Melos Workflow
 
 ```bash
-melos bootstrap        # flutter pub get across the 4-package workspace
+melos bootstrap        # flutter pub get across the 5-package workspace
 melos run analyze      # flutter analyze --no-pub everywhere
 melos run format       # dart format
 melos run test         # flutter test
@@ -401,7 +407,7 @@ Direct FFI to C++ instead of MethodChannel:
 ### Thin Backend Wrappers
 
 Backend Flutter packages are thin Dart shims; all model loading + inference
-lives in the bundled C++ backend library.
+lives in the bundled native backend (C++ engines or the Swift MLX runtime).
 
 - **Advantages**: logic shared with the other SDKs; consistent behavior
   cross-platform.
@@ -416,6 +422,7 @@ lives in the bundled C++ backend library.
 |-----------|---------|
 | `runanywhere` (Dart) | 0.20.0 |
 | `runanywhere_llamacpp` | 0.20.0 |
+| `runanywhere_mlx` | 0.20.0 |
 | `runanywhere_onnx` | 0.20.0 |
 | `runanywhere_qhexrt` | 0.20.0 |
 | `RACommons` native | 0.1.6 |
@@ -435,6 +442,7 @@ lives in the bundled C++ backend library.
 |---------|-----------|--------|
 | `runanywhere` | `RACommons.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
+| `runanywhere_mlx` | `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, `RunAnywhereMLXMetal.xcframework` | `ios-arm64`, `ios-arm64-simulator` (simulator is package/link validation only) |
 | `runanywhere_onnx` | `RABackendONNX.xcframework`, `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_qhexrt` | — | none |
 

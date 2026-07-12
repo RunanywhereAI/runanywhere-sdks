@@ -11,6 +11,7 @@ DerivedData/
 # Default mode (testLocal = false): SDK downloads XCFrameworks from runanywhere-binaries releases
 # Local mode (testLocal = true): Place XCFrameworks in Binaries/ for local development/testing
 Binaries/*.xcframework/
+Binaries/RunAnywhereMLXRuntimeResources/
 XCFrameworks/
 
 # SPM build artifacts (recreated during swift build)

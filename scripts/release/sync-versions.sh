@@ -301,6 +301,7 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-react-native/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/package.json" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/mlx/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/qhexrt/package.json"; do
     bump_json_version "$pkg"
@@ -332,6 +333,7 @@ echo ">> Flutter SDK:"
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_version "$pkg"
@@ -341,6 +343,7 @@ done
 # dependency floor to match the bumped suite version.
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/pubspec.yaml"; do
     bump_pubspec_runanywhere_dep "$pkg"
@@ -349,8 +352,9 @@ done
 # Flutter public `RunAnywhere.version` surface — Dart constant consumed by
 # `RunAnywhere.version` getter and by the native init payload.
 
-# Flutter's nested iOS Swift manifests construct checksum-pinned release URLs
+# Flutter's SwiftPM-enabled iOS packages construct checksum-pinned release URLs
 # for clean pub.dev consumers, so their archive version must remain in lockstep.
+# MLX is CocoaPods-only and its version is updated with the podspecs below.
 for package_manifest in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift" \
@@ -400,6 +404,7 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_qhexrt/andr
 for podspec in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec"; do
     bump_line "$podspec" \
         "s\.version[[:space:]]*=[[:space:]]*'[^']+'" \
@@ -413,10 +418,12 @@ echo ""
 echo ">> Release-facing documentation:"
 for release_doc in \
     "${REPO_ROOT}/sdk/runanywhere-react-native/AGENTS.md" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/mlx/README.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/AGENTS.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/README.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/README.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/README.md" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/README.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/README.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/docs/ARCHITECTURE.md" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/docs/Documentation.md" \

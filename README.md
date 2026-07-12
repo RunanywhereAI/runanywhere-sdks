@@ -22,7 +22,7 @@
 
 <p align="center">
   <a href="https://github.com/RunanywhereAI/runanywhere-sdks/stargazers"><img src="https://img.shields.io/github/stars/RunanywhereAI/runanywhere-sdks?style=flat-square" alt="GitHub Stars" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" /></a>
   <a href="https://docs.runanywhere.ai"><img src="https://img.shields.io/badge/Docs-docs.runanywhere.ai-000000?style=flat-square" alt="Documentation" /></a>
   <a href="https://huggingface.co/runanywhere/models"><img src="https://img.shields.io/badge/Models-Hugging%20Face-FFD21E?style=flat-square" alt="Hugging Face Models" /></a>
   <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
@@ -437,4 +437,5 @@ open RunAnywhereAI.xcodeproj
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE) for details.
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).
+See [LICENSE](LICENSE) for details.

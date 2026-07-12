@@ -25,6 +25,7 @@
     "nitrogen",
     "nitro.json",
     "react-native.config.js",
+    "LICENSE",
     "*.podspec"
   ],
   "scripts": {
@@ -47,7 +48,17 @@
     "nitro",
     "expo"
   ],
-  "license": "MIT",
+  "homepage": "https://runanywhere.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-react-native/packages/llamacpp"
+  },
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "author": "RunAnywhere AI <team@runanywhere.ai> (https://runanywhere.ai)",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
     "@runanywhere/proto-ts": "workspace:*"

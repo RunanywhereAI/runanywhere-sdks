@@ -10,6 +10,9 @@
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
 #   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework       (skipped if RAC_BACKEND_SHERPA=OFF)
 #   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
+#   sdk/runanywhere-swift/Binaries/RunAnywhereMLXRuntime.xcframework  (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
+#   sdk/runanywhere-swift/Binaries/RunAnywhereMLXMetal.xcframework    (platform-selected Metal resource framework)
+#   sdk/runanywhere-swift/Binaries/RunAnywhereMLXRuntimeResources/   (Swift resource bundles/notices)
 #
 # Engine plugins under engines/{llamacpp,onnx} use SHARED_ONLY inside
 # rac_add_engine_plugin(...), so on iOS (RAC_STATIC_PLUGINS=ON) they still
@@ -48,6 +51,9 @@ RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"
+MLX_RUNTIME_SOURCE="${REPO_ROOT}/sdk/runanywhere-swift/Sources/MLXRuntimeDistribution"
+MLX_RUNTIME_BUILD_ROOT="${REPO_ROOT}/build/mlx-runtime-distribution"
+MLX_METAL_BUNDLE_ID="ai.runanywhere.mlx.metal"
 
 run() {
     # Thin wrapper that either prints the command (DRY_RUN=1) or executes it.
@@ -925,6 +931,455 @@ build_xcframework_from_paths_with_macos() {
     run normalize_xcframework_info_plist "${xcf}"
 }
 
+# The C++ RABackendMLX archive is only the callback/plugin shell. Flutter and
+# React Native CocoaPods consumers also need the canonical Swift MLXRuntime
+# implementation and its upstream MLX dependencies. Build that implementation
+# as a separate static framework while deliberately omitting RACommons and the
+# MLX shell from its archive: final app linking then resolves every rac_* symbol
+# against the same process-wide Commons registry used by the core package.
+validate_mlx_runtime_archive() {
+    local archive="$1"
+    local label="$2"
+    local metal_bundle="$3"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+    if [ ! -f "${archive}" ]; then
+        echo "error: ${label} MLX runtime archive not found: ${archive}" >&2
+        exit 1
+    fi
+
+    local defined_symbols undefined_symbols archive_members lifecycle_count
+    defined_symbols="$(nm -gU "${archive}" 2>/dev/null)"
+    undefined_symbols="$(nm -gu "${archive}" 2>/dev/null)"
+    archive_members="$(ar -t "${archive}")"
+    lifecycle_count="$(grep -Ec \
+        ' [TDS] _ra_mlx_(register_runtime|unregister_runtime|runtime_is_registered|runtime_is_available)$' \
+        <<< "${defined_symbols}" || true)"
+    if [ "${lifecycle_count}" -ne 4 ]; then
+        echo "error: ${label} MLX runtime must define exactly four lifecycle symbols; found ${lifecycle_count}" >&2
+        exit 1
+    fi
+
+    if grep -Eq ' [TDSB] _rac_' <<< "${defined_symbols}"; then
+        echo "error: ${label} MLX runtime embeds rac_* definitions and would create a second Commons registry" >&2
+        grep -E ' [TDSB] _rac_' <<< "${defined_symbols}" | head -20 >&2
+        exit 1
+    fi
+
+    local required_undefined=(_ra_mlx_metal_resource_anchor)
+    if [ "${label}" = "ios-device" ]; then
+        required_undefined+=(
+            _ra_mlx_set_clear_cancel_callback
+            _rac_backend_mlx_register
+            _rac_backend_mlx_unregister
+            _rac_error_message
+            _rac_mlx_set_callbacks
+        )
+    fi
+    local symbol
+    for symbol in "${required_undefined[@]}"; do
+        if ! grep -Fxq "${symbol}" <<< "${undefined_symbols}"; then
+            echo "error: ${label} MLX runtime must leave ${symbol} unresolved for its peer artifact" >&2
+            exit 1
+        fi
+    done
+
+    if [ "${label}" = "ios-simulator" ]; then
+        local forbidden_simulator_undefined=(
+            _ra_mlx_set_clear_cancel_callback
+            _rac_backend_mlx_register
+            _rac_mlx_set_callbacks
+        )
+        for symbol in "${forbidden_simulator_undefined[@]}"; do
+            if grep -Fxq "${symbol}" <<< "${undefined_symbols}"; then
+                echo "error: ${label} MLX runtime unexpectedly retains registration-path symbol ${symbol}" >&2
+                exit 1
+            fi
+        done
+    fi
+
+    if grep -Eq 'rac_mlx_engine|rac_backend_mlx_register|rac_static_register_mlx' \
+        <<< "${archive_members}"; then
+        echo "error: ${label} MLX runtime contains the separately-distributed C++ MLX shell" >&2
+        exit 1
+    fi
+
+    python3 - "${archive}" "${label}" "${metal_bundle}" <<'PY'
+from pathlib import Path
+import sys
+
+archive = Path(sys.argv[1])
+label = sys.argv[2]
+bundle_id = sys.argv[3].encode()
+payload = archive.read_bytes()
+
+if payload.count(bundle_id) != 1:
+    raise SystemExit(
+        f"error: {label} MLX runtime expected one {bundle_id.decode()!r} bundle lookup, "
+        f"found {payload.count(bundle_id)}"
+    )
+
+for marker in (
+    b"/Users/",
+    b"/home/",
+    b"/tmp/runanywhere-mlx-runtime-",
+    b"/var/folders/",
+    b"\\Users\\",
+):
+    if marker in payload:
+        raise SystemExit(
+            f"error: {label} MLX runtime contains host path marker {marker.decode(errors='replace')!r}"
+        )
+PY
+}
+
+sanitize_mlx_runtime_generated_paths() {
+    local archive="$1"
+    local scratch="$2"
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+
+    # SwiftPM-generated Bundle.module accessors embed their build fallback as
+    # a string literal, so compiler prefix maps cannot rewrite it. The release
+    # scratch root is intentionally fixed under /tmp; replace only that exact
+    # generated accessor prefix, never arbitrary `/tmp/` literals that an
+    # upstream dependency may legitimately use at runtime. `/src` and `/tmp`
+    # are equal length, so the archive layout remains intact. Runtime lookup
+    # uses Bundle.main and never depends on this build-machine fallback.
+    python3 - "${archive}" "${scratch}" <<'PY'
+from pathlib import Path
+import sys
+
+archive = Path(sys.argv[1])
+scratch = sys.argv[2]
+payload = archive.read_bytes()
+source = scratch.encode()
+if not source.startswith(b"/tmp/runanywhere-mlx-runtime-"):
+    raise SystemExit(f"error: unexpected MLX release scratch path: {scratch}")
+replacement = b"/src" + source[len(b"/tmp"):]
+if len(source) != len(replacement):
+    raise SystemExit("error: sanitized MLX scratch prefix must preserve byte length")
+count = payload.count(source)
+if count == 0:
+    raise SystemExit(f"error: expected generated SwiftPM scratch paths in {archive}: {scratch}")
+archive.write_bytes(payload.replace(source, replacement))
+PY
+}
+
+validate_mlx_runtime_payload_host_paths() {
+    local payload="$1"
+    local label="$2"
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+
+    python3 - "${payload}" "${label}" <<'PY'
+from pathlib import Path
+import sys
+
+payload = Path(sys.argv[1])
+label = sys.argv[2]
+data = payload.read_bytes()
+for marker in (b"/Users/", b"/home/", b"/var/folders/", b"\\Users\\"):
+    if marker in data:
+        raise SystemExit(
+            f"error: {label} contains host path marker {marker.decode(errors='replace')!r}"
+        )
+PY
+}
+
+build_mlx_runtime_swift_slice() {
+    local label="$1"
+    local triple="$2"
+    local sdk_name="$3"
+    local metal_bundle="$4"
+    local scratch="$5"
+    local built_archive="$6"
+    local staged_archive="$7"
+    local sdk_path
+    sdk_path="$(xcrun --sdk "${sdk_name}" --show-sdk-path)"
+
+    local canonical_build_root="/runanywhere/build/mlx-runtime"
+    local canonical_source_root="/runanywhere/source"
+    local prefix_flags=(
+        -Xswiftc -debug-prefix-map -Xswiftc "${scratch}=${canonical_build_root}"
+        -Xswiftc -file-prefix-map -Xswiftc "${scratch}=${canonical_build_root}"
+        -Xswiftc -debug-prefix-map -Xswiftc "${REPO_ROOT}=${canonical_source_root}"
+        -Xswiftc -file-prefix-map -Xswiftc "${REPO_ROOT}=${canonical_source_root}"
+        -Xcc "-ffile-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcc "-fdebug-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcc "-fmacro-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcc "-ffile-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcc "-fdebug-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcc "-fmacro-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcxx "-ffile-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcxx "-fdebug-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcxx "-fmacro-prefix-map=${scratch}=${canonical_build_root}"
+        -Xcxx "-ffile-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcxx "-fdebug-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcxx "-fmacro-prefix-map=${REPO_ROOT}=${canonical_source_root}"
+        -Xcxx -USWIFTPM_BUNDLE
+        -Xcxx "-DSWIFTPM_BUNDLE=\"${metal_bundle}\""
+    )
+
+    echo "▶ Build ${label} canonical Swift MLX runtime"
+    run rm -rf "${scratch}"
+    run env \
+        RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK=1 \
+        RUNANYWHERE_USE_LOCAL_NATIVES=1 \
+        swift build \
+        --package-path "${REPO_ROOT}" \
+        --configuration release \
+        --product RunAnywhereMLXRuntime \
+        --triple "${triple}" \
+        --sdk "${sdk_path}" \
+        --scratch-path "${scratch}" \
+        "${prefix_flags[@]}"
+
+    run mkdir -p "$(dirname "${staged_archive}")"
+    run cp "${built_archive}" "${staged_archive}"
+    run /usr/bin/strip -S "${staged_archive}"
+    sanitize_mlx_runtime_generated_paths "${staged_archive}" "${scratch}"
+    validate_mlx_runtime_archive "${staged_archive}" "${label}" "${metal_bundle}"
+}
+
+assemble_mlx_runtime_framework() {
+    local archive="$1"
+    local plist="$2"
+    local framework="$3"
+
+    run rm -rf "${framework}"
+    run mkdir -p "${framework}/Headers" "${framework}/Modules"
+    run cp "${archive}" "${framework}/RunAnywhereMLXRuntime"
+    run cp "${MLX_RUNTIME_SOURCE}/include/RunAnywhereMLXRuntime.h" "${framework}/Headers/"
+    run cp "${MLX_RUNTIME_SOURCE}/include/module.modulemap" "${framework}/Modules/"
+    run cp "${plist}" "${framework}/Info.plist"
+}
+
+build_mlx_metal_framework() {
+    local label="$1"
+    local triple="$2"
+    local sdk_name="$3"
+    local metallib="$4"
+    local plist="$5"
+    local framework="$6"
+    local sdk_path
+    sdk_path="$(xcrun --sdk "${sdk_name}" --show-sdk-path)"
+
+    run rm -rf "${framework}"
+    run mkdir -p "${framework}/Headers" "${framework}/Modules"
+    run xcrun --sdk "${sdk_name}" clang \
+        -target "${triple}" \
+        -isysroot "${sdk_path}" \
+        -fobjc-arc \
+        -fapplication-extension \
+        -dynamiclib \
+        -framework Foundation \
+        -install_name @rpath/RunAnywhereMLXMetal.framework/RunAnywhereMLXMetal \
+        -compatibility_version 1.0 \
+        -current_version 1.0 \
+        "${MLX_RUNTIME_SOURCE}/RunAnywhereMLXMetal.m" \
+        -I "${MLX_RUNTIME_SOURCE}/Metal/include" \
+        -o "${framework}/RunAnywhereMLXMetal"
+    run /usr/bin/strip -S "${framework}/RunAnywhereMLXMetal"
+    run cp "${MLX_RUNTIME_SOURCE}/Metal/include/RunAnywhereMLXMetal.h" "${framework}/Headers/"
+    run cp "${MLX_RUNTIME_SOURCE}/Metal/include/module.modulemap" \
+        "${framework}/Modules/module.modulemap"
+    run cp "${metallib}" "${framework}/default.metallib"
+    run cp "${plist}" "${framework}/Info.plist"
+
+    if [ "${DRY_RUN}" != "1" ]; then
+        local metal_symbols metal_load_commands
+        metal_symbols="$(nm -gU "${framework}/RunAnywhereMLXMetal" 2>/dev/null)"
+        metal_load_commands="$(otool -l "${framework}/RunAnywhereMLXMetal")"
+        validate_mlx_runtime_payload_host_paths \
+            "${framework}/RunAnywhereMLXMetal" "${label} MLX Metal binary"
+        validate_mlx_runtime_payload_host_paths \
+            "${framework}/default.metallib" "${label} MLX Metal library"
+        if [ "$(grep -Ec ' [TDS] _ra_mlx_metal_resource_anchor$' \
+            <<< "${metal_symbols}" || true)" -ne 1 ]; then
+            echo "error: ${label} MLX Metal framework must export exactly one resource anchor" >&2
+            exit 1
+        fi
+        if grep -Eq ' [TDSB] _(rac_|ra_mlx_(register|unregister|runtime))' \
+            <<< "${metal_symbols}"; then
+            echo "error: ${label} MLX Metal framework contains runtime or Commons symbols" >&2
+            exit 1
+        fi
+        if ! grep -Fq 'cmd LC_UUID' <<< "${metal_load_commands}"; then
+            echo "error: ${label} MLX Metal framework is missing the LC_UUID required by Xcode embedding" >&2
+            exit 1
+        fi
+    fi
+}
+
+stage_mlx_runtime_notices() {
+    local checkout_root="$1"
+    local notices_dir="$2"
+
+    run rm -rf "${notices_dir}"
+    run mkdir -p "${notices_dir}"
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+
+    # SwiftPM resolves the complete manifest graph even when this packaging
+    # lane builds one product. Preserve every checkout's top-level license or
+    # notice so aggregate-link attribution cannot silently drift when an
+    # upstream product adds a transitive dependency.
+    local package_dir package_name notice source_name
+    for package_dir in "${checkout_root}"/*; do
+        [ -d "${package_dir}" ] || continue
+        package_name="$(basename "${package_dir}")"
+        for notice in "${package_dir}"/LICENSE* "${package_dir}"/NOTICE*; do
+            [ -f "${notice}" ] || continue
+            source_name="$(basename "${notice}")"
+            cp "${notice}" "${notices_dir}/${package_name}-${source_name}"
+        done
+    done
+    if [ -z "$(find "${notices_dir}" -type f -print -quit)" ]; then
+        echo "error: no MLX runtime third-party notices were staged" >&2
+        exit 1
+    fi
+}
+
+build_mlx_runtime_xcframework() {
+    local device_scratch="/tmp/runanywhere-mlx-runtime-device"
+    local simulator_scratch="/tmp/runanywhere-mlx-runtime-simulator"
+    local device_build_dir="${device_scratch}/arm64-apple-ios/release"
+    local simulator_build_dir="${simulator_scratch}/arm64-apple-ios-simulator/release"
+    local staging="${MLX_RUNTIME_BUILD_ROOT}/staging"
+    local device_archive="${staging}/device/libRunAnywhereMLXRuntime.a"
+    local simulator_archive="${staging}/simulator/libRunAnywhereMLXRuntime.a"
+    local device_metal_derived="${MLX_RUNTIME_BUILD_ROOT}/metal-device"
+    local simulator_metal_derived="${MLX_RUNTIME_BUILD_ROOT}/metal-simulator"
+    local mlx_project="${device_scratch}/checkouts/mlx-swift/xcode/MLX.xcodeproj"
+    local device_metallib="${device_metal_derived}/Build/Products/Release-iphoneos/Cmlx.framework/default.metallib"
+    local simulator_metallib="${simulator_metal_derived}/Build/Products/Release-iphonesimulator/Cmlx.framework/default.metallib"
+    local device_framework="${staging}/device/RunAnywhereMLXRuntime.framework"
+    local simulator_framework="${staging}/simulator/RunAnywhereMLXRuntime.framework"
+    local device_metal_framework="${staging}/metal-device/RunAnywhereMLXMetal.framework"
+    local simulator_metal_framework="${staging}/metal-simulator/RunAnywhereMLXMetal.framework"
+    local resources="${DEST}/RunAnywhereMLXRuntimeResources"
+    local output="${DEST}/RunAnywhereMLXRuntime.xcframework"
+    local metal_output="${DEST}/RunAnywhereMLXMetal.xcframework"
+
+    run rm -rf "${MLX_RUNTIME_BUILD_ROOT}"
+    build_mlx_runtime_swift_slice \
+        ios-device arm64-apple-ios17.5 iphoneos \
+        "${MLX_METAL_BUNDLE_ID}" \
+        "${device_scratch}" \
+        "${device_build_dir}/libRunAnywhereMLXRuntime.a" \
+        "${device_archive}"
+    build_mlx_runtime_swift_slice \
+        ios-simulator arm64-apple-ios17.5-simulator iphonesimulator \
+        "${MLX_METAL_BUNDLE_ID}" \
+        "${simulator_scratch}" \
+        "${simulator_build_dir}/libRunAnywhereMLXRuntime.a" \
+        "${simulator_archive}"
+
+    echo "▶ Build MLX device and simulator Metal libraries"
+    run xcodebuild -quiet \
+        -project "${mlx_project}" \
+        -scheme Cmlx \
+        -configuration Release \
+        -destination generic/platform=iOS \
+        -derivedDataPath "${device_metal_derived}" \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+        SKIP_INSTALL=NO \
+        CODE_SIGNING_ALLOWED=NO \
+        build
+    run xcodebuild -quiet \
+        -project "${mlx_project}" \
+        -scheme Cmlx \
+        -configuration Release \
+        -sdk iphonesimulator \
+        -derivedDataPath "${simulator_metal_derived}" \
+        SUPPORTED_PLATFORMS=iphonesimulator \
+        ARCHS=arm64 \
+        ONLY_ACTIVE_ARCH=YES \
+        BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+        SKIP_INSTALL=NO \
+        CODE_SIGNING_ALLOWED=NO \
+        build
+
+    if [ "${DRY_RUN}" != "1" ]; then
+        xcrun metallib --app-store-validate "${device_metallib}"
+        xcrun metallib --app-store-validate "${simulator_metallib}"
+    fi
+
+    assemble_mlx_runtime_framework \
+        "${device_archive}" \
+        "${MLX_RUNTIME_SOURCE}/Resources/DeviceInfo.plist" \
+        "${device_framework}"
+    assemble_mlx_runtime_framework \
+        "${simulator_archive}" \
+        "${MLX_RUNTIME_SOURCE}/Resources/SimulatorInfo.plist" \
+        "${simulator_framework}"
+
+    echo "▶ Create-xcframework → ${output}"
+    run rm -rf "${output}"
+    run xcodebuild -create-xcframework \
+        -framework "${device_framework}" \
+        -framework "${simulator_framework}" \
+        -output "${output}"
+    run normalize_xcframework_info_plist "${output}"
+
+    # Static framework wrappers are not embedded in applications, so their
+    # resources would be dropped. Put the platform-specific metallib in a tiny
+    # dynamic XCFramework. Xcode selects and embeds exactly one device or
+    # simulator slice; Cmlx finds it by CFBundleIdentifier in allFrameworks.
+    # The static runtime has a strong undefined reference to its C anchor, so
+    # dead-strip cannot discard the resource framework. Swift-generated
+    # Bundle.module accessors in swift-crypto and swift-transformers still
+    # require their platform-neutral bundles at the application resource root.
+    run rm -rf "${resources}"
+    run mkdir -p "${resources}"
+    run rm -rf "${metal_output}"
+    build_mlx_metal_framework \
+        ios-device \
+        arm64-apple-ios17.5 \
+        iphoneos \
+        "${device_metallib}" \
+        "${MLX_RUNTIME_SOURCE}/Resources/DeviceMetalInfo.plist" \
+        "${device_metal_framework}"
+    build_mlx_metal_framework \
+        ios-simulator \
+        arm64-apple-ios17.5-simulator \
+        iphonesimulator \
+        "${simulator_metallib}" \
+        "${MLX_RUNTIME_SOURCE}/Resources/SimulatorMetalInfo.plist" \
+        "${simulator_metal_framework}"
+    run xcodebuild -create-xcframework \
+        -framework "${device_metal_framework}" \
+        -framework "${simulator_metal_framework}" \
+        -output "${metal_output}"
+    run normalize_xcframework_info_plist "${metal_output}"
+    run cp -R "${device_build_dir}/swift-crypto_Crypto.bundle" "${resources}/"
+    run cp -R "${device_build_dir}/swift-transformers_Hub.bundle" "${resources}/"
+    stage_mlx_runtime_notices \
+        "${device_scratch}/checkouts" \
+        "${resources}/ThirdPartyNotices"
+
+    if [ "${DRY_RUN}" != "1" ]; then
+        for identifier in ios-arm64 ios-arm64-simulator; do
+            local framework="${output}/${identifier}/RunAnywhereMLXRuntime.framework"
+            plutil -lint "${framework}/Info.plist" >/dev/null
+        done
+        for identifier in ios-arm64 ios-arm64-simulator; do
+            local metal_framework="${metal_output}/${identifier}/RunAnywhereMLXMetal.framework"
+            [ -f "${metal_framework}/default.metallib" ] || {
+                echo "error: MLX Metal ${identifier} is missing default.metallib" >&2
+                exit 1
+            }
+            plutil -lint "${metal_framework}/Info.plist" >/dev/null
+        done
+    fi
+}
+
 COMMONS_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_commons.a"
 COMMONS_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_commons.a"
 COMMONS_MAC_LIB="${STAGING_DIR}/Release-macos/librac_commons.a"
@@ -1035,8 +1490,14 @@ if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     sanitize_and_validate_archive_host_paths "${MLX_SIM_LIB}" "ios-simulator RABackendMLX"
     sanitize_and_validate_archive_host_paths "${MLX_MAC_LIB}" "macos RABackendMLX"
     build_xcframework_from_paths_with_macos "${MLX_DEV_LIB}" "${MLX_SIM_LIB}" "${MLX_MAC_LIB}" "RABackendMLX.xcframework"
+    build_mlx_runtime_xcframework
 else
-    echo "▶ Skipping RABackendMLX.xcframework (RAC_BACKEND_MLX=OFF)"
+    run rm -rf \
+        "${DEST}/RABackendMLX.xcframework" \
+        "${DEST}/RunAnywhereMLXRuntime.xcframework" \
+        "${DEST}/RunAnywhereMLXMetal.xcframework" \
+        "${DEST}/RunAnywhereMLXRuntimeResources"
+    echo "▶ Skipping RABackendMLX and RunAnywhereMLXRuntime XCFrameworks (RAC_BACKEND_MLX=OFF)"
 fi
 
 sync_react_native_frameworks() {
@@ -1075,17 +1536,50 @@ sync_react_native_frameworks() {
         run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendSherpa.xcframework"
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${rn_root}/onnx/ios/Binaries/"
     fi
+
+    local rn_mlx="${rn_root}/mlx/ios"
+    run rm -rf \
+        "${rn_mlx}/Binaries/RABackendMLX.xcframework" \
+        "${rn_mlx}/Binaries/RunAnywhereMLXRuntime.xcframework" \
+        "${rn_mlx}/Binaries/RunAnywhereMLXMetal.xcframework" \
+        "${rn_mlx}/Resources/RunAnywhereMLXMetalDevice.bundle" \
+        "${rn_mlx}/Resources/RunAnywhereMLXMetalSimulator.bundle" \
+        "${rn_mlx}/Resources/swift-crypto_Crypto.bundle" \
+        "${rn_mlx}/Resources/swift-transformers_Hub.bundle" \
+        "${rn_mlx}/ThirdPartyNotices" \
+        "${rn_mlx}/Frameworks"
+
+    if [ "${RAC_BACKEND_MLX}" = "ON" ] \
+        && [ -d "${DEST}/RABackendMLX.xcframework" ] \
+        && [ -d "${DEST}/RunAnywhereMLXRuntime.xcframework" ] \
+        && [ -d "${DEST}/RunAnywhereMLXMetal.xcframework" ]; then
+        run mkdir -p "${rn_mlx}/Binaries" "${rn_mlx}/Resources"
+        run cp -R "${DEST}/RABackendMLX.xcframework" "${rn_mlx}/Binaries/"
+        run cp -R "${DEST}/RunAnywhereMLXRuntime.xcframework" "${rn_mlx}/Binaries/"
+        run cp -R "${DEST}/RunAnywhereMLXMetal.xcframework" "${rn_mlx}/Binaries/"
+        run cp -R \
+            "${DEST}/RunAnywhereMLXRuntimeResources/swift-crypto_Crypto.bundle" \
+            "${DEST}/RunAnywhereMLXRuntimeResources/swift-transformers_Hub.bundle" \
+            "${rn_mlx}/Resources/"
+        run cp -R \
+            "${DEST}/RunAnywhereMLXRuntimeResources/ThirdPartyNotices" \
+            "${rn_mlx}/ThirdPartyNotices"
+    fi
 }
 
-# Copy locally built xcframeworks next to each Flutter plugin's CocoaPods and
-# SwiftPM sources so both package managers resolve the same canonical binary.
-# Remove the superseded ios/Frameworks copies; current podspecs and Package.swift
-# manifests intentionally reference ios/<package>/Frameworks only.
+# Copy locally built XCFrameworks into each Flutter plugin's package-owned
+# native directory. Core/LlamaCPP/ONNX support CocoaPods and SwiftPM; MLX is
+# CocoaPods-only so its Hub/Crypto bundles land at the application root.
+# Remove the superseded ios/Frameworks copies; active package contracts
+# reference ios/<package>/Frameworks only.
 #
 # Plugin → xcframework mapping:
 #   runanywhere             ← RACommons.xcframework
 #   runanywhere_llamacpp    ← RABackendLLAMACPP.xcframework
 #   runanywhere_onnx        ← RABackendONNX.xcframework
+#   runanywhere_mlx         ← RABackendMLX.xcframework +
+#                              RunAnywhereMLXRuntime.xcframework +
+#                              RunAnywhereMLXMetal.xcframework
 sync_flutter_frameworks() {
     local flutter_root="${REPO_ROOT}/sdk/runanywhere-flutter/packages"
     if [ ! -d "${flutter_root}" ]; then
@@ -1097,15 +1591,26 @@ sync_flutter_frameworks() {
     local flutter_core="${flutter_root}/runanywhere/ios/runanywhere/Frameworks"
     local flutter_llama="${flutter_root}/runanywhere_llamacpp/ios/runanywhere_llamacpp/Frameworks"
     local flutter_onnx="${flutter_root}/runanywhere_onnx/ios/runanywhere_onnx/Frameworks"
+    local flutter_mlx_root="${flutter_root}/runanywhere_mlx/ios/runanywhere_mlx"
+    local flutter_mlx="${flutter_mlx_root}/Frameworks"
+    local flutter_mlx_resources="${flutter_mlx_root}/Resources"
 
     run rm -rf \
         "${flutter_root}/runanywhere/ios/Frameworks/RACommons.xcframework" \
         "${flutter_root}/runanywhere_llamacpp/ios/Frameworks/RABackendLLAMACPP.xcframework" \
         "${flutter_root}/runanywhere_onnx/ios/Frameworks/RABackendONNX.xcframework" \
         "${flutter_root}/runanywhere_onnx/ios/Frameworks/RABackendSherpa.xcframework" \
-        "${flutter_root}/runanywhere_onnx/ios/Frameworks/onnxruntime.xcframework"
+        "${flutter_root}/runanywhere_onnx/ios/Frameworks/onnxruntime.xcframework" \
+        "${flutter_root}/runanywhere_mlx/ios/Frameworks/RABackendMLX.xcframework" \
+        "${flutter_root}/runanywhere_mlx/ios/Frameworks/RunAnywhereMLXRuntime.xcframework" \
+        "${flutter_root}/runanywhere_mlx/ios/Frameworks/RunAnywhereMLXMetal.xcframework"
 
-    run mkdir -p "${flutter_core}" "${flutter_llama}" "${flutter_onnx}"
+    run mkdir -p \
+        "${flutter_core}" \
+        "${flutter_llama}" \
+        "${flutter_onnx}" \
+        "${flutter_mlx}" \
+        "${flutter_mlx_resources}"
 
     if [ -d "${DEST}/RACommons.xcframework" ]; then
         run rm -rf "${flutter_core}/RACommons.xcframework"
@@ -1131,6 +1636,32 @@ sync_flutter_frameworks() {
     if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then
         run rm -rf "${flutter_onnx}/RABackendSherpa.xcframework"
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
+    fi
+
+    run rm -rf \
+        "${flutter_mlx}/RABackendMLX.xcframework" \
+        "${flutter_mlx}/RunAnywhereMLXRuntime.xcframework" \
+        "${flutter_mlx}/RunAnywhereMLXMetal.xcframework" \
+        "${flutter_mlx_resources}/RunAnywhereMLXMetalDevice.bundle" \
+        "${flutter_mlx_resources}/RunAnywhereMLXMetalSimulator.bundle" \
+        "${flutter_mlx_resources}/swift-crypto_Crypto.bundle" \
+        "${flutter_mlx_resources}/swift-transformers_Hub.bundle" \
+        "${flutter_mlx_root}/ThirdPartyNotices"
+
+    if [ "${RAC_BACKEND_MLX}" = "ON" ] \
+        && [ -d "${DEST}/RABackendMLX.xcframework" ] \
+        && [ -d "${DEST}/RunAnywhereMLXRuntime.xcframework" ] \
+        && [ -d "${DEST}/RunAnywhereMLXMetal.xcframework" ]; then
+        run cp -R "${DEST}/RABackendMLX.xcframework" "${flutter_mlx}/"
+        run cp -R "${DEST}/RunAnywhereMLXRuntime.xcframework" "${flutter_mlx}/"
+        run cp -R "${DEST}/RunAnywhereMLXMetal.xcframework" "${flutter_mlx}/"
+        run cp -R \
+            "${DEST}/RunAnywhereMLXRuntimeResources/swift-crypto_Crypto.bundle" \
+            "${DEST}/RunAnywhereMLXRuntimeResources/swift-transformers_Hub.bundle" \
+            "${flutter_mlx_resources}/"
+        run cp -R \
+            "${DEST}/RunAnywhereMLXRuntimeResources/ThirdPartyNotices" \
+            "${flutter_mlx_root}/ThirdPartyNotices"
     fi
 }
 

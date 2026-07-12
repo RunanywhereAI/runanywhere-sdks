@@ -31,10 +31,12 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # Static linkage is required so every symbol from RACommons /
-  # RABackendLLAMACPP / RABackendONNX xcframeworks lands in the final
-  # Flutter app binary. The xcframeworks ship as `.a` static libraries, and
-  # Dart FFI resolves symbols via DynamicLibrary.executable() at runtime.
+  # CocoaPods links the RACommons and backend archives into the app so their
+  # exported C ABI remains available to Dart FFI. MLX also vendors the tiny
+  # dynamic RunAnywhereMLXMetal framework so Xcode embeds the active platform
+  # slice and its default.metallib; it is intentionally not a static archive.
+  # The iOS loader resolves through DynamicLibrary.process() first and falls
+  # back to DynamicLibrary.executable() for layouts that use the main binary.
   use_frameworks! :linkage => :static
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -84,10 +86,10 @@ post_install do |installer|
     project.save
   end
 
-  # NOTE: We rely on -all_load (set in runanywhere.podspec) to include all symbols
-  # from static frameworks. The symbols will be in the binary (visible via nm)
-  # but marked as local (lowercase 't'). Flutter's DynamicLibrary.executable()
-  # can still find these symbols because it operates at a lower level than dlsym.
+  # NOTE: runanywhere.podspec retains and exports the static C ABI archives.
+  # Backend-specific podspecs may use narrower symbol roots; MLX retains only
+  # `_ra_mlx_runtime_is_available`. DynamicLibrary.process() can resolve the
+  # exported symbols from every loaded image, with executable() as fallback.
   #
   # DO NOT use -exported_symbols_list here as it breaks Flutter's debug mode
   # by hiding the debug dylib entry point.

@@ -18,6 +18,10 @@ dependencies:
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
 
+  # RunAnywhere SDK - Apple MLX Backend (iOS only)
+  runanywhere_mlx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
+
   # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
@@ -71,6 +75,8 @@ dev_dependencies:
 dependency_overrides:
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  runanywhere_mlx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_mlx
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   runanywhere_qhexrt:

@@ -54,20 +54,44 @@ if [ ! -d "${SRC_DIR}" ]; then
     exit 1
 fi
 
-shopt -s nullglob
-xcframeworks=("${SRC_DIR}"/*.xcframework)
-if [ "${#xcframeworks[@]}" -eq 0 ]; then
-    echo "error: no .xcframework bundles produced under ${SRC_DIR}" >&2
-    exit 1
-fi
+# Keep the public release surface explicit. Globbing this directory could
+# accidentally publish a stale or private XCFramework left by a local build.
+xcframework_names=(
+    RACommons
+    RABackendLLAMACPP
+    RABackendONNX
+    RABackendSherpa
+    RABackendMLX
+    RunAnywhereMLXRuntime
+    RunAnywhereMLXMetal
+)
 
-for fw in "${xcframeworks[@]}"; do
-    fw_name="$(basename "${fw}")"
+for framework_name in "${xcframework_names[@]}"; do
+    fw_name="${framework_name}.xcframework"
+    fw="${SRC_DIR}/${fw_name}"
+    if [ ! -d "${fw}" ]; then
+        echo "error: required public XCFramework not found: ${fw}" >&2
+        exit 1
+    fi
     zip_path="${DEST_DIR}/${fw_name%.xcframework}-ios-v${VERSION}.zip"
     echo "▶ Packaging ${fw_name} → ${zip_path}"
     "${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-xcframework-zip.sh" \
         "${fw}" "${zip_path}"
 done
+
+# Hub/Crypto Bundle.module payloads and attribution notices are not a SwiftPM
+# binary target. Keep them in their own archive so each binary-target ZIP
+# contains exactly one XCFramework and passes SwiftPM artifact validation.
+mlx_resources="${SRC_DIR}/RunAnywhereMLXRuntimeResources"
+if [ ! -d "${mlx_resources}" ]; then
+    echo "error: MLX runtime resource payload not found: ${mlx_resources}" >&2
+    exit 1
+fi
+mlx_resources_zip="${DEST_DIR}/RunAnywhereMLXResources-ios-v${VERSION}.zip"
+echo "▶ Packaging MLX resources → ${mlx_resources_zip}"
+"${REPO_ROOT}/sdk/runanywhere-swift/scripts/create-reproducible-directory-zip.sh" \
+    "${mlx_resources}" "${mlx_resources_zip}"
 (cd "${DEST_DIR}" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done)
 
-echo "✓ build-ios.sh complete; staged ${#xcframeworks[@]} versioned archive(s) under ${DEST_DIR}"
+archive_count=$((${#xcframework_names[@]} + 1))
+echo "✓ build-ios.sh complete; staged ${archive_count} versioned archive(s) under ${DEST_DIR}"

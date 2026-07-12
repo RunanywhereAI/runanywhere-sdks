@@ -17,6 +17,11 @@ packages/*/ios/Frameworks/*.xcframework.zip
 # published packages use the pinned remote-download/checksum contract.
 packages/*/ios/*/Frameworks/
 
+# MLX resource bundles/notices are generated from the checksum-pinned CocoaPods
+# payload. The package-specific .pubignore also keeps them out of pub.dev.
+packages/runanywhere_mlx/ios/runanywhere_mlx/Resources/
+packages/runanywhere_mlx/ios/runanywhere_mlx/ThirdPartyNotices/
+
 # =============================================================================
 # Native Binaries - Android JNI Libraries
 # Downloaded from GitHub releases or copied from runanywhere-commons builds

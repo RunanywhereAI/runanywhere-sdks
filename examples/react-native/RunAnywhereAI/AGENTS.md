@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-React Native 0.85.3 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/onnx`, `@runanywhere/qhexrt`, `@runanywhere/proto-ts`).
+React Native 0.85.3 demo app showcasing the RunAnywhere on-device AI SDK. Demonstrates 8 AI capabilities (LLM chat, STT, TTS, voice assistant, RAG, VLM camera vision, YAML pipeline solutions, settings/model management) across a tab-based UI. Lives inside a Yarn workspace monorepo — consumes local workspace packages (`@runanywhere/core`, `@runanywhere/llamacpp`, `@runanywhere/mlx`, `@runanywhere/onnx`, `@runanywhere/qhexrt`, `@runanywhere/proto-ts`).
 
 ## Common Commands
 
@@ -54,6 +54,7 @@ yarn clean
 UI Screens (this app)
   └─> @runanywhere/core        (TypeScript API + NitroModules C++ bridge)
       ├─> @runanywhere/llamacpp (llama.cpp LLM/VLM backend)
+      ├─> @runanywhere/mlx      (Apple MLX LLM/VLM/speech/embedding backend)
       ├─> @runanywhere/onnx     (ONNX Runtime: STT/TTS/embeddings via Sherpa)
       └─> @runanywhere/qhexrt   (Qualcomm Hexagon NPU, Android-only)
           └─> runanywhere-commons (C++ core, delivered as xcframeworks + .so libs)
@@ -85,10 +86,13 @@ Three-state machine: `loading → ready | error`.
 
 1. Reads optional build-time configuration from the gitignored `.env`; Settings
    can apply an API key for the current process without persisting it
-2. `RunAnywhere.initialize()` with validated HTTPS configuration, or development
+2. `registerBackends()` — registers LlamaCPP, physical-device-only MLX, QHexRT,
+   and ONNX; MLX reports unavailable in the iOS Simulator
+3. `RunAnywhere.initialize()` with validated HTTPS configuration, or development
    mode when no usable configuration exists
-3. `registerModulesAndModels()` — registers backends (LlamaCPP, QHexRT, ONNX) and all model URLs
-4. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
+4. `registerAll(backendState)` — seeds only the successfully registered
+   backends' model catalogs
+5. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
 
 Backend registration uses dynamic `require()` with try/catch — `LlamaCPP` and `QHexRT` are optional.
 

@@ -28,7 +28,7 @@ infrastructure (RACommons) for speech-to-text (STT), text-to-speech (TTS),
 language models (LLM), voice activity detection (VAD), embeddings, and RAG.
                        DESC
   s.homepage         = 'https://runanywhere.ai'
-  s.license          = { :type => 'MIT' }
+  s.license          = { :type => 'RunAnywhere License', :file => '../LICENSE' }
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 

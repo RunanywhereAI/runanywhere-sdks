@@ -19,8 +19,15 @@ enum ModelCatalogBootstrap {
         subsystem: "com.runanywhere.RunAnywhereAI",
         category: "ModelCatalogBootstrap"
     )
+    @TaskLocal private static var mlxCatalogEnabled = false
 
-    static func registerAll() async {
+    static func registerAll(mlxRegistered: Bool) async {
+        await $mlxCatalogEnabled.withValue(mlxRegistered) {
+            await registerCatalog()
+        }
+    }
+
+    private static func registerCatalog() async {
         logger.info("Registering modules with their models...")
 
         #if canImport(LlamaCPPRuntime)
@@ -218,7 +225,11 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
-        logger.info("MLX models registered")
+        if mlxCatalogEnabled {
+            logger.info("MLX models registered")
+        } else {
+            logger.info("Skipping MLX models because this target cannot execute the runtime")
+        }
 
         #if canImport(LlamaCPPRuntime)
         // --- VLM models (multi-modal, multi-file) -----------------------------
@@ -773,6 +784,7 @@ enum ModelCatalogBootstrap {
         supportsThinking: Bool = false,
         supportsLora: Bool = false
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
             _ = try await RunAnywhere.registerModel(
                 id: id,
@@ -799,6 +811,7 @@ enum ModelCatalogBootstrap {
         structure: ArchiveStructure,
         memoryRequirement: Int64
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
             _ = try await RunAnywhere.registerModel(
                 archive: url,
@@ -841,6 +854,7 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory,
         memoryRequirement: Int64
     ) async {
+        guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
             guard let fileURL = URL(string: file.url) else { return nil }
             var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: file.isRequired)

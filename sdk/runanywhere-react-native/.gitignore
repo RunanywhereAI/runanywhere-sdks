@@ -14,6 +14,11 @@ ios/build/
 **/ios/xcframeworks/
 *.xcframework.zip
 
+# MLX release staging. npm's explicit package `files` list still includes
+# these generated resources in the packed artifact after validation.
+packages/mlx/ios/Resources/
+packages/mlx/ios/ThirdPartyNotices/
+
 # NOTE: iOS xcframeworks are now bundled in npm package - DO NOT gitignore them
 # The following are bundled for npm publish:
 # - packages/core/ios/Frameworks/RACommons.xcframework

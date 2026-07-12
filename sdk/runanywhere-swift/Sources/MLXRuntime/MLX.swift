@@ -21,6 +21,15 @@ import MLXAudioSTT
 import MLXAudioTTS
 #endif
 
+#if RUNANYWHERE_MLX_DISTRIBUTION
+// The CocoaPods distribution uses a tiny dynamic XCFramework to carry the
+// platform-selected Metal library. This strong reference makes the final app
+// retain that framework; normal SwiftPM builds use mlx-swift's own resource
+// bundle and never compile this packaging-only declaration.
+@_silgen_name("ra_mlx_metal_resource_anchor")
+private func raMLXMetalResourceAnchor() -> Int32
+#endif
+
 private struct MLXRuntimeLog {
     private let category: String
 
@@ -65,6 +74,18 @@ public enum MLX {
     @MainActor
     @discardableResult
     public static func register(priority _: Int = 100) -> Bool {
+        #if RUNANYWHERE_MLX_DISTRIBUTION
+        guard raMLXMetalResourceAnchor() != 0 else {
+            logger.error("MLX Metal runtime resource is unavailable")
+            return false
+        }
+        #endif
+
+        #if targetEnvironment(simulator)
+        logger.warning("MLX runtime is unavailable in the iOS simulator")
+        return false
+        #else
+
         guard !isRegistered else {
             logger.debug("MLX already registered, returning")
             return true
@@ -116,6 +137,7 @@ public enum MLX {
         isRegistered = true
         logger.info("MLX backend registered successfully")
         return true
+        #endif
     }
 
     @MainActor
@@ -173,7 +195,18 @@ public func raMLXRuntimeIsRegistered() -> Int32 {
 
 @_cdecl("ra_mlx_runtime_is_available")
 public func raMLXRuntimeIsAvailable() -> Int32 {
-    1
+    #if targetEnvironment(simulator)
+    #if RUNANYWHERE_MLX_DISTRIBUTION
+    _ = raMLXMetalResourceAnchor()
+    #endif
+    return 0
+    #else
+    #if RUNANYWHERE_MLX_DISTRIBUTION
+    return raMLXMetalResourceAnchor() != 0 ? 1 : 0
+    #else
+    return 1
+    #endif
+    #endif
 }
 
 private enum MLXSessionKind {

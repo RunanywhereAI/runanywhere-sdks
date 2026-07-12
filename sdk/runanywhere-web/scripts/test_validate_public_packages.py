@@ -15,10 +15,16 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "release"))
 
 from rewrite_npm_package import rewrite_packed_manifest
-from validate_public_packages import PackageValidationError, validate_public_packages
+from validate_public_packages import (
+    PROTO_LICENSE_METADATA,
+    PROTO_LICENSE_PATH,
+    PackageValidationError,
+    validate_public_packages,
+)
 
 
 PROTO_NAME = "@runanywhere/proto-ts"
+PROTO_LICENSE = PROTO_LICENSE_PATH.read_bytes()
 PACKAGE_NAMES = {
     "proto-ts": PROTO_NAME,
     "web": "@runanywhere/web",
@@ -26,7 +32,14 @@ PACKAGE_NAMES = {
     "web-onnx": "@runanywhere/web-onnx",
 }
 PROTO_FILES = {
-    "package.json": json.dumps({"name": PROTO_NAME, "version": "1.0.0"}).encode(),
+    "package.json": json.dumps(
+        {
+            "name": PROTO_NAME,
+            "version": "1.0.0",
+            "license": PROTO_LICENSE_METADATA,
+        }
+    ).encode(),
+    "LICENSE": PROTO_LICENSE,
     "dist/index.js": b"export {};",
     "dist/index.d.ts": b"export {};",
 }
@@ -47,8 +60,11 @@ def _write_package(
     bundle_proto: bool = False,
     metadata: dict[str, object] | None = None,
     extra_entries: dict[str, bytes] | None = None,
+    proto_license: bytes | None = PROTO_LICENSE,
 ) -> Path:
     manifest: dict[str, object] = {"name": name, "version": "1.0.0"}
+    if name == PROTO_NAME:
+        manifest["license"] = PROTO_LICENSE_METADATA
     if name in {"@runanywhere/web", "@runanywhere/web-llamacpp"}:
         manifest["dependencies"] = {
             "@bufbuild/protobuf": "^2.12.1",
@@ -63,6 +79,10 @@ def _write_package(
             for relative_path, payload in PROTO_FILES.items():
                 if relative_path == "package.json":
                     continue
+                if relative_path == "LICENSE":
+                    if proto_license is None:
+                        continue
+                    payload = proto_license
                 _add_bytes(bundle, f"package/{relative_path}", payload)
         else:
             _add_bytes(bundle, "package/dist/index.js", b"export {};")
@@ -140,6 +160,46 @@ class WebPackageValidationTest(unittest.TestCase):
                 PackageValidationError, "bundled proto-ts inventory mismatch"
             ):
                 validate_public_packages(dist)
+
+    def test_rejects_incorrect_proto_license_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            dist = Path(temporary)
+            _write_valid_set(dist)
+            (dist / "runanywhere-proto-ts-1.0.0.tgz").unlink()
+            _write_package(
+                dist,
+                "proto-ts",
+                PROTO_NAME,
+                metadata={"license": "MIT"},
+            )
+            with self.assertRaisesRegex(
+                PackageValidationError, "proto-ts license metadata"
+            ):
+                validate_public_packages(dist)
+
+    def test_rejects_missing_or_changed_proto_license_notice(self) -> None:
+        cases = (
+            (None, "proto-ts package is missing LICENSE"),
+            (
+                b"not the RunAnywhere license notice",
+                "proto-ts LICENSE does not match",
+            ),
+        )
+        for proto_license, error_pattern in cases:
+            with self.subTest(
+                error_pattern=error_pattern
+            ), tempfile.TemporaryDirectory() as temporary:
+                dist = Path(temporary)
+                _write_valid_set(dist)
+                (dist / "runanywhere-proto-ts-1.0.0.tgz").unlink()
+                _write_package(
+                    dist,
+                    "proto-ts",
+                    PROTO_NAME,
+                    proto_license=proto_license,
+                )
+                with self.assertRaisesRegex(PackageValidationError, error_pattern):
+                    validate_public_packages(dist)
 
     def test_rejects_workspace_protocol_and_extra_package(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

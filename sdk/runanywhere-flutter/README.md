@@ -14,7 +14,7 @@
   <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.12.2+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.12.2+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-API%2024+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" /></a>
-  <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" /></a>
 </p>
 
 ---
@@ -36,6 +36,7 @@
 ### Large Language Models (LLM)
 - On-device text generation with streaming support
 - **LlamaCPP** backend for GGUF models with Metal/GPU acceleration
+- Optional **MLX** backend for Apple-native LLM and VLM inference on physical iOS devices
 - Customizable generation parameters (temperature, max tokens, etc.)
 - Support for thinking/reasoning models (`<think>...</think>` patterns)
 - Token-by-token streaming for responsive UX
@@ -43,11 +44,13 @@
 ### Speech-to-Text (STT)
 - Real-time streaming transcription
 - Batch audio transcription with Whisper models via ONNX Runtime
+- Apple MLX speech recognition on physical iOS devices
 - Multi-language support
 - Confidence scores and timestamps
 
 ### Text-to-Speech (TTS)
 - Neural voice synthesis with Piper TTS
+- Apple MLX speech synthesis on physical iOS devices
 - System voices fallback via `flutter_tts`
 - Customizable voice, pitch, rate, and volume
 - PCM audio output for flexible playback
@@ -108,12 +111,21 @@ dependencies:
   runanywhere_onnx: ^0.20.0
 ```
 
-**All Backends (LLM + STT + TTS + VAD):**
+**Core + MLX (Apple LLM/VLM/Embeddings/STT/TTS):**
+
+```yaml
+dependencies:
+  runanywhere: ^0.20.0
+  runanywhere_mlx: ^0.20.0
+```
+
+**All Public Backends:**
 
 ```yaml
 dependencies:
   runanywhere: ^0.20.0
   runanywhere_llamacpp: ^0.20.0
+  runanywhere_mlx: ^0.20.0
   runanywhere_onnx: ^0.20.0
 ```
 
@@ -193,17 +205,19 @@ Add microphone permission to `android/app/src/main/AndroidManifest.xml`:
 ```dart
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize SDK (development mode - no API key needed)
-  await RunAnywhere.initialize();
-
-  // 2. Register backend modules
-  await LlamaCpp.register();  // LLM backend (GGUF models)
+  // 1. Register backend modules before SDK initialization
+  LlamaCpp.register();        // LLM backend (GGUF models)
+  await MLX.register();       // Apple MLX backend (physical iOS device only)
   await Onnx.register();      // STT/TTS backend (Whisper, Piper)
+
+  // 2. Initialize SDK (development mode - no API key needed)
+  await RunAnywhere.initialize();
 
   print('RunAnywhere SDK initialized: v${RunAnywhere.version}');
 
@@ -359,11 +373,12 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 ├─────────────────────────────────────────────────────────────────┤
 │                    Native Bridge Layer (FFI)                      │
 │                  DartBridge → C++ Commons APIs                    │
-├────────────┬─────────────┬──────────────────────────────────────┤
-│  LlamaCpp  │    ONNX     │        Future Backends...            │
-│  Backend   │   Backend   │                                       │
-│  (LLM)     │ (STT/TTS)   │                                       │
-└────────────┴─────────────┴──────────────────────────────────────┘
+├───────────┬───────────┬───────────┬─────────────────────────────┤
+│ LlamaCpp  │ Apple MLX │   ONNX    │ QHexRT (Android/Snapdragon) │
+│ LLM + VLM │ LLM, VLM, │ STT, TTS, │ LLM, VLM, STT, TTS         │
+│           │ embed,     │ VAD       │                             │
+│           │ STT, TTS   │           │                             │
+└───────────┴───────────┴───────────┴─────────────────────────────┘
 ```
 
 ### Key Components
@@ -381,6 +396,7 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 |---------|------|----------|
 | `runanywhere` | ~5MB | Core SDK, capability surface, registries, events |
 | `runanywhere_llamacpp` | ~15-25MB | LLM + VLM (GGUF models) |
+| `runanywhere_mlx` | varies | Apple MLX LLM, VLM, embeddings, STT, TTS on physical iOS devices |
 | `runanywhere_onnx` | ~50-70MB | STT, TTS, VAD (Sherpa/ONNX models) |
 | `runanywhere_qhexrt` | varies | QHexRT Qualcomm Hexagon NPU models |
 
@@ -585,10 +601,10 @@ await RunAnywhere.downloads.delete('old-model-id');
 **A:** iOS 17.5+ and Android API 24+. ARM64 devices are recommended for best performance.
 
 ### Q: Can I use custom models?
-**A:** Yes! Any GGUF model works with LlamaCpp backend. ONNX models work for STT/TTS with the appropriate format.
+**A:** GGUF models use LlamaCpp, ONNX/Sherpa bundles cover STT/TTS/VAD, and compatible Apple MLX repository bundles use the MLX backend.
 
 ### Q: How do I test on iOS Simulator?
-**A:** The SDK supports both arm64 and x86_64 simulators, but performance will be significantly slower than physical devices.
+**A:** Core backends support simulator builds. Apple MLX execution requires a physical arm64 iOS device. Its arm64 simulator slice is for package, compile, link, and startup validation only; registration reports unavailable there.
 
 ---
 
@@ -634,12 +650,12 @@ melos bootstrap
 
 | Mode | Description |
 |------|-------------|
-| **Source checkout** | Android uses staged JNI when `runanywhere.useLocalNatives=true`; CocoaPods and SwiftPM prefer package-owned `Frameworks/` when present. |
-| **Published package** | Pub archives omit native binaries. Android Gradle downloads per-ABI archives and verifies their published SHA-256 sidecars; CocoaPods and SwiftPM download versioned Apple archives and verify immutable checksums from the package manifest. |
+| **Source checkout** | Android uses staged JNI when `runanywhere.useLocalNatives=true`; Apple packages prefer staged `Frameworks/`. MLX uses CocoaPods; the other Apple plugins also support SwiftPM. |
+| **Published package** | Pub archives omit native payloads. Android Gradle downloads per-ABI archives and verifies SHA-256 sidecars. CocoaPods downloads all MLX frameworks/resources from its four pinned checksums; the other Apple plugins also expose checksum-pinned SwiftPM targets. |
 
 `RUNANYWHERE_FLUTTER_IOS_RELEASE_BASE_URL` is a CocoaPods release-contract test
-fixture override only. SwiftPM always uses the fixed GitHub HTTPS release URL;
-neither path allows archive checksums to be overridden.
+fixture override only. SwiftPM-enabled packages always use the fixed GitHub
+HTTPS release URL; neither path allows archive checksums to be overridden.
 
 ### Testing with the Flutter Sample App
 
@@ -689,7 +705,7 @@ Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
 
 | Script | Description |
 |--------|-------------|
-| `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages them into package-owned `ios/<package>/Frameworks/` directories shared by CocoaPods and SwiftPM. |
+| `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds/stages the package-owned XCFrameworks. Core/LlamaCPP/ONNX support CocoaPods and SwiftPM; MLX uses CocoaPods so Hub/Crypto land at the app root. |
 | `scripts/build/build-core-android.sh <ABI>` | Android: builds backend `.so` files and stages into Flutter packages' `android/src/main/jniLibs/<ABI>/`. |
 | `sdk/runanywhere-web/scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
 | `sdk/runanywhere-flutter/scripts/package-sdk.sh` | Validate all 4 Flutter packages via `pub publish --dry-run`. |
@@ -743,7 +759,7 @@ Open an issue on GitHub with:
 
 ## License
 
-Apache License 2.0 — See [LICENSE](../../LICENSE) for details.
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../LICENSE) for details.
 
 For commercial licensing inquiries, contact san@runanywhere.ai.
 
@@ -761,4 +777,5 @@ For commercial licensing inquiries, contact san@runanywhere.ai.
 
 - [runanywhere](https://pub.dev/packages/runanywhere) — Core SDK
 - [runanywhere_llamacpp](https://pub.dev/packages/runanywhere_llamacpp) — LLM backend
+- [runanywhere_mlx](https://pub.dev/packages/runanywhere_mlx) — Apple MLX backend
 - [runanywhere_onnx](https://pub.dev/packages/runanywhere_onnx) — STT/TTS/VAD backend

@@ -11,6 +11,7 @@ import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
@@ -95,7 +96,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Model paths + registry must be ready before catalog registration.
       await RunAnywhere.completeServicesInitialization();
-      await ModelCatalogBootstrap.registerAll();
+      await ModelCatalogBootstrap.registerAll(mlxRegistered: _mlxRegistered);
       await _registerRagBackend();
       await RunAnywhere.refreshModelRegistry();
 
@@ -153,6 +154,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   static bool _backendsRegistered = false;
+  static bool _mlxRegistered = false;
 
   Future<void> _registerBackends() async {
     if (_backendsRegistered) {
@@ -161,6 +163,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
 
     LlamaCpp.register();
+
+    _mlxRegistered = await MLX.register();
+    debugPrint(
+      _mlxRegistered
+          ? '✅ Apple MLX backend registered (LLM + VLM + Embeddings + STT + TTS)'
+          : 'ℹ️ Apple MLX backend unavailable on this target',
+    );
 
     try {
       await Onnx.register();

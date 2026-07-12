@@ -41,6 +41,47 @@ import Foundation
 // =============================================================================
 let useLocalNatives = ProcessInfo.processInfo.environment["RUNANYWHERE_USE_LOCAL_NATIVES"] == "1"
 
+// Release tooling asks SwiftPM for a static product that contains the Swift
+// MLX implementation and its MLX dependencies, but deliberately leaves the
+// Commons/plugin symbols unresolved. CocoaPods then links this archive beside
+// the package-owned RACommons and RABackendMLX archives so every frontend uses
+// one process-wide plugin registry. Normal SwiftPM consumers use the canonical
+// RunAnywhereMLX product below and do not see the packaging-only product.
+let buildMLXDistributionFramework =
+    ProcessInfo.processInfo.environment["RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK"] == "1"
+
+let mlxDistributionProducts: [Product] = buildMLXDistributionFramework
+    ? [
+        .library(
+            name: "RunAnywhereMLXRuntime",
+            type: .static,
+            targets: ["MLXRuntime"]
+        ),
+    ]
+    : []
+
+let commonsBridgeDependencies: [Target.Dependency] = buildMLXDistributionFramework
+    ? []
+    : ["RACommonsBinary"]
+
+let mlxBackendBridgeDependencies: [Target.Dependency] = buildMLXDistributionFramework
+    ? []
+    : ["CRACommons", "RABackendMLXBinary"]
+
+let mlxRuntimeNativeDependencies: [Target.Dependency] = buildMLXDistributionFramework
+    ? ["MLXBackend"]
+    : ["MLXBackend", "RABackendMLXBinary"]
+
+let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFramework
+    ? [
+        // MLXBackend remains a header-only import in this lane. Point Clang at
+        // the canonical ABI declarations without linking a second Commons
+        // archive into the runtime artifact.
+        .define("RUNANYWHERE_MLX_DISTRIBUTION"),
+        .unsafeFlags(["-Xcc", "-Isdk/runanywhere-commons/include"]),
+    ]
+    : []
+
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
 let sdkVersion = "0.20.0"
@@ -110,7 +151,7 @@ let package = Package(
             targets: ["RunAnywhereMLXCLI"]
         ),
 
-    ],
+    ] + mlxDistributionProducts,
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
         // silent upstream major bump can't land in `Package.resolved` without
@@ -150,7 +191,7 @@ let package = Package(
         // =================================================================
         .target(
             name: "CRACommons",
-            dependencies: ["RACommonsBinary"],
+            dependencies: commonsBridgeDependencies,
             path: "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons",
             publicHeadersPath: "include",
             cSettings: [
@@ -202,10 +243,7 @@ let package = Package(
         // =================================================================
         .target(
             name: "MLXBackend",
-            dependencies: [
-                "CRACommons",
-                "RABackendMLXBinary",
-            ],
+            dependencies: mlxBackendBridgeDependencies,
             path: "sdk/runanywhere-swift/Sources/MLXRuntime/include",
             publicHeadersPath: ".",
             cSettings: [
@@ -306,9 +344,7 @@ let package = Package(
         // =================================================================
         .target(
             name: "MLXRuntime",
-            dependencies: [
-                "MLXBackend",
-                "RABackendMLXBinary",
+            dependencies: mlxRuntimeNativeDependencies + [
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
@@ -318,6 +354,7 @@ let package = Package(
             ] + mlxAudioRuntimeDependencies,
             path: "sdk/runanywhere-swift/Sources/MLXRuntime",
             exclude: ["include"],
+            swiftSettings: mlxRuntimeDistributionSwiftSettings,
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
@@ -513,7 +550,8 @@ func binaryTargets() -> [Target] {
         //   1. Build XCFrameworks (CI native_ios job, or locally via
         //      `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`).
         //   2. Run `sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>` against the directory
-        //      that holds the five `*-ios-v<version>.zip` artifacts. This
+        //      that holds all eight Apple archives (seven XCFramework ZIPs
+        //      plus the MLX resource ZIP). This
         //      overwrites each `checksum:` line below with the real SHA-256.
         //   3. The release workflow (`release.yml::publish`) verifies the
         //      rebuilt archives still match these tagged checksums and aborts
@@ -531,17 +569,17 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "21835b3fbbbe3bac4e740621ce45f50bc35bc0f995d4cbb997d532e3182f0b65"
+                checksum: "de1e00a343475ef5f575037ec94df1a25226f5b9581a3cd0b393d4ed071d1aa4"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "811bb7447c80d390a6d11bee334bac62d99ee4537ce6d01c0eb910294e29ca99"
+                checksum: "4d7124cac80657d4a982c1c28f39830b06688b09945ec59a4a685404109ae535"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "5972f2dd232f19cb72507c6aa042fafda209faa2b3c223dd5404cb921653f3e7"
+                checksum: "1a6d67e40d69f5da56de317413b307d07d42a7c6e2fbb1ad07f79ff4b63dd914"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",

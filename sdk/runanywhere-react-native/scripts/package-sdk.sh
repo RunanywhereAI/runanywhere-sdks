@@ -15,6 +15,9 @@
 #   --natives-from PATH  Directory with iOS xcframeworks + Android .so files.
 #                        iOS uses the Swift-shaped binary names:
 #                        core=RACommons, llamacpp=RABackendLLAMACPP,
+#                        mlx=RABackendMLX+RunAnywhereMLXRuntime+
+#                            RunAnywhereMLXMetal, with Hub/Crypto resources in
+#                            PATH/RunAnywhereMLXRuntimeResources,
 #                        onnx=RABackendONNX+RABackendSherpa.
 #                        Android uses only canonical ownership roots
 #                        PATH/<abi>/{jni,llamacpp,onnx}/*.so.
@@ -55,7 +58,7 @@ echo ">> React Native SDK packaging (mode=${RAC_BUILD_MODE})"
 QHEXRT_ROOT="$RN_ROOT/packages/qhexrt"
 DIST_DIR="$RN_ROOT/dist/sdk-rn"
 INTERNAL_DIST_DIR="$RN_ROOT/dist/sdk-rn-internal"
-PUBLIC_PACKAGE_DIRS=(core llamacpp onnx)
+PUBLIC_PACKAGE_DIRS=(core llamacpp mlx onnx)
 
 validation_failure() {
     local description="$1"
@@ -99,6 +102,51 @@ if [ -n "$NATIVES_FROM" ]; then
         for framework in "$@"; do
             cp -R "$NATIVES_FROM/${framework}.xcframework" "$ios_bin/"
         done
+    }
+
+    stage_mlx_ios_resources() {
+        local src="$NATIVES_FROM/RunAnywhereMLXRuntimeResources"
+        local mlx_ios="$RN_ROOT/packages/mlx/ios"
+        local resources="$mlx_ios/Resources"
+        local notices="$mlx_ios/ThirdPartyNotices"
+        local bundle required
+
+        [ -d "$src" ] || {
+            echo "ERROR: missing MLX runtime resources: $src" >&2
+            exit 1
+        }
+        for bundle in swift-crypto_Crypto swift-transformers_Hub; do
+            if [ ! -d "$src/${bundle}.bundle" ]; then
+                echo "ERROR: missing MLX runtime resource bundle: ${bundle}.bundle" >&2
+                exit 1
+            fi
+        done
+        for required in \
+            "swift-crypto_Crypto.bundle/PrivacyInfo.xcprivacy" \
+            "swift-transformers_Hub.bundle/gpt2_tokenizer_config.json" \
+            "swift-transformers_Hub.bundle/t5_tokenizer_config.json"; do
+            if [ ! -s "$src/$required" ]; then
+                echo "ERROR: missing or empty MLX runtime resource: $required" >&2
+                exit 1
+            fi
+        done
+        for bundle in RunAnywhereMLXMetalDevice RunAnywhereMLXMetalSimulator; do
+            if [ -e "$src/${bundle}.bundle" ]; then
+                echo "ERROR: obsolete MLX Metal sidecar is not publishable: ${bundle}.bundle" >&2
+                exit 1
+            fi
+        done
+        if [ ! -d "$src/ThirdPartyNotices" ] || \
+           [ -z "$(find "$src/ThirdPartyNotices" -type f -print -quit)" ]; then
+            echo "ERROR: MLX runtime third-party notices are missing or empty" >&2
+            exit 1
+        fi
+
+        rm -rf "$resources" "$notices"
+        mkdir -p "$resources"
+        cp -R "$src/swift-crypto_Crypto.bundle" "$resources/"
+        cp -R "$src/swift-transformers_Hub.bundle" "$resources/"
+        cp -R "$src/ThirdPartyNotices" "$notices"
     }
 
     android_component_dir() {
@@ -265,6 +313,12 @@ if [ -n "$NATIVES_FROM" ]; then
         HAS_IOS=1
         stage_ios "$RN_ROOT/packages/core" RACommons
         stage_ios "$RN_ROOT/packages/llamacpp" RABackendLLAMACPP
+        stage_ios \
+            "$RN_ROOT/packages/mlx" \
+            RABackendMLX \
+            RunAnywhereMLXRuntime \
+            RunAnywhereMLXMetal
+        stage_mlx_ios_resources
         stage_ios "$RN_ROOT/packages/onnx" RABackendONNX RABackendSherpa
     fi
 
@@ -327,6 +381,7 @@ cp -R "$PUBLIC_RAC_HEADERS" "$CORE_RAC_HEADERS"
 if find \
     "$RN_ROOT/packages/core" \
     "$RN_ROOT/packages/llamacpp" \
+    "$RN_ROOT/packages/mlx" \
     "$RN_ROOT/packages/onnx" \
     -type f \( \
         -name 'librac_backend_qhexrt*.so' -o \
@@ -338,6 +393,43 @@ if find \
     echo "ERROR: private QHexRT native found in a public React Native package" >&2
     exit 1
 fi
+
+# MLX is never publishable as a TypeScript-only facade. Its podspec declares
+# all three frameworks unconditionally, so enforce the same fail-closed contract
+# before npm packing even when the caller reuses an already-staged tree.
+for framework in RABackendMLX RunAnywhereMLXRuntime RunAnywhereMLXMetal; do
+    framework_dir="$RN_ROOT/packages/mlx/ios/Binaries/${framework}.xcframework"
+    if [ ! -d "$framework_dir" ]; then
+        echo "ERROR: missing required MLX iOS runtime: ${framework}.xcframework" >&2
+        exit 1
+    fi
+    for slice in ios-arm64 ios-arm64-simulator; do
+        if [ ! -d "$framework_dir/$slice" ]; then
+            echo "ERROR: required MLX runtime is missing $slice: ${framework}.xcframework" >&2
+            exit 1
+        fi
+    done
+done
+for resource in \
+    "swift-crypto_Crypto.bundle/PrivacyInfo.xcprivacy" \
+    "swift-transformers_Hub.bundle/gpt2_tokenizer_config.json" \
+    "swift-transformers_Hub.bundle/t5_tokenizer_config.json"; do
+    if [ ! -s "$RN_ROOT/packages/mlx/ios/Resources/$resource" ]; then
+        echo "ERROR: missing or empty required MLX iOS resource: $resource" >&2
+        exit 1
+    fi
+done
+if [ ! -d "$RN_ROOT/packages/mlx/ios/ThirdPartyNotices" ] || \
+   [ -z "$(find "$RN_ROOT/packages/mlx/ios/ThirdPartyNotices" -type f -print -quit)" ]; then
+    echo "ERROR: required MLX iOS third-party notices are missing or empty" >&2
+    exit 1
+fi
+for obsolete in RunAnywhereMLXMetalDevice RunAnywhereMLXMetalSimulator; do
+    if [ -e "$RN_ROOT/packages/mlx/ios/Resources/${obsolete}.bundle" ]; then
+        echo "ERROR: obsolete MLX Metal sidecar is not publishable: ${obsolete}.bundle" >&2
+        exit 1
+    fi
+done
 
 cd "$RN_ROOT"
 
@@ -367,9 +459,10 @@ fi
 echo ">> yarn install --immutable (cwd=$YARN_CWD)"
 (cd "$YARN_CWD" && corepack yarn install --immutable)
 
-# Build and pack the canonical generated protocol package once. Every public
-# RN entry package vendors this exact archive, so installing a GitHub Release
-# tarball never depends on an unpublished registry copy of proto-ts.
+# Build and pack the canonical generated protocol package once. Public entry
+# packages that consume generated protocol types vendor this exact archive, so
+# installing a GitHub Release tarball never depends on an unpublished registry
+# copy of proto-ts. The MLX registration-only package has no protocol imports.
 echo ">> yarn build:proto"
 corepack yarn build:proto
 PROTO_STAGING="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-rn-proto.XXXXXX")"
@@ -424,10 +517,16 @@ for pkg in "${PUBLIC_PACKAGE_DIRS[@]}"; do
         exit 1
     fi
     [ -f "$artifact" ] || { echo "ERROR: npm pack did not produce $artifact" >&2; exit 1; }
-    python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \
-        --archive "$artifact" \
-        --exact-version "$PACKAGE_VERSION" \
-        --bundle "@runanywhere/proto-ts=$PROTO_ARCHIVE"
+    if [ "$pkg" = "mlx" ]; then
+        python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \
+            --archive "$artifact" \
+            --exact-version "$PACKAGE_VERSION"
+    else
+        python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \
+            --archive "$artifact" \
+            --exact-version "$PACKAGE_VERSION" \
+            --bundle "@runanywhere/proto-ts=$PROTO_ARCHIVE"
+    fi
 done
 
 echo ">> Skipping private package @runanywhere/qhexrt (use --include-private-qhexrt for an internal run)"
@@ -508,14 +607,16 @@ fi
 # Clean-install each advertised public entry transaction without lifecycle
 # scripts or host peer packages. The full pinned RN Android consumer below the
 # release workflow validates peers/native compilation; these focused installs
-# prove each tarball carries its own exact proto payload and published proto
-# runtime dependency instead of consulting the registry for proto-ts.
+# prove protocol-consuming tarballs carry their own exact proto payload and
+# runtime dependency instead of consulting the registry for proto-ts. MLX is
+# also clean-installed, but intentionally carries no unused proto payload.
 INSTALL_SMOKE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-rn-install.XXXXXX")"
 trap 'rm -rf "$PROTO_STAGING" "$INSTALL_SMOKE_ROOT"' EXIT
 verify_candidate_install() {
     local label="$1"
     local entry_package="$2"
-    shift 2
+    local expects_bundled_proto="$3"
+    shift 3
     local install_root="$INSTALL_SMOKE_ROOT/$label"
     mkdir -p "$install_root"
     (
@@ -529,6 +630,7 @@ verify_candidate_install() {
             --package-lock=false \
             "$@" >/dev/null
         ENTRY_PACKAGE="$entry_package" \
+        EXPECTS_BUNDLED_PROTO="$expects_bundled_proto" \
         EXPECTED_VERSION="$PACKAGE_VERSION" \
         node - <<'NODE'
 const fs = require('fs');
@@ -540,32 +642,46 @@ const manifest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json
 if (manifest.version !== process.env.EXPECTED_VERSION) {
   throw new Error(`${manifest.name} resolved ${manifest.version}`);
 }
-const protoManifest = JSON.parse(
-  fs.readFileSync(
-    path.join(packageRoot, 'node_modules/@runanywhere/proto-ts/package.json'),
-    'utf8'
-  )
+const bundledProto = path.join(
+  packageRoot,
+  'node_modules/@runanywhere/proto-ts/package.json'
 );
-if (protoManifest.version !== process.env.EXPECTED_VERSION) {
-  throw new Error(`proto-ts resolved ${protoManifest.version}`);
+if (process.env.EXPECTS_BUNDLED_PROTO === '1') {
+  const protoManifest = JSON.parse(fs.readFileSync(bundledProto, 'utf8'));
+  if (protoManifest.version !== process.env.EXPECTED_VERSION) {
+    throw new Error(`proto-ts resolved ${protoManifest.version}`);
+  }
+  const entryRequire = createRequire(path.join(packageRoot, 'package.json'));
+  entryRequire.resolve('@bufbuild/protobuf/wire');
+  console.log(`verified ${manifest.name}@${manifest.version} with bundled proto-ts@${protoManifest.version}`);
+} else {
+  if (fs.existsSync(bundledProto)) {
+    throw new Error(`${manifest.name} unexpectedly bundles proto-ts`);
+  }
+  console.log(`verified ${manifest.name}@${manifest.version} without an unused proto-ts payload`);
 }
-const entryRequire = createRequire(path.join(packageRoot, 'package.json'));
-entryRequire.resolve('@bufbuild/protobuf/wire');
-console.log(`verified ${manifest.name}@${manifest.version} with bundled proto-ts@${protoManifest.version}`);
 NODE
     )
 }
 
 CORE_ARTIFACT="$DIST_DIR/runanywhere-core-$PACKAGE_VERSION.tgz"
-verify_candidate_install core @runanywhere/core "$CORE_ARTIFACT"
+verify_candidate_install core @runanywhere/core 1 "$CORE_ARTIFACT"
 verify_candidate_install \
     llamacpp \
     @runanywhere/llamacpp \
+    1 \
     "$CORE_ARTIFACT" \
     "$DIST_DIR/runanywhere-llamacpp-$PACKAGE_VERSION.tgz"
 verify_candidate_install \
+    mlx \
+    @runanywhere/mlx \
+    0 \
+    "$CORE_ARTIFACT" \
+    "$DIST_DIR/runanywhere-mlx-$PACKAGE_VERSION.tgz"
+verify_candidate_install \
     onnx \
     @runanywhere/onnx \
+    1 \
     "$CORE_ARTIFACT" \
     "$DIST_DIR/runanywhere-onnx-$PACKAGE_VERSION.tgz"
 

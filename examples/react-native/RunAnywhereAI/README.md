@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Platform-Android%207.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 7.0+" />
   <img src="https://img.shields.io/badge/React%20Native-0.85.3-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.85.3" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.9" />
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
 
 **A production-ready reference app demonstrating the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) capabilities for on-device AI.** This cross-platform app showcases how to build privacy-first, offline-capable AI features with LLM chat, speech-to-text, text-to-speech, and a complete voice assistant pipeline—all running locally on your device.
@@ -34,7 +34,7 @@
 Prerequisites:
 
 - Node.js 22.12+ and Corepack-enabled Yarn 3 (`corepack enable`; this project uses `nodeLinker: node-modules`).
-- Xcode 15+ with iOS simulator runtimes and command line tools selected.
+- Xcode 26+ with Swift 6.2, iOS simulator runtimes, and command line tools selected.
 - CocoaPods (`pod --version` should succeed).
 - Android Studio with Android SDK 24+, build tools, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
 - JDK 17 and enough local disk for native build output plus downloaded AI models.
@@ -305,7 +305,7 @@ RunAnywhereAI/
 
 - **Node.js** 18+
 - **React Native CLI** or **npx**
-- **Xcode** 15+ (iOS development)
+- **Xcode** 26+ with Swift 6.2 (iOS development)
 - **Android Studio** Hedgehog+ (Android development)
 - **CocoaPods** (iOS)
 - **~2GB** free storage for AI models
@@ -876,7 +876,7 @@ git push origin feature/your-feature
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see [LICENSE](../../../LICENSE) for details.
+This project is licensed under the RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](../../../LICENSE) for details.
 
 ---
 

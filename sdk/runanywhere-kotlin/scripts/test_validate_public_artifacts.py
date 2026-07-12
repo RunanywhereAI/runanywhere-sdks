@@ -20,6 +20,7 @@ from validate_public_artifacts import (
     SUPPORTED_ABIS,
     ArtifactValidationError,
     ELF_MACHINE_BY_ABI,
+    MAVEN_LICENSE,
     archive_name,
     validate_public_artifacts,
 )
@@ -87,7 +88,13 @@ def _sources_jar(artifact: str) -> bytes:
     )
 
 
-def _pom(artifact: str, *, omit_core_dependency: bool = False) -> bytes:
+def _pom(
+    artifact: str,
+    *,
+    omit_core_dependency: bool = False,
+    license_metadata: tuple[str, str, str] = MAVEN_LICENSE,
+) -> bytes:
+    license_name, license_url, license_distribution = license_metadata
     dependency = ""
     if artifact != "runanywhere-sdk" and not omit_core_dependency:
         dependency = f"""
@@ -105,7 +112,14 @@ def _pom(artifact: str, *, omit_core_dependency: bool = False) -> bytes:
   <groupId>{MAVEN_GROUP}</groupId>
   <artifactId>{artifact}</artifactId>
   <version>{VERSION}</version>
-  <packaging>aar</packaging>{dependency}
+  <packaging>aar</packaging>
+  <licenses>
+    <license>
+      <name>{license_name}</name>
+      <url>{license_url}</url>
+      <distribution>{license_distribution}</distribution>
+    </license>
+  </licenses>{dependency}
 </project>
 """.encode()
 
@@ -173,6 +187,7 @@ def _write_distribution(
     qnn_family: str | None = None,
     private_class_family: str | None = None,
     omit_core_dependency_for: str | None = None,
+    wrong_license_for: str | None = None,
     wrong_module_hash_for: str | None = None,
     wrong_architecture_family: str | None = None,
     host_path_family: str | None = None,
@@ -206,6 +221,11 @@ def _write_distribution(
         repository_entries[f"{base}/{prefix}.pom"] = _pom(
             artifact,
             omit_core_dependency=omit_core_dependency_for == artifact,
+            license_metadata=(
+                ("MIT License", "https://opensource.org/license/mit", "repo")
+                if wrong_license_for == artifact
+                else MAVEN_LICENSE
+            ),
         )
         repository_entries[f"{base}/{prefix}.module"] = _module(
             artifact,
@@ -305,6 +325,15 @@ class PublicArtifactValidationTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(
                 ArtifactValidationError, "POM dependency graph mismatch"
+            ):
+                validate_public_artifacts(dist, VERSION)
+
+    def test_rejects_incorrect_pom_license_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            dist = Path(temporary)
+            _write_distribution(dist, wrong_license_for="runanywhere-sdk")
+            with self.assertRaisesRegex(
+                ArtifactValidationError, "POM license metadata mismatch"
             ):
                 validate_public_artifacts(dist, VERSION)
 

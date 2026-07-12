@@ -72,6 +72,12 @@
 @import runanywhere_llamacpp;
 #endif
 
+#if __has_include(<runanywhere_mlx/RunAnywhereMlxPlugin.h>)
+#import <runanywhere_mlx/RunAnywhereMlxPlugin.h>
+#else
+@import runanywhere_mlx;
+#endif
+
 #if __has_include(<runanywhere_onnx/OnnxPlugin.h>)
 #import <runanywhere_onnx/OnnxPlugin.h>
 #else
@@ -104,6 +110,7 @@
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];
   [RunAnywherePlugin registerWithRegistrar:[registry registrarForPlugin:@"RunAnywherePlugin"]];
   [LlamaCppPlugin registerWithRegistrar:[registry registrarForPlugin:@"LlamaCppPlugin"]];
+  [RunAnywhereMlxPlugin registerWithRegistrar:[registry registrarForPlugin:@"RunAnywhereMlxPlugin"]];
   [OnnxPlugin registerWithRegistrar:[registry registrarForPlugin:@"OnnxPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [URLLauncherPlugin registerWithRegistrar:[registry registrarForPlugin:@"URLLauncherPlugin"]];

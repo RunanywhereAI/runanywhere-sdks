@@ -369,7 +369,7 @@ jobs:
       # @runanywhere/proto-ts package (sdk/shared/proto-ts) is resolved as a
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
-      # llamacpp, and onnx — exactly the surface this PR touches.
+      # llamacpp, mlx, and onnx — exactly the surface this PR touches.
       # proto-ts is a workspace member of BOTH the repo-root Yarn workspace AND
       # the sdk/runanywhere-web npm workspace. When we cd into proto-ts and run
       # `npm install`, npm walks up, finds the root Yarn package.json with
@@ -405,6 +405,12 @@ jobs:
         run: bash scripts/validation/gates/check_deprecated_surfaces.sh
       - name: RAC_API export drift check (strict)
         run: bash scripts/validation/commons/check_rac_api_exports.sh --strict
+      - name: Kotlin release-boundary validator tests
+        run: python3 sdk/runanywhere-kotlin/scripts/test_validate_public_artifacts.py
+      - name: React Native release-boundary validator tests
+        run: python3 sdk/runanywhere-react-native/scripts/test_validate_public_packages.py
+      - name: Web release-boundary validator tests
+        run: python3 sdk/runanywhere-web/scripts/test_validate_public_packages.py
       - name: HF-auth public API packaging parity
         run: |
           set -euo pipefail

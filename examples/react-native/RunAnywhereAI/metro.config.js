@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
 // Yarn workspace root (where node_modules with all hoisted deps lives)
@@ -9,10 +10,17 @@ const bufbuildProtobufRoot = path.resolve(
 );
 // Use binary-encoding.js directly — the wire/index.js barrel re-exports can be
 // empty in Hermes production bundles, breaking ts-proto's `new BinaryWriter()`.
-const bufbuildWireCjs = path.join(
-  bufbuildProtobufRoot,
-  'dist/cjs/wire/binary-encoding.js'
-);
+const bufbuildWireCjs = [
+  'dist/commonjs/wire/binary-encoding.js',
+  'dist/cjs/wire/binary-encoding.js',
+]
+  .map((relativePath) => path.join(bufbuildProtobufRoot, relativePath))
+  .find((candidate) => fs.existsSync(candidate));
+if (!bufbuildWireCjs) {
+  throw new Error(
+    `Unable to locate @bufbuild/protobuf wire runtime under ${bufbuildProtobufRoot}`
+  );
+}
 
 const defaultConfig = getDefaultConfig(__dirname);
 // Allow Metro to resolve .mjs/.cjs entry points (default sourceExts omit them).
@@ -50,7 +58,10 @@ const config = {
     // Single instance enforcement for shared peer deps (RN forbids duplicates).
     extraNodeModules: {
       'react-native': path.resolve(workspaceRoot, 'node_modules/react-native'),
-      'react-native-nitro-modules': path.resolve(workspaceRoot, 'node_modules/react-native-nitro-modules'),
+      'react-native-nitro-modules': path.resolve(
+        workspaceRoot,
+        'node_modules/react-native-nitro-modules'
+      ),
       'react': path.resolve(workspaceRoot, 'node_modules/react'),
       // ts-proto generated code uses @bufbuild/protobuf/wire; Metro must resolve the CJS build.
       '@bufbuild/protobuf': bufbuildProtobufRoot,
@@ -58,6 +69,9 @@ const config = {
     resolveRequest: (context, moduleName, platform) => {
       if (
         moduleName === '@bufbuild/protobuf/wire' ||
+        moduleName === '@bufbuild/protobuf/dist/commonjs/wire/index.js' ||
+        moduleName ===
+          '@bufbuild/protobuf/dist/commonjs/wire/binary-encoding.js' ||
         moduleName === '@bufbuild/protobuf/dist/cjs/wire/index.js' ||
         moduleName === '@bufbuild/protobuf/dist/cjs/wire/binary-encoding.js' ||
         moduleName === '@bufbuild/protobuf/wire/binary-encoding'

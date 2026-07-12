@@ -2,9 +2,10 @@
 # =============================================================================
 # sync-checksums.sh
 # =============================================================================
-# Updates the SHA-256 checksum lines in the root Swift manifest and Flutter's
-# nested iOS Swift manifests to match freshly-built XCFramework zips. Run after
-# the native iOS/macOS builds have produced the zips and before cutting a tag.
+# Updates SHA-256 checksum lines in the root Swift manifest, Flutter's nested
+# iOS Swift manifests, and the CocoaPods-only Flutter MLX podspec to match
+# freshly-built XCFramework/resource zips. Run after the native iOS/macOS
+# builds have produced the zips and before a tag.
 #
 # Usage:
 #   sdk/runanywhere-swift/scripts/sync-checksums.sh ZIP_DIR
@@ -18,9 +19,10 @@
 #   {name}-v{version}.zip
 # where {name} is one of:
 #   RACommons, RABackendLLAMACPP, RABackendONNX, RABackendSherpa,
-#   RABackendMLX
+#   RABackendMLX, RunAnywhereMLXRuntime, RunAnywhereMLXMetal,
+#   RunAnywhereMLXResources
 #
-# and updates the corresponding `checksum: "..."` line in Package.swift.
+# and updates the corresponding immutable checksum declaration.
 # =============================================================================
 
 set -euo pipefail
@@ -42,6 +44,7 @@ PACKAGE_SWIFT="${REPO_ROOT}/Package.swift"
 FLUTTER_CORE_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift"
 FLUTTER_LLAMA_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift"
 FLUTTER_ONNX_PACKAGE="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift"
+FLUTTER_MLX_PODSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec"
 
 if [ ! -f "$PACKAGE_SWIFT" ]; then
     echo "ERROR: Package.swift not found at $PACKAGE_SWIFT" >&2
@@ -57,6 +60,11 @@ for flutter_manifest in \
         exit 1
     fi
 done
+
+if [ ! -f "$FLUTTER_MLX_PODSPEC" ]; then
+    echo "ERROR: Flutter MLX podspec not found at $FLUTTER_MLX_PODSPEC" >&2
+    exit 1
+fi
 
 if [ ! -d "$ZIP_DIR" ]; then
     echo "ERROR: zip dir not found: $ZIP_DIR" >&2
@@ -80,6 +88,13 @@ for flutter_manifest in \
         exit 1
     fi
 done
+
+flutter_mlx_version="$(sed -nE "s/^[[:space:]]*s\.version[[:space:]]*=[[:space:]]*'([^']+)'$/\1/p" "$FLUTTER_MLX_PODSPEC")"
+if [ "$flutter_mlx_version" != "$SDK_VERSION" ]; then
+    echo "ERROR: Flutter MLX podspec version mismatch: $FLUTTER_MLX_PODSPEC" >&2
+    echo "       expected $SDK_VERSION, found ${flutter_mlx_version:-<missing>}" >&2
+    exit 1
+fi
 
 # swiftpm binary target name → local-filename-prefix pairs. Names match the
 # `.binaryTarget(name: "X", ...)` entries in Package.swift.
@@ -131,6 +146,10 @@ elif pattern_kind == "flutter-helper":
         + r'"\s*,\s*checksum:\s*")([0-9a-f]{64})("\s*\))',
         re.DOTALL,
     )
+elif pattern_kind == "flutter-podspec":
+    pattern = re.compile(
+        r"('" + re.escape(binary_name) + r"'\s*=>\s*')([0-9a-f]{64})(')"
+    )
 else:
     print(f"  error: unknown checksum pattern kind: {pattern_kind}", file=sys.stderr)
     sys.exit(1)
@@ -163,9 +182,9 @@ PY
 }
 
 if [ "$MODE" = "check" ]; then
-    echo ">> Verifying release ZIP checksums against tagged Package.swift"
+    echo ">> Verifying release ZIP checksums against tagged Apple package contracts"
 else
-    echo ">> Syncing Package.swift checksums from $ZIP_DIR"
+    echo ">> Syncing Apple package checksums from $ZIP_DIR"
 fi
 echo ">> Swift release version: $SDK_VERSION"
 
@@ -213,11 +232,50 @@ while IFS='|' read -r binary_name zip_prefix; do
             fi
             ;;
         RABackendMLXBinary)
-            # Flutter does not currently publish an MLX backend package.
+            if ! process_checksum_line \
+                RABackendMLX "$sum" "$FLUTTER_MLX_PODSPEC" flutter-podspec; then
+                failed=$((failed + 1))
+            fi
             ;;
     esac
     processed=$((processed + 1))
 done < <(declare_mapping)
+
+# The Flutter MLX CocoaPods contract distributes the canonical Swift
+# runtime, the platform-selected dynamic Metal framework, and Hub/Crypto
+# resources as independent archives. They are intentionally absent from the
+# root manifest: normal Swift SDK consumers compile the canonical source
+# RunAnywhereMLX product instead of these CocoaPods-oriented binaries.
+while IFS='|' read -r target_name zip_prefix; do
+    zip_file="$ZIP_DIR/${zip_prefix}-v${SDK_VERSION}.zip"
+    if [ ! -f "$zip_file" ]; then
+        echo "  missing:   ${zip_prefix}-v${SDK_VERSION}.zip in $ZIP_DIR" >&2
+        missing=$((missing + 1))
+        continue
+    fi
+    sum=$(sha256_of "$zip_file")
+    if ! process_checksum_line \
+        "$target_name" "$sum" "$FLUTTER_MLX_PODSPEC" flutter-podspec; then
+        failed=$((failed + 1))
+    fi
+    processed=$((processed + 1))
+done <<'EOF'
+RunAnywhereMLXRuntime|RunAnywhereMLXRuntime-ios
+RunAnywhereMLXMetal|RunAnywhereMLXMetal-ios
+EOF
+
+mlx_resources_zip="$ZIP_DIR/RunAnywhereMLXResources-ios-v${SDK_VERSION}.zip"
+if [ ! -f "$mlx_resources_zip" ]; then
+    echo "  missing:   RunAnywhereMLXResources-ios-v${SDK_VERSION}.zip in $ZIP_DIR" >&2
+    missing=$((missing + 1))
+else
+    mlx_resources_sum=$(sha256_of "$mlx_resources_zip")
+    if ! process_checksum_line \
+        RunAnywhereMLXResources "$mlx_resources_sum" "$FLUTTER_MLX_PODSPEC" flutter-podspec; then
+        failed=$((failed + 1))
+    fi
+    processed=$((processed + 1))
+fi
 
 echo ""
 echo ">> Done. $processed processed, $missing missing, $failed failed."
@@ -227,7 +285,7 @@ if [ "$MODE" = "check" ]; then
         echo "ERROR: built Swift archives do not match the immutable tagged manifest" >&2
         exit 1
     fi
-    echo ">> Root and Flutter Package.swift manifests match every release archive."
+    echo ">> Root/Flutter manifests and the Flutter MLX podspec match every release archive."
 else
     if [ "$missing" -ne 0 ] || [ "$failed" -ne 0 ]; then
         echo "ERROR: could not update every Swift binary target checksum" >&2
@@ -235,5 +293,5 @@ else
     fi
     echo ""
     echo ">> Verify with:"
-    echo "    git diff -- Package.swift sdk/runanywhere-flutter/packages/*/ios/*/Package.swift"
+    echo "    git diff -- Package.swift sdk/runanywhere-flutter/packages/*/ios/*/Package.swift $FLUTTER_MLX_PODSPEC"
 fi

@@ -20,6 +20,7 @@ Core SDK for RunAnywhere React Native. Foundation package providing the public A
 
 This package is **required** for all RunAnywhere functionality. Additional capabilities are provided by:
 - `@runanywhere/llamacpp` — LLM text generation (GGUF models)
+- `@runanywhere/mlx` — Apple MLX inference (LLM, VLM, speech, embeddings)
 - `@runanywhere/onnx` — Speech-to-Text and Text-to-Speech
 
 ---
@@ -654,10 +655,11 @@ Native libraries (`librac_commons.so`, `librunanywhere_jni.so`) are staged into
 - [Main SDK README](../../README.md) — Full SDK documentation
 - [API Reference](../../Docs/Documentation.md) — Complete API docs
 - [@runanywhere/llamacpp](../llamacpp/README.md) — LLM backend
+- [@runanywhere/mlx](../mlx/README.md) — Apple MLX backend
 - [@runanywhere/onnx](../onnx/README.md) — STT/TTS backend
 
 ---
 
 ## License
 
-MIT License
+RunAnywhere License. See [LICENSE](LICENSE) for details.

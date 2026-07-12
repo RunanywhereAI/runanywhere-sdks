@@ -499,8 +499,8 @@ afterEvaluate {
 
                     licenses {
                         license {
-                            name.set("The Apache License, Version 2.0")
-                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                            name.set("RunAnywhere License")
+                            url.set("https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE")
                             distribution.set("repo")
                         }
                     }

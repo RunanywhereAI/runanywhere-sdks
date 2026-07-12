@@ -1,0 +1,12 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.iml
+
+# CocoaPods fetches the four independently checksum-pinned MLX release assets.
+# Keep every generated framework, resource bundle, and notice out of pub.dev;
+# this plugin intentionally uses CocoaPods rather than SwiftPM.
+ios/runanywhere_mlx/Frameworks/
+ios/runanywhere_mlx/Resources/
+ios/runanywhere_mlx/ThirdPartyNotices/

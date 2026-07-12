@@ -268,12 +268,15 @@ Three layers:
 
 ### SDK Initialization Gate
 The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. The boot sequence:
-1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, `ONNX.register(priority:100)`
+1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, Boolean-returning `MLX.register(priority:100)`, `ONNX.register(priority:100)`
 2. `RunAnywhere.initialize()` — core C++ bridge init
-3. `registerModulesAndModels()` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, LoRA
+3. `ModelCatalogBootstrap.registerAll(mlxRegistered:)` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, and LoRA while omitting every MLX row when registration failed
 4. `RunAnywhere.discoverDownloadedModels()` then `RunAnywhere.listModels()` (refresh registry)
 
 Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
+MLX execution requires a physical iOS device (or native macOS). The arm64 iOS
+Simulator build is for package, compile, link, and startup validation only;
+`MLX.register()` returns `false`, and the example does not seed MLX rows there.
 
 ### Cross-Platform Strategy
 The app targets iOS 17.5+ and macOS 14.5+ (matches `Package.swift` platform floor). Platform differences are handled via:

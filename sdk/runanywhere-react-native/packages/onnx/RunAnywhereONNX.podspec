@@ -7,13 +7,13 @@ Pod::Spec.new do |s|
   s.name         = "RunAnywhereONNX"
   s.version      = package["version"]
   s.summary      = package["description"]
-  s.homepage     = "https://runanywhere.com"
-  s.license      = package["license"]
+  s.homepage     = "https://runanywhere.ai"
+  s.license      = { type: "RunAnywhere License", file: "LICENSE" }
   s.authors      = "RunAnywhere AI"
 
   s.platforms    = { :ios => "17.5" }
-  s.swift_version = "6.0"
-  s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
+  s.swift_version = "6.2"
+  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
 
   # =============================================================================
   # ONNX Backend - xcframeworks are bundled in npm package

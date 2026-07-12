@@ -1,10 +1,10 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Verified state: 2026-05-12 against working tree on `feat/v2-architecture`.
+Verified state: 2026-07-12 against the 0.20.0 package architecture.
 
 ## Repository Structure
 
-Melos-managed monorepo with 4 Flutter plugin packages that wrap the shared C++ core (`runanywhere-commons` / `RACommons`) via Dart FFI. No Flutter platform channels are used for AI operations — all inference routes through direct FFI calls.
+Melos-managed monorepo with 5 Flutter plugin packages that wrap the shared C++ core (`runanywhere-commons` / `RACommons`) via Dart FFI. No Flutter platform channels are used for AI operations — all inference routes through direct FFI calls.
 
 ```
 sdk/runanywhere-flutter/
@@ -15,6 +15,7 @@ sdk/runanywhere-flutter/
 └── packages/
     ├── runanywhere/            # Core SDK (FFI bridge, public API, events, models)
     ├── runanywhere_llamacpp/   # LlamaCpp backend (LLM + VLM)
+    ├── runanywhere_mlx/        # Apple MLX backend (LLM + VLM + embeddings + STT + TTS, physical iOS)
     ├── runanywhere_onnx/       # Sherpa/ONNX Runtime backend (STT + TTS + VAD)
     └── runanywhere_qhexrt/     # QHexRT Qualcomm Hexagon NPU backend (Android-only)
 ```
@@ -25,21 +26,22 @@ Example app: `examples/flutter/RunAnywhereAI/`.
 
 ```
 runanywhere_llamacpp ──┐
+runanywhere_mlx     ───┤
 runanywhere_onnx    ───┼──→ runanywhere (core)
 runanywhere_qhexrt  ───┘
 ```
 
-All three backend packages depend on `runanywhere ^0.19.0`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
+All four backend packages depend on `runanywhere ^0.20.0`. The core package vendors `RACommons` (C++ library); backend packages vendor their own XCFrameworks/`.so` files.
 
 ## Development Commands
 
 ```bash
 # From sdk/runanywhere-flutter/
 melos bootstrap        # flutter pub get across the Dart workspace
-melos run analyze      # flutter analyze --no-pub in all 4 packages
-melos run format       # dart format in all 4 packages
-melos run test         # flutter test in all 4 packages
-melos run clean        # flutter clean in all 4 packages
+melos run analyze      # flutter analyze --no-pub in all 5 packages
+melos run format       # dart format in all 5 packages
+melos run test         # flutter test in all 5 packages
+melos run clean        # flutter clean in all 5 packages
 melos version          # Bump versions + generate workspace CHANGELOG
 
 ./scripts/package-sdk.sh                      # Validate all packages (pub publish --dry-run)
@@ -61,7 +63,7 @@ flutter build apk | ios        # Build per-platform artifacts
 | iOS deployment target | 17.5+ |
 | Android minSdk / compileSdk / targetSdk | 24 / 36 / 36 |
 | Android Gradle Plugin / Gradle | 9.0.1 / 9.1.0 |
-| Xcode | 15.0+ |
+| Xcode / Swift | 26+ / 6.2 |
 | Android NDK | **28.2.13676358** (`racFlutterNdkVersion` override) |
 
 ## Architecture Overview
@@ -196,7 +198,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 ### `runanywhere_llamacpp` — LLM + VLM
 
-- `await LlamaCpp.register()` → FFI `rac_backend_llamacpp_register()` + `rac_backend_llamacpp_vlm_register()`
+- `LlamaCpp.register()` → FFI `rac_backend_llamacpp_register()` + `rac_backend_llamacpp_vlm_register()`
 - Model format: `.gguf` extension
 - Constants: `version='2.0.0'`, `llamaCppVersion='b7199'`
 - iOS: `RABackendLLAMACPP.xcframework` (static `.a`); weak-links Metal/MetalKit/MetalPerformanceShaders
@@ -208,8 +210,18 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 - Model detection: `whisper`/`zipformer`/`paraformer` (STT), `piper`/`vits` (TTS), always handles VAD
 - Constants: `version='2.0.0'`, `onnxRuntimeVersion='1.24.3'`
 - Custom downloader: `OnnxDownloadStrategy` handles `.tar.bz2` archives via `rac_extract_archive_native`
-- iOS: `RABackendONNX.xcframework` (vendored), `RABackendSherpa.xcframework` (present but not in podspec)
+- iOS: `RABackendONNX.xcframework` and `RABackendSherpa.xcframework` are both vendored by the podspec
 - Android: 9 `.so` per ABI (`libonnxruntime`, `libsherpa-onnx-{c-api,jni}`, `librac_backend_{onnx,onnx_jni,sherpa}`, `librunanywhere_{onnx,sherpa}`, `libc++_shared`); declares `RECORD_AUDIO` permission; load order: `onnxruntime` → `sherpa-onnx-c-api` → backends
+
+### `runanywhere_mlx` — Apple MLX (physical iOS devices)
+
+- `await MLX.register()` → FFI `ra_mlx_register_runtime()`
+- Canonical implementation: Swift `RunAnywhereMLX` product; no inference business logic in Dart
+- Capabilities: LLM, VLM, embeddings, STT, and TTS through the shared core router
+- iOS: package-owned `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, and `RunAnywhereMLXMetal.xcframework`; all three are required
+- Packaging: CocoaPods-only. Hub/Crypto require app-root bundles, which Flutter SwiftPM cannot provide without colliding with the real upstream module identities
+- The arm64 simulator slices are for package, compile, link, and startup validation only; registration reports unavailable and no MLX model is executable there
+- Android: unsupported and not declared in the Flutter package manifest
 
 ### `runanywhere_qhexrt` — Qualcomm Hexagon NPU (Android-only)
 
@@ -263,6 +275,7 @@ Extends `package:flutter_lints/flutter.yaml` with:
 |---|---|---|
 | `runanywhere` | `RACommons.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_llamacpp` | `RABackendLLAMACPP.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
+| `runanywhere_mlx` | `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, `RunAnywhereMLXMetal.xcframework` | `ios-arm64`, `ios-arm64-simulator` (validation only) |
 | `runanywhere_onnx` | `RABackendONNX.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_onnx` | `RABackendSherpa.xcframework` | `ios-arm64`, `ios-arm64-simulator`, `macos-arm64` |
 | `runanywhere_qhexrt` | — | none |
@@ -318,6 +331,7 @@ Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equiva
 |---|---|
 | `runanywhere` (Dart package) | 0.20.0 |
 | `runanywhere_llamacpp` | 0.20.0 |
+| `runanywhere_mlx` | 0.20.0 |
 | `runanywhere_onnx` | 0.20.0 |
 | `runanywhere_qhexrt` | 0.20.0 |
 | `RACommons` native | 0.1.6 |

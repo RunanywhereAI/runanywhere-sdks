@@ -14,6 +14,7 @@ Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especi
 |---------|----------|---------|
 | `packages/core` | `@runanywhere/core` | SDK lifecycle, auth, native event/model/storage facades, all AI capability proxies |
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM inference) |
+| `packages/mlx` | `@runanywhere/mlx` | Apple MLX backend registration (LLM, VLM, speech, embeddings on physical iOS devices) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
 | `packages/qhexrt` | `@runanywhere/qhexrt` | Qualcomm Hexagon NPU backend registration and capability probe |
 
@@ -49,7 +50,7 @@ yarn onnx:download-android
 yarn release                    # lerna publish (npm, main branch only)
 ```
 
-### Per-package (from `packages/core/`, `packages/llamacpp/`, or `packages/onnx/`)
+### Per-package (from `packages/core/`, `packages/llamacpp/`, `packages/mlx/`, or `packages/onnx/`)
 
 ```bash
 yarn typecheck                  # tsc --noEmit
@@ -85,6 +86,7 @@ Layer 1: TypeScript API
 
 Layer 2: Nitro Bridge (JSI — no serialization)
   HybridRunAnywhereCore (C++)     — ~60 methods covering all SDK capabilities
+  HybridRunAnywhereCore+MLX       — dynamic registration of the linked Swift MLX runtime
   HybridRunAnywhereLlama (C++)    — LlamaCPP backend + VLM
   HybridRunAnywhereONNX (C++)     — generic ONNX + Sherpa speech registration
   HybridRunAnywhereDeviceInfo     — Platform-specific (Swift on iOS, Kotlin on Android)
@@ -101,6 +103,11 @@ Layer 4: Platform Native Code
 Layer 5: Pre-built C++ Libraries (runanywhere-commons)
   RACommons.xcframework / librac_commons.so       — Core infrastructure, registry, storage, events, proto ABI
   RABackendLLAMACPP.xcframework / .so             — llama.cpp backend
+  RABackendMLX.xcframework                        — MLX commons backend plugin (iOS)
+  RunAnywhereMLXRuntime.xcframework                — shared Swift MLX runtime (iOS)
+  RunAnywhereMLXMetal.xcframework                  — dynamic platform-selected default.metallib carrier (iOS)
+  swift-crypto_Crypto.bundle                       — packaged Crypto resources/privacy manifest (iOS)
+  swift-transformers_Hub.bundle                    — packaged tokenizer resources (iOS)
   RABackendONNX.xcframework / .so                 — generic ONNX backend
   RABackendSherpa.xcframework / .so               — Sherpa-ONNX speech backend
 ```
@@ -109,9 +116,14 @@ Layer 5: Pre-built C++ Libraries (runanywhere-commons)
 
 **NitroModules, not TurboModules**: All native bridging uses Nitrogen-generated `HybridObject` classes registered in `HybridObjectRegistry` at dylib load time (`+load` on iOS, `JNI_OnLoad` on Android). JavaScript calls `NitroModules.createHybridObject("RunAnywhereCore")` to get a JSI handle. There are no `RCT_EXPORT_MODULE` or `RCTBridgeModule` registrations in the SDK itself.
 
-**Swift source of truth, no Swift package dependency**: The RN SDK directly links the same pre-built RACommons/backend binaries described by the Swift architecture doc, but it does not depend on the Swift package product. RN owns only its Nitro bridge and platform adapters.
+**Swift source of truth, no consumer SPM setup**: The RN SDK directly links the same pre-built RACommons/backend binaries described by the Swift architecture doc. MLX packages the commons plugin, shared Swift runtime, and dynamic Metal resource carrier as `RABackendMLX.xcframework`, `RunAnywhereMLXRuntime.xcframework`, and `RunAnywhereMLXMetal.xcframework`, plus the package-owned Hub/Crypto resource bundles. React Native consumers receive that complete payload through CocoaPods rather than adding a separate Swift package dependency. RN does not duplicate MLX inference sources.
 
-**Backend registration is explicit**: Apps must call `LlamaCPP.register()` and `ONNX.register()` separately from `RunAnywhere.initialize()`. These register C++ backend vtables so `RunAnywhereCore`'s backend-agnostic methods know where to route inference calls.
+**Backend registration is explicit**: Apps must call `LlamaCPP.register()`, `MLX.register()`, and `ONNX.register()` separately from `RunAnywhere.initialize()`. These register backend vtables so `RunAnywhereCore`'s backend-agnostic methods know where to route inference calls. MLX deliberately reuses the core Nitro object and discovers the linked Swift runtime through exported C symbols; it does not add a second MLX-specific HybridObject.
+
+**MLX execution is physical-device-only**: the packaged arm64 simulator slices
+exist for package, compile, link, and startup validation. `MLX.register()` and
+`MLX.isAvailable()` return `false` in the iOS Simulator, so apps must not seed
+or present MLX models there.
 
 **HTTP transport vtable pattern**: `rac_http_transport_ops_t` is a C struct of function pointers in `librac_commons.so`. On iOS, `URLSessionHttpTransport` registers URLSession-based callbacks. On Android, `RunAnywhereCorePackage`'s companion `init` block calls `racHttpTransportRegisterOkHttp()` which installs OkHttp via JNI. This must happen before any native HTTP request.
 
@@ -213,6 +225,7 @@ The parent repo (`runanywhere-sdks-main`) declares these packages as workspaces 
 ```
 sdk/runanywhere-react-native/packages/core
 sdk/runanywhere-react-native/packages/llamacpp
+sdk/runanywhere-react-native/packages/mlx
 sdk/runanywhere-react-native/packages/onnx
 examples/react-native/RunAnywhereAI
 sdk/shared/proto-ts

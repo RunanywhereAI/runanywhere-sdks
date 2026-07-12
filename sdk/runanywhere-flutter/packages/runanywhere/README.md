@@ -148,6 +148,6 @@ print(result.text);
 
 ## License
 
-RunAnywhere License (Apache 2.0 based). See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE).
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms). See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE).
 
 Commercial licensing: san@runanywhere.ai

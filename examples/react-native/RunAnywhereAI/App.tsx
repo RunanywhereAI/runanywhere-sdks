@@ -50,12 +50,11 @@ import {
 
 /**
  * Minimal structural type for optional backend modules.
- * Each backend exposes a `register()` entry point and an optional `isAvailable`
- * flag. Typed here to avoid `any` while keeping the dynamic-require pattern.
+ * Each backend exposes a `register()` entry point. Typed here to avoid `any`
+ * while keeping the dynamic-require pattern.
  */
 type OptionalBackend = {
   register: () => void | Promise<void | boolean>;
-  isAvailable?: boolean;
 };
 
 // Make LlamaCPP optional for ONNX-only builds
@@ -73,6 +72,15 @@ try {
   ONNX = require('@runanywhere/onnx').ONNX as OptionalBackend;
 } catch {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
+}
+
+// MLX is an Apple-only optional backend. The package reuses the core Nitro
+// bridge and links the Swift/Metal runtime through CocoaPods.
+let MLX: OptionalBackend | null = null;
+try {
+  MLX = require('@runanywhere/mlx').MLX as OptionalBackend;
+} catch {
+  logDiagnostic('[App] MLX backend not available - Apple MLX disabled');
 }
 
 // QHexRT (Qualcomm Hexagon NPU) — Android arm64 only. On other platforms the
@@ -151,6 +159,16 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     );
   }
 
+  const mlxResult = MLX ? await MLX.register() : false;
+  const mlxRegistered = mlxResult !== false;
+  if (!MLX) {
+    logDiagnostic('[App] Skipping MLX models - backend not available');
+  } else if (!mlxRegistered) {
+    logDiagnostic(
+      '[App] MLX.register() returned false - Apple MLX runtime unavailable'
+    );
+  }
+
   // QHexRT registers all NPU modalities (LLM/VLM/STT/TTS) in one call. The SDK
   // resolves logical HNPU URLs to the current Hexagon arch during registration.
   let qhexrtRegistered = false;
@@ -169,7 +187,12 @@ async function registerBackends(): Promise<BackendRegistrationState> {
     }
   }
 
-  return { llamaRegistered, onnxRegistered, qhexrtRegistered };
+  return {
+    llamaRegistered,
+    onnxRegistered,
+    mlxRegistered,
+    qhexrtRegistered,
+  };
 }
 
 const App: React.FC = () => {

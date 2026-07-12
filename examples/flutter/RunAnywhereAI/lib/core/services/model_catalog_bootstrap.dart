@@ -17,7 +17,7 @@ abstract final class ModelCatalogBootstrap {
   /// hot-reload (or any second call) re-runs the entire registration block.
   static bool _modulesRegistered = false;
 
-  static Future<void> registerAll() async {
+  static Future<void> registerAll({bool mlxRegistered = false}) async {
     if (_modulesRegistered) {
       debugPrint('Catalog already registered — skipping');
       return;
@@ -146,6 +146,12 @@ abstract final class ModelCatalogBootstrap {
       memoryRequirement: 2000000000,
     );
     debugPrint('LLM models registered');
+
+    if (mlxRegistered) {
+      await _registerAppleMlxModels();
+    } else {
+      debugPrint('Skipping Apple MLX models — backend unavailable');
+    }
 
     // --- VLM models (multi-modal, multi-file) -----------------------------
     await _registerArchive(
@@ -286,6 +292,99 @@ abstract final class ModelCatalogBootstrap {
 
     debugPrint('All modules and models registered');
     _modulesRegistered = true;
+  }
+
+  /// A compact Apple MLX catalog aligned with the canonical iOS example.
+  /// One proven model per supported modality keeps the Flutter example useful
+  /// without duplicating the full iOS catalog.
+  static Future<void> _registerAppleMlxModels() async {
+    await _registerLLM(
+      id: 'mlx-qwen3-0.6b-4bit',
+      name: 'MLX Qwen3 0.6B 4bit',
+      url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 650000000,
+      supportsThinking: true,
+    );
+    await _registerLLM(
+      id: 'mlx-qwen2-vl-2b-instruct-4bit',
+      name: 'MLX Qwen2-VL 2B Instruct 4bit',
+      url: 'https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 2200000000,
+    );
+    await _registerMultiFile(
+      id: 'mlx-qwen3-asr-0.6b-8bit',
+      name: 'MLX Qwen3-ASR 0.6B 8bit',
+      files: [
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/chat_template.json',
+          filename: 'chat_template.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/config.json',
+          filename: 'config.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/generation_config.json',
+          filename: 'generation_config.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/merges.txt',
+          filename: 'merges.txt',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors',
+          filename: 'model.safetensors',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors.index.json',
+          filename: 'model.safetensors.index.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/preprocessor_config.json',
+          filename: 'preprocessor_config.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/tokenizer_config.json',
+          filename: 'tokenizer_config.json',
+        ),
+        (
+          url:
+              'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/vocab.json',
+          filename: 'vocab.json',
+        ),
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      memoryRequirement: 1010773761,
+    );
+    await _registerLLM(
+      id: 'mlx-kokoro-82m-6bit',
+      name: 'MLX Kokoro 82M 6bit',
+      url: 'https://huggingface.co/mlx-community/Kokoro-82M-6bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      memoryRequirement: 309640166,
+    );
+    await _registerLLM(
+      id: 'mlx-qwen3-embedding-0.6b-4bit-dwq',
+      name: 'MLX Qwen3 Embedding 0.6B 4bit DWQ',
+      url: 'https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      memoryRequirement: 350000000,
+    );
+    debugPrint('Apple MLX models registered');
   }
 
   /// Register logical HNPU rows. QHexRT's native bundle resolver chooses the

@@ -17,6 +17,7 @@
  * They call the C++ rac_*_component_* APIs which work with any registered backend.
  * Apps must install a backend package to register the actual implementation:
  * - @runanywhere/llamacpp registers the LLM backend
+ * - @runanywhere/mlx registers Apple MLX inference backends
  * - @runanywhere/onnx registers the STT/TTS/VAD backends
  *
  * Matches Swift SDK: RunAnywhere.swift + CppBridge extensions
@@ -29,6 +30,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * This interface provides all SDK functionality using backend-agnostic C++ APIs.
  * Install backend packages to enable specific capabilities:
  * - @runanywhere/llamacpp for text generation (LLM)
+ * - @runanywhere/mlx for Apple MLX inference
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
 export interface RunAnywhereCore extends HybridObject<{
@@ -99,8 +101,9 @@ export interface RunAnywhereCore extends HybridObject<{
    * Apple MLX runtime bridge.
    *
    * These methods call the Swift MLX runtime C entrypoints when the host app
-   * links `RunAnywhereMLX`. They return false on platforms or builds where the
-   * Swift runtime is not present.
+   * links `RunAnywhereMLX`. Availability is true only on a supported physical
+   * iOS device; the arm64 simulator artifact is for package, compile, and link
+   * validation and returns false.
    */
   mlxRuntimeAvailable(): Promise<boolean>;
   mlxRegisterBackend(priority: number): Promise<boolean>;

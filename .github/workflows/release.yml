@@ -13,7 +13,7 @@ name: Release
 #
 # Pre-flight (engineer runs locally before tagging):
 #   scripts/release/sync-versions.sh 1.2.3
-#   build the five Swift XCFramework archives
+#   build seven Swift XCFramework archives plus the MLX resource archive
 #   keep Package.swift production-defaulted to remote binaries
 #   sync and commit the real remote-binary checksums
 #   run all release gates, then commit the tag-ready manifest
@@ -67,17 +67,21 @@ jobs:
           fi
       - name: Verify release-train version coherence
         run: bash scripts/validation/gates/check_release_version_coherence.sh
-      - name: Verify tagged SwiftPM manifest uses release binaries
+      - name: Verify tagged Apple package contracts use release binaries
         run: |
           set -euo pipefail
           if ! grep -Fq 'RUNANYWHERE_USE_LOCAL_NATIVES"] == "1"' Package.swift; then
             echo "::error::Package.swift must default to remote release binaries and require explicit local opt-in."
             exit 1
           fi
-          if grep -Eq 'checksum: "0{64}"' Package.swift; then
-            echo "::error::Package.swift contains a placeholder XCFramework checksum."
-            exit 1
-          fi
+          for manifest in \
+            Package.swift \
+            sdk/runanywhere-flutter/packages/runanywhere_mlx/ios/runanywhere_mlx.podspec; do
+            if grep -Eq '0{64}' "$manifest"; then
+              echo "::error::$manifest contains a placeholder Apple binary/resource checksum."
+              exit 1
+            fi
+          done
 
   # ---------------------------------------------------------------------------
   # Native artifact builds — full matrix.
@@ -418,10 +422,13 @@ jobs:
 
   sdk_react_native:
     needs: [validate, native_ios, native_android]
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: ios
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node
@@ -540,6 +547,25 @@ jobs:
               exit 1
             fi
           done
+          if [ ! -d "$BINARIES/RunAnywhereMLXRuntime.xcframework" ]; then
+            echo "::error::Missing staged cross-SDK MLX runtime: RunAnywhereMLXRuntime.xcframework"
+            exit 1
+          fi
+          if [ ! -d "$BINARIES/RunAnywhereMLXMetal.xcframework" ]; then
+            echo "::error::Missing platform-selected MLX Metal resource XCFramework"
+            exit 1
+          fi
+          for bundle in swift-crypto_Crypto swift-transformers_Hub; do
+            if [ ! -d "$BINARIES/RunAnywhereMLXRuntimeResources/${bundle}.bundle" ]; then
+              echo "::error::Missing staged MLX runtime resource bundle: ${bundle}.bundle"
+              exit 1
+            fi
+          done
+          if ! find "$BINARIES/RunAnywhereMLXRuntimeResources/ThirdPartyNotices" \
+            -type f -print -quit | grep -q .; then
+            echo "::error::Missing staged MLX third-party attribution notices"
+            exit 1
+          fi
 
           # Publishing happens only after every consumer job succeeds, so the
           # tag's remote binary URLs do not exist yet. Point the starter at this
@@ -1121,8 +1147,8 @@ jobs:
 
           mapfile -t candidates < <(find "$STAGING" -type f -name '*.tgz' | sort)
           mapfile -t checksums < <(find "$STAGING" -type f -name '*.tgz.sha256' | sort)
-          if [ "${#candidates[@]}" -ne 3 ] || [ "${#checksums[@]}" -ne 3 ]; then
-            echo "::error::Expected three RN tarballs and three checksum sidecars; found ${#candidates[@]} and ${#checksums[@]}"
+          if [ "${#candidates[@]}" -ne 4 ] || [ "${#checksums[@]}" -ne 4 ]; then
+            echo "::error::Expected four RN tarballs and four checksum sidecars; found ${#candidates[@]} and ${#checksums[@]}"
             exit 1
           fi
           for checksum in "${checksums[@]}"; do
@@ -1144,6 +1170,7 @@ jobs:
           }
           stage_candidate "runanywhere-core-${RELEASE_VERSION}.tgz"
           stage_candidate "runanywhere-llamacpp-${RELEASE_VERSION}.tgz"
+          stage_candidate "runanywhere-mlx-${RELEASE_VERSION}.tgz"
           stage_candidate "runanywhere-onnx-${RELEASE_VERSION}.tgz"
 
           CORE_ARCHIVE="$LOCAL_SDK/runanywhere-core-${RELEASE_VERSION}.tgz"
@@ -1166,10 +1193,10 @@ jobs:
           const candidates = {
             '@runanywhere/core': `runanywhere-core-${version}.tgz`,
             '@runanywhere/llamacpp': `runanywhere-llamacpp-${version}.tgz`,
+            '@runanywhere/mlx': `runanywhere-mlx-${version}.tgz`,
             '@runanywhere/onnx': `runanywhere-onnx-${version}.tgz`,
           };
           manifest.dependencies ??= {};
-          delete manifest.dependencies['@runanywhere/mlx'];
           delete manifest.dependencies['@runanywhere/proto-ts'];
           for (const [name, filename] of Object.entries(candidates)) {
             manifest.dependencies[name] = `file:local-sdk/${filename}`;
@@ -1200,10 +1227,11 @@ jobs:
           import { Text, View } from 'react-native';
           import { RunAnywhere } from '@runanywhere/core';
           import { LlamaCPP } from '@runanywhere/llamacpp';
+          import { MLX } from '@runanywhere/mlx';
           import { ONNX } from '@runanywhere/onnx';
 
           export default function App(): React.JSX.Element {
-            void [RunAnywhere, LlamaCPP, ONNX];
+            void [RunAnywhere, LlamaCPP, MLX, ONNX];
             return (
               <View>
                 <Text>RunAnywhere release candidate</Text>
@@ -1221,8 +1249,14 @@ jobs:
           const expected = [
             '@runanywhere/core',
             '@runanywhere/llamacpp',
+            '@runanywhere/mlx',
             '@runanywhere/onnx',
           ];
+          const protoOwners = new Set([
+            '@runanywhere/core',
+            '@runanywhere/llamacpp',
+            '@runanywhere/onnx',
+          ]);
           const rootManifest = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
           if (rootManifest.dependencies['react-native-nitro-modules'] !== process.env.NITRO_RANGE) {
@@ -1234,15 +1268,6 @@ jobs:
             if (manifest.name !== name || manifest.version !== process.env.RELEASE_VERSION) {
               throw new Error(`${name} resolved ${manifest.name}@${manifest.version}, expected ${process.env.RELEASE_VERSION}`);
             }
-            if (manifest.dependencies?.['@runanywhere/proto-ts'] !== process.env.RELEASE_VERSION) {
-              throw new Error(`${name} does not pin the bundled proto-ts payload`);
-            }
-            if (manifest.dependencies?.['@bufbuild/protobuf'] !== '^2.12.1') {
-              throw new Error(`${name} does not declare the bundled proto runtime dependency`);
-            }
-            if (JSON.stringify(manifest.bundledDependencies) !== JSON.stringify(['@runanywhere/proto-ts'])) {
-              throw new Error(`${name} does not declare its bundled proto-ts payload`);
-            }
             if (!rootManifest.dependencies[name].startsWith('file:local-sdk/')) {
               throw new Error(`${name} is not pinned to a local release candidate`);
             }
@@ -1250,15 +1275,31 @@ jobs:
             if (!locked || locked.version !== process.env.RELEASE_VERSION) {
               throw new Error(`${name} lock entry is not the release candidate`);
             }
-            const packageRequire = createRequire(path.join(packageRoot, 'package.json'));
-            const protoManifest = JSON.parse(
-              fs.readFileSync(packageRequire.resolve('@runanywhere/proto-ts/package.json'), 'utf8')
-            );
-            if (protoManifest.version !== process.env.RELEASE_VERSION) {
-              throw new Error(`${name} resolved proto-ts@${protoManifest.version}`);
+            if (protoOwners.has(name)) {
+              if (manifest.dependencies?.['@runanywhere/proto-ts'] !== process.env.RELEASE_VERSION) {
+                throw new Error(`${name} does not pin the bundled proto-ts payload`);
+              }
+              if (manifest.dependencies?.['@bufbuild/protobuf'] !== '^2.12.1') {
+                throw new Error(`${name} does not declare the bundled proto runtime dependency`);
+              }
+              if (JSON.stringify(manifest.bundledDependencies) !== JSON.stringify(['@runanywhere/proto-ts'])) {
+                throw new Error(`${name} does not declare its bundled proto-ts payload`);
+              }
+              const packageRequire = createRequire(path.join(packageRoot, 'package.json'));
+              const protoManifest = JSON.parse(
+                fs.readFileSync(packageRequire.resolve('@runanywhere/proto-ts/package.json'), 'utf8')
+              );
+              if (protoManifest.version !== process.env.RELEASE_VERSION) {
+                throw new Error(`${name} resolved proto-ts@${protoManifest.version}`);
+              }
+              packageRequire.resolve('@bufbuild/protobuf/wire');
+              console.log(`verified ${name}@${manifest.version} with bundled proto-ts@${protoManifest.version}`);
+            } else {
+              if (manifest.dependencies?.['@runanywhere/proto-ts'] || manifest.bundledDependencies) {
+                throw new Error(`${name} must remain a thin facade without a bundled proto payload`);
+              }
+              console.log(`verified thin facade ${name}@${manifest.version}`);
             }
-            packageRequire.resolve('@bufbuild/protobuf/wire');
-            console.log(`verified ${name}@${manifest.version} with bundled proto-ts@${protoManifest.version}`);
           }
           NODE
           npm ls react-native-nitro-modules
@@ -1379,6 +1420,9 @@ jobs:
           assert_pair "iOS ONNX XCFramework"          "RABackendONNX-ios-v${VERSION}.zip"
           assert_pair "iOS Sherpa XCFramework"        "RABackendSherpa-ios-v${VERSION}.zip"
           assert_pair "iOS MLX XCFramework"           "RABackendMLX-ios-v${VERSION}.zip"
+          assert_pair "iOS MLX Swift runtime"         "RunAnywhereMLXRuntime-ios-v${VERSION}.zip"
+          assert_pair "iOS MLX Metal resources"       "RunAnywhereMLXMetal-ios-v${VERSION}.zip"
+          assert_pair "iOS MLX Swift resources"       "RunAnywhereMLXResources-ios-v${VERSION}.zip"
           assert_pair "Android arm64-v8a"              "RACommons-android-arm64-v8a-v${VERSION}.zip"
           assert_pair "Android armeabi-v7a"            "RACommons-android-armeabi-v7a-v${VERSION}.zip"
           assert_pair "Android x86_64"                 "RACommons-android-x86_64-v${VERSION}.zip"
@@ -1394,6 +1438,7 @@ jobs:
           assert_pair "Web ONNX package"               "runanywhere-web-onnx-${VERSION}.tgz"
           assert_pair "React Native core package"      "runanywhere-core-${VERSION}.tgz"
           assert_pair "React Native LlamaCPP package"  "runanywhere-llamacpp-${VERSION}.tgz"
+          assert_pair "React Native MLX package"       "runanywhere-mlx-${VERSION}.tgz"
           assert_pair "React Native ONNX package"      "runanywhere-onnx-${VERSION}.tgz"
           qhexrt_artifacts="$(find release-flat -maxdepth 1 -type f -iname '*qhexrt*' -print)"
           if [ -n "$qhexrt_artifacts" ]; then
@@ -1414,16 +1459,15 @@ jobs:
             done
           )
           echo "All required release assets are present and checksum-valid."
-      - name: Verify built XCFramework checksums match tagged Package.swift
-        # The tag is immutable: changing Package.swift here would only create
-        # an unattached file while SwiftPM continues to read the broken tagged
-        # manifest. Release preparation must commit the real checksums first;
-        # this gate proves the rebuilt archives are byte-identical and aborts
-        # publication on any mismatch.
+      - name: Verify built Apple checksums match tagged package contracts
+        # The tag is immutable: changing Package.swift or the Flutter MLX
+        # podspec here would only create unattached files. Release preparation
+        # must commit the real checksums first; this gate proves the rebuilt
+        # archives are byte-identical and aborts publication on any mismatch.
         run: |
           set -euo pipefail
           if ! ./sdk/runanywhere-swift/scripts/sync-checksums.sh --check release-flat; then
-            echo "::error::The built Swift archives do not match Package.swift at this tag. Rebuild deterministic archives and commit their checksums before creating the tag."
+            echo "::error::The built Apple archives do not match the tagged package contracts. Rebuild deterministic archives and commit their checksums before creating the tag."
             exit 1
           fi
       - name: Create / update GitHub Release

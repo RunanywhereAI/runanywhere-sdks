@@ -94,7 +94,7 @@ struct RunAnywhereAIApp: App {
             #if canImport(LlamaCPPRuntime)
             LlamaCPP.register(priority: 100)
             #endif
-            MLX.register(priority: 100)
+            let mlxRegistered = MLX.register(priority: 100)
             #if canImport(ONNXRuntime)
             ONNX.register(priority: 100)
             #endif
@@ -108,7 +108,7 @@ struct RunAnywhereAIApp: App {
                 RunAnywhere.setHfToken(hfToken)
             }
 
-            await ModelCatalogBootstrap.registerAll()
+            await ModelCatalogBootstrap.registerAll(mlxRegistered: mlxRegistered)
             await refreshSDKCatalogs()
 
             let initTime = Date().timeIntervalSince(startTime)

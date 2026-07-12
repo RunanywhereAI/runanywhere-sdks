@@ -5,7 +5,8 @@
  * the C++ `runanywhere-commons` ABI. All SDK capabilities (LLM, STT, TTS,
  * VAD, VLM, RAG, hardware, registry, storage, events, …) are reached
  * through this single proxy. Backend packages register themselves with
- * commons separately (`@runanywhere/llamacpp`, `@runanywhere/onnx`).
+ * commons separately (`@runanywhere/llamacpp`, `@runanywhere/mlx`,
+ * `@runanywhere/onnx`).
  */
 
 import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';

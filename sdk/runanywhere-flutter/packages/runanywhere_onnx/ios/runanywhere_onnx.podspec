@@ -33,7 +33,7 @@ ONNX Runtime and Sherpa-ONNX — all statically linked into
 RABackendONNX.xcframework.
                        DESC
   s.homepage         = 'https://runanywhere.ai'
-  s.license          = { :type => 'MIT' }
+  s.license          = { :type => 'RunAnywhere License', :file => '../LICENSE' }
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 

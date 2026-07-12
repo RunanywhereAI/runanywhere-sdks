@@ -7,6 +7,7 @@ environment:
 workspace:
   - packages/runanywhere
   - packages/runanywhere_llamacpp
+  - packages/runanywhere_mlx
   - packages/runanywhere_onnx
   - packages/runanywhere_qhexrt
 
@@ -33,8 +34,8 @@ melos:
   # Current centralization model:
   #   - The `packages/runanywhere` package is the source of truth for every
   #     third-party constraint shared across the workspace.
-  #   - Backend sub-packages (`runanywhere_llamacpp`, `runanywhere_onnx`,
-  #     `runanywhere_qhexrt`) should use the same shared-dependency major
+  #   - Backend sub-packages (`runanywhere_llamacpp`, `runanywhere_mlx`,
+  #     `runanywhere_onnx`, `runanywhere_qhexrt`) should use the same shared-dependency major
   #     range as the root package, expressed as a bounded publishable range
   #     (for example `>=2.2.0 <3.0.0`) when pub.dev rejects `any`.
   #   - The linter still flags hardcoded `^x.y.z` literals in sub-packages.

@@ -29,6 +29,7 @@ const { registerModel, registerMultiFileModel } = RunAnywhere;
 export type BackendRegistrationState = {
   llamaRegistered: boolean;
   onnxRegistered: boolean;
+  mlxRegistered: boolean;
   qhexrtRegistered: boolean;
 };
 
@@ -41,7 +42,7 @@ let qhexrtBackendRegistered = false;
 export async function registerAll(
   backendState: BackendRegistrationState
 ): Promise<void> {
-  const { llamaRegistered, onnxRegistered, qhexrtRegistered } =
+  const { llamaRegistered, onnxRegistered, mlxRegistered, qhexrtRegistered } =
     backendState;
   // =========================================================================
   // LlamaCPP backend + LLM models
@@ -227,6 +228,102 @@ export async function registerAll(
   // =========================================================================
   if (llamaRegistered) {
     await registerLoraAdapters();
+  }
+
+  // =========================================================================
+  // MLX backend — representative Apple catalog aligned with the iOS example
+  // =========================================================================
+  if (mlxRegistered) {
+    await Promise.all([
+      registerModel({
+        id: 'mlx-qwen3-0.6b-4bit',
+        name: 'MLX Qwen3 0.6B 4bit',
+        url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        memoryRequirement: 650_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'mlx-qwen2-vl-2b-instruct-4bit',
+        name: 'MLX Qwen2-VL 2B Instruct 4bit',
+        url: 'https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        memoryRequirement: 2_200_000_000,
+      }),
+      registerMultiFileModel({
+        id: 'mlx-qwen3-asr-0.6b-8bit',
+        name: 'MLX Qwen3-ASR 0.6B 8bit',
+        files: [
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/chat_template.json',
+            filename: 'chat_template.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/config.json',
+            filename: 'config.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/generation_config.json',
+            filename: 'generation_config.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/merges.txt',
+            filename: 'merges.txt',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors',
+            filename: 'model.safetensors',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/model.safetensors.index.json',
+            filename: 'model.safetensors.index.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/preprocessor_config.json',
+            filename: 'preprocessor_config.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/tokenizer_config.json',
+            filename: 'tokenizer_config.json',
+            isRequired: true,
+          },
+          {
+            url: 'https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-8bit/resolve/main/vocab.json',
+            filename: 'vocab.json',
+            isRequired: true,
+          },
+        ],
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        memoryRequirement: 1_010_773_761,
+      }),
+      registerModel({
+        id: 'mlx-kokoro-82m-6bit',
+        name: 'MLX Kokoro 82M 6bit',
+        url: 'https://huggingface.co/mlx-community/Kokoro-82M-6bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        memoryRequirement: 309_640_166,
+      }),
+      registerModel({
+        id: 'mlx-qwen3-embedding-0.6b-4bit-dwq',
+        name: 'MLX Qwen3 Embedding 0.6B 4bit DWQ',
+        url: 'https://huggingface.co/mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        memoryRequirement: 350_000_000,
+      }),
+    ]);
+  } else {
+    logDiagnostic('[App] Skipping MLX models - backend not available');
   }
 
   // =========================================================================

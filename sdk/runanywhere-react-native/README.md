@@ -7,7 +7,7 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
   <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-7.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 7.0+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.9+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.9+" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" /></a>
 </p>
 
 ---
@@ -90,6 +90,7 @@ This SDK uses a modular multi-package architecture. Install only the packages yo
 |---------|-------------|----------|
 | `@runanywhere/core` | Core SDK facade, native lifecycle/event/model APIs, proto types | Yes |
 | `@runanywhere/llamacpp` | LlamaCPP backend for LLM text generation (GGUF models) | For LLM |
+| `@runanywhere/mlx` | Apple MLX backend for LLM, VLM, speech, and embeddings on physical iOS devices | For Apple MLX |
 | `@runanywhere/onnx` | ONNX Runtime backend for STT/TTS (Whisper, Piper) | For Voice |
 
 ---
@@ -99,9 +100,9 @@ This SDK uses a modular multi-package architecture. Install only the packages yo
 ### Full Installation (All Features)
 
 ```bash
-npm install @runanywhere/core @runanywhere/llamacpp @runanywhere/onnx
+npm install @runanywhere/core @runanywhere/llamacpp @runanywhere/mlx @runanywhere/onnx
 # or
-yarn add @runanywhere/core @runanywhere/llamacpp @runanywhere/onnx
+yarn add @runanywhere/core @runanywhere/llamacpp @runanywhere/mlx @runanywhere/onnx
 ```
 
 ### Minimal Installation (LLM Only)
@@ -114,6 +115,12 @@ npm install @runanywhere/core @runanywhere/llamacpp
 
 ```bash
 npm install @runanywhere/core @runanywhere/onnx
+```
+
+### Minimal Installation (Apple MLX)
+
+```bash
+npm install @runanywhere/core @runanywhere/mlx
 ```
 
 ### iOS Setup
@@ -148,6 +155,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 import { LlamaCPP } from '@runanywhere/llamacpp';
+import { MLX } from '@runanywhere/mlx';
 import { ONNX } from '@runanywhere/onnx';
 
 // Initialize SDK (development mode - no API key needed)
@@ -176,6 +184,20 @@ if (llamaRegistered) {
     url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     memoryRequirement: 500_000_000,
+  });
+}
+
+// MLX uses the same core model APIs and is available only on a physical iOS
+// device when the runtime from @runanywhere/mlx is linked into the host app.
+const mlxRegistered = await MLX.register();
+if (mlxRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'mlx-qwen3-0.6b-4bit',
+    name: 'MLX Qwen3 0.6B 4bit',
+    url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+    memoryRequirement: 650_000_000,
+    supportsThinking: true,
   });
 }
 
@@ -676,7 +698,7 @@ Contributions are welcome. This section explains how to set up your development 
 ### Prerequisites
 
 - **Node.js** 18+
-- **Xcode** 15+ (for iOS builds)
+- **Xcode** 26+ with Swift 6.2 (for iOS builds)
 - **Android Studio** with NDK 27.3.13750724 (for Android builds)
 - **CMake** 3.24+
 
@@ -704,6 +726,7 @@ yarn install
 `package-sdk.sh --natives-from PATH` copies each binary into the package that owns it:
 - `RACommons.xcframework` / `librac_commons.so` → `packages/core`
 - `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` → `packages/llamacpp`
+- `RABackendMLX.xcframework` + `RunAnywhereMLXRuntime.xcframework` + `RunAnywhereMLXMetal.xcframework` → `packages/mlx` (physical-device execution; arm64 simulator validation only)
 - `RABackendONNX.xcframework` + `RABackendSherpa.xcframework` / matching `.so` files → `packages/onnx`
 
 Public Android packages include bridge and backend binaries for `arm64-v8a`,
@@ -847,7 +870,7 @@ Open an issue on GitHub with:
 
 ## License
 
-MIT License. See [LICENSE](../../LICENSE) for details.
+RunAnywhere License. See [LICENSE](../../LICENSE) for details.
 
 ---
 
