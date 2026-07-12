@@ -65,22 +65,64 @@ case "${PLATFORM}" in
             install_name_tool -change "${dep}" "@rpath/${local_name}" "${STAGE}/bin/rcli"
         done
 
+        # The pinned ONNX Runtime 1.24.4 arm64 dylib embeds its upstream CI
+        # checkout prefix in __FILE__ strings. Rewrite only that reviewed
+        # byte prefix, with raw/transformed digests and occurrence count
+        # pinned so an upstream artifact change fails closed.
+        for library in "${STAGE}"/lib/libonnxruntime*.dylib; do
+            [ -e "${library}" ] || continue
+            python3 - "${library}" <<'PY'
+from hashlib import sha256
+from pathlib import Path
+import sys
+
+library = Path(sys.argv[1])
+payload = library.read_bytes()
+source = b"/Users/cloudtest/vss/_work/"
+replacement = b"/runanywhere/vendor/onnxrt/"
+raw_digest = "872533f130f1839a5bc01788ddb4f75c83a189763441ba1178788ed965449289"
+transformed_digest = "3e4f1ac4cef99693c95532f38b436bd106156504c4dd51595af2e51d3c3d00ee"
+expected_count = 843
+
+digest = sha256(payload).hexdigest()
+if digest == raw_digest:
+    if payload.count(source) != expected_count or replacement in payload:
+        raise SystemExit("ERROR: ONNX Runtime embedded-path inventory drifted")
+    payload = payload.replace(source, replacement)
+    if sha256(payload).hexdigest() != transformed_digest:
+        raise SystemExit("ERROR: ONNX Runtime sanitized digest mismatch")
+    library.write_bytes(payload)
+elif digest != transformed_digest:
+    raise SystemExit("ERROR: unreviewed ONNX Runtime dylib bytes")
+
+if payload.count(source) or payload.count(replacement) != expected_count:
+    raise SystemExit("ERROR: ONNX Runtime path sanitization was incomplete")
+PY
+        done
+
         # A copied Homebrew dylib may retain an absolute install ID or refer
         # to another copied dylib through its Cellar path. Make the complete
         # staged set self-contained before validating the executable.
         for library in "${STAGE}"/lib/*.dylib; do
             [ -e "${library}" ] || continue
             library_name="$(basename "${library}")"
-            install_name_tool -id "@rpath/${library_name}" "${library}"
+            library_id="$(otool -D "${library}" | tail -1)"
+            if [[ "${library_id}" != @rpath/* && "${library_id}" != @loader_path/* ]]; then
+                install_name_tool -id "@rpath/${library_name}" "${library}"
+            fi
             library_deps=$(otool -L "${library}" | awk 'NR>1 {print $1}')
             for library_dep in ${library_deps}; do
                 dep_name="$(basename "${library_dep}")"
-                if [ "${dep_name}" != "${library_name}" ] && [ -f "${STAGE}/lib/${dep_name}" ]; then
+                if [ "${dep_name}" != "${library_name}" ] \
+                    && [ "${library_dep}" != "@loader_path/${dep_name}" ] \
+                    && [ -f "${STAGE}/lib/${dep_name}" ]; then
                     install_name_tool -change "${library_dep}" "@loader_path/${dep_name}" "${library}"
                 fi
             done
             while IFS= read -r rpath; do
-                install_name_tool -delete_rpath "${rpath}" "${library}"
+                if [[ "${rpath}" != @loader_path* && "${rpath}" != @rpath* ]]; then
+                    install_name_tool -delete_rpath "${rpath}" "${library}"
+                fi
             done < <(otool -l "${library}" | awk '
                 $1 == "cmd" && $2 == "LC_RPATH" { in_rpath = 1; next }
                 in_rpath && $1 == "path" { print $2; in_rpath = 0 }
