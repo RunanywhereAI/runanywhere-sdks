@@ -150,6 +150,15 @@ load_allowlist
 printf "Scanning for deprecated/DTO/JSON bridge surfaces...\n"
 
 # =========================================================================
+# 0. Canonical protobuf IDL
+# =========================================================================
+
+# Removed wire fields keep only numeric reservations. Do not reintroduce
+# source-level compatibility fields that regenerate deprecated SDK members.
+scan_grep "idl" \
+  "deprecated[[:space:]]*=[[:space:]]*true" "*.proto" "proto:deprecated-declaration"
+
+# =========================================================================
 # 1. Kotlin SDK
 # =========================================================================
 
