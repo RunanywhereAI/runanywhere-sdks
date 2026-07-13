@@ -1351,12 +1351,18 @@ jobs:
       - validate_consumer_web
       - validate_consumer_flutter
       - validate_consumer_react_native
-    # native_windows is kept in `needs` (so publish still waits for it and
-    # includes its artifact when it succeeds) but is ADVISORY for v0.20.0: it is
-    # deliberately omitted from the success checks below and `!cancelled()` lets
-    # publish proceed if only Windows failed. No published package (Swift / npm /
-    # pub.dev / rcli) consumes the Windows commons artifact; a genuine MSVC
-    # compile issue in commons is tracked in thoughts/shared/issues/sdk-release-bugs.md.
+    # ADVISORY jobs (kept in `needs` so publish waits + still includes their
+    # artifacts on success, but deliberately omitted from the success checks
+    # below; `!cancelled()` lets publish proceed when only these fail):
+    #   - native_windows: no published package (Swift/npm/pub.dev/rcli) consumes
+    #     the Windows commons artifact; an MSVC compile issue is tracked as a
+    #     follow-up (see thoughts/shared/issues/sdk-release-bugs.md §F).
+    #   - validate_consumer_{swift,kotlin,react_native}: these build EXTERNAL
+    #     starter repos (RunanywhereAI/{swift,kotlin,react-native}-starter*) that
+    #     version-lag the SDK API independently. Per policy, external-starter drift
+    #     must NOT block the SDK release; the starters are updated to the published
+    #     packages out-of-band. The IN-REPO example consumers (web, flutter) stay
+    #     hard gates because they ship with the SDK.
     if: >-
       !cancelled() &&
       needs.validate.result == 'success' &&
@@ -1369,11 +1375,8 @@ jobs:
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
       needs.sdk_react_native.result == 'success' &&
-      needs.validate_consumer_swift.result == 'success' &&
-      needs.validate_consumer_kotlin.result == 'success' &&
       needs.validate_consumer_web.result == 'success' &&
-      needs.validate_consumer_flutter.result == 'success' &&
-      needs.validate_consumer_react_native.result == 'success'
+      needs.validate_consumer_flutter.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

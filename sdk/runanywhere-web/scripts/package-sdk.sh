@@ -62,6 +62,16 @@ cd "$WEB_ROOT"
 echo ">> npm ci"
 npm ci
 
+# proto-ts is a SIBLING workspace member (../shared/proto-ts), so npm's hoisting
+# from $WEB_ROOT places @bufbuild/protobuf into $WEB_ROOT/node_modules only —
+# unreachable when tsc compiles proto-ts from its own sibling dir (TS2307 on
+# '@bufbuild/protobuf/wire' in a clean CI checkout; only passes locally via a
+# stray repo-root install). Install proto-ts standalone from its committed
+# lockfile first, mirroring the RN SDK's package-sdk.sh. --workspaces=false stops
+# npm from detecting the monorepo root and failing on the `workspace:*` protocol.
+echo ">> npm ci proto-ts (standalone, so tsc can resolve @bufbuild/protobuf)"
+(cd "$REPO_ROOT/sdk/shared/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
+
 echo ">> npm run build:ts"
 npm run build:ts
 

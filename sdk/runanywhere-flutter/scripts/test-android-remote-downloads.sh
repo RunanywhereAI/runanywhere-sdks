@@ -6,7 +6,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 FLUTTER_PACKAGES="${REPO_ROOT}/sdk/runanywhere-flutter/packages"
-KOTLIN_ROOT="${REPO_ROOT}/sdk/runanywhere-kotlin"
 ANDROID_PROJECT="${REPO_ROOT}/examples/flutter/RunAnywhereAI/android"
 VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/sdk/runanywhere-commons/VERSION")"
 FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/rac-flutter-release.XXXXXX")"
@@ -19,10 +18,13 @@ for abi in arm64-v8a armeabi-v7a x86_64; do
     stage="${FIXTURE}/stage-${abi}"
     mkdir -p "${stage}/${abi}"/{jni,llamacpp,onnx}
     for component in jni llamacpp onnx; do
+        # Natives are staged into the FLUTTER package layouts by package-sdk.sh
+        # (run immediately before this script), NOT the Kotlin SDK's jniLibs —
+        # those don't exist in the validate_consumer_flutter job's clean checkout.
         case "${component}" in
-            jni) source_dir="${KOTLIN_ROOT}/src/main/jniLibs/${abi}" ;;
-            llamacpp) source_dir="${KOTLIN_ROOT}/modules/runanywhere-core-llamacpp/src/main/jniLibs/${abi}" ;;
-            onnx) source_dir="${KOTLIN_ROOT}/modules/runanywhere-core-onnx/src/main/jniLibs/${abi}" ;;
+            jni) source_dir="${FLUTTER_PACKAGES}/runanywhere/android/src/main/jniLibs/${abi}" ;;
+            llamacpp) source_dir="${FLUTTER_PACKAGES}/runanywhere_llamacpp/android/src/main/jniLibs/${abi}" ;;
+            onnx) source_dir="${FLUTTER_PACKAGES}/runanywhere_onnx/android/src/main/jniLibs/${abi}" ;;
         esac
         if ! find "${source_dir}" -maxdepth 1 -type f -name '*.so' -print -quit | grep -q .; then
             echo "error: no staged ${component}/${abi} native libraries at ${source_dir}" >&2
