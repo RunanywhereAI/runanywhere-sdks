@@ -1,7 +1,9 @@
 package com.runanywhere.runanywhereai
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.SDKEnvironment
 import android.app.Application
+import com.runanywhere.runanywhereai.data.BackendAvailability
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.benchmark.BenchmarkStore
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
@@ -79,8 +81,25 @@ class RunAnywhereApplication : Application() {
         // registered and fail with -422 "No provider could handle the request" (same ordering
         // as iOS). QHexRT is registered below because its skel installer needs the application
         // Context installed by the public RunAnywhere.initialize(context = ...) overload.
-        LlamaCPP.register()
-        ONNX.register()
+        // Optional CPU/ONNX backends: tolerate a missing native lib (e.g. an NPU-only build) so SDK
+        // setup doesn't abort, and report availability so the model pickers hide rows whose backend
+        // can't serve (BackendAvailability / A10). QHexRT is proven separately via its device probe.
+        try {
+            LlamaCPP.register()
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, true)
+        } catch (t: Throwable) {
+            RACLog.w("LlamaCPP backend unavailable (native lib absent); continuing without CPU backend", t)
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, false)
+        }
+        try {
+            ONNX.register()
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_ONNX, true)
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, true)
+        } catch (t: Throwable) {
+            RACLog.w("ONNX/Sherpa backend unavailable (native lib absent); continuing without ONNX/ASR backend", t)
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_ONNX, false)
+            BackendAvailability.reportRegistration(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, false)
+        }
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
