@@ -38,6 +38,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.models.DeviceInfo
@@ -77,6 +80,18 @@ fun VoiceScreen() {
     // AudioRecord and its native feed loop before another speech screen runs.
     DisposableEffect(voiceVm) {
         onDispose { voiceVm.stop() }
+    }
+
+    // onDispose fires on nav-away but NOT when the Activity is backgrounded
+    // (Home/lock) mid-conversation. Stop Talk on ON_STOP too so the mic doesn't
+    // stay hot behind the lock screen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, voiceVm) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) voiceVm.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }

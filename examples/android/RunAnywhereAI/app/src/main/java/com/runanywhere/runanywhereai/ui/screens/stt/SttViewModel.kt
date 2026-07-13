@@ -33,6 +33,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -147,15 +148,29 @@ class SttViewModel : ViewModel() {
         isRecording = true
         if (mode == SttMode.LIVE) startLive()
         try {
-            recorder.start { chunk, level ->
-                // Batch/hybrid buffer locally; live feeds the SDK streaming session.
-                if (mode == SttMode.LIVE) {
-                    liveAudio?.trySend(chunk)
-                } else {
-                    synchronized(buffer) { buffer.write(chunk) }
-                }
-                audioLevel = level
-            }
+            recorder.start(
+                onChunk = { chunk, level ->
+                    // Batch/hybrid buffer locally; live feeds the SDK streaming session.
+                    if (mode == SttMode.LIVE) {
+                        liveAudio?.trySend(chunk)
+                    } else {
+                        synchronized(buffer) { buffer.write(chunk) }
+                    }
+                    audioLevel = level
+                },
+                onError = { t ->
+                    // A mid-capture mic fault (e.g. ERROR_DEAD_OBJECT) fires on the
+                    // recorder's worker thread; hop to main to surface it and clear
+                    // recording state so the button re-enables instead of hanging.
+                    RACLog.e("microphone read failed", t)
+                    viewModelScope.launch {
+                        if (isRecording) {
+                            error = t.message ?: "Microphone stopped unexpectedly"
+                            cancel()
+                        }
+                    }
+                },
+            )
         } catch (e: Exception) {
             RACLog.e("microphone start failed", e)
             error = e.message ?: "Could not start the microphone"
@@ -220,9 +235,15 @@ class SttViewModel : ViewModel() {
             isTranscribing = true
             val active = liveJob
             viewModelScope.launch {
-                active?.join()
-                if (liveJob === active) liveJob = null
-                isTranscribing = false
+                try {
+                    // The native flush can wedge; bound the wait so the record
+                    // button can't stay disabled forever. On timeout the job is
+                    // left to finish on its own — we just stop blocking the UI.
+                    withTimeoutOrNull(LIVE_FLUSH_TIMEOUT_MS) { active?.join() }
+                } finally {
+                    if (liveJob === active) liveJob = null
+                    isTranscribing = false
+                }
             }
             return
         }
@@ -405,5 +426,6 @@ class SttViewModel : ViewModel() {
     private companion object {
         const val MIN_BYTES = 16000
         const val LIVE_CHANNEL_CAPACITY = 8
+        const val LIVE_FLUSH_TIMEOUT_MS = 5000L
     }
 }
