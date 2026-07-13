@@ -148,6 +148,34 @@ void configure_adsp_library_path() {
     RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH set to %s", path.c_str());
 }
 
+// Append a single skel directory into the live ADSP_LIBRARY_PATH. Used when the
+// runtime is already created and configure_adsp_library_path() has already run
+// once (its std::call_once cannot fire again): a later skel-dir change would
+// otherwise be silently ignored until a process restart, so a re-register after
+// a first failed one could never pick up a corrected directory. Appends (rather
+// than replaces) so the paths the one-time setup discovered — dladdr, existing
+// value, /vendor/... — stay intact; skips no-op duplicates.
+void append_skel_dir_to_live_adsp_path(const char* dir) {
+    if (dir == nullptr || dir[0] == '\0' || !directory_contains_qnn_skel(dir)) {
+        return;
+    }
+    std::vector<std::string> paths;
+    append_existing_adsp_paths(paths, std::getenv(kAdspLibraryPathEnv));
+    const size_t before = paths.size();
+    if (!append_path(paths, dir, false) || paths.size() == before) {
+        return;  // already present — nothing to re-apply
+    }
+    std::string value;
+    for (const std::string& segment : paths) {
+        if (!value.empty()) {
+            value += ";";
+        }
+        value += segment;
+    }
+    setenv(kAdspLibraryPathEnv, value.c_str(), 1);
+    RAC_LOG_INFO(LOG_CAT, "ADSP_LIBRARY_PATH updated to %s", value.c_str());
+}
+
 extern "C" __attribute__((visibility("default"))) void
 rac_qhexrt_set_skel_directory(const char* path) {
     if (path == nullptr || path[0] == '\0') {
@@ -155,6 +183,13 @@ rac_qhexrt_set_skel_directory(const char* path) {
         return;
     }
     setenv(kQhexrtSkelDirEnv, path, 1);
+    // If the runtime is already up, the one-time ADSP setup has run and cannot
+    // re-run; fold the new skel dir into the live env so a re-register after a
+    // failed one works without a process restart.
+    std::lock_guard<std::mutex> lock(g_rt_mutex);
+    if (g_rt != nullptr) {
+        append_skel_dir_to_live_adsp_path(path);
+    }
 }
 #endif
 
@@ -259,6 +294,37 @@ std::string find_manifest_in_dir(const fs::path& dir) {
     return {};
 }
 
+// Extract the manifest's "dsp_arch" value (e.g. "v79") from the head of the
+// file, or empty if absent/unparsable. Lightweight sniff in the same spirit as
+// looks_like_manifest — avoids pulling a JSON parser into the resolver.
+std::string manifest_dsp_arch(const fs::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) {
+        return {};
+    }
+    char buf[8192];
+    in.read(buf, sizeof(buf) - 1);
+    buf[in.gcount() > 0 ? static_cast<size_t>(in.gcount()) : 0] = '\0';
+    std::string head(buf);
+    size_t key = head.find("dsp_arch");
+    if (key == std::string::npos) {
+        return {};
+    }
+    size_t colon = head.find(':', key);
+    if (colon == std::string::npos) {
+        return {};
+    }
+    size_t open = head.find('"', colon);
+    if (open == std::string::npos) {
+        return {};
+    }
+    size_t close = head.find('"', open + 1);
+    if (close == std::string::npos) {
+        return {};
+    }
+    return head.substr(open + 1, close - open - 1);
+}
+
 // Resolve the model reference (a bundle dir or a manifest file) to a manifest
 // path, preferring the subdirectory matching `arch` (e.g. "v79").
 std::string resolve_manifest(const char* path, const char* arch) {
@@ -276,7 +342,23 @@ std::string resolve_manifest(const char* path, const char* arch) {
             return m;
         }
     }
-    return find_manifest_in_dir(p);  // flat-layout fallback
+    // Flat-layout fallback: no per-arch subdirectory. Unlike the arch-subdir
+    // path (correct by construction), a flat bundle may target a different DSP
+    // (e.g. a v81 bundle on a v79 device). Reject an arch mismatch here with a
+    // clear message instead of trusting qhx_model_load to fail deep in QNN with
+    // an opaque error (A21).
+    std::string flat = find_manifest_in_dir(p);
+    if (flat.empty() || arch == nullptr || arch[0] == '\0') {
+        return flat;
+    }
+    std::string manifest_arch = manifest_dsp_arch(flat);
+    if (!manifest_arch.empty() && manifest_arch != arch) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "QHexRT manifest dsp_arch '%s' does not match device arch '%s': %s",
+                      manifest_arch.c_str(), arch, flat.c_str());
+        return {};
+    }
+    return flat;
 }
 
 }  // namespace
