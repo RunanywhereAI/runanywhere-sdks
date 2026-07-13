@@ -1,13 +1,13 @@
-/// Curated QHexRT NPU catalog — one manifest-pinned hf.co folder ref per
-/// bundle (`https://huggingface.co/<repo>/<arch>/<manifest>.json`). Commons
-/// + the engine-registered QHexRT bundle policy resolve the full file set
-/// (sizes, checksums, nested paths) from the Hub tree at registration — no
-/// file lists in the SDK. Context binaries are arch-exact ([arch] is the
-/// Hexagon architecture they were compiled for: v75+), so registration
-/// filters to the arch probed on the running device.
-///
-/// Kept in lockstep with the Kotlin (`runanywhere-core-qhexrt`) and React
-/// Native (`@runanywhere/qhexrt`) SDK packages.
+// Curated QHexRT NPU catalog — one manifest-pinned hf.co folder ref per
+// bundle (`https://huggingface.co/<repo>/<arch>/<manifest>.json`). Commons
+// + the engine-registered QHexRT bundle policy resolve the full file set
+// (sizes, checksums, nested paths) from the Hub tree at registration — no
+// file lists in the SDK. Context binaries are arch-exact ([arch] is the
+// Hexagon architecture they were compiled for: v75+), so registration
+// filters to the arch probed on the running device.
+//
+// Kept in lockstep with the Kotlin (`runanywhere-core-qhexrt`) and React
+// Native (`@runanywhere/qhexrt`) SDK packages.
 
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
