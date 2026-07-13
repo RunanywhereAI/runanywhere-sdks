@@ -423,6 +423,22 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     ctx.require_json_arguments = request.require_json_arguments();
     ctx.keep_tools_available = request.keep_tools_available();
     ctx.generation.disable_thinking = request.disable_thinking();
+    // Prior conversation turns (tool_calling.proto field 19). Threaded onto the
+    // generation snapshot so EVERY generate in the loop inherits it — the initial
+    // tool-decision generate (generation_for_tool_step copies base) and the
+    // follow-up generate (followup_ctx = ctx copies it). request.history already
+    // EXCLUDES the current turn (which travels as prompt) and is pre-alternated
+    // [user,asst,...], so we forward it as-is and do NOT pop a trailing turn —
+    // unlike llm_module's normalizer, whose history includes the current turn.
+    ctx.generation.history.assign(request.history().begin(), request.history().end());
+    // Defensive: the C ABI history slot is positional [user0, asst0, user1, ...];
+    // an odd count means a trailing user turn with no assistant reply (e.g. the
+    // prior turn's response was blank/filtered upstream). Drop it so the positional
+    // role assignment stays aligned — the same net effect as the standard path's
+    // trailing-user pop (llm_module.cpp), without needing role tags we don't carry.
+    if (ctx.generation.history.size() % 2 != 0) {
+        ctx.generation.history.pop_back();
+    }
     // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
     // The field is `optional bool` so we can preserve the documented default
     // (validate=true) when the caller did not set it, while still letting hosts
