@@ -39,7 +39,12 @@ import Foundation
 // avoids committing a local-only manifest or hand-editing it around a tag.
 //
 // =============================================================================
+let localNativesMarkerPath = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .appendingPathComponent(".runanywhere-local-natives")
+    .path
 let useLocalNatives = ProcessInfo.processInfo.environment["RUNANYWHERE_USE_LOCAL_NATIVES"] == "1"
+    || FileManager.default.fileExists(atPath: localNativesMarkerPath)
 
 // Release tooling asks SwiftPM for a static product that contains the Swift
 // MLX implementation and its MLX dependencies, but deliberately leaves the
