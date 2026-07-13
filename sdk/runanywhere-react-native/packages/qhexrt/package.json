@@ -1,8 +1,8 @@
 {
   "name": "@runanywhere/qhexrt",
   "version": "0.20.9",
-  "private": true,
-  "description": "QHexRT backend for RunAnywhere React Native SDK - Qualcomm Hexagon V75/V79/V81 on-device LLM/VLM/STT/TTS (Android arm64 only)",
+  "private": false,
+  "description": "On-device NPU acceleration backend for RunAnywhere (React Native) \u2014 LLM/VLM/STT/TTS on Qualcomm Snapdragon Hexagon (V75/V79/V81), Android arm64.",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
@@ -42,7 +42,6 @@
     "npu",
     "qualcomm",
     "hexagon",
-    "qnn",
     "qhexrt",
     "on-device",
     "nitro"
