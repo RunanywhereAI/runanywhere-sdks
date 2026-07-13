@@ -490,6 +490,17 @@ TYPECHECK_PACKAGE_DIRS=("${PUBLIC_PACKAGE_DIRS[@]}")
 if [ "$INCLUDE_PRIVATE_QHEXRT" = "1" ]; then
     TYPECHECK_PACKAGE_DIRS+=(qhexrt)
 fi
+# `core` is a composite TS project referenced by every backend package
+# (llamacpp/mlx/onnx/qhexrt via `references: [{ path: "../core" }]`). `tsc --noEmit`
+# never writes core/lib/*.d.ts (gitignored, absent on a clean checkout), so the
+# first dependent's `tsc --noEmit` fails with TS6305 ("Output file .../core/lib/
+# internal.d.ts has not been built..."). Build core's declarations once first —
+# mirrors the root package.json `typecheck` script. This lib/ output is never
+# shipped (core's package.json files/exports point at src/).
+echo ">> build core (emit declarations for composite project references)"
+if ! (cd "$RN_ROOT/packages/core" && npx tsc -b); then
+    validation_failure "Core declaration build failed"
+fi
 for pkg in "${TYPECHECK_PACKAGE_DIRS[@]}"; do
     pkg_dir="$RN_ROOT/packages/$pkg"
     if [ -f "$pkg_dir/tsconfig.json" ]; then
