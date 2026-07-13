@@ -155,6 +155,10 @@ jobs:
           path: |
             sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
             sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            sdk/runanywhere-commons/dist/RABackendLLAMACPP-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/runanywhere-commons/dist/RABackendLLAMACPP-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            sdk/runanywhere-commons/dist/RABackendONNX-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/runanywhere-commons/dist/RABackendONNX-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -1426,6 +1430,12 @@ jobs:
           assert_pair "Android arm64-v8a"              "RACommons-android-arm64-v8a-v${VERSION}.zip"
           assert_pair "Android armeabi-v7a"            "RACommons-android-armeabi-v7a-v${VERSION}.zip"
           assert_pair "Android x86_64"                 "RACommons-android-x86_64-v${VERSION}.zip"
+          assert_pair "Android LlamaCPP arm64-v8a"      "RABackendLLAMACPP-android-arm64-v8a-v${VERSION}.zip"
+          assert_pair "Android LlamaCPP armeabi-v7a"    "RABackendLLAMACPP-android-armeabi-v7a-v${VERSION}.zip"
+          assert_pair "Android LlamaCPP x86_64"         "RABackendLLAMACPP-android-x86_64-v${VERSION}.zip"
+          assert_pair "Android ONNX arm64-v8a"          "RABackendONNX-android-arm64-v8a-v${VERSION}.zip"
+          assert_pair "Android ONNX armeabi-v7a"        "RABackendONNX-android-armeabi-v7a-v${VERSION}.zip"
+          assert_pair "Android ONNX x86_64"             "RABackendONNX-android-x86_64-v${VERSION}.zip"
           assert_pair "Linux x86_64"                   "RACommons-linux-x86_64-v${VERSION}.tar.gz"
           assert_pair "Windows x64"                    "RACommons-windows-x64-v${VERSION}.zip"
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"

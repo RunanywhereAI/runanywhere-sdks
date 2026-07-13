@@ -188,6 +188,35 @@ write_checksum() {
     fi
 }
 
+create_component_archive() {
+    local source_dir="$1"
+    local component="$2"
+    local archive="$3"
+    shift 3
+
+    local package_parent package_root
+    package_parent="$(mktemp -d "${COMMONS_ROOT}/dist/android-${component}.XXXXXX")"
+    package_root="${package_parent}/${component}"
+    mkdir -p "$package_root"
+    stage_component "$source_dir" "$package_root" "$@"
+    validate_component_source "$component" "$package_root" "$@"
+
+    mkdir -p "$(dirname "$archive")"
+    archive="$(cd "$(dirname "$archive")" && pwd)/$(basename "$archive")"
+    find "$package_root" -type d -exec chmod 0755 {} +
+    find "$package_root" -type f -exec chmod 0755 {} +
+    find "$package_root" -exec touch -h -t 198001010000 {} +
+    rm -f "$archive"
+    (
+        cd "$package_parent"
+        LC_ALL=C find "$component" -print \
+            | LC_ALL=C sort \
+            | zip -qX "$archive" -@
+    )
+    rm -rf "$package_parent"
+    write_checksum "$archive"
+}
+
 main() {
     if [ "$#" -ne 1 ]; then
         echo "usage: build-android.sh <abi>" >&2
@@ -239,6 +268,12 @@ main() {
     rm -f "$archive" "$archive.sha256"
     create_deterministic_archive "$staging_parent" "$abi" "$archive"
     write_checksum "$archive"
+
+    local llamacpp_archive="${dist}/RABackendLLAMACPP-android-${abi}-v${version}.zip"
+    local onnx_archive="${dist}/RABackendONNX-android-${abi}-v${version}.zip"
+    rm -f "$llamacpp_archive" "$llamacpp_archive.sha256" "$onnx_archive" "$onnx_archive.sha256"
+    create_component_archive "$staging/llamacpp" "llamacpp" "$llamacpp_archive" "${LLAMACPP_LIBS[@]}"
+    create_component_archive "$staging/onnx" "onnx" "$onnx_archive" "${ONNX_LIBS[@]}"
 
     echo "✓ build-android.sh complete; staged ABI '${abi}' → ${archive}"
 }

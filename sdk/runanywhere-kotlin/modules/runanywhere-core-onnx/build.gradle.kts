@@ -1,3 +1,4 @@
+import com.runanywhere.gradle.NativeLibraryDownload
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -217,9 +218,7 @@ tasks.register("downloadJniLibs") {
             val tempZip = file("$tempDir/$packageName")
 
             try {
-                ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                }
+                NativeLibraryDownload.downloadZipWithChecksum(zipUrl, tempZip)
 
                 val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
                 extractDir.mkdirs()
@@ -239,7 +238,9 @@ tasks.register("downloadJniLibs") {
                 validateAbiInventory(abi)
                 tempZip.delete()
             } catch (e: Exception) {
-                throw GradleException("Failed to download or validate $packageName", e)
+                outputDir.deleteRecursively()
+                tempDir.deleteRecursively()
+                throw GradleException("Failed to download and verify $packageName: ${e.message}", e)
             }
         }
 
