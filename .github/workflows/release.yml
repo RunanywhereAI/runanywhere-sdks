@@ -38,6 +38,13 @@ permissions:
 
 env:
   RELEASE_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+  # Development-analytics config baked into rac_commons at build time. Kept in CI
+  # secrets (never in the public source tree); the commons CMake substitutes them
+  # into the generated development_config.cpp when present (else a credential-free
+  # stub). See sdk/runanywhere-commons/CMakeLists.txt (DEVELOPMENT CONFIG SOURCE).
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
 
 jobs:
 
