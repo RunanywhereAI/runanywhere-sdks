@@ -102,7 +102,7 @@ def getExtOrIntegerDefault(name) {
 // symlink (node_modules/@runanywhere/llamacpp -> ../../sdk/runanywhere-react-native/packages/llamacpp);
 // fall back to the pinned version if the commons VERSION file can't be located.
 def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
-def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.20.0"
+def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.20.9"
 
 // =============================================================================
 // Binary Source - RABackendLlamaCPP from runanywhere-sdks

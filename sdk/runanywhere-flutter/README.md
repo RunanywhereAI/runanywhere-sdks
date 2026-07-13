@@ -99,34 +99,34 @@ Add the packages you need to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.0
-  runanywhere_llamacpp: ^0.20.0
+  runanywhere: ^0.20.9
+  runanywhere_llamacpp: ^0.20.9
 ```
 
 **Core + ONNX (STT/TTS/VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.0
-  runanywhere_onnx: ^0.20.0
+  runanywhere: ^0.20.9
+  runanywhere_onnx: ^0.20.9
 ```
 
 **Core + MLX (Apple LLM/VLM/Embeddings/STT/TTS):**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.0
-  runanywhere_mlx: ^0.20.0
+  runanywhere: ^0.20.9
+  runanywhere_mlx: ^0.20.9
 ```
 
 **All Public Backends:**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.0
-  runanywhere_llamacpp: ^0.20.0
-  runanywhere_mlx: ^0.20.0
-  runanywhere_onnx: ^0.20.0
+  runanywhere: ^0.20.9
+  runanywhere_llamacpp: ^0.20.9
+  runanywhere_mlx: ^0.20.9
+  runanywhere_onnx: ^0.20.9
 ```
 
 Then run:

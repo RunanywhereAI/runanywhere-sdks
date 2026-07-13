@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/mlx",
-  "version": "0.20.0",
+  "version": "0.20.9",
   "description": "Apple MLX backend registration for the RunAnywhere React Native SDK",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -52,7 +52,7 @@
   "author": "RunAnywhere AI <team@runanywhere.ai> (https://runanywhere.ai)",
   "license": "SEE LICENSE IN LICENSE",
   "peerDependencies": {
-    "@runanywhere/core": ">=0.20.0",
+    "@runanywhere/core": ">=0.20.9",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"

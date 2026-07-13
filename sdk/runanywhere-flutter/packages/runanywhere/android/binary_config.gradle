@@ -16,7 +16,7 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    fallbackCoreVersion = "0.20.0"
+    fallbackCoreVersion = "0.20.9"
     coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : fallbackCoreVersion
 
     // =============================================================================

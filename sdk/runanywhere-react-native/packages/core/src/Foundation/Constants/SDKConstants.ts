@@ -26,7 +26,7 @@ export const SDKConstants = {
    * Native commons receives this through the Phase 1 init payload.
    * The literal is rewritten by `scripts/release/sync-versions.sh`.
    */
-  version: '0.20.0',
+  version: '0.20.9',
 
   /** SDK name. Mirrors Swift `SDKConstants.name`. */
   name: 'RunAnywhere SDK',
