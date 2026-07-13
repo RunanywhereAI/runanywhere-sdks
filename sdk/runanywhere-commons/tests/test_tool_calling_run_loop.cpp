@@ -10,6 +10,7 @@
  *  4. Validation failure short-circuits with a failed ToolResult.
  */
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -69,6 +70,12 @@ struct GenerationCapture {
     float top_p = 0.0f;
     bool disable_thinking = false;
     std::vector<std::string> stop_sequences;
+    // Prior conversation turns the run loop threaded onto rac_llm_options_t
+    // (ToolCallingSessionCreateRequest.history, field 19). Captured verbatim so
+    // tests can assert history flows through every generate in the loop and that
+    // the odd-length trailing-turn drop happened before generation.
+    std::vector<std::string> history;
+    int32_t n_history = 0;
 };
 
 std::vector<GenerationCapture> g_generation_captures;
@@ -114,6 +121,15 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* o
                 const char* stop = options->stop_sequences ? options->stop_sequences[i] : nullptr;
                 if (stop && stop[0] != '\0') {
                     capture.stop_sequences.emplace_back(stop);
+                }
+            }
+            // rac_llm_options_t.history / n_history (rac_llm_types.h): the run
+            // loop flattens generation.history into this positional C-ABI slot.
+            capture.n_history = options->n_history;
+            if (options->history != nullptr && options->n_history > 0) {
+                for (int32_t i = 0; i < options->n_history; ++i) {
+                    const char* turn = options->history[i];
+                    capture.history.emplace_back(turn ? turn : "");
                 }
             }
         }
@@ -1091,6 +1107,159 @@ int test_executor_result_contract_is_fail_closed() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// A11: prior conversation history threading
+// (ToolCallingSessionCreateRequest.history, tool_calling.proto field 19).
+// run_loop_impl copies request.history() into ctx.generation.history and
+// run_generate_once flattens it into rac_llm_options_t.history / n_history for
+// EVERY generate in the loop.
+// ---------------------------------------------------------------------------
+
+int test_history_flows_to_options_history() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Direct answer, no tool needed."});
+
+    auto request = make_request("What about tomorrow?");
+    // Even-length, pre-alternated [user0, asst0, user1, asst1]. The current turn
+    // travels as `prompt` and must NOT appear in history.
+    request.add_history("What's the weather in Tokyo?");
+    request.add_history("It is sunny, 25C.");
+    request.add_history("And in Osaka?");
+    request.add_history("Cloudy, 22C.");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "history run_loop returns RAC_SUCCESS");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "no-tool history request generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].n_history == 4, "options.n_history matches request.history size");
+        const std::vector<std::string> expected = {"What's the weather in Tokyo?",
+                                                    "It is sunny, 25C.", "And in Osaka?",
+                                                    "Cloudy, 22C."};
+        CHECK(captures[0].history == expected, "history forwarded verbatim, in order");
+        CHECK(captures[0].prompt.find("What about tomorrow?") != std::string::npos,
+              "current turn still travels as the prompt");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_history_threads_into_decision_and_followup_generates() {
+    if (!load_mock_llm())
+        return 1;
+    // One tool call then a synthesis turn: history must reach BOTH generates
+    // (the tool-decision generate copies ctx.generation; the follow-up generate
+    // copies ctx which carries ctx.generation).
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny, 25C.",
+    });
+
+    auto request = make_request("What's the weather in Tokyo?");
+    request.add_history("Hi");
+    request.add_history("Hello! How can I help?");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    {
+        std::lock_guard<std::mutex> lg(exec.mu);
+        exec.result_jsons.emplace_back(R"({"temp":25,"condition":"sunny"})");
+    }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "history+tool run_loop returns RAC_SUCCESS");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 2, "tool call plus synthesis generate twice");
+    const std::vector<std::string> expected = {"Hi", "Hello! How can I help?"};
+    if (captures.size() == 2) {
+        CHECK(captures[0].n_history == 2, "decision generate inherits history count");
+        CHECK(captures[0].history == expected, "decision generate inherits history verbatim");
+        CHECK(captures[1].n_history == 2, "follow-up synthesis generate inherits history count");
+        CHECK(captures[1].history == expected, "follow-up synthesis generate inherits history");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_odd_length_history_drops_trailing_turn() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Answer."});
+
+    auto request = make_request("Follow-up question.");
+    // Odd count: a trailing user turn with no assistant reply. The loop drops the
+    // last entry so the positional [user,asst,...] alignment stays intact.
+    request.add_history("First user turn");
+    request.add_history("First assistant reply");
+    request.add_history("Dangling user turn with no reply");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "odd-history run_loop returns RAC_SUCCESS");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "odd-history request generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].n_history == 2, "odd history is trimmed to an even count");
+        const std::vector<std::string> expected = {"First user turn", "First assistant reply"};
+        CHECK(captures[0].history == expected, "trailing unpaired user turn is dropped");
+        CHECK(std::find(captures[0].history.begin(), captures[0].history.end(),
+                        "Dangling user turn with no reply") == captures[0].history.end(),
+              "dropped turn never reaches the backend");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_empty_history_yields_no_options_history() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Single-turn answer."});
+
+    // make_request adds no history; single-turn callers must not accidentally
+    // send a non-null history pointer or a positive n_history.
+    auto request = make_request("Just a single-turn question.");
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "empty-history run_loop returns RAC_SUCCESS");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "empty-history request generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].n_history == 0, "no history => n_history == 0");
+        CHECK(captures[0].history.empty(), "no history => empty options.history");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int test_null_arguments_return_null_pointer() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -1135,6 +1304,10 @@ int main() {
         test_auto_execute_false_returns_call_without_side_effect();
         test_validation_failure_short_circuits();
         test_executor_result_contract_is_fail_closed();
+        test_history_flows_to_options_history();
+        test_history_threads_into_decision_and_followup_generates();
+        test_odd_length_history_drops_trailing_turn();
+        test_empty_history_yields_no_options_history();
         if (g_registry) {
             rac_model_registry_destroy(g_registry);
             g_registry = nullptr;
