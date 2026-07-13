@@ -62,7 +62,7 @@ suspend fun RunAnywhere.generateWithTools(
     // Prior conversation turns as a flat alternating list [user0, asst0, ...],
     // EXCLUDING the current turn (which is `prompt`). Threaded to commons so the
     // tool-calling loop keeps multi-turn context, matching the standard path.
-    // Defaulted for source/binary compat.
+    // Defaulted for source compatibility (existing callers recompile unchanged).
     history: List<String> = emptyList(),
 ): RAToolCallingResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")

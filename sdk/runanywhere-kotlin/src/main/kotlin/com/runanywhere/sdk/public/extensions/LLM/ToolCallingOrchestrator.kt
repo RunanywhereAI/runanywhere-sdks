@@ -326,7 +326,7 @@ internal object ToolCallingOrchestrator {
         validateCalls: Boolean? = null,
         // Prior conversation turns as a flat alternating list [user0, asst0, ...],
         // EXCLUDING the current turn (which is `prompt`). Threaded into commons so
-        // multi-turn tool use keeps context. Defaulted for source/binary compat.
+        // multi-turn tool use keeps context. Defaulted for source compatibility.
         history: List<String> = emptyList(),
     ): ToolCallingResult =
         coroutineScope {
