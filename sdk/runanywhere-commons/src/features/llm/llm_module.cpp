@@ -1077,6 +1077,82 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 }
 
 // =============================================================================
+// ADAPTIVE CONTEXT API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t handle,
+                                                               const char* prompt) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot inject system prompt: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    return rac_llm_inject_system_prompt(service, prompt);
+}
+
+extern "C" rac_result_t rac_llm_component_append_context(rac_handle_t handle, const char* text) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!text)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot append context: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    return rac_llm_append_context(service, text);
+}
+
+extern "C" rac_result_t rac_llm_component_generate_from_context(
+    rac_handle_t handle, const char* query, const rac_llm_options_t* options,
+    rac_llm_result_t* out_result) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!query || !out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot generate from context: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    return rac_llm_generate_from_context(service, query, options, out_result);
+}
+
+extern "C" rac_result_t rac_llm_component_clear_context(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        return RAC_SUCCESS;
+    }
+
+    return rac_llm_clear_context(service);
+}
+
+// =============================================================================
 // LORA ADAPTER API
 // =============================================================================
 
@@ -2269,6 +2345,149 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
     rac_result_t copy_rc = copy_proto(event, out_event);
     rac::llm::release_lifecycle_llm(&ref);
     return rc == RAC_SUCCESS ? copy_rc : rc;
+#endif
+}
+
+rac_result_t rac_llm_inject_system_prompt_lifecycle(const char* prompt) {
+    if (!prompt) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    rac::llm::LifecycleLlmRef ref;
+    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    rc = (ref.ops && ref.ops->inject_system_prompt)
+             ? ref.ops->inject_system_prompt(ref.impl, prompt)
+             : RAC_ERROR_NOT_SUPPORTED;
+    rac::llm::release_lifecycle_llm(&ref);
+    return rc;
+#endif
+}
+
+rac_result_t rac_llm_append_context_lifecycle(const char* text) {
+    if (!text) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    rac::llm::LifecycleLlmRef ref;
+    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    rc = (ref.ops && ref.ops->append_context) ? ref.ops->append_context(ref.impl, text)
+                                              : RAC_ERROR_NOT_SUPPORTED;
+    rac::llm::release_lifecycle_llm(&ref);
+    return rc;
+#endif
+}
+
+rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_bytes,
+                                                 size_t request_proto_size,
+                                                 rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_result, "LLMGenerateRequest bytes are empty or too large");
+    }
+
+    LLMGenerateRequest request;
+    if (!request.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return parse_error(out_result, "failed to parse LLMGenerateRequest");
+    }
+
+    rac::llm::LifecycleLlmRef ref;
+    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "no lifecycle LLM model loaded");
+    }
+
+    rac::llm::clear_lifecycle_llm_cancel(&ref);
+    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0);
+
+    const std::string system_prompt = system_prompt_from_request(request);
+    std::vector<std::string> stop_storage;
+    std::vector<const char*> stop_ptrs;
+    std::string grammar_storage;
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
+    options.streaming_enabled = RAC_FALSE;
+
+    rac_llm_result_t raw{};
+    const std::string effective_query =
+        rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
+    const int64_t started = now_ms();
+    rc = (ref.ops && ref.ops->generate_from_context)
+             ? ref.ops->generate_from_context(ref.impl, effective_query.c_str(), &options, &raw)
+             : RAC_ERROR_NOT_SUPPORTED;
+    const int64_t elapsed = now_ms() - started;
+
+    if (rc != RAC_SUCCESS) {
+        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FAILED,
+                                 request.prompt().c_str(), nullptr, nullptr, rac_error_message(rc),
+                                 ref.model_id, 0, elapsed);
+        rac::llm::release_lifecycle_llm(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    const char* raw_text = raw.text ? raw.text : "";
+    (void)rac_llm_extract_thinking(raw_text, &response, &response_len, &thinking, &thinking_len);
+
+    int32_t thinking_tokens = 0;
+    int32_t response_tokens = raw.completion_tokens;
+    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response, thinking, &thinking_tokens,
+                                        &response_tokens);
+
+    LLMGenerationResult result;
+    set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len, thinking_tokens,
+                        response_tokens, options.max_tokens, &result);
+    set_structured_output_if_present(response, &result);
+
+    publish_generation_event(
+        runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, request.prompt().c_str(), nullptr,
+        response, nullptr, ref.model_id, raw.completion_tokens,
+        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed, raw.prompt_tokens);
+
+    rac_llm_result_free(&raw);
+    rac::llm::release_lifecycle_llm(&ref);
+    return copy_proto(result, out_result);
+#endif
+}
+
+rac_result_t rac_llm_clear_context_lifecycle(void) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    rac::llm::LifecycleLlmRef ref;
+    rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    rc = (ref.ops && ref.ops->clear_context) ? ref.ops->clear_context(ref.impl)
+                                             : RAC_ERROR_NOT_SUPPORTED;
+    rac::llm::release_lifecycle_llm(&ref);
+    return rc;
 #endif
 }
 
