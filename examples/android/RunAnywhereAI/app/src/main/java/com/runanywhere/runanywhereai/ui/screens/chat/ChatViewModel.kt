@@ -67,7 +67,9 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAToolDefinition
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -185,8 +187,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun onCleared() {
         LlmModelChangeInterlock.remove(this)
+        // Cancelling the worker coroutine only unwinds the suspend surface; the
+        // one-shot/VLM JNI call keeps decoding on its native thread. Mirror stop()
+        // and issue the native cancel, but on GlobalScope because viewModelScope is
+        // already being torn down. Guarded so it is a no-op when nothing is running.
+        if (generationOwnership.isBusy()) {
+            GlobalScope.launch(Dispatchers.Default) {
+                runCatching { RunAnywhere.cancelGeneration() }
+                runCatching { RunAnywhere.cancelVLMGeneration() }
+            }
+        }
         conversationTransitionJob?.cancel()
         cancellationJob?.cancel()
         job?.cancel()
