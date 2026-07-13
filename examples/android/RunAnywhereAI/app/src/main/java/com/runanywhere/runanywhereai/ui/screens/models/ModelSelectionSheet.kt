@@ -270,6 +270,7 @@ private fun PickerModelRow(
         highlightLabel = highlightLabel,
         onSelect = { onSelect(model) },
         onDownload = { onDownload(model) },
+        onCancel = { viewModel.cancelDownload(model.id) },
         onDelete = if (viewModel.isDeletable(model)) ({ onDelete(model) }) else null,
         modifier = Modifier.padding(horizontal = dimens.spacingLg),
     )
