@@ -1289,6 +1289,83 @@ bool validate_resume_offset(const proto_plan_file& file, int64_t requested_resum
     return true;
 }
 
+// Bounded resume-retry loop for transient network drops, shared by the
+// sequential (process_plan_file) and parallel (run_parallel_direct_download_worker)
+// download paths so their retry policy can never diverge. Screen-off / doze on
+// Android tears down the socket mid-transfer; OkHttp surfaces that as
+// RAC_HTTP_DL_NETWORK_ERROR/TIMEOUT. Rather than failing the whole download,
+// re-invoke the stream from the bytes already on disk (the writer keeps them in
+// "<dest>.part") with exponential backoff. Only genuinely transient statuses
+// retry — server 4xx/5xx, checksum failures, invalid URLs, and cancellation are
+// terminal and fall straight through. Both task->cancel_requested and the
+// callback ctx's abort flag (set by a sibling parallel part's terminal failure;
+// nullptr in the sequential path) are honored between attempts.
+//
+// `dest_path` is the final path whose ".part" sidecar the writer streams into;
+// `base_resume_from` is the initial resume offset (the sequential path passes
+// its planner-computed file_resume_from, the parallel path passes 0). On each
+// retry the offset is recomputed from the ".part" size so the completed prefix
+// is never re-downloaded. `req.resume_from_byte` is set for attempt 0 by the
+// caller and re-set here for later attempts; `req` is mutated in place.
+rac_http_download_status_t execute_stream_with_retry(rac_http_download_request_t& req,
+                                                     proto_download_callback_ctx& cb_ctx,
+                                                     const std::string& dest_path,
+                                                     uint64_t base_resume_from, size_t i,
+                                                     int32_t* out_http_status) {
+    const auto& task = cb_ctx.task;
+    const std::atomic<bool>* abort = cb_ctx.abort_requested;
+    auto stop_requested = [&]() {
+        return task->cancel_requested.load() || (abort && abort->load());
+    };
+
+    int32_t http_status = 0;
+    rac_http_download_status_t status = RAC_HTTP_DL_UNKNOWN;
+    constexpr int kMaxAttempts = 4;
+    for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
+        if (stop_requested()) {
+            status = RAC_HTTP_DL_CANCELLED;
+            break;
+        }
+        // On a retry, resume from whatever the writer has flushed to the
+        // ".part" sidecar so we never re-download the completed prefix.
+        if (attempt > 0) {
+            int64_t on_disk = partial_size_or_zero(dest_path);
+            req.resume_from_byte =
+                on_disk > 0 ? static_cast<uint64_t>(on_disk) : base_resume_from;
+        }
+        http_status = 0;
+        status = rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
+
+        const bool transient =
+            status == RAC_HTTP_DL_NETWORK_ERROR || status == RAC_HTTP_DL_TIMEOUT;
+        if (!transient || stop_requested()) {
+            break;
+        }
+        if (attempt + 1 < kMaxAttempts) {
+            // Exponential backoff: 500ms, 1s, 2s. Poll cancel/abort while waiting
+            // so teardown is still responsive.
+            int backoff_ms = 500 << attempt;
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Transient download error (status=%d) for file %zu; retry %d/%d "
+                            "in %d ms (resume from %lld bytes)",
+                            static_cast<int>(status), i, attempt + 1, kMaxAttempts - 1, backoff_ms,
+                            static_cast<long long>(partial_size_or_zero(dest_path)));
+            const int step_ms = 50;
+            for (int waited = 0; waited < backoff_ms; waited += step_ms) {
+                if (stop_requested()) {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(step_ms));
+            }
+        }
+    }
+
+    if (out_http_status) {
+        *out_http_status = http_status;
+    }
+    return status;
+}
+
 // Result of processing one planned file. STOP means a terminal
 // (CANCELLED/FAILED) progress event was already emitted and the worker should
 // return; CONTINUE means proceed to the next file.
@@ -1375,56 +1452,12 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         req.expected_sha256_hex =
             file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
 
-        // Bounded resume-retry loop for transient network drops. Screen-off /
-        // doze on Android tears down the socket mid-transfer; OkHttp surfaces
-        // that as RAC_HTTP_DL_NETWORK_ERROR/TIMEOUT. Rather than failing the
-        // whole download, re-invoke the stream from the bytes already on disk
-        // (the writer keeps them in "<dest>.part") with exponential backoff.
-        // Only genuinely transient statuses retry — server 4xx/5xx, checksum
-        // failures, invalid URLs, and cancellation are terminal and fall
-        // straight through. cancel_requested is honored between attempts.
+        // Bounded resume-retry loop for transient network drops (shared with the
+        // parallel worker). cb_ctx.abort_requested is nullptr here, so only
+        // cancel_requested gates the retries.
         int32_t http_status = 0;
-        rac_http_download_status_t status = RAC_HTTP_DL_UNKNOWN;
-        constexpr int kMaxAttempts = 4;
-        for (int attempt = 0; attempt < kMaxAttempts; ++attempt) {
-            if (task->cancel_requested.load()) {
-                status = RAC_HTTP_DL_CANCELLED;
-                break;
-            }
-            // On a retry, resume from whatever the writer has flushed to the
-            // ".part" sidecar so we never re-download the completed prefix.
-            if (attempt > 0) {
-                int64_t on_disk = partial_size_or_zero(file.destination_path);
-                req.resume_from_byte =
-                    on_disk > 0 ? static_cast<uint64_t>(on_disk) : file_resume_from;
-            }
-            http_status = 0;
-            status = rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
-
-            const bool transient =
-                status == RAC_HTTP_DL_NETWORK_ERROR || status == RAC_HTTP_DL_TIMEOUT;
-            if (!transient || task->cancel_requested.load()) {
-                break;
-            }
-            if (attempt + 1 < kMaxAttempts) {
-                // Exponential backoff: 500ms, 1s, 2s. Poll cancel while waiting
-                // so teardown is still responsive.
-                int backoff_ms = 500 << attempt;
-                RAC_LOG_WARNING(LOG_TAG,
-                                "Transient download error (status=%d) for file %zu; retry %d/%d "
-                                "in %d ms (resume from %lld bytes)",
-                                static_cast<int>(status), i, attempt + 1, kMaxAttempts - 1,
-                                backoff_ms,
-                                static_cast<long long>(partial_size_or_zero(file.destination_path)));
-                const int step_ms = 50;
-                for (int waited = 0; waited < backoff_ms; waited += step_ms) {
-                    if (task->cancel_requested.load()) {
-                        break;
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(step_ms));
-                }
-            }
-        }
+        rac_http_download_status_t status = execute_stream_with_retry(
+            req, cb_ctx, file.destination_path, file_resume_from, i, &http_status);
 
         if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
             int64_t file_partial = partial_size_or_zero(file.destination_path);
@@ -1735,9 +1768,14 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
             req.expected_sha256_hex =
                 file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
 
+            // Same bounded resume-retry policy as the sequential path: a
+            // transient network blip resumes from the ".part" sidecar instead of
+            // permanently failing this part. cb_ctx.abort_requested points at the
+            // shared abort flag, so a sibling part's terminal failure also stops
+            // this part's retries between attempts (abort-all is preserved).
             int32_t http_status = 0;
-            rac_http_download_status_t status =
-                rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
+            rac_http_download_status_t status = execute_stream_with_retry(
+                req, cb_ctx, file.destination_path, /*base_resume_from=*/0, i, &http_status);
 
             if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
                 int64_t deleted = 0;
