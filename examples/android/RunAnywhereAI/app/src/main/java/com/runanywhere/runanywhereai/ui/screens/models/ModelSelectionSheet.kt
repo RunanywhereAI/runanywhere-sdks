@@ -1,5 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import com.runanywhere.runanywhereai.download.ModelDownloadService
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -133,11 +138,34 @@ private fun PickerBody(
     onDelete: (RAModelInfo) -> Unit,
 ) {
     val dimens = LocalDimens.current
+    val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     val isSearching = query.isNotBlank()
 
     val onSelect: (RAModelInfo) -> Unit = { model -> scope.launch { if (viewModel.select(model)) onDismiss() } }
-    val onDownload: (RAModelInfo) -> Unit = { model -> viewModel.download(model) }
+
+    // The download runs in a `dataSync` foreground service whose progress
+    // notification Android 13+ silently suppresses unless POST_NOTIFICATIONS is
+    // granted. Request it once, just-in-time, before the first download — but the
+    // notification is a nicety, so proceed with the download whether the user
+    // grants or denies (no re-prompt loop). On API < 33 `notificationsPermitted`
+    // returns true, so we download straight through without ever launching.
+    val pendingDownload = remember { mutableStateOf<RAModelInfo?>(null) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        // Denied or granted: the notification is optional, so start the download.
+        pendingDownload.value?.let { viewModel.download(it) }
+        pendingDownload.value = null
+    }
+    val onDownload: (RAModelInfo) -> Unit = { model ->
+        if (ModelDownloadService.notificationsPermitted(context)) {
+            viewModel.download(model)
+        } else {
+            pendingDownload.value = model
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     val tier = device?.tier ?: HardwareTier.MID_RANGE
     val hasNpu = device?.hasNpu ?: false
