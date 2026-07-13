@@ -18,6 +18,8 @@ import {
     InferenceFramework,
 } from '@runanywhere/proto-ts/model_types';
 
+const logger = new SDKLogger('QHexRT');
+
 /**
  * One QHexRT NPU bundle reference: an HF folder-bundle URL pinned to the
  * bundle's manifest (`huggingface.co/<repo>/<arch>/<manifest>.json`).
@@ -176,12 +178,12 @@ export async function seedNpuCatalog(
     try {
         npu = await probeNpu();
     } catch {
-        SDKLogger.debug('[QHexRT] NPU probe failed; skipping NPU catalog seed');
+        logger.debug('NPU probe failed; skipping NPU catalog seed');
         return 0;
     }
 
     if (!npu.qhexrtSupported) {
-        SDKLogger.debug('[QHexRT] NPU not supported on this device; skipping NPU catalog seed');
+        logger.debug('NPU not supported on this device; skipping NPU catalog seed');
         return 0;
     }
 
@@ -199,10 +201,10 @@ export async function seedNpuCatalog(
             });
             count++;
         } catch (error) {
-            SDKLogger.debug(`[QHexRT] Failed to register NPU bundle ${r.id}: ${String(error)}`);
+            logger.debug(`Failed to register NPU bundle ${r.id}: ${String(error)}`);
         }
     }
 
-    SDKLogger.debug(`[QHexRT] NPU bundles registered for ${arch}: ${count}`);
+    logger.debug(`NPU bundles registered for ${arch}: ${count}`);
     return count;
 }
