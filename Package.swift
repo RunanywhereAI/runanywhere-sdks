@@ -268,7 +268,11 @@ let package = Package(
             exclude: [
                 "CRACommons",
                 "Generated/router.pb.swift",
-                "Generated/diffusion_options.pb.swift",
+                // `diffusion_options.pb.swift` is compiled into the module: the
+                // CoreML Stable-Diffusion facade (RunAnywhere+Diffusion /
+                // CppBridge+Diffusion) consumes RADiffusionGenerationOptions /
+                // RADiffusionResult / RADiffusionStreamEvent.
+                //
                 // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and
@@ -307,6 +311,12 @@ let package = Package(
                 "ONNXBackend",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
+                // Apple CoreML Stable-Diffusion engine. `ONNX.register()`
+                // bundles the Apple secondary backends, and this target already
+                // links CoreML + Accelerate, so it is the natural home for the
+                // diffusion engine archive. The coreml plugin auto-wins the
+                // DIFFUSION slot (priority 100) once linked.
+                "RABackendCoreMLBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include", "README.md"],
@@ -530,6 +540,10 @@ func binaryTargets() -> [Target] {
                 path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
             .binaryTarget(
+                name: "RABackendCoreMLBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework"
+            ),
+            .binaryTarget(
                 name: "RABackendMLXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework"
             ),
@@ -585,6 +599,16 @@ func binaryTargets() -> [Target] {
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
                 checksum: "f83b0b3ffa2b4277c1136a813685bf1cf637b4e7b460776656fc32ef81fd54dc"
+            ),
+            // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
+            // unconditional dependency on this, so the remote list must carry it.
+            // PLACEHOLDER checksum — `scripts/sync-checksums.sh` overwrites this
+            // with the real SHA-256 of RABackendCoreML-ios-v<version>.zip before
+            // tagging (release choreography), exactly like the peers above.
+            .binaryTarget(
+                name: "RABackendCoreMLBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendCoreML-ios-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
