@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -40,6 +41,7 @@
 #include "rac/infrastructure/storage/storage_event_publisher.h"
 
 #ifdef RAC_HAVE_PROTOBUF
+#include "download_service.pb.h"
 #include "sdk_events.pb.h"
 #include "storage_types.pb.h"
 #endif
@@ -206,6 +208,46 @@ void add_warning_once(runanywhere::v1::StorageDeleteResult* result,
     if (seen_warnings == nullptr || seen_warnings->insert(warning).second) {
         result->add_warnings(warning);
     }
+}
+
+// Cancel any in-flight download for `model_id` before its files are deleted so
+// the download worker does not race the deleter and re-create partials under a
+// freshly removed folder (A18). delete_partial_bytes=true tells the orchestrator
+// to reclaim the "<final>.part" file it was streaming into. The call is a no-op
+// (RAC_ERROR_NOT_FOUND / non-running task) when no download is active, so it is
+// safe to invoke unconditionally on the delete path.
+void cancel_inflight_download(const std::string& model_id) {
+    if (model_id.empty()) {
+        return;
+    }
+    runanywhere::v1::DownloadCancelRequest cancel_request;
+    cancel_request.set_model_id(model_id);
+    cancel_request.set_delete_partial_bytes(true);
+    std::string cancel_bytes;
+    if (!cancel_request.SerializeToString(&cancel_bytes)) {
+        return;
+    }
+    rac_proto_buffer_t cancel_out;
+    rac_proto_buffer_init(&cancel_out);
+    rac_download_cancel_proto(reinterpret_cast<const uint8_t*>(cancel_bytes.data()),
+                              cancel_bytes.size(), &cancel_out);
+    rac_proto_buffer_free(&cancel_out);
+}
+
+// Resolve the per-model folder `{base}/RunAnywhere/Models/{framework}/{model_id}/`.
+// Deleting the whole folder (rather than the single registry local_path file)
+// reclaims interrupted-download partials ("<final>.part") and the folder itself,
+// and works even when local_path is empty (A8). Returns empty on failure.
+std::string model_folder_path(const std::string& model_id, rac_inference_framework_t framework) {
+    if (model_id.empty()) {
+        return {};
+    }
+    char folder[1024];
+    if (rac_model_paths_get_model_folder(model_id.c_str(), framework, folder, sizeof(folder)) !=
+        RAC_SUCCESS) {
+        return {};
+    }
+    return folder;
 }
 
 struct DeleteCandidateRow {
@@ -1104,7 +1146,17 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             continue;
         }
 
-        if (!model->local_path || std::strlen(model->local_path) == 0) {
+        const bool has_local_path = model->local_path && std::strlen(model->local_path) > 0;
+
+        // Delete the whole per-model folder (A8): removing only the registry
+        // local_path file orphaned the folder and left interrupted-download
+        // "<final>.part" partials unreclaimable. The folder also lets an
+        // interrupted download (empty local_path) still be cleaned up. Fall back
+        // to local_path only when the folder cannot be computed.
+        const std::string model_folder = model_folder_path(id, model->framework);
+        const std::string delete_target =
+            !model_folder.empty() ? model_folder : (has_local_path ? model->local_path : "");
+        if (delete_target.empty()) {
             result_proto.add_failed_model_ids(id);
             add_warning_once(&result_proto, &warnings, "Model has no local path: " + id);
             had_failure = true;
@@ -1113,7 +1165,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             continue;
         }
 
-        if (plan_candidate && !plan_candidate->local_path().empty() &&
+        if (plan_candidate && !plan_candidate->local_path().empty() && has_local_path &&
             plan_candidate->local_path() != model->local_path) {
             result_proto.add_skipped_model_ids(id);
             add_warning_once(&result_proto, &warnings,
@@ -1124,7 +1176,12 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             continue;
         }
 
-        if (request.delete_files() && !path_exists_if_callback_present(handle, model->local_path)) {
+        // A missing target is only a hard failure when there is nothing to
+        // reclaim. An interrupted download leaves a folder with just a ".part"
+        // partial (and an empty local_path), so absence of the exact file is not
+        // fatal — the recursive folder delete below removes whatever is present.
+        if (request.delete_files() && has_local_path && model_folder.empty() &&
+            !path_exists_if_callback_present(handle, delete_target.c_str())) {
             result_proto.add_failed_model_ids(id);
             add_warning_once(&result_proto, &warnings, "Model path is missing: " + id);
             had_failure = true;
@@ -1133,7 +1190,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             continue;
         }
 
-        int64_t model_size = model_metric_size(handle, model, model->local_path);
+        int64_t model_size = model_metric_size(handle, model, delete_target.c_str());
         if (request.delete_files() && !request.dry_run() && !request.allow_platform_delete()) {
             result_proto.add_skipped_model_ids(id);
             add_warning_once(&result_proto, &warnings,
@@ -1200,8 +1257,14 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
                 rac_model_info_free(model);
                 continue;
             }
+            // Cancel any in-flight download before deleting so the writer does
+            // not race the deleter and re-create the partial we just removed
+            // (A18). No-op when nothing is downloading for this id.
+            cancel_inflight_download(id);
+            // Delete the whole per-model folder recursively (A8): reclaims the
+            // model file, any "<final>.part" partial, and the folder itself.
             rac_result_t delete_result =
-                handle->callbacks.delete_path(model->local_path, 1, handle->callbacks.user_data);
+                handle->callbacks.delete_path(delete_target.c_str(), 1, handle->callbacks.user_data);
             if (RAC_FAILED(delete_result)) {
                 result_proto.add_failed_model_ids(id);
                 add_warning_once(&result_proto, &warnings,
