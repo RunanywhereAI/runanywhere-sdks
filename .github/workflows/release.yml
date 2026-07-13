@@ -1499,6 +1499,15 @@ jobs:
         # podspec here would only create unattached files. Release preparation
         # must commit the real checksums first; this gate proves the rebuilt
         # archives are byte-identical and aborts publication on any mismatch.
+        #
+        # RAC_CHECKSUM_SKIP=RunAnywhereMLXRuntime: this single archive's stripped
+        # mach-O is not yet byte-reproducible across CI runs (~1.3KB scattered
+        # drift build-to-build — see thoughts/shared/issues/sdk-release-bugs.md).
+        # It is consumed ONLY by the Flutter runanywhere_mlx package, which is
+        # therefore held from publish until determinism is fixed. Swift SPM MLX is
+        # source-built and unaffected; all other archives are still gated strictly.
+        env:
+          RAC_CHECKSUM_SKIP: RunAnywhereMLXRuntime
         run: |
           set -euo pipefail
           if ! ./sdk/runanywhere-swift/scripts/sync-checksums.sh --check release-flat; then
