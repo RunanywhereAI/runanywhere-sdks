@@ -273,6 +273,13 @@ export interface GenerateWithToolsOptions {
    * executor pass `false`.
    */
   validateCalls?: boolean;
+  /**
+   * Prior conversation turns as a flat alternating list [user0, asst0, ...],
+   * EXCLUDING the current turn (which travels as `prompt`). Threaded into
+   * commons so the tool-calling loop keeps multi-turn context, matching the
+   * standard path's ChatMessage history as strings. Defaults to empty.
+   */
+  history?: string[];
 }
 
 /**
@@ -348,6 +355,10 @@ export async function generateWithTools(
     autoExecute: options?.autoExecute ?? true,
     replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
     requireJsonArguments: options?.requireJsonArguments ?? false,
+    // Prior turns as a flat alternating [user0, asst0, ...] list (excluding the
+    // current turn, which is `prompt`); commons threads these into every
+    // generate in the loop so multi-turn tool use keeps context.
+    history: extra?.history ?? [],
   });
 
   logger.debug(

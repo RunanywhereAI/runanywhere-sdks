@@ -125,6 +125,13 @@ export interface GenerateWithToolsOptions {
    * executor pass `false`.
    */
   validateCalls?: boolean;
+  /**
+   * Prior conversation turns as a flat alternating list [user0, asst0, ...],
+   * EXCLUDING the current turn (which travels as `prompt`). Threaded to commons
+   * so the tool-calling loop keeps multi-turn context, matching the standard
+   * path's ChatMessage history as strings. Defaulted to empty for source compat.
+   */
+  history?: string[];
 }
 
 /**
@@ -452,6 +459,11 @@ function buildSessionCreateRequest(
     autoExecute: effectiveOptions.autoExecute ?? true,
     replaceSystemPrompt: effectiveOptions.replaceSystemPrompt ?? false,
     requireJsonArguments: effectiveOptions.requireJsonArguments ?? false,
+    // Prior conversation turns as a flat alternating list [user0, asst0, ...],
+    // EXCLUDING the current turn (which travels as `prompt`). commons threads
+    // these into every generate in the session loop so multi-turn tool use keeps
+    // context — Kotlin parity (makeToolCallingRunLoopRequest history param).
+    history: extra.history ?? [],
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
