@@ -2170,22 +2170,29 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     thinking_tags_from_request_or_model(request, ref, &thinking_open_tag, &thinking_close_tag);
     (void)rac_llm_extract_thinking_with_tags(
         raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response, &response_len,
-        &thinking, &thinking_len);
+        thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
+        &response_len, &thinking, &thinking_len);
+    const std::string response_text =
+        response ? std::string(response, response_len) : std::string();
+    const std::string thinking_text =
+        thinking ? std::string(thinking, thinking_len) : std::string();
+    const char* response_cstr = response_text.c_str();
+    const char* thinking_cstr = thinking_text.empty() ? nullptr : thinking_text.c_str();
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
-    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response, thinking, &thinking_tokens,
-                                        &response_tokens);
+    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response_cstr, thinking_cstr,
+                                        &thinking_tokens, &response_tokens);
 
     LLMGenerationResult result;
-    set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len, thinking_tokens,
-                        response_tokens, options.max_tokens, &result);
-    set_structured_output_if_present(response, &result);
+    set_result_from_raw(ref, raw, response_cstr, response_text.size(), thinking_cstr,
+                        thinking_text.size(), thinking_tokens, response_tokens, options.max_tokens,
+                        &result);
+    set_structured_output_if_present(response_cstr, &result);
 
     publish_generation_event(
         runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, request.prompt().c_str(), nullptr,
-        response, nullptr, ref.model_id, raw.completion_tokens,
+        response_cstr, nullptr, ref.model_id, raw.completion_tokens,
         raw.total_time_ms > 0 ? raw.total_time_ms : elapsed,
         raw.prompt_tokens > 0 ? raw.prompt_tokens : estimate_tokens(request.prompt().c_str()),
         ref.framework_name, static_cast<double>(raw.tokens_per_second),
@@ -2463,20 +2470,27 @@ rac_result_t rac_llm_generate_from_context_proto(const uint8_t* request_proto_by
         raw_text, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
         thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &response,
         &response_len, &thinking, &thinking_len);
+    const std::string response_text =
+        response ? std::string(response, response_len) : std::string();
+    const std::string thinking_text =
+        thinking ? std::string(thinking, thinking_len) : std::string();
+    const char* response_cstr = response_text.c_str();
+    const char* thinking_cstr = thinking_text.empty() ? nullptr : thinking_text.c_str();
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
-    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response, thinking, &thinking_tokens,
-                                        &response_tokens);
+    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response_cstr, thinking_cstr,
+                                        &thinking_tokens, &response_tokens);
 
     LLMGenerationResult result;
-    set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len, thinking_tokens,
-                        response_tokens, options.max_tokens, &result);
-    set_structured_output_if_present(response, &result);
+    set_result_from_raw(ref, raw, response_cstr, response_text.size(), thinking_cstr,
+                        thinking_text.size(), thinking_tokens, response_tokens, options.max_tokens,
+                        &result);
+    set_structured_output_if_present(response_cstr, &result);
 
     publish_generation_event(
         runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, request.prompt().c_str(), nullptr,
-        response, nullptr, ref.model_id, raw.completion_tokens,
+        response_cstr, nullptr, ref.model_id, raw.completion_tokens,
         raw.total_time_ms > 0 ? raw.total_time_ms : elapsed, raw.prompt_tokens);
 
     rac_llm_result_free(&raw);
