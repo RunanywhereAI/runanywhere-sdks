@@ -463,6 +463,15 @@ echo ">> yarn install --immutable (cwd=$YARN_CWD)"
 # packages that consume generated protocol types vendor this exact archive, so
 # installing a GitHub Release tarball never depends on an unpublished registry
 # copy of proto-ts. The MLX registration-only package has no protocol imports.
+# proto-ts is a SIBLING workspace member (../shared/proto-ts), so Yarn's
+# node-modules linker hoists its deps into the RN root — unreachable when tsc
+# compiles proto-ts from its own sibling dir (TS2307 on '@bufbuild/protobuf/wire'
+# in a clean CI checkout; only passes locally via a stray repo-root install).
+# Install proto-ts standalone from its committed lockfile first, mirroring the Web
+# SDK + idl-drift-check recipe. --workspaces=false stops npm from detecting the
+# monorepo root and failing on the `workspace:*` protocol.
+echo ">> npm ci proto-ts (standalone, so tsc can resolve @bufbuild/protobuf)"
+(cd "$REPO_ROOT/sdk/shared/proto-ts" && npm ci --workspaces=false --no-audit --no-fund)
 echo ">> yarn build:proto"
 corepack yarn build:proto
 PROTO_STAGING="$(mktemp -d "${TMPDIR:-/tmp}/runanywhere-rn-proto.XXXXXX")"
@@ -480,6 +489,17 @@ fi
 TYPECHECK_PACKAGE_DIRS=("${PUBLIC_PACKAGE_DIRS[@]}")
 if [ "$INCLUDE_PRIVATE_QHEXRT" = "1" ]; then
     TYPECHECK_PACKAGE_DIRS+=(qhexrt)
+fi
+# `core` is a composite TS project referenced by every backend package
+# (llamacpp/mlx/onnx/qhexrt via `references: [{ path: "../core" }]`). `tsc --noEmit`
+# never writes core/lib/*.d.ts (gitignored, absent on a clean checkout), so the
+# first dependent's `tsc --noEmit` fails with TS6305 ("Output file .../core/lib/
+# internal.d.ts has not been built..."). Build core's declarations once first —
+# mirrors the root package.json `typecheck` script. This lib/ output is never
+# shipped (core's package.json files/exports point at src/).
+echo ">> build core (emit declarations for composite project references)"
+if ! (cd "$RN_ROOT/packages/core" && npx tsc -b); then
+    validation_failure "Core declaration build failed"
 fi
 for pkg in "${TYPECHECK_PACKAGE_DIRS[@]}"; do
     pkg_dir="$RN_ROOT/packages/$pkg"

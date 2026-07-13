@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.0")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.9")
 //   No environment override is needed. SPM downloads the checksum-verified
 //   XCFramework archives from the GitHub release by default.
 //
@@ -84,7 +84,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.0"
+let sdkVersion = "0.20.9"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -569,7 +569,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "de1e00a343475ef5f575037ec94df1a25226f5b9581a3cd0b393d4ed071d1aa4"
+                checksum: "a3e04f228970041f8074206d0dd5627e077e283043ef976f3215c195da493e95"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
@@ -584,7 +584,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
+                checksum: "f83b0b3ffa2b4277c1136a813685bf1cf637b4e7b460776656fc32ef81fd54dc"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",

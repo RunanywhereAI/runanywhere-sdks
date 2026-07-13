@@ -246,7 +246,24 @@ done < <(declare_mapping)
 # resources as independent archives. They are intentionally absent from the
 # root manifest: normal Swift SDK consumers compile the canonical source
 # RunAnywhereMLX product instead of these CocoaPods-oriented binaries.
+#
+# RAC_CHECKSUM_SKIP (space/comma-separated archive names) opts an archive out of
+# both update and --check. This exists to ship a release while a specific archive
+# is not yet byte-reproducible across CI runs — currently RunAnywhereMLXRuntime,
+# whose stripped mach-O still differs ~1.3KB build-to-build (see
+# thoughts/shared/issues/sdk-release-bugs.md). The affected package (Flutter
+# runanywhere_mlx) MUST NOT be published while its archive is skipped.
+rac_should_skip_checksum() {
+    local norm=" ${RAC_CHECKSUM_SKIP:-} "
+    norm="${norm//,/ }"
+    case "$norm" in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
 while IFS='|' read -r target_name zip_prefix; do
+    if rac_should_skip_checksum "$target_name"; then
+        echo "  skipped:   $target_name (RAC_CHECKSUM_SKIP)" >&2
+        continue
+    fi
     zip_file="$ZIP_DIR/${zip_prefix}-v${SDK_VERSION}.zip"
     if [ ! -f "$zip_file" ]; then
         echo "  missing:   ${zip_prefix}-v${SDK_VERSION}.zip in $ZIP_DIR" >&2

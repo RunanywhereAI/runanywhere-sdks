@@ -59,7 +59,19 @@
 #include <io.h>
 #include <stdlib.h>
 #include <string.h>
+/* wingdi.h (pulled in by <windows.h>) is NOT excluded by WIN32_LEAN_AND_MEAN
+ * (which the build defines globally). It `#define ERROR 0` plus other unprefixed
+ * macros that collide with protobuf/absl generated headers in any TU that
+ * includes both this shim and generated code (e.g. vlm_module.cpp transitively
+ * pulls errors.pb.h). NOGDI drops wingdi entirely; this shim + the codebase
+ * never use Win32 GDI. The explicit ERROR undef is belt-and-suspenders. */
+#ifndef NOGDI
+#define NOGDI
+#endif
 #include <windows.h>
+#ifdef ERROR
+#undef ERROR
+#endif
 
 #ifndef NAME_MAX
 #define NAME_MAX 260

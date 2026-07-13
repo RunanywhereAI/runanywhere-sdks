@@ -1,6 +1,6 @@
 name: runanywhere_mlx
 description: Apple MLX backend for RunAnywhere Flutter SDK with on-device LLM, VLM, embeddings, speech recognition, and speech synthesis.
-version: 0.20.0
+version: 0.20.9
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
 issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
@@ -21,7 +21,7 @@ dependencies:
   flutter:
     sdk: flutter
   # MLX and core native binaries are released as one ABI-compatible train.
-  runanywhere: ^0.20.0
+  runanywhere: ^0.20.9
 
 dev_dependencies:
   flutter_test:

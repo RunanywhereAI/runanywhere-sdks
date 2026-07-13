@@ -8,7 +8,7 @@ catalog, download, lifecycle, LLM, VLM, speech, and embedding APIs remain in
 
 ## Requirements
 
-- `@runanywhere/core` 0.20.0+
+- `@runanywhere/core` 0.20.9+
 - React Native 0.83.1+
 - Xcode 26+ with the Swift 6.2 toolchain
 - A physical Apple device running iOS 17.5+
