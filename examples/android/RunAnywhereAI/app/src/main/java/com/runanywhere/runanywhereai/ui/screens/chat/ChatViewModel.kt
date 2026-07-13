@@ -565,7 +565,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             max_tokens = budget.effectiveMaxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
-            disable_thinking = s.disableThinking,
+            // Only apply the "disable thinking" preference to models that actually think — on a
+            // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
+            // and corrupts the prompt (e.g. Llama). Bug 5 follow-up.
+            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
         )
     }
 
