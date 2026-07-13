@@ -153,6 +153,11 @@ internal fun makeToolCallingRunLoopRequest(
     llmOptions: RALLMGenerationOptions,
     tools: List<ToolDefinition>,
     validateCalls: Boolean?,
+    // Prior conversation turns as a flat alternating list [user0, asst0, ...],
+    // EXCLUDING the current turn (which is `prompt`). commons threads these into
+    // every generate in the loop so multi-turn tool use keeps context. Same
+    // contract as the standard path's ChatMessage history, as strings.
+    history: List<String> = emptyList(),
 ): ToolCallingSessionCreateRequest =
     ToolCallingSessionCreateRequest(
         prompt = prompt,
@@ -183,6 +188,7 @@ internal fun makeToolCallingRunLoopRequest(
         auto_execute = options.auto_execute,
         replace_system_prompt = options.replace_system_prompt,
         require_json_arguments = options.require_json_arguments,
+        history = history,
     )
 
 /**
@@ -318,6 +324,10 @@ internal object ToolCallingOrchestrator {
         options: ToolCallingOptions? = null,
         llmOptions: RALLMGenerationOptions? = null,
         validateCalls: Boolean? = null,
+        // Prior conversation turns as a flat alternating list [user0, asst0, ...],
+        // EXCLUDING the current turn (which is `prompt`). Threaded into commons so
+        // multi-turn tool use keeps context. Defaulted for source/binary compat.
+        history: List<String> = emptyList(),
     ): ToolCallingResult =
         coroutineScope {
             require(RunAnywhere.isInitialized) { "SDK not initialized" }
@@ -339,6 +349,7 @@ internal object ToolCallingOrchestrator {
                     llmOptions = llmOpts,
                     tools = tools,
                     validateCalls = validateCalls,
+                    history = history,
                 )
 
             val parentJob = checkNotNull(currentCoroutineContext()[Job])
