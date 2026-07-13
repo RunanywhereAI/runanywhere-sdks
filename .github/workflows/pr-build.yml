@@ -148,6 +148,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: brew install ninja protobuf
+      - name: Sherpa-ONNX prebuilts (macOS arm64 static inventory)
+        # Without this, RAC_BACKEND_SHERPA=ON still compiles + registers the sherpa
+        # engine, but as a not-routable stub (no libsherpa-onnx-c-api.a found ->
+        # SHERPA_ONNX_AVAILABLE=0), so this "full-backend" smoke never actually
+        # exercised working STT/TTS/VAD. Mirrors rcli-linux's equivalent step below.
+        run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
       - run: cmake --preset rcli-macos-release
       - run: cmake --build --preset rcli-macos-release
       - name: Smoke (modelless)
