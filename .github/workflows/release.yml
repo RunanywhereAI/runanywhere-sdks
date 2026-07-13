@@ -212,17 +212,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: brew install ninja protobuf
-      - name: Sherpa-ONNX prebuilts (macOS arm64 static inventory)
-        # rcli-macos-release turns RAC_BACKEND_SHERPA=ON, but engines/sherpa/CMakeLists.txt
-        # only links the real Sherpa-ONNX C API when
-        # sdk/runanywhere-commons/third_party/sherpa-onnx-macos/lib/libsherpa-onnx-c-api.a
-        # already exists (EXISTS-gated, silent no-op otherwise). Without this step the
-        # sherpa engine still compiles and registers, but as a not-routable stub
-        # (SHERPA_ONNX_AVAILABLE=0 -> capability_check returns
-        # RAC_ERROR_BACKEND_UNAVAILABLE), so the published rcli silently ships without
-        # working STT/TTS/VAD. native_ios already runs this same script for its macOS
-        # arm64 static inventory (see below) — mirror it here so rcli gets it too.
-        run: bash sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
       - name: Build rcli (macOS arm64, Metal)
         run: |
           set -euo pipefail
