@@ -189,6 +189,121 @@ merge_static_archives() {
     run xcrun libtool -static -o "${output}" "${inputs[@]}"
 }
 
+# Collapse byte-identical duplicate members in a static archive, in place.
+#
+# The macOS ONNX slice folds in the pinned `libonnxruntime.a`, which is itself a
+# fat-merge of ONNX Runtime's sub-archives. Assembling it re-packed a handful of
+# object files (onnx-ml.pb.cc.o, onnx-data.pb.cc.o, onnx-operators-ml.pb.cc.o)
+# more than once, so the same onnx::* protobuf symbols are defined by two
+# byte-identical members. A normal consumer link only pulls the first
+# definition, but a full-backend macOS app links the slice with -all_load, which
+# force-loads every member and fails with hundreds of duplicate symbols.
+#
+# De-dup by (member name, content hash): keep the first occurrence of each unique
+# object and drop only byte-identical repeats — distinct objects that merely
+# share a basename (e.g. onnx's many defs.cc.o) are preserved, so no code is
+# lost. This mirrors the iOS slice, where ONNX Runtime ships as one prelinked
+# object with no duplicate members.
+dedup_byte_identical_archive_members() {
+    local archive="$1"
+    local label="$2"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+    if [ ! -f "${archive}" ]; then
+        echo "error: dedup target archive not found: ${archive}" >&2
+        exit 1
+    fi
+
+    local scratch_dir="${STAGING_DIR}/dedup/$(basename "${archive}")"
+    run rm -rf "${scratch_dir}"
+    run mkdir -p "${scratch_dir}"
+
+    local summary
+    summary="$(python3 - "${archive}" "${scratch_dir}" <<'PY'
+import hashlib
+import os
+import sys
+
+archive = sys.argv[1]
+outdir = sys.argv[2]
+data = open(archive, "rb").read()
+if data[:8] != b"!<arch>\n":
+    raise SystemExit(f"error: {archive} is not a static archive")
+
+pos = 8
+index = 0
+kept = []
+seen = set()
+total = 0
+while pos + 60 <= len(data):
+    header = data[pos:pos + 60]
+    if header[58:60] != b"`\n":
+        raise SystemExit(f"error: {archive}: bad member header at byte {pos}")
+    raw_name = header[0:16].decode("ascii", "replace").rstrip()
+    size = int(header[48:58].decode("ascii").strip())
+    body = data[pos + 60:pos + 60 + size]
+    name = raw_name
+    if raw_name.startswith("#1/"):
+        namelen = int(raw_name[3:])
+        name = body[:namelen].split(b"\0", 1)[0].decode("ascii", "replace")
+        body = body[namelen:]
+    pos += 60 + size + (size % 2)
+    if name in ("__.SYMDEF", "__.SYMDEF SORTED", "//", "/"):
+        continue
+    total += 1
+    key = (name, hashlib.sha256(body).hexdigest())
+    if key in seen:
+        continue
+    seen.add(key)
+    member_dir = os.path.join(outdir, f"{index:05d}")
+    os.makedirs(member_dir, exist_ok=True)
+    with open(os.path.join(member_dir, name), "wb") as stream:
+        stream.write(body)
+    kept.append(os.path.join(member_dir, name))
+    index += 1
+
+# NUL-terminate every path (including the last) so the bash `read -d ''`
+# loop below reads all fields — a bare `\0`.join() leaves the final path
+# unterminated, and `read` drops an unterminated trailing field.
+with open(os.path.join(outdir, "keep.nul"), "wb") as stream:
+    for path in kept:
+        stream.write(path.encode())
+        stream.write(b"\0")
+
+print(f"{total} {len(kept)} {total - len(kept)}")
+PY
+)"
+
+    local total kept removed
+    read -r total kept removed <<<"${summary}"
+
+    if [ "${removed}" -eq 0 ]; then
+        echo "  ✓ ${label}: no byte-identical duplicate members (${total} members)"
+        run rm -rf "${scratch_dir}"
+        return
+    fi
+
+    local keep_files=()
+    local path
+    while IFS= read -r -d '' path; do
+        keep_files+=("${path}")
+    done <"${scratch_dir}/keep.nul"
+
+    # Fail closed if the manifest read lost any member — a silently short
+    # repack drops object files (and their symbols) from the slice.
+    if [ "${#keep_files[@]}" -ne "${kept}" ]; then
+        echo "error: ${label} dedup manifest mismatch (expected ${kept} members, read ${#keep_files[@]})" >&2
+        exit 1
+    fi
+
+    run rm -f "${archive}"
+    run xcrun libtool -static -o "${archive}" "${keep_files[@]}"
+    run rm -rf "${scratch_dir}"
+    echo "  ✓ ${label}: de-duped ${removed} byte-identical member(s) (${total} → ${kept})"
+}
+
 # Some pinned upstream Apple archives embed their CI checkout roots in
 # __FILE__ strings. Rewrite only the reviewed, version-pinned prefixes while
 # preserving every byte offset, then fail closed if any host path remains.
@@ -565,6 +680,11 @@ merge_onnx_backend_macos_slice() {
     done
 
     merge_static_archives "${output}" "${prepared[@]}"
+    # The pinned macOS libonnxruntime.a re-packs a few onnx protobuf objects
+    # verbatim, so the merged slice carries duplicate onnx::* symbols that break
+    # a full-backend macOS app's -all_load link. Collapse the byte-identical
+    # repeats (iOS avoids this by shipping ONNX Runtime as one prelinked object).
+    dedup_byte_identical_archive_members "${output}" "macos RABackendONNX"
 }
 
 # Sherpa engine slice. Fold in the sherpa-onnx prebuilt archives because this
@@ -763,7 +883,7 @@ cmake_extra=(
     "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
 )
 ios_cmake_extra=(
-    "-DRAC_BACKEND_COREML=OFF"
+    "-DRAC_BACKEND_COREML=ON"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
 )
@@ -811,7 +931,7 @@ macos_cmake_args=(
     "-DRAC_BACKEND_LLAMACPP=ON"
     "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
     "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA:-ON}"
-    "-DRAC_BACKEND_COREML=OFF"
+    "-DRAC_BACKEND_COREML=ON"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"

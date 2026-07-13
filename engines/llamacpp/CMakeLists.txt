@@ -88,6 +88,18 @@ elseif(RAC_PLATFORM_MACOS)
     if(GGML_METAL)
         set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
     endif()
+    # llama.cpp's vendored cpp-httplib auto-enables CPPHTTPLIB_OPENSSL_SUPPORT
+    # whenever find_package(OpenSSL) succeeds (LLAMA_OPENSSL defaults ON). On a
+    # native macOS release host Homebrew OpenSSL is discoverable, so
+    # httplib.cpp.o compiles in the TLS path and drags ~100 unresolved
+    # SSL_/EVP_/ASN1_/BIO_ symbols into the static slice with no provider. A
+    # full-backend macOS app links that slice with -all_load, which force-loads
+    # this dead httplib path (SDK downloads go through the platform adapter, not
+    # cpp-httplib) and fails the link on the undefined OpenSSL symbols. iOS never
+    # hits this because the OpenSSL find fails under cross-compilation, so disable
+    # it here to make the macOS slice match iOS. Apple/macOS-scoped —
+    # Linux/Android keep their existing behavior.
+    set(LLAMA_OPENSSL OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_LINUX)
     # Disable GPU backends not typically available on Linux ARM
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
