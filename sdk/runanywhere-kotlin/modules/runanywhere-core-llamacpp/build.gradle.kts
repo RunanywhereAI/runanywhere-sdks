@@ -209,6 +209,8 @@ tasks.register("downloadJniLibs") {
 
                 tempZip.delete()
             } catch (e: Exception) {
+                outputDir.deleteRecursively()
+                tempDir.deleteRecursively()
                 throw GradleException("Failed to download and verify $packageName: ${e.message}", e)
             }
         }
