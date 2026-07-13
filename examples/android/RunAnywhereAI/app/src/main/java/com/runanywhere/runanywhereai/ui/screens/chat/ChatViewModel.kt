@@ -291,11 +291,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             replyIndex,
                             activeModel,
                             registeredTools,
-                            // Flat alternating [user0, asst0, ...] of PRIOR turns from the
-                            // SAME snapshot the standard path uses (turn.history is captured
-                            // before the current prompt is appended, so it already excludes
-                            // the current turn). Keeps multi-turn tool use in context.
-                            history = turn.history.map { it.content },
+                            // Normalized flat alternating [user0, asst0, ...] of PRIOR turns
+                            // from the SAME snapshot the standard path uses (turn.history is
+                            // captured before the current prompt is appended, so it already
+                            // excludes the current turn). toToolCallingHistory mirrors the
+                            // standard path's commons normalizer (coalesce same-role, drop
+                            // leading-assistant/trailing-user) so a dropped blank assistant
+                            // turn can't hand commons a mislabeled non-alternating list.
+                            history = ChatRequestPolicy.toToolCallingHistory(turn.history),
                         )
                     ToolCallingRoute.BLOCKED -> {
                         showToolGateNotice = true
