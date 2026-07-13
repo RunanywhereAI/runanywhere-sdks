@@ -431,11 +431,14 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     // [user,asst,...], so we forward it as-is and do NOT pop a trailing turn —
     // unlike llm_module's normalizer, whose history includes the current turn.
     ctx.generation.history.assign(request.history().begin(), request.history().end());
-    // Defensive: the C ABI history slot is positional [user0, asst0, user1, ...];
-    // an odd count means a trailing user turn with no assistant reply (e.g. the
-    // prior turn's response was blank/filtered upstream). Drop it so the positional
-    // role assignment stays aligned — the same net effect as the standard path's
-    // trailing-user pop (llm_module.cpp), without needing role tags we don't carry.
+    // Positional-parity safety net. The history slot is role-less and positional
+    // [user0, asst0, user1, ...], so the CALLER owns full normalization — drop
+    // leading-assistant, coalesce consecutive same-role, exclude the current turn —
+    // exactly as the standard path's commons normalizer (llm_module.cpp) does for a
+    // role-tagged ChatMessage list (the Android app mirrors it in
+    // ChatRequestPolicy.toToolCallingHistory). This guard only corrects an ODD count
+    // (a dangling trailing turn); it deliberately does NOT coalesce interior same-role
+    // runs, which role-less strings cannot detect — that must happen upstream.
     if (ctx.generation.history.size() % 2 != 0) {
         ctx.generation.history.pop_back();
     }
