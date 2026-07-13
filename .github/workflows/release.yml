@@ -100,7 +100,11 @@ jobs:
     # Use the macOS 26 runner line for Xcode 26 while keeping the desktop rcli
     # lane on its existing macos-14 llama.cpp Metal pin.
     runs-on: macos-26
-    timeout-minutes: 90
+    # The Apple build compiles all XCFramework slices + the heavy mlx-swift/MLX
+    # Metal runtime; wall-clock is ~45min typical but has spiked to the 90min cap
+    # on a slow macos-26 runner (Cycle C' timed out at exactly 90:00 → cancelled,
+    # skipping publish). Raised to 150 to absorb runner variance.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-toolchain
