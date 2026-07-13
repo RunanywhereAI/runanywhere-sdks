@@ -285,7 +285,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 when (toolPreflight.route) {
                     ToolCallingRoute.TOOL_GENERATION ->
-                        generateWithTools(request, prompt, replyIndex, activeModel, registeredTools)
+                        generateWithTools(
+                            request,
+                            prompt,
+                            replyIndex,
+                            activeModel,
+                            registeredTools,
+                            // Flat alternating [user0, asst0, ...] of PRIOR turns from the
+                            // SAME snapshot the standard path uses (turn.history is captured
+                            // before the current prompt is appended, so it already excludes
+                            // the current turn). Keeps multi-turn tool use in context.
+                            history = turn.history.map { it.content },
+                        )
                     ToolCallingRoute.BLOCKED -> {
                         showToolGateNotice = true
                         updateReply(request, replyIndex) { reply ->
@@ -670,6 +681,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         index: Int,
         activeModel: RuntimeModelSnapshot,
         registeredTools: List<RAToolDefinition>,
+        history: List<String> = emptyList(),
     ) {
         updateReply(request, index) { it.copy(text = ToolCallingExecutionPolicy.PROGRESS_MESSAGE) }
         val execution = ToolCallingExecutionPolicy.plan(
@@ -685,6 +697,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         toolOptions = execution.toolOptions,
                         toolChoice = execution.toolChoice,
                         forcedToolName = execution.forcedToolName,
+                        history = history,
                     )
                 }
             }
