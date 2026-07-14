@@ -48,7 +48,12 @@ enum class ModelSelectionContext(
         TTS -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
         VAD -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
         VLM -> model.isVisionLanguageModel
+        // Text-passage retrievers only. Exclude cross-modal CLIP towers (SigLIP2's text tower is a
+        // short-caption image-alignment encoder, not a document retriever), rerankers, and code
+        // embedders — all register as MODEL_CATEGORY_EMBEDDING but silently return poor RAG retrieval.
+        // Keeps genuine QA retrievers (nv_embedqa, embeddinggemma, all-minilm).
         RAG_EMBEDDING -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING) &&
-            !model.id.contains("rerank", ignoreCase = true)
+            !model.isVisionLanguageModel &&
+            listOf("rerank", "siglip", "clip", "embedcode").none { model.id.contains(it, ignoreCase = true) }
     }
 }
