@@ -42,7 +42,7 @@ internal object ModelCatalog {
     val npuCatalog: List<SingleFileModel> = listOf(
         SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 886_089_241L, contextLength = 512),
         SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048),
-        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_848L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 1_550_649_664L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 4_817_344_861L, contextLength = 1_024),
         SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 6_177_585_629L, contextLength = 1_024),
         SingleFileModel("qwen3_0_6b", "Qwen3 0.6B (HNPU)", "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json", QHEXRT, LANGUAGE, 1_823_248_798L, contextLength = 1_024),
