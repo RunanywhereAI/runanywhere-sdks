@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "rac/core/rac_core.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #include "io/output.h"
@@ -473,6 +474,19 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
 
+    // --- Image generation (CoreML diffusion; Apple only) ---
+    // Apple-optimized Stable Diffusion 1.5. Id matches the built-in diffusion
+    // model registry (diffusion_model_registry.cpp) and the Swift facade's
+    // canonical `.imageGeneration` model, so `rcli image generate` resolves it
+    // and `rcli list` shows it. The palettized CoreML bundle is a directory of
+    // compiled .mlmodelc sub-models served by the `coreml` engine; a
+    // pre-fetched bundle can also be passed to `--model` as a local path.
+    {"stable-diffusion-v1-5-coreml", "sd15", "Stable Diffusion 1.5 (CoreML)",
+     v1::MODEL_CATEGORY_IMAGE_GENERATION, v1::INFERENCE_FRAMEWORK_COREML,
+     v1::MODEL_FORMAT_MLPACKAGE,
+     "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized",
+     nullptr, 0, 1200 * MB, 0, false},
+
     // --- MLX (Apple Silicon / Apple GPU via mlx-swift-lm) ---
     {"mlx-qwen3-0.6b-4bit", "mlx-qwen3", "Qwen3 0.6B 4-bit (MLX)",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
@@ -516,6 +530,29 @@ constexpr CatalogEntry kCatalog[] = {
 constexpr size_t kCatalogCount = sizeof(kCatalog) / sizeof(kCatalog[0]);
 
 rac_result_t register_entry(const CatalogEntry &entry) {
+  // CoreML bundles (a directory of compiled .mlmodelc sub-models) don't fit the
+  // URL / multi-file download-factory grammar, which rejects a bare repo ref.
+  // Register the ModelInfo directly so the id resolves in the general registry
+  // (and `rcli list` shows it); the bundle itself is fetched by the diffusion
+  // pipeline or supplied to `rcli image --model <local path>`.
+  if (entry.framework == v1::INFERENCE_FRAMEWORK_COREML) {
+    v1::ModelInfo model;
+    model.set_id(entry.id);
+    model.set_name(entry.name);
+    model.set_category(entry.category);
+    model.set_framework(entry.framework);
+    model.set_format(entry.format);
+    if (entry.url != nullptr) {
+      model.set_download_url(entry.url);
+    }
+    model.set_download_size_bytes(entry.download_size_bytes);
+    model.set_source(v1::MODEL_SOURCE_REMOTE);
+    const std::string bytes = proto::serialize(model);
+    return rac_model_registry_register_proto(
+        rac_get_model_registry(),
+        reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size());
+  }
+
   rac_proto_buffer_t out;
   rac_proto_buffer_init(&out);
   rac_result_t rc = RAC_SUCCESS;

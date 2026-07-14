@@ -160,7 +160,7 @@ download_file() {
     local url="$1"
     local output="$2"
     if ! curl --fail --location --silent --show-error \
-        --retry 3 --retry-delay 2 --connect-timeout 15 \
+        --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 15 \
         --output "${output}" "${url}"; then
         rm -f "${output}"
         fail "Failed to download ${url}"

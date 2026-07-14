@@ -659,8 +659,23 @@ else()
         message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
     endif()
     set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
-    configure_file("${DEV_CONFIG_TEMPLATE}" "${RAC_DEV_CONFIG_SOURCE}" COPYONLY)
-    message(STATUS "Using credential-free development config stub")
+    # The tracked template carries only "YOUR_*" placeholders (never real
+    # credentials). Release/CI builds substitute the real values from the
+    # environment (GitHub Actions secrets SUPABASE_URL / SUPABASE_ANON_KEY /
+    # BUILD_TOKEN) into the generated source — so credentials live in CI secrets,
+    # never in the public source tree. When the env is unset (normal local build)
+    # the placeholders pass through and the dev config stays the credential-free
+    # stub (usability checks treat "YOUR_*" as unavailable).
+    file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
+    if(NOT "$ENV{SUPABASE_URL}" STREQUAL "")
+        string(REPLACE "YOUR_SUPABASE_PROJECT_URL" "$ENV{SUPABASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
+        string(REPLACE "YOUR_SUPABASE_ANON_KEY" "$ENV{SUPABASE_ANON_KEY}" _rac_dev_cfg "${_rac_dev_cfg}")
+        string(REPLACE "YOUR_BUILD_TOKEN" "$ENV{BUILD_TOKEN}" _rac_dev_cfg "${_rac_dev_cfg}")
+        message(STATUS "Injected development config from environment (CI secrets)")
+    else()
+        message(STATUS "Using credential-free development config stub")
+    endif()
+    file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
 endif()
 
 # =============================================================================

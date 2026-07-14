@@ -381,6 +381,16 @@ public:
   vlmCancelProto() override;
 
   // ============================================================================
+  // Diffusion Capability (Image Generation — Apple / CoreML only)
+  // Uses commons lifecycle-owned diffusion proto ABI
+  // (rac_diffusion_generate_lifecycle_proto).
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  diffusionGenerateLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+
+  // ============================================================================
   // Device Identity
   // ============================================================================
 

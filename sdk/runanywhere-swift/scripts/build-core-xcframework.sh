@@ -9,6 +9,7 @@
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
 #   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework       (skipped if RAC_BACKEND_SHERPA=OFF)
+#   sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework        (Apple-only; CoreML Stable-Diffusion engine)
 #   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #   sdk/runanywhere-swift/Binaries/RunAnywhereMLXRuntime.xcframework  (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #   sdk/runanywhere-swift/Binaries/RunAnywhereMLXMetal.xcframework    (platform-selected Metal resource framework)
@@ -187,6 +188,121 @@ merge_static_archives() {
     run mkdir -p "$(dirname "${output}")"
     run rm -f "${output}"
     run xcrun libtool -static -o "${output}" "${inputs[@]}"
+}
+
+# Collapse byte-identical duplicate members in a static archive, in place.
+#
+# The macOS ONNX slice folds in the pinned `libonnxruntime.a`, which is itself a
+# fat-merge of ONNX Runtime's sub-archives. Assembling it re-packed a handful of
+# object files (onnx-ml.pb.cc.o, onnx-data.pb.cc.o, onnx-operators-ml.pb.cc.o)
+# more than once, so the same onnx::* protobuf symbols are defined by two
+# byte-identical members. A normal consumer link only pulls the first
+# definition, but a full-backend macOS app links the slice with -all_load, which
+# force-loads every member and fails with hundreds of duplicate symbols.
+#
+# De-dup by (member name, content hash): keep the first occurrence of each unique
+# object and drop only byte-identical repeats — distinct objects that merely
+# share a basename (e.g. onnx's many defs.cc.o) are preserved, so no code is
+# lost. This mirrors the iOS slice, where ONNX Runtime ships as one prelinked
+# object with no duplicate members.
+dedup_byte_identical_archive_members() {
+    local archive="$1"
+    local label="$2"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        return
+    fi
+    if [ ! -f "${archive}" ]; then
+        echo "error: dedup target archive not found: ${archive}" >&2
+        exit 1
+    fi
+
+    local scratch_dir="${STAGING_DIR}/dedup/$(basename "${archive}")"
+    run rm -rf "${scratch_dir}"
+    run mkdir -p "${scratch_dir}"
+
+    local summary
+    summary="$(python3 - "${archive}" "${scratch_dir}" <<'PY'
+import hashlib
+import os
+import sys
+
+archive = sys.argv[1]
+outdir = sys.argv[2]
+data = open(archive, "rb").read()
+if data[:8] != b"!<arch>\n":
+    raise SystemExit(f"error: {archive} is not a static archive")
+
+pos = 8
+index = 0
+kept = []
+seen = set()
+total = 0
+while pos + 60 <= len(data):
+    header = data[pos:pos + 60]
+    if header[58:60] != b"\x60\n":  # ar member header magic 0x60 0x0A (\x60 avoids a raw backtick that macOS /bin/bash 3.2 mis-parses inside $()<<'PY')
+        raise SystemExit(f"error: {archive}: bad member header at byte {pos}")
+    raw_name = header[0:16].decode("ascii", "replace").rstrip()
+    size = int(header[48:58].decode("ascii").strip())
+    body = data[pos + 60:pos + 60 + size]
+    name = raw_name
+    if raw_name.startswith("#1/"):
+        namelen = int(raw_name[3:])
+        name = body[:namelen].split(b"\0", 1)[0].decode("ascii", "replace")
+        body = body[namelen:]
+    pos += 60 + size + (size % 2)
+    if name in ("__.SYMDEF", "__.SYMDEF SORTED", "//", "/"):
+        continue
+    total += 1
+    key = (name, hashlib.sha256(body).hexdigest())
+    if key in seen:
+        continue
+    seen.add(key)
+    member_dir = os.path.join(outdir, f"{index:05d}")
+    os.makedirs(member_dir, exist_ok=True)
+    with open(os.path.join(member_dir, name), "wb") as stream:
+        stream.write(body)
+    kept.append(os.path.join(member_dir, name))
+    index += 1
+
+# NUL-terminate every path (including the last) so the bash `read -d ''`
+# loop below reads all fields — a bare `\0`.join() leaves the final path
+# unterminated, and `read` drops an unterminated trailing field.
+with open(os.path.join(outdir, "keep.nul"), "wb") as stream:
+    for path in kept:
+        stream.write(path.encode())
+        stream.write(b"\0")
+
+print(f"{total} {len(kept)} {total - len(kept)}")
+PY
+)"
+
+    local total kept removed
+    read -r total kept removed <<<"${summary}"
+
+    if [ "${removed}" -eq 0 ]; then
+        echo "  ✓ ${label}: no byte-identical duplicate members (${total} members)"
+        run rm -rf "${scratch_dir}"
+        return
+    fi
+
+    local keep_files=()
+    local path
+    while IFS= read -r -d '' path; do
+        keep_files+=("${path}")
+    done <"${scratch_dir}/keep.nul"
+
+    # Fail closed if the manifest read lost any member — a silently short
+    # repack drops object files (and their symbols) from the slice.
+    if [ "${#keep_files[@]}" -ne "${kept}" ]; then
+        echo "error: ${label} dedup manifest mismatch (expected ${kept} members, read ${#keep_files[@]})" >&2
+        exit 1
+    fi
+
+    run rm -f "${archive}"
+    run xcrun libtool -static -o "${archive}" "${keep_files[@]}"
+    run rm -rf "${scratch_dir}"
+    echo "  ✓ ${label}: de-duped ${removed} byte-identical member(s) (${total} → ${kept})"
 }
 
 # Some pinned upstream Apple archives embed their CI checkout roots in
@@ -565,6 +681,11 @@ merge_onnx_backend_macos_slice() {
     done
 
     merge_static_archives "${output}" "${prepared[@]}"
+    # The pinned macOS libonnxruntime.a re-packs a few onnx protobuf objects
+    # verbatim, so the merged slice carries duplicate onnx::* symbols that break
+    # a full-backend macOS app's -all_load link. Collapse the byte-identical
+    # repeats (iOS avoids this by shipping ONNX Runtime as one prelinked object).
+    dedup_byte_identical_archive_members "${output}" "macos RABackendONNX"
 }
 
 # Sherpa engine slice. Fold in the sherpa-onnx prebuilt archives because this
@@ -649,6 +770,52 @@ merge_mlx_backend_macos_slice() {
     local scratch_dir="${STAGING_DIR}/prepared/Release-macos/mlx"
     local inputs=(
         "${build_root}/engines/mlx/librac_backend_mlx.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+# CoreML engine slice (Apple Stable-Diffusion pipeline). Fold in the
+# rac_runtime_coreml archive because the coreml engine links it (Pattern 3:
+# "engine IS our code on a device-runtime") and it is NOT folded into
+# rac_commons — mirrors how the ONNX slice folds in librac_runtime_onnxrt.a.
+# Both are first-party archives (system frameworks only, no third-party host
+# paths), so no path sanitization is required. This keeps
+# RABackendCoreML.xcframework self-contained.
+merge_coreml_backend_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/coreml"
+    local inputs=(
+        "${build_root}/engines/coreml/${slice_dir}/librac_backend_coreml.a"
+        "${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+merge_coreml_backend_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/coreml"
+    local inputs=(
+        "${build_root}/engines/coreml/librac_backend_coreml.a"
+        "${build_root}/runtimes/coreml/librac_runtime_coreml.a"
     )
 
     local prepared=()
@@ -763,7 +930,7 @@ cmake_extra=(
     "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
 )
 ios_cmake_extra=(
-    "-DRAC_BACKEND_COREML=OFF"
+    "-DRAC_BACKEND_COREML=ON"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
 )
@@ -783,6 +950,13 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
 fi
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     ios_build_targets+=(rac_backend_sherpa)
+fi
+# CoreML engine (Stable Diffusion) is Apple-only and forced ON above via
+# ios_cmake_extra (-DRAC_BACKEND_COREML=ON). Building rac_backend_coreml also
+# transitively builds its rac_runtime_coreml dependency; both are folded into
+# RABackendCoreML.xcframework below.
+if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+    ios_build_targets+=(rac_backend_coreml)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     ios_build_targets+=(rac_backend_mlx)
@@ -811,7 +985,7 @@ macos_cmake_args=(
     "-DRAC_BACKEND_LLAMACPP=ON"
     "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
     "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA:-ON}"
-    "-DRAC_BACKEND_COREML=OFF"
+    "-DRAC_BACKEND_COREML=ON"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
@@ -830,6 +1004,11 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
 fi
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     macos_build_targets+=(rac_backend_sherpa)
+fi
+# CoreML engine (Stable Diffusion) — forced ON above via macos_cmake_args
+# (-DRAC_BACKEND_COREML=ON). Pulls in rac_runtime_coreml transitively.
+if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+    macos_build_targets+=(rac_backend_coreml)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     macos_build_targets+=(rac_backend_mlx)
@@ -1472,6 +1651,35 @@ if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     fi
 else
     echo "▶ Skipping RABackendSherpa.xcframework (RAC_BACKEND_SHERPA=OFF)"
+fi
+
+# RABackendCoreML.xcframework — the Apple-only CoreML Stable-Diffusion engine
+# (serves the DIFFUSION primitive at priority 100). Apple-only and always ON in
+# this build (RAC_BACKEND_COREML forced ON in ios_cmake_extra / macos_cmake_args
+# above). The Swift ONNXRuntime target links this archive so the diffusion
+# vtable is present in the plugin registry; commons' RAC_STATIC_PLUGIN_REGISTER
+# (coreml) shim (compiled into rac_commons) references rac_plugin_entry_coreml,
+# pulling the archive at the final link. Folds in librac_runtime_coreml.a.
+if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+    COREML_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_coreml.a"
+    COREML_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_coreml.a"
+    COREML_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_coreml.a"
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${DEV_BIN}/engines/coreml/Release-iphoneos/librac_backend_coreml.a" ]; then
+        merge_coreml_backend_slice "${DEV_BIN}" "Release-iphoneos" "${COREML_DEV_LIB}" "arm64"
+        merge_coreml_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${COREML_SIM_LIB}" "arm64"
+        merge_coreml_backend_macos_slice "${MAC_BIN}" "${COREML_MAC_LIB}" "arm64"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_DEV_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_SIM_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_MAC_LIB}"
+        sanitize_and_validate_archive_host_paths "${COREML_DEV_LIB}" "ios-device RABackendCoreML"
+        sanitize_and_validate_archive_host_paths "${COREML_SIM_LIB}" "ios-simulator RABackendCoreML"
+        sanitize_and_validate_archive_host_paths "${COREML_MAC_LIB}" "macos RABackendCoreML"
+        build_xcframework_from_paths_with_macos "${COREML_DEV_LIB}" "${COREML_SIM_LIB}" "${COREML_MAC_LIB}" "RABackendCoreML.xcframework"
+    else
+        echo "▶ Skipping RABackendCoreML.xcframework (target not built — engines/coreml disabled?)"
+    fi
+else
+    echo "▶ Skipping RABackendCoreML.xcframework (RAC_BACKEND_COREML=OFF)"
 fi
 
 # RABackendMLX.xcframework provides the C++ callback-backed plugin shell. The

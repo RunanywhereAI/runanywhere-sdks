@@ -18,6 +18,8 @@ import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/diffusion_options.pb.dart'
+    show DiffusionGenerationOptions, DiffusionResult, DiffusionStreamEvent;
 import 'package:runanywhere/generated/download_service.pb.dart'
     show DownloadProgress, DownloadState;
 import 'package:runanywhere/generated/errors.pbenum.dart'
@@ -79,6 +81,7 @@ import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
     show ProtoInferenceFrameworkCppBridge;
+import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
@@ -841,13 +844,11 @@ abstract final class RunAnywhere {
   /// start / stop / cancel / feed / closeInput / destroy verbs.
   static RunAnywhereSolutions get solutions => RunAnywhereSolutions.shared;
 
-  // Diffusion (image generation) is intentionally NOT exposed on the public
-  // `RunAnywhere` namespace until the cross-SDK v2 contract for image
-  // generation lands (proto-backed lifecycle stream/cancel/capabilities ABIs
-  // across Swift/Kotlin/RN/Web). Removed under swift-parity-002-followup-flutter
-  // to keep the Swift-as-reference public surface coherent. The implementation
-  // in `public/capabilities/runanywhere_diffusion.dart` is retained for the
-  // day the contract is settled.
+  /// Diffusion (image generation) — load, generateImage, generateImageStream,
+  /// cancelImageGeneration. Apple/CoreML-only; fails closed with a clear
+  /// unsupported SDKException on non-Apple platforms. Mirrors the Swift
+  /// `RunAnywhere+Diffusion` facade.
+  static RunAnywhereDiffusion get diffusion => RunAnywhereDiffusion.shared;
 
   /// Embeddings — load an embeddings model and generate embedding vectors.
   static RunAnywhereEmbeddings get embeddings => RunAnywhereEmbeddings.shared;
@@ -1153,4 +1154,21 @@ abstract final class RunAnywhere {
   /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.
   static Stream<VoiceEvent> streamVoiceAgent() =>
       RunAnywhereVoice.shared.eventStream();
+
+  /// Flat alias — generate an image from the lifecycle-loaded diffusion model.
+  /// Apple/CoreML-only. Mirrors Swift `RunAnywhere.generateImage(_:)`.
+  static Future<DiffusionResult> generateImage(
+    DiffusionGenerationOptions options,
+  ) => RunAnywhereDiffusion.shared.generateImage(options);
+
+  /// Flat alias — stream typed diffusion events for an image generation.
+  /// Apple/CoreML-only. Mirrors Swift `RunAnywhere.generateImageStream(_:)`.
+  static Stream<DiffusionStreamEvent> generateImageStream(
+    DiffusionGenerationOptions options,
+  ) => RunAnywhereDiffusion.shared.generateImageStream(options);
+
+  /// Flat alias — cancel the current (streaming) image generation.
+  /// Mirrors Swift `RunAnywhere.cancelImageGeneration()`.
+  static Future<void> cancelImageGeneration() =>
+      RunAnywhereDiffusion.shared.cancelImageGeneration();
 }
