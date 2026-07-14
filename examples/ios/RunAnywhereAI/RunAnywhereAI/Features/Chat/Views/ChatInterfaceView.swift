@@ -103,6 +103,9 @@ struct ChatInterfaceView: View {
             }
         }
         .adaptiveSheet(isPresented: $showingSettings) {
+#if os(macOS)
+            NavigationStack { CombinedSettingsView() }
+#else
             NavigationStack {
                 CombinedSettingsView()
                     .toolbar {
@@ -111,8 +114,12 @@ struct ChatInterfaceView: View {
                         }
                     }
             }
+#endif
         }
         .adaptiveSheet(isPresented: $showingAdvancedHub) {
+#if os(macOS)
+            NavigationStack { ConsumerAdvancedHubView() }
+#else
             NavigationStack {
                 ConsumerAdvancedHubView()
                     .toolbar {
@@ -121,11 +128,15 @@ struct ChatInterfaceView: View {
                         }
                     }
             }
+#endif
         }
         .adaptiveSheet(isPresented: $showingTalkMode) {
             VoiceAssistantView()
         }
         .adaptiveSheet(isPresented: $showingVisionWorkbench) {
+#if os(macOS)
+            NavigationStack { VLMCameraView() }
+#else
             NavigationStack {
                 VLMCameraView()
                     .toolbar {
@@ -134,6 +145,7 @@ struct ChatInterfaceView: View {
                         }
                     }
             }
+#endif
         }
         .adaptiveSheet(isPresented: $showingVisionModelSelection) {
             ModelSelectionSheet(context: .vlm) { _ in
@@ -186,7 +198,7 @@ struct ChatInterfaceView: View {
         ) { result in
             handleFileImport(result, kind: activeFileImportKind)
         }
-        .sheet(isPresented: $showingLoRAScaleSheet) {
+        .adaptiveSheet(isPresented: $showingLoRAScaleSheet) {
             LoRAScaleSheetView(
                 url: pendingLoRAURL,
                 scale: $loraScale,
@@ -202,7 +214,7 @@ struct ChatInterfaceView: View {
             }
             .presentationDetents([.height(280)])
         }
-        .sheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
+        .adaptiveSheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
             loraManagementSheet
         }
         .animation(.easeInOut(duration: AppLayout.animationRegular), value: showingConversationList)

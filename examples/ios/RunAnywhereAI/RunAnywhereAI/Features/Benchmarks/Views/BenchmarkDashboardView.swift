@@ -232,7 +232,7 @@ struct BenchmarkDashboardView: View {
                 Text(error)
             }
         }
-        .sheet(isPresented: $viewModel.isRunning) {
+        .adaptiveSheet(isPresented: $viewModel.isRunning) {
             BenchmarkProgressView(
                 progress: viewModel.progress,
                 currentScenario: viewModel.currentScenario,
