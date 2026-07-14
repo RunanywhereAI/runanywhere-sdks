@@ -1,5 +1,5 @@
 group = 'ai.runanywhere.sdk.qhexrt'
-version = '0.20.9'
+version = '0.20.10'
 
 apply plugin: 'com.android.library'
 

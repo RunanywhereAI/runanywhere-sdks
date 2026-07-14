@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/proto-ts",
-  "version": "0.20.9",
+  "version": "0.20.10",
   "description": "Shared RunAnywhere ts-proto generated types and stream wrappers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

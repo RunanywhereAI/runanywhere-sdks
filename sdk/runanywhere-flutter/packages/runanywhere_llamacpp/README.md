@@ -27,8 +27,8 @@ Add both the core SDK and this backend to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.9
-  runanywhere_llamacpp: ^0.20.9
+  runanywhere: ^0.20.10
+  runanywhere_llamacpp: ^0.20.10
 ```
 
 Then run:

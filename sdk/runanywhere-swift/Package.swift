@@ -183,7 +183,10 @@ let package = Package(
                 // and `solutions.pb.swift` — those are consumed via the
                 // Solutions facade.
                 "Generated/router.pb.swift",
-                "Generated/diffusion_options.pb.swift",
+                // `diffusion_options.pb.swift` is compiled into the module: the
+                // CoreML Stable-Diffusion facade (RunAnywhere+Diffusion /
+                // CppBridge+Diffusion) consumes RADiffusionGenerationOptions /
+                // RADiffusionResult / RADiffusionStreamEvent.
             ],
             resources: [
                 .process("PrivacyInfo.xcprivacy"),
@@ -228,6 +231,12 @@ let package = Package(
 
         // -------------------------------------------------------------------
         // ONNX Runtime Backend (STT/TTS/VAD)
+        //
+        // Also carries the Apple CoreML Stable-Diffusion engine
+        // (RABackendCoreMLBinary): `ONNX.register()` bundles the Apple
+        // secondary backends, and this target already links CoreML + Accelerate,
+        // so it is the natural home for the diffusion engine archive. The
+        // coreml plugin auto-wins the DIFFUSION slot (priority 100) once linked.
         // -------------------------------------------------------------------
         .target(
             name: "ONNXRuntime",
@@ -236,6 +245,7 @@ let package = Package(
                 "ONNXBackend",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
+                "RABackendCoreMLBinary",
             ],
             path: "Sources/ONNXRuntime",
             exclude: [
@@ -319,6 +329,10 @@ let package = Package(
         .binaryTarget(
             name: "RABackendSherpaBinary",
             path: "Binaries/RABackendSherpa.xcframework"
+        ),
+        .binaryTarget(
+            name: "RABackendCoreMLBinary",
+            path: "Binaries/RABackendCoreML.xcframework"
         ),
         .binaryTarget(
             name: "RABackendMLXBinary",

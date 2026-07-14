@@ -870,6 +870,28 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   vlmCancelProto(): Promise<ArrayBuffer>;
 
+  // ============================================================================
+  // Diffusion Capability (Image Generation — Apple / CoreML only)
+  // Uses the commons lifecycle-owned diffusion proto ABI. The model is loaded
+  // through the canonical lifecycle (modelLifecycleLoadProto with
+  // component = SDK_COMPONENT_DIFFUSION / category = IMAGE_GENERATION), so
+  // generation is handle-free: rac_diffusion_generate_lifecycle_proto resolves
+  // the loaded model itself, mirroring the VLM / embeddings lifecycle paths.
+  // Backend package (@runanywhere/mlx and the CoreML platform backend) registers
+  // the provider; core owns the public diffusion call.
+  // ============================================================================
+
+  /**
+   * Generate an image from serialized
+   * runanywhere.v1.DiffusionGenerationRequest bytes using the
+   * lifecycle-loaded diffusion model. Returns serialized
+   * runanywhere.v1.DiffusionResult bytes. Backed by
+   * `rac_diffusion_generate_lifecycle_proto`.
+   */
+  diffusionGenerateLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
   /**
    * Get persistent device UUID.
    * Persists in platform secure storage for the lifetime of the app installation.

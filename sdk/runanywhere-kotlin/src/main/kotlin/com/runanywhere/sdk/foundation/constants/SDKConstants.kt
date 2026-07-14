@@ -19,7 +19,7 @@ object SDKConstants {
      * below is rewritten on every release by `scripts/release/sync-versions.sh`.
      */
     private object Fallback {
-        const val VERSION = "0.20.9"
+        const val VERSION = "0.20.10"
     }
 
     /**

@@ -99,7 +99,7 @@ def getExtOrIntegerDefault(name) {
 // RABackendONNX from runanywhere-sdks
 // =============================================================================
 def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
-def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.20.9"
+def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.20.10"
 
 // =============================================================================
 // Binary Source - RABackendONNX from runanywhere-sdks

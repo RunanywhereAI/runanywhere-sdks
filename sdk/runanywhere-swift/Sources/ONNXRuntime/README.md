@@ -31,7 +31,7 @@ The ONNXRuntime module is included in the RunAnywhere SDK. Add it to your target
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.9")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.10")
 ],
 targets: [
     .target(
