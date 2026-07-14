@@ -223,6 +223,17 @@ final class VoiceAgentViewModel: ObservableObject {
         // Ensure the catalog is loaded, then pre-select the best-for-device trio
         // so the user doesn't have to pick anything by hand.
         await ModelListViewModel.shared.loadModelsFromRegistry()
+
+        // If cleanup() ran while we were awaiting above (the user left the tab
+        // mid-initialization), it reset the init flags and removed our
+        // subscriptions. Bail instead of marking ourselves initialized with no
+        // live subscription — otherwise the next onAppear would take the refresh
+        // branch and the tab would be "deaf" again.
+        guard isViewModelInitialized else {
+            logger.debug("Voice agent initialization superseded by cleanup; aborting")
+            return
+        }
+
         preselectRecommendedPipeline()
 
         currentStatus = "Ready"
@@ -758,8 +769,24 @@ final class VoiceAgentViewModel: ObservableObject {
         eventTask?.cancel()
         eventTask = nil
         cancellables.removeAll()
+        // Reset ALL init/idempotency state together (matches
+        // VoiceComponentViewModelBase.cleanupBase()). The View's onAppear gates
+        // re-initialization on the @Published `isInitialized`; leaving it true
+        // across a leave+return made onAppear take the lightweight refresh branch
+        // instead of initialize(), so subscribeToSDKEvents() never re-ran and the
+        // Voice tab went "deaf" to model load/unload events.
+        isInitialized = false
         isViewModelInitialized = false
         hasSubscribedToSDKEvents = false
+        // Return the conversation-facing UI to a clean idle state (mirrors
+        // stopConversation) so leaving mid-session doesn't strand a stale
+        // "Listening…" / transcript / response when the tab is re-entered.
+        sessionState = .disconnected
+        currentStatus = "Ready"
+        audioLevel = 0.0
+        isSpeechDetected = false
+        currentTranscript = ""
+        assistantResponse = ""
         // VM teardown path (view's onDisappear) — Android's lifecycle
         // equivalent (`onCleared()` → `stop()`) also releases the agent here.
         Task {
