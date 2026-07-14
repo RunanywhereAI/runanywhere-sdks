@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web",
-  "version": "0.20.9",
+  "version": "0.20.10",
   "description": "RunAnywhere Web SDK - Backend-neutral browser infrastructure with the RACommons WebAssembly core",
   "type": "module",
   "main": "./dist/index.js",
@@ -79,7 +79,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.12.1",
-    "@runanywhere/proto-ts": "^0.20.9",
+    "@runanywhere/proto-ts": "^0.20.10",
     "long": "^5.3.2",
     "protobufjs": "^7.5.8"
   },

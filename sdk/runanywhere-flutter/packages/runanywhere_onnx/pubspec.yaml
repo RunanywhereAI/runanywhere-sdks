@@ -1,6 +1,6 @@
 name: runanywhere_onnx
 description: ONNX Runtime backend for RunAnywhere Flutter SDK. On-device Speech-to-Text, Text-to-Speech, and Voice Activity Detection.
-version: 0.20.9
+version: 0.20.10
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
 issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
@@ -25,7 +25,7 @@ dependencies:
   # Each backend ships against same-version native binaries, so the version
   # range floor MUST match this release. The caret range still lets consumers
   # upgrade core within the compatible published minor suite.
-  runanywhere: ^0.20.9
+  runanywhere: ^0.20.10
   # Keep this bounded for pub.dev publish validation, matching the core
   # package's major-version range.
   ffi: '>=2.2.0 <3.0.0'
