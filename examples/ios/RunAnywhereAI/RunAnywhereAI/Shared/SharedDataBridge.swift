@@ -22,18 +22,24 @@ private let _darwinCallback: CFNotificationCallback = { _, _, name, _, _ in
 final class DarwinNotificationCenter: @unchecked Sendable {
     static let shared = DarwinNotificationCenter()
 
-    private var handlers: [String: [() -> Void]] = [:]
+    private var handlers: [String: () -> Void] = [:]
     // Serial queue replaces NSLock — Swift 6 compatible, avoids priority inversion
     private let queue = DispatchQueue(label: "com.runanywhere.darwin.notifications")
 
     private init() {}
 
     /// Register a callback for a Darwin notification name.
-    /// Safe to call multiple times for the same name.
+    /// Idempotent per name: re-registering the same name REPLACES the previous
+    /// callback rather than accumulating. Darwin notifications are process-global
+    /// 1:1 signals and each target process has exactly one logical owner per name
+    /// (KeyboardViewController in the extension, FlowSessionManager in the app), so
+    /// a single live handler is always correct. This prevents the handler list from
+    /// growing unbounded across keyboard presentations, where viewDidLoad re-runs
+    /// addObserver on every fresh KeyboardViewController with no symmetric removal.
     func addObserver(name: String, callback: @escaping () -> Void) {
         queue.sync {
             let isFirstObserver = handlers[name] == nil
-            handlers[name, default: []].append(callback)
+            handlers[name] = callback
 
             if isFirstObserver {
                 CFNotificationCenterAddObserver(
@@ -61,9 +67,9 @@ final class DarwinNotificationCenter: @unchecked Sendable {
 
     /// Called by the C callback — dispatches registered handlers on main queue.
     func fire(name: String) {
-        let cbs: [() -> Void] = queue.sync { handlers[name] ?? [] }
+        let callback: (() -> Void)? = queue.sync { handlers[name] }
         DispatchQueue.main.async {
-            cbs.forEach { $0() }
+            callback?()
         }
     }
 }
