@@ -31,6 +31,14 @@
 #if defined(RCLI_HAS_MLX)
 #include "rac/backends/rac_mlx.h"
 #endif
+#if defined(RCLI_HAS_COREML)
+// The coreml engine (Apple-only, serves DIFFUSION) has no dedicated
+// rac_backend_coreml_register() fn; register its plugin entry directly. This
+// call also keeps the static rac_backend_coreml archive linked (references
+// rac_plugin_entry_coreml), mirroring how the other backends stay alive.
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_coreml.h"
+#endif
 
 namespace rcli {
 
@@ -250,6 +258,11 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
     } else if (rac_backend_mlx_register() != RAC_SUCCESS) {
       out::status_line(
           "warning: mlx backend requires MLX runtime callbacks; backend failed to register");
+    }
+#endif
+#if defined(RCLI_HAS_COREML)
+    if (rac_plugin_register(rac_plugin_entry_coreml()) != RAC_SUCCESS) {
+      out::status_line("warning: coreml diffusion backend failed to register");
     }
 #endif
 

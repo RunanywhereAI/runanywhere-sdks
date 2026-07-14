@@ -30,6 +30,7 @@ set(RCLI_SOURCES
     src/commands/cmd_pull.cpp
     src/commands/cmd_rm.cpp
     src/commands/cmd_run.cpp
+    src/commands/cmd_image.cpp
     src/commands/cmd_serve.cpp
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
@@ -41,6 +42,7 @@ set(RCLI_SOURCES
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
     src/io/wav_io.cpp
+    src/io/image_io.cpp
     src/io/output.cpp
     src/progress/progress_bar.cpp
     src/repl/repl.cpp
@@ -108,7 +110,11 @@ endif()
 
 # Per-backend availability defines, mirroring tools/CMakeLists.txt's
 # if(TARGET ...) pattern so the CLI builds with any backend subset.
-foreach(_rcli_backend llamacpp onnx sherpa mlx)
+# coreml is Apple-only (serves DIFFUSION); its target only exists on Apple, so
+# the if(TARGET ...) guard keeps this list cross-platform. Unlike the others it
+# has no rac_backend_coreml_register() fn — bootstrap.cpp registers its plugin
+# entry directly under RCLI_HAS_COREML.
+foreach(_rcli_backend llamacpp onnx sherpa mlx coreml)
     if(TARGET rac_backend_${_rcli_backend})
         string(TOUPPER ${_rcli_backend} _rcli_backend_upper)
         target_compile_definitions(rcli_core PUBLIC RCLI_HAS_${_rcli_backend_upper}=1)
