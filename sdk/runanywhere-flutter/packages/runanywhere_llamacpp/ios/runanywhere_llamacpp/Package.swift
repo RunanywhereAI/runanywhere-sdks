@@ -23,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let llamaTarget = runAnywhereBinaryTarget(
     name: "RABackendLLAMACPP",
-    checksum: "4d7124cac80657d4a982c1c28f39830b06688b09945ec59a4a685404109ae535"
+    checksum: "8cb12a64aa2e3704e9cecbcba0ccddc77670f2bb805118a04ff143548d8c8e93"
 )
 
 let package = Package(

@@ -585,22 +585,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "a3e04f228970041f8074206d0dd5627e077e283043ef976f3215c195da493e95"
+                checksum: "75f8172664661ab66d95c7da0e7e05e4c0a68014a54ec411c32ce56d61aaff39"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "4d7124cac80657d4a982c1c28f39830b06688b09945ec59a4a685404109ae535"
+                checksum: "8cb12a64aa2e3704e9cecbcba0ccddc77670f2bb805118a04ff143548d8c8e93"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "1a6d67e40d69f5da56de317413b307d07d42a7c6e2fbb1ad07f79ff4b63dd914"
+                checksum: "b50a9ebcf49a34f1cbefa6be445ced74cfa3ef47281fccfa7b1b272ba81aef79"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "f83b0b3ffa2b4277c1136a813685bf1cf637b4e7b460776656fc32ef81fd54dc"
+                checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
@@ -610,7 +610,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendCoreMLBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendCoreML-ios-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+                checksum: "93cb97b0a3e64dca8996214ebb85945202fa413e05907c260908fa6ab2b41e24"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
