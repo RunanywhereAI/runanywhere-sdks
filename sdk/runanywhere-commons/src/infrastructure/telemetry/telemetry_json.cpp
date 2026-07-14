@@ -265,7 +265,11 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("platform", payload->platform);
     json.add_string("sdk_version", payload->sdk_version);
 
-    json.add_double("processing_time_ms", payload->processing_time_ms);
+    // processing_time_ms: emit as a real value (including a measured 0 ms) when a
+    // duration was actually captured, else null. A plain add_double would drop a
+    // genuine 0 ms (e.g. a sub-millisecond SDK init span) as if it were unset.
+    json.add_double_or_null("processing_time_ms", payload->processing_time_ms,
+                            payload->has_processing_time_ms != RAC_FALSE);
     json.add_bool("success", payload->success, payload->has_success);
     json.add_string("error_message", payload->error_message);
     json.add_string("error_code", payload->error_code);
@@ -291,6 +295,10 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("confidence", payload->confidence);
         json.add_string("language", payload->language);
         json.add_int("segment_index", payload->segment_index);
+        // Hybrid STT router attribution (null on plain single-backend STT).
+        json.add_string("routed_backend", payload->routed_backend);
+        json.add_bool("was_fallback", payload->was_fallback, payload->has_was_fallback);
+        json.add_int("attempt_count", payload->attempt_count);
     } else if (strcmp(modality, "tts") == 0) {
         json.add_int("character_count", payload->character_count);
         json.add_double("characters_per_second", payload->characters_per_second);
@@ -325,6 +333,7 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_int("top_k", payload->top_k);
         json.add_double("retrieval_time_ms", payload->retrieval_time_ms);
         json.add_string("embedding_model", payload->embedding_model);
+        json.add_bool("reranker_used", payload->reranker_used, payload->has_reranker_used);
     } else if (strcmp(modality, "embeddings") == 0) {
         // input_count / vectors_produced / embedding_model / embedding_dimension
         // have sources today (dimension via the properties carrier).
@@ -341,6 +350,9 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("total_ms", payload->voice_total_ms);
         json.add_int("transcript_chars", payload->transcript_chars);
         json.add_int("response_chars", payload->response_chars);
+        json.add_int_or_null("turn_index", payload->turn_index,
+                             payload->has_turn_index != RAC_FALSE);
+        json.add_bool("interrupted", payload->voice_interrupted, payload->has_voice_interrupted);
     } else if (strcmp(modality, "vad") == 0) {
         json.add_double("speech_duration_ms", payload->speech_duration_ms);
         json.add_double("silence_duration_ms", payload->silence_duration_ms);

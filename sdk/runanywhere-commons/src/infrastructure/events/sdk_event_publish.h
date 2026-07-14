@@ -24,6 +24,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <string>
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -202,7 +204,8 @@ rac_result_t publish_with_session(
 rac_result_t publish_with_session(
     runanywhere::v1::SDKComponent component, runanywhere::v1::EventCategory category,
     runanywhere::v1::VoiceLifecycleEvent payload, const char* session_id,
-    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED);
+    runanywhere::v1::EventDestination destination = runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED,
+    const std::map<std::string, std::string>* extra_properties = nullptr);
 
 // ---------------------------------------------------------------------------
 // Destination router. Called by publish() after the PUBLIC proto stream has

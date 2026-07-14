@@ -474,9 +474,10 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
         std::string framework;
         int32_t transcript_chars = 0;
         int32_t response_chars = 0;
+        int32_t turn_index = 0;
+        bool armed = false;
         rac_result_t error_code = RAC_SUCCESS;
         std::string error_message;
-        bool armed = false;
         ~TurnMetricsGuard() {
             if (!armed)
                 return;
@@ -488,10 +489,12 @@ rac_result_t d7_process_utterance(rac_voice_agent_handle_t handle, const std::st
                 session_id.empty() ? nullptr : session_id.c_str(),
                 model_id.empty() ? nullptr : model_id.c_str(),
                 framework.empty() ? nullptr : framework.c_str(), transcript_chars, response_chars,
-                error_code, error_message.empty() ? nullptr : error_message.c_str());
+                turn_index, error_code == RAC_ERROR_CANCELLED ? RAC_TRUE : RAC_FALSE, error_code,
+                error_message.empty() ? nullptr : error_message.c_str());
         }
     } turn_metrics;
     turn_metrics.session_id = session_id;
+    turn_metrics.turn_index = handle->turn_counter.fetch_add(1, std::memory_order_relaxed);
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 

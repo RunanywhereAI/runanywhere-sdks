@@ -5564,6 +5564,33 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryRequestProto
     return makeProtoCallResult(env, rc, &result, "racRagQueryRequestProto");
 }
 
+// Streaming RAG query: blocks on the calling (background) thread, invoking the
+// JVM listener with each serialized RAGStreamEvent (TOKEN..., then COMPLETED or
+// ERROR). Mirrors racLlmGenerateStreamProto. Cancellation is via racRagCancelProto
+// (rac_rag_cancel_proto latches the pipeline atomic).
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryStreamProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray queryProto, jobject listener) {
+    (void)clazz;
+    JByteArrayView query(env, queryProto);
+    if (handle == 0L || !query.ok)
+        return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t,
+                                void (*)(const uint8_t*, size_t, void*), void*);
+    Fn streamRag = optionalNativeSymbol<Fn>("rac_rag_query_stream_proto");
+    if (streamRag == nullptr)
+        return static_cast<jint>(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racRagQueryStreamProto"};
+    rac_result_t rc = streamRag(handleFromJLong(handle), query.u8(), query.size(),
+                                globalListener != nullptr ? proto_void_callback : nullptr,
+                                globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
+}
+
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagCancelProto(
     JNIEnv* env, jclass clazz, jlong handle) {
     (void)env;

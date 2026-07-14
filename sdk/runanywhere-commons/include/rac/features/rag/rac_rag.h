@@ -93,6 +93,32 @@ RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* qu
                                          size_t query_proto_size, rac_proto_buffer_t* out_result);
 
 /**
+ * @brief Per-event callback for streaming RAG queries.
+ *
+ * Invoked synchronously on the calling thread for each serialized
+ * runanywhere.v1.RAGStreamEvent (TOKEN as the answer generates, then a terminal
+ * COMPLETED carrying the full RAGResult, or ERROR). The bytes are owned by the
+ * SDK and valid only for the duration of the call — copy if retained.
+ */
+typedef void (*rac_rag_stream_proto_callback_fn)(const uint8_t* event_bytes, size_t event_size,
+                                                 void* user_data);
+
+/**
+ * @brief Streaming variant of rac_rag_query_proto.
+ *
+ * Runs the same pipeline but forwards each generated token as a RAGStreamEvent
+ * to `callback` (no unary wait), then a terminal COMPLETED/ERROR event. Returns
+ * the pipeline status. Cancellation is via rac_rag_cancel_proto() (same as the
+ * unary path) — a cancelled run ends with an ERROR event carrying
+ * RAC_ERROR_CANCELLED.
+ */
+RAC_API rac_result_t rac_rag_query_stream_proto(rac_handle_t session,
+                                                const uint8_t* query_proto_bytes,
+                                                size_t query_proto_size,
+                                                rac_rag_stream_proto_callback_fn callback,
+                                                void* user_data);
+
+/**
  * @brief Request cancellation of the query currently running on a RAG session.
  *
  * Safe to call from a thread other than the one blocked in

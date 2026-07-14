@@ -75,6 +75,7 @@ void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -125,8 +126,21 @@ void emit_hybrid_stt_telemetry(const rac_stt_result_t& result,
     if (!ok) {
         voice.set_error(rac_error_message(rc));
     }
+    // routed_backend/was_fallback/attempt_count have no VoiceLifecycleEvent proto
+    // field; carry them on the envelope properties map (same pattern as VAD
+    // silence_duration_ms / RAG top_k). The telemetry manager reads these into the
+    // STT row's dedicated columns.
+    std::map<std::string, std::string> props;
+    if (meta.chosen_model_id[0] != '\0') {
+        props["routed_backend"] = meta.chosen_model_id;
+    }
+    props["was_fallback"] = meta.was_fallback ? "1" : "0";
+    if (meta.attempt_count > 0) {
+        props["attempt_count"] = std::to_string(meta.attempt_count);
+    }
     rac::events::publish_with_session(v1::SDK_COMPONENT_STT, v1::EVENT_CATEGORY_STT,
-                                      std::move(voice), nullptr);
+                                      std::move(voice), nullptr,
+                                      v1::EVENT_DESTINATION_UNSPECIFIED, &props);
 }
 
 void parse_descriptor(const uint8_t* bytes, size_t size, rac_hybrid_model_descriptor_t& out) {

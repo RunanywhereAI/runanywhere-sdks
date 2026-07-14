@@ -906,7 +906,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         double tokens_per_second = 0.0, double ttft_ms = 0.0,
                         const char* framework = nullptr, double temperature = -1.0,
                         int32_t max_tokens = 0, int64_t vision_tokens = 0,
-                        double vision_encode_ms = 0.0, const char* image_resolution = nullptr) {
+                        double vision_encode_ms = 0.0, const char* image_resolution = nullptr,
+                        int32_t context_length = 0) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -965,6 +966,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (image_resolution != nullptr && image_resolution[0] != '\0') {
         (*event.mutable_properties())["image_resolution"] = image_resolution;
+    }
+    if (context_length > 0) {
+        (*event.mutable_properties())["context_length"] = std::to_string(context_length);
     }
     publish_event(event);
 }
@@ -1253,7 +1257,9 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.generate",
-                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id, /*input_tokens=*/0,
+                       /*total_tokens=*/0, /*tokens_per_second=*/0.0, /*ttft_ms=*/0.0,
+                       ref.framework_name);
 
     rac_vlm_result_t raw = {};
     rc = (ref.ops && ref.ops->process) ? ref.ops->process(ref.impl, &image, prompt, &options, &raw)
@@ -1274,10 +1280,14 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     } else {
         rc = copy_proto(result, out_result);
     }
-    const std::string vlm_gen_res =
-        (image.width > 0 && image.height > 0)
-            ? std::to_string(image.width) + "x" + std::to_string(image.height)
-            : std::string();
+    // Prefer the decoded dimensions from the backend (the caller's rac_vlm_image
+    // carries no dims for encoded inputs); fall back to any caller-supplied dims.
+    const int32_t res_w = raw.image_width > 0 ? raw.image_width : static_cast<int32_t>(image.width);
+    const int32_t res_h =
+        raw.image_height > 0 ? raw.image_height : static_cast<int32_t>(image.height);
+    const std::string vlm_gen_res = (res_w > 0 && res_h > 0)
+                                        ? std::to_string(res_w) + "x" + std::to_string(res_h)
+                                        : std::string();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
                        "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
                        static_cast<double>(result.processing_time_ms()), ref.model_id,
@@ -1286,7 +1296,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                        static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                        static_cast<double>(options.temperature), options.max_tokens,
                        result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
-                       vlm_gen_res.empty() ? nullptr : vlm_gen_res.c_str());
+                       vlm_gen_res.empty() ? nullptr : vlm_gen_res.c_str(), raw.context_length);
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1352,7 +1362,9 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.stream",
-                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id, /*input_tokens=*/0,
+                       /*total_tokens=*/0, /*tokens_per_second=*/0.0, /*ttft_ms=*/0.0,
+                       ref.framework_name);
 
     GeneratedStreamCtx ctx;
     ctx.callback = callback;

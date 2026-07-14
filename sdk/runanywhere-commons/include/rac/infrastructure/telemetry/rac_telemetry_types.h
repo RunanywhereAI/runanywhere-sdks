@@ -64,6 +64,8 @@ typedef struct rac_telemetry_payload {
 
     // Common performance metrics
     double processing_time_ms;
+    rac_bool_t has_processing_time_ms;  // Whether a duration was actually measured
+                                        // (distinguishes a real 0 ms from "unset")
     rac_bool_t success;
     rac_bool_t has_success;  // Whether success field is set
     const char* error_message;
@@ -90,6 +92,12 @@ typedef struct rac_telemetry_payload {
     rac_bool_t is_streaming;
     rac_bool_t has_is_streaming;
     int32_t segment_index;
+    // Hybrid STT router attribution (populated only on the hybrid transcribe
+    // path; null on plain single-backend STT).
+    const char* routed_backend;    // backend/model that actually served the request
+    rac_bool_t was_fallback;       // secondary served after the primary failed
+    rac_bool_t has_was_fallback;   // whether was_fallback is meaningful
+    int32_t attempt_count;         // 1 = primary only, 2 = primary then fallback
 
     // TTS-specific fields
     int32_t character_count;
@@ -123,6 +131,8 @@ typedef struct rac_telemetry_payload {
     int32_t top_k;
     double retrieval_time_ms;
     const char* embedding_model;  // RAG embedding model (string → dup'd/freed)
+    rac_bool_t reranker_used;      // LLM-pointwise rerank enabled for the query
+    rac_bool_t has_reranker_used;  // whether reranker_used is set
 
     // LoRA-specific fields. Strings → must be dup'd/freed in track + payload_free.
     const char* adapter_id;
@@ -157,6 +167,10 @@ typedef struct rac_telemetry_payload {
     // Voice-agent per-turn fields (via properties carrier; voice_* timing above)
     int32_t transcript_chars;
     int32_t response_chars;
+    int32_t turn_index;              // 0-based turn number within the agent session
+    rac_bool_t has_turn_index;       // whether turn_index is set (0 is valid)
+    rac_bool_t voice_interrupted;    // turn ended via caller cancel / barge-out
+    rac_bool_t has_voice_interrupted;
 
     // SDK lifecycle fields
     int32_t count;

@@ -267,6 +267,7 @@ void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, dou
                                 int64_t tokens_generated, const char* session_id,
                                 const char* model_id, const char* framework,
                                 int32_t transcript_chars, int32_t response_chars,
+                                int32_t turn_index, rac_bool_t interrupted,
                                 rac_result_t error_code, const char* error_message) {
     const bool failed = (error_code != RAC_SUCCESS);
     runanywhere::v1::SDKEvent sdk_event;
@@ -298,6 +299,11 @@ void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, dou
     if (response_chars > 0) {
         (*sdk_event.mutable_properties())["response_chars"] = std::to_string(response_chars);
     }
+    // turn_index is 0-based (0 is valid) so always carry it; interrupted flags a
+    // caller cancel / barge-out. Both ride the properties carrier (MetricsEvent
+    // has no field for them) and are read back in the telemetry kMetrics arm.
+    (*sdk_event.mutable_properties())["turn_index"] = std::to_string(turn_index);
+    (*sdk_event.mutable_properties())["interrupted"] = interrupted != RAC_FALSE ? "1" : "0";
 
     auto* vp = sdk_event.mutable_voice_pipeline();
     vp->set_timestamp_us(rac_get_current_time_ms() * 1000);

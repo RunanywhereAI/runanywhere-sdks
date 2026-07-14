@@ -12,7 +12,9 @@ import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
+import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGDocument
@@ -80,6 +82,40 @@ object CppBridgeRAG {
             ),
             "racRagQueryRequestProto",
         )
+
+    /**
+     * Streaming query: blocks the calling thread, invoking [onEvent] with each
+     * RAGStreamEvent (TOKEN…, then COMPLETED or ERROR). [onEvent] returns false to
+     * stop early. Cancel from another thread via [cancelActiveQuery].
+     */
+    internal fun queryStream(
+        options: RAGQueryOptions,
+        onEvent: (RAGStreamEvent) -> Boolean,
+    ) {
+        val rc =
+            RunAnywhereBridge.racRagQueryStreamProto(
+                requireSession(),
+                RAGQueryOptions.ADAPTER.encode(options),
+                NativeProtoProgressListener { bytes -> onEvent(RAGStreamEvent.ADAPTER.decode(bytes)) },
+            )
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagQueryStreamProto failed: $rc")
+        }
+    }
+
+    /**
+     * Plain cancel of whatever query is running on the current session (not
+     * request-scoped). Safe to call from a different thread while [queryStream]
+     * blocks; a no-op if no session is loaded.
+     */
+    internal fun cancelActiveQuery() {
+        val handle = sessionHandle
+        if (handle == 0L) return
+        val rc = RunAnywhereBridge.racRagCancelProto(handle)
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagCancelProto failed: $rc")
+        }
+    }
 
     /** Cancel only the matching request-scoped JNI query wrapper. */
     internal fun cancelQueryRequest(
