@@ -23,6 +23,39 @@ internal object ChatRequestPolicy {
             history = messages.mapNotNull(::toProtoMessage),
         )
 
+    /**
+     * Trim the OLDEST prior turns so the prompt fits the model's context window. Small-context QHexRT
+     * models (e.g. Llama-3.2-1B = 512 on v79) otherwise fail with rc=-130 (generation-failed) once the
+     * accumulated conversation + the reply overrun MAXCTX. The output budget already reserves ~half the
+     * context (ChatGenerationBudgetPolicy); the input side (system + kept history + current prompt +
+     * template markers) must fit in the rest. There is no tokenizer on the app side, so token counts are
+     * ESTIMATED and deliberately over-counted (≈3 chars/token + per-message role markers) plus a context
+     * margin — better to trim a turn early than to overflow and crash. Large-context models (Qwen3.5 =
+     * 1024) keep their full history for normal conversations; only long chats on tiny models get trimmed.
+     */
+    fun windowHistory(
+        turn: ChatTurnSnapshot,
+        contextTokens: Int,
+        outputTokens: Int,
+        systemPrompt: String?,
+    ): ChatTurnSnapshot {
+        if (contextTokens <= 0 || turn.history.isEmpty()) return turn // unknown context → don't trim
+        fun est(text: String): Int = (text.length / 3) + 8 // ~3 chars/token over-estimate + role markers
+        val margin = maxOf(24, contextTokens / 6) // BOS/system/generation-prompt markers + estimate slack
+        val inputBudget = (contextTokens - outputTokens - margin).coerceAtLeast(16)
+        val fixed = (systemPrompt?.takeIf { it.isNotBlank() }?.let { est(it) } ?: 0) + est(turn.prompt)
+        var available = inputBudget - fixed
+        if (available <= 0) return turn.copy(history = emptyList()) // no room for any history
+        val kept = ArrayDeque<ProtoChatMessage>()
+        for (message in turn.history.asReversed()) { // keep the most RECENT turns that fit
+            val cost = est(message.content)
+            if (cost > available) break
+            available -= cost
+            kept.addFirst(message)
+        }
+        return if (kept.size == turn.history.size) turn else turn.copy(history = kept.toList())
+    }
+
     fun buildRequest(
         turn: ChatTurnSnapshot,
         options: RALLMGenerationOptions,
