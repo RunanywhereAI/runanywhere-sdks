@@ -108,13 +108,29 @@ final class VLMViewModel: NSObject {
         }
     }
 
+    /// Resolve a capture device that exists on the current platform. iOS prefers
+    /// the rear wide-angle camera (falling back to any default video device);
+    /// macOS has no camera at `.back` position, so `AVCaptureDevice.default(for:)`
+    /// selects the built-in/Continuity/external camera (which reports
+    /// `.front`/`.unspecified`). Hard-coding `.back` returned nil on Mac, leaving
+    /// Live mode permanently stuck on "Camera Access Required" even after access
+    /// was granted.
+    private static func defaultCameraDevice() -> AVCaptureDevice? {
+        #if os(macOS)
+        return AVCaptureDevice.default(for: .video)
+        #else
+        return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+            ?? AVCaptureDevice.default(for: .video)
+        #endif
+    }
+
     func setupCamera() {
         guard isCameraAuthorized else { return }
 
         let session = AVCaptureSession()
         session.sessionPreset = .medium
 
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+        guard let device = Self.defaultCameraDevice(),
               let input = try? AVCaptureDeviceInput(device: device) else { return }
 
         if session.canAddInput(input) { session.addInput(input) }
