@@ -8,6 +8,7 @@
  * launch — commons merges runtime fields on re-registration.
  */
 
+import { Platform } from 'react-native';
 import { RunAnywhere } from '@runanywhere/core';
 import { QHexRT } from '@runanywhere/qhexrt';
 import {
@@ -394,6 +395,32 @@ export async function registerAll(
         memoryRequirement: 90_619_114,
       }),
     ]);
+  }
+
+  // =========================================================================
+  // Diffusion (CoreML / Apple platform backend) — image generation
+  // Apple-only: the DIFFUSION primitive is served exclusively by the CoreML
+  // Stable-Diffusion backend, so register only on iOS/macOS. Mirrors the
+  // built-in commons diffusion registry entry
+  // (diffusion_model_registry.cpp MODEL_SD15_COREML). registerModel is safe to
+  // re-run — commons merges runtime fields on re-registration. Wrapped so a
+  // registration hiccup never blocks the rest of catalog bootstrap.
+  // =========================================================================
+  if (Platform.OS === 'ios' || Platform.OS === 'macos') {
+    try {
+      await registerModel({
+        id: 'stable-diffusion-v1-5-coreml',
+        name: 'Stable Diffusion 1.5',
+        url: 'https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+        modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+        memoryRequirement: 1_200_000_000,
+      });
+    } catch (error) {
+      logDiagnostic(
+        `[App] Skipping CoreML diffusion model registration: ${String(error)}`
+      );
+    }
   }
 
   // =========================================================================
