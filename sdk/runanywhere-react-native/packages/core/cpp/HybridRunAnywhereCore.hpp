@@ -473,6 +473,11 @@ public:
   ragIngestProto(const std::shared_ptr<ArrayBuffer> &documentBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ragQueryProto(const std::shared_ptr<ArrayBuffer> &queryBytes) override;
+  std::shared_ptr<Promise<void>> ragQueryStreamProto(
+      const std::shared_ptr<ArrayBuffer> &queryBytes,
+      const std::function<void(const std::shared_ptr<ArrayBuffer> &)> &onEventBytes)
+      override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragCancelProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ragClearProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>

@@ -188,6 +188,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> ragDestroyPipelineProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragIngestProto(const std::shared_ptr<ArrayBuffer>& documentBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> ragQueryStreamProto(const std::shared_ptr<ArrayBuffer>& queryBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragCancelProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

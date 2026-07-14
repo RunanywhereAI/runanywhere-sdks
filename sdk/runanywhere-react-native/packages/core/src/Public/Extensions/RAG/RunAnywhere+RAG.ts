@@ -18,6 +18,7 @@ import type {
   RAGQueryOptions,
   RAGResult,
   RAGStatistics,
+  RAGStreamEvent as RAGStreamEventType,
 } from '@runanywhere/proto-ts/rag';
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import {
@@ -34,6 +35,8 @@ import {
   RAGQueryOptions as RAGQueryOptionsMessage,
   RAGResult as RAGResultMessage,
   RAGStatistics as RAGStatisticsMessage,
+  RAGStreamEvent as RAGStreamEventMessage,
+  RAGStreamEventKind,
 } from '@runanywhere/proto-ts/rag';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
@@ -208,6 +211,139 @@ export async function ragQuery(
     encodeProtoMessage(queryOptions, RAGQueryOptionsMessage)
   );
   return decodeRequired(resultBytes, RAGResultMessage.decode, 'ragQueryProto');
+}
+
+/**
+ * Streaming RAG query. Emits a `RAGStreamEvent` per generated token (kind =
+ * TOKEN) as the answer is produced, then a terminal COMPLETED event carrying
+ * the full `RAGResult`, or an ERROR event. Mirrors Swift `ragQueryStream` /
+ * Kotlin `ragQueryStream`.
+ *
+ * Hermes caveat (same as `generateStream`): drive the iterator with a manual
+ * `for (;;) { const next = await iterator.next(); if (next.done) break; ... }`
+ * loop, NOT `for await...of`, and call `iterator.return()` in a `finally` to
+ * cancel. Hermes does not iterate NitroModules async streams via `for await`.
+ */
+export function ragQueryStream(
+  question: string,
+  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+): AsyncIterable<RAGStreamEventType>;
+export function ragQueryStream(
+  options: RAGQueryOptions
+): AsyncIterable<RAGStreamEventType>;
+export function ragQueryStream(
+  questionOrOptions: string | RAGQueryOptions,
+  options?: Partial<Omit<RAGQueryOptions, 'question'>>
+): AsyncIterable<RAGStreamEventType> {
+  requireInitialized();
+  const native = ensureNative();
+  const queryOptions: RAGQueryOptions =
+    typeof questionOrOptions === 'string'
+      ? RAGQueryOptionsMessage.fromPartial({
+          ...options,
+          maxTokens: options?.maxTokens ?? 512,
+          temperature: options?.temperature ?? 0.7,
+          topP: options?.topP ?? 1.0,
+          question: questionOrOptions,
+        })
+      : questionOrOptions;
+  const requestBytes = encodeProtoMessage(queryOptions, RAGQueryOptionsMessage);
+
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<RAGStreamEventType> {
+      const queue: RAGStreamEventType[] = [];
+      let resolver: ((v: IteratorResult<RAGStreamEventType>) => void) | null = null;
+      let done = false;
+      let started = false;
+      let streamError: Error | null = null;
+
+      const finish = (): void => {
+        done = true;
+        if (resolver) {
+          resolver({ value: undefined as unknown as RAGStreamEventType, done: true });
+          resolver = null;
+        }
+      };
+
+      const push = (event: RAGStreamEventType): void => {
+        if (resolver) {
+          resolver({ value: event, done: false });
+          resolver = null;
+        } else {
+          queue.push(event);
+        }
+      };
+
+      const isTerminal = (event: RAGStreamEventType): boolean =>
+        event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED ||
+        event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR;
+
+      const start = async (): Promise<void> => {
+        if (started) return;
+        started = true;
+        await ensureServicesReady();
+        native
+          .ragQueryStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+            try {
+              const event = RAGStreamEventMessage.decode(
+                arrayBufferToBytes(eventBytes)
+              );
+              if (
+                event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR &&
+                event.errorMessage
+              ) {
+                streamError = new Error(event.errorMessage);
+              }
+              push(event);
+              if (isTerminal(event)) {
+                finish();
+              }
+            } catch (error) {
+              streamError =
+                error instanceof Error ? error : new Error(String(error));
+              finish();
+            }
+          })
+          .then(() => {
+            if (!done) finish();
+          })
+          .catch((err: Error) => {
+            streamError = err;
+            finish();
+          });
+      };
+
+      return {
+        async next(): Promise<IteratorResult<RAGStreamEventType>> {
+          await start();
+          if (queue.length > 0) {
+            return { value: queue.shift()!, done: false };
+          }
+          if (streamError) throw streamError;
+          if (done) {
+            return { value: undefined as unknown as RAGStreamEventType, done: true };
+          }
+          return new Promise<IteratorResult<RAGStreamEventType>>((resolve) => {
+            resolver = resolve;
+          }).then((result) => {
+            if (streamError) throw streamError;
+            return result;
+          });
+        },
+        async return(): Promise<IteratorResult<RAGStreamEventType>> {
+          // Await the native cancel before resolving so back-to-back
+          // cancel → query sequences are race-free.
+          try {
+            await native.ragCancelProto();
+          } catch {
+            /* noop */
+          }
+          finish();
+          return { value: undefined as unknown as RAGStreamEventType, done: true };
+        },
+      };
+    },
+  };
 }
 
 /** Clear all documents from the pipeline. */

@@ -760,6 +760,7 @@ export const RunAnywhere = {
   ragIngest: RAG.ragIngest,
   ragAddDocumentsBatch: RAG.ragAddDocumentsBatch,
   ragQuery: RAG.ragQuery,
+  ragQueryStream: RAG.ragQueryStream,
   ragClearDocuments: RAG.ragClearDocuments,
   ragGetDocumentCount: RAG.ragGetDocumentCount,
   ragDocumentCount: RAG.ragDocumentCount,

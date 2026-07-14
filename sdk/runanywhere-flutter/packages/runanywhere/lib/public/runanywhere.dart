@@ -43,7 +43,8 @@ import 'package:runanywhere/generated/rag.pb.dart'
         RAGDocument,
         RAGQueryOptions,
         RAGResult,
-        RAGStatistics;
+        RAGStatistics,
+        RAGStreamEvent;
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
@@ -1091,6 +1092,11 @@ abstract final class RunAnywhere {
   /// Query the RAG pipeline.
   static Future<RAGResult> ragQuery(RAGQueryOptions options) =>
       RunAnywhereRAG.shared.ragQuery(options);
+
+  /// Streaming RAG query — emits a [RAGStreamEvent] per generated token, then a
+  /// terminal COMPLETED (with the full [RAGResult]) or ERROR event.
+  static Stream<RAGStreamEvent> ragQueryStream(RAGQueryOptions options) =>
+      RunAnywhereRAG.shared.ragQueryStream(options);
 
   /// Download a registered model by id. Drains the commons-backed progress
   /// stream, forwarding each event to [onProgress], and returns the terminal

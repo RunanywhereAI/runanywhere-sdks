@@ -19,6 +19,7 @@ import type {
   RAGResult,
   RAGSearchResult,
   RAGStatistics,
+  RAGStreamEvent,
 } from '@runanywhere/proto-ts/rag';
 import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
 import {
@@ -64,6 +65,9 @@ export interface RAGProvider {
   ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
+  /** Streaming query — emits a RAGStreamEvent per token, then COMPLETED/ERROR.
+   * Optional so providers without a streaming path stay compatible. */
+  ragQueryStream?(question: string, options?: RAGQueryOverrides): AsyncIterable<RAGStreamEvent>;
   ragClearDocuments(): Promise<void>;
   ragGetDocumentCount(): Promise<number>;
   ragGetStatistics?(): Promise<RAGStatistics>;
@@ -344,6 +348,21 @@ class NativeRAGSessionProvider implements RAGProvider {
       );
     }
     return result;
+  }
+
+  async *ragQueryStream(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): AsyncIterable<RAGStreamEvent> {
+    const session = await this.ensureSession();
+    if (!this.config.llmModelId.trim()) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'Native Web RAG query requires RAGConfiguration.llmModelId',
+        'A session without an LLM model id can ingest but cannot generate answers.',
+      );
+    }
+    yield* this.adapter.queryStream(session, makeRAGQuery(question, this.config, options));
   }
 
   async ragClearDocuments(): Promise<void> {
@@ -1221,6 +1240,35 @@ export async function ragQuery(
   }
   const { question, ...overrides } = questionOrOptions;
   return requireProvider('RAG.query').ragQuery(question, overrides);
+}
+
+/**
+ * Streaming RAG query. Emits a `RAGStreamEvent` per generated token
+ * (kind = TOKEN) as the answer is produced, then a terminal COMPLETED event
+ * carrying the full `RAGResult`, or an ERROR event. Mirrors Swift
+ * `ragQueryStream` and the Kotlin `ragQueryStream` Flow.
+ */
+export function ragQueryStream(
+  question: string,
+  options?: RAGQueryOverrides,
+): AsyncIterable<RAGStreamEvent>;
+export function ragQueryStream(options: RAGQueryOptions): AsyncIterable<RAGStreamEvent>;
+export function ragQueryStream(
+  questionOrOptions: string | RAGQueryOptions,
+  options?: RAGQueryOverrides,
+): AsyncIterable<RAGStreamEvent> {
+  const provider = requireProvider('RAG.queryStream');
+  if (!provider.ragQueryStream) {
+    throw SDKException.backendNotAvailable(
+      'RAG.queryStream',
+      'Streaming RAG is not available on this provider.',
+    );
+  }
+  if (typeof questionOrOptions === 'string') {
+    return provider.ragQueryStream(questionOrOptions, options);
+  }
+  const { question, ...overrides } = questionOrOptions;
+  return provider.ragQueryStream(question, overrides);
 }
 
 // ---------------------------------------------------------------------------

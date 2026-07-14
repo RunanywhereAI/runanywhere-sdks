@@ -317,6 +317,15 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t handle,
                                                 void* user_data);
 void rac_voice_agent_proto_quiesce(void);
 
+// RAG streaming query — bool-returning control callback (RAC_FALSE stops
+// generation early). Runs synchronously: all RAGStreamEvents fire before the
+// call returns, so no quiesce is needed.
+rac_result_t rac_rag_query_stream_proto(rac_handle_t session,
+                                        const uint8_t* query_proto_bytes,
+                                        size_t query_proto_size,
+                                        VlmStreamCallback callback,
+                                        void* user_data);
+
 __attribute__((visibility("default"))) int32_t ra_flutter_secure_storage_store(const char* key,
                                                                                const char* value) {
     if (!key || !value) {
@@ -538,6 +547,29 @@ ra_flutter_voice_agent_process_turn_proto_native_port(rac_voice_agent_handle_t h
     const rac_result_t rc = rac_voice_agent_process_turn_proto(
         handle, request_proto_bytes, request_proto_size, void_stream_callback, &context);
     rac_voice_agent_proto_quiesce();
+    post_int32(&context, rc);
+    return rc;
+}
+
+__attribute__((visibility("default"))) int32_t
+ra_flutter_rag_query_stream_proto_native_port(rac_handle_t session,
+                                              const uint8_t* query_proto_bytes,
+                                              size_t query_proto_size,
+                                              Dart_Port port,
+                                              DartPostCObjectFn post_cobject) {
+    if (!session || !query_proto_bytes || query_proto_size == 0 || port == 0 ||
+        !post_cobject) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    NativePortContext context;
+    context.port = port;
+    context.post = post_cobject;
+
+    // bool_stream_callback returns RAC_FALSE if a post fails, which stops the
+    // native generation loop (backpressure).
+    const rac_result_t rc = rac_rag_query_stream_proto(
+        session, query_proto_bytes, query_proto_size, bool_stream_callback, &context);
     post_int32(&context, rc);
     return rc;
 }
