@@ -37,6 +37,7 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     commands::register_rm(app, options);
     commands::register_show(app, options);
     commands::register_run(app, options);
+    commands::register_image(app, options);
     commands::register_embed(app, options);
     commands::register_stt(app, options);
     commands::register_tts(app, options);
