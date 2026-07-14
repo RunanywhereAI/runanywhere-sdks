@@ -289,7 +289,7 @@ class ConversationStore: ObservableObject {
 
         do {
             let data = try encoder.encode(conversation)
-            try data.write(to: fileURL)
+            try data.write(to: fileURL, options: [.atomic])
         } catch {
             print("Error saving conversation: \(error)")
         }
