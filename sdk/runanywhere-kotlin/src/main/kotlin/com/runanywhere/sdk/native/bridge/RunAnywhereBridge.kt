@@ -1293,11 +1293,14 @@ object RunAnywhereBridge {
     @JvmStatic external fun racRagQueryRequestProto(requestId: Long, handle: Long, queryProto: ByteArray): ByteArray?
 
     /**
-     * Streaming query: blocks on the calling thread, invoking [listener] with each
-     * serialized RAGStreamEvent (TOKEN…, then COMPLETED or ERROR). Returns the
-     * pipeline rac_result_t. Cancel via [racRagCancelProto].
+     * Request-scoped streaming query: blocks on the calling thread, invoking
+     * [listener] with each serialized RAGStreamEvent (TOKEN…, then COMPLETED or
+     * ERROR). Returns the pipeline rac_result_t. [listener] returns false to stop
+     * early (backpressure). Cancel this exact stream via [racRagCancelRequestProto]
+     * with the same [requestId], so concurrent collectors cannot cancel each other.
      */
-    @JvmStatic external fun racRagQueryStreamProto(
+    @JvmStatic external fun racRagQueryStreamRequestProto(
+        requestId: Long,
         handle: Long,
         queryProto: ByteArray,
         listener: NativeProtoProgressListener?,

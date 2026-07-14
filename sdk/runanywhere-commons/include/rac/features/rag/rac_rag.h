@@ -99,9 +99,13 @@ RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* qu
  * runanywhere.v1.RAGStreamEvent (TOKEN as the answer generates, then a terminal
  * COMPLETED carrying the full RAGResult, or ERROR). The bytes are owned by the
  * SDK and valid only for the duration of the call — copy if retained.
+ *
+ * Return RAC_TRUE to keep generating, RAC_FALSE to stop early (backpressure):
+ * a false return on a TOKEN event halts generation and the run ends with a
+ * terminal COMPLETED carrying the partial answer.
  */
-typedef void (*rac_rag_stream_proto_callback_fn)(const uint8_t* event_bytes, size_t event_size,
-                                                 void* user_data);
+typedef rac_bool_t (*rac_rag_stream_proto_callback_t)(const uint8_t* event_bytes,
+                                                      size_t event_size, void* user_data);
 
 /**
  * @brief Streaming variant of rac_rag_query_proto.
@@ -115,7 +119,7 @@ typedef void (*rac_rag_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
 RAC_API rac_result_t rac_rag_query_stream_proto(rac_handle_t session,
                                                 const uint8_t* query_proto_bytes,
                                                 size_t query_proto_size,
-                                                rac_rag_stream_proto_callback_fn callback,
+                                                rac_rag_stream_proto_callback_t callback,
                                                 void* user_data);
 
 /**

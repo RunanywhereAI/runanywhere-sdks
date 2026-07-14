@@ -211,7 +211,8 @@ suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
  *
  * Because tokens surface as they generate, callers render progress live and do
  * NOT need a wall-clock timeout around the call. Cancelling collection stops the
- * native query (via rac_rag_cancel_proto).
+ * native query request-scoped (via racRagCancelRequestProto), so concurrent
+ * collectors and unary queries serialize instead of cancelling each other.
  */
 fun RunAnywhere.ragQueryStream(
     question: String,
@@ -224,21 +225,29 @@ fun RunAnywhere.ragQueryStream(
             (options ?: RAGQueryOptions.defaults(question)).let {
                 if (it.question.isEmpty()) it.copy(question = question) else it
             }
-        // Run the blocking native stream off the collector thread; forward each
-        // event, then close. trySend returning false means the collector is gone.
+        val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
+        // Run the blocking native stream through the RAG request coordinator so
+        // cancellation targets this exact request (via cancelQueryRequest) rather
+        // than any query on the session. trySend returning false stops the native
+        // producer through backpressure; collecting cancellation cancels the worker,
+        // which the coordinator turns into the request-scoped native cancel.
         val worker =
-            launch(Dispatchers.IO) {
+            launch {
                 try {
-                    CppBridgeRAG.queryStream(queryOptions) { event -> trySend(event).isSuccess }
+                    runCancellableNativeRagQuery(
+                        query = { requestId ->
+                            CppBridgeRAG.queryStreamRequest(requestId, nativeRequest) { event ->
+                                trySend(event).isSuccess
+                            }
+                        },
+                        cancel = CppBridgeRAG::cancelQueryRequest,
+                    )
                     close()
                 } catch (t: Throwable) {
                     close(t)
                 }
             }
-        awaitClose {
-            runCatching { CppBridgeRAG.cancelActiveQuery() }
-            worker.cancel()
-        }
+        awaitClose { worker.cancel() }
     }
 
 fun RunAnywhere.ragQueryStream(options: RAGQueryOptions): Flow<RAGStreamEvent> =

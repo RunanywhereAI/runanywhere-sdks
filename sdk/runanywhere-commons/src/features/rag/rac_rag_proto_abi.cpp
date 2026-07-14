@@ -839,7 +839,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
 
 rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
                                         size_t query_proto_size,
-                                        rac_rag_stream_proto_callback_fn callback, void* user_data) {
+                                        rac_rag_stream_proto_callback_t callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
     (void)query_proto_bytes;
@@ -867,9 +867,11 @@ rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* que
     // Serializes one RAGStreamEvent and hands it to the SDK callback. Runs on the
     // calling thread (the pipeline invokes on_token synchronously).
     uint64_t seq = 0;
+    // Returns true to keep generating; false when the SDK callback asked to stop
+    // (backpressure / early stop). Terminal emits ignore the return.
     auto emit = [&](runanywhere::v1::RAGStreamEventKind kind, const std::string* token,
                     const runanywhere::v1::RAGResult* result, rac_result_t err_code,
-                    const char* err_msg) {
+                    const char* err_msg) -> bool {
         runanywhere::v1::RAGStreamEvent ev;
         ev.set_seq(seq++);
         ev.set_timestamp_us(now_ms() * 1000);
@@ -883,27 +885,30 @@ rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* que
             ev.set_error_code(static_cast<int32_t>(err_code));
         }
         std::string bytes;
-        if (ev.SerializeToString(&bytes)) {
-            callback(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), user_data);
-        }
+        if (!ev.SerializeToString(&bytes))
+            return true;
+        return callback(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), user_data) ==
+               RAC_TRUE;
     };
 
     auto on_token = [&](const std::string& tok) -> bool {
-        emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_TOKEN, &tok, nullptr, RAC_SUCCESS, nullptr);
-        // Cancellation is driven by rac_rag_cancel_proto() latching the pipeline's
-        // atomic; the graph stops between phases, so on_token always continues.
-        return true;
+        // Propagate the SDK callback's stop request: a false return halts token
+        // generation and the run ends with a terminal COMPLETED (partial answer).
+        // Cancellation via rac_rag_cancel_proto() still latches the pipeline atomic.
+        return emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_TOKEN, &tok, nullptr, RAC_SUCCESS,
+                    nullptr);
     };
 
     runanywhere::v1::RAGResult proto;
     std::string err_msg;
     const rac_result_t status = execute_rag_query(s, query_proto, on_token, &proto, &err_msg);
     if (status != RAC_SUCCESS) {
-        emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_ERROR, nullptr, nullptr, status,
-             err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
+        (void)emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_ERROR, nullptr, nullptr, status,
+                   err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
         return status;
     }
-    emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_COMPLETED, nullptr, &proto, RAC_SUCCESS, nullptr);
+    (void)emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_COMPLETED, nullptr, &proto, RAC_SUCCESS,
+               nullptr);
     return RAC_SUCCESS;
 #endif
 }
