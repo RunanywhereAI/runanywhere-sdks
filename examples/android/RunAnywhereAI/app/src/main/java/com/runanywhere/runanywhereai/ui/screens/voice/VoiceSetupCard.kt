@@ -59,6 +59,9 @@ fun VoiceSetupCard(
     onPrepareAll: () -> Unit,
     onChange: (VoiceComponent) -> Unit,
     modifier: Modifier = Modifier,
+    // true: a row is "ready" only when the model is loaded (co-resident agent path); false: ready when
+    // merely downloaded (NPU per-turn-swap path loads on demand).
+    requireLoaded: Boolean = true,
 ) {
     val dimens = LocalDimens.current
     Surface(
@@ -98,7 +101,7 @@ fun VoiceSetupCard(
 
             components.forEachIndexed { index, component ->
                 if (index == 0) Divider()
-                ComponentRow(component, enabled = !isPreparing, onChange = { onChange(component) })
+                ComponentRow(component, enabled = !isPreparing, requireLoaded = requireLoaded, onChange = { onChange(component) })
                 if (index < components.lastIndex) Divider()
             }
 
@@ -131,11 +134,14 @@ fun VoiceSetupCard(
 }
 
 @Composable
-private fun ComponentRow(component: VoiceComponent, enabled: Boolean, onChange: () -> Unit) {
+private fun ComponentRow(component: VoiceComponent, enabled: Boolean, requireLoaded: Boolean, onChange: () -> Unit) {
     val dimens = LocalDimens.current
     val vmState = component.viewModel.state
     val model = component.model
-    val ready = model != null && component.viewModel.isReady(model)
+    // "Ready" (green) must match the mic gate: LOADED for the co-resident agent path, or merely
+    // DOWNLOADED for the NPU per-turn-swap path (which loads on demand) — otherwise the check lies.
+    val ready = model != null &&
+        (if (requireLoaded) component.viewModel.isLoaded(model) else component.viewModel.isReady(model))
     val busy = model != null && vmState.busyModelId == model.id
     val progress = if (busy) vmState.progressPercent else null
 
