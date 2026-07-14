@@ -96,11 +96,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     // V79 requires model-downloaded executable .so files, which Play disallows.
     {"kokoro_en", kV75V81, true},
     {"kitten_nano_0_8", kV75V81, true},
-    {"kitten_mini_0_1", kV81, true},
-    {"kitten_mini_0_8", kV81, true},
-    {"kitten_micro_0_8", kV81, true},
-    {"kitten_nano_0_2", kV81, true},
-    {"kitten_nano_0_1", kV81, true},
+    {"kitten_mini_0_8", kV75V81, true},
+    {"kitten_micro_0_8", kV75V81, true},
 };
 
 const ModelPolicy* find_model_policy(std::string_view model_id) {

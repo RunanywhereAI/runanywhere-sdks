@@ -464,14 +464,6 @@ abstract final class QHexRTModelCatalog {
       memoryBytes: 95842227,
     ),
     QHexRTCatalogModel(
-      id: 'kitten_mini_0_1',
-      name: 'Kitten-mini-0.1 (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
-      category: _tts,
-      memoryBytes: 449672060,
-    ),
-    QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
       name: 'Kitten-mini-0.8 (HNPU)',
       url:
@@ -486,22 +478,6 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
       category: _tts,
       memoryBytes: 338682302,
-    ),
-    QHexRTCatalogModel(
-      id: 'kitten_nano_0_2',
-      name: 'Kitten-nano-0.2 (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
-      category: _tts,
-      memoryBytes: 105235740,
-    ),
-    QHexRTCatalogModel(
-      id: 'kitten_nano_0_1',
-      name: 'Kitten-nano-0.1 (HNPU)',
-      url:
-          'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
-      category: _tts,
-      memoryBytes: 104733291,
     ),
   ];
 
