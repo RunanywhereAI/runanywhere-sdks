@@ -346,6 +346,11 @@ class ModelSelectionViewModel(
 
     fun isReady(model: RAModelInfo): Boolean = model.isBuiltIn || model.isDownloadedOnDisk
 
+    // Loaded-into-the-lifecycle readiness (currentModelId is set only on a successful select()/load).
+    // Distinct from isReady() which is merely "downloaded on disk" — the voice mic gate needs LOADED,
+    // so the setup card must reflect the same thing or it shows a green "Ready" over a dead mic.
+    fun isLoaded(model: RAModelInfo): Boolean = model.isBuiltIn || state.currentModelId == model.id
+
     fun isDeletable(model: RAModelInfo): Boolean = !model.isBuiltIn && model.isDownloadedOnDisk
 
     private suspend fun syncCurrent(models: List<RAModelInfo>) {
@@ -359,7 +364,13 @@ class ModelSelectionViewModel(
 
     private suspend fun autoLoadIfNeeded(models: List<RAModelInfo>) {
         if (!isLlm || GlobalState.model.isLoaded) return
-        val candidate = models.firstOrNull { isReady(it) && !it.isBuiltIn } ?: return
+        val ready = models.filter { isReady(it) && !it.isBuiltIn }
+        // Default to the recommended chat model (Qwen3.5-0.8B — best on-device multi-turn recall) instead
+        // of whatever happens to be first in the list; degrade through the other strong NPU chat models,
+        // then any ready model. Mirrors ModelRecommendation.npuLLMs order.
+        val candidate = AUTO_LOAD_PREFERENCE.firstNotNullOfOrNull { pref ->
+            ready.firstOrNull { it.id.contains(pref) }
+        } ?: ready.firstOrNull() ?: return
         runCatching {
             val result = RunAnywhere.loadModel(candidate)
             if (result.success) {
@@ -373,5 +384,10 @@ class ModelSelectionViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ModelSelectionViewModel(context) as T
+    }
+
+    companion object {
+        // Preferred LLM to auto-load into an empty slot, best-first. Mirrors ModelRecommendation.npuLLMs.
+        private val AUTO_LOAD_PREFERENCE = listOf("qwen3_5_0_8b", "lfm2_5_350m", "qwen3_0_6b", "lfm2_5_230m")
     }
 }
