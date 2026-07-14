@@ -143,26 +143,40 @@ class ModelSelectionViewModel(
     // state so the picker shows the same bar the notification does. The collector
     // job is the cancellation handle for the foreground path.
     private fun observeForegroundDownload(model: RAModelInfo) {
+        downloadJob = viewModelScope.launch { collectForegroundDownload(model) }
+    }
+
+    // Mirrors the foreground service's progress/terminal state into this VM's row and
+    // completes when THIS model reaches a terminal status — OR when the service is
+    // preempted by a different download — so the collector can never hang on a stale
+    // or other-model snapshot. Shared by the fire-and-forget picker path and the
+    // awaiting prepare() path.
+    private suspend fun collectForegroundDownload(model: RAModelInfo) {
         state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
-        downloadJob = viewModelScope.launch {
-            // takeWhile keeps collecting until the service reports a terminal
-            // status for this model, then completes so the collector doesn't leak.
-            ModelDownloadService.state
-                .takeWhile { snapshot ->
-                    snapshot == null ||
-                        snapshot.modelId != model.id ||
+        var sawOurModel = false
+        ModelDownloadService.state
+            .takeWhile { snapshot ->
+                when {
+                    snapshot == null -> true // service hasn't reported yet
+                    snapshot.modelId == model.id -> {
+                        sawOurModel = true
                         snapshot.status == ModelDownloadService.Status.RUNNING
-                }
-                .collect { snapshot ->
-                    if (snapshot?.modelId == model.id &&
-                        snapshot.status == ModelDownloadService.Status.RUNNING
-                    ) {
-                        state = state.copy(busyModelId = model.id, progressPercent = snapshot.progressPercent)
                     }
+                    // A different model is active: keep waiting only during our
+                    // pre-registration window. Once we've tracked our model, a switch
+                    // means we were preempted — stop so applyTerminalDownload clears us.
+                    else -> !sawOurModel
                 }
-            // The flow completed on a terminal snapshot; apply it and clean up.
-            applyTerminalDownload(model, ModelDownloadService.state.value)
-        }
+            }
+            .collect { snapshot ->
+                if (snapshot?.modelId == model.id &&
+                    snapshot.status == ModelDownloadService.Status.RUNNING
+                ) {
+                    state = state.copy(busyModelId = model.id, progressPercent = snapshot.progressPercent)
+                }
+            }
+        // The flow completed on a terminal (or preemption) snapshot; apply + clean up.
+        applyTerminalDownload(model, ModelDownloadService.state.value)
     }
 
     private suspend fun applyTerminalDownload(
@@ -239,9 +253,27 @@ class ModelSelectionViewModel(
     // One-shot "make this model usable": download if needed, then load + mark current.
     // Used by the Voice AI card to stage a whole pipeline component with one call.
     suspend fun prepare(model: RAModelInfo): Boolean {
-        if (!downloadInternal(model)) return false
+        if (!awaitDownload(model)) return false
         val onDisk = state.models.firstOrNull { it.id == model.id } ?: model
         return select(onDisk)
+    }
+
+    // Downloads via the foreground service (survives screen-off / Doze) and suspends
+    // until this model reaches a terminal state, falling back to the in-VM stream when
+    // the service can't start (e.g. app already backgrounded). Returns true when the
+    // model is on disk afterward. Used by prepare() so voice-pipeline staging gets the
+    // same wake-lock/foreground guarantees as user-initiated picker downloads.
+    private suspend fun awaitDownload(model: RAModelInfo): Boolean {
+        if (isReady(model)) return true
+        if (model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()) {
+            state = state.copy(
+                error = "Add a Hugging Face token in Settings to download private HNPU/QHexRT models.",
+            )
+            return false
+        }
+        if (!ModelDownloadService.start(model)) return downloadInternal(model)
+        collectForegroundDownload(model)
+        return isReady(model)
     }
 
     fun delete(model: RAModelInfo) {

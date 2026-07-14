@@ -82,8 +82,12 @@ class ModelDownloadService : Service() {
         }
         acquireWakeLock()
 
-        // The picker enforces one active download at a time (the busy row hides
-        // the download action), so we drive a single job + notification here.
+        // Drive a single job + notification here. The picker enforces one active
+        // download at a time (the busy row hides the download action), but prepare()
+        // and rapid re-taps can still hand us a new target while one is in flight —
+        // preempt the prior job so we never leak a second runDownload coroutine
+        // racing on _state. Cancel unwinds the SDK stream, which preserves resume bytes.
+        downloadJob?.cancel()
         downloadJob = serviceScope.launch {
             runDownload(model)
         }
