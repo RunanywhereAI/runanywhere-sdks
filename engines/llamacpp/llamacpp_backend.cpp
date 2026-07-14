@@ -1021,9 +1021,45 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     std::string prompt = build_prompt(request);
     RAC_LOG_INFO("LLM.LlamaCpp", "Generating with prompt length: %zu", prompt.length());
 
-    const auto tokens_list = common_tokenize(context_, prompt, true, true);
+    auto tokens_list = common_tokenize(context_, prompt, true, true);
 
     const int n_ctx = llama_n_ctx(context_);
+
+    // Context-window fit: a long multi-turn conversation renders {system,
+    // history, current} into a prompt that can exceed n_ctx. Left unchecked the
+    // prompt-decode below fails and surfaces as a generic RAC_ERROR_INFERENCE_FAILED
+    // ("inference failed") to the caller. Instead, drop the oldest history
+    // exchanges — never the system prompt or the current user turn — until the
+    // prompt leaves room to generate. Only engages when structured history is
+    // present (request.messages == [oldest history ..., current user turn]).
+    if (request.messages.size() > 1) {
+        const int gen_reserve = std::clamp(request.max_tokens, 128, std::max(128, n_ctx / 2));
+        const int prompt_budget = n_ctx - kReservedEosTokens - gen_reserve;
+        if (prompt_budget > 0 && static_cast<int>(tokens_list.size()) > prompt_budget) {
+            TextGenerationRequest fitted = request;
+            int dropped = 0;
+            while (static_cast<int>(tokens_list.size()) > prompt_budget &&
+                   fitted.messages.size() > 1) {
+                // Drop a whole [user, assistant] exchange from the front so the
+                // remaining history stays a valid user-first alternating
+                // sequence; never drop the final (current) user turn.
+                const size_t drop = std::min<size_t>(2, fitted.messages.size() - 1);
+                fitted.messages.erase(
+                    fitted.messages.begin(),
+                    fitted.messages.begin() + static_cast<std::ptrdiff_t>(drop));
+                dropped += static_cast<int>(drop);
+                prompt = build_prompt(fitted);
+                tokens_list = common_tokenize(context_, prompt, true, true);
+            }
+            if (dropped > 0) {
+                RAC_LOG_INFO("LLM.LlamaCpp",
+                             "Context fit: dropped %d oldest history message(s) to fit "
+                             "n_ctx=%d (prompt now %d tokens, gen_reserve=%d)",
+                             dropped, n_ctx, static_cast<int>(tokens_list.size()), gen_reserve);
+            }
+        }
+    }
+
     const int prompt_tokens = static_cast<int>(tokens_list.size());
 
     if (out_prompt_tokens) {
