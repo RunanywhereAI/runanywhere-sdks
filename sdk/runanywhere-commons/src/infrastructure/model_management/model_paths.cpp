@@ -1106,7 +1106,25 @@ rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info
     }
 
     if (out_resolution->is_directory_based == RAC_TRUE) {
-        out_resolution->primary_model_path = dup_string(model_root.generic_string());
+        // QHexRT bundles can ship MULTIPLE manifests in one dir (e.g. qwen3_vl carries both a
+        // text and a vlm manifest, with the vlm pinned PRIMARY_MODEL). Handing the engine the
+        // bundle dir makes its resolve_manifest pick the first manifest ALPHABETICALLY
+        // ("...-text-..." < "...-vlm-...") and load the wrong (text) graphs, so an image request is
+        // silently ignored. When the descriptors mark a PRIMARY manifest, hand the engine that
+        // specific .json (its resolve_manifest accepts a file path and derives the dir from it).
+        // Scoped to QHEXRT so ONNX/Sherpa dir-based loads are unchanged; falls back to the dir when
+        // no PRIMARY manifest is marked (the common single-manifest case).
+        const scanned_file* primary_manifest = nullptr;
+        if (model_info->framework == RAC_FRAMEWORK_QHEXRT) {
+            for (const auto& file : files) {
+                if (file.role == RAC_RESOLVED_MODEL_FILE_ROLE_PRIMARY) {
+                    primary_manifest = &file;
+                    break;
+                }
+            }
+        }
+        out_resolution->primary_model_path =
+            dup_string((primary_manifest ? primary_manifest->path : model_root).generic_string());
     } else if (primary_file) {
         out_resolution->primary_model_path = dup_string(primary_file->path.generic_string());
     } else {
