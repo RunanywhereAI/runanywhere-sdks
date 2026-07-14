@@ -846,6 +846,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 0.19.13;
 				OTHER_LDFLAGS = "-all_load";
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"-force_load",
+					"$(SRCROOT)/../../../sdk/runanywhere-swift/Binaries/RACommons.xcframework/macos-arm64/librac_commons.a",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
