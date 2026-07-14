@@ -108,19 +108,30 @@ extension LLMViewModel {
         // of bounds).
         let end = min(max(currentUserIndex, 0), messages.count)
         guard end > 0 else { return [] }
-        return messages[0..<end].compactMap { message in
+        var history: [RAChatMessage] = []
+        for message in messages[0..<end] {
             let role: RAMessageRole
             switch message.role {
             case .user: role = .user
             case .assistant: role = .assistant
-            case .system: return nil
+            case .system: continue
             }
-            guard !message.content.isEmpty else { return nil }
+            guard !message.content.isEmpty else { continue }
+            // Skip assistant error placeholders ("Generation failed…" / an
+            // LLMError description): these are UI-only feedback, never real
+            // model output, so they must not pollute the conversation history.
+            if role == .assistant, message.isError == true { continue }
+            // Collapse consecutive same-role turns (e.g. a dropped assistant turn
+            // leaves two user turns back-to-back). Many chat templates require a
+            // strictly alternating history and reject repeats; keep the most
+            // recent turn of any same-role run.
+            if history.last?.role == role { history.removeLast() }
             var chatMessage = RAChatMessage()
             chatMessage.role = role
             chatMessage.content = message.content
-            return chatMessage
+            history.append(chatMessage)
         }
+        return history
     }
 
     // MARK: - Message Updates
@@ -215,7 +226,8 @@ extension LLMViewModel {
                 analytics: currentMessage.analytics,
                 modelInfo: currentMessage.modelInfo,
                 toolCallInfo: currentMessage.toolCallInfo,
-                attachment: currentMessage.attachment
+                attachment: currentMessage.attachment,
+                isError: true
             )
             self.updateMessage(at: index, with: updatedMessage)
         }

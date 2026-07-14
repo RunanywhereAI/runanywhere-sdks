@@ -178,4 +178,43 @@ final class LLMViewModelGenerationGuardTests: XCTestCase {
         XCTAssertTrue(LLMViewModel.makeHistory(from: messages, currentUserIndex: 0).isEmpty)
         XCTAssertTrue(LLMViewModel.makeHistory(from: messages, currentUserIndex: -3).isEmpty)
     }
+
+    // MARK: - makeHistory turn hygiene (Tier-3 #4)
+
+    /// An assistant error placeholder (isError == true) is excluded from history,
+    /// and the resulting consecutive user turns collapse to the latest.
+    func testMakeHistorySkipsErrorAssistantBubble() {
+        let messages = [
+            Message(role: .user, content: "q1"),
+            Message(role: .assistant, content: "Generation failed: boom", isError: true),
+            Message(role: .user, content: "q2")
+        ]
+        let history = LLMViewModel.makeHistory(from: messages, currentUserIndex: 3)
+        XCTAssertEqual(history.count, 1)
+        XCTAssertEqual(history.first?.role, .user)
+        XCTAssertEqual(history.first?.content, "q2")
+    }
+
+    /// Consecutive same-role turns are collapsed (keep the most recent).
+    func testMakeHistoryCollapsesConsecutiveSameRole() {
+        let messages = [
+            Message(role: .user, content: "u1"),
+            Message(role: .user, content: "u2"),
+            Message(role: .assistant, content: "a1")
+        ]
+        let history = LLMViewModel.makeHistory(from: messages, currentUserIndex: 3)
+        XCTAssertEqual(history.map { $0.role }, [.user, .assistant])
+        XCTAssertEqual(history.map { $0.content }, ["u2", "a1"])
+    }
+
+    /// A normal alternating history passes through unchanged.
+    func testMakeHistoryKeepsAlternatingTurns() {
+        let messages = [
+            Message(role: .user, content: "u1"),
+            Message(role: .assistant, content: "a1"),
+            Message(role: .user, content: "u2")
+        ]
+        let history = LLMViewModel.makeHistory(from: messages, currentUserIndex: 3)
+        XCTAssertEqual(history.map { $0.content }, ["u1", "a1", "u2"])
+    }
 }
