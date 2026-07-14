@@ -45,7 +45,7 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
         var audioPlayer: AVAudioPlayer?
         var playbackCompletion: (@Sendable (Bool) -> Void)?
         var playbackContinuation: CheckedContinuation<Void, Error>?
-        var progressTimer: Timer?
+        var progressTimer: DispatchSourceTimer?
     }
 
     private let lock = OSAllocatedUnfairLock<State>(initialState: State())
@@ -186,24 +186,30 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
     }
 
     private func startProgressTimer() {
-        let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        // A run-loop `Timer` only fires on a thread with a live run loop, but
+        // `play(_:)` starts on a Swift-concurrency cooperative thread that has
+        // none, so a scheduled `Timer` never ticks and `currentTime` stays 0. A
+        // `DispatchSourceTimer` needs no run loop, fires on its target queue,
+        // and is safe to create/cancel from any thread.
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 0.1, repeating: 0.1)
+        timer.setEventHandler { [weak self] in
             guard let self,
                   let playbackTime = self.lock.withLockUnchecked({ $0.audioPlayer?.currentTime }) else {
                 return
             }
-            DispatchQueue.main.async {
-                self.currentTime = playbackTime
-            }
+            self.currentTime = playbackTime
         }
         lock.withLockUnchecked { state in
-            state.progressTimer?.invalidate()
+            state.progressTimer?.cancel()
             state.progressTimer = timer
         }
+        timer.resume()
     }
 
     private func stopProgressTimer() {
         lock.withLockUnchecked { state in
-            state.progressTimer?.invalidate()
+            state.progressTimer?.cancel()
             state.progressTimer = nil
         }
     }
