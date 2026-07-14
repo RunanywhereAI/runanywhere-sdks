@@ -1,20 +1,44 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Diffusion capability backed by commons model lifecycle and lifecycle-owned
-// generated-proto image generation.
+// Diffusion (image generation) capability backed by commons model lifecycle
+// and the lifecycle-owned generated-proto image-generation ABI.
+//
+// Mirrors the Swift facade that landed in 0.20.10
+// (`RunAnywhere+Diffusion.swift` + `CppBridge+Diffusion.swift`):
+//   - generateImage(options)        -> DiffusionResult
+//   - generateImageStream(options)  -> Stream<DiffusionStreamEvent>
+//   - cancelImageGeneration()
+// Load flows through the canonical lifecycle (`RunAnywhere.loadModel` with the
+// image-generation component), so inference is handle-free —
+// `rac_diffusion_generate_lifecycle_proto` resolves the loaded model internally.
+//
+// Apple-only: the sole diffusion backend is Apple CoreML Stable-Diffusion. On
+// non-Apple platforms every image-generation entry point returns a clear
+// unsupported SDKException instead of calling the (absent) native ABI.
+//
+// Streaming note: commons' native diffusion stream kickoff
+// (`rac_diffusion_stream_start_proto`) is a documented NOT_IMPLEMENTED stub, so
+// — exactly like Swift's `CppBridge.Diffusion.generateStream` —
+// [generateImageStream] adapts the real, working lifecycle generate into a
+// stream: it emits STARTED, runs the CoreML pipeline, then emits a terminal
+// COMPLETED (carrying the full DiffusionResult) or ERROR. The generated image is
+// genuine; only intermediate per-step progress is unavailable until commons
+// wires the native stream kickoff.
 
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'dart:async';
+import 'dart:io' show Platform;
+
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/diffusion_options.pb.dart'
     show
-        DiffusionCapabilities,
         DiffusionConfiguration,
         DiffusionGenerationOptions,
         DiffusionGenerationRequest,
-        DiffusionProgress,
-        DiffusionResult;
+        DiffusionResult,
+        DiffusionStreamEvent,
+        DiffusionStreamEventKind;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -23,23 +47,22 @@ import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
-/// Diffusion (image generation) capability surface.
+/// Diffusion (image generation) capability surface. Access via
+/// `RunAnywhere.diffusion`.
 ///
-/// NOTE: This namespace is NOT part of the Swift-as-reference cross-SDK v2
-/// public contract yet — the `RunAnywhere.diffusion` getter and the public
-/// barrel export were removed under swift-parity-002-followup-flutter so
-/// Flutter does not advertise a surface that other SDKs do not implement.
-/// The class is retained for the day the cross-SDK v2 contract for image
-/// generation lands (proto-backed lifecycle stream/cancel/capabilities ABIs
-/// across Swift/Kotlin/RN/Web); callers that absolutely need it today must
-/// import this file directly and treat it as experimental/internal.
-///
-/// Load/current/unload state is owned by commons lifecycle; one-shot
-/// generation uses the lifecycle-owned generated-proto commons ABI.
+/// Load/current/unload state is owned by commons lifecycle; one-shot generation
+/// uses the lifecycle-owned generated-proto commons ABI. Only Apple platforms
+/// (iOS/macOS, CoreML) ship a diffusion backend — see the class header.
 class RunAnywhereDiffusion {
   RunAnywhereDiffusion._();
   static final RunAnywhereDiffusion _instance = RunAnywhereDiffusion._();
   static RunAnywhereDiffusion get shared => _instance;
+
+  /// Cooperative cancel latch. There is no native cancel for the single
+  /// (uninterruptible) CoreML generate call, so cancellation takes effect at
+  /// the next checkpoint — the streaming path drops its terminal COMPLETED
+  /// event when this is set. Mirrors Swift `CppBridge.Diffusion.cancel()`.
+  bool _cancelRequested = false;
 
   /// True when commons lifecycle has a ready diffusion model.
   bool get isLoaded {
@@ -63,10 +86,12 @@ class RunAnywhereDiffusion {
   }
 
   /// Load a diffusion model by registry ID through commons lifecycle routing.
+  ///
+  /// Reuses the canonical `RunAnywhere.loadModel` path with the image-generation
+  /// component, exactly like every other modality (VLM/embeddings/…).
   Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
+    _ensureInitialized();
+    _ensureApplePlatform();
 
     final result = await RunAnywhereModelLifecycle.shared.load(
       model_pb.ModelLoadRequest(
@@ -88,9 +113,7 @@ class RunAnywhereDiffusion {
 
   /// Unload the currently-loaded diffusion model.
   Future<void> unload() async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
+    _ensureInitialized();
 
     final modelId = currentModelId ??
         (await RunAnywhereModelLifecycle.shared.current(
@@ -114,75 +137,109 @@ class RunAnywhereDiffusion {
     }
   }
 
-  /// Generate an image from a text prompt.
-  Future<DiffusionResult> generate(
-    String prompt, [
-    DiffusionGenerationOptions? options,
-  ]) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
+  /// Generate an image from the lifecycle-loaded diffusion model.
+  ///
+  /// The prompt and all generation parameters travel in [options]. Load a
+  /// diffusion model first (via [load] or `RunAnywhere.loadModel`). Mirrors
+  /// Swift `RunAnywhere.generateImage(_:)`.
+  Future<DiffusionResult> generateImage(
+    DiffusionGenerationOptions options,
+  ) async {
+    _ensureInitialized();
+    _ensureApplePlatform();
     final modelId = await _requireLoadedModelId();
+    _cancelRequested = false;
     return DartBridgeDiffusion.generateProto(
-      DiffusionGenerationRequest(
-        modelId: modelId,
-        options: _effectiveOptions(prompt, options),
-        metadata: <String, String>{'model_id': modelId}.entries,
-      ),
+      _toGenerationRequest(options, modelId),
     );
   }
 
-  /// Stream generation progress.
-  Stream<DiffusionProgress> generateStream(
-    String prompt, [
-    DiffusionGenerationOptions? options,
-  ]) async* {
+  /// Stream typed diffusion events for an image generation.
+  ///
+  /// Yields STARTED → terminal COMPLETED (carrying the full [DiffusionResult])
+  /// or ERROR. Intermediate per-step progress is not yet emitted (the native
+  /// diffusion stream kickoff in commons is a documented stub); the generated
+  /// image itself is genuine. Mirrors Swift
+  /// `RunAnywhere.generateImageStream(_:)`.
+  Stream<DiffusionStreamEvent> generateImageStream(
+    DiffusionGenerationOptions options,
+  ) async* {
+    _ensureInitialized();
+    _ensureApplePlatform();
+    final modelId = await _requireLoadedModelId();
+    _cancelRequested = false;
+
+    yield DiffusionStreamEvent(
+      kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_STARTED,
+    );
+
+    final DiffusionResult result;
+    try {
+      result = DartBridgeDiffusion.generateProto(
+        _toGenerationRequest(options, modelId),
+      );
+    } on SDKException catch (e) {
+      yield DiffusionStreamEvent(
+        kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
+        errorMessage: e.message,
+      );
+      return;
+    } catch (e) {
+      yield DiffusionStreamEvent(
+        kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
+        errorMessage: e.toString(),
+      );
+      return;
+    }
+
+    // Honour a cancellation observed at this checkpoint: skip the terminal
+    // event (the single CoreML generate cannot be interrupted mid-flight).
+    if (_cancelRequested) {
+      _cancelRequested = false;
+      return;
+    }
+
+    yield DiffusionStreamEvent(
+      kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_COMPLETED,
+      result: result,
+    );
+  }
+
+  /// Cancel the current (streaming) image generation.
+  ///
+  /// Sets the cooperative cancel latch; the in-flight CoreML generate cannot be
+  /// interrupted, so cancellation takes effect at the next checkpoint (before
+  /// the terminal event is emitted). Never throws — mirrors Swift
+  /// `RunAnywhere.cancelImageGeneration()`.
+  Future<void> cancelImageGeneration() async {
+    _cancelRequested = true;
+  }
+
+  DiffusionGenerationRequest _toGenerationRequest(
+    DiffusionGenerationOptions options,
+    String modelId,
+  ) {
+    return DiffusionGenerationRequest(
+      modelId: modelId,
+      options: options,
+      metadata: <String, String>{'model_id': modelId}.entries,
+    );
+  }
+
+  void _ensureInitialized() {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    await _requireLoadedModelId();
-    _effectiveOptions(prompt, options, reportProgress: true);
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned diffusion progress streaming is unavailable in '
-      'Flutter. Use generate() for one-shot generation until commons exposes '
-      'rac_diffusion_generate_stream_lifecycle_proto.',
-    );
   }
 
-  /// Cancel any in-flight generation.
-  Future<void> cancel() async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
+  /// Diffusion runs only on the Apple CoreML backend. Fail closed elsewhere.
+  void _ensureApplePlatform() {
+    if (!(Platform.isIOS || Platform.isMacOS)) {
+      throw SDKException.featureNotAvailable(
+        'Image generation (diffusion) is only supported on Apple/CoreML '
+        'platforms',
+      );
     }
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned diffusion cancellation is unavailable in Flutter until '
-      'commons exposes rac_diffusion_cancel_lifecycle_proto.',
-    );
-  }
-
-  /// Backend capability discovery.
-  DiffusionCapabilities capabilities() {
-    if (!DartBridge.isInitialized) return DiffusionCapabilities();
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned diffusion capability discovery is unavailable in '
-      'Flutter until commons exposes rac_diffusion_capabilities_proto.',
-    );
-  }
-
-  DiffusionGenerationOptions _effectiveOptions(
-    String prompt,
-    DiffusionGenerationOptions? options, {
-    bool reportProgress = false,
-  }) {
-    final request = options?.deepCopy() ?? DiffusionGenerationOptions();
-    request.prompt = prompt;
-    if (reportProgress && !request.hasReportIntermediateImages()) {
-      request.reportIntermediateImages = true;
-    }
-    if (reportProgress && !request.hasProgressStride()) {
-      request.progressStride = 1;
-    }
-    return request;
   }
 
   Future<String> _requireLoadedModelId() async {
