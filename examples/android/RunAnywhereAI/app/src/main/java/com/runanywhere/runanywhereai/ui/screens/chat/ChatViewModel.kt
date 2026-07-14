@@ -273,6 +273,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 ensureOwns(request)
                 val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
                 bindActiveModel(request, activeModel)
+                // Trim old turns to the model's context window so small-context models (e.g.
+                // Llama-3.2-1B = 512 on v79) don't rc=-130 once a long conversation overruns MAXCTX.
+                val effectiveTurn = ChatRequestPolicy.windowHistory(
+                    turn = turn,
+                    contextTokens = activeModel.model.context_length,
+                    outputTokens = ChatGenerationBudgetPolicy.resolve(
+                        requestedMaxTokens = SettingsRepository.settings.maxTokens,
+                        modelContextTokens = activeModel.model.context_length,
+                    ).effectiveMaxTokens,
+                    systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+                )
                 val registeredTools = if (toolsRequested) {
                     RunAnywhere.getRegisteredTools()
                 } else {
@@ -298,7 +309,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             // standard path's commons normalizer (coalesce same-role, drop
                             // leading-assistant/trailing-user) so a dropped blank assistant
                             // turn can't hand commons a mislabeled non-alternating list.
-                            history = ChatRequestPolicy.toToolCallingHistory(turn.history),
+                            history = ChatRequestPolicy.toToolCallingHistory(effectiveTurn.history),
                         )
                     ToolCallingRoute.BLOCKED -> {
                         showToolGateNotice = true
@@ -312,7 +323,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     ToolCallingRoute.STANDARD_GENERATION -> {
                         val streaming = SettingsRepository.settings.streaming
                         val llmRequest = ChatRequestPolicy.buildRequest(
-                            turn = turn,
+                            turn = effectiveTurn,
                             options = generationOptions(activeModel),
                             conversationId = ensureConversationId(),
                             streaming = streaming,
