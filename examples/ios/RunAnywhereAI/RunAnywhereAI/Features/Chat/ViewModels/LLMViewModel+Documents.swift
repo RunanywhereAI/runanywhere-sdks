@@ -26,6 +26,12 @@ extension LLMViewModel {
             setCurrentConversation(conversationStore.createConversation())
         }
 
+        // Pin this generation to its conversation + give it an identity so late
+        // tokens / finalization are dropped if the user switches away.
+        setGeneratingConversationId(currentConversation?.id)
+        let generationID = UUID()
+        setActiveGenerationID(generationID)
+
         let savedAttachment = persistDocumentAttachment(document)
         let userMessage = Message(role: .user, content: prompt, attachment: savedAttachment)
         let assistantMessage = Message(role: .assistant, content: "")
@@ -50,17 +56,21 @@ extension LLMViewModel {
                 answerModel.supportsThinking && !settings.thinkingModeEnabled
 
             let result = try await RunAnywhere.ragQuery(options)
-            updateDocumentMessage(
-                at: messageIndex,
-                answer: result.answer,
-                thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
-                answerModel: answerModel
-            )
+            if isCurrentGeneration(generationID) {
+                updateDocumentMessage(
+                    at: messageIndex,
+                    answer: result.answer,
+                    thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+                    answerModel: answerModel
+                )
+            }
         } catch {
-            await handleGenerationError(error, at: messageIndex)
+            if isCurrentGeneration(generationID) {
+                await handleGenerationError(error, at: messageIndex)
+            }
         }
 
-        await finalizeGeneration(at: messageIndex)
+        await finalizeGeneration(at: messageIndex, generationID: generationID)
     }
 
     private func persistDocumentAttachment(_ document: ChatDocumentAttachment) -> MessageAttachment {

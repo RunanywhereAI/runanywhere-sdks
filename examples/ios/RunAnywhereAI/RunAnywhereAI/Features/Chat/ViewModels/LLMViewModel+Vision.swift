@@ -21,6 +21,12 @@ extension LLMViewModel {
             setCurrentConversation(conversationStore.createConversation())
         }
 
+        // Pin this generation to its conversation + give it an identity so late
+        // tokens / finalization are dropped if the user switches away.
+        setGeneratingConversationId(currentConversation?.id)
+        let generationID = UUID()
+        setActiveGenerationID(generationID)
+
         let savedAttachment = persistImageAttachment(attachment)
         let userMessage = Message(role: .user, content: prompt, attachment: savedAttachment)
         let assistantMessage = Message(role: .assistant, content: "")
@@ -39,13 +45,19 @@ extension LLMViewModel {
             options.maxTokens = 500
 
             let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
-            let response = try await consumeVisionStream(stream, messageIndex: messageIndex)
-            updateVisionMessage(at: messageIndex, response: response)
+            let response = try await consumeVisionStream(
+                stream, messageIndex: messageIndex, generationID: generationID
+            )
+            if isCurrentGeneration(generationID) {
+                updateVisionMessage(at: messageIndex, response: response)
+            }
         } catch {
-            await handleGenerationError(error, at: messageIndex)
+            if isCurrentGeneration(generationID) {
+                await handleGenerationError(error, at: messageIndex)
+            }
         }
 
-        await finalizeGeneration(at: messageIndex)
+        await finalizeGeneration(at: messageIndex, generationID: generationID)
     }
 
     private func persistImageAttachment(_ attachment: ChatImageAttachment) -> MessageAttachment {
@@ -77,7 +89,8 @@ extension LLMViewModel {
 
     private func consumeVisionStream(
         _ stream: AsyncStream<RAVLMStreamEvent>,
-        messageIndex: Int
+        messageIndex: Int,
+        generationID: UUID?
     ) async throws -> String {
         var fullResponse = ""
 
@@ -86,11 +99,17 @@ extension LLMViewModel {
             case .token:
                 guard !event.token.isEmpty else { continue }
                 fullResponse += event.token
-                updateMessageContent(at: messageIndex, content: fullResponse)
+                // Drop live tokens once superseded (the SDK VLM stream isn't
+                // cancelled on navigate-away, so keep draining but stop writing).
+                if isCurrentGeneration(generationID) {
+                    updateMessageContent(at: messageIndex, content: fullResponse)
+                }
             case .completed:
                 if fullResponse.isEmpty, !event.result.text.isEmpty {
                     fullResponse = event.result.text
-                    updateMessageContent(at: messageIndex, content: fullResponse)
+                    if isCurrentGeneration(generationID) {
+                        updateMessageContent(at: messageIndex, content: fullResponse)
+                    }
                 }
             case .error:
                 throw NSError(

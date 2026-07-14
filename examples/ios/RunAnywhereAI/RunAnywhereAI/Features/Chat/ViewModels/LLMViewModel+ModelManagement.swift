@@ -77,6 +77,16 @@ extension LLMViewModel {
     // MARK: - Conversation Management
 
     func loadConversation(_ conversation: Conversation) {
+        // Re-selecting the already-open conversation is a no-op. Reloading its
+        // stored messages here would wipe an in-flight streaming assistant slot
+        // (persisted only at finalize), silently losing the response.
+        guard conversation.id != currentConversation?.id else { return }
+
+        // Switching to a DIFFERENT conversation: cancel + detach the in-flight
+        // generation so its streaming tokens and finalization can't corrupt the
+        // one being selected.
+        cancelActiveGeneration()
+
         setCurrentConversation(conversation)
 
         if conversation.messages.isEmpty {

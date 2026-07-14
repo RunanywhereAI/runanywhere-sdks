@@ -61,6 +61,19 @@ final class LLMViewModel {
     // MARK: - Private State
 
     private var generationTask: Task<Void, Never>?
+    /// The conversation the in-flight generation is writing into. When the user
+    /// switches or clears conversations mid-generation this stops matching
+    /// `currentConversation`, so late streaming tokens, error writes, and
+    /// finalization are dropped instead of corrupting the newly-selected
+    /// conversation. `String?` to match `Conversation.id`.
+    private(set) var generatingConversationId: String?
+    /// Identity of the generation that currently owns the chat state. A
+    /// superseded generation (user navigated away / cleared / started a new one)
+    /// sees an id mismatch at finalize and no-ops — which lets
+    /// `cancelActiveGeneration()` clear `isGenerating` eagerly (restoring the send
+    /// control the instant the user leaves) without a stale finalize corrupting
+    /// the newly-selected conversation.
+    private(set) var activeGenerationID: UUID?
     var lifecycleCancellable: AnyCancellable?
     var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
@@ -120,11 +133,64 @@ final class LLMViewModel {
     }
 
     func updateMessage(at index: Int, with message: Message) {
+        // Drop writes from a generation the user has navigated away from. Every
+        // in-memory message mutation during generation — streaming tokens, final
+        // result, error text, vision, document, and tool-calling — funnels
+        // through here, so this single guard prevents a stale generation from
+        // corrupting the now-active conversation's messages.
+        guard isActiveGenerationTarget else { return }
+        guard index < messages.count else { return }
         messages[index] = message
     }
 
     func setIsGenerating(_ value: Bool) {
         isGenerating = value
+    }
+
+    /// True while the generation started for `generatingConversationId` still
+    /// owns the visible chat. Every message write/persist consults this so a
+    /// generation the user navigated away from cannot mutate or persist the
+    /// now-active conversation. Strict match (a nil target is never active), so a
+    /// cancelled generation's late tokens are also rejected.
+    var isActiveGenerationTarget: Bool {
+        generatingConversationId != nil && generatingConversationId == currentConversation?.id
+    }
+
+    /// True while `generationID` is still THE active generation. Write
+    /// initiations consult this (generation identity — not just conversation
+    /// identity) so a superseded, still-draining stream (e.g. a vision/RAG turn
+    /// the user navigated away from, whose SDK stream isn't cancelled) cannot
+    /// re-acquire the write path once a NEW generation re-pins the same visible
+    /// conversation.
+    func isCurrentGeneration(_ generationID: UUID?) -> Bool {
+        generationID != nil && activeGenerationID == generationID
+    }
+
+    func setGeneratingConversationId(_ id: String?) {
+        generatingConversationId = id
+    }
+
+    func setActiveGenerationID(_ id: UUID?) {
+        activeGenerationID = id
+    }
+
+    /// Cancel the in-flight generation and detach it from the active conversation
+    /// so its late token writes and finalization become no-ops. Shared by
+    /// `clearChat()` and `loadConversation(_:)`.
+    ///
+    /// Invalidating `activeGenerationID` supersedes the running generation: its
+    /// trailing `finalizeGeneration` sees an id mismatch and does nothing (no
+    /// persist, no state change). Because it can no longer clobber anything, we
+    /// clear `isGenerating` here immediately — restoring the send control the
+    /// instant the user leaves — instead of waiting for the abandoned generation
+    /// to unwind. `stopGeneration()` (same conversation, wants its partial
+    /// persisted) deliberately leaves both untouched.
+    func cancelActiveGeneration() {
+        generationTask?.cancel()
+        activeGenerationID = nil
+        generatingConversationId = nil
+        setIsGenerating(false)
+        Task { await RunAnywhere.cancelGeneration() }
     }
 
     func clearMessages() {
@@ -139,6 +205,16 @@ final class LLMViewModel {
         if !messages.isEmpty {
             messages.removeFirst()
         }
+    }
+
+    /// Drop a trailing empty assistant slot left behind by a Stop that produced
+    /// no text, so a cancelled turn with nothing to show doesn't leave an orphan
+    /// bubble. No-op unless the last message is a blank assistant message.
+    func removeTrailingEmptyAssistantMessage() {
+        guard let last = messages.last,
+              last.role == .assistant,
+              last.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        messages.removeLast()
     }
 
     func setLoadedModelName(_ name: String) {
@@ -224,8 +300,9 @@ final class LLMViewModel {
         }
 
         let (prompt, messageIndex) = prepareMessagesForSending()
+        let generationID = activeGenerationID
         generationTask = Task {
-            await executeGeneration(prompt: prompt, messageIndex: messageIndex)
+            await executeGeneration(prompt: prompt, messageIndex: messageIndex, generationID: generationID)
         }
     }
 
@@ -242,6 +319,11 @@ final class LLMViewModel {
             currentConversation = conversation
         }
 
+        // Pin this generation to its conversation (drops stale writes on switch)
+        // and give it an identity (lets a superseded finalize no-op).
+        generatingConversationId = currentConversation?.id
+        activeGenerationID = UUID()
+
         // Add user message
         let userMessage = Message(role: .user, content: prompt)
         messages.append(userMessage)
@@ -257,7 +339,7 @@ final class LLMViewModel {
         return (prompt, messages.count - 1)
     }
 
-    private func executeGeneration(prompt: String, messageIndex: Int) async {
+    private func executeGeneration(prompt: String, messageIndex: Int, generationID: UUID?) async {
         do {
             try await ensureModelIsLoaded()
 
@@ -267,18 +349,33 @@ final class LLMViewModel {
             // prompt is passed separately in options so the C++ layer can
             // place it correctly.
             let effectiveOptions = options
-            try await performGeneration(prompt: prompt, options: effectiveOptions, messageIndex: messageIndex)
+            try await performGeneration(
+                prompt: prompt,
+                options: effectiveOptions,
+                messageIndex: messageIndex,
+                generationID: generationID
+            )
         } catch {
-            await handleGenerationError(error, at: messageIndex)
+            // Drop the error write if this generation was superseded (user
+            // navigated away and possibly started a new one) or if the user
+            // pressed Stop: a cooperative cancellation is not a real failure, so it
+            // must not raise an error banner or leave a "Generation failed:
+            // cancelled" bubble (nor overwrite already-streamed partial text).
+            // finalizeGeneration then drops the now-empty assistant slot; a partial
+            // response keeps its text and is persisted.
+            if isCurrentGeneration(generationID), !Task.isCancelled {
+                await handleGenerationError(error, at: messageIndex)
+            }
         }
 
-        await finalizeGeneration(at: messageIndex)
+        await finalizeGeneration(at: messageIndex, generationID: generationID)
     }
 
     private func performGeneration(
         prompt: String,
         options: RALLMGenerationOptions,
-        messageIndex: Int
+        messageIndex: Int,
+        generationID: UUID?
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
         let registeredTools = await RunAnywhere.getRegisteredTools()
@@ -286,21 +383,27 @@ final class LLMViewModel {
 
         if shouldUseToolCalling {
             logger.info("Using tool calling with \(registeredTools.count) registered tools")
-            try await generateWithToolCalling(prompt: prompt, options: options, messageIndex: messageIndex)
+            try await generateWithToolCalling(
+                prompt: prompt, options: options, messageIndex: messageIndex, generationID: generationID
+            )
             return
         }
 
         // All LLM backends now handle streaming via the canonical generateStream
         // entry point; the SDK no longer exposes a per-model capability flag.
         if useStreaming {
-            try await generateStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
+            try await generateStreamingResponse(
+                prompt: prompt, options: options, messageIndex: messageIndex, generationID: generationID
+            )
         } else {
-            try await generateNonStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
+            try await generateNonStreamingResponse(
+                prompt: prompt, options: options, messageIndex: messageIndex, generationID: generationID
+            )
         }
     }
 
     func clearChat() {
-        generationTask?.cancel()
+        cancelActiveGeneration()
 
         // Generate smart title for the old conversation before creating new one
         if let oldConversation = currentConversation,
@@ -313,7 +416,9 @@ final class LLMViewModel {
 
         messages.removeAll()
         currentInput = ""
-        isGenerating = false
+        // `isGenerating` is intentionally NOT reset here: if a generation is
+        // still unwinding, its own `finalizeGeneration` clears it (and drops its
+        // now-stale persist). If none is running it is already false.
         error = nil
 
         // Create new conversation
@@ -326,8 +431,13 @@ final class LLMViewModel {
     }
 
     func stopGeneration() {
+        // Cancel cooperatively and stop the SDK, but do NOT flip `isGenerating`
+        // here: cancellation is async, so the in-flight generation keeps
+        // unwinding. Its own `finalizeGeneration` owns the true->false
+        // transition, which keeps `canSend` false until the stream has actually
+        // stopped — otherwise a second `sendMessage()` could start and overlap
+        // the still-running generation on the single-callback LLM component.
         generationTask?.cancel()
-        isGenerating = false
 
         Task {
             await RunAnywhere.cancelGeneration()
