@@ -1,3 +1,7 @@
+## [0.20.10] - 2026-07-13
+
+- CoreML diffusion enablement + macOS backend slice fixes (see SDK release notes).
+
 ## [0.20.9] - 2026-07-13
 
 ### Changed
