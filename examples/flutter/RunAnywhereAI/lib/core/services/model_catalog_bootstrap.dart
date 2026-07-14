@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
@@ -280,6 +282,21 @@ abstract final class ModelCatalogBootstrap {
     );
     debugPrint('ONNX Embedding models registered');
 
+    // --- Diffusion (image generation, Apple CoreML-only) -------------------
+    // The Swift facade + CoreML Stable-Diffusion backend landed in 0.20.10.
+    // There is no Android/CoreML diffusion backend, so the row is registered
+    // only on Apple platforms and never appears on Android.
+    if (Platform.isIOS || Platform.isMacOS) {
+      await _registerDiffusion(
+        id: 'stable-diffusion-v1-5-coreml',
+        name: 'Stable Diffusion 1.5 (CoreML)',
+        url:
+            'https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized',
+        memoryRequirement: 1200000000,
+      );
+      debugPrint('Diffusion (CoreML) models registered');
+    }
+
     // --- LoRA adapters ------------------------------------------------------
     // Mirrors iOS `registerLoraAdapters` / Android `ModelBootstrap.seedLora`.
     await _registerLoraAdapters();
@@ -462,6 +479,29 @@ abstract final class ModelCatalogBootstrap {
       );
     } catch (e) {
       debugPrint('Failed to register model $id: $e');
+    }
+  }
+
+  /// Register the Apple CoreML Stable-Diffusion catalog row (image generation).
+  /// Framework is CoreML and modality is image-generation so the SDK routes it
+  /// to the diffusion component. Swallow-and-warn like the other helpers.
+  static Future<void> _registerDiffusion({
+    required String id,
+    required String name,
+    required String url,
+    required int memoryRequirement,
+  }) async {
+    try {
+      await RunAnywhere.models.register(
+        id: id,
+        name: name,
+        url: url,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+        modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+        memoryRequirement: memoryRequirement,
+      );
+    } catch (e) {
+      debugPrint('Failed to register diffusion model $id: $e');
     }
   }
 

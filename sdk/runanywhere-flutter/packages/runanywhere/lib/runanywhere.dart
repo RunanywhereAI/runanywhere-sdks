@@ -13,13 +13,12 @@ export 'features/tts/services/audio_playback_manager.dart'
 export 'foundation/constants/sdk_constants.dart';
 export 'foundation/errors/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
-// Diffusion is intentionally NOT exported from the public barrel until the
-// cross-SDK v2 contract for image generation lands (proto-backed lifecycle
-// stream/cancel/capabilities ABIs across Swift/Kotlin/RN/Web). Removed under
-// swift-parity-002-followup-flutter to keep the Swift-as-reference public
-// surface coherent. The implementation in
-// `public/capabilities/runanywhere_diffusion.dart` is retained for the day
-// the contract is settled.
+// Diffusion (image generation, Apple/CoreML-only) — the Swift facade landed in
+// 0.20.10 (`RunAnywhere+Diffusion.swift`), so Flutter re-exposes the matching
+// surface. On non-Apple platforms the capability fails closed with a clear
+// unsupported SDKException.
+export 'public/capabilities/runanywhere_diffusion.dart'
+    show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
 export 'public/capabilities/runanywhere_embeddings.dart'
