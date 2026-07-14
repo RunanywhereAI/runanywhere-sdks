@@ -240,7 +240,7 @@ seen = set()
 total = 0
 while pos + 60 <= len(data):
     header = data[pos:pos + 60]
-    if header[58:60] != b"`\n":
+    if header[58:60] != b"\x60\n":  # ar member header magic 0x60 0x0A (\x60 avoids a raw backtick that macOS /bin/bash 3.2 mis-parses inside $()<<'PY')
         raise SystemExit(f"error: {archive}: bad member header at byte {pos}")
     raw_name = header[0:16].decode("ascii", "replace").rstrip()
     size = int(header[48:58].decode("ascii").strip())
