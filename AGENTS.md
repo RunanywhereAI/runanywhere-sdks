@@ -376,11 +376,11 @@ cd examples/android/RunAnywhereAI/
 ./scripts/verify.sh            # Full build gate
 ```
 
-Consumes the SDK + engine modules (`runanywhere-sdk` / `runanywhere-llamacpp` / `runanywhere-onnx`) from Maven Local by coordinate, so their POMs supply transitive runtime deps. Discrete steps:
+Consumes the SDK + engine modules as raw local AARs — `app/build.gradle.kts` declares `implementation(files("../libs/runanywhere-{sdk,llamacpp,onnx,qhexrt}.aar"))`, not Maven Local coordinates. Local AARs carry no POM, so the app declares the SDK's transitive runtime deps itself. Discrete steps:
 - `./run sdk commons build-android` — build the commons `.so` for all Android ABIs.
-- `./run example android stage` — publish SDK + engine modules to `~/.m2` (`publishToMavenLocal`, `useLocalNatives=true` so the local commons natives are embedded).
-- `./run example android build` — `assembleDebug`.
-- `./run example android install` — install the built APK + launch.
+- `./run example android stage` — build the SDK release AARs and copy them into `examples/android/RunAnywhereAI/libs/` (via `scripts/stage-sdk-aars.sh release`).
+- `./run example android build` — stage, then `:app:assembleDebug`.
+- `./run example android install` — stage, then `:app:installDebug` and launch.
 
 Re-run `build-android` + `stage` after any change to C++ commons or the Kotlin SDK.
 
@@ -467,7 +467,7 @@ All SDKs follow the same pattern:
 3. The registry orders registered plugins by base priority, per primitive
 4. On inference, the highest-priority plugin that serves the primitive is selected via `rac_plugin_find()` (or `rac_plugin_find_for_engine()` for a name-pinned engine)
 
-Backend base priorities: qhexrt=150 (QNN-context models only), llamacpp=100, sherpa=90, onnx/cloud=50. Selection is plain priority order — there is no runtime/format scoring or pinned-engine bonus; an explicit engine name is honored via `rac_plugin_find_for_engine()`.
+Backend base priorities: qhexrt=150 (QNN-context models only), mlx=110 (Apple), llamacpp=100, sherpa=90, onnx/cloud=50. Selection is plain priority order — there is no runtime/format scoring or pinned-engine bonus; an explicit engine name is honored via `rac_plugin_find_for_engine()`.
 
 ### HTTP Transport is Platform-Provided
 libcurl was removed. Each SDK registers a `rac_http_transport_ops_t` vtable: Swift uses URLSession, Kotlin/Flutter/RN use OkHttp (Android) or URLSession (iOS), Web uses `emscripten_fetch`.
