@@ -9,11 +9,11 @@ import 'package:runanywhere_ai/features/models/model_types.dart'
 void main() {
   tearDown(QHexRTModelCatalog.resetForTesting);
 
-  test('Flutter QHexRT catalog exactly matches the 51 Android rows', () {
+  test('Flutter QHexRT catalog exactly matches the 48 Android rows', () {
     final kotlinRows = _parseKotlinCatalog();
     const flutterRows = QHexRTModelCatalog.models;
 
-    expect(flutterRows, hasLength(51));
+    expect(flutterRows, hasLength(48));
     expect(
       flutterRows.map((model) => model.id).toList(),
       kotlinRows.map((model) => model.id).toList(),
@@ -98,9 +98,9 @@ void main() {
 
       expect(result.registered, 1);
       expect(result.failed, 0);
-      expect(result.skippedNative, 50);
+      expect(result.skippedNative, 47);
       expect(result.registeredModelIds, {'qwen3_5_0_8b_v81'});
-      expect(seenIds, hasLength(51));
+      expect(seenIds, hasLength(48));
       expect(seenIds, contains('kokoro_en'));
 
       final cpu = ModelInfo(
@@ -148,7 +148,7 @@ void main() {
 
     expect(registrarCalled, isFalse);
     expect(result.registeredModelIds, isEmpty);
-    expect(result.skippedNative, 51);
+    expect(result.skippedNative, 48);
     expect(QHexRTModelCatalog.registeredModelIds, isEmpty);
     expect(QHexRTModelCatalog.snapshots.value.revision, 2);
   });

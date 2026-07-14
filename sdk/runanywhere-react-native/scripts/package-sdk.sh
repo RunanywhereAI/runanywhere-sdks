@@ -319,7 +319,7 @@ if [ -n "$NATIVES_FROM" ]; then
             RunAnywhereMLXRuntime \
             RunAnywhereMLXMetal
         stage_mlx_ios_resources
-        stage_ios "$RN_ROOT/packages/onnx" RABackendONNX RABackendSherpa
+        stage_ios "$RN_ROOT/packages/onnx" RABackendONNX RABackendSherpa RABackendCoreML
     fi
 
     HAS_ANDROID=0

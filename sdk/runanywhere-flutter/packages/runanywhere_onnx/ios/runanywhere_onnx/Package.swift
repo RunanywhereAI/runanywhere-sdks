@@ -23,11 +23,20 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let onnxTarget = runAnywhereBinaryTarget(
     name: "RABackendONNX",
-    checksum: "1a6d67e40d69f5da56de317413b307d07d42a7c6e2fbb1ad07f79ff4b63dd914"
+    checksum: "b50a9ebcf49a34f1cbefa6be445ced74cfa3ef47281fccfa7b1b272ba81aef79"
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "f83b0b3ffa2b4277c1136a813685bf1cf637b4e7b460776656fc32ef81fd54dc"
+    checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
+)
+// Apple CoreML Stable-Diffusion engine. RACommons references
+// _rac_plugin_entry_coreml (0.20.10 enabled the CoreML backend in commons),
+// so this archive must be co-linked or the iOS link fails with an Undefined
+// symbol error — the same reason RABackendSherpa is vendored here. It also
+// makes on-device image generation (diffusion.generateImage) routable.
+let coremlTarget = runAnywhereBinaryTarget(
+    name: "RABackendCoreML",
+    checksum: "93cb97b0a3e64dca8996214ebb85945202fa413e05907c260908fa6ab2b41e24"
 )
 
 let package = Package(
@@ -48,12 +57,14 @@ let package = Package(
     targets: [
         onnxTarget,
         sherpaTarget,
+        coremlTarget,
         .target(
             name: "runanywhere_onnx",
             dependencies: [
                 .product(name: "FlutterFramework", package: "FlutterFramework"),
                 "RABackendONNX",
                 "RABackendSherpa",
+                "RABackendCoreML",
             ],
             path: "Sources/runanywhere_onnx",
             linkerSettings: [

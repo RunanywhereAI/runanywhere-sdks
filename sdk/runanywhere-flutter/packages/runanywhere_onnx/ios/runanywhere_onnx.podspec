@@ -99,6 +99,10 @@ download_xcframework \
   RABackendSherpa \
   "#{checksum_for.call('RABackendSherpa')}" \
   runanywhere_onnx/Frameworks
+download_xcframework \
+  RABackendCoreML \
+  "#{checksum_for.call('RABackendCoreML')}" \
+  runanywhere_onnx/Frameworks
   CMD
 
   s.ios.deployment_target = '17.5'
@@ -117,9 +121,14 @@ download_xcframework \
   # RABackendSherpa provides STT/TTS/VAD via sherpa-onnx — its plugin entry
   # symbol (_rac_plugin_entry_sherpa) is referenced from RACommons, so without
   # vendoring this xcframework the linker fails with an Undefined symbol error.
+  # RABackendCoreML provides the Apple CoreML Stable-Diffusion engine — RACommons
+  # references _rac_plugin_entry_coreml (0.20.10 enabled the CoreML backend in
+  # commons), so it must be vendored here for the same reason, and it makes
+  # image generation (diffusion.generateImage) routable on Apple devices.
   s.vendored_frameworks = [
     'runanywhere_onnx/Frameworks/RABackendONNX.xcframework',
-    'runanywhere_onnx/Frameworks/RABackendSherpa.xcframework'
+    'runanywhere_onnx/Frameworks/RABackendSherpa.xcframework',
+    'runanywhere_onnx/Frameworks/RABackendCoreML.xcframework'
   ]
   s.preserve_paths = 'runanywhere_onnx/Frameworks/**/*'
 

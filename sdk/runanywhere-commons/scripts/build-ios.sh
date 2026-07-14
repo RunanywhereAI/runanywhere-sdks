@@ -61,6 +61,12 @@ xcframework_names=(
     RABackendLLAMACPP
     RABackendONNX
     RABackendSherpa
+    # Apple CoreML Stable-Diffusion engine. The root Package.swift's ONNXRuntime
+    # target has an UNCONDITIONAL .binaryTarget dependency on RABackendCoreMLBinary
+    # (RABackendCoreML-ios-v<version>.zip), so external SPM consumers 404 on
+    # `swift package resolve` unless this archive is published. build-core-xcframework.sh
+    # already emits RABackendCoreML.xcframework (Apple-only, RAC_BACKEND_COREML=ON).
+    RABackendCoreML
     RABackendMLX
     RunAnywhereMLXRuntime
     RunAnywhereMLXMetal
