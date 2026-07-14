@@ -158,34 +158,7 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
 
         logger.info("Input format: \(inputFormat.sampleRate) Hz, \(inputFormat.channelCount) channels")
 
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: targetSampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AudioCaptureError.formatConversionFailed
-        }
-
-        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-            throw AudioCaptureError.formatConversionFailed
-        }
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self = self else { return }
-
-            self.updateAudioLevel(buffer: buffer)
-
-            guard let convertedBuffer = self.convert(buffer: buffer, using: converter, to: outputFormat) else {
-                return
-            }
-
-            if let audioData = self.bufferToData(buffer: convertedBuffer) {
-                DispatchQueue.main.async {
-                    onAudioData(audioData)
-                }
-            }
-        }
+        try installCaptureTap(on: inputNode, inputFormat: inputFormat, onAudioData: onAudioData)
 
         // Start the engine on a background thread to avoid blocking the main thread.
         // AVAudioEngine.start() performs synchronous IPC to mediaserverd.
@@ -311,6 +284,44 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     }
 
     // MARK: - Private Helpers
+
+    /// Build the Int16 output format + converter for `inputFormat` and install
+    /// the mic tap that converts each buffer and forwards the PCM data. Extracted
+    /// from `startRecording` to keep that function within the body-length limit.
+    private func installCaptureTap(
+        on inputNode: AVAudioInputNode,
+        inputFormat: AVAudioFormat,
+        onAudioData: @escaping @Sendable (Data) -> Void
+    ) throws {
+        guard let outputFormat = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: targetSampleRate,
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw AudioCaptureError.formatConversionFailed
+        }
+
+        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+            throw AudioCaptureError.formatConversionFailed
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+            guard let self = self else { return }
+
+            self.updateAudioLevel(buffer: buffer)
+
+            guard let convertedBuffer = self.convert(buffer: buffer, using: converter, to: outputFormat) else {
+                return
+            }
+
+            if let audioData = self.bufferToData(buffer: convertedBuffer) {
+                DispatchQueue.main.async {
+                    onAudioData(audioData)
+                }
+            }
+        }
+    }
 
     /// Converts a PCM buffer to the target format. Internal for unit testing.
     internal func convert(
