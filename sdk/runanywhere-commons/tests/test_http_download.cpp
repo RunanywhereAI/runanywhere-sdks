@@ -638,6 +638,9 @@ void test_cancel_via_progress() {
 void test_resume_merged_matches_payload() {
     auto dest = tmp_file("resume.bin");
     std::string dest_str = dest.string();
+    // Partials now live in the "<dest>.part" sidecar (transport atomic-write);
+    // the final "<dest>" only appears after a successful execute renames it.
+    fs::path part = dest_str + ".part";
 
     // Pass 1: stop after ~50% by cancelling.
     {
@@ -653,7 +656,8 @@ void test_resume_merged_matches_payload() {
         rac_http_download_execute(&req, cancel_midway, &cc, &s);
     }
 
-    uint64_t prefix = fs::exists(dest) ? fs::file_size(dest) : 0;
+    // The cancelled prefix lives in "<dest>.part", not "<dest>".
+    uint64_t prefix = fs::exists(part) ? fs::file_size(part) : 0;
     T_CHECK(prefix > 0);
     T_CHECK(prefix < g_payload.size());
 
@@ -669,6 +673,7 @@ void test_resume_merged_matches_payload() {
     int32_t status = 0;
     auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
     T_CHECK(rc == RAC_HTTP_DL_OK);
+    // Success renamed "<dest>.part" -> "<dest>"; the final lands at "<dest>".
     T_CHECK(fs::file_size(dest) == g_payload.size());
 
     // Byte-for-byte compare the merged file against the source payload.
@@ -678,14 +683,19 @@ void test_resume_merged_matches_payload() {
     T_CHECK(merged == g_payload);
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 void test_resume_rejects_stale_offset() {
     auto dest = tmp_file("resume-stale.bin");
     std::string dest_str = dest.string();
+    // Partials now live in the "<dest>.part" sidecar (transport atomic-write);
+    // seed the pre-existing partial there so the resume offset is validated
+    // against the ".part" size.
+    fs::path part = dest_str + ".part";
     const size_t prefix_size = 4096;
     {
-        std::ofstream out(dest, std::ios::binary);
+        std::ofstream out(part, std::ios::binary);
         out.write(reinterpret_cast<const char*>(g_payload.data()),
                   static_cast<std::streamsize>(prefix_size));
     }
@@ -700,9 +710,12 @@ void test_resume_rejects_stale_offset() {
     int32_t status = 0;
     auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
     T_CHECK(rc == RAC_HTTP_DL_FILE_ERROR);
-    T_CHECK(fs::file_size(dest) == prefix_size);
+    // Rejected resume performs no rename; the partial must be unchanged in
+    // "<dest>.part".
+    T_CHECK(fs::file_size(part) == prefix_size);
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 // Regression: covers the CDN / proxy behavior where a resume request
@@ -715,16 +728,20 @@ void test_resume_rejects_stale_offset() {
 void test_resume_with_200_full_body_replay_checksum() {
     auto dest = tmp_file("resume-200.bin");
     std::string dest_str = dest.string();
+    // Partials now live in the "<dest>.part" sidecar (transport atomic-write);
+    // seed the pre-existing partial there. The successful execute renames
+    // "<dest>.part" -> "<dest>", so the final assertions read "<dest>".
+    fs::path part = dest_str + ".part";
     const size_t prefix_size = g_payload.size() / 3;
 
-    // Seed a "partial" prefix on disk that matches what the previous
-    // attempt would have left after a cancel.
+    // Seed a "partial" prefix in the ".part" sidecar that matches what the
+    // previous attempt would have left after a cancel.
     {
-        std::ofstream out(dest, std::ios::binary);
+        std::ofstream out(part, std::ios::binary);
         out.write(reinterpret_cast<const char*>(g_payload.data()),
                   static_cast<std::streamsize>(prefix_size));
     }
-    T_CHECK(fs::file_size(dest) == prefix_size);
+    T_CHECK(fs::file_size(part) == prefix_size);
 
     g_resume_returns_200.store(true);
     rac_http_download_request_t req{};
@@ -742,6 +759,7 @@ void test_resume_with_200_full_body_replay_checksum() {
 
     T_CHECK(rc == RAC_HTTP_DL_OK);
     T_CHECK(status == 200);
+    // Success renamed "<dest>.part" -> "<dest>"; the final lands at "<dest>".
     T_CHECK(fs::file_size(dest) == g_payload.size());
 
     // The file on disk must be byte-for-byte the full payload — not the
@@ -753,6 +771,7 @@ void test_resume_with_200_full_body_replay_checksum() {
     T_CHECK(merged == g_payload);
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 // Same scenario as above but without an expected_sha256_hex. The runner
@@ -761,9 +780,13 @@ void test_resume_with_200_full_body_replay_checksum() {
 void test_resume_with_200_full_body_replay_no_checksum() {
     auto dest = tmp_file("resume-200-nocs.bin");
     std::string dest_str = dest.string();
+    // Partials now live in the "<dest>.part" sidecar (transport atomic-write);
+    // seed the pre-existing partial there. The successful execute renames
+    // "<dest>.part" -> "<dest>", so the final assertions read "<dest>".
+    fs::path part = dest_str + ".part";
     const size_t prefix_size = g_payload.size() / 4;
     {
-        std::ofstream out(dest, std::ios::binary);
+        std::ofstream out(part, std::ios::binary);
         out.write(reinterpret_cast<const char*>(g_payload.data()),
                   static_cast<std::streamsize>(prefix_size));
     }
@@ -783,6 +806,7 @@ void test_resume_with_200_full_body_replay_no_checksum() {
     g_resume_returns_200.store(false);
 
     T_CHECK(rc == RAC_HTTP_DL_OK);
+    // Success renamed "<dest>.part" -> "<dest>"; the final lands at "<dest>".
     T_CHECK(fs::file_size(dest) == g_payload.size());
     std::ifstream in(dest, std::ios::binary);
     std::vector<uint8_t> merged((std::istreambuf_iterator<char>(in)),
@@ -790,6 +814,7 @@ void test_resume_with_200_full_body_replay_no_checksum() {
     T_CHECK(merged == g_payload);
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 // Regression: a partial resume that fails mid-stream must not
@@ -803,14 +828,17 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     auto dest = tmp_file("resume-midfail.bin");
     std::string dest_str = dest.string();
     const size_t initial_prefix = g_payload.size() / 4;
+    // In-flight/partial bytes live in the "<dest>.part" sidecar (transport
+    // atomic-write); the final path only appears after a successful rename.
+    const fs::path part(dest_str + ".part");
 
     // Seed a partial prefix on disk (e.g. from a previous attempt).
     {
-        std::ofstream out(dest, std::ios::binary);
+        std::ofstream out(part, std::ios::binary);
         out.write(reinterpret_cast<const char*>(g_payload.data()),
                   static_cast<std::streamsize>(initial_prefix));
     }
-    T_CHECK(fs::file_size(dest) == initial_prefix);
+    T_CHECK(fs::file_size(part) == initial_prefix);
 
     // Arm the transport to deliver only `mid_stream_bytes` of the tail
     // before returning a network error.
@@ -837,11 +865,11 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     // After the truncated first attempt, the on-disk file must have grown
     // by at most `mid_stream_bytes` and must remain a valid prefix of the
     // canonical payload so a second resume can pick up where it left off.
-    size_t after_fail = fs::file_size(dest);
+    size_t after_fail = fs::file_size(part);
     T_CHECK(after_fail >= initial_prefix);
     T_CHECK(after_fail <= initial_prefix + mid_stream_bytes);
     {
-        std::ifstream in(dest, std::ios::binary);
+        std::ifstream in(part, std::ios::binary);
         std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
                                      std::istreambuf_iterator<char>());
         T_CHECK(on_disk.size() == after_fail);
@@ -872,6 +900,7 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     T_CHECK(final_bytes == g_payload);
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 // Regression: a resume request that
@@ -890,15 +919,18 @@ void test_resume_with_416_tiny_html_body_preserves_prefix() {
     auto dest = tmp_file("resume-416-html.bin");
     std::string dest_str = dest.string();
     const size_t prefix_size = g_payload.size() / 3;
+    // The resumable prefix lives in the "<dest>.part" sidecar; a 416 failure
+    // rolls back the ".part" and never renames to the final path.
+    const fs::path part(dest_str + ".part");
 
     // Seed a "valid" prefix on disk (stand-in for the 386 MB gguf in
     // the production scenario).
     {
-        std::ofstream out(dest, std::ios::binary);
+        std::ofstream out(part, std::ios::binary);
         out.write(reinterpret_cast<const char*>(g_payload.data()),
                   static_cast<std::streamsize>(prefix_size));
     }
-    T_CHECK(fs::file_size(dest) == prefix_size);
+    T_CHECK(fs::file_size(part) == prefix_size);
 
     g_resume_returns_416_html.store(true);
     rac_http_download_request_t req{};
@@ -925,17 +957,18 @@ void test_resume_with_416_tiny_html_body_preserves_prefix() {
     // The on-disk file MUST still be exactly `prefix_size` bytes — the same
     // bytes that were there before the failed resume request. The 47-byte
     // HTML stub must NOT have been appended.
-    T_CHECK(fs::exists(dest));
-    T_CHECK(fs::file_size(dest) == prefix_size);
+    T_CHECK(fs::exists(part));
+    T_CHECK(fs::file_size(part) == prefix_size);
 
     // Byte-for-byte: the prefix is still the valid model payload prefix.
-    std::ifstream in(dest, std::ios::binary);
+    std::ifstream in(part, std::ios::binary);
     std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
                                  std::istreambuf_iterator<char>());
     T_CHECK(on_disk.size() == prefix_size);
     T_CHECK(std::equal(on_disk.begin(), on_disk.end(), g_payload.begin()));
 
     fs::remove(dest);
+    fs::remove(part);
 }
 
 // Companion: fresh download (resume_from_byte == 0) that receives HTTP 416
