@@ -7,6 +7,7 @@
 
 import CRACommons
 import Foundation
+import os
 import SwiftProtobuf
 
 // MARK: - Download Bridge
@@ -41,11 +42,84 @@ private enum DownloadProtoABI {
     )
 }
 
-private final class DownloadProtoProgressBox {
-    let continuation: AsyncStream<RADownloadProgress>.Continuation
+/// Process-wide fan-out over the single native download progress callback slot.
+///
+/// `rac_download_set_progress_proto_callback` exposes exactly ONE callback
+/// slot. Registering it per subscriber lets a second subscriber overwrite the
+/// first's context, and the first stream's teardown (`setProgressCallback(nil,
+/// nil)`) then silences every other subscriber. Concurrent downloads therefore
+/// need one native registration multiplexed to many `AsyncStream`
+/// continuations, mirroring the LLMStreamAdapter fan-out. The trampoline reads
+/// this immortal singleton (no `user_data` pointer to release), so a native
+/// callback can never outlive its context.
+private final class DownloadProgressFanOut: @unchecked Sendable {
+    static let shared = DownloadProgressFanOut()
 
-    init(continuation: AsyncStream<RADownloadProgress>.Continuation) {
-        self.continuation = continuation
+    // Subscriber continuations. `dispatch` (invoked from the C trampoline while
+    // the commons progress-sink mutex is held) reads this, so it MUST NOT be the
+    // lock held across the native register/unregister calls.
+    private let subscribers = OSAllocatedUnfairLock(
+        initialState: [UUID: AsyncStream<RADownloadProgress>.Continuation]()
+    )
+
+    // Serializes the native register/unregister calls together with the
+    // first/last-subscriber decision, so two concurrent subscribe/unsubscribe
+    // can't reorder their native calls and leave the single slot inconsistent
+    // with `registered` (which would silence a fresh subscriber). Held ACROSS
+    // the native call. Never taken by `dispatch`, so it cannot invert with the
+    // commons progress-sink mutex: register/unregister acquire
+    // registration -> commons-mutex; dispatch acquires commons-mutex ->
+    // subscribers; the two lock sets are disjoint, so no cycle.
+    private let registration = OSAllocatedUnfairLock(initialState: false)
+
+    private init() {}
+
+    /// Add a subscriber; registers the native callback only for the first one.
+    /// Returns the subscription id, or nil if native registration failed. The
+    /// whole decision + native call is serialized under `registration`, so a
+    /// concurrent joiner cannot be stranded by a first-subscriber register
+    /// failure (it runs afterwards and re-tries the registration).
+    func subscribe(
+        _ continuation: AsyncStream<RADownloadProgress>.Continuation
+    ) -> UUID? {
+        let id = UUID()
+        return registration.withLock { registered -> UUID? in
+            subscribers.withLock { $0[id] = continuation }
+            guard !registered else { return id }
+            guard let setProgressCallback = DownloadProtoABI.setProgressCallback,
+                  setProgressCallback(downloadProtoProgressCallback, nil) == RAC_SUCCESS else {
+                subscribers.withLock { $0[id] = nil }
+                return nil
+            }
+            registered = true
+            return id
+        }
+    }
+
+    /// Remove a subscriber; unregisters the native callback once the last one
+    /// leaves. Serialized with `subscribe` under `registration` so it cannot
+    /// reorder against a concurrent register. commons-072:
+    /// `setProgressCallback(nil, nil)` serializes on the dispatcher mutex, so it
+    /// acts as a quiesce barrier — it cannot return while a callback is in flight.
+    func unsubscribe(_ id: UUID) {
+        registration.withLock { registered in
+            let isEmpty = subscribers.withLock { dict -> Bool in
+                dict[id] = nil
+                return dict.isEmpty
+            }
+            guard isEmpty, registered,
+                  let setProgressCallback = DownloadProtoABI.setProgressCallback else { return }
+            _ = setProgressCallback(nil, nil)
+            registered = false
+        }
+    }
+
+    /// Fan a single native progress update out to every active subscriber.
+    func dispatch(_ progress: RADownloadProgress) {
+        let continuations = subscribers.withLock { Array($0.values) }
+        for continuation in continuations {
+            continuation.yield(progress)
+        }
     }
 }
 
@@ -54,13 +128,11 @@ private func downloadProtoProgressCallback(
     protoSize: Int,
     userData: UnsafeMutableRawPointer?
 ) {
-    guard let userData, let protoBytes, protoSize > 0 else { return }
-    let box = Unmanaged<DownloadProtoProgressBox>.fromOpaque(userData).takeUnretainedValue()
-    if let progress = try? RADownloadProgress(
+    guard let protoBytes, protoSize > 0 else { return }
+    guard let progress = try? RADownloadProgress(
         serializedBytes: Data(bytes: protoBytes, count: protoSize)
-    ) {
-        box.continuation.yield(progress)
-    }
+    ) else { return }
+    DownloadProgressFanOut.shared.dispatch(progress)
 }
 
 extension CppBridge {
@@ -166,42 +238,19 @@ extension CppBridge {
 
         public nonisolated func progressEvents() -> AsyncStream<RADownloadProgress> {
             AsyncStream { continuation in
-                guard let setProgressCallback = DownloadProtoABI.setProgressCallback else {
-                    continuation.finish()
-                    return
-                }
-
-                let box = DownloadProtoProgressBox(continuation: continuation)
-                let retained = Unmanaged.passRetained(box)
-                let context = DownloadProtoContextPointer(rawValue: retained.toOpaque())
-                let status = setProgressCallback(downloadProtoProgressCallback, context.rawValue)
-
-                guard status == RAC_SUCCESS else {
-                    retained.release()
+                // One process-wide native callback slot is fanned out to every
+                // subscriber by DownloadProgressFanOut, so concurrent downloads
+                // (e.g. Voice one-tap STT + LLM + TTS) each get their own stream
+                // instead of clobbering a single shared registration.
+                guard let subscriptionID = DownloadProgressFanOut.shared.subscribe(continuation) else {
                     continuation.finish()
                     return
                 }
 
                 continuation.onTermination = { _ in
-                    // commons-072: `rac_download_set_progress_proto_callback`
-                    // and the dispatcher (`emit_progress` in
-                    // commons/src/infrastructure/download/download_orchestrator.cpp)
-                    // both serialize on `progress_sink().mutex`, and the
-                    // dispatcher holds that mutex across the user callback
-                    // invocation. Setting the slot to nil therefore acts as
-                    // a quiesce barrier: it cannot return until any in-flight
-                    // callback (which would dereference `userData`) has
-                    // returned. The subsequent `Unmanaged.release()` is safe.
-                    _ = setProgressCallback(nil, nil)
-                    Unmanaged<DownloadProtoProgressBox>.fromOpaque(context.rawValue).release()
+                    DownloadProgressFanOut.shared.unsubscribe(subscriptionID)
                 }
             }
         }
     }
-}
-
-/// Retained callback context released only after the native unregister call
-/// has synchronously quiesced the progress dispatcher.
-private struct DownloadProtoContextPointer: @unchecked Sendable {
-    let rawValue: UnsafeMutableRawPointer
 }
