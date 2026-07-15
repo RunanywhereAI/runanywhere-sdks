@@ -96,7 +96,22 @@ target_include_directories(rac_backend_rag PUBLIC
     ${usearch_SOURCE_DIR}/include
 )
 
-if(Protobuf_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../src/generated/proto/rag.pb.h")
+# RAC_HAVE_PROTOBUF gate.
+#
+# rac_backend_rag is an OBJECT library folded into rac_commons. rac_commons
+# gets RAC_HAVE_PROTOBUF=1 from the top-level CMakeLists whenever the protobuf
+# runtime was set up (RAC_PROTOBUF_RUNTIME_ENABLED) — including the *vendored*
+# and namespace-isolated cases where find_package leaves Protobuf_FOUND FALSE.
+# Keying this object library only on `Protobuf_FOUND AND EXISTS rag.pb.h`
+# diverged from that: with vendored protobuf (Protobuf_FOUND is forced FALSE at
+# configure) OR when the generated rag.pb.h isn't on disk at *configure* time,
+# this evaluated FALSE and every rac_rag_*_proto ABI compiled as the
+# RAC_ERROR_FEATURE_NOT_AVAILABLE stub — so RAG failed at runtime with -801 for
+# *all* embedders. Track the parent's authoritative flag; keep the old check as
+# an OR so this is strictly more permissive than before (never removes the
+# define, only adds it where it was wrongly omitted).
+if(RAC_PROTOBUF_RUNTIME_ENABLED
+   OR (Protobuf_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../src/generated/proto/rag.pb.h"))
     target_compile_definitions(rac_backend_rag PRIVATE RAC_HAVE_PROTOBUF=1)
     target_include_directories(rac_backend_rag PRIVATE
         # commons src/ root — rac_backend_rag is folded into rac_commons via
