@@ -195,6 +195,9 @@ final class VoiceAgentViewModel: ObservableObject {
     // surface. The SDK wraps the raw C handle internally; this view model
     // consumes `RAVoiceEvent`s and switches on `event.payload`.
     private var eventTask: Task<Void, Never>?
+    /// True while `stopConversation` is tearing down the SDK voice agent. Blocks a
+    /// restart until cleanup completes so we never run two mic drivers at once.
+    private var isStopping = false
 
     // MARK: - Initialization State (for idempotency)
 
@@ -602,6 +605,23 @@ final class VoiceAgentViewModel: ObservableObject {
             return
         }
 
+        // Reentrancy guard: ignore a start while a session is already active/
+        // connecting, or while a stop is still tearing down. Otherwise a second
+        // streamVoiceAgent() spins up a second mic driver → permanent hot mic.
+        switch sessionState {
+        case .disconnected, .error:
+            break
+        default:
+            logger.warning("Ignoring startConversation: session already active")
+            return
+        }
+        guard !isStopping else {
+            logger.warning("Ignoring startConversation: stop still in progress")
+            return
+        }
+        eventTask?.cancel()
+        eventTask = nil
+
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
@@ -635,6 +655,8 @@ final class VoiceAgentViewModel: ObservableObject {
     /// reset UI state first, then release the SDK's voice-agent resources.
     /// `cleanupVoiceAgent()` never throws and is safe to call anytime.
     func stopConversation() async {
+        guard !isStopping else { return }
+        isStopping = true
         logger.info("Stopping voice session...")
         eventTask?.cancel()
         eventTask = nil
@@ -643,6 +665,7 @@ final class VoiceAgentViewModel: ObservableObject {
         audioLevel = 0.0
         isSpeechDetected = false
         await RunAnywhere.cleanupVoiceAgent()
+        isStopping = false
         logger.info("Voice session stopped")
     }
 
