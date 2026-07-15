@@ -293,6 +293,13 @@ private struct MLXLLMOptionsSnapshot: Sendable {
     let frequencyPenalty: Float
     let seed: Int64
     let disableThinking: Bool
+    /// System prompt (options.system_prompt); nil when NULL/empty. MLX used to
+    /// ignore this, so the model never saw the system instruction.
+    let systemPrompt: String?
+    /// Prior conversation turns (options.history/n_history), alternating
+    /// user,assistant in chronological order (commons-normalized). MLX used to
+    /// ignore these, so the model had no memory across turns.
+    let history: [String]
 
     init(_ options: UnsafePointer<rac_llm_options_t>?) {
         guard let options = options?.pointee else {
@@ -307,6 +314,8 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             frequencyPenalty = 0
             seed = 0
             disableThinking = false
+            systemPrompt = nil
+            history = []
             return
         }
 
@@ -321,6 +330,16 @@ private struct MLXLLMOptionsSnapshot: Sendable {
         frequencyPenalty = options.frequency_penalty
         seed = options.seed
         disableThinking = options.disable_thinking == RAC_TRUE
+        if let sys = options.system_prompt.map({ String(cString: $0) }), !sys.isEmpty {
+            systemPrompt = sys
+        } else {
+            systemPrompt = nil
+        }
+        if let entries = options.history, options.n_history > 0 {
+            history = (0..<Int(options.n_history)).compactMap { entries[$0].map { String(cString: $0) } }
+        } else {
+            history = []
+        }
     }
 }
 
@@ -652,10 +671,7 @@ private final class MLXSession: @unchecked Sendable {
     func generate(prompt: String, options: MLXLLMOptionsSnapshot) async throws
         -> (String, MLXGenerationMetrics) {
         let params = generateParameters(from: options)
-        let input = UserInput(
-            prompt: prompt,
-            additionalContext: llmAdditionalContext(from: options)
-        )
+        let input = llmUserInput(prompt: prompt, options: options)
         return try await collect(input: input, parameters: params)
     }
 
@@ -666,10 +682,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: MLXCallbackUserData
     ) async throws -> MLXGenerationMetrics {
         let params = generateParameters(from: options)
-        let input = UserInput(
-            prompt: prompt,
-            additionalContext: llmAdditionalContext(from: options)
-        )
+        let input = llmUserInput(prompt: prompt, options: options)
         return try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
             return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
@@ -1296,6 +1309,29 @@ private func llmAdditionalContext(from options: MLXLLMOptionsSnapshot) -> [Strin
         return nil
     }
     return ["enable_thinking": false]
+}
+
+/// Build the MLX `UserInput` for an LLM turn. Reconstructs the full conversation
+/// — `{system, history, current prompt}` — so the model's own chat template
+/// renders prior turns and the system instruction. Without this the MLX runtime
+/// only ever saw the current prompt (no memory, no system prompt); llama.cpp
+/// already renders this in commons, and MLX owns its template so it must do the
+/// same here. Falls back to the single-prompt path when there is no history and
+/// no system prompt.
+private func llmUserInput(prompt: String, options: MLXLLMOptionsSnapshot) -> UserInput {
+    let context = llmAdditionalContext(from: options)
+    guard options.systemPrompt != nil || !options.history.isEmpty else {
+        return UserInput(prompt: prompt, additionalContext: context)
+    }
+    var chat: [Chat.Message] = []
+    if let system = options.systemPrompt {
+        chat.append(.system(system))
+    }
+    for (index, turn) in options.history.enumerated() {
+        chat.append(index.isMultiple(of: 2) ? .user(turn) : .assistant(turn))
+    }
+    chat.append(.user(prompt))
+    return UserInput(chat: chat, additionalContext: context)
 }
 
 private func generateParameters(from options: MLXVLMOptionsSnapshot) -> GenerateParameters {
