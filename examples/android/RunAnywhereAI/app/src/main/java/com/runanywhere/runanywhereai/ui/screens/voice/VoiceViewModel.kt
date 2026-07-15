@@ -65,11 +65,6 @@ class VoiceViewModel : ViewModel() {
     private var llmModel: RAModelInfo? = null
     private var ttsModel: RAModelInfo? = null
     private var useNpuSwap = false
-    // Cut sentences on . ! ? followed by whitespace (so "3.14"/"U.S." don't split mid-number).
-    private val sentenceSplit = Regex("(?<=[.!?])\\s+")
-    // Hard cap per TTS chunk. MeloTTS v79 rejects >512 phonemes (~a couple hundred chars) with the
-    // -130 "Text/audio generation failed"; keep each spoken chunk comfortably under that.
-    private val maxTtsChars = 160
 
     /** Called by VoiceScreen with the currently-selected components so the mic can swap them per turn. */
     fun setPipeline(stt: RAModelInfo?, llm: RAModelInfo?, tts: RAModelInfo?) {
@@ -209,10 +204,10 @@ class VoiceViewModel : ViewModel() {
                 if (tok.isEmpty()) return@let
                 appendAssistantToken(tok)
                 buf.append(tok)
-                emit(drainSentences(buf, flush = false))
+                emit(VoiceTtsChunkPolicy.drainSentences(buf, flush = false))
             }
         }
-        emit(drainSentences(buf, flush = true))
+        emit(VoiceTtsChunkPolicy.drainSentences(buf, flush = true))
         chunks.close()
         speaker.join()
     }
@@ -225,7 +220,7 @@ class VoiceViewModel : ViewModel() {
             ev.token?.let { if (it.isNotEmpty()) { sb.append(it); appendAssistantToken(it) } }
         }
         val buf = StringBuilder(sb)
-        val sentences = drainSentences(buf, flush = true)
+        val sentences = VoiceTtsChunkPolicy.drainSentences(buf, flush = true)
         if (sentences.isEmpty() || tts == null) return
         state = VoiceState.SPEAKING
         if (isNpu(tts)) withContext(Dispatchers.IO) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = tts.id)) }
@@ -249,7 +244,7 @@ class VoiceViewModel : ViewModel() {
     // blank/symbol-only text (an empty phoneme sequence also fails synthesis). A single failed chunk
     // is logged and skipped, never aborting the turn.
     private suspend fun speakChunk(text: String) {
-        for (piece in capForTts(text)) {
+        for (piece in VoiceTtsChunkPolicy.capForTts(text)) {
             if (piece.isBlank()) continue
             try {
                 RunAnywhere.speak(piece, ttsOptions())
@@ -259,44 +254,6 @@ class VoiceViewModel : ViewModel() {
                 RACLog.w("tts chunk failed: ${e.message}")
             }
         }
-    }
-
-    // Pull complete, speakable sentences out of [buf] (mutating it), dropping <think> reasoning so it
-    // is never read aloud. With [flush] the trailing partial is returned too and the buffer drained.
-    private fun drainSentences(buf: StringBuilder, flush: Boolean): List<String> {
-        val stripped = buf.toString().replace(Regex("(?s)<think>.*?</think>"), "")
-        val open = stripped.indexOf("<think>")                 // an unclosed reasoning block, if any
-        val held = if (open >= 0) stripped.substring(open) else ""
-        val speakable = if (open >= 0) stripped.substring(0, open) else stripped
-        val parts = sentenceSplit.split(speakable)
-        val complete = if (flush) parts.size else parts.size - 1
-        val out = ArrayList<String>(maxOf(complete, 0))
-        for (i in 0 until complete) {
-            val clean = sanitizeForTts(parts[i])
-            if (clean.isNotEmpty()) out.add(clean)
-        }
-        buf.setLength(0)
-        if (!flush) buf.append(parts.lastOrNull() ?: "").append(held)
-        return out
-    }
-
-    // Strip markdown formatting and collapse whitespace so the TTS g2p sees clean prose.
-    private fun sanitizeForTts(text: String): String =
-        text.replace(Regex("[*_`#>~|]+"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-
-    private fun capForTts(text: String): List<String> {
-        if (text.length <= maxTtsChars) return listOf(text)
-        val out = ArrayList<String>()
-        val cur = StringBuilder()
-        for (w in text.split(" ")) {
-            if (cur.isNotEmpty() && cur.length + 1 + w.length > maxTtsChars) { out.add(cur.toString()); cur.setLength(0) }
-            if (cur.isNotEmpty()) cur.append(' ')
-            cur.append(w)
-        }
-        if (cur.isNotEmpty()) out.add(cur.toString())
-        return out
     }
 
     fun stop() {
