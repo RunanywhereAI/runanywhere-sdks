@@ -97,6 +97,13 @@ extension LLMViewModel {
         )
 
         var updatedConversation = conversation
+        // Persist the live transcript, not `currentConversation`'s stale snapshot
+        // (which lags a full turn and is empty on a brand-new conversation). Without
+        // this, an analytics write during a turn whose assistant reply finalizes
+        // empty — where `finalizeGeneration` early-returns before its own repair —
+        // overwrites the on-disk conversation with a truncated message list and
+        // drops the user's just-sent message. Mirrors the tool-calling path.
+        updatedConversation.messages = messages
         updatedConversation.analytics = conversationAnalytics
         updatedConversation.performanceSummary = PerformanceSummary(from: messages)
         conversationStore.updateConversation(updatedConversation)
