@@ -43,6 +43,10 @@ struct KeyboardView: View {
     // MARK: - State (polled from SharedDataBridge)
 
     @State private var sessionState: String = "idle"
+    /// When the local state first became "activating" with no app heartbeat, so a
+    /// failed activation (e.g. Full Access off → the app never launches) can revert
+    /// to idle instead of spinning forever.
+    @State private var activatingSince: Date?
     @State private var audioLevel: Float = 0
 
     // Waveform bar heights — 30 bars driven by audioLevel
@@ -545,6 +549,23 @@ struct KeyboardView: View {
             if heartbeat > 0 && (Date().timeIntervalSince1970 - heartbeat) > 3.0 {
                 newState = "idle"
             }
+        }
+
+        // Failed-activation recovery: heartbeat == 0 means the app never launched
+        // (e.g. Full Access is off), so no heartbeat will ever arrive and the
+        // heartbeat check above can't fire. Revert to idle after a grace period
+        // so the "Run" button reappears instead of a permanent spinner.
+        if newState == "activating" && SharedDataBridge.shared.lastHeartbeatTimestamp == 0 {
+            if let since = activatingSince {
+                if Date().timeIntervalSince(since) > 6.0 {
+                    newState = "idle"
+                    activatingSince = nil
+                }
+            } else {
+                activatingSince = Date()
+            }
+        } else if newState != "activating" {
+            activatingSince = nil
         }
 
         if newState != sessionState {
