@@ -2835,6 +2835,7 @@ function createBaseToolCallingSessionCreateRequest() {
         autoExecute: undefined,
         replaceSystemPrompt: false,
         requireJsonArguments: false,
+        history: [],
     };
 }
 exports.ToolCallingSessionCreateRequest = {
@@ -2886,6 +2887,9 @@ exports.ToolCallingSessionCreateRequest = {
         }
         if (message.requireJsonArguments !== false) {
             writer.uint32(144).bool(message.requireJsonArguments);
+        }
+        for (const v of message.history) {
+            writer.uint32(154).string(v);
         }
         return writer;
     },
@@ -3008,6 +3012,13 @@ exports.ToolCallingSessionCreateRequest = {
                     message.requireJsonArguments = reader.bool();
                     continue;
                 }
+                case 19: {
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.history.push(reader.string());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3084,6 +3095,9 @@ exports.ToolCallingSessionCreateRequest = {
                 : isSet(object.require_json_arguments)
                     ? globalThis.Boolean(object.require_json_arguments)
                     : false,
+            history: globalThis.Array.isArray(object?.history)
+                ? object.history.map((e) => globalThis.String(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -3136,6 +3150,9 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.requireJsonArguments !== false) {
             obj.requireJsonArguments = message.requireJsonArguments;
         }
+        if (message.history?.length) {
+            obj.history = message.history;
+        }
         return obj;
     },
     create(base) {
@@ -3159,6 +3176,7 @@ exports.ToolCallingSessionCreateRequest = {
         message.autoExecute = object.autoExecute ?? undefined;
         message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
         message.requireJsonArguments = object.requireJsonArguments ?? false;
+        message.history = object.history?.map((e) => e) || [];
         return message;
     },
 };
