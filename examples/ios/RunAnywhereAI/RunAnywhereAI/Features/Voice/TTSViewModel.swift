@@ -64,6 +64,7 @@ class TTSViewModel: VoiceComponentViewModelBase {
         isSpeaking = true
         errorMessage = nil
         lastResult = nil
+        didRequestStop = false
 
         do {
             var options = RATTSOptions.defaults()
@@ -77,16 +78,25 @@ class TTSViewModel: VoiceComponentViewModelBase {
             let durationMs = Int(result.duration * 1000)
             logger.info("Speech generation complete: duration=\(durationMs)ms")
         } catch {
-            logger.error("Speech failed: \(error.localizedDescription)")
-            errorMessage = "Speech failed: \(error.localizedDescription)"
+            // A user- or teardown-initiated stop surfaces here as
+            // `.playbackInterrupted`; that is expected, not a failure to report.
+            if !didRequestStop {
+                logger.error("Speech failed: \(error.localizedDescription)")
+                errorMessage = "Speech failed: \(error.localizedDescription)"
+            }
         }
 
         isSpeaking = false
     }
 
+    /// Set when playback is stopped intentionally (Stop button or teardown) so the
+    /// `.playbackInterrupted` thrown back into `speak` isn't shown as an error.
+    private var didRequestStop = false
+
     /// Stop current speech
     func stopSpeaking() async {
         logger.info("Stopping speech")
+        didRequestStop = true
         await RunAnywhere.stopSpeaking()
         isSpeaking = false
     }
@@ -95,6 +105,10 @@ class TTSViewModel: VoiceComponentViewModelBase {
 
     /// Clean up resources - call from view's onDisappear
     func cleanup() {
+        // Stop any in-flight playback so speech doesn't keep playing after the
+        // screen is dismissed (mirrors STT/VAD cleanup stopping capture).
+        didRequestStop = true
+        Task { await RunAnywhere.stopSpeaking() }
         cleanupBase()
     }
 
