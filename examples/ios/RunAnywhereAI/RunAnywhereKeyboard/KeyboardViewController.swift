@@ -40,6 +40,15 @@ final class KeyboardViewController: UIInputViewController {
         setupKeyboardView()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // The keyboard is going away (switched away, text field closed, host app
+        // backgrounded). Tell the main app to end any active dictation session so
+        // the mic engine doesn't keep capturing in the background with no stop
+        // affordance. The main app already observes this channel and tears down.
+        DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.endSession)
+    }
+
     // MARK: - Setup
 
     private func setupKeyboardView() {
