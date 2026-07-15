@@ -43,6 +43,7 @@ struct ModelPrimaryActionButton: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
+    @State private var downloadErrorMessage: String?
 
     var body: some View {
         Group {
@@ -63,6 +64,12 @@ struct ModelPrimaryActionButton: View {
         .font(AppTypography.caption)
         .fontWeight(.semibold)
         .controlSize(.small)
+        .alert("Download Failed", isPresented: Binding(
+            get: { downloadErrorMessage != nil },
+            set: { if !$0 { downloadErrorMessage = nil } }
+        ), presenting: downloadErrorMessage) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { Text($0) }
     }
 
     private var useButton: some View {
@@ -117,9 +124,12 @@ struct ModelPrimaryActionButton: View {
                 onChanged()
             }
         } catch {
+            // Surface the SDK's descriptive failure (disk-full / network / checksum)
+            // instead of silently reverting to "Get" with no feedback.
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                downloadErrorMessage = (error as? SDKException)?.message ?? error.localizedDescription
             }
         }
     }
