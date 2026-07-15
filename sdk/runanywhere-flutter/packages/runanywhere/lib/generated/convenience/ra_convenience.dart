@@ -224,6 +224,39 @@ ArchiveStructure? archiveStructureFromWireString(String value) {
   return null;
 }
 
+extension VADConfigurationConvenience on VADConfiguration {
+  static VADConfiguration defaults() {
+    final r = VADConfiguration();
+    r.sampleRate = 16000;
+    r.frameLengthMs = 100;
+    r.threshold = 0.015;
+    return r;
+  }
+}
+
+extension VADConfigurationValidate on VADConfiguration {
+  void validate() {
+    if (sampleRate < 1 || sampleRate > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate must be in 1...48000 (got $sampleRate)',
+        fieldPath: 'VADConfiguration.sample_rate',
+      );
+    }
+    if (frameLengthMs < 1 || frameLengthMs > 1000) {
+      throw SDKException.validationFailed(
+        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
+        fieldPath: 'VADConfiguration.frame_length_ms',
+      );
+    }
+    if (threshold < 0.0 || threshold > 1.0) {
+      throw SDKException.validationFailed(
+        'threshold must be in 0.0...1.0 (got $threshold)',
+        fieldPath: 'VADConfiguration.threshold',
+      );
+    }
+  }
+}
+
 extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
   static EmbeddingsConfiguration defaults() {
     final r = EmbeddingsConfiguration();
@@ -262,39 +295,6 @@ extension EmbeddingsOptionsConvenience on EmbeddingsOptions {
     final r = EmbeddingsOptions();
     r.normalize = true;
     return r;
-  }
-}
-
-extension VADConfigurationConvenience on VADConfiguration {
-  static VADConfiguration defaults() {
-    final r = VADConfiguration();
-    r.sampleRate = 16000;
-    r.frameLengthMs = 100;
-    r.threshold = 0.015;
-    return r;
-  }
-}
-
-extension VADConfigurationValidate on VADConfiguration {
-  void validate() {
-    if (sampleRate < 1 || sampleRate > 48000) {
-      throw SDKException.validationFailed(
-        'sample_rate must be in 1...48000 (got $sampleRate)',
-        fieldPath: 'VADConfiguration.sample_rate',
-      );
-    }
-    if (frameLengthMs < 1 || frameLengthMs > 1000) {
-      throw SDKException.validationFailed(
-        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
-        fieldPath: 'VADConfiguration.frame_length_ms',
-      );
-    }
-    if (threshold < 0.0 || threshold > 1.0) {
-      throw SDKException.validationFailed(
-        'threshold must be in 0.0...1.0 (got $threshold)',
-        fieldPath: 'VADConfiguration.threshold',
-      );
-    }
   }
 }
 

@@ -141,9 +141,10 @@
 #include "rac_tts_platform.h"
 
 // =============================================================================
-// NETWORK - Environment, Auth, API Types, Dev Config
+// NETWORK - Connect, Environment, Auth, API Types, Dev Config
 // =============================================================================
 
+#include "rac_connect.h"
 #include "rac_api_types.h"
 #include "rac_auth_manager.h"
 #include "rac_client_info.h"

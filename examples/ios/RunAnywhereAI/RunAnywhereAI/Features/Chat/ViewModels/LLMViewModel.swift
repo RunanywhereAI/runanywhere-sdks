@@ -33,6 +33,8 @@ final class LLMViewModel {
     private(set) var loadedModelSupportsThinking = false
     private(set) var selectedFramework: InferenceFramework?
     private(set) var modelSupportsStreaming = true
+    private(set) var isUsingConnect = false
+    private(set) var connectedHostName: String?
     private(set) var currentConversation: Conversation?
 
     // MARK: - LoRA Adapter State
@@ -109,6 +111,27 @@ final class LLMViewModel {
         loadedModelSupportsThinking = false
         selectedFramework = nil
     }
+
+    #if os(iOS)
+    func activateConnectModel(_ model: ConnectModel, hostName: String) {
+        isUsingConnect = true
+        connectedHostName = hostName
+        updateModelLoadedState(isLoaded: true)
+        loadedModelName = model.displayName
+        loadedModelSupportsThinking = false
+        selectedFramework = nil
+        setModelSupportsStreaming(model.supportsStreaming)
+        updateSystemMessageAfterModelLoad()
+    }
+
+    func deactivateConnectModel() async {
+        guard isUsingConnect else { return }
+        isUsingConnect = false
+        connectedHostName = nil
+        await checkModelStatusFromSDK()
+        updateSystemMessageAfterModelLoad()
+    }
+    #endif
 
     func recordFirstTokenLatency(generationId: String, latency: Double) {
         firstTokenLatencies[generationId] = latency

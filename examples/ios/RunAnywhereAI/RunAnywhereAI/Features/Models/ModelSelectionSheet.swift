@@ -74,6 +74,9 @@ enum ModelSelectionContext {
 struct ModelSelectionSheet: View {
     @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
+    #if os(iOS)
+    @ObservedObject private var connectController = ConnectClientController.shared
+    #endif
 
     @Environment(\.dismiss)
     var dismiss
@@ -185,6 +188,9 @@ struct ModelSelectionSheet: View {
                 List {
                     searchSection
                     addFromHuggingFaceSection
+                    #if os(iOS)
+                    connectSection
+                    #endif
                     recommendedSection
                     familiesSection
                 }
@@ -231,6 +237,166 @@ struct ModelSelectionSheet: View {
         }
         #endif
     }
+
+    #if os(iOS)
+    @ViewBuilder private var connectSection: some View {
+        if context == .llm && searchText.isEmpty {
+            Section {
+                switch connectController.session.status {
+                case .idle:
+                    connectDiscoveryButton(
+                        title: "Connect to a Mac",
+                        subtitle: "Use a language model hosted on your local network",
+                        systemImage: "macbook.and.iphone"
+                    )
+
+                case .discovering:
+                    if let host = connectController.discoveredHost {
+                        discoveredHostButton(host)
+                    } else {
+                        connectProgressRow(
+                            title: "Looking for Macs",
+                            subtitle: "Searching your local network"
+                        )
+                    }
+
+                case .connecting:
+                    connectProgressRow(
+                        title: "Connecting",
+                        subtitle: connectController.session.connectingHost?.displayName ?? "Checking the selected Mac"
+                    )
+
+                case .connected:
+                    connectedHostRow
+
+                case let .disconnected(reason):
+                    connectDiscoveryButton(
+                        title: "Find a Mac Again",
+                        subtitle: reason,
+                        systemImage: "arrow.clockwise"
+                    )
+
+                case let .failed(message):
+                    connectDiscoveryButton(
+                        title: "Try Connect Again",
+                        subtitle: message,
+                        systemImage: "arrow.clockwise"
+                    )
+
+                case .hosting:
+                    EmptyView()
+                }
+            } header: {
+                Label("Connect", systemImage: "network")
+            } footer: {
+                Text("Local Network access is requested only after you choose to find a Mac.")
+                    .font(AppTypography.caption)
+            }
+        }
+    }
+
+    private func connectDiscoveryButton(
+        title: String,
+        subtitle: String,
+        systemImage: String
+    ) -> some View {
+        Button {
+            Task { await connectController.startDiscovery() }
+        } label: {
+            connectRowLabel(
+                title: title,
+                subtitle: subtitle,
+                systemImage: systemImage,
+                tint: AppColors.primaryAccent
+            ) {
+                Text("Find Mac")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.primaryAccent)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func discoveredHostButton(_ host: ConnectHost) -> some View {
+        Button {
+            Task {
+                await connectController.connect(to: host)
+                if connectController.isConnected {
+                    dismiss()
+                }
+            }
+        } label: {
+            connectRowLabel(
+                title: host.displayName,
+                subtitle: "Language model available on this Mac",
+                systemImage: "desktopcomputer",
+                tint: AppColors.primaryAccent
+            ) {
+                Text("Connect")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.primaryAccent)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var connectedHostRow: some View {
+        connectRowLabel(
+            title: connectController.session.activeHost?.displayName ?? "Connected Mac",
+            subtitle: connectController.session.activeModel?.displayName ?? "Hosted language model",
+            systemImage: "checkmark.circle.fill",
+            tint: AppColors.statusGreen
+        ) {
+            Button("Use") { dismiss() }
+                .font(AppTypography.caption)
+        }
+    }
+
+    private func connectProgressRow(title: String, subtitle: String) -> some View {
+        connectRowLabel(
+            title: title,
+            subtitle: subtitle,
+            systemImage: "network",
+            tint: AppColors.primaryAccent
+        ) {
+            ProgressView()
+                .controlSize(.small)
+        }
+    }
+
+    private func connectRowLabel<Trailing: View>(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        HStack(spacing: AppSpacing.mediumLarge) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tint)
+                .frame(width: 38, height: 38)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTypography.subheadlineMedium)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+            trailing()
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, AppSpacing.small)
+    }
+    #endif
 
     // MARK: - Sections
 

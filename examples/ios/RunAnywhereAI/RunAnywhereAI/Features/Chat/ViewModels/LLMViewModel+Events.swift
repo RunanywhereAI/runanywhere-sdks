@@ -40,6 +40,10 @@ extension LLMViewModel {
     }
 
     func checkModelStatusFromSDK() async {
+        #if os(iOS)
+        guard !isUsingConnect else { return }
+        #endif
+
         // Resolve currently-loaded LLM via canonical proto snapshot API.
         var request = RACurrentModelRequest()
         request.category = .language
@@ -53,6 +57,8 @@ extension LLMViewModel {
                let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
                 self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
+            } else if !isLoaded {
+                self.clearLoadedModelInfo()
             }
         }
     }
@@ -61,6 +67,9 @@ extension LLMViewModel {
 
     /// Apply a typed model load/unload change.
     private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        #if os(iOS)
+        guard !isUsingConnect else { return }
+        #endif
         guard change.component == .llm || change.event.category == .llm else { return }
 
         switch change.kind {
