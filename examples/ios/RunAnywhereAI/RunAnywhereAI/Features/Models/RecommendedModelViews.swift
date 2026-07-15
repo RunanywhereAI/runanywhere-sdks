@@ -41,9 +41,9 @@ struct ModelPrimaryActionButton: View {
     let onSelectModel: () -> Void
     let onChanged: () -> Void
 
-    @State private var isDownloading = false
-    @State private var downloadProgress: Double = 0.0
-    @State private var downloadErrorMessage: String?
+    // Download state lives in the shared tracker so it survives navigation, can be
+    // cancelled, and can't start twice for the same model.
+    private var downloads: ModelDownloadTracker { .shared }
 
     var body: some View {
         Group {
@@ -65,9 +65,9 @@ struct ModelPrimaryActionButton: View {
         .fontWeight(.semibold)
         .controlSize(.small)
         .alert("Download Failed", isPresented: Binding(
-            get: { downloadErrorMessage != nil },
-            set: { if !$0 { downloadErrorMessage = nil } }
-        ), presenting: downloadErrorMessage) { _ in
+            get: { downloads.errorMessage(model.id) != nil },
+            set: { if !$0 { downloads.clearError(model.id) } }
+        ), presenting: downloads.errorMessage(model.id)) { _ in
             Button("OK", role: .cancel) {}
         } message: { Text($0) }
     }
@@ -80,16 +80,24 @@ struct ModelPrimaryActionButton: View {
     }
 
     @ViewBuilder private var downloadControl: some View {
-        if isDownloading {
+        if downloads.isDownloading(model.id) {
             HStack(spacing: AppSpacing.xxSmall) {
                 ProgressView().scaleEffect(0.7)
-                Text("\(Int(downloadProgress * 100))%")
+                Text("\(Int(downloads.progress(model.id) * 100))%")
                     .font(AppTypography.caption2)
                     .foregroundColor(AppColors.textSecondary)
+                Button {
+                    downloads.cancel(model.id)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(AppColors.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel download")
             }
         } else {
             Button {
-                Task { await download() }
+                downloads.start(model) { onChanged() }
             } label: {
                 HStack(spacing: AppSpacing.xxSmall) {
                     Image(systemName: "arrow.down.circle.fill")
@@ -110,29 +118,6 @@ struct ModelPrimaryActionButton: View {
         .foregroundColor(AppColors.statusGreen)
     }
 
-    private func download() async {
-        await MainActor.run {
-            isDownloading = true
-            downloadProgress = 0.0
-        }
-        do {
-            try await RunAnywhere.downloadModel(model) { progress in
-                await MainActor.run { downloadProgress = Double(progress.overallProgress) }
-            }
-            await MainActor.run {
-                isDownloading = false
-                onChanged()
-            }
-        } catch {
-            // Surface the SDK's descriptive failure (disk-full / network / checksum)
-            // instead of silently reverting to "Get" with no feedback.
-            await MainActor.run {
-                downloadProgress = 0.0
-                isDownloading = false
-                downloadErrorMessage = (error as? SDKException)?.message ?? error.localizedDescription
-            }
-        }
-    }
 }
 
 /// Rich, rounded card for a single recommended model in the hero section.
