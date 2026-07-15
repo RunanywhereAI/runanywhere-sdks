@@ -143,6 +143,7 @@ void free_payload_strings(rac_telemetry_payload_t& event) {
     free((void*)event.image_resolution);
     free((void*)event.scheduler);
     free((void*)event.output_format);
+    free((void*)event.routed_backend);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -380,6 +381,7 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     copy.image_resolution = dup_string(payload->image_resolution);
     copy.scheduler = dup_string(payload->scheduler);
     copy.output_format = dup_string(payload->output_format);
+    copy.routed_backend = dup_string(payload->routed_backend);
 
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
@@ -548,10 +550,18 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                 case runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED:
                     return "vad.started";
                 case runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED:
+                    // Terminal VAD-session event — flush promptly so it is not
+                    // stranded in the queue when the screen tears down.
+                    out_is_completion = true;
                     return "vad.stopped";
                 case runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED:
                     return "vad.speech.started";
                 case runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED:
+                    // Terminal per-utterance event carrying speech_duration/silence
+                    // /segment_count. It is emitted right as VAD stops/resets, so
+                    // without an immediate flush the queued row never reaches the
+                    // backend (vad.speech.ended had 0 rows). Flag it a completion.
+                    out_is_completion = true;
                     return "vad.speech.ended";
                 case runanywhere::v1::VOICE_EVENT_KIND_VAD_PAUSED:
                     return "vad.paused";
@@ -911,6 +921,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             const double dur =
                 g.duration_ms() != 0.0 ? g.duration_ms() : static_cast<double>(g.latency_ms());
             payload.processing_time_ms = dur;
+            payload.has_processing_time_ms = RAC_TRUE;
             payload.generation_time_ms = dur;
             payload.tokens_per_second = g.tokens_per_second();
             payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
@@ -949,6 +960,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                      : (!m.model_id().empty() ? m.model_id().c_str() : nullptr);
             payload.model_size_bytes = m.model_size_bytes();
             payload.processing_time_ms = static_cast<double>(m.duration_ms());
+            payload.has_processing_time_ms = RAC_TRUE;
             framework_str = framework_proto_to_string(m.framework());
             payload.framework = framework_str.c_str();
             // archive_type has no ModelEvent field; rides the properties carrier.
@@ -979,6 +991,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                                          ? v.model_name().c_str()
                                          : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
                 payload.processing_time_ms = static_cast<double>(v.duration_ms());
+                payload.has_processing_time_ms = RAC_TRUE;
                 payload.audio_duration_ms = static_cast<double>(v.audio_length_ms());
                 payload.audio_size_bytes = v.audio_size_bytes();
                 payload.word_count = v.word_count();
@@ -991,6 +1004,24 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.has_is_streaming = RAC_TRUE;
                 framework_str = framework_proto_to_string(v.framework());
                 payload.framework = framework_str.c_str();
+                // Hybrid STT router attribution rides the envelope properties
+                // carrier (VoiceLifecycleEvent has no field for it); present only
+                // on the hybrid transcribe path.
+                {
+                    auto rb_it = ev.properties().find("routed_backend");
+                    if (rb_it != ev.properties().end() && !rb_it->second.empty()) {
+                        payload.routed_backend = rb_it->second.c_str();
+                    }
+                    auto wf_it = ev.properties().find("was_fallback");
+                    if (wf_it != ev.properties().end()) {
+                        payload.was_fallback = wf_it->second == "1" ? RAC_TRUE : RAC_FALSE;
+                        payload.has_was_fallback = RAC_TRUE;
+                    }
+                    auto ac_it = ev.properties().find("attempt_count");
+                    if (ac_it != ev.properties().end()) {
+                        payload.attempt_count = std::atoi(ac_it->second.c_str());
+                    }
+                }
                 if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED &&
                     !ev.has_error()) {
                     payload.success = RAC_TRUE;
@@ -1008,6 +1039,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.output_duration_ms = static_cast<double>(v.audio_duration_ms());
                 payload.audio_size_bytes = v.audio_size_bytes_tts();
                 payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
+                payload.has_processing_time_ms = RAC_TRUE;
                 payload.characters_per_second = v.characters_per_second();
                 payload.sample_rate = v.sample_rate();
                 framework_str = framework_proto_to_string(v.framework());
@@ -1072,6 +1104,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     const double dur = std::atof(it->second.c_str());
                     if (dur > 0.0) {
                         payload.processing_time_ms = dur;
+                        payload.has_processing_time_ms = RAC_TRUE;
                     }
                 }
             }
@@ -1148,6 +1181,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (mt_it != ev.properties().end()) {
                         payload.max_tokens = std::atoi(mt_it->second.c_str());
                     }
+                    auto cl_it = ev.properties().find("context_length");
+                    if (cl_it != ev.properties().end()) {
+                        payload.context_length = std::atoi(cl_it->second.c_str());
+                    }
                     // Vision-specific metrics ride the properties carrier (no proto fields).
                     auto vt_it = ev.properties().find("vision_tokens");
                     if (vt_it != ev.properties().end()) {
@@ -1180,6 +1217,11 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     auto em_it = ev.properties().find("embedding_model");
                     if (em_it != ev.properties().end() && !em_it->second.empty()) {
                         payload.embedding_model = em_it->second.c_str();
+                    }
+                    auto rr_it = ev.properties().find("reranker_used");
+                    if (rr_it != ev.properties().end()) {
+                        payload.reranker_used = rr_it->second == "1" ? RAC_TRUE : RAC_FALSE;
+                        payload.has_reranker_used = RAC_TRUE;
                     }
                     break;
                 }
@@ -1271,6 +1313,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 payload.voice_tts_ms = m.tts_total_ms();
                 payload.voice_total_ms = m.end_to_end_ms();
                 payload.processing_time_ms = m.end_to_end_ms();
+                payload.has_processing_time_ms = RAC_TRUE;
                 // MetricsEvent has no model/framework/char fields — read them
                 // from the envelope properties carrier set by
                 // publish_voice_turn_metrics. (session_id is read at L761.)
@@ -1291,6 +1334,16 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 if (rc_it != ev.properties().end()) {
                     payload.response_chars = std::atoi(rc_it->second.c_str());
                 }
+                auto ti_it = ev.properties().find("turn_index");
+                if (ti_it != ev.properties().end()) {
+                    payload.turn_index = std::atoi(ti_it->second.c_str());
+                    payload.has_turn_index = RAC_TRUE;
+                }
+                auto intr_it = ev.properties().find("interrupted");
+                if (intr_it != ev.properties().end()) {
+                    payload.voice_interrupted = intr_it->second == "1" ? RAC_TRUE : RAC_FALSE;
+                    payload.has_voice_interrupted = RAC_TRUE;
+                }
                 if (!ev.has_error()) {
                     payload.success = RAC_TRUE;
                     payload.has_success = RAC_TRUE;
@@ -1309,6 +1362,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             auto dur_it = ev.properties().find("duration_ms");
             if (dur_it != ev.properties().end()) {
                 payload.processing_time_ms = std::atof(dur_it->second.c_str());
+                // Record even a sub-millisecond (0 ms) init span as a measured
+                // value rather than letting add_double drop it to null.
+                payload.has_processing_time_ms = RAC_TRUE;
             }
             break;
         }
@@ -1334,7 +1390,11 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.has_success = RAC_TRUE;
         } else if (ends_with(".completed") || ends_with(".loaded") || ends_with(".deleted") ||
                    ends_with(".cleared") || ends_with(".cleaned") || ends_with(".registered") ||
-                   ends_with(".stopped")) {
+                   ends_with(".stopped") || ends_with(".succeeded") || ends_with(".authenticated") ||
+                   ends_with(".refreshed") || ends_with(".token_refreshed")) {
+            // ".succeeded"/".authenticated"/".refreshed"/".token_refreshed" cover the
+            // auth lifecycle (auth.succeeded, auth.token_refreshed) whose success flag
+            // was otherwise left null on the system row.
             payload.success = RAC_TRUE;
             payload.has_success = RAC_TRUE;
         }

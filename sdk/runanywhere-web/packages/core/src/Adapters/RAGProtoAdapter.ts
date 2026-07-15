@@ -4,11 +4,14 @@ import {
   RAGQueryOptions,
   RAGResult,
   RAGStatistics,
+  RAGStreamEvent,
+  RAGStreamEventKind,
   type RAGConfiguration as ProtoRAGConfiguration,
   type RAGDocument as ProtoRAGDocument,
   type RAGQueryOptions as ProtoRAGQueryOptions,
   type RAGResult as ProtoRAGResult,
   type RAGStatistics as ProtoRAGStatistics,
+  type RAGStreamEvent as ProtoRAGStreamEvent,
 } from '@runanywhere/proto-ts/rag';
 import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
@@ -16,6 +19,7 @@ import {
   ensureExports,
   missingExports,
   modalityLogger as logger,
+  streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
 
@@ -96,6 +100,44 @@ export class RAGProtoAdapter {
       ),
       'rac_rag_query_proto',
     );
+  }
+
+  /**
+   * Streaming query: emits a RAGStreamEvent per generated token (kind = TOKEN),
+   * then a terminal COMPLETED carrying the full RAGResult, or an ERROR event.
+   * The native callback returns a bool — returning false stops generation early
+   * (backpressure), which is how iterator cancellation propagates.
+   */
+  queryStream(session: number, query: ProtoRAGQueryOptions): AsyncIterable<ProtoRAGStreamEvent> {
+    this.requireStreamExports();
+    const encoded = RAGQueryOptions.encode(query).finish();
+    return streamCallback(
+      this.module,
+      RAGStreamEvent,
+      'rac_rag_query_stream_proto',
+      (callbackPtr) => this.bridge().withHeapBytes(encoded, (queryPtr, querySize) => (
+        this.module._rac_rag_query_stream_proto!(session, queryPtr, querySize, callbackPtr, 0)
+      )),
+      (event) => (
+        event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED
+        || event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR
+      ),
+      undefined,
+      // Non-success rc synthesizes a terminal ERROR event instead of rejecting
+      // the iterator (parity with the LLM stream adapter).
+      (rc) => RAGStreamEvent.fromPartial({
+        kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR,
+        errorCode: rc,
+        errorMessage: `RAG stream failed: ${formatRacResult(rc)}`,
+      }),
+      /* callbackReturnsBool */ true,
+    );
+  }
+
+  private requireStreamExports(): void {
+    if (!ensureExports(this.module, 'rag.queryStream', ['_rac_rag_query_stream_proto'])) {
+      throw new Error('rac_rag_query_stream_proto is unavailable');
+    }
   }
 
   clear(session: number): ProtoRAGStatistics | null {

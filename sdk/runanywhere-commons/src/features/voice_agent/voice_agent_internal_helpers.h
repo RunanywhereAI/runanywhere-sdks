@@ -141,7 +141,8 @@ void publish_voice_turn_metrics(double stt_ms, double llm_ms, double tts_ms, dou
                                 int64_t tokens_generated, const char* session_id,
                                 const char* model_id, const char* framework,
                                 int32_t transcript_chars, int32_t response_chars,
-                                rac_result_t error_code, const char* error_message);
+                                int32_t turn_index, rac_bool_t interrupted, rac_result_t error_code,
+                                const char* error_message);
 
 // Translate a proto `VoiceAgentComposeConfig` into the C ABI
 // `rac_voice_agent_config_t`. The returned config aliases string pointers

@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.ui.screens.rag
 
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
+import ai.runanywhere.proto.v1.RAGStreamEventKind
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -19,17 +20,16 @@ import com.runanywhere.sdk.public.extensions.ragCancelQuery
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
 import com.runanywhere.sdk.public.extensions.ragGetStatistics
 import com.runanywhere.sdk.public.extensions.ragIngest
-import com.runanywhere.sdk.public.extensions.ragQuery
+import com.runanywhere.sdk.public.extensions.ragQueryStream
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -198,27 +198,53 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         isQuerying = true
         val requestVersion = RagQueryVersion(query = ++queryGeneration, corpus = corpusGeneration)
         job = viewModelScope.launch {
+            // Live-updating answer slot; tokens stream in, then the COMPLETED
+            // event replaces it with the final answer + cited sources. No
+            // wall-clock timeout — progress is visible as it generates.
+            val answerIndex = messages.size
+            messages += RagMessage("", isUser = false)
+            val streamed = StringBuilder()
+            var finalized = false
             try {
                 val options = RagGenerationPolicy.options(q, multiQueryEnabled)
                 val key = pipelineKey ?: error("Choose document models and add a document first.")
-                val result = withTimeout(RagGenerationPolicy.QUERY_TIMEOUT_MS) {
-                    withPipeline(key.first, key.second) {
-                        RunAnywhere.ragQuery(q, options)
+                withPipeline(key.first, key.second) {
+                    RunAnywhere.ragQueryStream(q, options).collect { event ->
+                        currentCoroutineContext().ensureActive()
+                        if (!requestVersion.isCurrent(queryGeneration, corpusGeneration)) {
+                            return@collect
+                        }
+                        when (event.kind) {
+                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN -> {
+                                streamed.append(event.token)
+                                messages[answerIndex] = RagMessage(
+                                    text = RagAnswerNormalizer.visibleAnswer(streamed.toString()),
+                                    isUser = false,
+                                )
+                            }
+                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED -> {
+                                val result = event.result
+                                val sources = result?.retrieved_chunks?.map {
+                                    RagSource(
+                                        text = it.text.trim(),
+                                        score = it.similarity_score,
+                                        document = it.source_document.orEmpty(),
+                                    )
+                                } ?: emptyList()
+                                messages[answerIndex] = buildRagAnswerMessage(
+                                    rawAnswer = result?.answer ?: streamed.toString(),
+                                    sources = sources,
+                                    elapsedMs = result?.total_time_ms ?: 0L,
+                                )
+                                finalized = true
+                            }
+                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR -> {
+                                error = event.error_message?.takeIf { it.isNotBlank() }
+                                    ?: "The query failed."
+                            }
+                            else -> Unit
+                        }
                     }
-                }
-                currentCoroutineContext().ensureActive()
-                if (!requestVersion.isCurrent(queryGeneration, corpusGeneration)) return@launch
-                val sources = result.retrieved_chunks.map {
-                    RagSource(text = it.text.trim(), score = it.similarity_score, document = it.source_document.orEmpty())
-                }
-                messages += buildRagAnswerMessage(
-                    rawAnswer = result.answer,
-                    sources = sources,
-                    elapsedMs = result.total_time_ms,
-                )
-            } catch (e: TimeoutCancellationException) {
-                if (requestVersion.isCurrent(queryGeneration, corpusGeneration)) {
-                    error = "The query took too long and was stopped. Try a shorter question."
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -228,6 +254,14 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
                     error = e.message ?: "The query failed."
                 }
             } finally {
+                // Drop the placeholder if nothing streamed and no final answer
+                // landed (error/cancel), so no empty bubble lingers.
+                if (!finalized && streamed.isBlank() &&
+                    answerIndex < messages.size && !messages[answerIndex].isUser &&
+                    messages[answerIndex].text.isBlank()
+                ) {
+                    messages.removeAt(answerIndex)
+                }
                 if (requestVersion.query == queryGeneration) {
                     isQuerying = false
                     job = null

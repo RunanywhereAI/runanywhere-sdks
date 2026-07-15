@@ -6,6 +6,46 @@
 //
 
 import CRACommons
+import Foundation
+import SwiftProtobuf
+
+// MARK: - RAG streaming ABI
+
+/// Typed streaming ABI for `rac_rag_query_stream_proto`: takes a session handle
+/// plus a serialized `RAGQueryOptions` and emits serialized `RAGStreamEvent`s
+/// (TOKEN* → terminal COMPLETED/ERROR). The control callback returns
+/// `rac_bool_t` — RAC_FALSE stops generation early (backpressure). RAG has no
+/// separate per-query cancel symbol, so consumer cancellation is cooperative:
+/// the callback returns RAC_FALSE and the native loop breaks on its next tick.
+private enum RAGStreamProtoABI {
+    typealias StreamCallback = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutableRawPointer?
+    ) -> rac_bool_t
+    typealias Stream = @convention(c) (
+        rac_handle_t?,
+        UnsafePointer<UInt8>?,
+        Int,
+        StreamCallback?,
+        UnsafeMutableRawPointer?
+    ) -> rac_result_t
+
+    static let streamName = "rac_rag_query_stream_proto"
+    static let stream = NativeProtoABI.load(streamName, as: Stream.self)
+}
+
+/// Retained RAG stream context released by the detached worker after the
+/// synchronous native stream call returns.
+private struct RAGStreamContextPointer: @unchecked Sendable {
+    let rawValue: UnsafeMutableRawPointer
+}
+
+/// Sendable box for the opaque session handle so it can cross into the detached
+/// worker without tripping Swift 6 strict-concurrency checks.
+private struct RAGSessionHandleBox: @unchecked Sendable {
+    let handle: rac_handle_t?
+}
 
 // MARK: - RAG Pipeline Bridge
 
@@ -77,6 +117,80 @@ extension CppBridge {
 
         func runQuery(_ options: RARAGQueryOptions) throws -> RARAGResult {
             try query(handle: requireProtoSession(), options)
+        }
+
+        /// Streaming query. Emits a `RARAGStreamEvent` per generated token
+        /// (kind = TOKEN) as the answer is produced, then a terminal COMPLETED
+        /// carrying the full `RARAGResult`, or an ERROR event. Mirrors the shared
+        /// typed stream contract used by LLM/VLM. Breaking out of the stream (or
+        /// cancelling the owning task) stops native generation via the
+        /// backpressure return, so callers do not need a wall-clock timeout.
+        func runQueryStream(_ options: RARAGQueryOptions) throws -> AsyncStream<RARAGStreamEvent> {
+            let handleBox = RAGSessionHandleBox(handle: try requireProtoSession())
+            _ = try NativeProtoABI.require(RAGStreamProtoABI.stream, named: RAGStreamProtoABI.streamName)
+            let requestData = try options.serializedData()
+            return AsyncStream { continuation in
+                let context = ProtoStreamContext<RARAGStreamEvent>(
+                    continuation: continuation,
+                    category: "CppBridge.RAG.ProtoStream"
+                )
+                let contextPtr = RAGStreamContextPointer(
+                    rawValue: Unmanaged.passRetained(context).toOpaque()
+                )
+
+                // RAG has no native per-query cancel symbol; cancellation is
+                // cooperative — flip the flag so the stream callback returns
+                // RAC_FALSE and the native loop stops on its next token.
+                continuation.onTermination = { @Sendable termination in
+                    switch termination {
+                    case .cancelled:
+                        context.cancel()
+                    case .finished:
+                        break
+                    @unknown default:
+                        break
+                    }
+                }
+
+                Task.detached {
+                    guard let stream = RAGStreamProtoABI.stream else {
+                        Unmanaged<ProtoStreamContext<RARAGStreamEvent>>
+                            .fromOpaque(contextPtr.rawValue)
+                            .release()
+                        continuation.finish()
+                        return
+                    }
+                    let rc = await withTaskCancellationHandler {
+                        requestData.withUnsafeBytes { requestRaw in
+                            stream(
+                                handleBox.handle,
+                                requestRaw.bindMemory(to: UInt8.self).baseAddress,
+                                requestRaw.count,
+                                { bytes, size, userData in
+                                    guard let userData else { return RAC_FALSE }
+                                    let ctx = Unmanaged<ProtoStreamContext<RARAGStreamEvent>>
+                                        .fromOpaque(userData)
+                                        .takeUnretainedValue()
+                                    if ctx.isCancelled { return RAC_FALSE }
+                                    ctx.yield(bytes: bytes, size: size)
+                                    return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
+                                },
+                                contextPtr.rawValue
+                            )
+                        }
+                    } onCancel: {
+                        context.cancel()
+                    }
+                    Unmanaged<ProtoStreamContext<RARAGStreamEvent>>
+                        .fromOpaque(contextPtr.rawValue)
+                        .release()
+                    if rc != RAC_SUCCESS, !context.isCancelled {
+                        SDKLogger(category: "CppBridge.RAG.ProtoStream")
+                            .warning("RAG proto stream failed: \(rc)")
+                    }
+                    continuation.finish()
+                }
+            }
         }
     }
 }

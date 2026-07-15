@@ -1112,6 +1112,11 @@ export interface RunAnywhereCore extends HybridObject<{
   ragDestroyPipelineProto(): Promise<boolean>;
   ragIngestProto(documentBytes: ArrayBuffer): Promise<ArrayBuffer>;
   ragQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragQueryStreamProto(
+    queryBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  ragCancelProto(): Promise<ArrayBuffer>;
   ragClearProto(): Promise<ArrayBuffer>;
   ragStatsProto(): Promise<ArrayBuffer>;
 
