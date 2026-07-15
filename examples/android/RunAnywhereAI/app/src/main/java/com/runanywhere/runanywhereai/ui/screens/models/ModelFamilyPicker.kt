@@ -155,6 +155,7 @@ fun FamilyCard(
                             progressPercent = if (state.busyModelId == variant.id) state.progressPercent else null,
                             onSelect = { onSelect(variant) },
                             onDownload = { onDownload(variant) },
+                            onCancel = { viewModel.cancelDownload(variant.id) },
                             onDelete = if (viewModel.isDeletable(variant)) ({ onDelete(variant) }) else null,
                         )
                         if (index < group.variants.lastIndex) {
@@ -182,6 +183,7 @@ private fun VariantRow(
     progressPercent: Int?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
+    onCancel: (() -> Unit)? = null,
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
@@ -237,7 +239,7 @@ private fun VariantRow(
         }
         Spacer(Modifier.width(dimens.spacingSm))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            VariantAction(isCurrent, isReady, isBusy, variant, onDownload)
+            VariantAction(isCurrent, isReady, isBusy, variant, onDownload, onCancel)
             if (onDelete != null && isReady) {
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                     Icon(
@@ -259,14 +261,11 @@ private fun VariantAction(
     isBusy: Boolean,
     variant: RAModelInfo,
     onDownload: () -> Unit,
+    onCancel: (() -> Unit)? = null,
 ) {
     when {
         isCurrent -> TagPill("Loaded", primaryGreen)
-        isBusy -> CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        isBusy -> VariantProgressAction(onCancel)
         isReady -> TagPill("Use", primaryGreen)
         else -> {
             val dimens = LocalDimens.current
@@ -284,6 +283,35 @@ private fun VariantAction(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+        }
+    }
+}
+
+// Busy-state control. With [onCancel] the spinner becomes a tap-to-cancel target
+// that stops the in-flight download; without it, a plain progress indicator.
+@Composable
+private fun VariantProgressAction(onCancel: (() -> Unit)?) {
+    if (onCancel == null) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        return
+    }
+    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                imageVector = RACIcons.Outline.Close,
+                contentDescription = "Cancel download",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp),
+            )
         }
     }
 }

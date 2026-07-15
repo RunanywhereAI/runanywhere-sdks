@@ -92,9 +92,22 @@ void fill_inputs(qhx_inputs* in, const char* prompt, const rac_llm_options_t* o)
     // Prior conversation turns (alternating user,assistant). QHexRT's runtime
     // chat template renders {system_prompt, history, text} from the model's
     // manifest markers, so the app never hand-builds a ChatML string.
+    //
+    // Defensive bound (A24): history/n_history come straight from the caller and
+    // index a const char* const[] the runtime reads n_history entries from. The
+    // runtime owns MAXCTX, but a negative (already excluded by >0) or absurdly
+    // large count would over-read that array before the runtime ever sees it, so
+    // clamp to a generous conversation ceiling. Real multi-turn chats never
+    // approach this; anything past it is a corrupt/hostile request.
+    constexpr int kMaxHistoryEntries = 4096;
     if (o != nullptr && o->history != nullptr && o->n_history > 0) {
+        int n_history = static_cast<int>(o->n_history);
+        if (n_history > kMaxHistoryEntries) {
+            RAC_LOG_WARNING(LOG_CAT, "Clamping n_history %d to %d", n_history, kMaxHistoryEntries);
+            n_history = kMaxHistoryEntries;
+        }
         in->history = o->history;
-        in->n_history = o->n_history;
+        in->n_history = n_history;
     }
 }
 

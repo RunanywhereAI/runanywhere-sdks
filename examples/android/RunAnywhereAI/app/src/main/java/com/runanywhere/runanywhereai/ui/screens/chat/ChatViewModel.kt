@@ -67,7 +67,9 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAToolDefinition
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -185,8 +187,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun onCleared() {
         LlmModelChangeInterlock.remove(this)
+        // Cancelling the worker coroutine only unwinds the suspend surface; the
+        // one-shot/VLM JNI call keeps decoding on its native thread. Mirror stop()
+        // and issue the native cancel, but on GlobalScope because viewModelScope is
+        // already being torn down. Guarded so it is a no-op when nothing is running.
+        if (generationOwnership.isBusy()) {
+            GlobalScope.launch(Dispatchers.Default) {
+                runCatching { RunAnywhere.cancelGeneration() }
+                runCatching { RunAnywhere.cancelVLMGeneration() }
+            }
+        }
         conversationTransitionJob?.cancel()
         cancellationJob?.cancel()
         job?.cancel()
@@ -260,6 +273,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 ensureOwns(request)
                 val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
                 bindActiveModel(request, activeModel)
+                // Trim old turns to the model's context window so small-context models (e.g.
+                // Llama-3.2-1B = 512 on v79) don't rc=-130 once a long conversation overruns MAXCTX.
+                val effectiveTurn = ChatRequestPolicy.windowHistory(
+                    turn = turn,
+                    contextTokens = activeModel.model.context_length,
+                    outputTokens = ChatGenerationBudgetPolicy.resolve(
+                        requestedMaxTokens = SettingsRepository.settings.maxTokens,
+                        modelContextTokens = activeModel.model.context_length,
+                    ).effectiveMaxTokens,
+                    systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+                )
                 val registeredTools = if (toolsRequested) {
                     RunAnywhere.getRegisteredTools()
                 } else {
@@ -272,7 +296,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 when (toolPreflight.route) {
                     ToolCallingRoute.TOOL_GENERATION ->
-                        generateWithTools(request, prompt, replyIndex, activeModel, registeredTools)
+                        generateWithTools(
+                            request,
+                            prompt,
+                            replyIndex,
+                            activeModel,
+                            registeredTools,
+                            // Normalized flat alternating [user0, asst0, ...] of PRIOR turns
+                            // from the SAME snapshot the standard path uses (turn.history is
+                            // captured before the current prompt is appended, so it already
+                            // excludes the current turn). toToolCallingHistory mirrors the
+                            // standard path's commons normalizer (coalesce same-role, drop
+                            // leading-assistant/trailing-user) so a dropped blank assistant
+                            // turn can't hand commons a mislabeled non-alternating list.
+                            history = ChatRequestPolicy.toToolCallingHistory(effectiveTurn.history),
+                        )
                     ToolCallingRoute.BLOCKED -> {
                         showToolGateNotice = true
                         updateReply(request, replyIndex) { reply ->
@@ -285,7 +323,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     ToolCallingRoute.STANDARD_GENERATION -> {
                         val streaming = SettingsRepository.settings.streaming
                         val llmRequest = ChatRequestPolicy.buildRequest(
-                            turn = turn,
+                            turn = effectiveTurn,
                             options = generationOptions(activeModel),
                             conversationId = ensureConversationId(),
                             streaming = streaming,
@@ -552,7 +590,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             max_tokens = budget.effectiveMaxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
-            disable_thinking = s.disableThinking,
+            // Only apply the "disable thinking" preference to models that actually think — on a
+            // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
+            // and corrupts the prompt (e.g. Llama). Bug 5 follow-up.
+            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
         )
     }
 
@@ -654,6 +695,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         index: Int,
         activeModel: RuntimeModelSnapshot,
         registeredTools: List<RAToolDefinition>,
+        history: List<String> = emptyList(),
     ) {
         updateReply(request, index) { it.copy(text = ToolCallingExecutionPolicy.PROGRESS_MESSAGE) }
         val execution = ToolCallingExecutionPolicy.plan(
@@ -669,6 +711,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         toolOptions = execution.toolOptions,
                         toolChoice = execution.toolChoice,
                         forcedToolName = execution.forcedToolName,
+                        history = history,
                     )
                 }
             }

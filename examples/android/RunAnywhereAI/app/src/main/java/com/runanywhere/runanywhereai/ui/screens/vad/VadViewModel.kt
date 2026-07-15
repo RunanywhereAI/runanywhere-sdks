@@ -62,11 +62,23 @@ class VadViewModel : ViewModel() {
         startDetectionStream()
         isListening = true
         try {
-            recorder.start { chunk, level ->
-                // SDK expects Float32 PCM; framing is handled natively.
-                audio?.trySend(RunAnywhere.pcm16ToFloat32(chunk))
-                audioLevel = level
-            }
+            recorder.start(
+                onChunk = { chunk, level ->
+                    // SDK expects Float32 PCM; framing is handled natively.
+                    audio?.trySend(RunAnywhere.pcm16ToFloat32(chunk))
+                    audioLevel = level
+                },
+                onError = { e ->
+                    // A2: a mid-capture mic fault (e.g. OS revoke) — clear the UI on the main thread.
+                    viewModelScope.launch {
+                        if (isListening) {
+                            RACLog.e("microphone error", e)
+                            error = e.message ?: "Microphone error"
+                            stop()
+                        }
+                    }
+                },
+            )
         } catch (e: Exception) {
             RACLog.e("microphone start failed", e)
             error = e.message ?: "Could not start the microphone"

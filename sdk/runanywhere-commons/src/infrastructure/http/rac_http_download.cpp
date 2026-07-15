@@ -14,17 +14,22 @@
  * platform adapters own HTTP execution.
  *
  * The runner:
- *   1. Opens the destination file (append when resuming, truncate
- *      otherwise; creates parent directories as needed).
+ *   1. Opens a "<destination>.part" sidecar (append when resuming,
+ *      truncate otherwise; creates parent directories as needed). The
+ *      final path is never written mid-flight.
  *   2. Streams bytes through `rac_http_request_stream` /
  *      `rac_http_request_resume`, flushing to disk in the chunk
- *      callback. Throttles progress reports to at most one per
- *      100 ms to avoid flooding the JNI layer.
+ *      callback. Progress fires on every chunk (cancellation must be
+ *      observable mid-stream); callers coalesce for UI-update frequency.
  *   3. Runs SHA-256 verification (embedded implementation below)
  *      when `req->expected_sha256_hex` is non-NULL. The hash is
  *      computed inline on the wire to avoid a second pass over the
  *      file.
- *   4. Maps transport / file-system errors to the
+ *   4. On success (status + size + checksum all pass) atomically renames
+ *      "<destination>.part" → "<destination>". A crash / network drop /
+ *      checksum failure at any earlier stage leaves only the ".part", so
+ *      a truncated or corrupt file never appears at the final path.
+ *   5. Maps transport / file-system errors to the
  *      `RAC_HTTP_DL_*` codes, which mirror the Kotlin
  *      `DownloadError` enum byte-for-byte.
  */
@@ -172,6 +177,20 @@ rac_bool_t on_chunk(const uint8_t* chunk, size_t chunk_len, uint64_t /*total_wri
 
 rac_http_download_status_t map_rac_error(rac_result_t rc, int32_t http_status) {
     if (rc == RAC_SUCCESS) {
+        // 401/403 are authentication/authorization failures — distinct from a
+        // generic server error. There is no dedicated RAC_HTTP_DL_* auth code
+        // in the stable status enum, so we keep returning SERVER_ERROR (the
+        // status byte the download orchestrator already handles) but LOG the
+        // auth case distinctly and rely on the orchestrator specializing the
+        // user-facing message off the preserved http_status (401/403 →
+        // "authentication failed … check your Hugging Face token / repo
+        // access"). The caller always receives http_status via out_http_status.
+        if (http_status == 401 || http_status == 403) {
+            RAC_LOG_WARNING(kTag,
+                            "download rejected with HTTP %d (authentication/authorization failure)",
+                            static_cast<int>(http_status));
+            return RAC_HTTP_DL_SERVER_ERROR;
+        }
         if (http_status >= 400 && http_status < 600)
             return RAC_HTTP_DL_SERVER_ERROR;
         return RAC_HTTP_DL_OK;
@@ -224,12 +243,21 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
+    // In-flight bytes are streamed to "<dest>.part" and atomically renamed to
+    // "<dest>" only after checksum/size validation passes. This keeps a
+    // partially-downloaded (or checksum-failing) transfer from ever appearing at
+    // the final path where a loader would treat it as complete. Resume operates
+    // on the ".part" sidecar; the final path is written exactly once, by the
+    // rename below. The suffix ".part" is a shared convention: the model-folder
+    // deleter removes any "<name>.part" alongside the final files.
+    const fs::path part_path(std::string(req->destination_path) + ".part");
+
     if (req->resume_from_byte > 0) {
-        if (!fs::exists(dest, ec) || ec) {
-            RAC_LOG_ERROR(kTag, "resume requested but destination does not exist");
+        if (!fs::exists(part_path, ec) || ec) {
+            RAC_LOG_ERROR(kTag, "resume requested but partial (.part) does not exist");
             return RAC_HTTP_DL_FILE_ERROR;
         }
-        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(dest, ec));
+        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(part_path, ec));
         if (ec || existing_size != req->resume_from_byte) {
             RAC_LOG_ERROR(kTag, "resume offset mismatch: requested=%llu existing=%llu",
                           static_cast<unsigned long long>(req->resume_from_byte),
@@ -259,8 +287,8 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // re-serves the full body, so the worst-case outcome is one extra
     // shift-left pass instead of permanent corruption.
     uint64_t effective_resume_from = req->resume_from_byte;
-    if (req->resume_from_byte == 0 && fs::exists(dest, ec) && !ec) {
-        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(dest, ec));
+    if (req->resume_from_byte == 0 && fs::exists(part_path, ec) && !ec) {
+        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(part_path, ec));
         if (!ec && existing_size > 0) {
             bool looks_like_stub = false;
             // Sniff the first 16 bytes. HTML/XML error pages start with '<'
@@ -271,7 +299,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             if (existing_size <= kStubMaxBytes) {
                 looks_like_stub = true;
             } else {
-                std::ifstream sniff(dest, std::ios::binary);
+                std::ifstream sniff(part_path, std::ios::binary);
                 if (sniff.is_open()) {
                     char sniff_buf[16] = {0};
                     sniff.read(sniff_buf, sizeof(sniff_buf));
@@ -298,16 +326,16 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // ---- Open destination file --------------------------------------
+    // ---- Open destination file (the ".part" sidecar) ----------------
     std::ios::openmode mode = std::ios::binary | std::ios::out;
     if (effective_resume_from > 0) {
         mode |= std::ios::app;
     } else {
         mode |= std::ios::trunc;
     }
-    std::ofstream out(dest, mode);
+    std::ofstream out(part_path, mode);
     if (!out.is_open()) {
-        RAC_LOG_ERROR(kTag, "cannot open %s for writing", req->destination_path);
+        RAC_LOG_ERROR(kTag, "cannot open %s.part for writing", req->destination_path);
         return RAC_HTTP_DL_FILE_ERROR;
     }
 
@@ -328,7 +356,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     if (do_hash) {
         sha256_init(&hasher);
         if (effective_resume_from > 0) {
-            std::ifstream in(dest, std::ios::binary);
+            std::ifstream in(part_path, std::ios::binary);
             if (!in.is_open()) {
                 return RAC_HTTP_DL_FILE_ERROR;
             }
@@ -513,7 +541,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         static_cast<uint64_t>(content_range_total) == effective_resume_from) {
         if (ctx.bytes_written > 0) {
             std::error_code trunc_ec;
-            fs::resize_file(dest, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
+            fs::resize_file(part_path, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
             if (trunc_ec) {
                 RAC_LOG_ERROR(kTag, "416-complete rollback truncate failed: %s",
                               trunc_ec.message().c_str());
@@ -525,7 +553,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             // The running digest covers the rehydrated prefix plus the
             // discarded stub body; recompute it over the actual payload.
             sha256_init(&hasher);
-            std::ifstream rehash(dest, std::ios::binary);
+            std::ifstream rehash(part_path, std::ios::binary);
             std::vector<uint8_t> hbuf(static_cast<size_t>(64) * 1024);
             while (rehash.good()) {
                 rehash.read(reinterpret_cast<char*>(hbuf.data()),
@@ -561,7 +589,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             // (from a fresh URL or after the server recovers) can pick up
             // where it left off.
             std::error_code trunc_ec;
-            fs::resize_file(dest, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
+            fs::resize_file(part_path, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
             if (trunc_ec) {
                 RAC_LOG_ERROR(kTag,
                               "rollback truncate failed: %s (file may have %llu garbage bytes "
@@ -577,7 +605,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             // caller observes a clean "no partial" state and can retry from
             // scratch without the stub masquerading as a recoverable prefix.
             std::error_code rm_ec;
-            fs::remove(dest, rm_ec);
+            fs::remove(part_path, rm_ec);
             // Best-effort: even if remove fails the file is just an HTML
             // stub that the next iteration's promote-to-resume sniff will
             // catch via the `looks_like_stub` heuristic.
@@ -627,7 +655,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                         static_cast<unsigned long long>(effective_resume_from));
         fs::path tmp_path(std::string(req->destination_path) + ".rac_resume_fallback.tmp");
         std::error_code ren_ec;
-        fs::rename(dest, tmp_path, ren_ec);
+        fs::rename(part_path, tmp_path, ren_ec);
         if (ren_ec) {
             return RAC_HTTP_DL_FILE_ERROR;
         }
@@ -635,13 +663,13 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         tmpg.arm(tmp_path);
         {
             std::ifstream src(tmp_path, std::ios::binary);
-            std::ofstream dst(dest, std::ios::binary | std::ios::trunc);
+            std::ofstream dst(part_path, std::ios::binary | std::ios::trunc);
             if (!src.is_open() || !dst.is_open()) {
                 // Try to put the original file back; the guard will clean up
                 // tmp_path either way (if restore succeeded the remove is a
                 // harmless no-op).
                 std::error_code restore_ec;
-                fs::rename(tmp_path, dest, restore_ec);
+                fs::rename(tmp_path, part_path, restore_ec);
                 if (!restore_ec) {
                     tmpg.disarm();
                 }
@@ -667,7 +695,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         // wrong; recompute it from scratch over the on-disk bytes.
         if (do_hash) {
             sha256_init(&hasher);
-            std::ifstream rehash(dest, std::ios::binary);
+            std::ifstream rehash(part_path, std::ios::binary);
             std::vector<uint8_t> hbuf(static_cast<size_t>(64) * 1024);
             while (rehash.good()) {
                 rehash.read(reinterpret_cast<char*>(hbuf.data()),
@@ -704,7 +732,35 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         if (!iequals(actual, req->expected_sha256_hex)) {
             RAC_LOG_WARNING(kTag, "checksum mismatch: expected=%s actual=%s",
                             req->expected_sha256_hex, actual.c_str());
+            // Leave the ".part" in place (not the final path) so a checksum
+            // failure never surfaces at the destination a loader would trust.
             return RAC_HTTP_DL_CHECKSUM_FAILED;
+        }
+    }
+
+    // ---- Atomic finalize: promote "<dest>.part" → "<dest>" ----------
+    //
+    // Every validation gate above (status, 416 rollback, shift-left, size,
+    // checksum) has passed, so the ".part" sidecar now holds the complete,
+    // verified payload. Rename it onto the final path in a single filesystem
+    // operation. Only after this point does the destination exist — a crash,
+    // network drop, or checksum failure at any earlier stage leaves only the
+    // ".part", never a truncated/corrupt file masquerading as complete.
+    //
+    // A stale final from a prior interrupted attempt is removed first so the
+    // rename doesn't fail on platforms (Windows) where renaming onto an
+    // existing target errors.
+    {
+        std::error_code rm_ec;
+        if (fs::exists(dest, rm_ec)) {
+            fs::remove(dest, rm_ec);
+        }
+        std::error_code ren_ec;
+        fs::rename(part_path, dest, ren_ec);
+        if (ren_ec) {
+            RAC_LOG_ERROR(kTag, "finalize rename .part -> destination failed: %s",
+                          ren_ec.message().c_str());
+            return RAC_HTTP_DL_FILE_ERROR;
         }
     }
 

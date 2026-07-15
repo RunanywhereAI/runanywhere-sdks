@@ -7,7 +7,13 @@ import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.extensions.generateStream
+import com.runanywhere.sdk.public.extensions.processImage
+import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
@@ -34,6 +40,8 @@ class NpuLoadOnlyTest {
         val args = InstrumentationRegistry.getArguments()
         val modelId = args.getString("modelId") ?: return
         val text = args.getString("text") ?: "Hexagon neural processing unit."
+        val mode = args.getString("mode") ?: "tts"
+        val maxNew = args.getString("maxNew")?.toIntOrNull() ?: 64
         val outDir = InstrumentationRegistry.getInstrumentation().targetContext
             .getExternalFilesDir(null)?.let { File(it, "npu_e2e") }
         var line = "NPU_E2E id=$modelId phase=init status=FAIL"
@@ -44,8 +52,41 @@ class NpuLoadOnlyTest {
                     GlobalState.initError?.let { error("SDK init failed: $it") }
                     Thread.sleep(500)
                 }
-                val load = withTimeout(60_000) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = modelId)) }
+                val load = withTimeout(180_000) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = modelId, validate_availability = true)) }
                 if (!load.success) { line = "NPU_E2E id=$modelId phase=load status=FAIL detail=\"${load.error_message}\""; return@runBlocking }
+                if (mode == "llm") {
+                    val opts = RALLMGenerationOptions(max_tokens = maxNew, temperature = 0f, top_p = 1f)
+                    val sb = StringBuilder(); var inTok = 0; var outTok = 0
+                    withTimeout(180_000) {
+                        RunAnywhere.generateStream(text, opts).collect { ev ->
+                            ev.token?.let { if (it.isNotEmpty()) sb.append(it) }
+                            if (ev.is_final) ev.result?.let { inTok = it.prompt_tokens; outTok = it.completion_tokens }
+                        }
+                    }
+                    val out = sb.toString().trim().replace("\n", " ")
+                    line = "NPU_E2E id=$modelId phase=done status=PASS framework=${load.framework.name} " +
+                        "promptTokens=$inTok outTokens=$outTok text=\"${out.take(240)}\""
+                    Log.i(tag, line); assertTrue(line, line.contains("status=PASS")); return@runBlocking
+                }
+                if (mode == "vlm") {
+                    // Read test.jpg (two cats) from the TEST apk assets; sys != "" exercises the system-prompt
+                    // vstart shift the splice/deepstack fix addresses.
+                    val testCtx = InstrumentationRegistry.getInstrumentation().context
+                    val bytes = testCtx.assets.open(args.getString("img") ?: "test.jpg").use { it.readBytes() }
+                    val f = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "vlm_test.jpg")
+                        .apply { writeBytes(bytes) }
+                    val sys = args.getString("sys")?.takeIf { it.isNotBlank() }
+                    val r = withTimeout(180_000) {
+                        RunAnywhere.processImage(
+                            RAVLMImage.fromFilePath(f.absolutePath),
+                            RAVLMGenerationOptions(prompt = text, system_prompt = sys, max_tokens = maxNew, temperature = 0f, top_p = 0f, top_k = 0),
+                        )
+                    }
+                    val out = r.text.trim().replace("\n", " ")
+                    line = "NPU_E2E id=$modelId phase=done status=PASS framework=${load.framework.name} " +
+                        "sys=${if (sys != null) "Y" else "N"} imgTok=${r.image_tokens} outTok=${r.completion_tokens} text=\"${out.take(240)}\""
+                    Log.i(tag, line); assertTrue(line, line.contains("status=PASS")); return@runBlocking
+                }
                 val r = withTimeout(60_000) { RunAnywhere.synthesize(text) }
                 val raw = r.audio_data.toByteArray()
                 val floats = if (r.audio_format.name.contains("S16") || r.audio_format.name.contains("PCM16")) {

@@ -2025,6 +2025,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     $core.bool? autoExecute,
     $core.bool? replaceSystemPrompt,
     $core.bool? requireJsonArguments,
+    $core.Iterable<$core.String>? history,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
@@ -2046,6 +2047,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
       result.replaceSystemPrompt = replaceSystemPrompt;
     if (requireJsonArguments != null)
       result.requireJsonArguments = requireJsonArguments;
+    if (history != null) result.history.addAll(history);
     return result;
   }
 
@@ -2083,6 +2085,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     ..aOB(16, _omitFieldNames ? '' : 'autoExecute')
     ..aOB(17, _omitFieldNames ? '' : 'replaceSystemPrompt')
     ..aOB(18, _omitFieldNames ? '' : 'requireJsonArguments')
+    ..pPS(19, _omitFieldNames ? '' : 'history')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2262,6 +2265,14 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   $core.bool hasRequireJsonArguments() => $_has(15);
   @$pb.TagNumber(18)
   void clearRequireJsonArguments() => $_clearField(18);
+
+  /// Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+  /// EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+  /// in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+  /// ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+  /// cross-proto import cycle.
+  @$pb.TagNumber(19)
+  $pb.PbList<$core.String> get history => $_getList(16);
 }
 
 class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {

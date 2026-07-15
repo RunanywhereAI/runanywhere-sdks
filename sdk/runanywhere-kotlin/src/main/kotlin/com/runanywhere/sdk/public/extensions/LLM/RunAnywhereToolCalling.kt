@@ -59,6 +59,11 @@ suspend fun RunAnywhere.generateWithTools(
     toolChoice: ToolChoiceMode?,
     forcedToolName: String?,
     validateCalls: Boolean? = null,
+    // Prior conversation turns as a flat alternating list [user0, asst0, ...],
+    // EXCLUDING the current turn (which is `prompt`). Threaded to commons so the
+    // tool-calling loop keeps multi-turn context, matching the standard path.
+    // Defaulted for source compatibility (existing callers recompile unchanged).
+    history: List<String> = emptyList(),
 ): RAToolCallingResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     // Swift parity (`RunAnywhere+ToolCalling.swift`): run the cold-start HTTP
@@ -89,5 +94,6 @@ suspend fun RunAnywhere.generateWithTools(
         options = effectiveToolOptions,
         llmOptions = options,
         validateCalls = validateCalls,
+        history = history,
     )
 }

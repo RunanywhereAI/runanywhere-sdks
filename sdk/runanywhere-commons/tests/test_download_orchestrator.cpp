@@ -16,6 +16,7 @@
 #include <cstring>
 #include <fstream>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <utility>
@@ -472,7 +473,21 @@ std::vector<uint8_t> fake_payload(size_t n) {
 struct FakeTransport {
     std::vector<uint8_t> payload = fake_payload(static_cast<size_t>(256) * 1024);
     int sleep_ms_per_chunk = 0;
+    // Flaky-mode accounting for "/flaky" URLs (transient-retry coverage). Each
+    // distinct URL fails its FIRST fresh-stream attempt with a mid-transfer
+    // network drop (after flushing a prefix to the ".part" sidecar), then every
+    // subsequent attempt — a resume — succeeds. Shared across the parallel
+    // worker threads, so the bookkeeping is mutex-guarded and observable.
+    std::mutex flaky_mutex;
+    std::set<std::string> flaky_urls_failed_once;  // URLs that already took their fail
+    int stream_attempts = 0;                       // total fresh-stream calls seen
+    int resume_attempts = 0;                        // total resume calls seen
 };
+
+// The prefix a "/flaky" stream flushes to disk before the simulated drop. Small
+// enough to leave a real resume tail; a multiple of the 8 KiB chunk size so the
+// partial ends on a chunk boundary (mirrors a socket teardown between chunks).
+constexpr size_t kFlakyPrefixBytes = static_cast<size_t>(64) * 1024;
 
 rac_bool_t fake_send_chunk(rac_http_body_chunk_fn cb, void* cb_user_data,
                            const std::vector<uint8_t>& payload, size_t start, size_t chunk_size,
@@ -490,6 +505,25 @@ rac_bool_t fake_send_chunk(rac_http_body_chunk_fn cb, void* cb_user_data,
         }
     }
     return RAC_TRUE;
+}
+
+// Deliver only [start, start+limit) of the payload, then stop. Returns true if
+// the whole limited range was delivered without the callback cancelling — used
+// to flush a partial prefix before a simulated network drop.
+bool fake_send_prefix(rac_http_body_chunk_fn cb, void* cb_user_data,
+                      const std::vector<uint8_t>& payload, size_t start, size_t limit,
+                      size_t chunk_size) {
+    const size_t end = std::min(payload.size(), start + limit);
+    uint64_t delivered = 0;
+    for (size_t offset = start; offset < end; offset += chunk_size) {
+        size_t n = std::min(chunk_size, end - offset);
+        delivered += n;
+        if (cb(payload.data() + offset, n, delivered,
+               static_cast<uint64_t>(payload.size() - start), cb_user_data) == RAC_FALSE) {
+            return false;
+        }
+    }
+    return true;
 }
 
 rac_result_t fake_request_send(void*, const rac_http_request_t*, rac_http_response_t* out_resp) {
@@ -515,6 +549,30 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         out_resp_meta->status = 500;
         return RAC_SUCCESS;
     }
+    // Transient-failure simulation: the first fresh-stream attempt for each
+    // distinct "/flaky" URL flushes a prefix to the ".part" sidecar and then
+    // reports a network drop, so the orchestrator's bounded resume-retry loop
+    // has to re-drive the transfer (via the resume path) to complete.
+    if (url.find("/flaky") != std::string::npos) {
+        bool should_fail = false;
+        {
+            std::lock_guard<std::mutex> lock(fake->flaky_mutex);
+            fake->stream_attempts++;
+            should_fail = fake->flaky_urls_failed_once.insert(url).second;
+        }
+        if (should_fail) {
+            out_resp_meta->status = 200;
+            // Flush a real prefix, then drop the connection mid-transfer.
+            (void)fake_send_prefix(cb, cb_user_data, fake->payload, 0, kFlakyPrefixBytes, 8192);
+            return RAC_ERROR_NETWORK_ERROR;
+        }
+        // A retried "/flaky" fresh stream (no partial on disk yet) succeeds.
+        out_resp_meta->status = 200;
+        return fake_send_chunk(cb, cb_user_data, fake->payload, 0, 8192,
+                               fake->sleep_ms_per_chunk) == RAC_TRUE
+                   ? RAC_SUCCESS
+                   : RAC_ERROR_CANCELLED;
+    }
     out_resp_meta->status = 200;
     return fake_send_chunk(cb, cb_user_data, fake->payload, 0, 8192, fake->sleep_ms_per_chunk) ==
                    RAC_TRUE
@@ -528,6 +586,10 @@ rac_result_t fake_request_resume(void* user_data, const rac_http_request_t* req,
     auto* fake = static_cast<FakeTransport*>(user_data);
     if (!fake || !req || !req->url || !cb || !out_resp_meta) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    {
+        std::lock_guard<std::mutex> lock(fake->flaky_mutex);
+        fake->resume_attempts++;
     }
     out_resp_meta->status = 206;
     size_t start = std::min<size_t>(static_cast<size_t>(resume_from_byte), fake->payload.size());
@@ -635,6 +697,26 @@ bool poll_progress(const std::string& task_id, rav1::DownloadProgress* out_progr
 
 bool wait_for_terminal(const std::string& task_id, rav1::DownloadProgress* out_progress) {
     for (int i = 0; i < 250; ++i) {
+        if (poll_progress(task_id, out_progress)) {
+            auto state = out_progress->state();
+            if (state == rav1::DOWNLOAD_STATE_COMPLETED || state == rav1::DOWNLOAD_STATE_FAILED ||
+                state == rav1::DOWNLOAD_STATE_CANCELLED) {
+                return true;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+}
+
+// Like wait_for_terminal but with a caller-chosen budget. The bounded
+// resume-retry loop (execute_stream_with_retry) backs off 500ms + 1s + 2s
+// between its 4 attempts, so a permanently-failing transfer needs >3.5s to
+// exhaust the budget and terminate — longer than the default 2.5s poll.
+bool wait_for_terminal_ms(const std::string& task_id, int max_wait_ms,
+                          rav1::DownloadProgress* out_progress) {
+    const int iterations = std::max(1, max_wait_ms / 10);
+    for (int i = 0; i < iterations; ++i) {
         if (poll_progress(task_id, out_progress)) {
             auto state = out_progress->state();
             if (state == rav1::DOWNLOAD_STATE_COMPLETED || state == rav1::DOWNLOAD_STATE_FAILED ||
@@ -771,7 +853,10 @@ static TestResult test_proto_plan_resume_metadata() {
     if (slash != std::string::npos) {
         mkdir_p(dest_path.substr(0, slash));
     }
-    write_dummy_file(dest_path, std::string(128, 'p'));
+    // Resumable bytes live in the ".part" sidecar the writer streams into until
+    // its finalize rename; the final path only appears once the download is
+    // complete. Seed the partial there so the planner can detect it for resume.
+    write_dummy_file(dest_path + ".part", std::string(128, 'p'));
 
     rav1::DownloadPlanRequest request;
     request.set_model_id(model_id);
@@ -842,7 +927,9 @@ static TestResult test_proto_plan_self_heals_oversized_existing_bytes() {
     if (slash != std::string::npos) {
         mkdir_p(dest_path.substr(0, slash));
     }
-    write_dummy_file(dest_path, std::string(256, 'p'));
+    // The oversized stale bytes live in the ".part" sidecar (the resumable-partial
+    // location); the planner self-heals by deleting that sidecar and replanning fresh.
+    write_dummy_file(dest_path + ".part", std::string(256, 'p'));
 
     rav1::DownloadPlanRequest request;
     request.set_model_id(model_id);
@@ -865,7 +952,8 @@ static TestResult test_proto_plan_self_heals_oversized_existing_bytes() {
     ASSERT_TRUE(!plan.files(0).is_resume_candidate(),
                 "Healed entry must replan as a fresh download, not a resume");
     ASSERT_TRUE(plan.resume_from_bytes() == 0, "Fresh plan should not carry a resume offset");
-    ASSERT_TRUE(!std::ifstream(dest_path).good(), "Stale oversized partial should be deleted");
+    ASSERT_TRUE(!std::ifstream(dest_path + ".part").good(),
+                "Stale oversized partial should be deleted");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -1162,6 +1250,158 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
     return r;
 }
 
+// Builds + plans a 2-file bundle whose per-file URLs share `url_base`, each
+// carrying an explicit size so the pre-flight gate + parallel accounting have
+// per-file totals. Two required non-archive files with resume_from==0 satisfy
+// can_download_files_in_parallel(), so the start path drives
+// run_parallel_direct_download_worker. Returns the parsed start result.
+static bool plan_and_start_parallel_bundle(FakeTransport& fake, const std::string& model_id,
+                                           const std::string& url_base, int64_t per_file_bytes,
+                                           rav1::DownloadStartResult* out_start) {
+    rac_model_info_t registered{};
+    registered.id = const_cast<char*>(model_id.c_str());
+    registered.name = const_cast<char*>(model_id.c_str());
+    std::string base_copy = url_base;
+    registered.download_url = const_cast<char*>(base_copy.c_str());
+    registered.category = RAC_MODEL_CATEGORY_IMAGE_GENERATION;
+    registered.framework = RAC_FRAMEWORK_QHEXRT;
+    registered.format = RAC_MODEL_FORMAT_QNN_CONTEXT;
+    if (rac_register_model(&registered) != RAC_SUCCESS)
+        return false;
+
+    rav1::DownloadPlanRequest request;
+    request.set_model_id(model_id);
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(model_id);
+    model->set_name(model_id);
+    model->set_download_url(url_base);
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_QHEXRT);
+    model->set_format(rav1::MODEL_FORMAT_QNN_CONTEXT);
+    for (const auto& relative : {std::string("part_a.bin"), std::string("part_b.bin")}) {
+        auto* file = model->mutable_multi_file()->add_files();
+        file->set_url(url_base + "/" + relative);
+        file->set_filename(relative);
+        file->set_relative_path(relative);
+        file->set_is_required(true);
+        file->set_size_bytes(per_file_bytes);
+    }
+
+    std::string plan_bytes = serialize_msg(request);
+    rac_proto_buffer_t plan_buffer;
+    rac_proto_buffer_init(&plan_buffer);
+    if (rac_download_plan_proto(reinterpret_cast<const uint8_t*>(plan_bytes.data()),
+                                plan_bytes.size(), &plan_buffer) != RAC_SUCCESS) {
+        rac_proto_buffer_free(&plan_buffer);
+        return false;
+    }
+    rav1::DownloadPlanResult plan;
+    bool parsed = parse_plan(plan_buffer, &plan);
+    rac_proto_buffer_free(&plan_buffer);
+    if (!parsed || !plan.can_start() || plan.files_size() != 2)
+        return false;
+
+    return start_from_plan(plan, /*resume=*/false, out_start);
+}
+
+// #4 parallel retry: a transient network drop on a bundle file must NOT fail the
+// whole download. The parallel worker shares execute_stream_with_retry with the
+// sequential path, so each part resumes from its ".part" sidecar and completes.
+// The "/flaky" transport fails each part's first stream once (after flushing a
+// prefix) and then serves the resume tail — so a successful terminal state and
+// on-disk files prove the parallel worker retried.
+static TestResult test_proto_parallel_retries_transient_then_completes() {
+    TestResult r;
+    r.test_name = "proto_parallel_retries_transient_then_completes";
+
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_parallel_retry");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-parallel-retry";
+    rav1::DownloadStartResult start;
+    ASSERT_TRUE(plan_and_start_parallel_bundle(fake, model_id, "http://fake/flaky",
+                                               static_cast<int64_t>(fake.payload.size()), &start),
+                "Flaky 2-file bundle should plan and start");
+    ASSERT_TRUE(start.accepted(), "Parallel bundle start should be accepted");
+
+    rav1::DownloadProgress terminal;
+    // One 500ms backoff per part plus the transfer — 8s is generous headroom.
+    ASSERT_TRUE(wait_for_terminal_ms(start.task_id(), 8000, &terminal),
+                "Parallel retry download should reach a terminal state");
+    ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
+                "Transient drops must be retried, not fail the whole download");
+
+    // Each distinct "/flaky" part failed its first fresh stream exactly once and
+    // then completed via a resume, so both a fail and a resume must have run.
+    {
+        std::lock_guard<std::mutex> lock(fake.flaky_mutex);
+        ASSERT_TRUE(fake.flaky_urls_failed_once.size() == 2,
+                    "Both parallel parts should have taken their one transient failure");
+        ASSERT_TRUE(fake.resume_attempts >= 2,
+                    "Both parts should have resumed from their .part sidecar after the drop");
+    }
+
+    char model_folder[4096];
+    ASSERT_TRUE(rac_model_paths_get_model_folder(model_id.c_str(), RAC_FRAMEWORK_QHEXRT,
+                                                 model_folder, sizeof(model_folder)) == RAC_SUCCESS,
+                "Model root should resolve");
+    std::string folder(model_folder);
+    for (const auto& part : {std::string("part_a.bin"), std::string("part_b.bin")}) {
+        std::ifstream in(folder + "/" + part, std::ios::binary);
+        std::vector<uint8_t> got((std::istreambuf_iterator<char>(in)),
+                                 std::istreambuf_iterator<char>());
+        ASSERT_TRUE(got == fake.payload,
+                    "Retried+resumed part must equal the full payload byte-for-byte");
+        // The finalize rename must have consumed the ".part" sidecar.
+        ASSERT_TRUE(!std::ifstream(folder + "/" + part + ".part").good(),
+                    "No .part sidecar should survive a completed retry");
+    }
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
+// #4 retry is BOUNDED: a URL that network-errors on every attempt must give up
+// after the fixed attempt budget and fail the whole parallel download rather
+// than spin forever. "/network" always returns a network error (never a prefix,
+// never a resume tail), so no part can complete.
+static TestResult test_proto_parallel_permanent_error_fails_after_retries() {
+    TestResult r;
+    r.test_name = "proto_parallel_permanent_error_fails_after_retries";
+
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_parallel_permanent");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-parallel-permanent";
+    rav1::DownloadStartResult start;
+    ASSERT_TRUE(plan_and_start_parallel_bundle(fake, model_id, "http://fake/network",
+                                               static_cast<int64_t>(fake.payload.size()), &start),
+                "Always-failing 2-file bundle should still plan and start");
+    ASSERT_TRUE(start.accepted(), "Parallel bundle start should be accepted");
+
+    rav1::DownloadProgress terminal;
+    // 4 attempts back off 500ms + 1s + 2s = 3.5s per part before giving up;
+    // 15s covers that plus the two parts running concurrently, with margin.
+    ASSERT_TRUE(wait_for_terminal_ms(start.task_id(), 15000, &terminal),
+                "Bounded retry must terminate (not hang) on a permanent network error");
+    ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_FAILED,
+                "A permanently unreachable part must fail after the retry budget is exhausted");
+    ASSERT_TRUE(terminal.local_path().empty(),
+                "A failed parallel download must not publish a final path");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_cancel_resume() {
     TestResult r;
     r.test_name = "proto_cancel_resume";
@@ -1217,7 +1457,10 @@ static TestResult test_proto_cancel_resume() {
 
     int64_t partial_size = 0;
     if (plan.files_size() > 0) {
-        std::ifstream partial(plan.files(0).destination_path(), std::ios::binary | std::ios::ate);
+        // A cancelled transfer preserves its bytes in the ".part" sidecar; the
+        // final path only materializes on the finalize rename after completion.
+        std::ifstream partial(plan.files(0).destination_path() + ".part",
+                              std::ios::binary | std::ios::ate);
         partial_size = partial.good() ? static_cast<int64_t>(partial.tellg()) : 0;
     }
     ASSERT_TRUE(partial_size > 0 && std::cmp_less(partial_size, fake.payload.size()),
@@ -1353,6 +1596,11 @@ int main(int argc, char** argv) {
                   test_proto_start_progress_callback_complete);
         suite.add("proto_nested_multifile_reports_model_root",
                   test_proto_nested_multifile_reports_model_root);
+        // #4 parallel download retry-with-resume (shared execute_stream_with_retry).
+        suite.add("proto_parallel_retries_transient_then_completes",
+                  test_proto_parallel_retries_transient_then_completes);
+        suite.add("proto_parallel_permanent_error_fails_after_retries",
+                  test_proto_parallel_permanent_error_fails_after_retries);
         suite.add("proto_cancel_resume", test_proto_cancel_resume);
         suite.add("proto_failed_transfer_no_stale_completion",
                   test_proto_failed_transfer_no_stale_completion);
