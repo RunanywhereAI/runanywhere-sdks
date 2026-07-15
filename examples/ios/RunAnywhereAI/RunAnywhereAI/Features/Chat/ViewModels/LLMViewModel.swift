@@ -174,6 +174,15 @@ final class LLMViewModel {
         activeGenerationID = id
     }
 
+    /// Store the task backing the current turn so `stopGeneration()` /
+    /// `cancelActiveGeneration()` can cancel image- and document-question turns,
+    /// which run outside `sendMessage` (the text path assigns `generationTask`
+    /// directly). Without this, Stop cancels a stale/nil task and the composer
+    /// stays locked until the turn finishes on its own.
+    func setGenerationTask(_ task: Task<Void, Never>?) {
+        generationTask = task
+    }
+
     /// Cancel the in-flight generation and detach it from the active conversation
     /// so its late token writes and finalization become no-ops. Shared by
     /// `clearChat()` and `loadConversation(_:)`.

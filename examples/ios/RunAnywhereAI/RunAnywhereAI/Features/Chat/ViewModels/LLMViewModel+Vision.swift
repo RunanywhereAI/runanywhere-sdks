@@ -38,26 +38,33 @@ extension LLMViewModel {
 
         let messageIndex = messagesValue.count - 1
 
-        do {
-            try ensureVisionModelLoaded()
+        // Track the turn so Stop / conversation-switch can cancel it (mirrors the
+        // text path). The VLM stream isn't SDK-cancellable yet, so consumeVisionStream
+        // also breaks its loop cooperatively on Task.isCancelled.
+        let task = Task {
+            do {
+                try ensureVisionModelLoaded()
 
-            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = 500
+                var options = RAVLMGenerationOptions.defaults(prompt: prompt)
+                options.maxTokens = 500
 
-            let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
-            let response = try await consumeVisionStream(
-                stream, messageIndex: messageIndex, generationID: generationID
-            )
-            if isCurrentGeneration(generationID) {
-                updateVisionMessage(at: messageIndex, response: response)
+                let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
+                let response = try await consumeVisionStream(
+                    stream, messageIndex: messageIndex, generationID: generationID
+                )
+                if isCurrentGeneration(generationID) {
+                    updateVisionMessage(at: messageIndex, response: response)
+                }
+            } catch {
+                if isCurrentGeneration(generationID) {
+                    await handleGenerationError(error, at: messageIndex)
+                }
             }
-        } catch {
-            if isCurrentGeneration(generationID) {
-                await handleGenerationError(error, at: messageIndex)
-            }
+
+            await finalizeGeneration(at: messageIndex, generationID: generationID)
         }
-
-        await finalizeGeneration(at: messageIndex, generationID: generationID)
+        setGenerationTask(task)
+        await task.value
     }
 
     private func persistImageAttachment(_ attachment: ChatImageAttachment) -> MessageAttachment {
@@ -95,6 +102,9 @@ extension LLMViewModel {
         var fullResponse = ""
 
         for await event in stream {
+            // Cooperative stop: the SDK VLM stream has no cancel entry point, so
+            // break here when the turn's task is cancelled (Stop / navigate-away).
+            if Task.isCancelled { break }
             switch event.kind {
             case .token:
                 guard !event.token.isEmpty else { continue }
