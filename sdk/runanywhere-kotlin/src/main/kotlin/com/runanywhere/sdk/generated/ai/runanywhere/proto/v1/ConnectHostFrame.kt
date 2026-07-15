@@ -95,11 +95,11 @@ public class ConnectHostFrame(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectHostFrame> = object : ProtoAdapter<ConnectHostFrame>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectHostFrame::class,
-      "type.googleapis.com/runanywhere.v1.ConnectHostFrame",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectHostFrame::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectHostFrame", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectHostFrame): Int {

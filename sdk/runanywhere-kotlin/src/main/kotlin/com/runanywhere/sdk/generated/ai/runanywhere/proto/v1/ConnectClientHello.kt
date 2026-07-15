@@ -117,11 +117,11 @@ public class ConnectClientHello(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectClientHello> =
         object : ProtoAdapter<ConnectClientHello>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectClientHello::class,
-      "type.googleapis.com/runanywhere.v1.ConnectClientHello",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectClientHello::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectClientHello", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectClientHello): Int {

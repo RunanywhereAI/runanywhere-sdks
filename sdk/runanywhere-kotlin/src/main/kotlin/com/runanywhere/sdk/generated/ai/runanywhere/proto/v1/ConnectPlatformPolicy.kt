@@ -107,11 +107,11 @@ public class ConnectPlatformPolicy(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectPlatformPolicy> =
         object : ProtoAdapter<ConnectPlatformPolicy>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectPlatformPolicy::class,
-      "type.googleapis.com/runanywhere.v1.ConnectPlatformPolicy",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectPlatformPolicy::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectPlatformPolicy", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectPlatformPolicy): Int {

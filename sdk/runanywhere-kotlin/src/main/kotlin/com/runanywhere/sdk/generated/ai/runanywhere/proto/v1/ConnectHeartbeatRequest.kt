@@ -96,11 +96,11 @@ public class ConnectHeartbeatRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectHeartbeatRequest> =
         object : ProtoAdapter<ConnectHeartbeatRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectHeartbeatRequest::class,
-      "type.googleapis.com/runanywhere.v1.ConnectHeartbeatRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectHeartbeatRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectHeartbeatRequest", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectHeartbeatRequest): Int {

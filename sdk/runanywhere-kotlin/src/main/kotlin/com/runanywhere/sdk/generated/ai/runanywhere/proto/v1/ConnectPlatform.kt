@@ -47,8 +47,8 @@ public enum class ConnectPlatform(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectPlatform> = object : EnumAdapter<ConnectPlatform>(
-      ConnectPlatform::class,
-      PROTO_3,
+      ConnectPlatform::class, 
+      PROTO_3, 
       ConnectPlatform.CONNECT_PLATFORM_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ConnectPlatform? = ConnectPlatform.fromValue(`value`)

@@ -119,11 +119,11 @@ public class ConnectDiscoveryMetadata(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectDiscoveryMetadata> =
         object : ProtoAdapter<ConnectDiscoveryMetadata>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectDiscoveryMetadata::class,
-      "type.googleapis.com/runanywhere.v1.ConnectDiscoveryMetadata",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectDiscoveryMetadata::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectDiscoveryMetadata", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectDiscoveryMetadata): Int {

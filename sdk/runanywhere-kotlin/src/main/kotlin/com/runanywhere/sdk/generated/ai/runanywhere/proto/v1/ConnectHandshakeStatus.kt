@@ -28,8 +28,8 @@ public enum class ConnectHandshakeStatus(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectHandshakeStatus> =
         object : EnumAdapter<ConnectHandshakeStatus>(
-      ConnectHandshakeStatus::class,
-      PROTO_3,
+      ConnectHandshakeStatus::class, 
+      PROTO_3, 
       ConnectHandshakeStatus.CONNECT_HANDSHAKE_STATUS_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ConnectHandshakeStatus? = ConnectHandshakeStatus.fromValue(`value`)

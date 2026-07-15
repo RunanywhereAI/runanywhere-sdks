@@ -33,8 +33,8 @@ public enum class ConnectRoleAvailability(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectRoleAvailability> =
         object : EnumAdapter<ConnectRoleAvailability>(
-      ConnectRoleAvailability::class,
-      PROTO_3,
+      ConnectRoleAvailability::class, 
+      PROTO_3, 
       ConnectRoleAvailability.CONNECT_ROLE_AVAILABILITY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ConnectRoleAvailability? = ConnectRoleAvailability.fromValue(`value`)

@@ -53,11 +53,11 @@ public class ConnectHostStopRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectHostStopRequest> =
         object : ProtoAdapter<ConnectHostStopRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectHostStopRequest::class,
-      "type.googleapis.com/runanywhere.v1.ConnectHostStopRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectHostStopRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectHostStopRequest", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectHostStopRequest): Int {

@@ -100,11 +100,11 @@ public class ConnectClientFrame(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectClientFrame> =
         object : ProtoAdapter<ConnectClientFrame>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectClientFrame::class,
-      "type.googleapis.com/runanywhere.v1.ConnectClientFrame",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectClientFrame::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectClientFrame", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectClientFrame): Int {

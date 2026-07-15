@@ -131,11 +131,11 @@ public class ConnectModelDescriptor(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectModelDescriptor> =
         object : ProtoAdapter<ConnectModelDescriptor>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectModelDescriptor::class,
-      "type.googleapis.com/runanywhere.v1.ConnectModelDescriptor",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectModelDescriptor::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectModelDescriptor", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectModelDescriptor): Int {
