@@ -79,7 +79,14 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             let benchRequest = benchOptions.toRALLMGenerateRequest(prompt: prompt)
             let benchEvents = try await RunAnywhere.generateStream(benchRequest)
 
-            let result = await RunAnywhere.aggregateStream(prompt: prompt, events: benchEvents)
+            let result = await withTaskCancellationHandler {
+                await RunAnywhere.aggregateStream(prompt: prompt, events: benchEvents)
+            } onCancel: {
+                // Benchmark cancelled mid-run: stop the in-flight generation so the
+                // model doesn't keep decoding for tens of seconds before the loop
+                // observes cancellation.
+                Task { await RunAnywhere.cancelGeneration() }
+            }
             let wallMs = Date().timeIntervalSince(benchStart) * 1000
             let generationMs = result.generationTimeMs > 0 ? result.generationTimeMs : wallMs
 
