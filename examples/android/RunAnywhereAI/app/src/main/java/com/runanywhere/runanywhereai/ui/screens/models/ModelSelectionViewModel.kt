@@ -368,9 +368,8 @@ class ModelSelectionViewModel(
         // Default to the recommended chat model (Qwen3.5-0.8B — best on-device multi-turn recall) instead
         // of whatever happens to be first in the list; degrade through the other strong NPU chat models,
         // then any ready model. Mirrors ModelRecommendation.npuLLMs order.
-        val candidate = AUTO_LOAD_PREFERENCE.firstNotNullOfOrNull { pref ->
-            ready.firstOrNull { it.id.contains(pref) }
-        } ?: ready.firstOrNull() ?: return
+        val candidateId = ModelAutoLoadPolicy.preferredCandidateId(ready.map { it.id }) ?: return
+        val candidate = ready.first { it.id == candidateId }
         runCatching {
             val result = RunAnywhere.loadModel(candidate)
             if (result.success) {
@@ -386,8 +385,4 @@ class ModelSelectionViewModel(
             ModelSelectionViewModel(context) as T
     }
 
-    companion object {
-        // Preferred LLM to auto-load into an empty slot, best-first. Mirrors ModelRecommendation.npuLLMs.
-        private val AUTO_LOAD_PREFERENCE = listOf("qwen3_5_0_8b", "lfm2_5_350m", "qwen3_0_6b", "lfm2_5_230m")
-    }
 }
