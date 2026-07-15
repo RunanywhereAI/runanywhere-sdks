@@ -282,6 +282,12 @@ final class LLMViewModel {
             name: .conversationSelected,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(conversationDeleted(_:)),
+            name: .conversationDeleted,
+            object: nil
+        )
 
         subscribeToModelLifecycle()
 
@@ -748,6 +754,25 @@ final class LLMViewModel {
     private func conversationSelected(_ notification: Notification) {
         if let conversation = notification.object as? Conversation {
             loadConversation(conversation)
+        }
+    }
+
+    @objc
+    private func conversationDeleted(_ notification: Notification) {
+        guard let deletedId = notification.object as? String,
+              currentConversation?.id == deletedId
+                || generatingConversationId == deletedId else { return }
+        // The chat the user is viewing/generating was deleted: stop any in-flight
+        // generation (so its finalize can't persist) and move off the tombstoned
+        // conversation so a later send starts a fresh chat instead of being
+        // silently dropped by the store's tombstone guard.
+        cancelActiveGeneration()
+        if let replacement = conversationStore.currentConversation, replacement.id != deletedId {
+            loadConversation(replacement)
+        } else {
+            messages.removeAll()
+            currentInput = ""
+            currentConversation = nil
         }
     }
 

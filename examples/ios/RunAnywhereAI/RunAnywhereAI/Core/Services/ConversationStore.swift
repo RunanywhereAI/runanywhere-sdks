@@ -67,6 +67,10 @@ class ConversationStore: ObservableObject {
         return conversation
     }
 
+    /// Ids of conversations the user deleted this session. A late write from an
+    /// in-flight generation (or a stale ViewModel) must not resurrect them.
+    private var deletedConversationIds: Set<String> = []
+
     func updateConversation(_ conversation: Conversation) {
         var updated = conversation
         updated.updatedAt = Date()
@@ -74,6 +78,11 @@ class ConversationStore: ObservableObject {
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
             // Update existing conversation
             conversations[index] = updated
+        } else if deletedConversationIds.contains(conversation.id) {
+            // Tombstoned: a write arriving after the user deleted this chat (e.g.
+            // an in-flight generation finalizing) must not re-create it on disk
+            // or in the list.
+            return
         } else {
             // First time adding this conversation (when first message is sent)
             conversations.insert(updated, at: 0)
@@ -87,6 +96,7 @@ class ConversationStore: ObservableObject {
     }
 
     func deleteConversation(_ conversation: Conversation) {
+        deletedConversationIds.insert(conversation.id)
         conversations.removeAll { $0.id == conversation.id }
 
         if currentConversation?.id == conversation.id {
@@ -97,6 +107,9 @@ class ConversationStore: ObservableObject {
         let fileURL = conversationFileURL(for: conversation.id)
         try? FileManager.default.removeItem(at: fileURL)
         try? FileManager.default.removeItem(at: attachmentDirectory(for: conversation.id))
+
+        // Let the chat ViewModel reset if it was viewing/generating this one.
+        NotificationCenter.default.post(name: .conversationDeleted, object: conversation.id)
     }
 
     func addMessage(_ message: Message, to conversation: Conversation) {
