@@ -137,6 +137,11 @@ struct rac_voice_agent {
     /// agent remembers context across turns. Bounded to the last
     /// kVoiceAgentMaxHistoryEntries flattened entries. Guarded by `mutex`.
     std::vector<VoiceConversationTurn> conversation_history;
+
+    /// Monotonic 0-based turn counter for this agent, stamped onto each turn's
+    /// telemetry (voice_telemetry.turn_index). Atomic so it can be read without
+    /// holding `mutex`.
+    std::atomic<int32_t> turn_counter{0};
 };
 
 #endif  // RAC_FEATURES_VOICE_AGENT_VOICE_AGENT_INTERNAL_H

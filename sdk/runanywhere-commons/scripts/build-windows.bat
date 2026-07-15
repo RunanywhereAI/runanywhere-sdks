@@ -5,6 +5,14 @@ setlocal enabledelayedexpansion
 :: build-windows.bat
 :: Windows build script for runanywhere-commons (x64, MSVC)
 ::
+:: KNOWN LIMITATION (v0.20.0): the CI native_windows job is currently ADVISORY
+:: (non-blocking). Two MSVC-only compile bugs surfaced that could not be verified
+:: on a non-Windows dev machine; both have best-effort fixes committed (strcasecmp
+:: shim in rac_http_client_default.cpp + NOGDI/ERROR guard in platform_compat.h).
+:: If you build this on a real Windows box: verify it compiles clean, then
+:: re-enable the strict gate in .github/workflows/release.yml. Exact errors + fixes:
+:: thoughts/shared/issues/sdk-release-bugs.md (section F).
+::
 :: Usage: build-windows.bat [options] [backends]
 ::        backends: onnx | llamacpp | all (default: all)
 ::                  - onnx: STT/TTS/VAD (ONNX Runtime)

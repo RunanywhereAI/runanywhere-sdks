@@ -327,6 +327,15 @@ typedef struct rac_vlm_result {
     /** Number of vision/image tokens specifically */
     int32_t image_tokens;
 
+    /** Decoded image dimensions in pixels (0 when text-only). Populated by the
+     *  backend after the image is decoded, so telemetry can report the real
+     *  resolution even when the caller supplied encoded bytes without dims. */
+    int32_t image_width;
+    int32_t image_height;
+
+    /** Model context window (n_ctx) the generation ran with. */
+    int32_t context_length;
+
     /** Number of tokens generated */
     int32_t completion_tokens;
 

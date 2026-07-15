@@ -12,8 +12,8 @@
 		54398D222F4939A7009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D212F4939A7009D6B51 /* WidgetKit.framework */; };
 		54398D242F4939A7009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D232F4939A7009D6B51 /* SwiftUI.framework */; };
 		54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
-		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; platformFilter = ios; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
+		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
+		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
 		58MLX00012ED16DA40058D0 /* RunAnywhereMLX in Frameworks */ = {isa = PBXBuildFile; productRef = 58MLX00002ED16DA40058D0 /* RunAnywhereMLX */; };
 		RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */; };
 		RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };

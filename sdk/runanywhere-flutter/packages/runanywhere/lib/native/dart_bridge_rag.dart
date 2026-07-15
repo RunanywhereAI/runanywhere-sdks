@@ -2,6 +2,7 @@
 //
 // Generated-proto RAG session bridge.
 
+import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -184,6 +185,106 @@ class DartBridgeRAG {
     return RAGResult.fromBuffer(resultBytes);
   }
 
+  /// Streaming query. Emits a [RAGStreamEvent] per generated token (kind =
+  /// TOKEN) as the answer is produced, then a terminal COMPLETED carrying the
+  /// full [RAGResult], or an ERROR event. The blocking embed→retrieve→generate
+  /// work runs in a worker isolate; the native helper copies each event and
+  /// posts it to a [ReceivePort], then posts the rc as the final sentinel.
+  ///
+  /// RAG has no native per-query cancel symbol, so cancelling the subscription
+  /// stops delivery and closes the port (the native call runs to completion).
+  Stream<RAGStreamEvent> queryStream(RAGQueryOptions options) {
+    if (RacNative.bindings.ra_flutter_rag_query_stream_proto_native_port ==
+        null) {
+      return Stream<RAGStreamEvent>.error(
+        UnsupportedError(
+          'ra_flutter_rag_query_stream_proto_native_port is unavailable',
+        ),
+      );
+    }
+    final ffi.Pointer<ffi.Void> session;
+    try {
+      session = _requireSession();
+    } catch (e, st) {
+      return Stream<RAGStreamEvent>.error(e, st);
+    }
+    final sessionAddr = session.address;
+
+    final controller = StreamController<RAGStreamEvent>(sync: false);
+    final receivePort = ReceivePort();
+    var sawTerminalEvent = false;
+    var sawError = false;
+    var tornDown = false;
+
+    void teardown() {
+      if (tornDown) return;
+      tornDown = true;
+      receivePort.close();
+    }
+
+    receivePort.listen((Object? message) {
+      if (message is Uint8List) {
+        if (controller.isClosed) return;
+        try {
+          final event = RAGStreamEvent.fromBuffer(message);
+          final terminal =
+              event.kind ==
+                  RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED ||
+              event.kind == RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR;
+          sawTerminalEvent = sawTerminalEvent || terminal;
+          controller.add(event);
+          if (terminal) {
+            unawaited(controller.close());
+          }
+        } catch (e, st) {
+          sawError = true;
+          controller.addError(e, st);
+          unawaited(controller.close());
+        }
+      } else if (message is int) {
+        // rc sentinel — always LAST (same port as events ⇒ FIFO). Early-return
+        // rcs (parse / no-session errors) produce no terminal event.
+        if (message != RAC_SUCCESS &&
+            !sawTerminalEvent &&
+            !sawError &&
+            !controller.isClosed) {
+          controller.addError(
+            StateError(
+              'rac_rag_query_stream_proto failed: '
+              '${RacResultCode.getMessage(message)}',
+            ),
+          );
+        }
+        if (!controller.isClosed) {
+          unawaited(controller.close());
+        }
+        teardown();
+      }
+    });
+
+    final requestBytes = options.writeToBuffer();
+    final worker = _runRagQueryStreamNativePortWorker(
+      sessionAddr,
+      requestBytes,
+      receivePort.sendPort.nativePort,
+    );
+
+    unawaited(
+      worker.catchError((Object e, StackTrace st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          unawaited(controller.close());
+        }
+        teardown();
+        return RAC_SUCCESS;
+      }),
+    );
+
+    controller.onCancel = teardown;
+
+    return controller.stream;
+  }
+
   RAGStatistics getStatistics() {
     final session = _requireSession();
     final fn = RacNative.bindings.rac_rag_stats_proto;
@@ -240,6 +341,44 @@ Uint8List _ragIngestWorker(int sessionAddr, Uint8List requestBytes) {
     bindings.rac_proto_buffer_free(out);
     calloc.free(reqPtr);
     calloc.free(out);
+  }
+}
+
+/// Runs the Flutter native-port RAG stream helper in a worker isolate. The
+/// helper posts each copied RAGStreamEvent to [nativePort] and posts the return
+/// code as the final sentinel.
+Future<int> _runRagQueryStreamNativePortWorker(
+  int sessionAddr,
+  Uint8List requestBytes,
+  int nativePort,
+) => Isolate.run(
+  () => _ragQueryStreamNativePortWorker(sessionAddr, requestBytes, nativePort),
+);
+
+int _ragQueryStreamNativePortWorker(
+  int sessionAddr,
+  Uint8List requestBytes,
+  int nativePort,
+) {
+  final bindings = RacNative.bindings;
+  final fn = bindings.ra_flutter_rag_query_stream_proto_native_port;
+  if (fn == null) {
+    throw UnsupportedError(
+      'ra_flutter_rag_query_stream_proto_native_port is unavailable',
+    );
+  }
+  final session = ffi.Pointer<ffi.Void>.fromAddress(sessionAddr);
+  final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
+  try {
+    return fn(
+      session,
+      requestPtr,
+      requestBytes.length,
+      nativePort,
+      ffi.NativeApi.postCObject,
+    );
+  } finally {
+    calloc.free(requestPtr);
   }
 }
 

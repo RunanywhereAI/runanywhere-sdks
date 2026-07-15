@@ -22,6 +22,7 @@ _rac_rag_clear_proto
 _rac_rag_cancel_proto
 _rac_rag_ingest_proto
 _rac_rag_query_proto
+_rac_rag_query_stream_proto
 _rac_rag_session_create_proto
 _rac_rag_session_destroy_proto
 _rac_rag_stats_proto

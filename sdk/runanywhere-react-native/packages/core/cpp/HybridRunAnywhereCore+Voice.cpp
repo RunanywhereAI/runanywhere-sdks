@@ -33,6 +33,7 @@
 #include "rac/features/stt/rac_stt_stream.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_stream.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
@@ -1084,6 +1085,37 @@ HybridRunAnywhereCore::vlmCancelProto() {
             return emptyVoiceProtoBuffer();
         }
         return copyVoiceProtoBuffer(out, "vlmCancelProto");
+    });
+}
+
+// ============================================================================
+// Diffusion Capability (Image Generation — Apple / CoreML only)
+// Uses commons lifecycle-owned diffusion proto ABI. The diffusion model is
+// loaded through the canonical lifecycle (modelLifecycleLoadProto with
+// component = DIFFUSION), so this call is handle-free:
+// rac_diffusion_generate_lifecycle_proto resolves the loaded model itself,
+// exactly like vlmProcessProto / embeddings lifecycle paths. Apple gating and
+// the streaming/cancel adaptation live in the TS facade
+// (RunAnywhere+Diffusion.ts), mirroring the Swift CppBridge.Diffusion actor.
+// ============================================================================
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::diffusionGenerateLifecycleProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [request = std::move(request)]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = rac_diffusion_generate_lifecycle_proto(
+            requestData, request.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("diffusionGenerateLifecycleProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "diffusionGenerateLifecycleProto");
     });
 }
 

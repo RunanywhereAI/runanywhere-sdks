@@ -96,7 +96,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
                         int64_t top_k = 0, double retrieval_time_ms = 0.0,
-                        const char* embedding_model = nullptr) {
+                        const char* embedding_model = nullptr,
+                        rac_result_t error_code = RAC_SUCCESS, int reranker_used = -1) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -121,6 +122,14 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // Populate the envelope SDKError so the telemetry manager records error_code on
+    // the row (the kCapability extractor reads ev.error().c_abi_code(); without this
+    // a failed RAG op landed with error_message set but error_code null).
+    if (error && error[0] && error_code != RAC_SUCCESS) {
+        auto* err = event.mutable_error();
+        err->set_message(error);
+        err->set_c_abi_code(static_cast<int32_t>(error_code));
+    }
     // CapabilityOperationEvent has no duration field; telemetry reads it from
     // the envelope properties map (see telemetry_manager kCapability extraction).
     if (duration_ms > 0.0) {
@@ -135,12 +144,17 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     if (embedding_model != nullptr && embedding_model[0] != '\0') {
         (*event.mutable_properties())["embedding_model"] = embedding_model;
     }
+    if (reranker_used >= 0) {
+        (*event.mutable_properties())["reranker_used"] = reranker_used != 0 ? "1" : "0";
+    }
     publish_event(event);
 }
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED, operation, 0.0f,
-                       0, 0, message && message[0] ? message : rac_error_message(code));
+                       0, 0, message && message[0] ? message : rac_error_message(code),
+                       /*duration_ms=*/0.0, /*model_id=*/nullptr, /*top_k=*/0,
+                       /*retrieval_time_ms=*/0.0, /*embedding_model=*/nullptr, /*error_code=*/code);
     (void)rac_sdk_event_publish_failure(code, message, "rag", operation, RAC_TRUE);
 }
 
@@ -207,6 +221,13 @@ struct Session {
     // events report the embedding model, query events the LLM).
     std::string embedding_model_id;
     std::string llm_model_id;
+    // Resolved retrieval top_k for this session (config default). Telemetry emits
+    // the effective retrieval top_k so the query row is never null when a caller
+    // omits a per-query override.
+    size_t retrieval_top_k = 5;
+    // Whether LLM-pointwise reranking is enabled for this session (config).
+    // Stamped onto query telemetry (rag_telemetry.reranker_used).
+    bool rerank = false;
 };
 
 struct SessionRegistry {
@@ -367,6 +388,143 @@ runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
     return out;
 }
 
+// Shared core for the unary + streaming RAG query entry points. Runs setup →
+// retrieval + generation (per-token via on_token when non-null) → telemetry →
+// builds the RAGResult proto. On success fills *out_proto and returns
+// RAC_SUCCESS; on failure returns the status and sets *out_error for the
+// caller's error surface. Telemetry (started/completed/failed) is emitted here
+// so both entry points behave identically.
+rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
+                               const runanywhere::v1::RAGQueryOptions& query_proto,
+                               std::function<bool(const std::string&)> on_token,
+                               runanywhere::v1::RAGResult* out_proto, std::string* out_error) {
+    const std::string question = query_proto.question();
+    const std::string system_prompt =
+        query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
+
+    // Base off RAC_LLM_OPTIONS_DEFAULT so the sampling fields RAGQueryOptions
+    // does not expose carry the proto-documented defaults instead of zero-init.
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+    opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
+    opts.temperature = query_proto.temperature();
+    opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
+    opts.top_k = query_proto.top_k();
+    opts.disable_thinking = query_proto.disable_thinking() ? RAC_TRUE : RAC_FALSE;
+    opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+
+    RAGBackend::QueryOverrides overrides;
+    overrides.retrieval_top_k = query_proto.retrieval_top_k();
+    overrides.has_similarity_threshold = query_proto.has_similarity_threshold();
+    overrides.similarity_threshold = query_proto.similarity_threshold();
+    overrides.enable_multi_query = query_proto.enable_multi_query();
+    constexpr int32_t kMaxMultiQueryCount = 8;
+    if (query_proto.has_multi_query_count()) {
+        const int32_t n = query_proto.multi_query_count();
+        overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
+    } else {
+        overrides.multi_query_count = 0;
+    }
+    if (query_proto.has_scope_prefix())
+        overrides.scope_prefix = query_proto.scope_prefix();
+
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
+                       "rag.query", 0.0f, 1, 0, nullptr, 0.0,
+                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
+                                               : s->llm_model_id.c_str());
+
+    const auto t_start = std::chrono::high_resolution_clock::now();
+    rac_llm_result_t llm_result = {};
+    nlohmann::json metadata;
+    rac_result_t status = RAC_SUCCESS;
+    try {
+        status = s->backend->query(question, &opts, &llm_result, metadata, std::move(on_token),
+                                   &overrides);
+    } catch (const std::exception& e) {
+        LOGE("rag.query exception: %s", e.what());
+        rac_llm_result_free(&llm_result);
+        if (out_error)
+            *out_error = e.what();
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.query", e.what());
+        return RAC_ERROR_PROCESSING_FAILED;
+    }
+    const auto t_end = std::chrono::high_resolution_clock::now();
+    const double total_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    if (status != RAC_SUCCESS) {
+        rac_llm_result_free(&llm_result);
+        if (out_error)
+            *out_error = rac_error_message(status);
+        publish_failure(status, "rag.query", rac_error_message(status));
+        return status;
+    }
+
+    runanywhere::v1::RAGResult& proto = *out_proto;
+    const char* raw_answer = llm_result.text ? llm_result.text : "";
+    const char* answer = nullptr;
+    size_t answer_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    std::string thinking_open_tag;
+    std::string thinking_close_tag;
+    (void)rac::llm::model_thinking_tags_from_registry(s->llm_model_id.c_str(), &thinking_open_tag,
+                                                      &thinking_close_tag);
+    if (rac_llm_extract_thinking_with_tags(
+            raw_answer, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
+            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &answer, &answer_len,
+            &thinking, &thinking_len) == RAC_SUCCESS) {
+        proto.set_answer(answer ? std::string(answer, answer_len) : std::string());
+        if (thinking && thinking_len > 0) {
+            proto.set_thinking_content(std::string(thinking, thinking_len));
+        }
+    } else if (llm_result.text) {
+        proto.set_answer(llm_result.text);
+    }
+
+    if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
+        proto.set_context_used(metadata["context_used"].get<std::string>());
+    }
+
+    if (metadata.contains("sources") && metadata["sources"].is_array()) {
+        for (const auto& s_item : metadata["sources"]) {
+            auto* chunk = proto.add_retrieved_chunks();
+            if (s_item.contains("id") && s_item["id"].is_string()) {
+                chunk->set_chunk_id(s_item["id"].get<std::string>());
+            }
+            if (s_item.contains("text") && s_item["text"].is_string()) {
+                chunk->set_text(s_item["text"].get<std::string>());
+            }
+            if (s_item.contains("score") && s_item["score"].is_number()) {
+                chunk->set_similarity_score(s_item["score"].get<float>());
+            }
+            if (s_item.contains("source_document") && s_item["source_document"].is_string()) {
+                chunk->set_source_document(s_item["source_document"].get<std::string>());
+            } else if (s_item.contains("source") && s_item["source"].is_string()) {
+                chunk->set_source_document(s_item["source"].get<std::string>());
+            }
+        }
+    }
+
+    const double generation_ms = llm_result.total_time_ms;
+    const double retrieval_ms = std::max(0.0, total_ms - generation_ms);
+    proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
+    proto.set_generation_time_ms(static_cast<int64_t>(generation_ms));
+    proto.set_total_time_ms(static_cast<int64_t>(total_ms));
+
+    // Emit the EFFECTIVE retrieval top_k (per-query override, else the session
+    // config default) — not query_proto.top_k(), which is the LLM sampling top_k.
+    const int64_t effective_top_k =
+        overrides.retrieval_top_k > 0 ? static_cast<int64_t>(overrides.retrieval_top_k)
+                                      : static_cast<int64_t>(s->retrieval_top_k);
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
+                       "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
+                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
+                                               : s->llm_model_id.c_str(),
+                       effective_top_k, retrieval_ms, s->embedding_model_id.c_str(),
+                       /*error_code=*/RAC_SUCCESS, /*reranker_used=*/s->rerank ? 1 : 0);
+    rac_llm_result_free(&llm_result);
+    return RAC_SUCCESS;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -490,6 +648,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         session->embedding_model_id = embedding_model_id;
         session->llm_model_id = llm_model_id;
         RAGBackendConfig backend_config = build_backend_config(proto);
+        session->retrieval_top_k = backend_config.top_k;
+        session->rerank = backend_config.rerank;
         // Resolve the dimension without assuming 384. Some providers know it
         // at create time; providers such as QHexRT only know after inference,
         // in which case zero remains the auto sentinel and RAGBackend binds the
@@ -666,135 +826,90 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
                                           "RAGQueryOptions.question is required");
     }
 
-    const std::string system_prompt =
-        query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
-
-    // Base off RAC_LLM_OPTIONS_DEFAULT so the sampling fields RAGQueryOptions
-    // does not expose (repetition_penalty, min_p, seed, grammar, ...) carry the
-    // proto-documented disabled/default sentinels instead of a raw zero-init.
-    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
-    opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
-    // 0.0 is the documented greedy value, not an "unset" sentinel. SDK
-    // defaults materialize 0.7 explicitly, so preserve an explicit zero all
-    // the way to the provider for deterministic production RAG answers.
-    opts.temperature = query_proto.temperature();
-    opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
-    // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
-    // dropped; thread it through. 0 = disabled (engine default).
-    opts.top_k = query_proto.top_k();
-    // Thread the structured thinking-suppression flag so commons prepends the
-    // no-think directive instead of the app injecting "/no_think" into the query.
-    opts.disable_thinking = query_proto.disable_thinking() ? RAC_TRUE : RAC_FALSE;
-    opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
-
-    // Per-query retrieval overrides from RAGQueryOptions (idl/rag.proto:180-183).
-    // Zero values fall back to the session-level RAGConfig defaults inside
-    // RAGBackend::query so legacy callers behave as before.
-    RAGBackend::QueryOverrides overrides;
-    overrides.retrieval_top_k = query_proto.retrieval_top_k();
-    overrides.has_similarity_threshold = query_proto.has_similarity_threshold();
-    overrides.similarity_threshold = query_proto.similarity_threshold();
-    overrides.enable_multi_query = query_proto.enable_multi_query();
-    // Clamp to a sane ceiling: each variant triggers an extra LLM rewrite +
-    // retrieval pass, so an unbounded value would let a caller fan out into
-    // arbitrarily many inference passes. 0 = use the session default; values
-    // <= 0 are treated as "use default" downstream (RAGBackend::query).
-    constexpr int32_t kMaxMultiQueryCount = 8;
-    if (query_proto.has_multi_query_count()) {
-        const int32_t n = query_proto.multi_query_count();
-        overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
-    } else {
-        overrides.multi_query_count = 0;
-    }
-    if (query_proto.has_scope_prefix())
-        overrides.scope_prefix = query_proto.scope_prefix();
-
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
-                       "rag.query", 0.0f, 1, 0, nullptr, 0.0,
-                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
-                                               : s->llm_model_id.c_str());
-
-    const auto t_start = std::chrono::high_resolution_clock::now();
-    rac_llm_result_t llm_result = {};
-    nlohmann::json metadata;
-    rac_result_t status = RAC_SUCCESS;
-    try {
-        status = s->backend->query(question, &opts, &llm_result, metadata, nullptr, &overrides);
-    } catch (const std::exception& e) {
-        LOGE("rag.query exception: %s", e.what());
-        rac_llm_result_free(&llm_result);
-        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.query", e.what());
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_PROCESSING_FAILED, e.what());
-    }
-    const auto t_end = std::chrono::high_resolution_clock::now();
-    const double total_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
-
+    runanywhere::v1::RAGResult proto;
+    std::string err_msg;
+    const rac_result_t status = execute_rag_query(s, query_proto, nullptr, &proto, &err_msg);
     if (status != RAC_SUCCESS) {
-        rac_llm_result_free(&llm_result);
-        publish_failure(status, "rag.query", rac_error_message(status));
-        return rac_proto_buffer_set_error(out_result, status, rac_error_message(status));
+        return rac_proto_buffer_set_error(
+            out_result, status, err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
     }
+    return copy_proto(proto, out_result);
+#endif
+}
+
+rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
+                                        size_t query_proto_size,
+                                        rac_rag_stream_proto_callback_t callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session;
+    (void)query_proto_bytes;
+    (void)query_proto_size;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!callback)
+        return RAC_ERROR_NULL_POINTER;
+    const auto s = acquire_session(session);
+    if (!s || !s->backend) {
+        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.query", "RAG session is not loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+    if (!valid_bytes(query_proto_bytes, query_proto_size))
+        return RAC_ERROR_DECODING_ERROR;
+    runanywhere::v1::RAGQueryOptions query_proto;
+    if (!query_proto.ParseFromArray(parse_data(query_proto_bytes, query_proto_size),
+                                    static_cast<int>(query_proto_size)))
+        return RAC_ERROR_DECODING_ERROR;
+    if (query_proto.question().empty())
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // Serializes one RAGStreamEvent and hands it to the SDK callback. Runs on the
+    // calling thread (the pipeline invokes on_token synchronously).
+    uint64_t seq = 0;
+    // Returns true to keep generating; false when the SDK callback asked to stop
+    // (backpressure / early stop). Terminal emits ignore the return.
+    auto emit = [&](runanywhere::v1::RAGStreamEventKind kind, const std::string* token,
+                    const runanywhere::v1::RAGResult* result, rac_result_t err_code,
+                    const char* err_msg) -> bool {
+        runanywhere::v1::RAGStreamEvent ev;
+        ev.set_seq(seq++);
+        ev.set_timestamp_us(now_ms() * 1000);
+        ev.set_kind(kind);
+        if (token != nullptr)
+            ev.set_token(*token);
+        if (result != nullptr)
+            *ev.mutable_result() = *result;
+        if (err_msg != nullptr && err_msg[0] != '\0') {
+            ev.set_error_message(err_msg);
+            ev.set_error_code(static_cast<int32_t>(err_code));
+        }
+        std::string bytes;
+        if (!ev.SerializeToString(&bytes))
+            return true;
+        return callback(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), user_data) ==
+               RAC_TRUE;
+    };
+
+    auto on_token = [&](const std::string& tok) -> bool {
+        // Propagate the SDK callback's stop request: a false return halts token
+        // generation and the run ends with a terminal COMPLETED (partial answer).
+        // Cancellation via rac_rag_cancel_proto() still latches the pipeline atomic.
+        return emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_TOKEN, &tok, nullptr, RAC_SUCCESS,
+                    nullptr);
+    };
 
     runanywhere::v1::RAGResult proto;
-    const char* raw_answer = llm_result.text ? llm_result.text : "";
-    const char* answer = nullptr;
-    size_t answer_len = 0;
-    const char* thinking = nullptr;
-    size_t thinking_len = 0;
-    std::string thinking_open_tag;
-    std::string thinking_close_tag;
-    (void)rac::llm::model_thinking_tags_from_registry(s->llm_model_id.c_str(), &thinking_open_tag,
-                                                      &thinking_close_tag);
-    if (rac_llm_extract_thinking_with_tags(
-            raw_answer, thinking_open_tag.empty() ? nullptr : thinking_open_tag.c_str(),
-            thinking_close_tag.empty() ? nullptr : thinking_close_tag.c_str(), &answer, &answer_len,
-            &thinking, &thinking_len) == RAC_SUCCESS) {
-        proto.set_answer(answer ? std::string(answer, answer_len) : std::string());
-        if (thinking && thinking_len > 0) {
-            proto.set_thinking_content(std::string(thinking, thinking_len));
-        }
-    } else if (llm_result.text) {
-        proto.set_answer(llm_result.text);
+    std::string err_msg;
+    const rac_result_t status = execute_rag_query(s, query_proto, on_token, &proto, &err_msg);
+    if (status != RAC_SUCCESS) {
+        (void)emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_ERROR, nullptr, nullptr, status,
+                   err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
+        return status;
     }
-
-    if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
-        proto.set_context_used(metadata["context_used"].get<std::string>());
-    }
-
-    if (metadata.contains("sources") && metadata["sources"].is_array()) {
-        for (const auto& s_item : metadata["sources"]) {
-            auto* chunk = proto.add_retrieved_chunks();
-            if (s_item.contains("id") && s_item["id"].is_string()) {
-                chunk->set_chunk_id(s_item["id"].get<std::string>());
-            }
-            if (s_item.contains("text") && s_item["text"].is_string()) {
-                chunk->set_text(s_item["text"].get<std::string>());
-            }
-            if (s_item.contains("score") && s_item["score"].is_number()) {
-                chunk->set_similarity_score(s_item["score"].get<float>());
-            }
-            if (s_item.contains("source_document") && s_item["source_document"].is_string()) {
-                chunk->set_source_document(s_item["source_document"].get<std::string>());
-            } else if (s_item.contains("source") && s_item["source"].is_string()) {
-                chunk->set_source_document(s_item["source"].get<std::string>());
-            }
-        }
-    }
-
-    const double generation_ms = llm_result.total_time_ms;
-    const double retrieval_ms = std::max(0.0, total_ms - generation_ms);
-    proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
-    proto.set_generation_time_ms(static_cast<int64_t>(generation_ms));
-    proto.set_total_time_ms(static_cast<int64_t>(total_ms));
-
-    rac_result_t rc = copy_proto(proto, out_result);
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
-                       "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
-                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
-                                               : s->llm_model_id.c_str(),
-                       query_proto.top_k(), retrieval_ms, s->embedding_model_id.c_str());
-    rac_llm_result_free(&llm_result);
-    return rc;
+    (void)emit(runanywhere::v1::RAG_STREAM_EVENT_KIND_COMPLETED, nullptr, &proto, RAC_SUCCESS,
+               nullptr);
+    return RAC_SUCCESS;
 #endif
 }
 

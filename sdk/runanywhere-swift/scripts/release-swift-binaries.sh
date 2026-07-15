@@ -184,6 +184,12 @@ zip_resources() {
 
 zip_target "RACommons.xcframework"          "RACommons-ios"
 zip_target "RABackendLLAMACPP.xcframework"  "RABackendLLAMACPP-ios"
+# CoreML Stable-Diffusion engine — Apple-only, always produced by
+# build-core-xcframework.sh. The Swift ONNXRuntime target declares an
+# unconditional dependency on RABackendCoreMLBinary, so external SPM consumers
+# need this zip + the matching `.binaryTarget(name: "RABackendCoreMLBinary", …)`
+# entry in the root Package.swift to resolve the manifest.
+zip_target "RABackendCoreML.xcframework"    "RABackendCoreML-ios"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     zip_target "RABackendONNX.xcframework"  "RABackendONNX-ios"
     # Sherpa-ONNX ships as a peer xcframework alongside RABackendONNX. The

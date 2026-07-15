@@ -381,6 +381,16 @@ public:
   vlmCancelProto() override;
 
   // ============================================================================
+  // Diffusion Capability (Image Generation — Apple / CoreML only)
+  // Uses commons lifecycle-owned diffusion proto ABI
+  // (rac_diffusion_generate_lifecycle_proto).
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  diffusionGenerateLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+
+  // ============================================================================
   // Device Identity
   // ============================================================================
 
@@ -473,6 +483,11 @@ public:
   ragIngestProto(const std::shared_ptr<ArrayBuffer> &documentBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ragQueryProto(const std::shared_ptr<ArrayBuffer> &queryBytes) override;
+  std::shared_ptr<Promise<void>> ragQueryStreamProto(
+      const std::shared_ptr<ArrayBuffer> &queryBytes,
+      const std::function<void(const std::shared_ptr<ArrayBuffer> &)> &onEventBytes)
+      override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragCancelProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ragClearProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>

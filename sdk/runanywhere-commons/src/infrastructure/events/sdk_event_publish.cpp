@@ -235,7 +235,8 @@ rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
                                   runanywhere::v1::EventCategory category,
                                   runanywhere::v1::VoiceLifecycleEvent payload,
                                   const char* session_id,
-                                  runanywhere::v1::EventDestination destination) {
+                                  runanywhere::v1::EventDestination destination,
+                                  const std::map<std::string, std::string>* extra_properties) {
     runanywhere::v1::SDKEvent event;
     *event.mutable_voice() = std::move(payload);
     if (session_id != nullptr && session_id[0] != '\0') {
@@ -243,6 +244,11 @@ rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
     }
     if (destination != runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED) {
         event.set_destination(destination);
+    }
+    if (extra_properties != nullptr) {
+        for (const auto& kv : *extra_properties) {
+            (*event.mutable_properties())[kv.first] = kv.second;
+        }
     }
     return publish(event, component, category);
 }

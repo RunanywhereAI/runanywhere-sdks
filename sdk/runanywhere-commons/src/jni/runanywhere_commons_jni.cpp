@@ -5564,6 +5564,49 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryRequestProto
     return makeProtoCallResult(env, rc, &result, "racRagQueryRequestProto");
 }
 
+// Streaming RAG query: blocks on the calling (background) thread, invoking the
+// JVM listener with each serialized RAGStreamEvent (TOKEN..., then COMPLETED or
+// ERROR). Mirrors racLlmGenerateStreamProto. Request-scoped like the unary path:
+// the request relay makes cancellation target this exact stream (via
+// racRagCancelRequestProto) instead of any query on the session, so concurrent
+// collectors cannot cancel each other. The listener returns false to stop early
+// (backpressure), forwarded through proto_bool_callback.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryStreamRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray queryProto,
+    jobject listener) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return static_cast<jint>(RAC_ERROR_INVALID_STATE);
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_rag_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        return static_cast<jint>(start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                                     ? RAC_ERROR_CANCELLED
+                                     : RAC_ERROR_INVALID_STATE);
+    }
+    rac::jni::RequestCompletionGuard completion(&g_rag_request_relay, request_id);
+
+    JByteArrayView query(env, queryProto);
+    if (handle == 0L || !query.ok)
+        return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t,
+                                rac_bool_t (*)(const uint8_t*, size_t, void*), void*);
+    Fn streamRag = optionalNativeSymbol<Fn>("rac_rag_query_stream_proto");
+    if (streamRag == nullptr)
+        return static_cast<jint>(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racRagQueryStreamRequestProto"};
+    rac_result_t rc = streamRag(handleFromJLong(handle), query.u8(), query.size(),
+                                globalListener != nullptr ? proto_bool_callback : nullptr,
+                                globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
+}
+
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagCancelProto(
     JNIEnv* env, jclass clazz, jlong handle) {
     (void)env;

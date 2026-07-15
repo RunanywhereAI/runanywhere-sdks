@@ -36,7 +36,7 @@ internal object QHexRTSkelInstaller {
             val skelNames =
                 context.assets
                     .list(assetDir)
-                    ?.filter { it.startsWith("libQnnHtpV") && it.endsWith("Skel.so") }
+                    ?.filter { (it.startsWith("libQnnHtpV") && it.endsWith("Skel.so")) || it == "libQnnBonsaiBitnet.so" }
                     .orEmpty()
                     .sorted()
             if (skelNames.isEmpty()) {

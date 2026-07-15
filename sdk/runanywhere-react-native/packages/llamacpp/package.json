@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/llamacpp",
-  "version": "0.20.0",
+  "version": "0.20.10",
   "description": "LlamaCpp backend for RunAnywhere React Native SDK - GGUF model support for on-device LLM",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -64,7 +64,7 @@
     "@runanywhere/proto-ts": "workspace:*"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.20.0",
+    "@runanywhere/core": ">=0.20.10",
     "react": ">=19.0.0",
     "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"

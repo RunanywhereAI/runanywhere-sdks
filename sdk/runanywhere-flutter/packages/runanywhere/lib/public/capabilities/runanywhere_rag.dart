@@ -203,6 +203,35 @@ class RunAnywhereRAG {
     return DartBridgeRAG.shared.queryAsync(options);
   }
 
+  /// Streaming query — emits a [RAGStreamEvent] per generated token (kind =
+  /// TOKEN) as the answer is produced, then a terminal COMPLETED event carrying
+  /// the full [RAGResult], or an ERROR event.
+  ///
+  /// Because tokens surface as they generate, callers render progress live and
+  /// do not need a wall-clock timeout. Cancelling the subscription stops
+  /// delivery (the native call runs to completion; RAG has no per-query cancel).
+  Stream<RAGStreamEvent> queryStream(String question, {RAGQueryOptions? options}) {
+    if (!DartBridge.isInitialized) {
+      return Stream<RAGStreamEvent>.error(SDKException.notInitialized());
+    }
+    final effectiveOptions = RAGQueryOptions();
+    if (options != null) {
+      effectiveOptions.mergeFromMessage(options);
+    }
+    if (effectiveOptions.question.isEmpty) {
+      effectiveOptions.question = question;
+    }
+    return ragQueryStream(effectiveOptions);
+  }
+
+  /// Streaming query through the generated-proto C++ RAG ABI.
+  Stream<RAGStreamEvent> ragQueryStream(RAGQueryOptions options) {
+    if (!DartBridge.isInitialized) {
+      return Stream<RAGStreamEvent>.error(SDKException.notInitialized());
+    }
+    return DartBridgeRAG.shared.queryStream(options);
+  }
+
   Future<ModelLoadResult> _loadRAGArtifactModel(
     ModelInfo model, {
     required ModelCategory fallbackCategory,

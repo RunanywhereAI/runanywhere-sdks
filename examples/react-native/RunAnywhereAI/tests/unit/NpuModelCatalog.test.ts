@@ -15,11 +15,11 @@ import {
 } from '../../src/services/NpuModelCatalog';
 
 describe('React Native QHexRT catalog', () => {
-  it('keeps 51 unique app-owned URL and presentation rows', () => {
-    expect(NPU_BUNDLES).toHaveLength(51);
+  it('keeps 48 unique app-owned URL and presentation rows', () => {
+    expect(NPU_BUNDLES).toHaveLength(48);
     expect(new Set(NPU_BUNDLES.map((bundle) => bundle.id))).toHaveProperty(
       'size',
-      51
+      48
     );
     expect(
       NPU_BUNDLES.every((bundle) => bundle.url.startsWith('https://'))

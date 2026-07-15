@@ -531,7 +531,11 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl, const char* prompt,
             impl->text_encoder, /*input=*/true, impl->io_config,
             {"text_encoder.attention_mask", "text.attention_mask", "attention_mask"},
             {"attention_mask"}, MLFeatureTypeMultiArray);
-        if (mask_name) {
+        // Apple's TextEncoder has only input_ids; resolve_feature_name's fallback
+        // returns the first MultiArray input when no real attention_mask exists, so
+        // the original code overwrote input_ids with a length-only 1/0 mask ->
+        // content-blind conditioning. Only set the mask when it is a DISTINCT input.
+        if (mask_name && ![mask_name isEqualToString:ids_name]) {
             MLFeatureDescription* mask_desc = feature_desc(impl->text_encoder, true, mask_name);
             std::vector<NSInteger> mask_shape = multiarray_shape(mask_desc, ids_shape);
             MLMultiArray* mask_array = make_multiarray(
@@ -700,10 +704,21 @@ MLMultiArray* make_batched_embeddings(MLMultiArray* negative, MLMultiArray* posi
     if (src_count == 0) {
         return out;
     }
+    // Apple's TextEncoder emits last_hidden_state as [1, S=77, E=768] (seq-major)
+    // but the UNet encoder_hidden_states input is [B, E=768, 1, S=77] (embed-major).
+    // Transpose the (seq, embed) axes so the conditioning is not scrambled.
+    const std::vector<NSInteger> src_shape = ns_shape_to_vector(positive.shape);
+    const NSInteger S = src_shape.size() >= 2 ? src_shape[src_shape.size() - 2] : 1;
+    const NSInteger E = src_shape.size() >= 1 ? src_shape[src_shape.size() - 1] : 1;
     for (NSInteger b = 0; b < batch; ++b) {
         MLMultiArray* source = (b == 0 && negative) ? negative : positive;
-        for (size_t i = 0; i < src_count; ++i) {
-            array_set(out, static_cast<size_t>(b) * src_count + i, array_get(source, i));
+        for (NSInteger s = 0; s < S; ++s) {
+            for (NSInteger e = 0; e < E; ++e) {
+                const size_t src_idx = static_cast<size_t>(s) * E + e;
+                const size_t dst_idx = static_cast<size_t>(e) * S + s;
+                array_set(out, static_cast<size_t>(b) * src_count + dst_idx,
+                          array_get(source, src_idx));
+            }
         }
     }
     return out;
@@ -910,10 +925,10 @@ bool convert_decoded_image(MLMultiArray* image, uint8_t** out_rgba, size_t* out_
         for (NSInteger x = 0; x < width; ++x) {
             const size_t dst = static_cast<size_t>(y * width + x) * 4;
             for (NSInteger c = 0; c < 3; ++c) {
+                // VAE decoder output is in [-1, 1]; map the whole range with
+                // (v+1)/2 (the original only remapped negatives, crushing bright tones).
                 float value = read_pixel(y, x, c);
-                if (value < 0.0f) {
-                    value = (value + 1.0f) * 0.5f;
-                }
+                value = (value + 1.0f) * 0.5f;
                 value = std::clamp(value, 0.0f, 1.0f);
                 rgba[dst + static_cast<size_t>(c)] =
                     static_cast<uint8_t>(std::lround(value * 255.0f));

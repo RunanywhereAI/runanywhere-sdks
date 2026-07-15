@@ -406,6 +406,21 @@ class DartBridgeDevice {
   /// Device model from the canonical registration snapshot.
   static String get cachedDeviceModel => _cachedRegistrationInfo.deviceModel;
 
+  /// OS version from the canonical registration snapshot (Android
+  /// `Build.VERSION.RELEASE` / iOS `systemVersion`), not the kernel/build
+  /// string that `Platform.operatingSystemVersion` returns.
+  static String get cachedOsVersion => _cachedRegistrationInfo.osVersion;
+
+  /// Populate the device-info snapshot if it is still the placeholder default.
+  /// Lets callers that run before Phase 2 device registration (e.g. telemetry
+  /// device-info setup) get the real model/OS instead of `unknown` + the build
+  /// string. Idempotent: a no-op once a real snapshot has been collected.
+  static Future<void> ensureDeviceInfoSnapshot() async {
+    if (_cachedRegistrationInfo.deviceModel == 'unknown') {
+      await _refreshDeviceInfoSnapshot();
+    }
+  }
+
   /// Register accurate app/client metadata with commons before Phase 2 device
   /// registration builds its JSON payload.
   static Future<void> _configureClientInfo() async {
