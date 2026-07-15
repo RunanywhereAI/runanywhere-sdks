@@ -45,7 +45,9 @@ internal object ChatRequestPolicy {
         val inputBudget = (contextTokens - outputTokens - margin).coerceAtLeast(16)
         val fixed = (systemPrompt?.takeIf { it.isNotBlank() }?.let { est(it) } ?: 0) + est(turn.prompt)
         var available = inputBudget - fixed
-        if (available <= 0) return turn.copy(history = emptyList()) // no room for any history
+        // The current prompt + system prompt already fill the input budget — drop history entirely.
+        // Expected only for an extremely tight context or a very long single prompt.
+        if (available <= 0) return turn.copy(history = emptyList())
         val kept = ArrayDeque<ProtoChatMessage>()
         for (message in turn.history.asReversed()) { // keep the most RECENT turns that fit
             val cost = est(message.content)
