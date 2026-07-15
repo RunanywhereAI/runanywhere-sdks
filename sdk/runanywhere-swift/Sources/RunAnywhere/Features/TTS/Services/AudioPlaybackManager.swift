@@ -76,15 +76,22 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
             throw AudioPlaybackError.emptyAudioData
         }
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            lock.withLock { $0.playbackContinuation = continuation }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                lock.withLock { $0.playbackContinuation = continuation }
 
-            do {
-                try startPlayback(audioData)
-            } catch {
-                lock.withLock { $0.playbackContinuation = nil }
-                continuation.resume(throwing: error)
+                do {
+                    try startPlayback(audioData)
+                } catch {
+                    lock.withLock { $0.playbackContinuation = nil }
+                    continuation.resume(throwing: error)
+                }
             }
+        } onCancel: {
+            // Stop immediately when the awaiting task is cancelled (voice-agent
+            // teardown / user Stop) so a reply doesn't keep playing to the end;
+            // stop() resumes the continuation with .playbackInterrupted.
+            stop()
         }
     }
 
