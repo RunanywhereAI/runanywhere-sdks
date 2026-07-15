@@ -205,10 +205,17 @@ class DartBridgeTelemetry {
         return;
       }
 
-      // Device info — the model lookup is async, so it only happens here in
-      // Phase 2 (the Phase-1 attach creates the manager without it).
+      // Device info — the model/OS lookup is async (device_info_plus), so it
+      // only happens here. Ensure the device snapshot is populated first; this
+      // runs before Phase 2 device registration refreshes it, so without this
+      // the manager would be stamped with the placeholder defaults (model
+      // "unknown" + the Platform.operatingSystemVersion build string).
+      await DartBridgeDevice.ensureDeviceInfoSnapshot();
       final deviceModel = await _getDeviceModel();
-      final osVersion = Platform.operatingSystemVersion;
+      final cachedOs = DartBridgeDevice.cachedOsVersion.trim();
+      final osVersion = cachedOs.isNotEmpty
+          ? cachedOs
+          : Platform.operatingSystemVersion;
       final setDeviceInfo = lib
           .lookupFunction<
             Void Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),

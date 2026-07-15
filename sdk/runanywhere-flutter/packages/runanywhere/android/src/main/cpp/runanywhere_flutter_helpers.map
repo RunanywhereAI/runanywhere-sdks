@@ -1,0 +1,14 @@
+# Export only the Flutter helper's own C entry points. Everything else —
+# crucially the weak libc++ vague-linkage symbols (operator new/delete) pulled
+# in from the static C++ runtime — is localized so it cannot be exported and
+# interpose the process-wide allocator. Without this, `operator new`/`delete`
+# leaked from this .so bind ahead of libc++_shared for other libraries
+# (e.g. llama.cpp's gguf std::strings), so a buffer is new'd on one allocator
+# view and freed on another -> "pointer tag truncated" SIGABRT on Android 15+.
+{
+  global:
+    ra_flutter_*;
+    JNI_OnLoad;
+  local:
+    *;
+};

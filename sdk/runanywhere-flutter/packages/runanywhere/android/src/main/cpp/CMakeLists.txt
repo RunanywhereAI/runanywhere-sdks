@@ -26,6 +26,15 @@ if(ANDROID)
         PRIVATE
             -Wl,-z,max-page-size=16384
             -Wl,-z,common-page-size=16384
+            # Do not leak libc++ operator new/delete (or any static-runtime
+            # symbol) out of this helper. Exporting them lets the dynamic linker
+            # interpose this .so's allocator ahead of libc++_shared for other
+            # libraries (e.g. llama.cpp gguf std::strings), which frees a buffer
+            # on a different allocator view than it was allocated on and aborts
+            # with "pointer tag truncated" on Android 15+. The version script
+            # exports only the ra_flutter_* entry points + JNI_OnLoad.
+            -Wl,--exclude-libs,ALL
+            -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/runanywhere_flutter_helpers.map
     )
 endif()
 
