@@ -679,20 +679,30 @@ extension ChatInterfaceView {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            do {
-                let text = try DocumentService.extractText(from: url)
-                pendingDocumentAttachment = ChatDocumentAttachment(
-                    filename: url.lastPathComponent,
-                    text: text
-                )
-                pendingImageAttachment = nil
-
-                if !areDocumentModelsReady {
-                    showNextDocumentModelPicker()
+            Task {
+                do {
+                    // Extract off the main actor — PDFKit/JSON parsing of a large
+                    // file blocks the UI (and risks the watchdog) if run inline.
+                    // extractText manages its own security-scoped access.
+                    let text = try await Task.detached(priority: .userInitiated) {
+                        try DocumentService.extractText(from: url)
+                    }.value
+                    await MainActor.run {
+                        pendingDocumentAttachment = ChatDocumentAttachment(
+                            filename: url.lastPathComponent,
+                            text: text
+                        )
+                        pendingImageAttachment = nil
+                        if !areDocumentModelsReady {
+                            showNextDocumentModelPicker()
+                        }
+                    }
+                } catch {
+                    await MainActor.run {
+                        debugMessage = error.localizedDescription
+                        showDebugAlert = true
+                    }
                 }
-            } catch {
-                debugMessage = error.localizedDescription
-                showDebugAlert = true
             }
         case .failure(let error):
             debugMessage = error.localizedDescription

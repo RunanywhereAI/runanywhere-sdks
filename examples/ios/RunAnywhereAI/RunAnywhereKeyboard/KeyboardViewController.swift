@@ -40,6 +40,15 @@ final class KeyboardViewController: UIInputViewController {
         setupKeyboardView()
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // The keyboard is going away (switched away, text field closed, host app
+        // backgrounded). Tell the main app to end any active dictation session so
+        // the mic engine doesn't keep capturing in the background with no stop
+        // affordance. The main app already observes this channel and tears down.
+        DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.endSession)
+    }
+
     // MARK: - Setup
 
     private func setupKeyboardView() {
@@ -86,11 +95,18 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - Undo
 
+    /// Text THIS keyboard actually inserted, so Undo never blind-deletes the
+    /// user's own typing. The shared `lastInsertedText` is written by the app even
+    /// when the insertion notification was missed (extension jettisoned), which
+    /// would otherwise make Undo delete characters the user typed themselves.
+    private var lastInsertedByKeyboard: String?
+
     private func handleUndo() {
-        guard let text = SharedDataBridge.shared.lastInsertedText, !text.isEmpty else { return }
+        guard let text = lastInsertedByKeyboard, !text.isEmpty else { return }
         for _ in text {
             textDocumentProxy.deleteBackward()
         }
+        lastInsertedByKeyboard = nil
         SharedDataBridge.shared.lastInsertedText = nil
     }
 
@@ -99,6 +115,9 @@ final class KeyboardViewController: UIInputViewController {
     private func handleTranscriptionReady() {
         guard let text = SharedDataBridge.shared.transcribedText, !text.isEmpty else { return }
         textDocumentProxy.insertText(text)
+        // Record what we actually inserted so Undo only removes this, not the
+        // user's own text (see lastInsertedByKeyboard).
+        lastInsertedByKeyboard = text
         // Do NOT call clearSession() here — that would set state back to "idle".
         // FlowSessionManager handles the done→ready transition itself.
         SharedDataBridge.shared.transcribedText = nil

@@ -49,17 +49,22 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
         // capture engine mid-session.
         try await configureVoiceAudioSession()
         playback.managesAudioSession = false
-        try await capture.startRecording(configureSession: false) { [weak self] chunk in
-            self?.enqueueChunk(chunk)
-        }
-        logger.info("Voice-agent mic capture started")
 
+        // Register teardown BEFORE startRecording: configureVoiceAudioSession has
+        // already activated the shared .playAndRecord session, so if capture start
+        // throws (mic contended / engine fails) this defer still deactivates it —
+        // otherwise the activated session leaks and other apps stay ducked.
         defer {
             capture.stopRecording(deactivateSession: true)
             playback.stop()
             chunkLock.withLock { $0.removeAll() }
             logger.info("Voice-agent mic capture stopped")
         }
+
+        try await capture.startRecording(configureSession: false) { [weak self] chunk in
+            self?.enqueueChunk(chunk)
+        }
+        logger.info("Voice-agent mic capture started")
 
         try await feedLoop()
     }

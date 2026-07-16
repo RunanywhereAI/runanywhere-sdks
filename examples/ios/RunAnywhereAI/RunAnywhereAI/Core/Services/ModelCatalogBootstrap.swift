@@ -214,22 +214,14 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_400_000_000,
             supportsThinking: true
         )
-        await registerLLM(
-            id: "mlx-gemma-4-e2b-it-4bit",
-            name: "MLX Gemma 4 E2B IT 4bit (Experimental)",
-            url: "https://huggingface.co/mlx-community/gemma-4-e2b-it-4bit",
-            framework: .mlx,
-            modality: .multimodal,
-            memoryRequirement: 2_200_000_000
-        )
-        await registerLLM(
-            id: "mlx-gemma-4-e4b-it-4bit",
-            name: "MLX Gemma 4 E4B IT 4bit (Experimental)",
-            url: "https://huggingface.co/mlx-community/gemma-4-e4b-it-4bit",
-            framework: .mlx,
-            modality: .multimodal,
-            memoryRequirement: 4_000_000_000
-        )
+        // NOTE: The MLX Gemma 4 (E2B/E4B) checkpoints are intentionally NOT
+        // registered. Their attention layers use an asymmetric QK-norm (some
+        // layers ship `self_attn.q_norm` without a matching `self_attn.k_norm`),
+        // but mlx-swift-lm 3.31.4's `Gemma4TextAttention` unconditionally loads
+        // `self_attn.k_norm.weight` and aborts with `keyNotFound` on the first
+        // such layer — so they download fully and then fail to load. Re-enable
+        // once mlx-swift-lm makes per-layer k_norm optional. The GGUF (llama.cpp)
+        // Gemma 4 variants below load fine and remain available.
         await registerLLM(
             id: "mlx-qwen2-vl-2b-instruct-4bit",
             name: "MLX Qwen2-VL 2B Instruct 4bit",

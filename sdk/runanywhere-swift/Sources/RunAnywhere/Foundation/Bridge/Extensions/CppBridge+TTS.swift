@@ -109,7 +109,13 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
     }
 
     func waitForTerminal() {
-        terminalSemaphore.wait()
+        // Bounded wait: if the native engine streams audio but never delivers a
+        // terminal event, don't park the consumer's stream forever. Time out and
+        // surface a failure terminal (yieldFailure also signals), matching the
+        // timed waits used elsewhere in the bridge.
+        if terminalSemaphore.wait(timeout: .now() + 120) == .timedOut {
+            yieldFailure("TTS synthesis timed out waiting for completion")
+        }
     }
 
     func yield(bytes: UnsafePointer<UInt8>?, size: Int) {

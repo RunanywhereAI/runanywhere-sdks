@@ -65,6 +65,12 @@ struct VLMCameraView: View {
                 }
             }
         }
+        .onChange(of: viewModel.isModelLoaded) { _, loaded in
+            // Start the camera once a model is ready; stop it if the model is
+            // unloaded/deleted mid-session so the session doesn't keep running
+            // behind the "choose a vision model" prompt.
+            if loaded { setupCameraIfNeeded() } else { viewModel.stopCamera() }
+        }
     }
 
     // MARK: - Main Content
@@ -294,6 +300,11 @@ struct VLMCameraView: View {
     }
 
     private func setupCameraIfNeeded() {
+        // Don't run the camera until a vision model is loaded. Otherwise the
+        // capture session (and the iOS camera privacy indicator) runs with no
+        // visible preview and nothing to feed it, and the permission prompt
+        // fires before the user has chosen a model.
+        guard viewModel.isModelLoaded else { return }
         Task {
             await viewModel.checkCameraAuthorization()
             if viewModel.isCameraAuthorized {

@@ -71,6 +71,9 @@ public final class SystemTTSService: NSObject {
                     // actually route audio to the speaker.
                     #if os(iOS) || os(tvOS)
                     let audioSession = AVAudioSession.sharedInstance()
+                    let previousCategory = audioSession.category
+                    let previousMode = audioSession.mode
+                    let previousOptions = audioSession.categoryOptions
                     try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
                     try audioSession.setActive(true)
                     #endif
@@ -79,6 +82,12 @@ public final class SystemTTSService: NSObject {
 
                     // The delegate completes this continuation when speech ends.
                     speechCompletion = { result in
+                        #if os(iOS) || os(tvOS)
+                        // Restore the caller's prior audio-session configuration so a
+                        // single speak() call does not permanently leave the session
+                        // in .playback/.duckOthers.
+                        try? audioSession.setCategory(previousCategory, mode: previousMode, options: previousOptions)
+                        #endif
                         continuation.resume(with: result)
                     }
                     synthesizer.speak(utterance)
@@ -91,7 +100,11 @@ public final class SystemTTSService: NSObject {
 
     public func stop() {
         synthesizer.stopSpeaking(at: .immediate)
-        speechCompletion?(.success(()))
+        // Cancelling an in-flight speak() must surface as CancellationError to match
+        // speak()'s documented contract and the SDK-wide cancel-throws convention.
+        // Nil-ing the completion here also prevents the later didCancel delegate
+        // from double-resuming the continuation.
+        speechCompletion?(.failure(CancellationError()))
         speechCompletion = nil
     }
 
