@@ -57,8 +57,15 @@ contextBridge.exposeInMainWorld('runanywhere', {
   initialize: (secureDir?: string, baseDir?: string) => send('initialize', [secureDir, baseDir]),
 
   loadLLM: (modelPath: string) => send('loadModel', [modelPath]),
-  generate: (handle: number, prompt: string, onToken: (t: string) => void) =>
-    send('generate', [handle, prompt], onToken),
+  generate: (
+    handle: number,
+    prompt: string,
+    optionsOrOnToken: Record<string, unknown> | ((t: string) => void),
+    onToken?: (t: string) => void
+  ) =>
+    typeof optionsOrOnToken === 'function'
+      ? send('generate', [handle, prompt], optionsOrOnToken)
+      : send('generate', [handle, prompt, optionsOrOnToken], onToken),
   unloadLLM: (handle: number) => send('unloadModel', [handle]),
 
   loadVLM: (modelPath: string, mmprojPath: string) => send('loadVlmModel', [modelPath, mmprojPath]),
