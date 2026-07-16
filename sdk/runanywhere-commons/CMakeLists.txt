@@ -535,6 +535,15 @@ endif()
 # archive to a known directory and add it to the linker search path so the
 # `-l` lookup succeeds.
 if(MSVC)
+    # zlib's own CMake gives the static target OUTPUT_NAME `zs` on Windows, but
+    # commons + libarchive reference it by the bare string `zlibstatic`
+    # (ZLIB_LIBRARIES=zlibstatic), so the link line looks for `zlibstatic.lib` —
+    # which never exists, producing LNK1181 the first time an executable links the
+    # chain. We build static-only (no shared zlib.lib to disambiguate from), so
+    # force the output name back to match the reference.
+    if(TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES OUTPUT_NAME zlibstatic)
+    endif()
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
         string(TOUPPER "${_cfg}" _CFG)
         if(TARGET zlibstatic)
@@ -1422,6 +1431,11 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
         set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
         set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
+        # protobuf defaults protobuf_MSVC_STATIC_RUNTIME=ON (static CRT /MT), but
+        # the rest of the build (rac_commons, llama.cpp, libarchive, desktop exes,
+        # and the Node .node addon) uses the dynamic CRT /MD. Mixing /MT and /MD in
+        # one link fails with LNK2038; Node/Electron require /MD. Force /MD here.
+        set(protobuf_MSVC_STATIC_RUNTIME   OFF CACHE BOOL "" FORCE)
         set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
         # Skip building upb (Universal Protocol Buffers) entirely. Upstream
         # protobuf v34 builds protoc-gen-upb / protoc-gen-upbdefs /
