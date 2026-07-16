@@ -144,6 +144,17 @@ if(RAC_PLATFORM_ANDROID)
     endif()
 endif()
 
+# Windows/MSVC: this repo forces C++20, under which llama.cpp's u8"" string
+# literals become char8_t[] and no longer convert to const char* (llama-chat.cpp,
+# llama-model.cpp, ...). Restore char-typed u8 literals for the llama.cpp targets.
+if(MSVC)
+    foreach(_llama_tgt IN ITEMS llama ggml ggml-base ggml-cpu common)
+        if(TARGET ${_llama_tgt})
+            target_compile_options(${_llama_tgt} PRIVATE /Zc:char8_t-)
+        endif()
+    endforeach()
+endif()
+
 # =============================================================================
 # LlamaCPP Backend Library
 # =============================================================================
@@ -245,6 +256,7 @@ rac_add_engine_plugin(llamacpp
     LINK_LIBRARIES      llama llama-common
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${RAC_COMMONS_ROOT_DIR}/src   # core/internal/platform_compat.h (POSIX dirent/stat shim on MSVC)
                         ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
                         ${llamacpp_SOURCE_DIR}/include
                         ${llamacpp_SOURCE_DIR}/src    # llama-adapter.h for LoRA introspection
