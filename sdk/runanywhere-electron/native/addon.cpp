@@ -224,10 +224,48 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, hid);
 }
 
+// Optional per-request generation options (from a JS object). Strings are held by
+// value so their c_str() stays valid for the duration of the streaming call.
+struct GenOpts {
+    bool has_max = false;
+    int32_t max_tokens = 0;
+    bool has_temp = false;
+    float temperature = 0.0f;
+    bool has_top_p = false;
+    float top_p = 0.0f;
+    bool has_top_k = false;
+    int32_t top_k = 0;
+    std::string system_prompt;
+    std::string grammar;
+};
+
+GenOpts parse_gen_opts(const Napi::Value& v) {
+    GenOpts o;
+    if (!v.IsObject()) return o;
+    Napi::Object obj = v.As<Napi::Object>();
+    if (obj.Has("maxTokens")) { o.max_tokens = obj.Get("maxTokens").ToNumber().Int32Value(); o.has_max = true; }
+    if (obj.Has("temperature")) { o.temperature = obj.Get("temperature").ToNumber().FloatValue(); o.has_temp = true; }
+    if (obj.Has("topP")) { o.top_p = obj.Get("topP").ToNumber().FloatValue(); o.has_top_p = true; }
+    if (obj.Has("topK")) { o.top_k = obj.Get("topK").ToNumber().Int32Value(); o.has_top_k = true; }
+    if (obj.Has("systemPrompt")) o.system_prompt = obj.Get("systemPrompt").ToString().Utf8Value();
+    if (obj.Has("grammar")) o.grammar = obj.Get("grammar").ToString().Utf8Value();
+    return o;
+}
+
+void apply_gen_opts(rac_llm_options_t& opts, const GenOpts& o) {
+    if (o.has_max) opts.max_tokens = o.max_tokens;
+    if (o.has_temp) opts.temperature = o.temperature;
+    if (o.has_top_p) opts.top_p = o.top_p;
+    if (o.has_top_k) opts.top_k = o.top_k;
+    if (!o.system_prompt.empty()) opts.system_prompt = o.system_prompt.c_str();
+    if (!o.grammar.empty()) opts.grammar = o.grammar.c_str();
+}
+
+// generate(handle, prompt, onToken) OR generate(handle, prompt, options, onToken).
 Napi::Value Generate(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 3 || !info[0].IsNumber() || !info[1].IsString() || !info[2].IsFunction()) {
-        Napi::TypeError::New(env, "generate(handleId, prompt, onToken) bad args")
+    if (info.Length() < 3 || !info[0].IsNumber() || !info[1].IsString()) {
+        Napi::TypeError::New(env, "generate(handleId, prompt[, options], onToken) bad args")
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -237,8 +275,24 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     std::string prompt = info[1].As<Napi::String>().Utf8Value();
-    return start_stream(env, info[2].As<Napi::Function>(), [h, prompt](StreamCtx* c) {
-        return rac_llm_component_generate_stream(h, prompt.c_str(), nullptr, stream_token_cb,
+
+    GenOpts o;
+    Napi::Function on_token;
+    if (info[2].IsFunction()) {
+        on_token = info[2].As<Napi::Function>();
+    } else {
+        o = parse_gen_opts(info[2]);
+        if (info.Length() < 4 || !info[3].IsFunction()) {
+            Napi::TypeError::New(env, "generate: onToken callback required").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        on_token = info[3].As<Napi::Function>();
+    }
+
+    return start_stream(env, on_token, [h, prompt, o](StreamCtx* c) {
+        rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+        apply_gen_opts(opts, o);
+        return rac_llm_component_generate_stream(h, prompt.c_str(), &opts, stream_token_cb,
                                                  stream_llm_complete_cb, stream_error_cb, c);
     });
 }
