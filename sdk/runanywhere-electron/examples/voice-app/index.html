@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'" />
+    <title>RunAnywhere — Voice</title>
+    <style>
+      body { font: 15px system-ui, sans-serif; margin: 24px; color: #222; }
+      #status { color: #666; }
+      #hold { font-size: 18px; padding: 12px 20px; margin: 12px 0; }
+      .row { margin: 10px 0; }
+      .label { color: #888; }
+    </style>
+  </head>
+  <body>
+    <h2>RunAnywhere — on-device voice</h2>
+    <div id="status">loading models…</div>
+    <button id="hold" disabled>Hold to talk</button>
+    <div class="row"><span class="label">Heard:</span> <span id="heard"></span></div>
+    <div class="row"><span class="label">Reply:</span> <span id="reply"></span></div>
+    <script src="renderer.js"></script>
+  </body>
+</html>
