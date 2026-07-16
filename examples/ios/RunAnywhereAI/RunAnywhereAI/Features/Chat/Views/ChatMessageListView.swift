@@ -74,12 +74,12 @@ struct ChatMessageListView: View {
             #endif
             .onChange(of: viewModel.messages.last?.content) { _, _ in
                 if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    proxy.scrollTo(lastMessage.id.uuidString, anchor: .bottom)
                 }
             }
             .onChange(of: viewModel.messages.last?.thinkingContent) { _, _ in
                 if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    proxy.scrollTo(lastMessage.id.uuidString, anchor: .bottom)
                 }
             }
         }
@@ -187,7 +187,8 @@ struct ChatMessageListView: View {
                     isGenerating: viewModel.isGenerating,
                     isStreamingTail: viewModel.isGenerating
                         && message.role == .assistant
-                        && message.id == viewModel.messages.last?.id
+                        && message.id == viewModel.messages.last?.id,
+                    loadedModelSupportsThinking: viewModel.loadedModelSupportsThinking
                 )
                 .id(message.id.uuidString)
                 .transition(messageTransition)

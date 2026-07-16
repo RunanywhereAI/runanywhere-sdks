@@ -189,7 +189,7 @@ internal object ModelCatalog {
         SingleFileModel(
             "bonsai-27b-q1_0",
             "Bonsai-27B 1-bit Q1_0 (CPU)",
-            "https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/resolve/main/Bonsai-27B-Q1_0.gguf",
+            "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf",
             LLAMA,
             LANGUAGE,
             3_803_452_480,

@@ -321,11 +321,11 @@ private data class ThinkingPresentation(
 )
 
 private fun ChatMessage.thinkingPresentation(isStreamingTail: Boolean): ThinkingPresentation? = when {
-    isStreamingTail && thinking != null && tool == null && stats == null -> ThinkingPresentation(
+    isStreamingTail -> ThinkingPresentation(
         text = thinking.orEmpty(),
         phase = ThinkingPhase.ACTIVE,
     )
-    thinking != null -> ThinkingPresentation(
+    !thinking.isNullOrBlank() -> ThinkingPresentation(
         text = thinking,
         phase = ThinkingPhase.COMPLETE,
     )

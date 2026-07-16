@@ -50,9 +50,11 @@ public extension RALLMGenerationOptions {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
         // Commons already classifies streamed output into ANSWER / THOUGHT
-        // token kinds. Ask it to surface thought events whenever the caller
-        // supplied a thinking pattern and did not disable reasoning.
-        request.emitThoughts = hasThinkingPattern && !disableThinking
+        // token kinds and resolves a model's thinking tags from the registry,
+        // so a request-local thinking pattern is NOT required. Surface thought
+        // events whenever thinking is enabled (i.e. not explicitly disabled) so
+        // default catalog models still stream reasoning.
+        request.emitThoughts = !disableThinking
         // LLM generation controls have one canonical wire location.
         request.options = self
         return request

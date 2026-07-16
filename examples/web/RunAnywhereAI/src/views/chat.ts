@@ -551,6 +551,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         await generateStreaming(prompt, assistantMsg, messagesEl, generationContext);
       }
     } catch (error) {
+      if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
       assistantMsg.content = formatChatError(error);
       renderLastMessage(messagesEl, assistantMsg, false);
     } finally {
@@ -630,6 +631,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
       renderLastMessage(host, assistantMsg, false);
     } catch (error) {
+      if (assistantMsg.thinking === 'Starting…') assistantMsg.thinking = undefined;
       assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
       renderLastMessage(host, assistantMsg, false);
     } finally {

@@ -685,14 +685,18 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     }
 
     if (!request.deleteFiles) return;
-    for (const [modelId, path] of targets) {
+    for (const [modelId, localPath] of targets) {
       if (this.loadedModelIds.has(modelId) || this.unloadFailures.has(modelId)) continue;
-      if (!isSafeModelStoragePath(path)) continue;
+      // Remove the persisted OPFS copy at the framework-specific canonical
+      // directory, but record the model's original localPath as the prepared
+      // delete key so native's deletePath(localPath) exact-path check matches.
+      const opfsPath = this.modelDeletePathsById.get(modelId) ?? localPath;
+      if (!isSafeModelStoragePath(opfsPath)) continue;
       try {
-        await OPFSBridge.removePath(path);
-        this.preparedPersistentDeletes.add(path);
+        await OPFSBridge.removePath(opfsPath);
+        this.preparedPersistentDeletes.add(localPath);
       } catch {
-        this.persistentDeleteFailures.add(path);
+        this.persistentDeleteFailures.add(localPath);
       }
     }
   }
@@ -712,7 +716,10 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
       const plannedCandidate = planCandidates.get(modelId);
       if (request.requirePlanMatch && !plannedCandidate) continue;
       if (plannedCandidate?.localPath && plannedCandidate.localPath !== localPath) continue;
-      targets.set(modelId, this.modelDeletePathsById.get(modelId) ?? localPath);
+      // Store the ORIGINAL localPath: it is the path native later hands to the
+      // deletePath callback. The framework-specific modelDeletePathsById entry
+      // is used only for the preceding OPFSBridge.removePath() in prepareDelete.
+      targets.set(modelId, localPath);
     }
     return targets;
   }
@@ -1012,20 +1019,43 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   }
 
   private removeMetadataPath(path: string): void {
-    for (const [modelId, modelPath] of Array.from(this.modelStoragePathsById.entries())) {
-      if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
+    const matchesTarget = (candidate: string): boolean =>
+      candidate === path || candidate.startsWith(`${path.replace(/\/$/, '')}/`);
+
+    // validatedDeleteTargets() can hand native a framework-specific delete path
+    // from modelDeletePathsById that differs from the model's localPath. Resolve
+    // the model id from that delete path FIRST, clearing the corresponding
+    // localPath entries; fall back to matching the localPath directly (and, when
+    // nothing resolves, the raw path) so registry roots/metadata still purge.
+    const localPathsToClear = new Set<string>();
+    for (const [modelId, deletePath] of Array.from(this.modelDeletePathsById.entries())) {
+      if (!matchesTarget(deletePath)) continue;
+      const localPath = this.modelStoragePathsById.get(modelId);
+      if (localPath) localPathsToClear.add(localPath);
+      this.modelStoragePathsById.delete(modelId);
+      this.modelDeletePathsById.delete(modelId);
+    }
+    if (localPathsToClear.size === 0) {
+      for (const [modelId, modelPath] of Array.from(this.modelStoragePathsById.entries())) {
+        if (!matchesTarget(modelPath)) continue;
+        localPathsToClear.add(modelPath);
         this.modelStoragePathsById.delete(modelId);
         this.modelDeletePathsById.delete(modelId);
       }
+      if (localPathsToClear.size === 0) localPathsToClear.add(path);
     }
-    for (const modelPath of Array.from(this.modelStorageRoots.keys())) {
-      if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
-        this.modelStorageRoots.delete(modelPath);
+
+    for (const localPath of localPathsToClear) {
+      const localPrefix = `${localPath.replace(/\/$/, '')}/`;
+      for (const modelPath of Array.from(this.modelStorageRoots.keys())) {
+        if (modelPath === localPath || modelPath.startsWith(localPrefix)) {
+          this.modelStorageRoots.delete(modelPath);
+        }
       }
-    }
-    for (const metadataPath of Array.from(this.pathMetadata.keys())) {
-      if (metadataPath === path || metadataPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
-        this.pathMetadata.delete(metadataPath);
+      for (const metadataPath of Array.from(this.pathMetadata.keys())) {
+        if (metadataPath === localPath || metadataPath.startsWith(localPrefix)) {
+          this.pathMetadata.delete(metadataPath);
+        }
       }
     }
   }

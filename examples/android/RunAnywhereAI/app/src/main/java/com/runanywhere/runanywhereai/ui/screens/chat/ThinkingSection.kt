@@ -107,7 +107,7 @@ fun ThinkingSection(
                 shape = RoundedCornerShape(dimens.radiusSm),
             ) {
                 Text(
-                    text = thinking.ifEmpty { "Waiting for the first reasoning token…" },
+                    text = thinking.ifEmpty { if (inProgress) "Waiting for the first reasoning token…" else "No reasoning provided." },
                     style = RACTextStyles.CodeSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier

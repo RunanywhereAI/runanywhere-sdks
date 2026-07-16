@@ -71,6 +71,9 @@ struct MessageBubbleView: View {
     let isGenerating: Bool
     /// True only for the assistant message currently receiving tokens.
     var isStreamingTail: Bool = false
+    /// True when the currently loaded model can emit reasoning; gates the
+    /// "Thinking…" disclosure so non-thinking models never show it.
+    var loadedModelSupportsThinking: Bool = false
     @State private var showToolCallSheet = false
     @State private var previewAttachment: MessageAttachment?
 
@@ -89,7 +92,7 @@ struct MessageBubbleView: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                if message.role == .assistant && (isStreamingTail || hasThinking) {
+                if message.role == .assistant && loadedModelSupportsThinking && (isStreamingTail || hasThinking) {
                     ReasoningDisclosureView(
                         reasoning: message.thinkingContent ?? "",
                         isStreaming: isStreamingTail
@@ -201,6 +204,7 @@ struct ReasoningDisclosureView: View {
                 .background(headerBackground)
             }
             .buttonStyle(.plain)
+            .disabled(isStreaming)
             .accessibilityLabel(headerTitle)
             .accessibilityHint(
                 isStreaming

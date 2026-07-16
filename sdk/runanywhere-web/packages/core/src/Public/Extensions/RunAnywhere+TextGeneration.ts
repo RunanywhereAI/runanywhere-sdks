@@ -384,12 +384,15 @@ export async function aggregateStream(
   if (streaming.events) {
     for await (const event of streaming.events) {
       if (!event.token) continue;
+      // Record TTFT for the first token of EITHER kind (thinking or response),
+      // matching the C++ backend — a reasoning-first model must not report a
+      // delayed TTFT just because its thinking tokens arrive before any response.
+      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
       if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
         fullThinking += event.token;
         if (onThinking) await onThinking(fullThinking);
         continue;
       }
-      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
       fullResponse += event.token;
       tokenCount += 1;
       if (onToken) await onToken(fullResponse);

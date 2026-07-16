@@ -476,6 +476,11 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await appPage.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForInteractive(appPage);
     await navigateTo(appPage, 'chat');
+    // Explicit precondition: the incompatible Bonsai model must not be downloaded
+    // before proving the blocked runtime path. Asserting it up front keeps the
+    // negative-state check order-independent even though the release suite reuses
+    // a single worker-scoped page/context in serial mode.
+    expect(await isModelDownloaded(appPage, 'bonsai-27b-q1_0')).toBe(false);
     await appPage.locator('#chat-toolbar-model').click();
     await appPage.locator('#model-sheet-search').fill('Bonsai-27B');
 
@@ -495,7 +500,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(row.locator('.model-compatibility-reason')).toContainText(
       '4 GiB WASM32 heap',
     );
-    await expect(row.locator('.model-compatibility-reason')).toContainText('469 MiB');
+    await expect(row.locator('.model-compatibility-reason')).toContainText('281 MiB');
     const reference = row.locator('.model-compatibility-reason a');
     await expect(reference).toHaveText(/Experimental direct-WebGPU reference/);
     await expect(reference).toHaveAttribute(
@@ -2113,7 +2118,7 @@ async function runThinkingEnabledTurn(
       await expect(completedThinking).not.toHaveAttribute('open', '');
       return (await reply.locator('.chat-bubble').textContent() ?? '').trim();
     } catch (error) {
-      const retryable = /response limit|without producing a final answer|no final answer/i.test(
+      const retryable = /response limit|without producing a final answer|no final answer|cancelled/i.test(
         error instanceof Error ? error.message : String(error),
       );
       if (!retryable || attempt === maxAttempts) throw error;

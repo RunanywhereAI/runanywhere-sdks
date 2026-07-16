@@ -493,7 +493,7 @@ export function webSizeCompatibility(
 
   const remainingMiB = Math.max(
     0,
-    Math.round((WASM32_ADDRESS_SPACE_BYTES - downloadSizeBytes) / (1024 * 1024)),
+    Math.round((WASM32_ADDRESS_SPACE_BYTES - modelBytes) / (1024 * 1024)),
   );
   return {
     supported: false,

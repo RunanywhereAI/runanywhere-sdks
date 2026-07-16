@@ -665,16 +665,22 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     // re-enter lifecycle APIs. Publish only after releasing the admission gate.
     // The load's transitions are collected here and emitted in their original
     // LOADING-then-terminal order after the slot has reached its terminal state.
-    const auto publish_deferred_transitions = [&] {
+    // `emit_loading_transition` is false when a preserved-load failure keeps the
+    // resident model: publishing `previous_state -> LOADING` for the failed
+    // request.model_id() would be spurious (that model never loaded) and would
+    // leak a phantom LOADING transition onto a slot whose resident never moved.
+    const auto publish_deferred_transitions = [&](bool emit_loading_transition) {
         for (const auto& evicted : evicted_qhexrt_models) {
             detail::publish_component_event(evicted->component,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_UNLOADING,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                             evicted->model_id, nullptr, nullptr, nullptr);
         }
-        detail::publish_component_event(component, previous_state,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                        request.model_id(), nullptr, nullptr, nullptr);
+        if (emit_loading_transition) {
+            detail::publish_component_event(component, previous_state,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            request.model_id(), nullptr, nullptr, nullptr);
+        }
     };
 
     // Pin the engine the model was built for when its framework is known
@@ -713,18 +719,28 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                                                std::move(failed), &displaced);
         detail::destroy_loaded_model(displaced);
         load_admission_lock.unlock();
-        publish_deferred_transitions();
-        detail::publish_component_event(
-            component,
-            preserved ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY
-                      : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-            preserved ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY
-                      : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-            // A preserved (kept) model is a clean READY->READY outcome, not an error — don't leak
-            // the failed-load message onto it (it would surface as an error banner for a working
-            // model).
-            request.model_id(), &result, nullptr,
-            preserved ? nullptr : result.error_message().c_str());
+        publish_deferred_transitions(!preserved);
+        if (preserved) {
+            // The resident model was kept. Emit a benign READY->READY for the
+            // PRESERVED (resident) model — not the failed request — carrying its
+            // own result so subscribers never see the failed id or its error
+            // message attributed to a working model. `swap_previous` is
+            // guaranteed non-null + READY whenever preserved is true.
+            ModelLoadResult resident = detail::make_load_result(
+                true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
+                swap_previous->resolved_path, swap_previous->resolved_artifacts,
+                swap_previous->loaded_at_ms, "");
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            swap_previous->model_id, &resident, nullptr, nullptr);
+        } else {
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                            request.model_id(), &result, nullptr,
+                                            result.error_message().c_str());
+        }
         return detail::copy_proto(result, out_result);
     }
 
@@ -756,18 +772,28 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                                                std::move(failed), &displaced);
         detail::destroy_loaded_model(displaced);
         load_admission_lock.unlock();
-        publish_deferred_transitions();
-        detail::publish_component_event(
-            component,
-            preserved ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY
-                      : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-            preserved ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY
-                      : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-            // A preserved (kept) model is a clean READY->READY outcome, not an error — don't leak
-            // the failed-load message onto it (it would surface as an error banner for a working
-            // model).
-            request.model_id(), &result, nullptr,
-            preserved ? nullptr : result.error_message().c_str());
+        publish_deferred_transitions(!preserved);
+        if (preserved) {
+            // The resident model was kept. Emit a benign READY->READY for the
+            // PRESERVED (resident) model — not the failed request — carrying its
+            // own result so subscribers never see the failed id or its error
+            // message attributed to a working model. `swap_previous` is
+            // guaranteed non-null + READY whenever preserved is true.
+            ModelLoadResult resident = detail::make_load_result(
+                true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
+                swap_previous->resolved_path, swap_previous->resolved_artifacts,
+                swap_previous->loaded_at_ms, "");
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            swap_previous->model_id, &resident, nullptr, nullptr);
+        } else {
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                            request.model_id(), &result, nullptr,
+                                            result.error_message().c_str());
+        }
         return detail::copy_proto(result, out_result);
     }
 
@@ -809,7 +835,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         detail::make_load_result(true, request.model_id(), category, framework, resolved_path,
                                  artifact_resolution.artifacts, loaded_at_ms, "");
     load_admission_lock.unlock();
-    publish_deferred_transitions();
+    publish_deferred_transitions(true);
     detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                     runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                     request.model_id(), &result, nullptr, nullptr);
