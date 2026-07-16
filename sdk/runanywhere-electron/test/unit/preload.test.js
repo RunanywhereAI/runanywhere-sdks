@@ -1,0 +1,232 @@
+// Unit tests for the renderer preload (src/process/preload.ts): it exposes the
+// window.runanywhere API over contextBridge, correlates request/reply by id over
+// a MessagePort, routes streamed tokens to onToken callbacks, and gates every
+// call on the port handshake. We mock 'electron' (contextBridge + ipcRenderer)
+// and drive a fake MessagePort — no real Electron / renderer needed.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+
+let electronPath = null;
+try {
+  electronPath = require.resolve('electron');
+} catch {
+  /* electron devDep missing */
+}
+const SKIP = electronPath ? false : 'electron devDependency not installed';
+const preloadPath = electronPath ? require.resolve('../../dist/process/preload') : null;
+
+const tick = () => new Promise((r) => setImmediate(r));
+
+function installFakeElectron() {
+  const exposed = {};
+  const state = { ipcOn: {}, ipcSends: [] };
+  const fakeElectron = {
+    contextBridge: {
+      exposeInMainWorld(name, api) {
+        exposed[name] = api;
+      },
+    },
+    ipcRenderer: {
+      on(channel, cb) {
+        state.ipcOn[channel] = cb;
+      },
+      send(channel, ...args) {
+        state.ipcSends.push({ channel, args });
+      },
+    },
+  };
+  require.cache[electronPath] = {
+    id: electronPath,
+    filename: electronPath,
+    loaded: true,
+    exports: fakeElectron,
+  };
+  return { exposed, state };
+}
+
+// Re-require the preload fresh so its module-level port/pending/ready reset.
+function freshPreload() {
+  const { exposed, state } = installFakeElectron();
+  delete require.cache[preloadPath];
+  require(preloadPath);
+  return { exposed, state };
+}
+
+function fakePort() {
+  return {
+    posts: [],
+    started: false,
+    onmessage: null,
+    postMessage(m) {
+      this.posts.push(m);
+    },
+    start() {
+      this.started = true;
+    },
+    last() {
+      return this.posts[this.posts.length - 1];
+    },
+  };
+}
+
+// Connect the preload to a port (simulate main delivering it over ipc).
+function connect(state) {
+  const port = fakePort();
+  state.ipcOn['runanywhere-port']({ ports: [port] });
+  return port;
+}
+
+test('exposes window.runanywhere with the full method surface', { skip: SKIP }, () => {
+  const { exposed } = freshPreload();
+  const api = exposed.runanywhere;
+  assert.ok(api, 'runanywhere API exposed');
+  for (const m of [
+    'ready', 'version', 'initialize',
+    'loadLLM', 'generate', 'unloadLLM',
+    'loadVLM', 'generateVlm', 'unloadVLM',
+    'loadEmbedder', 'embed', 'unloadEmbedder',
+    'shutdown',
+  ]) {
+    assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
+  }
+});
+
+test('exposes the runanywhereTest hook that forwards over ipc', { skip: SKIP }, () => {
+  const { exposed, state } = freshPreload();
+  assert.equal(typeof exposed.runanywhereTest.done, 'function');
+  assert.equal(typeof exposed.runanywhereTest.log, 'function');
+  exposed.runanywhereTest.done(true);
+  exposed.runanywhereTest.log('hi');
+  assert.deepEqual(state.ipcSends[0], { channel: 'runanywhere-test-done', args: [true] });
+  assert.deepEqual(state.ipcSends[1], { channel: 'runanywhere-test-log', args: ['hi'] });
+});
+
+test('the port handshake starts the port and resolves ready()', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  assert.ok(port.started, 'port.start() called');
+  assert.equal(typeof port.onmessage, 'function', 'onmessage handler installed');
+  // ready() resolves now that the port is connected.
+  await exposed.runanywhere.ready();
+});
+
+test('a unary call posts {id,method,args} and resolves with the reply result', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.version();
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'version');
+  assert.deepEqual(msg.args, []);
+  assert.equal(typeof msg.id, 'number');
+  port.onmessage({ data: { id: msg.id, ok: true, result: 'v9.9' } });
+  assert.equal(await p, 'v9.9');
+});
+
+test('initialize forwards its args', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.initialize('/sec', '/base');
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'initialize');
+  assert.deepEqual(msg.args, ['/sec', '/base']);
+  port.onmessage({ data: { id: msg.id, ok: true } });
+  await p;
+});
+
+test('a failing reply rejects with the error message', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.loadLLM('/model.gguf');
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'loadModel');
+  port.onmessage({ data: { id: msg.id, ok: false, error: 'boom' } });
+  await assert.rejects(() => p, /boom/);
+});
+
+test('generate streams tokens to onToken then resolves on done', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const tokens = [];
+  const p = exposed.runanywhere.generate(3, 'hello', (t) => tokens.push(t));
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.deepEqual(msg.args, [3, 'hello']);
+  port.onmessage({ data: { id: msg.id, token: 'a' } });
+  port.onmessage({ data: { id: msg.id, token: 'b' } });
+  assert.deepEqual(tokens, ['a', 'b'], 'tokens routed to onToken in order');
+  port.onmessage({ data: { id: msg.id, done: true } });
+  await p; // resolves on done
+});
+
+test('generate forwards a generation-options object before the callback', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.generate(3, 'hi', { grammar: 'root ::= "x"', maxTokens: 8 }, () => {});
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.deepEqual(msg.args, [3, 'hi', { grammar: 'root ::= "x"', maxTokens: 8 }]);
+  port.onmessage({ data: { id: msg.id, done: true } });
+  await p;
+});
+
+test('generateVlm streams tokens over an image + prompt call', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const tokens = [];
+  const p = exposed.runanywhere.generateVlm(5, '/img.png', 'describe', (t) => tokens.push(t));
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generateVlm');
+  assert.deepEqual(msg.args, [5, '/img.png', 'describe']);
+  port.onmessage({ data: { id: msg.id, token: 'red' } });
+  port.onmessage({ data: { id: msg.id, done: true } });
+  assert.deepEqual(tokens, ['red']);
+  await p;
+});
+
+test('calls made BEFORE the handshake wait for the port, then post once connected', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  // No connect() yet — the port is null and ready is unresolved.
+  const p = exposed.runanywhere.version();
+  await tick();
+  // Nothing could have been posted (no port). Now connect.
+  const port = connect(state);
+  await tick();
+  assert.equal(port.posts.length, 1, 'the queued call posts after the handshake');
+  const msg = port.last();
+  port.onmessage({ data: { id: msg.id, ok: true, result: 'ok' } });
+  assert.equal(await p, 'ok');
+});
+
+test('reply ids are unique per in-flight call and route independently', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p1 = exposed.runanywhere.version();
+  const p2 = exposed.runanywhere.shutdown();
+  await tick();
+  assert.equal(port.posts.length, 2);
+  const [m1, m2] = port.posts;
+  assert.notEqual(m1.id, m2.id, 'each call gets a distinct id');
+  // Resolve out of order: reply to the 2nd first.
+  port.onmessage({ data: { id: m2.id, ok: true } });
+  port.onmessage({ data: { id: m1.id, ok: true, result: 'v' } });
+  await p2;
+  assert.equal(await p1, 'v');
+});
+
+test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.version();
+  await tick();
+  const msg = port.last();
+  // A stray message for an id we never sent must be a no-op.
+  assert.doesNotThrow(() => port.onmessage({ data: { id: 999999, ok: true, result: 'nope' } }));
+  port.onmessage({ data: { id: msg.id, ok: true, result: 'real' } });
+  assert.equal(await p, 'real');
+});
