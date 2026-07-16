@@ -65,6 +65,16 @@
  * includes both this shim and generated code (e.g. vlm_module.cpp transitively
  * pulls errors.pb.h). NOGDI drops wingdi entirely; this shim + the codebase
  * never use Win32 GDI. The explicit ERROR undef is belt-and-suspenders. */
+/* Self-protect: engine-plugin targets (engines/*) do NOT inherit commons' global
+ * NOMINMAX / WIN32_LEAN_AND_MEAN compile definitions, so define them here before
+ * <windows.h> — otherwise its min()/max() macros clobber std::min / std::max /
+ * std::numeric_limits<>::max() in any engine TU that includes this shim. */
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #ifndef NOGDI
 #define NOGDI
 #endif
