@@ -11,6 +11,8 @@ import { resolveModel } from './download';
 import type { DownloadProgress, ResolvedModel } from './download';
 import { VoiceAgent } from './VoiceAgent';
 import type { VoiceAgentModels, VoiceAgentOptions } from './VoiceAgent';
+import { Chat } from './Chat';
+import type { ChatOptions } from './Chat';
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -152,6 +154,11 @@ export const RunAnywhere = {
   async loadTTS(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<TTSVoice> {
     const m = await resolveModel(idOrPath, opts);
     return new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
+  },
+
+  /** Start a multi-turn chat session over a loaded LLM (keeps history). */
+  createChat(llm: LLMModel, opts?: ChatOptions): Chat {
+    return new Chat(llm, opts);
   },
 
   /** Compose loaded STT + LLM + TTS models into a voice turn pipeline. */
