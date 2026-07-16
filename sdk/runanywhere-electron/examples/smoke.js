@@ -26,7 +26,7 @@ function readWavPcm(file) {
   RunAnywhere.initialize();
 
   // LLM (streaming AsyncIterable)
-  const llm = RunAnywhere.loadLLM(path.join(MODELS, 'smollm2-135m.gguf'));
+  const llm = await RunAnywhere.loadLLM(path.join(MODELS, 'smollm2-135m.gguf'));
   process.stdout.write('LLM  : ');
   for await (const t of llm.generate('What is the capital of France? Answer in one word.')) {
     process.stdout.write(t);
@@ -35,12 +35,12 @@ function readWavPcm(file) {
   llm.unload();
 
   // Embeddings
-  const emb = RunAnywhere.loadEmbedder(path.join(MODELS, 'minilm', 'model.onnx'));
+  const emb = await RunAnywhere.loadEmbedder(path.join(MODELS, 'minilm', 'model.onnx'));
   console.log('EMBED:', emb.embed('hello world').length, 'dims');
   emb.unload();
 
   // VLM
-  const vlm = RunAnywhere.loadVLM(
+  const vlm = await RunAnywhere.loadVLM(
     path.join(MODELS, 'smolvlm-256m.gguf'),
     path.join(MODELS, 'smolvlm-256m-mmproj.gguf')
   );
@@ -52,13 +52,13 @@ function readWavPcm(file) {
   vlm.unload();
 
   // STT
-  const stt = RunAnywhere.loadSTT(path.join(MODELS, 'sherpa-onnx-whisper-tiny.en'));
+  const stt = await RunAnywhere.loadSTT(path.join(MODELS, 'sherpa-onnx-whisper-tiny.en'));
   const pcm = readWavPcm(path.join(MODELS, 'sherpa-onnx-whisper-tiny.en', 'test_wavs', '0.wav'));
   console.log('STT  :', JSON.stringify(stt.transcribe(pcm).trim()));
   stt.unload();
 
   // TTS
-  const tts = RunAnywhere.loadTTS(path.join(MODELS, 'vits-piper-en_US-lessac-medium'));
+  const tts = await RunAnywhere.loadTTS(path.join(MODELS, 'vits-piper-en_US-lessac-medium'));
   const { sampleRate, samples } = tts.synthesize('Hello from the RunAnywhere Electron SDK.');
   console.log('TTS  :', samples.length, 'samples @', sampleRate, 'Hz');
   tts.unload();
