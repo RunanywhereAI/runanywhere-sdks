@@ -645,9 +645,10 @@ private final class ConnectTransport: @unchecked Sendable {
         activeClientRequestID = requestID
         clientEventContinuation = streamContinuation
         streamContinuation.onTermination = { [weak self] _ in
-            self?.queue.async {
-                guard self?.activeClientRequestID == requestID else { return }
-                self?.finishClientInvocation()
+            guard let transport = self else { return }
+            transport.queue.async { [transport] in
+                guard transport.activeClientRequestID == requestID else { return }
+                transport.finishClientInvocation()
             }
         }
 
