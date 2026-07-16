@@ -10,7 +10,9 @@
 // count)
 #include "llama-adapter.h"
 
-#include <dirent.h>
+// POSIX dirent/stat over a Win32 shim on MSVC (passthrough to <dirent.h>
+// elsewhere) — provides DIR/opendir/readdir/closedir + S_ISDIR. Mirrors sherpa.
+#include "core/internal/platform_compat.h"
 
 #include <algorithm>
 #include <chrono>
