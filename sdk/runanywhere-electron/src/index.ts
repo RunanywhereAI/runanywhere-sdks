@@ -9,6 +9,13 @@ export {
   TTSVoice,
 } from './RunAnywhere';
 export type { InitOptions, LoadOptions, DownloadOptions } from './RunAnywhere';
+export { VoiceAgent } from './VoiceAgent';
+export type {
+  VoiceAgentModels,
+  VoiceAgentOptions,
+  VoiceTurn,
+  VoiceTurnCallbacks,
+} from './VoiceAgent';
 export type { NativeAddon } from './bridge';
 export { CATALOG, isCatalogId } from './catalog';
 export type { CatalogEntry, ModelType } from './catalog';
