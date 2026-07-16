@@ -9,6 +9,8 @@ import * as path from 'path';
 import { addon, toAsyncIterable } from './bridge';
 import { resolveModel } from './download';
 import type { DownloadProgress, ResolvedModel } from './download';
+import { VoiceAgent } from './VoiceAgent';
+import type { VoiceAgentModels, VoiceAgentOptions } from './VoiceAgent';
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -150,6 +152,11 @@ export const RunAnywhere = {
   async loadTTS(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<TTSVoice> {
     const m = await resolveModel(idOrPath, opts);
     return new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
+  },
+
+  /** Compose loaded STT + LLM + TTS models into a voice turn pipeline. */
+  createVoiceAgent(models: VoiceAgentModels, opts?: VoiceAgentOptions): VoiceAgent {
+    return new VoiceAgent(models, opts);
   },
 
   /** Tear down the runtime. Idempotent. */
