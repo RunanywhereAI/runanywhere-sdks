@@ -14,6 +14,8 @@ export type {
   DownloadOptions,
   GenerateOptions,
   GenerateObjectOptions,
+  ToolSpec,
+  ToolCall,
 } from './RunAnywhere';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
