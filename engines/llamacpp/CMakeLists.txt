@@ -36,6 +36,9 @@ FetchContent_Declare(
     GIT_TAG        ${RAC_LLAMACPP_VERSION}
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE
+    # Fix the ggml arch/arm/quants.c armv7 build break (raw AArch64-only vqtbl1q_u8 -> portable wrapper).
+    # Idempotent + no-op when the pattern/file is absent, so it is safe on every arch and future llama.cpp bump.
+    PATCH_COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/patch_ggml_armv7.cmake"
 )
 
 # Configure llama.cpp build options
@@ -67,7 +70,9 @@ elseif(RAC_PLATFORM_ANDROID)
     # CRITICAL: Disable native CPU detection (fails during cross-compilation)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 
-    # Enable ARM NEON only for ARM architectures (not x86/x86_64)
+    # Enable ARM NEON only for ARM architectures (not x86/x86_64). armeabi-v7a keeps
+    # NEON on; the ggml arch/arm/quants.c armv7 build break (raw AArch64-only
+    # vqtbl1q_u8) is fixed by the FetchContent PATCH_COMMAND above, not by dropping NEON.
     if(ANDROID_ABI MATCHES "arm64-v8a|armeabi-v7a")
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for ARM ABI: ${ANDROID_ABI}")
