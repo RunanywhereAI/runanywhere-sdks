@@ -77,6 +77,14 @@ contextBridge.exposeInMainWorld('runanywhere', {
   embed: (handle: number, text: string) => send('embed', [handle, text]),
   unloadEmbedder: (handle: number) => send('unloadEmbeddingModel', [handle]),
 
+  loadSTT: (modelDir: string) => send('loadSttModel', [modelDir]),
+  transcribe: (handle: number, pcm16: Uint8Array) => send('transcribe', [handle, pcm16]),
+  unloadSTT: (handle: number) => send('unloadSttModel', [handle]),
+
+  loadTTS: (voiceDir: string) => send('loadTtsVoice', [voiceDir]),
+  synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
+  unloadTTS: (handle: number) => send('unloadTtsVoice', [handle]),
+
   shutdown: () => send('shutdown', []),
 });
 
