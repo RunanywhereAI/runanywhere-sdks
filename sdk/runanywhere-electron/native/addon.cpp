@@ -30,6 +30,11 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 #include "rac/plugin/rac_plugin_entry_onnx.h"
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
+#include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_types.h"
+#include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
 // Internal (non-proto) embeddings service factory — its header lives under
@@ -53,6 +58,8 @@ std::mutex g_handles_mutex;
 std::unordered_map<int32_t, rac_handle_t> g_llm_handles;
 std::unordered_map<int32_t, rac_handle_t> g_vlm_handles;
 std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
+std::unordered_map<int32_t, rac_handle_t> g_stt_handles;
+std::unordered_map<int32_t, rac_handle_t> g_tts_handles;
 int32_t g_next_handle_id = 1;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -101,6 +108,8 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
     // Embeddings engine (optional): register the ONNX backend. A failure here
     // just means embeddings are unavailable, not a fatal init error.
     rac_backend_onnx_register();
+    // Speech engine (optional): register sherpa for STT / TTS.
+    rac_backend_sherpa_register();
     g_initialized.store(true);
     return env.Undefined();
 }
@@ -422,6 +431,187 @@ Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
 }
 
 // =============================================================================
+// STT: loadSttModel / transcribe / unloadSttModel   (sherpa engine)
+// =============================================================================
+Napi::Value LoadSttModel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "loadSttModel(modelDir[, id, name]) expects a string")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string dir = info[0].As<Napi::String>().Utf8Value();
+    std::string id =
+        (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : dir;
+    std::string name =
+        (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
+    rac_handle_t h = nullptr;
+    rac_result_t rc = rac_stt_component_create(&h);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "stt_component_create failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rc = rac_stt_component_load_model(h, dir.c_str(), id.c_str(), name.c_str());
+    if (rc != RAC_SUCCESS) {
+        rac_stt_component_destroy(h);
+        Napi::Error::New(env, "stt load_model failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        hid = g_next_handle_id++;
+        g_stt_handles[hid] = h;
+    }
+    return Napi::Number::New(env, hid);
+}
+
+// transcribe(handleId, pcm16Buffer) -> text. Audio = 16 kHz mono PCM16 bytes.
+// Synchronous (blocks the JS thread for the decode); the utility process keeps it
+// off the UI. A dedicated worker-thread variant can come later.
+Napi::Value Transcribe(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsBuffer()) {
+        Napi::TypeError::New(env, "transcribe(handleId, pcm16Buffer) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_stt_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) {
+        Napi::Error::New(env, "invalid stt handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Napi::Buffer<uint8_t> buf = info[1].As<Napi::Buffer<uint8_t>>();
+    rac_stt_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc =
+        rac_stt_component_transcribe(h, buf.Data(), buf.Length(), nullptr, &result);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "transcribe failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string text = result.text ? result.text : "";
+    rac_stt_result_free(&result);
+    return Napi::String::New(env, text);
+}
+
+Napi::Value UnloadSttModel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_stt_handles.find(hid);
+        if (it != g_stt_handles.end()) {
+            h = it->second;
+            g_stt_handles.erase(it);
+        }
+    }
+    if (h) rac_stt_component_destroy(h);
+    return env.Undefined();
+}
+
+// =============================================================================
+// TTS: loadTtsVoice / synthesize / unloadTtsVoice   (sherpa engine)
+// =============================================================================
+Napi::Value LoadTtsVoice(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "loadTtsVoice(voiceDir[, id, name]) expects a string")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string dir = info[0].As<Napi::String>().Utf8Value();
+    std::string id =
+        (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : dir;
+    std::string name =
+        (info.Length() > 2 && info[2].IsString()) ? info[2].As<Napi::String>().Utf8Value() : id;
+    rac_handle_t h = nullptr;
+    rac_result_t rc = rac_tts_component_create(&h);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "tts_component_create failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rc = rac_tts_component_load_voice(h, dir.c_str(), id.c_str(), name.c_str());
+    if (rc != RAC_SUCCESS) {
+        rac_tts_component_destroy(h);
+        Napi::Error::New(env, "tts load_voice failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        hid = g_next_handle_id++;
+        g_tts_handles[hid] = h;
+    }
+    return Napi::Number::New(env, hid);
+}
+
+// synthesize(handleId, text) -> { sampleRate, samples: Float32Array }.
+Napi::Value Synthesize(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsString()) {
+        Napi::TypeError::New(env, "synthesize(handleId, text) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_tts_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) {
+        Napi::Error::New(env, "invalid tts handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string text = info[1].As<Napi::String>().Utf8Value();
+    rac_tts_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc = rac_tts_component_synthesize(h, text.c_str(), nullptr, &result);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "synthesize failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    size_t n = result.audio_size / sizeof(float);  // audio_data is float32 PCM
+    Napi::Float32Array samples = Napi::Float32Array::New(env, n);
+    if (result.audio_data && n) std::memcpy(samples.Data(), result.audio_data, n * sizeof(float));
+    int32_t sr = result.sample_rate;
+    rac_tts_result_free(&result);
+    Napi::Object out = Napi::Object::New(env);
+    out.Set("sampleRate", Napi::Number::New(env, sr));
+    out.Set("samples", samples);
+    return out;
+}
+
+Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_tts_handles.find(hid);
+        if (it != g_tts_handles.end()) {
+            h = it->second;
+            g_tts_handles.erase(it);
+        }
+    }
+    if (h) rac_tts_component_destroy(h);
+    return env.Undefined();
+}
+
+// =============================================================================
 // shutdown()
 // =============================================================================
 Napi::Value Shutdown(const Napi::CallbackInfo& info) {
@@ -440,6 +630,12 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("loadEmbeddingModel", Napi::Function::New(env, LoadEmbeddingModel));
     exports.Set("embed", Napi::Function::New(env, Embed));
     exports.Set("unloadEmbeddingModel", Napi::Function::New(env, UnloadEmbeddingModel));
+    exports.Set("loadSttModel", Napi::Function::New(env, LoadSttModel));
+    exports.Set("transcribe", Napi::Function::New(env, Transcribe));
+    exports.Set("unloadSttModel", Napi::Function::New(env, UnloadSttModel));
+    exports.Set("loadTtsVoice", Napi::Function::New(env, LoadTtsVoice));
+    exports.Set("synthesize", Napi::Function::New(env, Synthesize));
+    exports.Set("unloadTtsVoice", Napi::Function::New(env, UnloadTtsVoice));
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;
