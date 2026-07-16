@@ -19,6 +19,18 @@ export type {
 } from './RunAnywhere';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
+export {
+  float32ToPcm16,
+  pcm16ToFloat32,
+  pcm16Bytes,
+  downsample,
+  rms,
+  encodeWav,
+  decodeWav,
+  MicRecorder,
+  SpeakerPlayer,
+} from './audio';
+export type { MicRecorderOptions } from './audio';
 export { Chat } from './Chat';
 export type { ChatMessage, ChatOptions } from './Chat';
 export { VoiceAgent } from './VoiceAgent';
