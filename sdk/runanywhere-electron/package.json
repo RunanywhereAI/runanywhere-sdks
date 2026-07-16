@@ -12,7 +12,11 @@
     "src"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "pretest": "tsc -p tsconfig.json",
+    "test": "node --test \"test/unit/**/*.test.js\"",
+    "test:integration": "node --test \"test/integration/**/*.test.js\"",
+    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
