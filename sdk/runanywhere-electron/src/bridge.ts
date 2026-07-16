@@ -10,7 +10,14 @@ export interface NativeAddon {
   readonly version: string;
   initialize(secureDir: string, baseDir?: string): void;
   loadModel(modelPath: string, id?: string, name?: string): number;
-  generate(handle: number, prompt: string, onToken: (t: string) => void): Promise<void>;
+  // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
+  // detects whether arg 3 is the callback or a generation-options object.
+  generate(
+    handle: number,
+    prompt: string,
+    optionsOrOnToken: object | ((t: string) => void),
+    onToken?: (t: string) => void
+  ): Promise<void>;
   unloadModel(handle: number): void;
   loadVlmModel(modelPath: string, mmprojPath: string, id?: string, name?: string): number;
   generateVlm(
