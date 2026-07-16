@@ -85,6 +85,8 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
     'loadLLM', 'generate', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
+    'loadSTT', 'transcribe', 'unloadSTT',
+    'loadTTS', 'synthesize', 'unloadTTS',
     'shutdown',
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
@@ -133,6 +135,34 @@ test('initialize forwards its args', { skip: SKIP }, async () => {
   assert.deepEqual(msg.args, ['/sec', '/base']);
   port.onmessage({ data: { id: msg.id, ok: true } });
   await p;
+});
+
+test('transcribe forwards the pcm bytes and resolves with the transcript', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const pcm = new Uint8Array([1, 2, 3, 4]);
+  const p = exposed.runanywhere.transcribe(7, pcm);
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'transcribe');
+  assert.deepEqual(msg.args, [7, pcm]);
+  port.onmessage({ data: { id: msg.id, ok: true, result: 'hello world' } });
+  assert.equal(await p, 'hello world');
+});
+
+test('synthesize resolves with the {sampleRate,samples} audio result', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.synthesize(9, 'hi there');
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'synthesize');
+  assert.deepEqual(msg.args, [9, 'hi there']);
+  const audio = { sampleRate: 22050, samples: new Float32Array([0.1, -0.2]) };
+  port.onmessage({ data: { id: msg.id, ok: true, result: audio } });
+  const got = await p;
+  assert.equal(got.sampleRate, 22050);
+  assert.deepEqual(Array.from(got.samples), [0.1, -0.2].map((x) => Math.fround(x)));
 });
 
 test('a failing reply rejects with the error message', { skip: SKIP }, async () => {
