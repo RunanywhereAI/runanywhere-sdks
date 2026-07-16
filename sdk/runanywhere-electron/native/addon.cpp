@@ -27,7 +27,19 @@
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/embeddings/rac_embeddings_types.h"
+#include "rac/plugin/rac_plugin_entry_onnx.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+
+// Internal (non-proto) embeddings service factory — its header lives under
+// commons/src/, not include/, so re-declare the prototype here. The addon
+// static-links rac_commons, so the symbol resolves at link time.
+namespace rac {
+namespace embeddings {
+rac_result_t create_service(const char* model_id, const char* config_json, rac_handle_t* out_handle);
+}  // namespace embeddings
+}  // namespace rac
 
 namespace {
 
@@ -40,6 +52,7 @@ std::atomic<bool> g_initialized{false};
 std::mutex g_handles_mutex;
 std::unordered_map<int32_t, rac_handle_t> g_llm_handles;
 std::unordered_map<int32_t, rac_handle_t> g_vlm_handles;
+std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
 int32_t g_next_handle_id = 1;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -85,6 +98,9 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    // Embeddings engine (optional): register the ONNX backend. A failure here
+    // just means embeddings are unavailable, not a fatal init error.
+    rac_backend_onnx_register();
     g_initialized.store(true);
     return env.Undefined();
 }
@@ -322,6 +338,90 @@ Napi::Value UnloadVlmModel(const Napi::CallbackInfo& info) {
 }
 
 // =============================================================================
+// Embeddings: loadEmbeddingModel / embed / unloadEmbeddingModel  (ONNX engine)
+// =============================================================================
+Napi::Value LoadEmbeddingModel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "loadEmbeddingModel(path[, configJson]) expects a string")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string model = info[0].As<Napi::String>().Utf8Value();
+    std::string config = (info.Length() > 1 && info[1].IsString())
+                             ? info[1].As<Napi::String>().Utf8Value()
+                             : std::string();
+    rac_handle_t h = nullptr;
+    rac_result_t rc = rac::embeddings::create_service(
+        model.c_str(), config.empty() ? nullptr : config.c_str(), &h);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "embeddings create_service failed: " + std::to_string(rc))
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        hid = g_next_handle_id++;
+        g_embed_handles[hid] = h;
+    }
+    return Napi::Number::New(env, hid);
+}
+
+Napi::Value Embed(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsString()) {
+        Napi::TypeError::New(env, "embed(handleId, text) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_embed_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) {
+        Napi::Error::New(env, "invalid embedding handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string text = info[1].As<Napi::String>().Utf8Value();
+    rac_embeddings_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc = rac_embeddings_embed(h, text.c_str(), nullptr, &result);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "embed failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (result.num_embeddings == 0 || result.embeddings == nullptr ||
+        result.embeddings[0].data == nullptr) {
+        rac_embeddings_result_free(&result);
+        Napi::Error::New(env, "no embedding produced").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    size_t dim = result.embeddings[0].dimension;
+    Napi::Float32Array arr = Napi::Float32Array::New(env, dim);
+    std::memcpy(arr.Data(), result.embeddings[0].data, dim * sizeof(float));
+    rac_embeddings_result_free(&result);
+    return arr;
+}
+
+Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_embed_handles.find(hid);
+        if (it != g_embed_handles.end()) {
+            h = it->second;
+            g_embed_handles.erase(it);
+        }
+    }
+    if (h) rac_embeddings_destroy(h);
+    return env.Undefined();
+}
+
+// =============================================================================
 // shutdown()
 // =============================================================================
 Napi::Value Shutdown(const Napi::CallbackInfo& info) {
@@ -337,6 +437,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("loadVlmModel", Napi::Function::New(env, LoadVlmModel));
     exports.Set("generateVlm", Napi::Function::New(env, GenerateVlm));
     exports.Set("unloadVlmModel", Napi::Function::New(env, UnloadVlmModel));
+    exports.Set("loadEmbeddingModel", Napi::Function::New(env, LoadEmbeddingModel));
+    exports.Set("embed", Napi::Function::New(env, Embed));
+    exports.Set("unloadEmbeddingModel", Napi::Function::New(env, UnloadEmbeddingModel));
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;
