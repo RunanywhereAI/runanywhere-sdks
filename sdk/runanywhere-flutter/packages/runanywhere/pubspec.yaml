@@ -52,6 +52,9 @@ dependencies:
   device_info_plus: ^13.1.0
   flutter_timezone: ^5.1.0
   package_info_plus: ^10.1.0
+  # Local-network discovery for the platform-neutral Connect client. The
+  # framed TCP protocol and handshake remain SDK-owned.
+  multicast_dns: ^0.3.3+1
   # Utilities
   uuid: ^4.5.3
 

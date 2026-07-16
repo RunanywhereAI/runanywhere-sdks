@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/services/connect_service.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
 import 'package:runanywhere_ai/features/more/more_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
@@ -25,6 +27,23 @@ class _ContentViewState extends State<ContentView> {
   // periodic refreshes) must not run until the user selects that tab.
   // IndexedStack still preserves each tab's state once it has been built.
   final Set<int> _visitedTabs = {0};
+  final ConnectService _connect = ConnectService.shared;
+
+  @override
+  void initState() {
+    super.initState();
+    _connect.addListener(_connectChanged);
+  }
+
+  @override
+  void dispose() {
+    _connect.removeListener(_connectChanged);
+    super.dispose();
+  }
+
+  void _connectChanged() {
+    if (mounted) setState(() {});
+  }
 
   Widget _buildTab(int index) {
     switch (index) {
@@ -46,14 +65,24 @@ class _ContentViewState extends State<ContentView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedTab,
-        children: List.generate(
-          5,
-          (index) => _visitedTabs.contains(index)
-              ? _buildTab(index)
-              : const SizedBox.shrink(),
-        ),
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _selectedTab,
+            children: List.generate(
+              5,
+              (index) => _visitedTabs.contains(index)
+                  ? _buildTab(index)
+                  : const SizedBox.shrink(),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + kToolbarHeight + 8,
+            left: 0,
+            right: 0,
+            child: _ConnectBanner(state: _connect.state),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
@@ -125,6 +154,91 @@ class _ContentViewState extends State<ContentView> {
             label: 'Settings',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConnectBanner extends StatefulWidget {
+  const _ConnectBanner({required this.state});
+
+  final ConnectState state;
+
+  @override
+  State<_ConnectBanner> createState() => _ConnectBannerState();
+}
+
+class _ConnectBannerState extends State<_ConnectBanner> {
+  String? _dismissedKey;
+
+  String? get _key => switch (widget.state.status) {
+    ConnectStatus.connected =>
+      'connected:${widget.state.activeHost?.id}:${widget.state.activeModel?.id}',
+    ConnectStatus.disconnected =>
+      'disconnected:${widget.state.lastDisconnectedHost?.id}:${widget.state.message}',
+    ConnectStatus.failed => 'failed:${widget.state.message}',
+    _ => null,
+  };
+
+  @override
+  void didUpdateWidget(covariant _ConnectBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final key = _key;
+    if (key == null || key == _dismissedKey) return;
+    _dismissedKey = null;
+    if (widget.state.status == ConnectStatus.connected) {
+      Future<void>.delayed(const Duration(seconds: 6), () {
+        if (mounted && _key == key) setState(() => _dismissedKey = key);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final key = _key;
+    final visible = key != null && key != _dismissedKey;
+    final connected = widget.state.status == ConnectStatus.connected;
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 220),
+      offset: visible ? Offset.zero : const Offset(0, -1.2),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: visible ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            elevation: 8,
+            child: ListTile(
+              leading: Icon(
+                connected ? Icons.check_circle : Icons.warning_amber_rounded,
+                color: connected ? AppColors.statusGreen : AppColors.primaryRed,
+              ),
+              title: Text(
+                connected
+                    ? widget.state.activeHost?.displayName ??
+                          'Connected to Host'
+                    : 'Host connection lost',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                connected
+                    ? widget.state.activeModel?.displayName ??
+                          'Hosted model ready'
+                    : widget.state.message ??
+                          'Choose a local model or reconnect',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: IconButton(
+                onPressed: () => setState(() => _dismissedKey = key),
+                icon: const Icon(Icons.close),
+                tooltip: 'Dismiss Connect status',
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

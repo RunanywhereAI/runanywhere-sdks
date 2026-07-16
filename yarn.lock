@@ -2738,7 +2738,11 @@ __metadata:
     long: ^5.3.2
     nitrogen: ^0.34.1
     protobufjs: ^7.5.8
+    react: 19.2.3
+    react-native: 0.85.3
     react-native-nitro-modules: ^0.33.9
+    react-native-tcp-socket: ^6.4.1
+    react-native-zeroconf: ^0.14.0
     ts-jest: ^29.1.2
     typescript: ^5.9.3
   peerDependencies:
@@ -2748,6 +2752,8 @@ __metadata:
     react-native-device-info: ">=11.0.0"
     react-native-fs: ">=2.20.0"
     react-native-nitro-modules: ^0.33.9
+    react-native-tcp-socket: ">=6.4.1"
+    react-native-zeroconf: ">=0.14.0"
   peerDependenciesMeta:
     react-native-blob-util:
       optional: true
@@ -3953,7 +3959,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buffer@npm:^5.5.0":
+"buffer@npm:^5.4.3, buffer@npm:^5.5.0":
   version: 5.7.1
   resolution: "buffer@npm:5.7.1"
   dependencies:
@@ -5270,6 +5276,20 @@ __metadata:
   version: 5.0.1
   resolution: "event-target-shim@npm:5.0.1"
   checksum: 1ffe3bb22a6d51bdeb6bf6f7cf97d2ff4a74b017ad12284cc9e6a279e727dc30a5de6bb613e5596ff4dc3e517841339ad09a7eec44266eccb1aa201a30448166
+  languageName: node
+  linkType: hard
+
+"eventemitter3@npm:^4.0.7":
+  version: 4.0.7
+  resolution: "eventemitter3@npm:4.0.7"
+  checksum: 1875311c42fcfe9c707b2712c32664a245629b42bb0a5a84439762dd0fd637fc54d078155ea83c2af9e0323c9ac13687e03cfba79b03af9f40c89b4960099374
+  languageName: node
+  linkType: hard
+
+"events@npm:^3.0.0":
+  version: 3.3.0
+  resolution: "events@npm:3.3.0"
+  checksum: f6f487ad2198aa41d878fa31452f1a3c00958f46e9019286ff4787c84aac329332ab45c9cdc8c445928fc6d7ded294b9e005a7fce9426488518017831b272780
   languageName: node
   linkType: hard
 
@@ -8692,6 +8712,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-tcp-socket@npm:^6.4.1":
+  version: 6.4.1
+  resolution: "react-native-tcp-socket@npm:6.4.1"
+  dependencies:
+    buffer: ^5.4.3
+    eventemitter3: ^4.0.7
+  peerDependencies:
+    react-native: ">=0.60.0"
+  checksum: 0c0af3a3044a3edeb9fb5077476eba7ba26675b4af2a1d6b11a63cd56a939a63e4675a63cc1da72cd573cf37ae386a4e98b16b442e4adc11c0addbccaf48b925
+  languageName: node
+  linkType: hard
+
 "react-native-vector-icons@npm:^10.3.0":
   version: 10.3.0
   resolution: "react-native-vector-icons@npm:10.3.0"
@@ -8772,6 +8804,17 @@ __metadata:
     react: "*"
     react-native: 0.83 - 0.86
   checksum: 98225e012aba6923c8f39c3c10cbac92de9b6e6dc30be247a8c473aeb8585eb725e51a5547d9d59a0232c652bef2a132401af543c9207de1d8325af77a5c76ce
+  languageName: node
+  linkType: hard
+
+"react-native-zeroconf@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "react-native-zeroconf@npm:0.14.0"
+  dependencies:
+    events: ^3.0.0
+  peerDependencies:
+    react-native: ">=0.60"
+  checksum: f944fe1208849e2b6e68584732bfcb53cc39b16c6958afdd60b348bab834711e721a3eeb3243f107bef297b5e05dd9ad5c5d11f90e6038514cba4b3a40dc9644
   languageName: node
   linkType: hard
 
@@ -9123,9 +9166,11 @@ __metadata:
     react-native-safe-area-context: ^5.6.2
     react-native-screens: ~4.18.0
     react-native-svg: ^15.15.5
+    react-native-tcp-socket: ^6.4.1
     react-native-vector-icons: ^10.3.0
     react-native-vision-camera: ^4.7.3
     react-native-worklets: ^0.9.2
+    react-native-zeroconf: ^0.14.0
     ts-jest: ^29.1.2
     typescript: ^5.9.3
     zustand: ^5.0.13

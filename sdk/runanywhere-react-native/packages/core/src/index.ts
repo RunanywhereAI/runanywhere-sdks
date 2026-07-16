@@ -13,6 +13,14 @@
 
 export { RunAnywhere } from './Public/RunAnywhere';
 
+export { ConnectSession } from './Public/Connect/ConnectSession';
+export type {
+  ConnectHost,
+  ConnectModel,
+  ConnectState,
+  ConnectStatus,
+} from './Public/Connect/ConnectSession';
+
 // Hybrid STT router (offline sherpa <-> cloud). THIN binding over the
 // commons hybrid router — commons owns all routing. Mirrors Swift `Hybrid/*`
 // and Kotlin `public/hybrid/*` (RACRouter / CloudSTT / RoutingPolicy).

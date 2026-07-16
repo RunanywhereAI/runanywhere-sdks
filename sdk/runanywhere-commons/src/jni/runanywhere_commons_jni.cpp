@@ -62,6 +62,7 @@
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "../infrastructure/http/rac_http_internal.h"
+#include "rac/connect/rac_connect.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -7797,6 +7798,33 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFile
     JNIEnv* env, jclass clazz, jbyteArray modelInfoProto) {
     return callProtoBufferFn(env, modelInfoProto, rac_artifact_expected_files_proto,
                              "racArtifactExpectedFilesProto");
+}
+
+// =============================================================================
+// CONNECT CLIENT — commons-owned role policy and handshake validation.
+// Android owns discovery and the socket transport, while these proto thunks
+// keep platform eligibility, protocol negotiation, and model binding in C++.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectGetPlatformPolicyProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_get_platform_policy_proto,
+                             "racConnectGetPlatformPolicyProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClientCreateHelloProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_connect_client_create_hello_proto,
+                             "racConnectClientCreateHelloProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racConnectClientValidateHostProto(
+    JNIEnv* env, jclass clazz, jbyteArray responseProto) {
+    return callProtoBufferFn(env, responseProto, rac_connect_client_validate_host_proto,
+                             "racConnectClientValidateHostProto");
 }
 
 // =============================================================================

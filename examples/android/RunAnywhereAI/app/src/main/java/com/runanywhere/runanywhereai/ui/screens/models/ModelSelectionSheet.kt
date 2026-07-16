@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -26,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -33,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,11 +48,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.ui.connect.ConnectClientViewModel
 import com.runanywhere.runanywhereai.ui.screens.models.huggingface.HuggingFaceSearchSheet
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectHost
+import com.runanywhere.sdk.public.connect.ConnectState
+import com.runanywhere.sdk.public.connect.ConnectStatus
 import ai.runanywhere.proto.v1.InferenceFramework
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -58,6 +67,7 @@ import kotlinx.coroutines.launch
 fun ModelSelectionSheet(
     viewModel: ModelSelectionViewModel,
     onDismiss: () -> Unit,
+    connectController: ConnectClientViewModel? = null,
 ) {
     val dimens = LocalDimens.current
     val state = viewModel.state
@@ -66,6 +76,29 @@ fun ModelSelectionSheet(
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
     var pendingDelete by remember { mutableStateOf<RAModelInfo?>(null) }
     var showHfSearch by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val connectState by connectController?.state?.collectAsState()
+        ?: remember { mutableStateOf(ConnectState()) }
+    var localNetworkDenied by remember { mutableStateOf(false) }
+    val localNetworkPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        localNetworkDenied = !granted
+        if (granted) connectController?.startDiscovery()
+    }
+    val startConnectDiscovery = {
+        localNetworkDenied = false
+        if (
+            Build.VERSION.SDK_INT >= 37 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_LOCAL_NETWORK) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        } else {
+            connectController?.startDiscovery()
+        }
+        Unit
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -84,6 +117,17 @@ fun ModelSelectionSheet(
         ) {
             Header(title = viewModel.title, onCancel = onDismiss)
 
+            if (viewModel.modality == ModelSelectionContext.LLM && connectController != null) {
+                ConnectPickerSection(
+                    state = connectState,
+                    permissionDenied = localNetworkDenied,
+                    onFindHost = startConnectDiscovery,
+                    onConnect = { host -> connectController.connect(host, onDismiss) },
+                    onUseConnected = onDismiss,
+                )
+                Spacer(Modifier.height(dimens.spacingSm))
+            }
+
             device?.let {
                 SectionLabel("Your device")
                 DeviceStatusCard(it, Modifier.padding(horizontal = dimens.spacingLg))
@@ -95,6 +139,7 @@ fun ModelSelectionSheet(
                 state.models.isEmpty() -> CenterNote("No models available")
                 else -> PickerBody(
                     viewModel, state, device, scope, onDismiss,
+                    onSelectLocalModel = { connectController?.disconnect() },
                     onDelete = { pendingDelete = it },
                     onAddFromHuggingFace = { showHfSearch = true },
                 )
@@ -148,12 +193,122 @@ fun ModelSelectionSheet(
 }
 
 @Composable
+private fun ConnectPickerSection(
+    state: ConnectState,
+    permissionDenied: Boolean,
+    onFindHost: () -> Unit,
+    onConnect: (ConnectHost) -> Unit,
+    onUseConnected: () -> Unit,
+) {
+    val dimens = LocalDimens.current
+    SectionLabel("Connect")
+    val host = state.availableHosts.firstOrNull()
+    val title: String
+    val subtitle: String
+    val icon = when (state.status) {
+        ConnectStatus.CONNECTED -> RACIcons.Outline.Check
+        ConnectStatus.DISCONNECTED, ConnectStatus.FAILED -> RACIcons.Outline.Refresh
+        else -> RACIcons.Outline.Desktop
+    }
+    val action: (() -> Unit)?
+    val actionLabel: String?
+
+    when (state.status) {
+        ConnectStatus.IDLE -> {
+            title = "Connect to a Host"
+            subtitle = "Use a text model hosted on your local network"
+            action = onFindHost
+            actionLabel = "Find Host"
+        }
+        ConnectStatus.DISCOVERING -> if (host == null) {
+            title = "Looking for Hosts"
+            subtitle = "Searching your local network"
+            action = null
+            actionLabel = null
+        } else {
+            title = host.displayName
+            subtitle = "Text model available on this host"
+            action = { onConnect(host) }
+            actionLabel = "Connect"
+        }
+        ConnectStatus.CONNECTING -> {
+            title = "Connecting"
+            subtitle = state.connectingHost?.displayName ?: "Checking the selected host"
+            action = null
+            actionLabel = null
+        }
+        ConnectStatus.CONNECTED -> {
+            title = state.activeHost?.displayName ?: "Connected Host"
+            subtitle = state.activeModel?.displayName ?: "Hosted text model"
+            action = onUseConnected
+            actionLabel = "Use"
+        }
+        ConnectStatus.DISCONNECTED -> {
+            title = "Find a Host again"
+            subtitle = state.message ?: "The previous connection ended"
+            action = onFindHost
+            actionLabel = "Retry"
+        }
+        ConnectStatus.FAILED -> {
+            title = "Try Connect again"
+            subtitle = state.message ?: "Could not connect to the selected host"
+            action = onFindHost
+            actionLabel = "Retry"
+        }
+    }
+
+    ListItem(
+        headlineContent = {
+            Text(title, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(subtitle, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+        trailingContent = {
+            when {
+                state.status == ConnectStatus.DISCOVERING && host == null ||
+                    state.status == ConnectStatus.CONNECTING -> CircularProgressIndicator(
+                    Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+                actionLabel != null -> Text(
+                    actionLabel,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+        modifier = Modifier
+            .padding(horizontal = dimens.spacingLg)
+            .then(if (action != null) Modifier.clickable(onClick = action) else Modifier),
+    )
+    Text(
+        if (permissionDenied) {
+            "Local Network access was denied. Allow it in Android settings to find a host."
+        } else {
+            "Local Network access is requested only after you choose to find a host."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = if (permissionDenied) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = Modifier.padding(horizontal = dimens.spacingLg),
+    )
+}
+
+@Composable
 private fun PickerBody(
     viewModel: ModelSelectionViewModel,
     state: ModelSelectionState,
     device: DeviceInfo?,
     scope: CoroutineScope,
     onDismiss: () -> Unit,
+    onSelectLocalModel: () -> Unit,
     onDelete: (RAModelInfo) -> Unit,
     onAddFromHuggingFace: () -> Unit,
 ) {
@@ -177,7 +332,14 @@ private fun PickerBody(
             .sortedBy { fw -> order.indexOf(fw).let { if (it < 0) Int.MAX_VALUE else it } }
     }
 
-    val onSelect: (RAModelInfo) -> Unit = { model -> scope.launch { if (viewModel.select(model)) onDismiss() } }
+    val onSelect: (RAModelInfo) -> Unit = { model ->
+        scope.launch {
+            if (viewModel.select(model)) {
+                onSelectLocalModel()
+                onDismiss()
+            }
+        }
+    }
 
     // The download runs in a `dataSync` foreground service whose progress
     // notification Android 13+ silently suppresses unless POST_NOTIFICATIONS is
