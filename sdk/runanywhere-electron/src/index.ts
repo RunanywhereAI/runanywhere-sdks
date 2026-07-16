@@ -8,5 +8,9 @@ export {
   STTModel,
   TTSVoice,
 } from './RunAnywhere';
-export type { InitOptions, LoadOptions } from './RunAnywhere';
+export type { InitOptions, LoadOptions, DownloadOptions } from './RunAnywhere';
 export type { NativeAddon } from './bridge';
+export { CATALOG, isCatalogId } from './catalog';
+export type { CatalogEntry, ModelType } from './catalog';
+export { resolveModel, downloadFile, modelsRoot } from './download';
+export type { DownloadProgress, ResolvedModel } from './download';
