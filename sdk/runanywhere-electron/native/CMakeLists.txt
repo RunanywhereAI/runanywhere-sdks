@@ -73,7 +73,7 @@ if(RAC_BUILD_ELECTRON_ADDON)
         NAPI_VERSION=8 NODE_ADDON_API_DISABLE_DEPRECATED BUILDING_NODE_EXTENSION)
     target_compile_features(runanywhere_native PRIVATE cxx_std_20)
     target_link_libraries(runanywhere_native PRIVATE
-        rac_commons rac_backend_llamacpp rac_backend_onnx "${RAC_NODE_LIB}")
+        rac_commons rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa "${RAC_NODE_LIB}")
 
     if(MSVC)
         target_link_directories(runanywhere_native PRIVATE "${_ra_bundled_dir}")
