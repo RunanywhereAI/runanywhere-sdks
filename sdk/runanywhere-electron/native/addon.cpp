@@ -324,7 +324,10 @@ Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
         std::memset(&image, 0, sizeof(image));
         image.format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         image.file_path = image_path.c_str();
-        return rac_vlm_component_process_stream(h, &image, prompt.c_str(), nullptr, stream_token_cb,
+        // Pass explicit defaults: NULL options leaves the VLM sampler config
+        // (top_k / seed / ...) reading uninitialized memory, which can crash.
+        rac_vlm_options_t opts = RAC_VLM_OPTIONS_DEFAULT;
+        return rac_vlm_component_process_stream(h, &image, prompt.c_str(), &opts, stream_token_cb,
                                                 stream_vlm_complete_cb, stream_error_cb, c);
     });
 }
