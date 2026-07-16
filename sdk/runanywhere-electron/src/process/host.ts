@@ -1,16 +1,14 @@
 // host.ts — entry point for the Electron utilityProcess that owns the native
 // addon. Loads the .node once, then serves RPC requests from one or more
 // renderer-connected MessagePorts (each delivered by RunAnywhereMain). Heavy
-// inference runs here, isolated from the main + renderer processes.
-import * as os from 'os';
-import * as path from 'path';
-
+// inference runs here, isolated from the main + renderer processes. The request
+// routing itself lives in dispatch.ts (pure + unit-tested); this file only wires
+// the real addon + model resolver into it and manages the parent port.
 import { addon } from '../bridge';
 import { isCatalogId } from '../catalog';
 import { resolveModel } from '../download';
-import { RpcRequest, STREAMING_METHODS } from './rpc';
-
-const LOAD_RE = /^load(Model|VlmModel|EmbeddingModel|SttModel|TtsVoice)$/;
+import { dispatch } from './dispatch';
+import { RpcRequest } from './rpc';
 
 // If a load method's first arg is a catalog id, download+resolve it (in the
 // utility process, which owns Node I/O) before handing paths to the addon.
@@ -36,53 +34,16 @@ interface ParentPort {
 }
 const parentPort = (process as unknown as { parentPort: ParentPort }).parentPort;
 
-const errmsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
-function dispatch(port: Port, req: RpcRequest): void {
-  const { id, method, args } = req;
-  const api = addon as unknown as Record<string, (...a: unknown[]) => unknown>;
-  try {
-    if (STREAMING_METHODS.has(method)) {
-      const onToken = (token: string) => port.postMessage({ id, token });
-      (api[method](...args, onToken) as Promise<void>)
-        .then(() => port.postMessage({ id, done: true }))
-        .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
-      return;
-    }
-    if (method === 'version') {
-      port.postMessage({ id, ok: true, result: addon.version });
-      return;
-    }
-    if (method === 'initialize') {
-      const home = path.join(os.homedir(), '.runanywhere');
-      const base = (args[1] as string) || home;
-      const secure = (args[0] as string) || path.join(base, 'secure');
-      addon.initialize(secure, base);
-      port.postMessage({ id, ok: true });
-      return;
-    }
-    if (LOAD_RE.test(method)) {
-      resolveLoadArgs(method, args)
-        .then((resolved) => {
-          try {
-            port.postMessage({ id, ok: true, result: api[method](...resolved) });
-          } catch (e) {
-            port.postMessage({ id, ok: false, error: errmsg(e) });
-          }
-        })
-        .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
-      return;
-    }
-    port.postMessage({ id, ok: true, result: api[method](...args) });
-  } catch (e) {
-    port.postMessage({ id, ok: false, error: errmsg(e) });
-  }
-}
+const deps = {
+  api: addon as unknown as Record<string, (...a: unknown[]) => unknown>,
+  getVersion: () => addon.version,
+  resolveLoadArgs,
+};
 
 parentPort.on('message', (e) => {
   const port = e.ports[0];
   if (!port) return;
-  port.on('message', (ev) => dispatch(port, ev.data as RpcRequest));
+  port.on('message', (ev) => dispatch(port, ev.data as RpcRequest, deps));
   port.start();
   parentPort.postMessage({ ready: true });
 });
