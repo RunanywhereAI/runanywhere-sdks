@@ -13,6 +13,25 @@ import { VoiceAgent } from './VoiceAgent';
 import type { VoiceAgentModels, VoiceAgentOptions } from './VoiceAgent';
 import { Chat } from './Chat';
 import type { ChatOptions } from './Chat';
+import { jsonSchemaToGrammar } from './grammar';
+import type { JsonSchema } from './grammar';
+
+/** Per-request generation controls (all optional). */
+export interface GenerateOptions {
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  /** System instruction passed to the backend for this request. */
+  systemPrompt?: string;
+  /** Raw GBNF grammar to constrain decoding (advanced; see generateObject). */
+  grammar?: string;
+}
+
+/** Options for schema-constrained structured generation. */
+export interface GenerateObjectOptions extends GenerateOptions {
+  schema: JsonSchema;
+}
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -36,14 +55,30 @@ export interface DownloadOptions {
 export class LLMModel {
   constructor(private readonly handle: number) {}
   /** Stream the completion token-by-token. */
-  generate(prompt: string): AsyncIterableIterator<string> {
-    return toAsyncIterable((onToken) => addon.generate(this.handle, prompt, onToken));
+  generate(prompt: string, options: GenerateOptions = {}): AsyncIterableIterator<string> {
+    return toAsyncIterable((onToken) => addon.generate(this.handle, prompt, options, onToken));
   }
   /** Convenience: collect the full completion. */
-  async generateText(prompt: string): Promise<string> {
+  async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
     let out = '';
-    for await (const t of this.generate(prompt)) out += t;
+    for await (const t of this.generate(prompt, options)) out += t;
     return out;
+  }
+  /**
+   * Structured output: constrain decoding to JSON matching `schema` (via a GBNF
+   * grammar) and return the parsed object. Output is guaranteed parseable.
+   */
+  async generateObject<T = unknown>(prompt: string, options: GenerateObjectOptions): Promise<T> {
+    const { schema, ...rest } = options;
+    const grammar = jsonSchemaToGrammar(schema);
+    let out = '';
+    for await (const t of this.generate(prompt, { ...rest, grammar })) out += t;
+    const text = out.trim();
+    try {
+      return JSON.parse(text) as T;
+    } catch (e) {
+      throw new Error(`generateObject: model did not return valid JSON: ${text}`);
+    }
   }
   unload(): void {
     addon.unloadModel(this.handle);
