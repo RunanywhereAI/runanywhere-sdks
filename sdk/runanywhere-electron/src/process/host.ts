@@ -6,7 +6,21 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { addon } from '../bridge';
+import { isCatalogId } from '../catalog';
+import { resolveModel } from '../download';
 import { RpcRequest, STREAMING_METHODS } from './rpc';
+
+const LOAD_RE = /^load(Model|VlmModel|EmbeddingModel|SttModel|TtsVoice)$/;
+
+// If a load method's first arg is a catalog id, download+resolve it (in the
+// utility process, which owns Node I/O) before handing paths to the addon.
+async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown[]> {
+  const first = args[0];
+  if (typeof first !== 'string' || !isCatalogId(first)) return args;
+  const m = await resolveModel(first);
+  if (method === 'loadVlmModel') return [m.primary, m.mmproj ?? args[1], ...args.slice(2)];
+  return [m.primary, ...args.slice(1)];
+}
 
 // electron's utility-process ParentPort / MessagePortMain are loosely typed here
 // so this file compiles without pulling electron's full type surface into the
@@ -45,6 +59,18 @@ function dispatch(port: Port, req: RpcRequest): void {
       const secure = (args[0] as string) || path.join(base, 'secure');
       addon.initialize(secure, base);
       port.postMessage({ id, ok: true });
+      return;
+    }
+    if (LOAD_RE.test(method)) {
+      resolveLoadArgs(method, args)
+        .then((resolved) => {
+          try {
+            port.postMessage({ id, ok: true, result: api[method](...resolved) });
+          } catch (e) {
+            port.postMessage({ id, ok: false, error: errmsg(e) });
+          }
+        })
+        .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
       return;
     }
     port.postMessage({ id, ok: true, result: api[method](...args) });
