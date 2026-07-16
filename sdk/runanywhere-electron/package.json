@@ -7,12 +7,16 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
+    "electron": "^43.1.1",
     "typescript": "^5.6.3"
   }
 }
