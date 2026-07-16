@@ -19,9 +19,9 @@ import com.runanywhere.runanywhereai.util.isExpandedScreen
 // (detail is a separate nav route), or a two-pane list ↔ detail layout on expanded
 // widths with in-pane selection.
 @Composable
-fun BenchmarkScreen(onOpenDetail: (String) -> Unit) {
+fun BenchmarkScreen(onOpenDetail: (String) -> Unit, onOpenModels: () -> Unit = {}) {
     if (!isExpandedScreen()) {
-        BenchmarkDashboardScreen(onOpenRun = onOpenDetail)
+        BenchmarkDashboardScreen(onOpenRun = onOpenDetail, onOpenModels = onOpenModels)
         return
     }
 
@@ -29,6 +29,7 @@ fun BenchmarkScreen(onOpenDetail: (String) -> Unit) {
     Row(modifier = Modifier.fillMaxSize()) {
         BenchmarkDashboardScreen(
             onOpenRun = { selectedRunId = it },
+            onOpenModels = onOpenModels,
             selectedRunId = selectedRunId,
             modifier = Modifier.weight(1f),
         )

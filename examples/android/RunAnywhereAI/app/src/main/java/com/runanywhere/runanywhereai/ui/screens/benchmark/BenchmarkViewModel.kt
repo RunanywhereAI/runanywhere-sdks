@@ -31,6 +31,12 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
     val deviceInfo: BenchDeviceInfo = runner.deviceInfo()
     val selected = mutableStateListOf(BenchmarkCategory.LLM)
 
+    // Number of measured passes per (model x scenario); the median is reported with
+    // an observed min/max range. 3 balances noise-robustness against total run time.
+    val trialOptions = listOf(1, 3, 5)
+    var trials by mutableStateOf(3)
+        private set
+
     var isRunning by mutableStateOf(false)
         private set
     var progress by mutableStateOf<BenchmarkProgress?>(null)
@@ -38,18 +44,40 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
     var message by mutableStateOf<String?>(null)
         private set
 
+    // Whether any non-built-in model is downloaded for the selected categories. Starts
+    // true to avoid a "download models" flash before the first availability check.
+    var hasModels by mutableStateOf(true)
+        private set
+
     private var job: Job? = null
 
     val history: List<BenchmarkRun> get() = BenchmarkStore.runs
 
+    init {
+        refreshAvailability()
+    }
+
+    fun refreshAvailability() {
+        viewModelScope.launch(Dispatchers.Default) {
+            hasModels = runCatching { runner.hasDownloadedModels(selected.toSet()) }.getOrDefault(true)
+        }
+    }
+
     fun toggle(category: BenchmarkCategory) {
         if (isRunning) return
         if (category in selected) selected.remove(category) else selected.add(category)
+        refreshAvailability()
+    }
+
+    fun selectTrials(count: Int) {
+        if (isRunning) return
+        if (count in trialOptions) trials = count
     }
 
     fun run() {
         if (isRunning || selected.isEmpty()) return
         val categories = selected.toSet()
+        val trialCount = trials
         val startedAt = System.currentTimeMillis()
         val device = runner.deviceInfo()
         val results = mutableListOf<BenchmarkResult>()
@@ -61,6 +89,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 runner.run(
                     categories = categories,
+                    trials = trialCount,
                     onProgress = { progress = it },
                     onResult = { results += it },
                 )

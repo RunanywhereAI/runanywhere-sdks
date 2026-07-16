@@ -77,6 +77,12 @@ enum ModelFamilyCatalog {
         FamilyRule(key: "qwen3", displayName: "Qwen3",
                    tagline: "Fast, capable everyday assistants",
                    patterns: ["qwen3", "qwen3.5"]),
+        // PrismML org umbrella: groups both the Bonsai (1-bit) and
+        // Ternary-Bonsai (2-bit) quantization lines under one family card,
+        // since they're the same org/brand rather than distinct products.
+        FamilyRule(key: "prismml", displayName: "PrismML",
+                   tagline: "Sub-byte reasoning models (Bonsai / Ternary-Bonsai)",
+                   patterns: ["bonsai"]),
         FamilyRule(key: "qwen2", displayName: "Qwen2.5",
                    tagline: "Reliable general-purpose chat",
                    patterns: ["qwen2.5", "qwen2"]),

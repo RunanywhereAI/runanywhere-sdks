@@ -137,8 +137,10 @@ final class BenchmarkRunner {
     func runBenchmarks(
         categories: Set<BenchmarkCategory>,
         modelIds: Set<String>? = nil,
+        trials: Int = 1,
         onProgress: @escaping @Sendable (BenchmarkProgressUpdate) -> Void
     ) async throws -> BenchmarkRunOutput {
+        let trialCount = max(1, trials)
         let preflight = try await preflight(categories: categories)
 
         // If nothing to run, throw a descriptive error
@@ -173,27 +175,40 @@ final class BenchmarkRunner {
                 currentModel: item.model.name
             ))
 
-            let metrics: BenchmarkMetrics
+            // Each execute() is a full independent pass (load → warmup → measure →
+            // unload). Running it `trialCount` times and reporting the per-metric
+            // median (with min/max range) damps single-run noise. Any trial failure
+            // fails the whole item, matching the deterministic (temperature 0) intent.
+            let aggregated: BenchmarkMetrics
+            let variance: BenchmarkVariance?
             do {
                 guard let provider = providers[item.category] else { continue }
-                metrics = try await provider.execute(
-                    scenario: item.scenario,
-                    model: item.model
-                )
+                var trialMetrics: [BenchmarkMetrics] = []
+                trialMetrics.reserveCapacity(trialCount)
+                for _ in 0..<trialCount {
+                    try Task.checkCancellation()
+                    trialMetrics.append(try await provider.execute(
+                        scenario: item.scenario,
+                        model: item.model
+                    ))
+                }
+                (aggregated, variance) = BenchmarkMetrics.aggregate(trialMetrics)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 var errorMetrics = BenchmarkMetrics()
                 let prefix = "\(item.category.displayName) [\(item.model.name)]"
                 errorMetrics.errorMessage = "\(prefix): \(error.localizedDescription)"
-                metrics = errorMetrics
+                aggregated = errorMetrics
+                variance = nil
             }
 
             results.append(BenchmarkResult(
                 category: item.category,
                 scenario: item.scenario,
                 modelInfo: ComponentModelInfo(from: item.model),
-                metrics: metrics
+                metrics: aggregated,
+                variance: variance
             ))
         }
 

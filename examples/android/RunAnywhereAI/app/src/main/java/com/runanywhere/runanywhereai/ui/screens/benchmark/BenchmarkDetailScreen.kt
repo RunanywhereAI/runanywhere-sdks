@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,13 +65,19 @@ fun BenchmarkDetailScreen(runId: String) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingMd),
     ) {
+        var showShareSheet by remember { mutableStateOf(false) }
+
         RunInfoCard(run)
         ExportCard(
+            onShareCard = { showShareSheet = true },
             onCopyMarkdown = { copy(context, "Benchmark (Markdown)", BenchmarkReport.toMarkdown(run)) },
             onCopyJson = { copy(context, "Benchmark (JSON)", BenchmarkReport.toJson(run)) },
             onCopyCsv = { copy(context, "Benchmark (CSV)", BenchmarkReport.toCsv(run)) },
             onShare = { share(context, BenchmarkReport.toMarkdown(run)) },
         )
+        if (showShareSheet) {
+            BenchmarkShareSheet(run = run, onDismiss = { showShareSheet = false })
+        }
         BenchmarkCategory.entries.forEach { category ->
             val results = run.results.filter { it.category == category }
             if (results.isEmpty()) return@forEach
@@ -104,6 +114,7 @@ private fun RunInfoCard(run: BenchmarkRun) {
 
 @Composable
 private fun ExportCard(
+    onShareCard: () -> Unit,
     onCopyMarkdown: () -> Unit,
     onCopyJson: () -> Unit,
     onCopyCsv: () -> Unit,
@@ -111,6 +122,10 @@ private fun ExportCard(
 ) {
     val dimens = LocalDimens.current
     Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+        Button(onClick = onShareCard, modifier = Modifier.fillMaxWidth()) {
+            Icon(RACIcons.Outline.Send, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+            Text("Share result card", modifier = Modifier.padding(start = dimens.spacingSm))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
             OutlinedButton(onClick = onCopyMarkdown, modifier = Modifier.weight(1f)) { Text("Copy MD") }
             OutlinedButton(onClick = onCopyJson, modifier = Modifier.weight(1f)) { Text("Copy JSON") }
@@ -119,7 +134,7 @@ private fun ExportCard(
             OutlinedButton(onClick = onCopyCsv, modifier = Modifier.weight(1f)) { Text("Copy CSV") }
             OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
                 Icon(RACIcons.Outline.Send, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
-                Text("Share", modifier = Modifier.padding(start = dimens.spacingSm))
+                Text("Share text", modifier = Modifier.padding(start = dimens.spacingSm))
             }
         }
     }

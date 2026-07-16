@@ -86,7 +86,10 @@ fun AppNavHost(
         composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }
         composable<Benchmarks> {
-            BenchmarkScreen(onOpenDetail = { navController.navigate(BenchmarkDetail(it)) })
+            BenchmarkScreen(
+                onOpenDetail = { navController.navigate(BenchmarkDetail(it)) },
+                onOpenModels = onOpenModels,
+            )
         }
         composable<BenchmarkDetail> { entry ->
             BenchmarkDetailScreen(runId = entry.toRoute<BenchmarkDetail>().runId)

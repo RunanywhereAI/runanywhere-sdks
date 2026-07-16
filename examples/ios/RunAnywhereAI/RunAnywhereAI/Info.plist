@@ -24,5 +24,12 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<!-- Deep-link targets for the benchmark share card (Instagram Stories / X). -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>instagram-stories</string>
+		<string>twitter</string>
+		<string>x</string>
+	</array>
 </dict>
 </plist>

@@ -50,9 +50,16 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         unloadRequest.category = .speechSynthesis
 
         do {
+            let options = RATTSOptions.defaults()
+
+            // Warmup: one discarded synthesis so first-run cache/JIT cost is not
+            // charged to the measured pass (parity with the LLM/VLM warmup).
+            let warmupStart = Date()
+            _ = try? await RunAnywhere.synthesize("Hi.", options: options)
+            metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
+
             // Synthesize (not speak)
             let benchStart = Date()
-            let options = RATTSOptions.defaults()
             let result = try await RunAnywhere.synthesize(text, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 

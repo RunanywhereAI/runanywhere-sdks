@@ -178,6 +178,57 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
+    // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
+    // GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS. Unlike the 27B sibling below, this
+    // size comfortably clears the WASM 4 GB heap gate with runtime/KV
+    // headroom to spare, so it's a normal, fully-usable in-browser entry.
+    id: 'bonsai-1.7b-q1_0',
+    name: 'Bonsai-1.7B 1-bit Q1_0',
+    description: 'PrismML 1-bit 1.7B LLM. Small enough to run comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf',
+    downloadSizeBytes: 248_302_272,
+    memoryRequiredBytes: 350_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-4b-q1_0',
+    name: 'Bonsai-4B 1-bit Q1_0',
+    description: 'PrismML 1-bit 4B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf',
+    downloadSizeBytes: 572_270_624,
+    memoryRequiredBytes: 700_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-8b-q1_0',
+    name: 'Bonsai-8B 1-bit Q1_0',
+    description: 'PrismML 1-bit 8B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf',
+    downloadSizeBytes: 1_158_654_496,
+    memoryRequiredBytes: 1_400_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
     // EXPERIMENTAL: PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant,
     // qwen3_5 GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
     // sdk/runanywhere-commons/VERSIONS. At ~3.8 GB the artifact sits at the
