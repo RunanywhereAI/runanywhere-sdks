@@ -87,7 +87,16 @@
 #define NAME_MAX 260
 #endif
 
+/* dirent d_type values (subset). Windows has no d_type; readdir() below fills it
+ * from the Win32 file attributes so callers can use DT_DIR / DT_REG. */
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#define DT_DIR 4
+#define DT_REG 8
+#endif
+
 struct dirent {
+    unsigned char d_type;
     char d_name[NAME_MAX + 1];
 };
 
@@ -149,6 +158,8 @@ static inline struct dirent* readdir(DIR* dir) {
     }
     strncpy(dir->entry.d_name, dir->fdata.cFileName, NAME_MAX);
     dir->entry.d_name[NAME_MAX] = '\0';
+    dir->entry.d_type =
+        (dir->fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? DT_DIR : DT_REG;
     return &dir->entry;
 }
 
