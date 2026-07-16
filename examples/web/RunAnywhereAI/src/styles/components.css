@@ -1579,6 +1579,25 @@
 .model-action-btn.loaded { background: var(--badge-green); color: var(--color-green); cursor: pointer; }
 .model-action-btn--progress { background: var(--bg-tertiary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .model-action-btn--retry { background: var(--badge-red); color: var(--color-red); }
+.model-action-btn--unavailable {
+  max-width: 132px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  line-height: 1.15;
+}
+
+.model-compatibility-reason {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  white-space: normal;
+}
+.model-compatibility-reason a {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
 
 .model-row-error {
   margin-top: 4px;

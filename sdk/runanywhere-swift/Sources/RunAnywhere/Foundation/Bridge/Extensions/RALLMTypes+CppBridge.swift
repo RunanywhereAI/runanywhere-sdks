@@ -49,6 +49,10 @@ public extension RALLMGenerationOptions {
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
+        // Commons already classifies streamed output into ANSWER / THOUGHT
+        // token kinds. Ask it to surface thought events whenever the caller
+        // supplied a thinking pattern and did not disable reasoning.
+        request.emitThoughts = hasThinkingPattern && !disableThinking
         // LLM generation controls have one canonical wire location.
         request.options = self
         return request

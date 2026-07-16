@@ -22,18 +22,23 @@ extension LLMViewModel {
         // currently-loaded LLM model), and invokes `onToken` for live UI
         // updates. Avoids the synthetic result construction the example used
         // to do alongside a hardcoded `framework = "llamacpp"` literal.
-        let request = Self.makeRequest(prompt: prompt, options: options)
-        let eventStream = try await RunAnywhere.generateStream(request)
+        let eventStream = try await RunAnywhere.generateStream(prompt: prompt, options: options)
         let result = await RunAnywhere.aggregateStream(
             prompt: prompt,
-            events: eventStream
-        ) { fullResponse in
-            await MainActor.run {
-                // `@Observable` publishes the message mutation; the chat view
-                // auto-scrolls via `.onChange(of: messages.last?.content)`.
-                self.updateMessageContent(at: messageIndex, content: fullResponse)
+            events: eventStream,
+            onThinking: { fullThinking in
+                await MainActor.run {
+                    self.updateMessageThinking(at: messageIndex, content: fullThinking)
+                }
+            },
+            onToken: { fullResponse in
+                await MainActor.run {
+                    // `@Observable` publishes the message mutation; the chat view
+                    // auto-scrolls via `.onChange(of: messages.last?.content)`.
+                    self.updateMessageContent(at: messageIndex, content: fullResponse)
+                }
             }
-        }
+        )
 
         if !result.errorMessage.isEmpty {
             throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
@@ -57,8 +62,7 @@ extension LLMViewModel {
         options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        let request = Self.makeRequest(prompt: prompt, options: options)
-        let result = try await RunAnywhere.generate(request)
+        let result = try await RunAnywhere.generate(prompt: prompt, options: options)
         await updateMessageWithResult(
             at: messageIndex,
             result: result,
@@ -66,16 +70,6 @@ extension LLMViewModel {
             options: options,
             wasInterrupted: false
         )
-    }
-
-    /// Compose a canonical `RALLMGenerateRequest` from a prompt and options.
-    /// Example-local convenience for bridging the app's options-based API into
-    /// the SDK's canonical request-based entry points.
-    static func makeRequest(prompt: String, options: RALLMGenerationOptions) -> RALLMGenerateRequest {
-        var request = RALLMGenerateRequest()
-        request.prompt = prompt
-        request.options = options
-        return request
     }
 
     // MARK: - Message Updates
@@ -88,6 +82,23 @@ extension LLMViewModel {
             role: currentMessage.role,
             content: content,
             thinkingContent: currentMessage.thinkingContent,
+            timestamp: currentMessage.timestamp,
+            analytics: currentMessage.analytics,
+            modelInfo: currentMessage.modelInfo,
+            toolCallInfo: currentMessage.toolCallInfo,
+            attachment: currentMessage.attachment
+        )
+        self.updateMessage(at: index, with: updatedMessage)
+    }
+
+    func updateMessageThinking(at index: Int, content: String) {
+        guard index < self.messagesValue.count else { return }
+        let currentMessage = self.messagesValue[index]
+        let updatedMessage = Message(
+            id: currentMessage.id,
+            role: currentMessage.role,
+            content: currentMessage.content,
+            thinkingContent: content,
             timestamp: currentMessage.timestamp,
             analytics: currentMessage.analytics,
             modelInfo: currentMessage.modelInfo,

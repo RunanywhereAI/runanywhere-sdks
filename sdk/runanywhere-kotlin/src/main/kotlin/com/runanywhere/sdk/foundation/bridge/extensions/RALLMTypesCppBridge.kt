@@ -59,7 +59,7 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
         )
     return RALLMGenerateRequest(
         prompt = prompt,
-        emit_thoughts = requestOptions.thinking_pattern != null,
+        emit_thoughts = requestOptions.thinking_pattern != null && !requestOptions.disable_thinking,
         options = requestOptions,
     )
 }

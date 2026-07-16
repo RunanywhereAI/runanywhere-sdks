@@ -106,6 +106,12 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
 ]
 
+// PrismML's Bonsai 1-bit weights require kernels that are not yet available
+// in upstream mlx-swift. This revision is the maintained Prism delta applied
+// directly on top of upstream mlx-swift 0.31.6, which keeps mlx-swift-lm
+// 3.31.x API-compatible while enabling bits=1 / group_size=128 models.
+let prismMLXSwiftRevision = "563961dfcfd4589755190d285555e4f9eface890"
+
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -148,8 +154,8 @@ let package = Package(
         ),
 
         // =================================================================
-        // macOS MLX CLI host - registers real mlx-swift callbacks, then
-        // delegates to the existing C++ rcli command stack in-process.
+        // macOS CLI host — registers real mlx-swift callbacks, then
+        // delegates to the C++ rcli stack with llama.cpp + MLX both enabled.
         // =================================================================
         .executable(
             name: "RunAnywhereMLXCLI",
@@ -176,7 +182,10 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
+        .package(
+            url: "https://github.com/PrismML-Eng/mlx-swift.git",
+            revision: prismMLXSwiftRevision
+        ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
@@ -380,11 +389,12 @@ let package = Package(
         ),
 
         // =================================================================
-        // rcli host bridge for the macOS MLX CLI executable.
+        // rcli host bridge for the macOS CLI executable (RunAnywhereMLXCLI).
         //
-        // This CLI uses the MLX backend specifically, while the other binary
-        // targets also carry macOS slices for their own published products.
-        // Linux/Windows keep using the normal CMake-built pure C++ rcli.
+        // Release builds keep BOTH llama.cpp (GGUF) and MLX enabled. MLX
+        // needs Swift runtime callbacks from MLXRuntime; llama.cpp registers
+        // from C++ bootstrap via RCLI_HAS_LLAMACPP. Linux/Windows keep using
+        // the CMake-built pure C++ rcli (llama.cpp; MLX is Apple-only).
         // =================================================================
         .target(
             name: "RADesktopHostAdapter",
@@ -413,6 +423,7 @@ let package = Package(
             dependencies: [
                 "CRACommons",
                 "RADesktopHostAdapter",
+                "RABackendLlamaCPPBinary",
                 "RABackendMLXBinary",
             ],
             path: "sdk/runanywhere-cli",
@@ -458,6 +469,7 @@ let package = Package(
                 // CLI11's C++20 codecvt path uses APIs deprecated since C++17.
                 // Select its current locale-conversion implementation.
                 .define("CLI11_HAS_CODECVT", to: "0"),
+                .define("RCLI_HAS_LLAMACPP", to: "1"),
                 .define("RCLI_HAS_MLX", to: "1"),
                 .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
                 .headerSearchPath("include"),
@@ -479,7 +491,10 @@ let package = Package(
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
                 .linkedLibrary("z"),
+                .linkedFramework("Accelerate"),
                 .linkedFramework("CoreFoundation"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
                 .linkedFramework("Security"),
             ]
         ),

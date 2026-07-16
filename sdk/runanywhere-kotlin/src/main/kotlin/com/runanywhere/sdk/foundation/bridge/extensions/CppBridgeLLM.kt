@@ -71,7 +71,7 @@ internal fun RALLMGenerationOptions?.toGenerateRequest(
         )
     return RALLMGenerateRequest(
         prompt = prompt,
-        emit_thoughts = options.thinking_pattern != null,
+        emit_thoughts = requestOptions.thinking_pattern != null && !requestOptions.disable_thinking,
         options = requestOptions,
     )
 }

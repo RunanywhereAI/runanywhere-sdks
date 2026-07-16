@@ -552,7 +552,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
     } catch (error) {
       assistantMsg.content = formatChatError(error);
-      renderLastMessage(messagesEl, assistantMsg);
+      renderLastMessage(messagesEl, assistantMsg, false);
     } finally {
       cancelGeneration = null;
       isGenerating = false;
@@ -628,10 +628,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         assistantMsg.thinking = answer.thinking;
         assistantMsg.sources = answer.sources;
       }
-      renderLastMessage(host, assistantMsg);
+      renderLastMessage(host, assistantMsg, false);
     } catch (error) {
       assistantMsg.content = isAbortError(error) ? 'Cancelled.' : formatChatError(error);
-      renderLastMessage(host, assistantMsg);
+      renderLastMessage(host, assistantMsg, false);
     } finally {
       cancelGeneration = null;
       isGenerating = false;
@@ -719,28 +719,30 @@ async function generateStreaming(
   });
   cancelGeneration = stream.cancel;
 
-  let raw = '';
-  for await (const token of stream.stream) {
-    raw += token;
-    // Thinking-capable models can stream thinking tags inline; split them
-    // into the collapsible section live (iOS receives the split from
-    // commons; the Web stream carries raw tokens).
-    const split = splitThinking(raw);
-    assistantMsg.content = split.content;
-    assistantMsg.thinking = split.thinking || undefined;
+  const thinkingEnabled = loadedModelSupportsThinking() && !options.disableThinking;
+  if (thinkingEnabled) {
+    assistantMsg.thinking = 'Starting…';
     renderLastMessage(messagesEl, assistantMsg);
   }
 
-  const result = await stream.result;
-  // Reconcile the terminal snapshot even when the model never leaves its
-  // reasoning phase. Keep hidden reasoning separate from the answer and make
-  // an exhausted/empty terminal state explicit instead of leaving the live
-  // "Thinking…" placeholder on screen indefinitely.
-  const terminal = splitThinking(result.text || raw);
+  let receivedThinking = false;
+  const result = await RunAnywhere.textGeneration.aggregateStream(
+    prompt,
+    stream,
+    (answer) => {
+      assistantMsg.content = answer;
+      renderLastMessage(messagesEl, assistantMsg);
+    },
+    (thinking) => {
+      receivedThinking = true;
+      assistantMsg.thinking = thinking;
+      renderLastMessage(messagesEl, assistantMsg);
+    },
+  );
+
   assistantMsg.thinking = result.thinkingContent?.trim()
-    || terminal.thinking
-    || assistantMsg.thinking;
-  assistantMsg.content = terminal.content;
+    || (receivedThinking ? assistantMsg.thinking : undefined);
+  assistantMsg.content = result.text.trim();
   if (!assistantMsg.content) {
     assistantMsg.content = result.finishReason === 'cancelled'
       ? 'Cancelled.'
@@ -748,7 +750,10 @@ async function generateStreaming(
         ? 'The response limit was reached before a final answer. Increase Max tokens in Settings or turn off thinking, then try again.'
         : 'The model finished without producing a final answer. Try again or turn off thinking.';
   }
-  renderLastMessage(messagesEl, assistantMsg);
+  // Generation is terminal now, even though onSend's persistence cleanup is
+  // still pending. Collapse reasoning immediately so the final answer below
+  // becomes the primary surface; the native <details> remains user-expandable.
+  renderLastMessage(messagesEl, assistantMsg, false);
 }
 
 /**
@@ -793,7 +798,7 @@ async function generateWithToolCalling(
       };
     });
   }
-  renderLastMessage(messagesEl, assistantMsg);
+  renderLastMessage(messagesEl, assistantMsg, false);
 }
 
 const DEMO_TOOL_NAMES = ['calculate', 'get_current_time', 'get_weather'] as const;
@@ -1265,10 +1270,8 @@ function loadedModelSupportsThinking(): boolean {
 }
 
 /**
- * Split built-in thinking sections out of raw model text. Handles an
- * unterminated tag while tokens are still streaming. iOS receives the
- * split from commons (result.thinkingContent); the Web stream carries raw
- * tokens, so the view performs the same tag split client-side.
+ * Split built-in thinking sections out of a non-streaming tool-call result.
+ * Streaming chat consumes the SDK's canonical typed thinking events instead.
  */
 function splitThinking(raw: string): { content: string; thinking: string } {
   const thinkingParts: string[] = [];
@@ -1371,10 +1374,14 @@ function renderMessageActions(msg: ChatMessage, idx: number): string {
   `;
 }
 
-function renderLastMessage(host: HTMLElement, msg: ChatMessage): void {
+function renderLastMessage(
+  host: HTMLElement,
+  msg: ChatMessage,
+  streaming = isGenerating,
+): void {
   const last = host.lastElementChild;
   if (last) {
-    last.innerHTML = renderMessageBody(msg, isGenerating);
+    last.innerHTML = renderMessageBody(msg, streaming);
   }
   host.scrollTop = host.scrollHeight;
 }
@@ -1385,7 +1392,7 @@ function renderMessageBody(msg: ChatMessage, streaming = false): string {
   const thinking = msg.thinking?.trim();
   const thinkingSection = msg.role === 'assistant' && thinking
     ? `
-      <details class="chat-thinking">
+      <details class="chat-thinking"${streaming ? ' open' : ''}>
         <summary>Thinking</summary>
         <pre class="chat-thinking-content">${escapeHtml(thinking)}</pre>
       </details>

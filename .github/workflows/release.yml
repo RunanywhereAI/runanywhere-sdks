@@ -217,6 +217,15 @@ jobs:
           set -euo pipefail
           cmake --preset rcli-macos-release
           cmake --build --preset rcli-macos-release
+      - name: Smoke (modelless — llama.cpp + dual catalog)
+        run: |
+          set -euo pipefail
+          RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
+          BACKENDS="$("$RCLI" backends --json)"
+          echo "$BACKENDS"
+          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
+          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
+          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
       - name: Package rcli tarball
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}

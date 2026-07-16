@@ -1,15 +1,15 @@
 package com.runanywhere.runanywhereai.data.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppSettingsTest {
 
     @Test
-    fun `reasoning is off by default so small on-device models keep their budget for the answer`() {
-        // Thinking-on burned Qwen3.5-0.8B's whole ~512-token output budget, leaving no room to answer.
-        assertTrue(AppSettings().disableThinking)
+    fun `reasoning is visible by default`() {
+        assertFalse(AppSettings().disableThinking)
     }
 
     @Test

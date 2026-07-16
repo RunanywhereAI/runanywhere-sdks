@@ -22,9 +22,17 @@ include(LoadVersions)
 # nativeGetVersion() doesn't drift from the actual linked llama.cpp build.
 add_compile_definitions(RAC_LLAMACPP_VERSION="${RAC_LLAMACPP_VERSION}")
 
+# Repo + tag both come from sdk/runanywhere-commons/VERSIONS (via LoadVersions)
+# so a fork swap (e.g. the PrismML Bonsai fork) is a VERSIONS-only change.
+# Fall back to upstream when the key is absent (older VERSIONS files).
+if(NOT RAC_LLAMACPP_GIT_REPOSITORY)
+    set(RAC_LLAMACPP_GIT_REPOSITORY "https://github.com/ggerganov/llama.cpp.git")
+endif()
+message(STATUS "llama.cpp source: ${RAC_LLAMACPP_GIT_REPOSITORY} @ ${RAC_LLAMACPP_VERSION}")
+
 FetchContent_Declare(
     llamacpp
-    GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
+    GIT_REPOSITORY ${RAC_LLAMACPP_GIT_REPOSITORY}
     GIT_TAG        ${RAC_LLAMACPP_VERSION}
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE

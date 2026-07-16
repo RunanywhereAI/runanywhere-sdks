@@ -270,7 +270,11 @@ private fun AssistantMessage(
 ) {
     val dimens = LocalDimens.current
     var showToolSheet by remember { mutableStateOf(false) }
-    val isWaiting = message.text.isEmpty() && message.thinking == null && message.tool == null && message.stats == null
+    val thinkingPresentation = message.thinkingPresentation(isStreamingTail)
+    val isWaiting = message.text.isEmpty() &&
+        thinkingPresentation == null &&
+        message.tool == null &&
+        message.stats == null
 
     // Assistant replies read as a document: full-width, no bubble — the
     // consumer chat idiom shared with the iOS and web examples.
@@ -278,8 +282,8 @@ private fun AssistantMessage(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
     ) {
-        message.thinking?.let {
-            ThinkingSection(thinking = it, inProgress = message.text.isEmpty() && message.stats == null)
+        thinkingPresentation?.let { presentation ->
+            ThinkingSection(thinking = presentation.text, phase = presentation.phase)
         }
 
         message.tool?.let { tool ->
@@ -309,6 +313,23 @@ private fun AssistantMessage(
     if (showToolSheet) {
         message.tool?.let { ToolCallDetailSheet(tool = it, onDismiss = { showToolSheet = false }) }
     }
+}
+
+private data class ThinkingPresentation(
+    val text: String,
+    val phase: ThinkingPhase,
+)
+
+private fun ChatMessage.thinkingPresentation(isStreamingTail: Boolean): ThinkingPresentation? = when {
+    isStreamingTail && thinking != null && tool == null && stats == null -> ThinkingPresentation(
+        text = thinking.orEmpty(),
+        phase = ThinkingPhase.ACTIVE,
+    )
+    thinking != null -> ThinkingPresentation(
+        text = thinking,
+        phase = ThinkingPhase.COMPLETE,
+    )
+    else -> null
 }
 
 @Composable
