@@ -36,6 +36,16 @@ export const CATALOG: Record<string, CatalogEntry> = {
     ],
     primary: 'model.gguf',
   },
+  'qwen2.5-0.5b': {
+    type: 'llm',
+    files: [
+      {
+        url: `${HF}/bartowski/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`,
+        as: 'model.gguf',
+      },
+    ],
+    primary: 'model.gguf',
+  },
   'smolvlm-256m': {
     type: 'vlm',
     files: [
