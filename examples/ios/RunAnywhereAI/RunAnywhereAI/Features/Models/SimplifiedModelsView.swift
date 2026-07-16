@@ -20,6 +20,8 @@ struct SimplifiedModelsView: View {
     @State private var selectedModel: RAModelInfo?
     @State private var searchText = ""
     @State private var selectedModality: ModelModalityFilter = .all
+    @State private var showAddFromHuggingFace = false
+    @State private var showAddFromURL = false
 
     private let recommendationEngine = ModelRecommendationEngine()
     private let tierResolver = HardwareTierResolver()
@@ -81,8 +83,44 @@ struct SimplifiedModelsView: View {
             ModelStorageSection(storageViewModel: storageViewModel)
         }
         .navigationTitle("Models")
+        .toolbar {
+            addModelToolbarItem
+        }
+        .sheet(
+            isPresented: $showAddFromHuggingFace,
+            onDismiss: { Task { await refreshAfterChange() } },
+            content: { AddFromHuggingFaceView() }
+        )
+        .sheet(
+            isPresented: $showAddFromURL,
+            onDismiss: { Task { await refreshAfterChange() } },
+            content: {
+                AddModelFromURLView { _ in
+                    Task { await refreshAfterChange() }
+                }
+            }
+        )
         .task {
             await loadInitialData()
+        }
+    }
+
+    private var addModelToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button {
+                    showAddFromHuggingFace = true
+                } label: {
+                    Label("Add from Hugging Face", systemImage: "magnifyingglass")
+                }
+                Button {
+                    showAddFromURL = true
+                } label: {
+                    Label("Add from URL", systemImage: "link")
+                }
+            } label: {
+                Image(systemName: "plus")
+            }
         }
     }
 

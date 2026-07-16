@@ -52,6 +52,8 @@ internal object ModelCatalog {
         // ring, degenerates into garbage, and the decode fails with rc=-130.
         SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L, contextLength = 512),
         SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 2_367_579_370L, contextLength = 1_024),
+        SingleFileModel("bonsai_4b_1bit", "Bonsai-4B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json", QHEXRT, LANGUAGE, 1_358_352_318L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("bonsai_8b_1bit", "Bonsai-8B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json", QHEXRT, LANGUAGE, 2_323_975_102L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("bonsai_27b_1bit", "Bonsai-27B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/bonsai-27b-1024.json", QHEXRT, LANGUAGE, 6_400_000_000L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 6_100_212_369L),
         SingleFileModel("embeddinggemma_300m", "EmbeddingGemma 300M (HNPU)", "https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU", QHEXRT, EMBEDDING, 566_263_339L),
@@ -179,6 +181,18 @@ internal object ModelCatalog {
             LLAMA,
             LANGUAGE,
             2_800_000_000,
+            supportsThinking = true
+        ),
+        // Bonsai-27B at TRUE 1-bit (Q1_0, ~1.125 bit/wt) on CPU via llama.cpp — the same GGUF
+        // that runs on the NPU (bonsai_27b_1bit, QHEXRT). Requires a llama.cpp build with
+        // qwen3_5 GatedDeltaNet + Q1_0 support (the app's LlamaCPP engine must be the patched fork).
+        SingleFileModel(
+            "bonsai-27b-q1_0",
+            "Bonsai-27B 1-bit Q1_0 (CPU)",
+            "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            3_803_452_480,
             supportsThinking = true
         ),
         SingleFileModel(

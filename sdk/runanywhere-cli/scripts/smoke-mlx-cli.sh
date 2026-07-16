@@ -53,6 +53,7 @@ PNG
 
 echo "MLX CLI backend smoke"
 "$CLI" --home "$HOME_DIR" backends --json | grep -q '"name":"mlx"'
+"$CLI" --home "$HOME_DIR" backends --json | grep -q '"name":"llamacpp"'
 
 echo "LLM: $LLM_MODEL"
 pull_if_enabled "$LLM_MODEL"

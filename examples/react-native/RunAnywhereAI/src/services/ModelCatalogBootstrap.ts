@@ -116,6 +116,17 @@ export async function registerAll(
         memoryRequirement: 2_497_281_312,
         supportsThinking: true,
       }),
+      // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
+      // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
+      // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
+      registerModel({
+        id: 'bonsai-27b-q1_0',
+        name: 'Bonsai-27B 1-bit Q1_0 (CPU)',
+        url: 'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirement: 3_803_452_480,
+        supportsThinking: true,
+      }),
       registerModel({
         id: 'llama-3.2-3b-instruct-q4_k_m',
         name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
@@ -242,6 +253,16 @@ export async function registerAll(
         url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
         memoryRequirement: 650_000_000,
+        supportsThinking: true,
+      }),
+      // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
+      // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+      registerModel({
+        id: 'mlx-bonsai-27b-1bit',
+        name: 'MLX Bonsai-27B 1-bit',
+        url: 'https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        memoryRequirement: 5_129_115_752,
         supportsThinking: true,
       }),
       registerModel({

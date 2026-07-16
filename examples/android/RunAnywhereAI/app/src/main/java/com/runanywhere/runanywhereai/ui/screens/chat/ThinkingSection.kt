@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,21 +40,34 @@ import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.RACTextStyles
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 
+enum class ThinkingPhase {
+    ACTIVE,
+    COMPLETE,
+}
+
 @Composable
 fun ThinkingSection(
     thinking: String,
-    inProgress: Boolean,
+    phase: ThinkingPhase,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var manuallyExpanded by rememberSaveable { mutableStateOf(false) }
+    val inProgress = phase == ThinkingPhase.ACTIVE
+    val expanded = inProgress || manuallyExpanded
     val accent = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(phase) {
+        if (phase == ThinkingPhase.COMPLETE) {
+            manuallyExpanded = false
+        }
+    }
 
     Column(modifier = modifier) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(dimens.radiusSm))
-                .clickable { expanded = !expanded }
+                .clickable(enabled = !inProgress) { manuallyExpanded = !manuallyExpanded }
                 .padding(vertical = dimens.spacingXs, horizontal = dimens.spacingXs),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
@@ -93,7 +107,7 @@ fun ThinkingSection(
                 shape = RoundedCornerShape(dimens.radiusSm),
             ) {
                 Text(
-                    text = thinking,
+                    text = thinking.ifEmpty { if (inProgress) "Waiting for the first reasoning token…" else "No reasoning provided." },
                     style = RACTextStyles.CodeSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier

@@ -28,16 +28,24 @@ extension LLMViewModel {
         let eventStream = try await RunAnywhere.generateStream(request)
         let result = await RunAnywhere.aggregateStream(
             prompt: prompt,
-            events: eventStream
-        ) { fullResponse in
-            await MainActor.run {
-                // Drop tokens from a superseded generation (user navigated away).
-                guard self.isCurrentGeneration(generationID) else { return }
-                // `@Observable` publishes the message mutation; the chat view
-                // auto-scrolls via `.onChange(of: messages.last?.content)`.
-                self.updateMessageContent(at: messageIndex, content: fullResponse)
+            events: eventStream,
+            onThinking: { fullThinking in
+                await MainActor.run {
+                    // Drop thoughts from a superseded generation (user navigated away).
+                    guard self.isCurrentGeneration(generationID) else { return }
+                    self.updateMessageThinking(at: messageIndex, content: fullThinking)
+                }
+            },
+            onToken: { fullResponse in
+                await MainActor.run {
+                    // Drop tokens from a superseded generation (user navigated away).
+                    guard self.isCurrentGeneration(generationID) else { return }
+                    // `@Observable` publishes the message mutation; the chat view
+                    // auto-scrolls via `.onChange(of: messages.last?.content)`.
+                    self.updateMessageContent(at: messageIndex, content: fullResponse)
+                }
             }
-        }
+        )
 
         if !result.errorMessage.isEmpty {
             throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
@@ -144,6 +152,23 @@ extension LLMViewModel {
             role: currentMessage.role,
             content: content,
             thinkingContent: currentMessage.thinkingContent,
+            timestamp: currentMessage.timestamp,
+            analytics: currentMessage.analytics,
+            modelInfo: currentMessage.modelInfo,
+            toolCallInfo: currentMessage.toolCallInfo,
+            attachment: currentMessage.attachment
+        )
+        self.updateMessage(at: index, with: updatedMessage)
+    }
+
+    func updateMessageThinking(at index: Int, content: String) {
+        guard index < self.messagesValue.count else { return }
+        let currentMessage = self.messagesValue[index]
+        let updatedMessage = Message(
+            id: currentMessage.id,
+            role: currentMessage.role,
+            content: currentMessage.content,
+            thinkingContent: content,
             timestamp: currentMessage.timestamp,
             analytics: currentMessage.analytics,
             modelInfo: currentMessage.modelInfo,

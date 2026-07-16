@@ -208,9 +208,17 @@ SHERPA_ONNX_COMMIT_WEB=142807252687d81b40d6315f23470a1512a00de3
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# Upstream release pin selected for the 2026-07-10 Web release cut. b9959
-# includes the ARMv7 table-lookup fallback required by Android builds.
-LLAMACPP_VERSION=b9959
+# (2026-07-15 Bonsai pin): PrismML fork, NOT an upstream ggerganov b-tag.
+# Tag prism-b9591-62061f9 = upstream b9591 + PrismML Bonsai patches
+# (LLM_ARCH_QWEN35 GatedDeltaNet + GGML_TYPE_Q1_0), required to load
+# prism-ml/Bonsai-27B-gguf Q1_0 artifacts. Additive changes only — existing
+# GGUF type IDs are unchanged. Known trade-off vs the previous upstream
+# b9959 pin: upstream b9591..b9959 work (newer mtmd/OCR models, ARMv7
+# table-lookup fallback) is not included.
+LLAMACPP_VERSION=prism-b9591-62061f9
+# Repository the llama.cpp FetchContent clones. Consumed by
+# engines/llamacpp/CMakeLists.txt via LoadVersions (RAC_LLAMACPP_GIT_REPOSITORY).
+LLAMACPP_GIT_REPOSITORY=https://github.com/PrismML-Eng/llama.cpp.git
 
 # =============================================================================
 # nlohmann/json

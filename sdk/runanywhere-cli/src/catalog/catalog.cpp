@@ -384,6 +384,36 @@ constexpr CatalogFile kMlxSoprano1180M5BitFiles[] = {
      "tokenizer_config.json", true},
 };
 
+// PrismML Bonsai-27B 1-bit MLX (qwen3_5). Files match the HF repo siblings
+// needed for mlx-swift-lm load (weights + tokenizer + config). Vision
+// preprocessor stubs are present on HF but not required for text-only LLM use.
+constexpr CatalogFile kMlxBonsai27B1BitFiles[] = {
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "config.json",
+     "config.json", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "merges.txt",
+     "merges.txt", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "tokenizer_config.json",
+     "tokenizer_config.json", true},
+    {"https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit/resolve/main/"
+     "vocab.json",
+     "vocab.json", true},
+};
+
 constexpr int64_t MB = 1024LL * 1024LL;
 
 // ids/URLs verbatim from: examples/ios ModelCatalogBootstrap.swift, Android
@@ -409,6 +439,14 @@ constexpr CatalogEntry kCatalog[] = {
      "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/"
      "Qwen3-4B-Q4_K_M.gguf",
      nullptr, 0, 2560 * MB, 4096, true},
+    // PrismML Bonsai-27B Q1_0 — needs PrismML llama.cpp fork
+    // (LLAMACPP_VERSION=prism-b9591-62061f9). Exact artifact byte size.
+    {"bonsai-27b-q1_0", "bonsai-27b", "Bonsai-27B 1-bit Q1_0 (CPU)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
+     v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/"
+     "Bonsai-27B-Q1_0.gguf",
+     nullptr, 0, 3803452480LL, 4096, true},
     {"llama-3.2-3b", "llama3.2", "Llama 3.2 3B Instruct Q4_K_M",
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
      v1::MODEL_FORMAT_GGUF,
@@ -492,6 +530,12 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
      4096, true},
+    // PrismML Bonsai-27B 1-bit MLX (~5.1 GB safetensors). Experimental —
+    // requires mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+    {"mlx-bonsai-27b-1bit", "mlx-bonsai", "MLX Bonsai-27B 1-bit",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxBonsai27B1BitFiles, 8,
+     5129115752LL, 4096, true},
     {"mlx-llama-3.2-1b-instruct-4bit", "mlx-llama3.2",
      "Llama 3.2 1B Instruct 4-bit (MLX)", v1::MODEL_CATEGORY_LANGUAGE,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,

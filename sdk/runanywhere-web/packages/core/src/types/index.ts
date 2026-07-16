@@ -26,8 +26,12 @@ import type {
   LLMGenerationResult as ProtoLLMGenerationResult,
   LLMGenerationOptions as ProtoLLMGenerationOptions,
 } from '@runanywhere/proto-ts/llm_options';
+import type { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 
 export interface LLMStreamingResult {
+  /** Canonical typed events, including thinking, progress, and terminal state. */
+  events?: AsyncIterable<LLMStreamEvent>;
+  /** Answer tokens only. Thinking tokens are available through `events`. */
   stream: AsyncIterable<string>;
   result: Promise<ProtoLLMGenerationResult>;
   cancel: () => void;

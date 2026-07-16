@@ -3,6 +3,9 @@ import Foundation
 import MLXRuntime
 import RCLIHost
 
+/// macOS CLI entry: registers MLX Swift callbacks, then hands off to the
+/// shared C++ rcli host. RCLIHost is built with both `RCLI_HAS_LLAMACPP` and
+/// `RCLI_HAS_MLX`, so GGUF (llama.cpp) and MLX catalog models are available.
 @main
 struct RunAnywhereMLXCLI {
     static func main() {

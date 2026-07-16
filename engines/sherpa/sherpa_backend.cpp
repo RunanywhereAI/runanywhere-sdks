@@ -12,6 +12,10 @@
 
 #include "core/internal/platform_compat.h"
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir
 #else
@@ -1632,12 +1636,23 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
 
     RAC_LOG_DEBUG("Sherpa.TTS", "Speaker ID: %d, Speed: %.2f", speaker_id, speed);
 
-    SherpaOnnxGenerationConfig generation_config{};
-    generation_config.sid = speaker_id;
-    generation_config.speed = speed;
-
     const SherpaOnnxGeneratedAudio* audio = nullptr;
     try {
+        // iOS ships sherpa-onnx 1.13.2 XCFramework headers without
+        // SherpaOnnxGenerationConfig / GenerateWithConfig. Android/macOS
+        // third_party headers expose the newer API — prefer it when present.
+#if defined(__APPLE__) && (TARGET_OS_IPHONE || TARGET_OS_SIMULATOR)
+        audio = SherpaOnnxOfflineTtsGenerateWithProgressCallbackWithArg(
+            tts_ptr, request.text.c_str(), speaker_id, speed,
+            [](const float*, int32_t, float, void* user_data) -> int32_t {
+                const auto* cancelled = static_cast<const std::atomic<bool>*>(user_data);
+                return cancelled->load(std::memory_order_acquire) ? 0 : 1;
+            },
+            &cancel_requested_);
+#else
+        SherpaOnnxGenerationConfig generation_config{};
+        generation_config.sid = speaker_id;
+        generation_config.speed = speed;
         audio = SherpaOnnxOfflineTtsGenerateWithConfig(
             tts_ptr, request.text.c_str(), &generation_config,
             [](const float*, int32_t, float, void* user_data) -> int32_t {
@@ -1645,6 +1660,7 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
                 return cancelled->load(std::memory_order_acquire) ? 0 : 1;
             },
             &cancel_requested_);
+#endif
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("Sherpa.TTS", "Exception during TTS synthesis: %s", e.what());
         RAC_LOG_ERROR("Sherpa.TTS", "Model dir: %s, espeak data was: %s", model_dir_.c_str(),

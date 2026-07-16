@@ -109,7 +109,7 @@ Requires CMake ≥ 3.22, a C++20 compiler, and libcurl dev headers on Linux
 (`apt install libcurl4-openssl-dev`).
 
 ```bash
-# macOS (arm64; preset enables Metal — needs Xcode ≤ 15.x, see note):
+# macOS (arm64; preset enables Metal + llama.cpp + MLX — needs Xcode ≤ 15.x, see note):
 cmake --preset rcli-macos-release
 cmake --build build/rcli-macos-release -j 2
 
@@ -122,6 +122,11 @@ cmake --build build/rcli-linux-release -j 2
 cmake --preset macos-debug -DRAC_DESKTOP_ADAPTER=ON -DRAC_BUILD_CLI=ON
 cmake --build build/macos-debug -j 2 --target rcli test_rcli_unit
 ```
+
+macOS release builds pin `RAC_BACKEND_LLAMACPP=ON` and `RAC_BACKEND_MLX=ON`.
+MLX inference still needs the Swift host (`./sdk/runanywhere-cli/scripts/build-mlx-cli.sh`
+→ `RunAnywhereMLXCLI`); the CMake `rcli` binary registers llama.cpp and ships
+both GGUF and MLX catalog entries.
 
 > Xcode 16+ rejects llama.cpp's Metal ObjC casts — on newer Xcode add
 > `-DGGML_METAL=OFF` (CPU inference; CI builds Metal on macos-14 runners).

@@ -30,6 +30,12 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
 ]
 
+// PrismML's Bonsai 1-bit weights require kernels that are not yet available
+// in upstream mlx-swift. This revision is the maintained Prism delta applied
+// directly on top of upstream mlx-swift 0.31.6, which keeps mlx-swift-lm
+// 3.31.x API-compatible while enabling bits=1 / group_size=128 models.
+let prismMLXSwiftRevision = "563961dfcfd4589755190d285555e4f9eface890"
+
 let package = Package(
     name: "RunAnywhere",
     platforms: [
@@ -79,7 +85,10 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
+        .package(
+            url: "https://github.com/PrismML-Eng/mlx-swift.git",
+            revision: prismMLXSwiftRevision
+        ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),

@@ -9,7 +9,11 @@
  * All paths go through proto-byte adapters — there is no JS provider routing.
  */
 
-import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import {
+  LLMStreamEventKind,
+  type LLMGenerateRequest,
+  type LLMStreamEvent,
+} from '@runanywhere/proto-ts/llm_service';
 import type { ChatMessage } from '@runanywhere/proto-ts/chat';
 import {
   LLMGenerationOptions as LLMGenerationOptionsMessage,
@@ -156,9 +160,11 @@ function streamingResultFromEvents(
   cancelNative: () => void,
 ): LLMStreamingResult {
   const queue = new AsyncQueue<string>();
+  const eventQueue = new AsyncQueue<LLMStreamEvent>();
   let started = false;
   let cancelled = false;
   let fullText = '';
+  let thinkingText = '';
   let tokenCount = 0;
   let finalEvent: LLMStreamEvent | undefined;
   // pass2-syn-010-followup-web: surface LLMStreamEvent.toolCall (proto field 18)
@@ -178,10 +184,15 @@ function streamingResultFromEvents(
         try {
           for await (const event of events) {
             finalEvent = event;
+            eventQueue.push(event);
             if (event.token) {
-              fullText += event.token;
-              tokenCount += 1;
-              queue.push(event.token);
+              if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
+                thinkingText += event.token;
+              } else {
+                fullText += event.token;
+                tokenCount += 1;
+                queue.push(event.token);
+              }
             }
             if (event.toolCall) {
               accumulatedToolCalls.push(event.toolCall);
@@ -192,11 +203,21 @@ function streamingResultFromEvents(
             }
           }
           queue.complete();
+          eventQueue.complete();
           resolve(
-            finalLLMResult(fullText, tokenCount, startedAt, finalEvent, accumulatedToolCalls),
+            finalLLMResult(
+              fullText,
+              thinkingText,
+              tokenCount,
+              startedAt,
+              finalEvent,
+              accumulatedToolCalls,
+            ),
           );
         } catch (error) {
-          queue.fail(error instanceof Error ? error : new Error(String(error)));
+          const normalized = error instanceof Error ? error : new Error(String(error));
+          queue.fail(normalized);
+          eventQueue.fail(normalized);
           reject(error);
         }
       })();
@@ -211,6 +232,7 @@ function streamingResultFromEvents(
   });
 
   return {
+    events: eventQueue,
     stream: queue,
     result,
     cancel() {
@@ -230,6 +252,7 @@ function streamingResultFromEvents(
 
 function finalLLMResult(
   fullText: string,
+  thinkingText: string,
   tokenCount: number,
   startedAt: number,
   finalEvent?: LLMStreamEvent,
@@ -245,7 +268,7 @@ function finalLLMResult(
   const toolCalls = final?.toolCalls?.length ? final.toolCalls : streamedToolCalls;
   return {
     text: final?.text ?? fullText,
-    thinkingContent: final?.thinkingContent,
+    thinkingContent: final?.thinkingContent || thinkingText || undefined,
     inputTokens,
     tokensGenerated,
     modelUsed: '',
@@ -335,8 +358,9 @@ async function generateStream(
  * Fold an `LLMStreamingResult` into a canonical final `LLMGenerationResult`.
  *
  * Port of Swift `RunAnywhere.aggregateStream(prompt:events:onToken:)`
- * (RunAnywhere+TextGeneration.swift:129-198): consumes the token stream —
- * invoking `onToken` with the aggregated transcript so far — then awaits the
+ * (RunAnywhere+TextGeneration.swift:129-198): consumes the canonical event
+ * stream when available, invoking `onToken` and `onThinking` with their
+ * separate aggregated transcripts, then awaits the
  * terminal aggregate and applies the Swift fallback chain: `text` falls back
  * to the concatenated tokens, `inputTokens` to the `max(1, prompt/4)`
  * estimate, `totalTokens` to `inputTokens + tokensGenerated`, timing and
@@ -349,18 +373,38 @@ export async function aggregateStream(
   prompt: string,
   streaming: LLMStreamingResult,
   onToken?: (transcript: string) => void | Promise<void>,
+  onThinking?: (transcript: string) => void | Promise<void>,
 ): Promise<LLMGenerationResult> {
   let fullResponse = '';
+  let fullThinking = '';
   let tokenCount = 0;
   let firstTokenAtMs: number | undefined;
   const startedAtMs = performance.now();
 
-  for await (const token of streaming.stream) {
-    if (!token) continue;
-    if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
-    fullResponse += token;
-    tokenCount += 1;
-    if (onToken) await onToken(fullResponse);
+  if (streaming.events) {
+    for await (const event of streaming.events) {
+      if (!event.token) continue;
+      // Record TTFT for the first token of EITHER kind (thinking or response),
+      // matching the C++ backend — a reasoning-first model must not report a
+      // delayed TTFT just because its thinking tokens arrive before any response.
+      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
+      if (event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING) {
+        fullThinking += event.token;
+        if (onThinking) await onThinking(fullThinking);
+        continue;
+      }
+      fullResponse += event.token;
+      tokenCount += 1;
+      if (onToken) await onToken(fullResponse);
+    }
+  } else {
+    for await (const token of streaming.stream) {
+      if (!token) continue;
+      if (firstTokenAtMs === undefined) firstTokenAtMs = performance.now();
+      fullResponse += token;
+      tokenCount += 1;
+      if (onToken) await onToken(fullResponse);
+    }
   }
 
   // Terminal aggregate — already prefers the backend's final-event metrics
@@ -387,6 +431,7 @@ export async function aggregateStream(
   return {
     ...result,
     text: result.text || fullResponse,
+    thinkingContent: result.thinkingContent || fullThinking || undefined,
     inputTokens,
     tokensGenerated,
     responseTokens: tokensGenerated,

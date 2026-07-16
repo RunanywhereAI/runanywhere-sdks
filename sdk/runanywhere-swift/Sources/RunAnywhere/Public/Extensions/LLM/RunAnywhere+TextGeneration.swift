@@ -124,18 +124,21 @@ public extension RunAnywhere {
     ///   - events: AsyncStream of stream events from
     ///     `generateStream(_:)`. The function consumes the stream until
     ///     `isFinal == true` or the stream finishes.
-    ///   - onToken: Optional callback invoked for each non-empty
-    ///     `event.token` text. Receives the aggregated transcript so far
-    ///     (suitable for live UI updates).
+    ///   - onThinking: Optional callback invoked for each typed thought token.
+    ///     Receives the accumulated model-emitted reasoning text so far.
+    ///   - onToken: Optional callback invoked for each typed answer token.
+    ///     Receives the accumulated answer transcript so far.
     /// - Returns: A populated `RALLMGenerationResult` whose `framework`
     ///   field matches the loaded LLM model's analytics key; on terminal
     ///   error events the `errorMessage` is propagated.
     static func aggregateStream(
         prompt: String,
         events: AsyncStream<RALLMStreamEvent>,
+        onThinking: ((String) async -> Void)? = nil,
         onToken: ((String) async -> Void)? = nil
     ) async -> RALLMGenerationResult {
-        var fullResponse = ""
+        var answerResponse = ""
+        var thinkingResponse = ""
         var tokenCount = 0
         var firstTokenTime: Date?
         let startTime = Date()
@@ -146,10 +149,17 @@ public extension RunAnywhere {
         for await event in events {
             if !event.token.isEmpty {
                 if firstTokenTime == nil { firstTokenTime = Date() }
-                fullResponse += event.token
                 tokenCount += 1
-                if let onToken {
-                    await onToken(fullResponse)
+                if event.kind == .thought {
+                    thinkingResponse += event.token
+                    if let onThinking {
+                        await onThinking(thinkingResponse)
+                    }
+                } else if event.kind != .toolCall {
+                    answerResponse += event.token
+                    if let onToken {
+                        await onToken(answerResponse)
+                    }
                 }
             }
             if event.isFinal {
@@ -176,9 +186,11 @@ public extension RunAnywhere {
         // to the locally concatenated text / wall-clock metrics.
         let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
-        result.text = final?.text ?? fullResponse
+        result.text = final?.text ?? answerResponse
         if let final, final.hasThinkingContent {
             result.thinkingContent = final.thinkingContent
+        } else if !thinkingResponse.isEmpty {
+            result.thinkingContent = thinkingResponse
         }
         result.inputTokens = final.map { $0.promptTokens } ?? Int32(max(1, prompt.count / 4))
         result.tokensGenerated = final.map { $0.completionTokens } ?? Int32(tokenCount)

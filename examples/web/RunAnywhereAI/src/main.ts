@@ -24,6 +24,7 @@ import {
   resetCatalogRegistrationState,
 } from './components/model-selection';
 import {
+  getHostedAPIConfiguration,
   setAPIConfigurationApplyHandler,
   type APIConfiguration,
   type APIConfigurationApplyResult,
@@ -331,10 +332,14 @@ async function initializeSDK(): Promise<void> {
   // concurrency suspension race; on Web the backend packages install onto
   // core adapters, so the SDK-documented order is initialize() first.
   try {
-    const configuration: RuntimeConfiguration = {
-      environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-    };
-    await startRuntime(configuration, false);
+    const hostedConfiguration = getHostedAPIConfiguration();
+    const configuration: RuntimeConfiguration = hostedConfiguration
+      ? {
+          ...hostedConfiguration,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        }
+      : { environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT };
+    await startRuntime(configuration, hostedConfiguration !== null);
     activeRuntimeConfiguration = configuration;
     sdkReadinessState = 'ready';
     sdkInitializationError = undefined;

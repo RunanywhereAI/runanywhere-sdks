@@ -71,7 +71,9 @@ struct MessageBubbleView: View {
     let isGenerating: Bool
     /// True only for the assistant message currently receiving tokens.
     var isStreamingTail: Bool = false
-    @State private var isThinkingExpanded = false
+    /// True when the currently loaded model can emit reasoning; gates the
+    /// "Thinking…" disclosure so non-thinking models never show it.
+    var loadedModelSupportsThinking: Bool = false
     @State private var showToolCallSheet = false
     @State private var previewAttachment: MessageAttachment?
 
@@ -90,19 +92,15 @@ struct MessageBubbleView: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                if message.role == .assistant && hasThinking {
-                    thinkingSection
+                if message.role == .assistant && loadedModelSupportsThinking && (isStreamingTail || hasThinking) {
+                    ReasoningDisclosureView(
+                        reasoning: message.thinkingContent ?? "",
+                        isStreaming: isStreamingTail
+                    )
                 }
 
                 if message.role == .assistant && hasToolCall {
                     toolCallSection
-                }
-
-                if message.role == .assistant &&
-                    message.content.isEmpty &&
-                    !(message.thinkingContent ?? "").isEmpty &&
-                    isGenerating {
-                    thinkingProgressIndicator
                 }
 
                 mainMessageBubble
@@ -154,14 +152,31 @@ struct MessageBubbleView: View {
     }
 }
 
-// MARK: - MessageBubbleView Thinking Section
+// MARK: - Reasoning Disclosure
 
-extension MessageBubbleView {
-    var thinkingSection: some View {
+/// Shared reasoning presentation for Apple chat surfaces. Streaming forces the
+/// disclosure open so model-emitted thought deltas remain visible. Once the
+/// request finishes, the disclosure returns to its user-controlled collapsed
+/// state while keeping the final answer directly below it.
+struct ReasoningDisclosureView: View {
+    let reasoning: String
+    let isStreaming: Bool
+    @State private var isUserExpanded = false
+
+    private var isExpanded: Bool {
+        isStreaming || isUserExpanded
+    }
+
+    private var hasReasoning: Bool {
+        !reasoning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.small) {
             Button {
+                guard !isStreaming else { return }
                 withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
-                    isThinkingExpanded.toggle()
+                    isUserExpanded.toggle()
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -169,33 +184,36 @@ extension MessageBubbleView {
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.primaryPurple)
 
-                    Text(isThinkingExpanded ? "Hide reasoning" : thinkingSummary)
+                    Text(headerTitle)
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.primaryPurple)
                         .lineLimit(1)
 
                     Spacer()
 
-                    Image(systemName: isThinkingExpanded ? "chevron.up" : "chevron.right")
-                        .font(AppTypography.caption2)
-                        .foregroundColor(AppColors.primaryPurple.opacity(0.6))
+                    if isStreaming {
+                        StreamingCursorDot()
+                    } else {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.right")
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.primaryPurple.opacity(0.6))
+                    }
                 }
                 .padding(.horizontal, AppSpacing.regular)
                 .padding(.vertical, AppSpacing.padding9)
-                .background(thinkingButtonBackground)
+                .background(headerBackground)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+            .disabled(isStreaming)
+            .accessibilityLabel(headerTitle)
+            .accessibilityHint(
+                isStreaming
+                    ? "Reasoning is expanded while generation is active"
+                    : "Toggles reasoning"
+            )
 
-            if isThinkingExpanded {
-                ScrollView {
-                    Text(message.thinkingContent ?? "")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .multilineTextAlignment(.leading)
-                }
-                .frame(maxHeight: AppSpacing.minFrameHeight)
+            if isExpanded {
+                reasoningContent
                 .padding(AppSpacing.mediumLarge)
                 .background(
                     RoundedRectangle(cornerRadius: AppSpacing.medium)
@@ -209,34 +227,55 @@ extension MessageBubbleView {
         }
     }
 
-    var thinkingSummary: String {
-        guard let thinking = message.thinkingContent?
-            .trimmingCharacters(in: .whitespacesAndNewlines) else {
-            return ""
+    private var headerTitle: String {
+        if isStreaming {
+            return hasReasoning ? "Thinking live…" : "Thinking…"
         }
-
-        let sentences = thinking.components(separatedBy: CharacterSet(charactersIn: ".!?"))
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-        if sentences.count >= 2 {
-            let firstSentence = sentences[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            if firstSentence.count > 20 {
-                return firstSentence + "..."
-            }
-        }
-
-        if thinking.count > 80 {
-            let truncated = String(thinking.prefix(80))
-            if let lastSpace = truncated.lastIndex(of: " ") {
-                return String(truncated[..<lastSpace]) + "..."
-            }
-            return truncated + "..."
-        }
-
-        return thinking
+        return isExpanded ? "Hide reasoning" : "Show reasoning"
     }
 
-    var thinkingButtonBackground: some View {
+    private var reasoningContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                    if hasReasoning {
+                        Text(reasoning)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    } else {
+                        HStack(spacing: AppSpacing.smallMedium) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Waiting for model output…")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id("reasoning-stream-end")
+                }
+            }
+            .frame(maxHeight: AppSpacing.minFrameHeight)
+            .onAppear {
+                scrollToLatestReasoning(using: proxy)
+            }
+            .onChange(of: reasoning) { _, _ in
+                scrollToLatestReasoning(using: proxy)
+            }
+        }
+    }
+
+    private func scrollToLatestReasoning(using proxy: ScrollViewProxy) {
+        guard isStreaming else { return }
+        proxy.scrollTo("reasoning-stream-end", anchor: .bottom)
+    }
+
+    private var headerBackground: some View {
         RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
             .fill(
                 LinearGradient(
@@ -256,55 +295,6 @@ extension MessageBubbleView {
                         lineWidth: AppSpacing.strokeThin
                     )
             )
-    }
-
-    var thinkingProgressBackground: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.medium)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        AppColors.primaryPurple.opacity(0.12),
-                        AppColors.primaryPurple.opacity(0.06)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppSpacing.medium)
-                    .strokeBorder(
-                        AppColors.primaryPurple.opacity(0.3),
-                        lineWidth: AppSpacing.strokeThin
-                    )
-            )
-    }
-
-    var thinkingProgressIndicator: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(AppColors.primaryPurple)
-                        .frame(width: AppSpacing.small, height: AppSpacing.small)
-                        .scaleEffect(isGenerating ? 1.0 : 0.5)
-                        .animation(
-                            Animation.easeInOut(duration: AppLayout.animationVerySlow)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                            value: isGenerating
-                        )
-                }
-            }
-
-            Text("Thinking...")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryPurple.opacity(0.8))
-        }
-        .padding(.horizontal, AppSpacing.mediumLarge)
-        .padding(.vertical, AppSpacing.smallMedium)
-        .background(thinkingProgressBackground)
-        .transition(.opacity.combined(with: .scale(scale: 0.9)))
     }
 }
 
@@ -579,7 +569,8 @@ private struct MessageAttachmentThumbnail: View {
 
 private struct MessageAttachmentPreviewSheet: View {
     let attachment: MessageAttachment
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)
+    private var dismiss
     @State private var imageData: Data?
 
     var body: some View {

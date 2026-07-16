@@ -590,6 +590,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             max_tokens = budget.effectiveMaxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
+            thinking_pattern = activeModel.model.thinking_pattern.takeIf {
+                activeModel.model.supports_thinking && !s.disableThinking
+            },
             // Only apply the "disable thinking" preference to models that actually think — on a
             // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
             // and corrupts the prompt (e.g. Llama). Bug 5 follow-up.
@@ -648,11 +651,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
+        if (llmRequest.emit_thoughts) {
+            updateReply(request, index) { it.copy(thinking = "") }
+        }
         val events = RunAnywhere.generateStream(llmRequest)
         val result =
-            RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
-                updateReply(request, index) { it.copy(text = accumulated) }
-            }
+            RunAnywhere.aggregateStream(
+                prompt = llmRequest.prompt,
+                events = events,
+                onThinking = { accumulated ->
+                    updateReply(request, index) { it.copy(thinking = accumulated) }
+                },
+                onToken = { accumulated ->
+                    updateReply(request, index) { it.copy(text = accumulated) }
+                },
+            )
 
         ensureOwns(request)
         if (!result.error_message.isNullOrBlank()) {

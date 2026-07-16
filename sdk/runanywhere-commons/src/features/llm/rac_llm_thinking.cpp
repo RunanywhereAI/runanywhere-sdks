@@ -10,6 +10,7 @@
 
 #include "rac/features/llm/rac_llm_thinking.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstring>
@@ -192,6 +193,37 @@ rac_result_t rac_llm_extract_thinking_with_tags(const char* text, const char* op
         kDefaultTagPairs[0],
         kDefaultTagPairs[1],
     }};
+
+    // Thinking-capable chat templates may prefill the opening tag as part of
+    // the prompt. The generated text then contains only the reasoning body,
+    // the closing tag, and the answer. The caller-provided tag pair is the
+    // model-level signal that makes this otherwise malformed-looking form
+    // unambiguous; keep the default parser's close-before-open compatibility
+    // unchanged when no explicit model pattern is supplied.
+    if (text != nullptr && out_response != nullptr && out_response_len != nullptr &&
+        out_thinking != nullptr && out_thinking_len != nullptr) {
+        const std::string_view value{text};
+        size_t earliest_open = std::string_view::npos;
+        size_t earliest_close = std::string_view::npos;
+        std::string_view matched_close_tag;
+        for (const auto& pair : tag_pairs) {
+            earliest_open = std::min(earliest_open, value.find(pair.first));
+            const size_t close = value.find(pair.second);
+            if (close < earliest_close) {
+                earliest_close = close;
+                matched_close_tag = pair.second;
+            }
+        }
+        if (earliest_open == std::string_view::npos && earliest_close != std::string_view::npos) {
+            tl_thinking = trim(value.substr(0, earliest_close));
+            tl_response = trim(value.substr(earliest_close + matched_close_tag.size()));
+            *out_response = tl_response.c_str();
+            *out_response_len = tl_response.size();
+            *out_thinking = tl_thinking.empty() ? nullptr : tl_thinking.c_str();
+            *out_thinking_len = tl_thinking.size();
+            return RAC_SUCCESS;
+        }
+    }
     return extract_thinking_with_pairs(text, tag_pairs.data(), tag_pairs.size(), out_response,
                                        out_response_len, out_thinking, out_thinking_len);
 }

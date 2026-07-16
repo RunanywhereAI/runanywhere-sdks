@@ -19,6 +19,7 @@ import {
 import {
   ModelArtifactType,
   ModelCategory,
+  type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -29,6 +30,7 @@ import {
 } from '../Foundation/RACErrors.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
+import { frameworkOPFSDir } from '../Infrastructure/FrameworkOPFSPaths.js';
 import { ModelLifecycleAdapter } from './ModelLifecycleAdapter.js';
 import { ModelRegistryAdapter } from './ModelRegistryAdapter.js';
 import { getAllRegisteredModules } from '../runtime/EmscriptenModule.js';
@@ -552,6 +554,8 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   /** Exact model and known multi-file child paths for synchronous callbacks. */
   private readonly pathMetadata = new Map<string, StoragePathMetadata>();
   private readonly modelStoragePathsById = new Map<string, string>();
+  /** Canonical per-model folders removed by the native storage analyzer. */
+  private readonly modelDeletePathsById = new Map<string, string>();
   private readonly preparedPersistentDeletes = new Set<string>();
   private readonly persistentDeleteFailures = new Set<string>();
   private disposed = false;
@@ -609,6 +613,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     this.modelStorageRoots.clear();
     this.pathMetadata.clear();
     this.modelStoragePathsById.clear();
+    this.modelDeletePathsById.clear();
     this.preparedPersistentDeletes.clear();
     this.persistentDeleteFailures.clear();
   }
@@ -680,14 +685,18 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     }
 
     if (!request.deleteFiles) return;
-    for (const [modelId, path] of targets) {
+    for (const [modelId, localPath] of targets) {
       if (this.loadedModelIds.has(modelId) || this.unloadFailures.has(modelId)) continue;
-      if (!isSafeModelStoragePath(path)) continue;
+      // Remove the persisted OPFS copy at the framework-specific canonical
+      // directory, but record the model's original localPath as the prepared
+      // delete key so native's deletePath(localPath) exact-path check matches.
+      const opfsPath = this.modelDeletePathsById.get(modelId) ?? localPath;
+      if (!isSafeModelStoragePath(opfsPath)) continue;
       try {
-        await OPFSBridge.removePath(path);
-        this.preparedPersistentDeletes.add(path);
+        await OPFSBridge.removePath(opfsPath);
+        this.preparedPersistentDeletes.add(localPath);
       } catch {
-        this.persistentDeleteFailures.add(path);
+        this.persistentDeleteFailures.add(localPath);
       }
     }
   }
@@ -702,12 +711,15 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
 
     const targets = new Map<string, string>();
     for (const modelId of this.requestedDeleteModelIds(request)) {
-      const path = this.modelStoragePathsById.get(modelId);
-      if (!path) continue;
+      const localPath = this.modelStoragePathsById.get(modelId);
+      if (!localPath) continue;
       const plannedCandidate = planCandidates.get(modelId);
       if (request.requirePlanMatch && !plannedCandidate) continue;
-      if (plannedCandidate?.localPath && plannedCandidate.localPath !== path) continue;
-      targets.set(modelId, path);
+      if (plannedCandidate?.localPath && plannedCandidate.localPath !== localPath) continue;
+      // Store the ORIGINAL localPath: it is the path native later hands to the
+      // deletePath callback. The framework-specific modelDeletePathsById entry
+      // is used only for the preceding OPFSBridge.removePath() in prepareDelete.
+      targets.set(modelId, localPath);
     }
     return targets;
   }
@@ -938,6 +950,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
     this.modelStorageRoots.clear();
     this.pathMetadata.clear();
     this.modelStoragePathsById.clear();
+    this.modelDeletePathsById.clear();
     let models: readonly ModelInfo[] = [];
     try {
       models = ModelRegistryAdapter.tryDefault()?.list()?.models ?? [];
@@ -956,6 +969,13 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
       const size = Math.max(finiteStorageBytes(model.downloadSizeBytes), descriptorBytes);
       const rootMetadata: StoragePathMetadata = { size, isDirectory };
       this.modelStoragePathsById.set(model.id, localPath);
+      const frameworkDirectory = frameworkOPFSDir(model.framework as InferenceFramework);
+      this.modelDeletePathsById.set(
+        model.id,
+        frameworkDirectory
+          ? `${STORAGE_MODEL_PREFIX}${frameworkDirectory}/${model.id}`
+          : localPath,
+      );
       this.modelStorageRoots.set(localPath, rootMetadata);
       this.pathMetadata.set(localPath, rootMetadata);
 
@@ -999,19 +1019,43 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
   }
 
   private removeMetadataPath(path: string): void {
-    for (const [modelId, modelPath] of Array.from(this.modelStoragePathsById.entries())) {
-      if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
+    const matchesTarget = (candidate: string): boolean =>
+      candidate === path || candidate.startsWith(`${path.replace(/\/$/, '')}/`);
+
+    // validatedDeleteTargets() can hand native a framework-specific delete path
+    // from modelDeletePathsById that differs from the model's localPath. Resolve
+    // the model id from that delete path FIRST, clearing the corresponding
+    // localPath entries; fall back to matching the localPath directly (and, when
+    // nothing resolves, the raw path) so registry roots/metadata still purge.
+    const localPathsToClear = new Set<string>();
+    for (const [modelId, deletePath] of Array.from(this.modelDeletePathsById.entries())) {
+      if (!matchesTarget(deletePath)) continue;
+      const localPath = this.modelStoragePathsById.get(modelId);
+      if (localPath) localPathsToClear.add(localPath);
+      this.modelStoragePathsById.delete(modelId);
+      this.modelDeletePathsById.delete(modelId);
+    }
+    if (localPathsToClear.size === 0) {
+      for (const [modelId, modelPath] of Array.from(this.modelStoragePathsById.entries())) {
+        if (!matchesTarget(modelPath)) continue;
+        localPathsToClear.add(modelPath);
         this.modelStoragePathsById.delete(modelId);
+        this.modelDeletePathsById.delete(modelId);
       }
+      if (localPathsToClear.size === 0) localPathsToClear.add(path);
     }
-    for (const modelPath of Array.from(this.modelStorageRoots.keys())) {
-      if (modelPath === path || modelPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
-        this.modelStorageRoots.delete(modelPath);
+
+    for (const localPath of localPathsToClear) {
+      const localPrefix = `${localPath.replace(/\/$/, '')}/`;
+      for (const modelPath of Array.from(this.modelStorageRoots.keys())) {
+        if (modelPath === localPath || modelPath.startsWith(localPrefix)) {
+          this.modelStorageRoots.delete(modelPath);
+        }
       }
-    }
-    for (const metadataPath of Array.from(this.pathMetadata.keys())) {
-      if (metadataPath === path || metadataPath.startsWith(`${path.replace(/\/$/, '')}/`)) {
-        this.pathMetadata.delete(metadataPath);
+      for (const metadataPath of Array.from(this.pathMetadata.keys())) {
+        if (metadataPath === localPath || metadataPath.startsWith(localPrefix)) {
+          this.pathMetadata.delete(metadataPath);
+        }
       }
     }
   }

@@ -984,6 +984,11 @@ macos_cmake_args=(
     "-DRAC_BACKEND_RAG=ON"
     "-DRAC_BACKEND_LLAMACPP=ON"
     "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
+    # Force runtimes ON: a polluted macos-release CMakeCache can leave
+    # RAC_RUNTIME_ONNXRT=OFF even when the ONNX backend is enabled, which
+    # fails engines/onnx with "requires rac_runtime_onnxrt".
+    "-DRAC_RUNTIME_ONNXRT=ON"
+    "-DRAC_RUNTIME_COREML=ON"
     "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA:-ON}"
     "-DRAC_BACKEND_COREML=ON"
     "-DGGML_NATIVE=OFF"

@@ -155,8 +155,13 @@ jobs:
           set -euo pipefail
           RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
           "$RCLI" version
-          "$RCLI" backends
-          "$RCLI" list --all
+          BACKENDS="$("$RCLI" backends --json)"
+          echo "$BACKENDS"
+          # Release CLI must ship llama.cpp. MLX is linked (RCLI_HAS_MLX) but
+          # only registers once Swift callbacks are present (RunAnywhereMLXCLI).
+          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
+          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
+          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
           "$RCLI" info --json
       - name: Package smoke
         run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
@@ -178,8 +183,10 @@ jobs:
           set -euo pipefail
           RCLI=build/rcli-linux-release/sdk/runanywhere-cli/rcli
           "$RCLI" version
-          "$RCLI" backends
-          "$RCLI" list --all
+          BACKENDS="$("$RCLI" backends --json)"
+          echo "$BACKENDS"
+          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
+          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
           "$RCLI" info --json
       - name: Package smoke
         run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64

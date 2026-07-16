@@ -1859,9 +1859,24 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
     ctx->pending_text += token;
     while (!ctx->pending_text.empty()) {
         if (ctx->inside_thinking) {
+            size_t open_pos = std::string::npos;
+            const StreamThinkingTagPair* open_pair =
+                find_earliest_open_pair(ctx->pending_text, tag_pairs, tag_pair_count, &open_pos);
             size_t close_pos = std::string::npos;
             const StreamThinkingTagPair* close_pair =
                 find_earliest_close_pair(ctx->pending_text, tag_pairs, tag_pair_count, &close_pos);
+            if (open_pos != std::string::npos &&
+                (close_pos == std::string::npos || open_pos < close_pos)) {
+                // Some chat templates prefill the opening thinking tag in the
+                // prompt, while other runtimes include it in the generated
+                // stream. Starting in thinking mode supports the prefilled
+                // form; swallowing a generated opening tag here supports both
+                // without ever surfacing the delimiter to SDK consumers.
+                emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
+                                    runanywhere::v1::TOKEN_KIND_THOUGHT);
+                ctx->pending_text.erase(0, open_pos + std::strlen(open_pair->open));
+                continue;
+            }
             if (close_pos != std::string::npos) {
                 emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
                                     runanywhere::v1::TOKEN_KIND_THOUGHT);
@@ -1871,7 +1886,8 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
             }
 
             const size_t keep =
-                matching_close_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count);
+                std::max(matching_open_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count),
+                         matching_close_suffix_len(ctx->pending_text, tag_pairs, tag_pair_count));
             const size_t emit_len = ctx->pending_text.size() - keep;
             if (emit_len == 0) {
                 break;
@@ -2161,6 +2177,12 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.conversation_id = request.conversation_id();
     thinking_tags_from_request_or_model(request, ref, &ctx.thinking_open_tag,
                                         &ctx.thinking_close_tag);
+    // Reasoning chat templates such as Qwen/Bonsai commonly append the
+    // opening tag to the prompt and generate only the reasoning body followed
+    // by the closing tag. A configured tag pair is the typed signal that this
+    // stream begins in thinking mode; emit_thoughts controls visibility only.
+    ctx.inside_thinking = options.disable_thinking == RAC_FALSE && !ctx.thinking_open_tag.empty() &&
+                          !ctx.thinking_close_tag.empty();
 
     // Defensive: catch any C++ exception that escapes the engine vtable.
     // Each backend (llamacpp, onnx, etc.) already wraps its inference call in
