@@ -78,7 +78,15 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
 
     // MARK: LocalizedError
 
-    public var errorDescription: String? { proto.message }
+    public var errorDescription: String? {
+        // Include the underlying "caused by" detail (e.g. the real backend/MLX
+        // load error commons set via rac_error_set_details) when present, so
+        // callers see the actual reason instead of only the generic per-code
+        // message.
+        let nested = proto.nestedMessage
+        guard !nested.isEmpty, nested != proto.message else { return proto.message }
+        return proto.message.isEmpty ? nested : "\(proto.message): \(nested)"
+    }
 
     public var failureReason: String? {
         "[\(proto.category)] \(proto.code)"

@@ -228,6 +228,15 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 $0.userPtr = userPtr
                 $0.installation = .installed
             }
+            // Re-assert registry membership. A concurrent tearDown may have
+            // evicted this entry AFTER `fanOut(for:)` handed it to our `attach`
+            // but BEFORE `attach` flipped `.notInstalled` -> `.installing` (the
+            // two are disjoint lock acquisitions). Re-inserting here — now that
+            // we hold a live C registration — guarantees this re-armed instance
+            // is discoverable, so the next `stream()` JOINS it instead of
+            // building a second fan-out and installing a SECOND C callback on
+            // the same native handle. Idempotent when the entry is still present.
+            HandleStreamAdapter.fanOuts.withLock { $0[storeKey] = self }
             return true
         }
 
@@ -328,12 +337,37 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 quiesce()
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease.rawValue).release()
             }
-            HandleStreamAdapter.removeFanOut(for: storeKey)
+            removeFromRegistryIfTornDown()
 
             // Finish AFTER unregister/quiesce/release so a consumer that
             // reacts to `.finished` cannot race the C teardown.
             for continuation in teardown.continuations {
                 continuation.finish()
+            }
+        }
+
+        /// Evict this fan-out from the static registry, but ONLY if the
+        /// stored entry is still THIS instance AND it has not been
+        /// re-armed since teardown began. Between the `state`-lock
+        /// snapshot at the top of `tearDown()` (which flips
+        /// `installation` back to `.notInstalled`) and this call, a
+        /// concurrent `stream()` can look up this same instance — still
+        /// present in the registry — and take `attach()`'s installer
+        /// path, installing a FRESH C registration. Removing the entry
+        /// unconditionally would orphan that live registration and let
+        /// the next `stream()` build a second fan-out, double-registering
+        /// the C callback on the same native handle. Re-checking identity
+        /// and `installation` under BOTH the registry lock and the state
+        /// lock closes the add-then-remove window. Lock order is
+        /// registry -> state; no path holds `state` while acquiring the
+        /// registry lock, so this cannot deadlock.
+        private func removeFromRegistryIfTornDown() {
+            HandleStreamAdapter.fanOuts.withLock { dict in
+                guard let current = dict[storeKey] as? HandleFanOut,
+                      current === self else { return }
+                let stillTornDown = state.withLock { $0.installation == .notInstalled }
+                guard stillTornDown else { return }
+                dict.removeValue(forKey: storeKey)
             }
         }
     }
@@ -377,10 +411,6 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             dict[key] = candidate
             return candidate
         }
-    }
-
-    private static func removeFanOut(for key: HandleStreamStoreKey) {
-        fanOuts.withLock { _ = $0.removeValue(forKey: key) }
     }
 
     // MARK: - Stored properties

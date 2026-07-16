@@ -14,12 +14,16 @@ extension LLMViewModel {
     func generateWithToolCalling(
         prompt: String,
         options: RALLMGenerationOptions,
-        messageIndex: Int
+        messageIndex: Int,
+        generationID: UUID?
     ) async throws {
         // The SDK derives the tool-calling format from the loaded model and
         // orchestrates the tool call → execute → respond loop internally.
         let result = try await RunAnywhere.generateWithTools(prompt: prompt, options: options)
         let toolCallInfo = ToolCallInfo(from: result)
+
+        // Drop the write if this generation was superseded while awaiting.
+        guard isCurrentGeneration(generationID) else { return }
 
         // Update the message with the result
         await updateMessageWithToolResult(
@@ -39,6 +43,8 @@ extension LLMViewModel {
         toolCallInfo: ToolCallInfo?
     ) async {
         await MainActor.run {
+            // Drop the final write + persist if the user navigated away mid tool call.
+            guard self.isActiveGenerationTarget else { return }
             guard index < self.messagesValue.count else { return }
 
             let currentMessage = self.messagesValue[index]

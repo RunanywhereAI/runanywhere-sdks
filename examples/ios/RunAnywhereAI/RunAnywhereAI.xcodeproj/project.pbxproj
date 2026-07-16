@@ -318,7 +318,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2152E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAITests" */;
 			buildPhases = (
-				9417651A8C4CCCB5473F1949 /* [CP] Check Pods Manifest.lock */,
 				5480A1FA2E2F250400337F2F /* Sources */,
 				5480A1FB2E2F250400337F2F /* Frameworks */,
 				5480A1FC2E2F250400337F2F /* Resources */,
@@ -340,7 +339,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2182E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAIUITests" */;
 			buildPhases = (
-				94361D75FF8B6C07227D4520 /* [CP] Check Pods Manifest.lock */,
 				5480A2042E2F250400337F2F /* Sources */,
 				5480A2052E2F250400337F2F /* Frameworks */,
 				5480A2062E2F250400337F2F /* Resources */,
@@ -846,6 +844,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 0.19.13;
 				OTHER_LDFLAGS = "-all_load";
+				"OTHER_LDFLAGS[sdk=macosx*]" = (
+					"-force_load",
+					"$(SRCROOT)/../../../sdk/runanywhere-swift/Binaries/RACommons.xcframework/macos-arm64/librac_commons.a",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

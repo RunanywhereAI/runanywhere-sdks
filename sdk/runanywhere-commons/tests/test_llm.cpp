@@ -9,9 +9,12 @@
 #include "test_common.h"
 #include "test_config.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_core.h"
@@ -425,6 +428,146 @@ static TestResult test_unload_reload() {
 }
 
 // =============================================================================
+// Test: multi-turn memory — history reaches the model
+//
+// rac_llm_options_t.history is alternating user/assistant turns; the engine
+// renders {system_prompt, history, prompt} via the chat template
+// (rac_llm_llamacpp.cpp). A fact planted in an earlier user turn must be
+// recalled when asked in the current prompt — proving history is threaded and
+// not silently dropped. This is the C-ABI regression guard for the Apple
+// "no memory" chat bug (which was really the Swift MLX runtime ignoring these
+// same fields; llama.cpp reads them here).
+// =============================================================================
+
+static std::string to_lower(const std::string& in) {
+    std::string out = in;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return out;
+}
+
+static TestResult test_generate_with_history() {
+    TestResult result;
+    result.test_name = "generate_with_history";
+
+    std::string model_path = test_config::get_llm_model_path();
+    if (!test_config::require_model(model_path, result.test_name, result)) {
+        return result;
+    }
+
+    if (!setup()) {
+        result.passed = false;
+        result.details = "setup() failed";
+        return result;
+    }
+
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_llm_llamacpp_create(model_path.c_str(), nullptr, &handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_create should succeed");
+
+    // Alternating user/assistant. history[0] plants the fact.
+    const char* history[] = {
+        "My name is Oliver. Please remember it.",
+        "Of course, I will remember that your name is Oliver.",
+    };
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+    opts.max_tokens = 48;
+    opts.temperature = 0.0f;  // greedy → deterministic recall
+    opts.history = history;
+    opts.n_history = 2;
+
+    rac_llm_result_t gen_result = {};
+    {
+        ScopedTimer timer("llm_generate_with_history");
+        rc = rac_llm_llamacpp_generate(handle, "What is my name? Reply with only my name.", &opts,
+                                       &gen_result);
+    }
+    ASSERT_EQ(rc, RAC_SUCCESS, "generate with history should succeed");
+    ASSERT_TRUE(gen_result.text != nullptr, "result text should not be NULL");
+
+    const std::string answer = gen_result.text ? gen_result.text : "";
+    std::cout << "  With-history answer: " << answer << "\n";
+    ASSERT_TRUE(to_lower(answer).find("oliver") != std::string::npos,
+                "model must recall the name planted in history");
+
+    rac_llm_result_free(&gen_result);
+    rac_llm_llamacpp_destroy(handle);
+    teardown();
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: context overflow — long conversation must not fail
+//
+// A small context (512) plus a history far larger than it would, pre-fix,
+// tokenize past n_ctx and make llama.cpp's decode fail ("inference failed").
+// The sliding-window fit in llamacpp_backend.cpp drops the oldest history
+// turns until the prompt fits, so generation still succeeds. This is the
+// regression guard for the "long conversation beyond context length" bug.
+// =============================================================================
+
+static TestResult test_generate_history_overflow() {
+    TestResult result;
+    result.test_name = "generate_history_overflow";
+
+    std::string model_path = test_config::get_llm_model_path();
+    if (!test_config::require_model(model_path, result.test_name, result)) {
+        return result;
+    }
+
+    if (!setup()) {
+        result.passed = false;
+        result.details = "setup() failed";
+        return result;
+    }
+
+    // Small context so a modest history is guaranteed to overflow it.
+    rac_llm_llamacpp_config_t config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
+    config.context_size = 512;
+
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_llm_llamacpp_create(model_path.c_str(), &config, &handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_create (ctx=512) should succeed");
+
+    // ~40 turns of filler → well over 512 tokens of history. Owned storage
+    // (the options array is const char* const*, pointing into these strings).
+    std::vector<std::string> turns;
+    for (int i = 0; i < 40; ++i) {
+        turns.push_back("This is filler conversation turn number " + std::to_string(i) +
+                        " intended purely to consume context window space so the total prompt "
+                        "exceeds the model's configured context length of five hundred tokens.");
+    }
+    std::vector<const char*> history;
+    history.reserve(turns.size());
+    for (const auto& turn : turns) {
+        history.push_back(turn.c_str());
+    }
+
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+    opts.max_tokens = 32;
+    opts.temperature = 0.0f;
+    opts.history = history.data();
+    opts.n_history = static_cast<int32_t>(history.size());
+
+    rac_llm_result_t gen_result = {};
+    {
+        ScopedTimer timer("llm_generate_history_overflow");
+        rc = rac_llm_llamacpp_generate(handle, "Please say hello.", &opts, &gen_result);
+    }
+    // The key assertion: the sliding-window fit keeps this from failing.
+    ASSERT_EQ(rc, RAC_SUCCESS, "overflowing history must be trimmed, not fail generation");
+    ASSERT_TRUE(gen_result.text != nullptr, "result text should not be NULL");
+    ASSERT_TRUE(gen_result.completion_tokens > 0, "should still generate after trimming");
+
+    std::cout << "  Overflow-trimmed answer: " << (gen_result.text ? gen_result.text : "") << "\n";
+
+    rac_llm_result_free(&gen_result);
+    rac_llm_llamacpp_destroy(handle);
+    teardown();
+    return TEST_PASS();
+}
+
+// =============================================================================
 // Main: register tests and dispatch via CLI args
 // =============================================================================
 
@@ -439,6 +582,8 @@ int main(int argc, char** argv) {
     suite.add("cancel_generation", test_cancel_generation);
     suite.add("get_model_info", test_get_model_info);
     suite.add("unload_reload", test_unload_reload);
+    suite.add("generate_with_history", test_generate_with_history);
+    suite.add("generate_history_overflow", test_generate_history_overflow);
 
     return suite.run(argc, argv);
 }

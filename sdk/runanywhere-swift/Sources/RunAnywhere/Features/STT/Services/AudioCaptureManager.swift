@@ -48,6 +48,16 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
 
+    /// Synchronous, atomically-updated source of truth for the start/stop guards.
+    /// `isRecording` below is an `@Published` UI mirror that is written a
+    /// main-queue turn later (`DispatchQueue.main.async`), so it cannot drive the
+    /// hardware-teardown decision without a TOCTOU race: stop-before-the-flip
+    /// leaves the engine running (hot mic), start-before-the-flip no-ops (no
+    /// capture), and two concurrent starts each build an engine (leak). This
+    /// claim flag is checked-and-set under the lock so start/stop are idempotent
+    /// and race-free.
+    private let recordingClaim = OSAllocatedUnfairLock(initialState: false)
+
     @Published public var isRecording = false
     @Published public var audioLevel: Float = 0.0
 
@@ -87,9 +97,26 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
         configureSession: Bool = true,
         onAudioData: @escaping @Sendable (Data) -> Void
     ) async throws {
-        guard !isRecording else {
+        // Atomically claim the recording slot. If we're already recording (or a
+        // concurrent start already claimed it), bail before creating an engine so
+        // two starts can't leak a second AVAudioEngine.
+        let claimed = recordingClaim.withLock { claim -> Bool in
+            guard !claim else { return false }
+            claim = true
+            return true
+        }
+        guard claimed else {
             logger.warning("Already recording")
             return
+        }
+
+        // Any throwing failure during setup below must release the claim so a
+        // subsequent start can retry instead of wedging on "Already recording".
+        var startSucceeded = false
+        defer {
+            if !startSucceeded {
+                recordingClaim.withLock { $0 = false }
+            }
         }
 
         #if os(iOS) || os(tvOS)
@@ -131,34 +158,7 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
 
         logger.info("Input format: \(inputFormat.sampleRate) Hz, \(inputFormat.channelCount) channels")
 
-        guard let outputFormat = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: targetSampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AudioCaptureError.formatConversionFailed
-        }
-
-        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-            throw AudioCaptureError.formatConversionFailed
-        }
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self = self else { return }
-
-            self.updateAudioLevel(buffer: buffer)
-
-            guard let convertedBuffer = self.convert(buffer: buffer, using: converter, to: outputFormat) else {
-                return
-            }
-
-            if let audioData = self.bufferToData(buffer: convertedBuffer) {
-                DispatchQueue.main.async {
-                    onAudioData(audioData)
-                }
-            }
-        }
+        try installCaptureTap(on: inputNode, inputFormat: inputFormat, onAudioData: onAudioData)
 
         // Start the engine on a background thread to avoid blocking the main thread.
         // AVAudioEngine.start() performs synchronous IPC to mediaserverd.
@@ -176,8 +176,25 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
             }
         }
 
+        // A stopRecording() may have interleaved during the awaits above — the
+        // main actor is free while we await session activation / engine start,
+        // and stopRecording ran while `audioEngine` was still nil, so it could
+        // not tear down THIS engine. If our claim was released out from under us,
+        // honor the stop: tear the just-started engine down instead of leaving a
+        // hot mic with the tap installed.
+        let stillClaimed = recordingClaim.withLock { $0 }
+        guard stillClaimed else {
+            DispatchQueue.global(qos: .userInitiated).async {
+                inputNode.removeTap(onBus: 0)
+                engine.stop()
+            }
+            logger.info("Recording start superseded by a concurrent stop; torn down")
+            return
+        }
+
         self.audioEngine = engine
         self.inputNode = inputNode
+        startSucceeded = true
 
         DispatchQueue.main.async {
             self.isRecording = true
@@ -222,7 +239,16 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     ///   deactivated. Pass `false` to keep the session alive for subsequent recordings
     ///   (e.g. between listening segments in a flow session).
     public func stopRecording(deactivateSession: Bool = true) {
-        guard isRecording else { return }
+        // Atomically release the claim. Only the first stop tears down hardware;
+        // re-entrant/concurrent stops — and a stop issued before the async
+        // `isRecording = true` flip — no-op instead of skipping teardown and
+        // leaving a hot mic.
+        let wasRecording = recordingClaim.withLock { claim -> Bool in
+            guard claim else { return false }
+            claim = false
+            return true
+        }
+        guard wasRecording else { return }
 
         // Capture references and nil out immediately so the logical state is "stopped"
         // and re-entrant calls hit the guard above.
@@ -258,6 +284,44 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     }
 
     // MARK: - Private Helpers
+
+    /// Build the Int16 output format + converter for `inputFormat` and install
+    /// the mic tap that converts each buffer and forwards the PCM data. Extracted
+    /// from `startRecording` to keep that function within the body-length limit.
+    private func installCaptureTap(
+        on inputNode: AVAudioInputNode,
+        inputFormat: AVAudioFormat,
+        onAudioData: @escaping @Sendable (Data) -> Void
+    ) throws {
+        guard let outputFormat = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: targetSampleRate,
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw AudioCaptureError.formatConversionFailed
+        }
+
+        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+            throw AudioCaptureError.formatConversionFailed
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+            guard let self = self else { return }
+
+            self.updateAudioLevel(buffer: buffer)
+
+            guard let convertedBuffer = self.convert(buffer: buffer, using: converter, to: outputFormat) else {
+                return
+            }
+
+            if let audioData = self.bufferToData(buffer: convertedBuffer) {
+                DispatchQueue.main.async {
+                    onAudioData(audioData)
+                }
+            }
+        }
+    }
 
     /// Converts a PCM buffer to the target format. Internal for unit testing.
     internal func convert(

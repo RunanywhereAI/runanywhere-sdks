@@ -20,6 +20,13 @@ public struct Message: Identifiable, Codable, Sendable {
     public let modelInfo: MessageModelInfo?
     public let toolCallInfo: ToolCallInfo?
     public let attachment: MessageAttachment?
+    /// True when this assistant bubble holds error feedback (a "Generation
+    /// failed…" message or an `LLMError` description) rather than real model
+    /// output. A structured flag — not string matching — so `makeHistory` can
+    /// exclude it: an error bubble is UI-only and must never be fed back into
+    /// the conversation the model conditions on. Optional so conversations
+    /// persisted before this field existed decode as `nil`.
+    public let isError: Bool?
 
     public enum Role: String, Codable, Sendable {
         case system
@@ -36,7 +43,8 @@ public struct Message: Identifiable, Codable, Sendable {
         analytics: MessageAnalytics? = nil,
         modelInfo: MessageModelInfo? = nil,
         toolCallInfo: ToolCallInfo? = nil,
-        attachment: MessageAttachment? = nil
+        attachment: MessageAttachment? = nil,
+        isError: Bool? = nil
     ) {
         self.id = id
         self.role = role
@@ -47,6 +55,7 @@ public struct Message: Identifiable, Codable, Sendable {
         self.modelInfo = modelInfo
         self.toolCallInfo = toolCallInfo
         self.attachment = attachment
+        self.isError = isError
     }
 }
 

@@ -47,6 +47,16 @@ rac_result_t rac_result_to_proto_error(rac_result_t code, rac_proto_buffer_t* ou
     const char* message = rac_error_message(code);
     error.set_message(message ? message : "");
 
+    // Surface the thread-local "caused by" detail (set via
+    // rac_error_set_details, e.g. the underlying backend/MLX load error) so
+    // callers see the real reason instead of only the generic per-code message.
+    // Runs on the same thread that produced the failure and set the detail, so
+    // the thread-local is still visible here.
+    const char* details = rac_error_get_details();
+    if (details != nullptr && details[0] != '\0') {
+        error.set_nested_message(details);
+    }
+
     if (signed_code != 0) {
         error.set_c_abi_code(signed_code);
     }

@@ -703,9 +703,19 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     rc = detail::create_backend_impl(vt, primitive, resolved_path, artifact_resolution.mmproj_path,
                                      &impl, &destroy);
     if (rc != RAC_SUCCESS) {
+        // Compose the generic per-code message with the backend's "caused by"
+        // detail (set via rac_error_set_details inside create/initialize, e.g.
+        // the real MLX weight-mismatch error) so the caller sees the actual
+        // reason instead of only "Failed to load the model".
+        const char* generic = rac_error_message(rc);
+        const char* detail_str = rac_error_get_details();
+        std::string load_error = generic ? generic : "";
+        if (detail_str != nullptr && detail_str[0] != '\0') {
+            load_error.append(": ").append(detail_str);
+        }
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
-                                     artifact_resolution.artifacts, 0, rac_error_message(rc));
+                                     artifact_resolution.artifacts, 0, load_error);
         auto failed = std::make_shared<detail::LoadedModel>();
         failed->component = component;
         failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;

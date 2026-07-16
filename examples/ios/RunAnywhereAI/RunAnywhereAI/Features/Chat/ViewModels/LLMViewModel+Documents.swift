@@ -26,6 +26,12 @@ extension LLMViewModel {
             setCurrentConversation(conversationStore.createConversation())
         }
 
+        // Pin this generation to its conversation + give it an identity so late
+        // tokens / finalization are dropped if the user switches away.
+        setGeneratingConversationId(currentConversation?.id)
+        let generationID = UUID()
+        setActiveGenerationID(generationID)
+
         let savedAttachment = persistDocumentAttachment(document)
         let userMessage = Message(role: .user, content: prompt, attachment: savedAttachment)
         let assistantMessage = Message(role: .assistant, content: "")
@@ -37,30 +43,41 @@ extension LLMViewModel {
 
         let messageIndex = messagesValue.count - 1
 
-        do {
-            try await prepareDocumentRAGPipelineIfNeeded(
-                document: document,
-                embeddingModel: embeddingModel,
-                answerModel: answerModel
-            )
+        // Track the turn so Stop / conversation-switch cancels it and unlocks the
+        // composer (mirrors the text path). ragQuery is a single await with no SDK
+        // cancel entry point, so cancellation is observed once it returns.
+        let task = Task {
+            do {
+                try await prepareDocumentRAGPipelineIfNeeded(
+                    document: document,
+                    embeddingModel: embeddingModel,
+                    answerModel: answerModel
+                )
 
-            var options = RARAGQueryOptions.defaults(question: prompt)
-            let settings = SettingsViewModel.shared
-            options.disableThinking =
-                answerModel.supportsThinking && !settings.thinkingModeEnabled
+                var options = RARAGQueryOptions.defaults(question: prompt)
+                let settings = SettingsViewModel.shared
+                options.disableThinking =
+                    answerModel.supportsThinking && !settings.thinkingModeEnabled
 
-            let result = try await RunAnywhere.ragQuery(options)
-            updateDocumentMessage(
-                at: messageIndex,
-                answer: result.answer,
-                thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
-                answerModel: answerModel
-            )
-        } catch {
-            await handleGenerationError(error, at: messageIndex)
+                let result = try await RunAnywhere.ragQuery(options)
+                if isCurrentGeneration(generationID) {
+                    updateDocumentMessage(
+                        at: messageIndex,
+                        answer: result.answer,
+                        thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+                        answerModel: answerModel
+                    )
+                }
+            } catch {
+                if isCurrentGeneration(generationID) {
+                    await handleGenerationError(error, at: messageIndex)
+                }
+            }
+
+            await finalizeGeneration(at: messageIndex, generationID: generationID)
         }
-
-        await finalizeGeneration(at: messageIndex)
+        setGenerationTask(task)
+        await task.value
     }
 
     private func persistDocumentAttachment(_ document: ChatDocumentAttachment) -> MessageAttachment {
