@@ -7,6 +7,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { addon, toAsyncIterable } from './bridge';
+import { resolveModel } from './download';
+import type { DownloadProgress, ResolvedModel } from './download';
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -18,6 +20,12 @@ export interface InitOptions {
 export interface LoadOptions {
   id?: string;
   name?: string;
+}
+
+export interface DownloadOptions {
+  /** Base dir for downloads (default: ~/.runanywhere/models). */
+  dir?: string;
+  onProgress?: (p: DownloadProgress) => void;
 }
 
 /** A loaded LLM. */
@@ -111,20 +119,37 @@ export const RunAnywhere = {
     initialized = true;
   },
 
-  loadLLM(modelPath: string, opts: LoadOptions = {}): LLMModel {
-    return new LLMModel(addon.loadModel(modelPath, opts.id, opts.name));
+  /** Download a catalog model (or resolve a local path) to concrete file paths. */
+  downloadModel(idOrPath: string, opts: DownloadOptions = {}): Promise<ResolvedModel> {
+    return resolveModel(idOrPath, opts);
   },
-  loadVLM(modelPath: string, mmprojPath: string, opts: LoadOptions = {}): VLMModel {
-    return new VLMModel(addon.loadVlmModel(modelPath, mmprojPath, opts.id, opts.name));
+
+  // load* accept a catalog id (auto-downloaded if missing) OR a local path.
+  async loadLLM(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<LLMModel> {
+    const m = await resolveModel(idOrPath, opts);
+    return new LLMModel(addon.loadModel(m.primary, opts.id, opts.name));
   },
-  loadEmbedder(onnxPath: string, configJson?: string): Embedder {
-    return new Embedder(addon.loadEmbeddingModel(onnxPath, configJson));
+  async loadVLM(
+    idOrPath: string,
+    mmprojPath?: string,
+    opts: LoadOptions & DownloadOptions = {}
+  ): Promise<VLMModel> {
+    const m = await resolveModel(idOrPath, opts);
+    const mmproj = mmprojPath ?? m.mmproj;
+    if (!mmproj) throw new Error('loadVLM needs an mmproj path (or a catalog id that includes one)');
+    return new VLMModel(addon.loadVlmModel(m.primary, mmproj, opts.id, opts.name));
   },
-  loadSTT(modelDir: string, opts: LoadOptions = {}): STTModel {
-    return new STTModel(addon.loadSttModel(modelDir, opts.id, opts.name));
+  async loadEmbedder(idOrPath: string, opts: DownloadOptions = {}): Promise<Embedder> {
+    const m = await resolveModel(idOrPath, opts);
+    return new Embedder(addon.loadEmbeddingModel(m.primary));
   },
-  loadTTS(voiceDir: string, opts: LoadOptions = {}): TTSVoice {
-    return new TTSVoice(addon.loadTtsVoice(voiceDir, opts.id, opts.name));
+  async loadSTT(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<STTModel> {
+    const m = await resolveModel(idOrPath, opts);
+    return new STTModel(addon.loadSttModel(m.primary, opts.id, opts.name));
+  },
+  async loadTTS(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<TTSVoice> {
+    const m = await resolveModel(idOrPath, opts);
+    return new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
   },
 
   /** Tear down the runtime. Idempotent. */
