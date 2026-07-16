@@ -8,7 +8,15 @@ export {
   STTModel,
   TTSVoice,
 } from './RunAnywhere';
-export type { InitOptions, LoadOptions, DownloadOptions } from './RunAnywhere';
+export type {
+  InitOptions,
+  LoadOptions,
+  DownloadOptions,
+  GenerateOptions,
+  GenerateObjectOptions,
+} from './RunAnywhere';
+export { jsonSchemaToGrammar } from './grammar';
+export type { JsonSchema } from './grammar';
 export { Chat } from './Chat';
 export type { ChatMessage, ChatOptions } from './Chat';
 export { VoiceAgent } from './VoiceAgent';
