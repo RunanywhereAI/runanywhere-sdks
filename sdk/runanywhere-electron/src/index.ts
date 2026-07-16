@@ -9,6 +9,8 @@ export {
   TTSVoice,
 } from './RunAnywhere';
 export type { InitOptions, LoadOptions, DownloadOptions } from './RunAnywhere';
+export { Chat } from './Chat';
+export type { ChatMessage, ChatOptions } from './Chat';
 export { VoiceAgent } from './VoiceAgent';
 export type {
   VoiceAgentModels,
