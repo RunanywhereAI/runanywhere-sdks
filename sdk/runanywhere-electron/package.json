@@ -7,16 +7,52 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "default": "./dist/audio.js"
+    },
+    "./main": {
+      "types": "./dist/process/main.d.ts",
+      "default": "./dist/process/main.js"
+    },
+    "./preload": {
+      "types": "./dist/process/preload.d.ts",
+      "default": "./dist/process/preload.js"
+    },
+    "./host": {
+      "types": "./dist/process/host.d.ts",
+      "default": "./dist/process/host.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist",
-    "src"
+    "prebuilds",
+    "README.md"
   ],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "bundle:native": "node scripts/bundle-native.js",
     "pretest": "tsc -p tsconfig.json",
     "test": "node --test \"test/unit/**/*.test.js\"",
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
-    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\""
+    "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
+    "prepack": "npm run build && npm run bundle:native"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",
