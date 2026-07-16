@@ -427,6 +427,9 @@ let package = Package(
                 "RABackendMLXBinary",
             ],
             path: "sdk/runanywhere-cli",
+            exclude: [
+                "dist",
+            ],
             sources: [
                 "src/app.cpp",
                 "src/bootstrap.cpp",
