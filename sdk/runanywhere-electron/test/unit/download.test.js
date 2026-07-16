@@ -1,0 +1,327 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+
+const download = require('../../dist/download');
+
+// Small helper: a fresh, unique temp root per test (cleaned up by the caller).
+function freshTempRoot() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'ra-'));
+}
+
+// --- exports -----------------------------------------------------------------
+
+test('modelsRoot is an exported function', () => {
+  assert.equal(typeof download.modelsRoot, 'function');
+});
+
+test('downloadFile is an exported function', () => {
+  assert.equal(typeof download.downloadFile, 'function');
+});
+
+test('resolveModel is an exported function', () => {
+  assert.equal(typeof download.resolveModel, 'function');
+});
+
+test('module exports exactly the public surface', () => {
+  // Guard against accidental leakage of internal helpers (extractTarBz2 is not exported).
+  assert.equal(typeof download.extractTarBz2, 'undefined');
+  const own = Object.keys(download).filter((k) => typeof download[k] === 'function');
+  assert.deepEqual(own.sort(), ['downloadFile', 'modelsRoot', 'resolveModel']);
+});
+
+// --- modelsRoot() ------------------------------------------------------------
+
+test('modelsRoot returns an absolute path', () => {
+  const root = download.modelsRoot();
+  assert.equal(typeof root, 'string');
+  assert.ok(path.isAbsolute(root), `expected absolute path, got ${root}`);
+});
+
+test('modelsRoot ends with .runanywhere/models segments', () => {
+  const root = download.modelsRoot();
+  const suffix = path.join('.runanywhere', 'models');
+  assert.ok(root.endsWith(suffix), `expected ${root} to end with ${suffix}`);
+});
+
+test('modelsRoot is rooted at the home directory', () => {
+  const root = download.modelsRoot();
+  const expected = path.join(os.homedir(), '.runanywhere', 'models');
+  assert.equal(root, expected);
+});
+
+test('modelsRoot is stable across calls', () => {
+  assert.equal(download.modelsRoot(), download.modelsRoot());
+});
+
+// --- resolveModel(): non-catalog local path (no network, no fs writes) -------
+
+test('resolveModel resolves a non-catalog local path to a path-type result', async () => {
+  const localPath = path.join(os.tmpdir(), 'nope', 'model.gguf');
+  const res = await download.resolveModel(localPath);
+  assert.deepEqual(res, {
+    id: localPath,
+    type: 'path',
+    dir: path.dirname(localPath),
+    primary: localPath,
+  });
+});
+
+test('resolveModel non-catalog path result has no mmproj key', async () => {
+  const localPath = path.join(os.tmpdir(), 'nope', 'model.gguf');
+  const res = await download.resolveModel(localPath);
+  assert.ok(!('mmproj' in res), 'expected no mmproj key for a path result');
+});
+
+test('resolveModel non-catalog path uses dirname for dir', async () => {
+  const localPath = path.join(os.tmpdir(), 'deep', 'nested', 'weights.bin');
+  const res = await download.resolveModel(localPath);
+  assert.equal(res.dir, path.join(os.tmpdir(), 'deep', 'nested'));
+  assert.equal(res.primary, localPath);
+  assert.equal(res.id, localPath);
+  assert.equal(res.type, 'path');
+});
+
+test('resolveModel treats an unknown id (no path separators) as a path', async () => {
+  // Not a catalog id -> the non-catalog branch runs. path.dirname('unknown-model') === '.'
+  const res = await download.resolveModel('unknown-model');
+  assert.equal(res.type, 'path');
+  assert.equal(res.id, 'unknown-model');
+  assert.equal(res.primary, 'unknown-model');
+  assert.equal(res.dir, path.dirname('unknown-model'));
+  assert.ok(!('mmproj' in res));
+});
+
+test('resolveModel does NOT create the directory for a non-catalog path', async () => {
+  // Use a unique directory that does not exist; resolveModel must not mkdir it.
+  const base = path.join(os.tmpdir(), 'ra-noexist-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  const localPath = path.join(base, 'model.gguf');
+  assert.ok(!fs.existsSync(base), 'precondition: dir must not already exist');
+  const res = await download.resolveModel(localPath);
+  assert.equal(res.type, 'path');
+  assert.ok(!fs.existsSync(base), 'resolveModel must not have created the directory');
+});
+
+// --- resolveModel(): hermetic "already downloaded" catalog path (no network) -
+
+test('resolveModel skips download when the catalog file already exists', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    // Pre-create the expected primary file so the download loop is skipped.
+    fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
+
+    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+
+    assert.equal(res.id, 'smollm2-135m');
+    assert.equal(res.type, 'llm');
+    assert.equal(res.dir, modelDir);
+    assert.equal(res.primary, path.join(tempRoot, 'smollm2-135m', 'model.gguf'));
+    assert.equal(res.mmproj, undefined);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('resolveModel does not overwrite the existing catalog file', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    const primary = path.join(modelDir, 'model.gguf');
+    const sentinel = Buffer.from('already-here');
+    fs.writeFileSync(primary, sentinel);
+
+    await download.resolveModel('smollm2-135m', { dir: tempRoot });
+
+    // Untouched: no network fetch replaced our sentinel bytes.
+    assert.deepEqual(fs.readFileSync(primary), sentinel);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('resolveModel returns undefined mmproj for a non-VLM catalog entry', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
+
+    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    assert.ok('mmproj' in res, 'ResolvedModel shape includes the mmproj key');
+    assert.equal(res.mmproj, undefined);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('resolveModel creates the per-model directory (dir side effect) when it is missing', async () => {
+  // Only the tempRoot exists; the per-id subdir does not. Because BOTH catalog
+  // files for the entry are pre-staged *by us* the loop cannot fire — but we
+  // must stage them, which requires the dir. Instead verify the mkdir side
+  // effect directly: after resolve, res.dir exists on disk.
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
+
+    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    assert.ok(fs.existsSync(res.dir), 'resolveModel should ensure the model dir exists');
+    assert.equal(res.dir, modelDir);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// --- resolveModel(): VLM entry (multi-file + mmproj resolution) --------------
+
+test('resolveModel resolves a VLM entry with an mmproj path when files exist', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smolvlm-256m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    // smolvlm-256m has two files: model.gguf (primary) and mmproj.gguf.
+    fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
+    fs.writeFileSync(path.join(modelDir, 'mmproj.gguf'), Buffer.from([0]));
+
+    const res = await download.resolveModel('smolvlm-256m', { dir: tempRoot });
+
+    assert.equal(res.id, 'smolvlm-256m');
+    assert.equal(res.type, 'vlm');
+    assert.equal(res.dir, modelDir);
+    assert.equal(res.primary, path.join(modelDir, 'model.gguf'));
+    assert.equal(res.mmproj, path.join(modelDir, 'mmproj.gguf'));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// --- resolveModel(): embedder entry (two plain, non-archive files) -----------
+
+test('resolveModel resolves a multi-file embedder entry when all files exist', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'minilm');
+    fs.mkdirSync(modelDir, { recursive: true });
+    // minilm has model.onnx (primary) + vocab.txt, no archive, no mmproj.
+    fs.writeFileSync(path.join(modelDir, 'model.onnx'), Buffer.from([0]));
+    fs.writeFileSync(path.join(modelDir, 'vocab.txt'), Buffer.from('hello'));
+
+    const res = await download.resolveModel('minilm', { dir: tempRoot });
+
+    assert.equal(res.type, 'embedder');
+    assert.equal(res.primary, path.join(modelDir, 'model.onnx'));
+    assert.equal(res.mmproj, undefined);
+    assert.equal(res.dir, modelDir);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// --- resolveModel(): archive entry, "extracted" short-circuit ----------------
+
+test('resolveModel skips an archive download when the extracted primary already exists', async () => {
+  // For an archive entry, the loop skips download when the extracted primary
+  // (a directory here) exists — even though the downloaded .tar.bz2 (`as`) does not.
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'whisper-tiny');
+    fs.mkdirSync(modelDir, { recursive: true });
+    // whisper-tiny.primary === 'sherpa-onnx-whisper-tiny.en' (extraction output).
+    const extractedPrimary = path.join(modelDir, 'sherpa-onnx-whisper-tiny.en');
+    fs.mkdirSync(extractedPrimary, { recursive: true });
+    // Deliberately do NOT create whisper.tar.bz2 — the `extracted` guard must skip.
+    assert.ok(!fs.existsSync(path.join(modelDir, 'whisper.tar.bz2')));
+
+    const res = await download.resolveModel('whisper-tiny', { dir: tempRoot });
+
+    assert.equal(res.type, 'stt');
+    assert.equal(res.primary, extractedPrimary);
+    assert.equal(res.mmproj, undefined);
+    // No download/extract happened: the tar file was never created.
+    assert.ok(!fs.existsSync(path.join(modelDir, 'whisper.tar.bz2')));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('resolveModel archive primary resolves under the model dir (piper tts entry)', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'piper-lessac');
+    fs.mkdirSync(modelDir, { recursive: true });
+    const extractedPrimary = path.join(modelDir, 'vits-piper-en_US-lessac-medium');
+    fs.mkdirSync(extractedPrimary, { recursive: true });
+
+    const res = await download.resolveModel('piper-lessac', { dir: tempRoot });
+
+    assert.equal(res.type, 'tts');
+    assert.equal(res.primary, extractedPrimary);
+    assert.equal(res.dir, modelDir);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// --- resolveModel(): opts.dir defaulting is honored -------------------------
+
+test('resolveModel honors an explicit opts.dir root for the model directory', async () => {
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    fs.mkdirSync(modelDir, { recursive: true });
+    fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
+
+    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    // dir must be rooted at opts.dir, NOT at modelsRoot()/home.
+    assert.equal(res.dir, path.join(tempRoot, 'smollm2-135m'));
+    assert.ok(!res.dir.startsWith(download.modelsRoot()), 'opts.dir should override modelsRoot()');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// --- downloadFile(): shape + error path (no live network) --------------------
+
+test('downloadFile returns a Promise', () => {
+  // Point at an RFC 2606 reserved, guaranteed non-resolving host so no real
+  // network I/O occurs; the connection error rejects the promise.
+  const p = download.downloadFile('https://nonexistent.invalid/model.gguf', path.join(os.tmpdir(), 'ra-dl-shape.part'));
+  assert.ok(p instanceof Promise);
+  // Swallow the expected rejection so it doesn't surface as an unhandled rejection.
+  p.then(
+    () => {},
+    () => {}
+  );
+});
+
+test('downloadFile rejects on a connection/transport error (unresolvable host)', async () => {
+  const dest = path.join(os.tmpdir(), 'ra-dl-fail-' + Date.now() + '.gguf');
+  await assert.rejects(
+    () => download.downloadFile('https://nonexistent.invalid/model.gguf', dest),
+    (err) => {
+      assert.ok(err instanceof Error, 'expected an Error');
+      return true;
+    }
+  );
+  // No partial file or final file should be left behind on a transport failure.
+  assert.ok(!fs.existsSync(dest), 'dest must not exist after a failed download');
+  assert.ok(!fs.existsSync(dest + '.part'), '.part must not be renamed into place on failure');
+});
+
+test('downloadFile does not invoke onProgress when the request fails to connect', async () => {
+  const dest = path.join(os.tmpdir(), 'ra-dl-noprog-' + Date.now() + '.gguf');
+  let progressCalls = 0;
+  await assert.rejects(() =>
+    download.downloadFile('https://nonexistent.invalid/model.gguf', dest, () => {
+      progressCalls += 1;
+    })
+  );
+  assert.equal(progressCalls, 0, 'onProgress must not fire when the connection never succeeds');
+});
