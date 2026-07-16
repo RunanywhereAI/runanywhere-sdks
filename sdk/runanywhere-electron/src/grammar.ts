@@ -9,6 +9,10 @@ export interface JsonSchema {
   required?: string[];
   items?: JsonSchema;
   enum?: Array<string | number | boolean>;
+  /** Fixed literal value (JSON const) — matches exactly this value. */
+  const?: string | number | boolean;
+  /** Union: the value must match one of these schemas (alternation). */
+  anyOf?: JsonSchema[];
 }
 
 const PRIMITIVES: Record<string, string> = {
@@ -30,6 +34,16 @@ export function jsonSchemaToGrammar(schema: JsonSchema): string {
   let n = 0;
 
   function build(s: JsonSchema): string {
+    if (s.anyOf && s.anyOf.length) {
+      const name = `any${n++}`;
+      rules.push(`${name} ::= ${s.anyOf.map((sub) => build(sub)).join(' | ')}`);
+      return name;
+    }
+    if (s.const !== undefined) {
+      const name = `const${n++}`;
+      rules.push(`${name} ::= ${lit(JSON.stringify(s.const))}`);
+      return name;
+    }
     if (s.enum && s.enum.length) {
       const name = `enum${n++}`;
       rules.push(`${name} ::= ${s.enum.map((v) => lit(JSON.stringify(v))).join(' | ')}`);
