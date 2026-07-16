@@ -875,9 +875,12 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
     bool stop_sequence_hit = false;
 
     while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
+        // llama_sampler_sample() already calls llama_sampler_accept() on the
+        // chain internally (see llama-sampler.cpp), so we must NOT accept again:
+        // a second accept is a no-op for stateless samplers but double-advances
+        // the stateful GBNF grammar sampler, emptying its stack and throwing
+        // "Unexpected empty grammar stack" once a grammar is in use.
         const llama_token new_token_id = llama_sampler_sample(sampler, context_, -1);
-
-        llama_sampler_accept(sampler, new_token_id);
 
         if (llama_vocab_is_eog(vocab, new_token_id)) {
             RAC_LOG_INFO("LLM.LlamaCpp", "End of generation token received");
