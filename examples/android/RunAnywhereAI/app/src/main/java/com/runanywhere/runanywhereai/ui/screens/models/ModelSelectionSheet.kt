@@ -3,14 +3,18 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +23,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,9 +45,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import com.runanywhere.runanywhereai.download.ModelDownloadService
+import com.runanywhere.runanywhereai.ui.screens.models.huggingface.HuggingFaceSearchSheet
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import ai.runanywhere.proto.v1.InferenceFramework
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -58,6 +65,7 @@ fun ModelSelectionSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
     var pendingDelete by remember { mutableStateOf<RAModelInfo?>(null) }
+    var showHfSearch by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -85,7 +93,11 @@ fun ModelSelectionSheet(
             when {
                 state.isLoading -> CenterNote("Loading models…", showSpinner = true)
                 state.models.isEmpty() -> CenterNote("No models available")
-                else -> PickerBody(viewModel, state, device, scope, onDismiss, onDelete = { pendingDelete = it })
+                else -> PickerBody(
+                    viewModel, state, device, scope, onDismiss,
+                    onDelete = { pendingDelete = it },
+                    onAddFromHuggingFace = { showHfSearch = true },
+                )
             }
 
             Text(
@@ -126,6 +138,13 @@ fun ModelSelectionSheet(
             text = { Text("Delete ${model.name} from this device? You can download it again later.") },
         )
     }
+
+    if (showHfSearch) {
+        HuggingFaceSearchSheet(
+            onDismiss = { showHfSearch = false },
+            onModelAdded = { viewModel.refresh() },
+        )
+    }
 }
 
 @Composable
@@ -136,11 +155,27 @@ private fun PickerBody(
     scope: CoroutineScope,
     onDismiss: () -> Unit,
     onDelete: (RAModelInfo) -> Unit,
+    onAddFromHuggingFace: () -> Unit,
 ) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     val isSearching = query.isNotBlank()
+
+    // Backend/NPU filter. null = "All". Only meaningful when the picker spans more than
+    // one backend (e.g. NPU + Llama.cpp on the same device). Order NPU/QHexRT prominent.
+    var selectedBackend by remember { mutableStateOf<InferenceFramework?>(null) }
+    val backends = remember(state.models) {
+        val order = listOf(
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+            InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+            InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        )
+        state.models.map { it.framework }.distinct()
+            .sortedBy { fw -> order.indexOf(fw).let { if (it < 0) Int.MAX_VALUE else it } }
+    }
 
     val onSelect: (RAModelInfo) -> Unit = { model -> scope.launch { if (viewModel.select(model)) onDismiss() } }
 
@@ -182,8 +217,13 @@ private fun PickerBody(
     }
     val surfacedIds = recommendation?.allIds ?: setOfNotNull(scopedRecommended?.id)
 
-    // Recommended section only in the default (non-search) view.
-    if (!isSearching) {
+    // Bring-your-own model: search Hugging Face for any GGUF and download it.
+    AddFromHuggingFaceRow(onClick = onAddFromHuggingFace)
+    Spacer(Modifier.height(dimens.spacingMd))
+
+    // Recommended section only in the default view — hidden while searching OR when a
+    // backend filter is active (the filter is an explicit "show me only this backend").
+    if (!isSearching && selectedBackend == null) {
         when {
             recommendation != null && recommendation.recommendedLLMs.isNotEmpty() -> {
                 RecommendedSection(recommendation, device, viewModel, state, onSelect, onDownload, onDelete)
@@ -204,10 +244,24 @@ private fun PickerBody(
     SearchField(query = query, onQueryChange = { query = it })
     Spacer(Modifier.height(dimens.spacingXs))
 
-    // Families to show. In the default view, hide models already surfaced above so the
-    // list stays short. Search matches friendly family/variant names + tags only.
-    val families = state.models
-        .filter { isSearching || it.id !in surfacedIds }
+    // Backend/NPU filter chips — only when the picker spans more than one backend.
+    if (backends.size > 1) {
+        BackendFilterRow(
+            backends = backends,
+            selected = selectedBackend,
+            onSelect = { selectedBackend = it },
+        )
+        Spacer(Modifier.height(dimens.spacingXs))
+    }
+
+    // Families to show. Apply the backend filter first, then (default view only) hide
+    // models already surfaced in the recommended section so the list stays short. Search
+    // matches friendly family/variant names + tags only.
+    val filteredModels = selectedBackend?.let { fw -> state.models.filter { it.framework == fw } }
+        ?: state.models
+    val hideSurfaced = !isSearching && selectedBackend == null
+    val families = filteredModels
+        .filter { !hideSurfaced || it.id !in surfacedIds }
         .toFamilyGroups()
         .mapNotNull { group ->
             if (!isSearching) return@mapNotNull group
@@ -305,6 +359,47 @@ private fun PickerModelRow(
 }
 
 @Composable
+private fun AddFromHuggingFaceRow(onClick: () -> Unit) {
+    val dimens = LocalDimens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dimens.spacingLg)
+            .clickable(onClick = onClick)
+            .padding(vertical = dimens.spacingSm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            RACIcons.Brands.HuggingFace,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(dimens.iconLg),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = dimens.spacingMd),
+        ) {
+            Text(
+                "Add from Hugging Face",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Search and download any GGUF model",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            RACIcons.Outline.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
     val dimens = LocalDimens.current
     OutlinedTextField(
@@ -325,6 +420,44 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
         },
         placeholder = { Text("Search models — chat, vision, voice…") },
     )
+}
+
+// Horizontally-scrollable single-select backend/NPU filter. A leading "All" chip clears
+// the filter; tapping the active chip again also clears it. Backend order is set upstream.
+@Composable
+private fun BackendFilterRow(
+    backends: List<InferenceFramework>,
+    selected: InferenceFramework?,
+    onSelect: (InferenceFramework?) -> Unit,
+) {
+    val dimens = LocalDimens.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = dimens.spacingLg),
+        horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+    ) {
+        FilterChip(
+            selected = selected == null,
+            onClick = { onSelect(null) },
+            label = { Text("All") },
+        )
+        backends.forEach { framework ->
+            FilterChip(
+                selected = selected == framework,
+                onClick = { onSelect(if (selected == framework) null else framework) },
+                label = { Text(framework.filterLabel()) },
+                leadingIcon = {
+                    Icon(
+                        framework.backendIcon(),
+                        contentDescription = null,
+                        modifier = Modifier.size(dimens.iconSm),
+                    )
+                },
+            )
+        }
+    }
 }
 
 // Friendly-only search: family title/tagline. No quant, backend, or ids.

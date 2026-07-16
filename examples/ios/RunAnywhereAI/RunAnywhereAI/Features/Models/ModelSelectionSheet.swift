@@ -83,6 +83,7 @@ struct ModelSelectionSheet: View {
     @State private var loadingProgress: String = ""
     @State private var loadErrorMessage: String?
     @State private var searchText = ""
+    @State private var showAddFromHuggingFace = false
 
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
@@ -183,6 +184,7 @@ struct ModelSelectionSheet: View {
             ZStack {
                 List {
                     searchSection
+                    addFromHuggingFaceSection
                     recommendedSection
                     familiesSection
                 }
@@ -197,6 +199,11 @@ struct ModelSelectionSheet: View {
             .toolbar { toolbarContent }
         }
         .adaptiveSheetFrame()
+        .sheet(
+            isPresented: $showAddFromHuggingFace,
+            onDismiss: { Task { await viewModel.loadModelsFromRegistry() } },
+            content: { AddFromHuggingFaceView() }
+        )
         .task { await viewModel.loadModelsFromRegistry() }
         .alert(
             "Unable to Load Model",
@@ -249,6 +256,37 @@ struct ModelSelectionSheet: View {
             .padding(.vertical, AppSpacing.smallMedium)
             .background(AppColors.backgroundSecondary)
             .cornerRadius(AppSpacing.cornerRadiusRegular)
+        }
+    }
+
+    /// Bring-your-own model: search Hugging Face for any GGUF and download it.
+    /// Only shown for language-model contexts, where a downloaded GGUF LLM is
+    /// usable (the same discoverable spot as the Android/Web pickers).
+    @ViewBuilder private var addFromHuggingFaceSection: some View {
+        if context.relevantCategories.contains(.language), searchText.isEmpty {
+            Section {
+                Button {
+                    showAddFromHuggingFace = true
+                } label: {
+                    HStack(spacing: AppSpacing.smallMedium) {
+                        Image(systemName: "magnifyingglass.circle.fill")
+                            .foregroundColor(AppColors.primaryAccent)
+                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+                            Text("Add from Hugging Face")
+                                .font(AppTypography.subheadline.weight(.semibold))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text("Search and download any GGUF model")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 

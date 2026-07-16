@@ -59,6 +59,7 @@ import {
 } from '../services/model-recommendation';
 import { showToast } from './dialogs';
 import { appLogger } from '../services/app-logger';
+import { openAddFromHuggingFace } from './add-from-huggingface';
 
 // ---------------------------------------------------------------------------
 // State (module-scope, one selection sheet per app)
@@ -390,6 +391,13 @@ function renderSheet(): void {
           <input id="model-sheet-search" class="model-search__input" type="search"
             placeholder="Search models, capabilities…" autocomplete="off" spellcheck="false" />
         </div>
+        <button type="button" class="btn btn-secondary btn-sm model-sheet-hf-btn" id="model-sheet-hf-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add from Hugging Face
+        </button>
         <div id="model-sheet-list"></div>
       </div>
     </div>
@@ -406,6 +414,10 @@ function renderSheet(): void {
   searchInput.addEventListener('input', () => {
     searchQuery = searchInput.value;
     renderRows();
+  });
+
+  modalEl.querySelector('#model-sheet-hf-btn')!.addEventListener('click', () => {
+    openAddFromHuggingFace();
   });
 
   // Probe hardware once, then re-render the banner + recommended section. The

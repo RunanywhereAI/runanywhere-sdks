@@ -463,31 +463,46 @@ export function getCatalog(): readonly CatalogEntry[] {
  * inference can begin, even on a machine with abundant physical memory.
  */
 export function webModelCompatibility(entry: CatalogEntry): WebModelCompatibility {
-  const modelBytes = Math.max(entry.downloadSizeBytes, entry.memoryRequiredBytes);
+  const base = webSizeCompatibility(entry.downloadSizeBytes, entry.memoryRequiredBytes);
+  if (base.supported) return base;
+  if (entry.id === 'bonsai-27b-q1_0') {
+    return {
+      ...base,
+      reference: {
+        label: 'Experimental direct-WebGPU reference',
+        url: 'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',
+      },
+    };
+  }
+  return base;
+}
+
+/**
+ * Same 4 GiB WASM32 gate as `webModelCompatibility`, expressed over raw sizes so
+ * ad-hoc models (e.g. an arbitrary Hugging Face GGUF added at runtime) can reuse
+ * the identical check without first being promoted to a `CatalogEntry`.
+ */
+export function webSizeCompatibility(
+  downloadSizeBytes: number,
+  memoryRequiredBytes: number,
+): WebModelCompatibility {
+  const modelBytes = Math.max(downloadSizeBytes, memoryRequiredBytes);
   if (modelBytes + MINIMUM_WASM_RUNTIME_HEADROOM_BYTES <= WASM32_ADDRESS_SPACE_BYTES) {
     return { supported: true };
   }
 
   const remainingMiB = Math.max(
     0,
-    Math.round((WASM32_ADDRESS_SPACE_BYTES - entry.downloadSizeBytes) / (1024 * 1024)),
+    Math.round((WASM32_ADDRESS_SPACE_BYTES - downloadSizeBytes) / (1024 * 1024)),
   );
   return {
     supported: false,
     code: WebModelCompatibilityCode.WASM32_ADDRESS_SPACE,
     reason:
-      `Unavailable in this app: RunAnywhere's current llama.cpp/WebGPU backend must stage this `
-      + `${(entry.downloadSizeBytes / 1_000_000_000).toFixed(3)} GB GGUF in a 4 GiB WASM32 heap `
+      `RunAnywhere's current llama.cpp/WebGPU backend must stage this `
+      + `${(downloadSizeBytes / 1_000_000_000).toFixed(3)} GB GGUF in a 4 GiB WASM32 heap `
       + `before GPU upload, leaving only ${remainingMiB} MiB for loader, runtime, and KV-cache state. `
-      + 'Use a native app until a direct ranged-GGUF-to-WebGPU backend is integrated.',
-    ...(entry.id === 'bonsai-27b-q1_0'
-      ? {
-          reference: {
-            label: 'Experimental direct-WebGPU reference',
-            url: 'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',
-          },
-        }
-      : {}),
+      + 'This model is likely to run out of memory in-browser; use a native app instead.',
   };
 }
 

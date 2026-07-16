@@ -83,6 +83,11 @@ suspend fun RunAnywhere.registerModel(
             source = ModelSource.MODEL_SOURCE_REMOTE,
             id = id,
             memory_required_bytes = memoryRequirement,
+            // Mirror Swift `RunAnywhere+Storage.swift`: a caller-supplied size is
+            // both the memory estimate and the download size. Without
+            // download_size_bytes the download planner can't verify free storage
+            // and fails when the server (e.g. an HF redirect) omits Content-Length.
+            download_size_bytes = memoryRequirement,
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
             artifact_type = artifactType,
