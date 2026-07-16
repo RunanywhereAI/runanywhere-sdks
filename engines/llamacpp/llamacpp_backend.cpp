@@ -861,6 +861,17 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
                                             const TextStreamCallback& sink) {
     const auto* const vocab = llama_model_get_vocab(model_);
 
+    // Each generation starts a new output sequence, so reset the sampler chain's
+    // per-sequence state. Critical for the stateful GBNF grammar sampler: it is
+    // cached and reused across requests with the same grammar (see the
+    // params_match fast-path in generate_stream), and without a reset it would
+    // still be in the accepting/end state left by the previous generation —
+    // making the model emit EOG immediately (zero tokens). Also clears the
+    // repetition-penalty window so it does not leak across generations.
+    if (sampler) {
+        llama_sampler_reset(sampler);
+    }
+
     std::string stop_window;
     stop_window.reserve(kMaxBuiltinStopLen * 2);
 
