@@ -4,6 +4,7 @@
 // to concrete on-disk file paths, downloading if missing.
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
+import * as http from 'http';
 import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
@@ -41,7 +42,8 @@ export function downloadFile(
         reject(new Error('too many redirects: ' + u));
         return;
       }
-      https
+      const lib = new URL(u).protocol === 'http:' ? http : https;
+      lib
         .get(u, { headers: { 'User-Agent': 'runanywhere-electron' } }, (res) => {
           const code = res.statusCode ?? 0;
           if (code >= 300 && code < 400 && res.headers.location) {
