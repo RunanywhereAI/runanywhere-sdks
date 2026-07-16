@@ -1,0 +1,32 @@
+# CI for @runanywhere/electron. The unit suite is hermetic (pure TS/JS — no native
+# addon, no models), so it builds and runs anywhere. The native addon + the
+# integration suite need MSVC + the compiled commons/engines and run separately.
+name: electron-sdk-ci
+
+on:
+  push:
+    paths:
+      - 'sdk/runanywhere-electron/**'
+      - '.github/workflows/electron-sdk-ci.yml'
+  pull_request:
+    paths:
+      - 'sdk/runanywhere-electron/**'
+      - '.github/workflows/electron-sdk-ci.yml'
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/runanywhere-electron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Type-check + build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
