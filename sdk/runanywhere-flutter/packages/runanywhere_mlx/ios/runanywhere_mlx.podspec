@@ -25,7 +25,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_mlx'
-  s.version          = '0.20.10'
+  s.version          = '0.20.11'
   s.summary          = 'RunAnywhere MLX backend for physical iOS devices'
   s.description      = <<-DESC
 Apple MLX backend for the RunAnywhere Flutter SDK. Provides on-device LLM,

@@ -94,8 +94,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 37
-        versionCode = 23
-        versionName = "0.1.12"
+        versionCode = 24
+        versionName = "0.1.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
