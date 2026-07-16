@@ -13,6 +13,13 @@ export interface JsonSchema {
   const?: string | number | boolean;
   /** Union: the value must match one of these schemas (alternation). */
   anyOf?: JsonSchema[];
+  /**
+   * Upper bound on array length. The grammar itself enforces it — so a small
+   * model that would otherwise ramble into an unbounded list is forced to close
+   * the array within the token budget (keeps the JSON parseable). Only applies
+   * to `type: 'array'`.
+   */
+  maxItems?: number;
 }
 
 const PRIMITIVES: Record<string, string> = {
@@ -68,7 +75,23 @@ export function jsonSchemaToGrammar(schema: JsonSchema): string {
         if (!s.items) used.add('string');
         const name = `arr${n++}`;
         used.add('ws');
-        rules.push(`${name} ::= "[" ws ( ${item} ( ws "," ws ${item} )* )? ws "]"`);
+        const max = typeof s.maxItems === 'number' ? Math.floor(s.maxItems) : undefined;
+        if (max === undefined) {
+          rules.push(`${name} ::= "[" ws ( ${item} ( ws "," ws ${item} )* )? ws "]"`);
+        } else if (max <= 0) {
+          rules.push(`${name} ::= "[" ws "]"`);
+        } else {
+          // Bound the length with a chain of nested optional tails (portable
+          // GBNF — uses only `?`, no {m,n} repetition): tail_k allows up to k
+          // items, and the array is an optional tail_max. 0..max items.
+          let prev = '';
+          for (let k = 1; k <= max; k++) {
+            const tn = `${name}t${k}`;
+            rules.push(k === 1 ? `${tn} ::= ${item}` : `${tn} ::= ${item} ( ws "," ws ${prev} )?`);
+            prev = tn;
+          }
+          rules.push(`${name} ::= "[" ws ( ${prev} )? ws "]"`);
+        }
         return name;
       }
       case 'integer':
