@@ -68,6 +68,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
         "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
         "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
+        "bonsai_4b_1bit",       "bonsai_8b_1bit",
     };
     const std::unordered_set<std::string> v79 = {
         "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
@@ -126,6 +127,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "llama_embed_nemotron_8b",
         "siglip2_base",
         "lama_dilated",
+        "bonsai_4b_1bit",
+        "bonsai_8b_1bit",
     };
     std::unordered_set<std::string> all = v75;
     all.insert(v79.begin(), v79.end());
