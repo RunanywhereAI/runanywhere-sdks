@@ -43,6 +43,11 @@ export interface NativeAddon {
 function resolveAddon(): NativeAddon {
   const candidates = [
     process.env.RUNANYWHERE_NATIVE_PATH,
+    // Packaged prebuild bundled by scripts/bundle-native.js (dist -> pkg root).
+    path.resolve(
+      __dirname, '..', 'prebuilds', `${process.platform}-${process.arch}`,
+      'runanywhere_native.node'
+    ),
     // Local dev build (repo build dir): dist -> electron -> sdk -> repo root.
     path.resolve(
       __dirname, '..', '..', '..', 'build', 'windows-release', 'sdk',
