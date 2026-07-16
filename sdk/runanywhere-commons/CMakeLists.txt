@@ -1060,6 +1060,16 @@ endif()
 # this define, so accidental SDK-side inclusion still triggers the warning.
 target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
 
+# Windows/MSVC: <winnt.h> defines ERROR_SEVERITY_SUCCESS/INFORMATIONAL/WARNING/ERROR
+# and <wingdi.h> defines ERROR as macros that collide with generated protobuf enum
+# values (e.g. runanywhere::ErrorSeverity::ERROR_SEVERITY_WARNING in errors.pb.h).
+# Force-include a compat header that pulls <windows.h> once, then #undefs them; the
+# windows.h include guard keeps them gone for the rest of each TU. No proto drift.
+if(MSVC)
+    target_compile_options(rac_commons PRIVATE
+        "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/win_msvc_compat.h")
+endif()
+
 # Canonical SDK version string (from the VERSION file) injected as a compile
 # define so rac_get_version()/rac_sdk_get_version() return the real release
 # version. Single source of truth: sdk/runanywhere-commons/VERSION -> RAC_VERSION
