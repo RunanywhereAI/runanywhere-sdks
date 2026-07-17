@@ -170,12 +170,8 @@ final class BenchmarkShareViewModel {
             )
             targetURL = URL(string: "instagram-stories://share?source_application=\(bundleID)")
         case .x:
-            guard let encodedCaption = caption.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-                error = .invalidTargetURL(target)
-                return
-            }
             UIPasteboard.general.image = renderedImage
-            targetURL = xURL(encodedCaption: encodedCaption)
+            targetURL = xURL(caption: caption)
         }
 
         guard let targetURL else {
@@ -196,9 +192,15 @@ final class BenchmarkShareViewModel {
         } ? .available : .unavailable
     }
 
-    private func xURL(encodedCaption: String) -> URL? {
-        ["twitter://post?message=\(encodedCaption)", "x://post?message=\(encodedCaption)"]
-            .compactMap(URL.init(string:))
+    private func xURL(caption: String) -> URL? {
+        ["twitter", "x"]
+            .compactMap { scheme -> URL? in
+                var components = URLComponents()
+                components.scheme = scheme
+                components.host = "post"
+                components.queryItems = [URLQueryItem(name: "message", value: caption)]
+                return components.url
+            }
             .first(where: UIApplication.shared.canOpenURL)
     }
 
