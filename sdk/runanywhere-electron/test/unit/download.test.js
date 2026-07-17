@@ -251,6 +251,27 @@ test('resolveModel skips an archive download when the extracted primary already 
   }
 });
 
+test('resolveModel re-extracts an archive when the primary is missing (retry, not skip)', async () => {
+  // The old code skipped whenever the .tar.bz2 existed, even if extraction never
+  // produced the primary — permanently blocking retry. Now a present archive with
+  // a MISSING primary must trigger (re-)extraction. A bogus archive makes the
+  // extraction step run and fail loudly instead of silently returning a broken path.
+  const tempRoot = freshTempRoot();
+  try {
+    const modelDir = path.join(tempRoot, 'whisper-tiny');
+    fs.mkdirSync(modelDir, { recursive: true });
+    fs.writeFileSync(path.join(modelDir, 'whisper.tar.bz2'), 'not a real archive');
+    // primary (sherpa-onnx-whisper-tiny.en) intentionally absent.
+    await assert.rejects(
+      () => download.resolveModel('whisper-tiny', { dir: tempRoot }),
+      /extraction failed/,
+      'a present archive with a missing primary must (re-)extract, not skip'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('resolveModel archive primary resolves under the model dir (piper tts entry)', async () => {
   const tempRoot = freshTempRoot();
   try {
