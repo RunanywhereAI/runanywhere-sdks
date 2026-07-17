@@ -34,8 +34,23 @@ interface ParentPort {
 }
 const parentPort = (process as unknown as { parentPort: ParentPort }).parentPort;
 
+// Route addon methods to the native addon (bound so `this` is the addon), plus
+// a host-owned `downloadModel` that runs in this utility process (keeping the
+// renderer responsive); its onProgress is the injected stream callback.
+const addonMap = addon as unknown as Record<string, (...a: unknown[]) => unknown>;
+const api = new Proxy(addonMap, {
+  get(target, prop: string) {
+    if (prop === 'downloadModel') {
+      return (idOrPath: unknown, onProgress: unknown) =>
+        resolveModel(idOrPath as string, { onProgress: onProgress as (p: unknown) => void });
+    }
+    const value = target[prop];
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+}) as Record<string, (...a: unknown[]) => unknown>;
+
 const deps = {
-  api: addon as unknown as Record<string, (...a: unknown[]) => unknown>,
+  api,
   getVersion: () => addon.version,
   resolveLoadArgs,
 };
