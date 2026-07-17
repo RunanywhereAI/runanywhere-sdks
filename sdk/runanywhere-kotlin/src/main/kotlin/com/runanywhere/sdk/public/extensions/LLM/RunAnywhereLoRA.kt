@@ -93,6 +93,17 @@ interface LoRA {
         )
     }
 
+    /**
+     * Named alias for [apply] on a catalog entry, mirroring Swift
+     * `applyCatalogAdapter(_:localPath:scale:replaceExisting:)`.
+     */
+    suspend fun applyCatalogAdapter(
+        entry: LoraAdapterCatalogEntry,
+        localPath: String? = null,
+        scale: Float? = null,
+        replaceExisting: Boolean = false,
+    ): LoRAApplyResult = apply(entry, localPath, scale, replaceExisting)
+
     /** Remove adapters by generated request semantics, including `clear_all`. */
     suspend fun remove(request: RALoRARemoveRequest): RALoRAState
 

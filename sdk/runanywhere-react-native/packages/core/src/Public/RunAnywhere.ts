@@ -617,39 +617,32 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get device ID from native device state.
-   *
-   * Matches Swift's throwing `RunAnywhere.deviceId` property. RN returns a
-   * Promise because the value lives behind the Nitro async bridge and rejects
-   * if native identity cannot be resolved durably.
-   */
-  async getDeviceId(): Promise<string> {
-    if (!isNativeModuleAvailable()) {
-      throw SDKException.nativeModuleUnavailable();
-    }
-    const native = requireNativeModule();
-    try {
-      const registeredDeviceId = await native.getDeviceId();
-      if (registeredDeviceId) return registeredDeviceId;
-
-      const persistentDeviceId = await native.getPersistentDeviceUUID();
-      if (!persistentDeviceId) {
-        throw SDKException.notInitialized('Persistent device identity');
-      }
-      return persistentDeviceId;
-    } catch (error) {
-      throw await asNativeSDKException(error);
-    }
-  },
-
-  /**
    * Device ID persisted in platform secure storage for the app installation.
    *
-   * RN-only property accessor — matches Swift's throwing device-ID getter,
-   * but returns `Promise<string>` through the Nitro async native bridge.
+   * Mirrors Swift's single throwing `RunAnywhere.deviceId` accessor. RN returns
+   * a `Promise<string>` because the value lives behind the Nitro async bridge
+   * (a synchronous getter is not expressible over it); the promise rejects if
+   * native identity cannot be resolved durably.
    */
   get deviceId(): Promise<string> {
-    return this.getDeviceId();
+    return (async () => {
+      if (!isNativeModuleAvailable()) {
+        throw SDKException.nativeModuleUnavailable();
+      }
+      const native = requireNativeModule();
+      try {
+        const registeredDeviceId = await native.getDeviceId();
+        if (registeredDeviceId) return registeredDeviceId;
+
+        const persistentDeviceId = await native.getPersistentDeviceUUID();
+        if (!persistentDeviceId) {
+          throw SDKException.notInitialized('Persistent device identity');
+        }
+        return persistentDeviceId;
+      } catch (error) {
+        throw await asNativeSDKException(error);
+      }
+    })();
   },
 
   // ============================================================================
@@ -807,7 +800,6 @@ export const RunAnywhere = {
   // ============================================================================
 
   registerModel: ModelManagement.registerModel,
-  registerModelFromUrl: ModelManagement.registerModelFromUrl,
   registerMultiFileModel: ModelManagement.registerMultiFileModel,
   registerArchiveModel: ModelManagement.registerArchiveModel,
   listModels: ModelManagement.listModels,
@@ -842,6 +834,7 @@ export const RunAnywhere = {
   // ============================================================================
 
   subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
+  unsubscribeSDKEvents: SDKEvents.unsubscribeSDKEvents,
   publishSDKEvent: SDKEvents.publishSDKEvent,
   pollSDKEvent: SDKEvents.pollSDKEvent,
   publishSDKFailure: SDKEvents.publishSDKFailure,

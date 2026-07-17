@@ -1879,15 +1879,17 @@ export const RunAnywhere = {
   },
 
   synthesizeStream(
-    handle: Parameters<typeof TTSCapability.synthesizeStream>[0],
-    text: Parameters<typeof TTSCapability.synthesizeStream>[1],
-    options: Parameters<typeof TTSCapability.synthesizeStream>[2],
+    text: Parameters<typeof TTSCapability.synthesizeStreamAuto>[0],
+    options?: Parameters<typeof TTSCapability.synthesizeStreamAuto>[1],
     extra: CancellableCall = {},
-  ): ReturnType<typeof TTSCapability.synthesizeStream> {
+  ): ReturnType<typeof TTSCapability.synthesizeStreamAuto> {
+    // Swift-shaped lifecycle-owned stream: mirrors
+    // `RunAnywhere.synthesizeStream(_:options:)` (no component handle). The
+    // handle-owning form stays on `RunAnywhere.tts.synthesizeStream(handle,...)`.
     throwIfAborted(extra.signal, 'synthesizeStream');
-    const iterable = TTSCapability.synthesizeStream(handle, text, options);
+    const iterable = TTSCapability.synthesizeStreamAuto(text, options);
     if (!extra.signal) return iterable;
-    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stop(handle));
+    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stopLoaded());
     return (async function* () {
       try {
         yield* iterable;

@@ -14,9 +14,10 @@ import SwiftProtobuf
 /// Typed streaming ABI for `rac_rag_query_stream_proto`: takes a session handle
 /// plus a serialized `RAGQueryOptions` and emits serialized `RAGStreamEvent`s
 /// (TOKEN* → terminal COMPLETED/ERROR). The control callback returns
-/// `rac_bool_t` — RAC_FALSE stops generation early (backpressure). RAG has no
-/// separate per-query cancel symbol, so consumer cancellation is cooperative:
-/// the callback returns RAC_FALSE and the native loop breaks on its next tick.
+/// `rac_bool_t` — RAC_FALSE stops generation early (backpressure). Consumers
+/// that break the stream (or cancel the owning task) stop generation
+/// cooperatively via this return; `RAGCancelProtoABI` provides the explicit,
+/// session-scoped imperative cancel used by `RunAnywhere.ragCancelQuery()`.
 private enum RAGStreamProtoABI {
     typealias StreamCallback = @convention(c) (
         UnsafePointer<UInt8>?,
@@ -33,6 +34,18 @@ private enum RAGStreamProtoABI {
 
     static let streamName = "rac_rag_query_stream_proto"
     static let stream = NativeProtoABI.load(streamName, as: Stream.self)
+}
+
+/// Session-scoped cancel ABI for `rac_rag_cancel_proto`: requests cancellation
+/// of the query currently running on a RAG session. The active unary/streaming
+/// run ends with an ERROR event carrying the cancellation status. Loaded
+/// dynamically (RAG is a backend-conditional feature); `nil` when RAG is not
+/// linked, in which case cancellation falls back to the cooperative path.
+private enum RAGCancelProtoABI {
+    typealias Cancel = @convention(c) (rac_handle_t?) -> rac_result_t
+
+    static let cancelName = "rac_rag_cancel_proto"
+    static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
 /// Retained RAG stream context released by the detached worker after the
@@ -74,6 +87,22 @@ extension CppBridge {
                 destroyRAGProtoSessionIfAvailable(protoSession)
                 self.protoSession = nil
                 logger.debug("RAG proto session destroyed")
+            }
+        }
+
+        /// Request cancellation of the query currently running on this session.
+        /// Session-scoped via `rac_rag_cancel_proto`; the active run ends with an
+        /// ERROR event. No-op when no session exists or RAG is not linked (the
+        /// stream's cooperative backpressure path still applies).
+        public func cancelActiveQuery() {
+            guard let protoSession else { return }
+            guard let cancel = RAGCancelProtoABI.cancel else {
+                logger.debug("rac_rag_cancel_proto unavailable; relying on cooperative cancellation")
+                return
+            }
+            let rc = cancel(protoSession)
+            if rc != RAC_SUCCESS {
+                logger.warning("rac_rag_cancel_proto failed: \(rc)")
             }
         }
 

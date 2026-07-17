@@ -24,11 +24,13 @@ function decodeEvent(buffer: ArrayBuffer): SDKEventMessage | null {
 }
 
 /**
- * Subscribe to native SDKEvent proto messages.
+ * Subscribe to native SDKEvent proto messages. Returns the native subscription
+ * id, which is passed to {@link unsubscribeSDKEvents} to stop the stream.
+ * Mirrors Swift `RunAnywhere.subscribeSDKEvents(_:) -> UInt64`.
  */
 export async function subscribeSDKEvents(
   callback: (event: SDKEventMessage) => void
-): Promise<() => Promise<void>> {
+): Promise<number> {
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
@@ -47,9 +49,23 @@ export async function subscribeSDKEvents(
     throw SDKException.generationFailedWith('Native SDKEvent subscription failed');
   }
 
-  return async () => {
-    await native.unsubscribeSDKEventsProto(subscriptionId);
-  };
+  return subscriptionId;
+}
+
+/**
+ * Unsubscribe a previously-registered SDKEvent handler by the subscription id
+ * returned from {@link subscribeSDKEvents}. Mirrors Swift
+ * `RunAnywhere.unsubscribeSDKEvents(_:)`. No-op when native is unavailable.
+ */
+export async function unsubscribeSDKEvents(
+  subscriptionId: number
+): Promise<void> {
+  if (!isNativeModuleAvailable()) {
+    return;
+  }
+
+  const native = requireNativeModule();
+  await native.unsubscribeSDKEventsProto(subscriptionId);
 }
 
 /**

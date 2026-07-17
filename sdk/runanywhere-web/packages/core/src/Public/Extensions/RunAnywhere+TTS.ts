@@ -194,6 +194,25 @@ export const TTS = {
   synthesizeAuto: synthesize,
 
   /**
+   * Streaming synthesis on the lifecycle-loaded TTS model (no component
+   * handle). Handle-less form backing Swift's `RunAnywhere.synthesizeStream(_:
+   * options:)`. The handle-owning form stays on `RunAnywhere.tts.synthesizeStream`.
+   */
+  synthesizeStreamAuto(
+    text: string,
+    options?: Partial<TTSOptions>,
+  ): AsyncIterable<TTSOutput> {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoTTS()) {
+      throw SDKException.backendNotAvailable(
+        'TTS.synthesizeStreamAuto',
+        'No Web WASM backend with rac_tts_*_proto exports is registered.',
+      );
+    }
+    return adapter.synthesizeLifecycleStream(text, defaultTTSOptions(options));
+  },
+
+  /**
    * Returns true when the WASM module is loaded with both the proto-byte
    * TTS exports AND the component lifecycle exports (create / load_voice /
    * destroy).
