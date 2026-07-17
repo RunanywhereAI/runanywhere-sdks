@@ -33,6 +33,7 @@ fun AppNavHost(
     navController: NavHostController,
     chatViewModel: ChatViewModel,
     onOpenModels: () -> Unit,
+    isModelSheetVisible: Boolean,
     onOpenVision: () -> Unit,
     onOpenVoice: () -> Unit,
     onOpenAdvanced: () -> Unit,
@@ -86,7 +87,11 @@ fun AppNavHost(
         composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }
         composable<Benchmarks> {
-            BenchmarkScreen(onOpenDetail = { navController.navigate(BenchmarkDetail(it)) })
+            BenchmarkScreen(
+                onOpenDetail = { navController.navigate(BenchmarkDetail(it)) },
+                onOpenModels = onOpenModels,
+                isModelSheetVisible = isModelSheetVisible,
+            )
         }
         composable<BenchmarkDetail> { entry ->
             BenchmarkDetailScreen(runId = entry.toRoute<BenchmarkDetail>().runId)

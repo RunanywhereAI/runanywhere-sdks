@@ -2095,7 +2095,7 @@ __metadata:
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.20.10"
+    "@runanywhere/core": ">=0.20.11"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2110,7 +2110,7 @@ __metadata:
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.20.10"
+    "@runanywhere/core": ">=0.20.11"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2128,7 +2128,7 @@ __metadata:
     react-native-nitro-modules: ^0.33.9
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.20.10"
+    "@runanywhere/core": ">=0.20.11"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9
@@ -2157,7 +2157,7 @@ __metadata:
     ts-jest: ^29.1.2
     typescript: ^5.9.3
   peerDependencies:
-    "@runanywhere/core": ">=0.20.10"
+    "@runanywhere/core": ">=0.20.11"
     react: ">=19.0.0"
     react-native: ">=0.83.1"
     react-native-nitro-modules: ^0.33.9

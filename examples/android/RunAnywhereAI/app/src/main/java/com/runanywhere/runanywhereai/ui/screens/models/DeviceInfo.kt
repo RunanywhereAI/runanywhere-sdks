@@ -81,6 +81,7 @@ data class DeviceInfo(
         private fun hexagonNameFor(socModel: String): String = when {
             socModel.startsWith("SM8850") -> "Hexagon v81 NPU"
             socModel.startsWith("SM8750") -> "Hexagon v79 NPU"
+            socModel.startsWith("SM8650") -> "Hexagon v75 NPU"
             socModel.startsWith("SM8") -> "Hexagon NPU"
             else -> "Hexagon NPU"
         }

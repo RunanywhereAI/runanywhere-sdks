@@ -103,7 +103,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json',
       category: _language,
-      memoryBytes: 886089241,
+      memoryBytes: 538771163,
       contextLength: 512,
     ),
     QHexRTCatalogModel(
@@ -121,7 +121,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
       category: _language,
-      memoryBytes: 2046527848,
+      memoryBytes: 2046527510,
       contextLength: 1024,
       supportsThinking: true,
     ),
@@ -159,6 +159,7 @@ abstract final class QHexRTModelCatalog {
           'https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json',
       category: _language,
       memoryBytes: 3023821212,
+      contextLength: 512,
     ),
     QHexRTCatalogModel(
       id: 'ternary_bonsai_1_7b',
@@ -170,11 +171,41 @@ abstract final class QHexRTModelCatalog {
       contextLength: 1024,
     ),
     QHexRTCatalogModel(
+      id: 'bonsai_4b_1bit',
+      name: 'Bonsai-4B 1-bit (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json',
+      category: _language,
+      memoryBytes: 1358352318,
+      contextLength: 1024,
+      supportsThinking: true,
+    ),
+    QHexRTCatalogModel(
+      id: 'bonsai_8b_1bit',
+      name: 'Bonsai-8B 1-bit (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json',
+      category: _language,
+      memoryBytes: 2323975102,
+      contextLength: 1024,
+      supportsThinking: true,
+    ),
+    QHexRTCatalogModel(
+      id: 'bonsai_27b_1bit',
+      name: 'Bonsai-27B 1-bit (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/bonsai-27b-1024.json',
+      category: _language,
+      memoryBytes: 6400000000,
+      contextLength: 1024,
+      supportsThinking: true,
+    ),
+    QHexRTCatalogModel(
       id: 'phi_tiny_moe',
       name: 'Phi Tiny MoE (HNPU)',
       url: 'https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json',
       category: _language,
-      memoryBytes: 6100212369,
+      memoryBytes: 4721494520,
     ),
     QHexRTCatalogModel(
       id: 'embeddinggemma_300m',
@@ -196,7 +227,7 @@ abstract final class QHexRTModelCatalog {
       name: 'Gemma 4 E2B (HNPU)',
       url: 'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json',
       category: _language,
-      memoryBytes: 10532159450,
+      memoryBytes: 9252275672,
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e4b',
@@ -282,7 +313,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json',
       category: _language,
-      memoryBytes: 3220397297,
+      memoryBytes: 2364667194,
       contextLength: 512,
     ),
     QHexRTCatalogModel(
@@ -291,7 +322,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json',
       category: _multimodal,
-      memoryBytes: 3220397297,
+      memoryBytes: 3220398168,
       contextLength: 512,
     ),
     QHexRTCatalogModel(
@@ -308,7 +339,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json',
       category: _multimodal,
-      memoryBytes: 10532159450,
+      memoryBytes: 9252275672,
     ),
     QHexRTCatalogModel(
       id: 'gemma4_e4b_vlm',
@@ -461,7 +492,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json',
       category: _tts,
-      memoryBytes: 95842227,
+      memoryBytes: 44135896,
     ),
     QHexRTCatalogModel(
       id: 'kitten_mini_0_8',
@@ -469,7 +500,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
       category: _tts,
-      memoryBytes: 778828575,
+      memoryBytes: 184334815,
     ),
     QHexRTCatalogModel(
       id: 'kitten_micro_0_8',
@@ -477,7 +508,7 @@ abstract final class QHexRTModelCatalog {
       url:
           'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
       category: _tts,
-      memoryBytes: 338682302,
+      memoryBytes: 103930338,
     ),
   ];
 

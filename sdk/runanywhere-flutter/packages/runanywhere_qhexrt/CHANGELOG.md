@@ -5,6 +5,10 @@ All notable changes to the RunAnywhere QHexRT Backend will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.11] - 2026-07-16
+
+- Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.
+
 ## [0.20.10] - 2026-07-13
 
 - CoreML diffusion enablement + macOS backend slice fixes (see SDK release notes).

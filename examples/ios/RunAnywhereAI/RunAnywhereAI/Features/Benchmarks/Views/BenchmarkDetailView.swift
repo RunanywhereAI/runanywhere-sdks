@@ -12,6 +12,7 @@ struct BenchmarkDetailView: View {
     @State private var viewModel = BenchmarkViewModel()
     @State private var jsonURL: URL?
     @State private var csvURL: URL?
+    @State private var showShareCard = false
 
     var body: some View {
         ZStack {
@@ -52,6 +53,13 @@ struct BenchmarkDetailView: View {
 
                 // Copy & Export actions
                 Section("Copy & Export") {
+                    // Branded, shareable result card
+                    Button {
+                        showShareCard = true
+                    } label: {
+                        Label("Share result card", systemImage: "square.and.arrow.up.on.square")
+                    }
+
                     // Copy to clipboard
                     ForEach(BenchmarkExportFormat.allCases) { format in
                         Button {
@@ -132,6 +140,10 @@ struct BenchmarkDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayModeCompat(.inline)
         #endif
+        .sheet(isPresented: $showShareCard) {
+            BenchmarkShareSheet(run: run)
+                .presentationDetents([.large])
+        }
         .task {
             jsonURL = viewModel.shareJSON(run: run)
             csvURL = viewModel.shareCSV(run: run)

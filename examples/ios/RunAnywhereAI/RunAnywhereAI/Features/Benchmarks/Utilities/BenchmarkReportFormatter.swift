@@ -33,6 +33,12 @@ enum BenchmarkExportFormat: String, CaseIterable, Identifiable, Sendable {
 // MARK: - Formatter
 
 enum BenchmarkReportFormatter {
+    /// " (min–max)" suffix for a median value when a variance range is present.
+    private static func rangeSuffix(_ range: MetricRange?, _ format: (Double) -> String) -> String {
+        guard let range else { return "" }
+        return " (\(format(range.min))–\(format(range.max)))"
+    }
+
     // MARK: - Clipboard String (Markdown or JSON)
 
     static func formattedString(run: BenchmarkRun, format: BenchmarkExportFormat) -> String {
@@ -76,16 +82,21 @@ enum BenchmarkReportFormatter {
             lines.append("")
             for result in results {
                 let metrics = result.metrics
+                let variance = result.variance
                 lines.append("### \(result.scenario.name) — \(result.modelInfo.name)")
                 lines.append("- Framework: \(result.modelInfo.framework)")
                 if !metrics.didSucceed {
                     lines.append("- **Error:** \(metrics.errorMessage ?? "Unknown")")
                 } else {
+                    if result.trials > 1 {
+                        lines.append("- Trials: \(result.trials) (median shown)")
+                    }
                     lines.append("- Load: \(String(format: "%.0f", metrics.loadTimeMs))ms")
                     if metrics.warmupTimeMs > 0 {
                         lines.append("- Warmup: \(String(format: "%.0f", metrics.warmupTimeMs))ms")
                     }
-                    lines.append("- End-to-end: \(String(format: "%.0f", metrics.endToEndLatencyMs))ms")
+                    lines.append("- End-to-end: \(String(format: "%.0f", metrics.endToEndLatencyMs))ms"
+                        + rangeSuffix(variance?.endToEndLatencyMs) { String(format: "%.0f", $0) })
                     if let decode = metrics.decodeTokensPerSecond {
                         lines.append("- Decode: \(String(format: "%.1f", decode)) tok/s")
                     }
@@ -93,10 +104,12 @@ enum BenchmarkReportFormatter {
                         lines.append("- Prefill: \(String(format: "%.1f", prefill)) tok/s")
                     }
                     if let tps = metrics.tokensPerSecond {
-                        lines.append("- Tokens/s: \(String(format: "%.1f", tps))")
+                        lines.append("- Tokens/s: \(String(format: "%.1f", tps))"
+                            + rangeSuffix(variance?.tokensPerSecond) { String(format: "%.1f", $0) })
                     }
                     if let ttft = metrics.ttftMs {
-                        lines.append("- TTFT: \(String(format: "%.0f", ttft))ms")
+                        lines.append("- TTFT: \(String(format: "%.0f", ttft))ms"
+                            + rangeSuffix(variance?.ttftMs) { String(format: "%.0f", $0) })
                     }
                     if let inp = metrics.inputTokens { lines.append("- Input tokens: \(inp)") }
                     if let out = metrics.outputTokens { lines.append("- Output tokens: \(out)") }
@@ -155,23 +168,31 @@ enum BenchmarkReportFormatter {
     // MARK: - File Export: CSV
 
     static func writeCSV(run: BenchmarkRun) -> URL {
-        var csv = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,DecodeTPS,PrefillTPS,"
-            + "TPS,TTFT,InTokens,OutTokens,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,"
-            + "GenMs,MemDeltaBytes,Success,Error\n"
+        var csv = "Category,Scenario,Model,Framework,Trials,LoadMs,WarmupMs,E2EMs,E2EMinMs,E2EMaxMs,"
+            + "DecodeTPS,PrefillTPS,TPS,TPSMin,TPSMax,TTFT,TTFTMinMs,TTFTMaxMs,InTokens,OutTokens,"
+            + "RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,GenMs,MemDeltaBytes,Success,Error\n"
         for result in run.results {
             let metrics = result.metrics
+            let variance = result.variance
             var row: [String] = []
             row.append(result.category.displayName)
             row.append(result.scenario.name)
             row.append(result.modelInfo.name)
             row.append(result.modelInfo.framework)
+            row.append(String(result.trials))
             row.append(String(format: "%.0f", metrics.loadTimeMs))
             row.append(String(format: "%.0f", metrics.warmupTimeMs))
             row.append(String(format: "%.0f", metrics.endToEndLatencyMs))
+            row.append(variance?.endToEndLatencyMs.map { String(format: "%.0f", $0.min) } ?? "")
+            row.append(variance?.endToEndLatencyMs.map { String(format: "%.0f", $0.max) } ?? "")
             row.append(metrics.decodeTokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
             row.append(metrics.prefillTokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
             row.append(metrics.tokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
+            row.append(variance?.tokensPerSecond.map { String(format: "%.1f", $0.min) } ?? "")
+            row.append(variance?.tokensPerSecond.map { String(format: "%.1f", $0.max) } ?? "")
             row.append(metrics.ttftMs.map { String(format: "%.0f", $0) } ?? "")
+            row.append(variance?.ttftMs.map { String(format: "%.0f", $0.min) } ?? "")
+            row.append(variance?.ttftMs.map { String(format: "%.0f", $0.max) } ?? "")
             row.append(metrics.inputTokens.map { "\($0)" } ?? "")
             row.append(metrics.outputTokens.map { "\($0)" } ?? "")
             row.append(metrics.realTimeFactor.map { String(format: "%.2f", $0) } ?? "")

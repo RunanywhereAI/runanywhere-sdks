@@ -14,7 +14,7 @@
 # =============================================================================
 
 # Project version (read from VERSION file, but also defined here for scripts)
-PROJECT_VERSION=0.20.10
+PROJECT_VERSION=0.20.11
 
 # =============================================================================
 # Platform Deployment Targets
@@ -42,6 +42,11 @@ XCODE_BUILD=17F113
 # Note: although NDK 28.x and 29.x are published on the SDK repo channel, only
 # the r27 line carries the LTS label, so we hold on the latest r27 patch.
 NDK_VERSION=27.3.13750724
+
+# Android CMake version requested by the React Native Gradle packages. Install
+# this through sdkmanager because Android Gradle Plugin resolves exact SDK CMake
+# packages independently from the host CMake tool used by native CI jobs.
+ANDROID_CMAKE_VERSION=3.30.5
 
 # Emscripten SDK (used by sdk/runanywhere-web/wasm/scripts/build.sh)
 # (2026-07-10 Web release bump): 5.0.6 -> 6.0.2. Keep the setup script and

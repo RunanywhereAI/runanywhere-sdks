@@ -27,8 +27,8 @@ Add both the core SDK and this backend to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.10
-  runanywhere_onnx: ^0.20.10
+  runanywhere: ^0.20.11
+  runanywhere_onnx: ^0.20.11
 ```
 
 Then run:
