@@ -72,6 +72,20 @@ contextBridge.exposeInMainWorld('runanywhere', {
       : send('generate', [handle, prompt, optionsOrOnToken], onToken),
   // Structured output: constrain decoding to JSON matching `schema` and return
   // the parsed object (grammar built here in the preload; streaming accumulated).
+  generateStructured: async (
+    handle: number,
+    prompt: string,
+    schema: JsonSchema,
+    options: Record<string, unknown> = {}
+  ): Promise<unknown> => {
+    const grammar = jsonSchemaToGrammar(schema);
+    let out = '';
+    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
+      out += t;
+    });
+    return parseStructured(out, 'generateStructured');
+  },
+  /** @deprecated Use generateStructured. */
   generateObject: async (
     handle: number,
     prompt: string,
@@ -83,7 +97,7 @@ contextBridge.exposeInMainWorld('runanywhere', {
     await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
       out += t;
     });
-    return parseStructured(out, 'generateObject');
+    return parseStructured(out, 'generateStructured');
   },
   // Tool calling: force a well-formed { name, arguments } call for one of `tools`.
   generateToolCall: async (
