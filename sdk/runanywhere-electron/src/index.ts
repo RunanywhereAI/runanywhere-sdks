@@ -19,6 +19,7 @@ export type {
 } from './RunAnywhere';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
+export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
 export {
   float32ToPcm16,
   pcm16ToFloat32,
