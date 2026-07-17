@@ -133,6 +133,10 @@ contextBridge.exposeInMainWorld('runanywhere', {
   synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
   unloadTTS: (handle: number) => send('unloadTtsVoice', [handle]),
 
+  secureSet: (key: string, value: string) => send('secureSet', [key, value]),
+  secureGet: (key: string) => send('secureGet', [key]),
+  secureDelete: (key: string) => send('secureDelete', [key]),
+
   shutdown: () => send('shutdown', []),
 });
 
