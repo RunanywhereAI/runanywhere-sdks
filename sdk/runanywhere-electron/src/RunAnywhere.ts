@@ -24,6 +24,8 @@ import {
 } from './structured';
 import type { ToolSpec, ToolCall, ToolRun } from './structured';
 import { SDKException } from './errors';
+import { bus } from './events';
+import type { EventBus } from './events';
 
 /** Per-request generation controls (all optional). */
 export interface GenerateOptions {
@@ -45,11 +47,19 @@ export interface GenerateObjectOptions extends GenerateOptions {
 export type { ToolSpec, ToolCall, ToolRun } from './structured';
 export type { LLMStreamEvent, LLMGenerationResult } from './stream';
 
+export type Environment = 'development' | 'staging' | 'production';
+
 export interface InitOptions {
-  /** Directory for the (encrypted, in a future release) secure store. */
+  /** Directory for the DPAPI-encrypted secure store. */
   secureDir?: string;
   /** Base dir for model storage / RunAnywhere home. */
   baseDir?: string;
+  /** API key for the (future) RunAnywhere backend — stored for Phase 2 services. */
+  apiKey?: string;
+  /** Backend base URL — stored for Phase 2 services. */
+  baseURL?: string;
+  /** Deployment environment (default: production). */
+  environment?: Environment;
 }
 
 export interface LoadOptions {
@@ -76,7 +86,14 @@ export class LLMModel {
    * aggregated `result` (text, token count, time-to-first-token, tokens/second).
    */
   generateStream(prompt: string, options: GenerateOptions = {}): AsyncIterableIterator<LLMStreamEvent> {
-    return streamWithMetrics(this.generate(prompt, options));
+    const source = streamWithMetrics(this.generate(prompt, options));
+    return (async function* () {
+      for await (const event of source) {
+        // Emit the completed generation's metrics as a telemetry event.
+        if (event.isFinal && event.result) bus.emit({ type: 'generation', result: event.result });
+        yield event;
+      }
+    })();
   }
   /** Convenience: collect the full completion. */
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
@@ -141,6 +158,7 @@ export class LLMModel {
   }
   unload(): void {
     addon.unloadModel(this.handle);
+    bus.emit({ type: 'modelUnloaded', modality: 'llm' });
   }
 }
 
@@ -160,6 +178,7 @@ export class VLMModel {
   }
   unload(): void {
     addon.unloadVlmModel(this.handle);
+    bus.emit({ type: 'modelUnloaded', modality: 'vlm' });
   }
 }
 
@@ -172,6 +191,7 @@ export class Embedder {
   }
   unload(): void {
     addon.unloadEmbeddingModel(this.handle);
+    bus.emit({ type: 'modelUnloaded', modality: 'embedder' });
   }
 }
 
@@ -184,6 +204,7 @@ export class STTModel {
   }
   unload(): void {
     addon.unloadSttModel(this.handle);
+    bus.emit({ type: 'modelUnloaded', modality: 'stt' });
   }
 }
 
@@ -196,25 +217,71 @@ export class TTSVoice {
   }
   unload(): void {
     addon.unloadTtsVoice(this.handle);
+    bus.emit({ type: 'modelUnloaded', modality: 'tts' });
   }
 }
 
 let initialized = false;
+let servicesReady = false;
+let servicesPromise: Promise<void> | null = null;
+let environment: Environment = 'production';
 
 export const RunAnywhere = {
   /** The bundled commons/runtime version. */
   get version(): string {
     return addon.version;
   },
+  /** True once Phase 1 (synchronous core init) has completed. */
+  get isInitialized(): boolean {
+    return initialized;
+  },
+  /** True once Phase 2 (background services) has completed. */
+  get areServicesReady(): boolean {
+    return servicesReady;
+  },
+  /** The configured deployment environment. */
+  get environment(): Environment {
+    return environment;
+  },
+  /** The lifecycle + telemetry event bus (subscribe with `.on(listener)`). */
+  get events(): EventBus {
+    return bus;
+  },
 
-  /** Bring the runtime up (Win32 platform adapter + engine registration). Idempotent. */
+  /**
+   * Bring the runtime up. Two-phase, mirroring the other SDKs: Phase 1 (this
+   * call) is synchronous — platform adapter + engine registration + secure store
+   * — after which models can load and inference can run. Phase 2 (background
+   * services) is kicked off non-blocking; await `completeServicesInitialization()`
+   * if you need it. Idempotent.
+   */
   initialize(opts: InitOptions = {}): void {
     if (initialized) return;
     const home = path.join(os.homedir(), '.runanywhere');
     const base = opts.baseDir ?? home;
     const secure = opts.secureDir ?? path.join(base, 'secure');
+    environment = opts.environment ?? 'production';
     addon.initialize(secure, base);
     initialized = true;
+    bus.emit({ type: 'initialized' });
+    void this.completeServicesInitialization();
+  },
+
+  /**
+   * Phase 2: bring up background services. Local-only for now (marks services
+   * ready + emits `servicesReady`); this is the seam where real backend auth /
+   * device registration / telemetry upload will attach (using opts.apiKey /
+   * opts.baseURL). Idempotent — concurrent callers share one run.
+   */
+  async completeServicesInitialization(): Promise<void> {
+    if (!initialized) return;
+    if (servicesPromise) return servicesPromise;
+    servicesPromise = (async () => {
+      // TODO(services): backend auth + device registration + telemetry upload.
+      servicesReady = true;
+      bus.emit({ type: 'servicesReady' });
+    })();
+    return servicesPromise;
   },
 
   /** Download a catalog model (or resolve a local path) to concrete file paths. */
@@ -225,7 +292,9 @@ export const RunAnywhere = {
   // load* accept a catalog id (auto-downloaded if missing) OR a local path.
   async loadLLM(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<LLMModel> {
     const m = await resolveModel(idOrPath, opts);
-    return new LLMModel(addon.loadModel(m.primary, opts.id, opts.name));
+    const model = new LLMModel(addon.loadModel(m.primary, opts.id, opts.name));
+    bus.emit({ type: 'modelLoaded', modality: 'llm', id: idOrPath });
+    return model;
   },
   async loadVLM(
     idOrPath: string,
@@ -240,19 +309,27 @@ export const RunAnywhere = {
         message: 'loadVLM needs an mmproj path (or a catalog id that includes one)',
       });
     }
-    return new VLMModel(addon.loadVlmModel(m.primary, mmproj, opts.id, opts.name));
+    const model = new VLMModel(addon.loadVlmModel(m.primary, mmproj, opts.id, opts.name));
+    bus.emit({ type: 'modelLoaded', modality: 'vlm', id: idOrPath });
+    return model;
   },
   async loadEmbedder(idOrPath: string, opts: DownloadOptions = {}): Promise<Embedder> {
     const m = await resolveModel(idOrPath, opts);
-    return new Embedder(addon.loadEmbeddingModel(m.primary));
+    const model = new Embedder(addon.loadEmbeddingModel(m.primary));
+    bus.emit({ type: 'modelLoaded', modality: 'embedder', id: idOrPath });
+    return model;
   },
   async loadSTT(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<STTModel> {
     const m = await resolveModel(idOrPath, opts);
-    return new STTModel(addon.loadSttModel(m.primary, opts.id, opts.name));
+    const model = new STTModel(addon.loadSttModel(m.primary, opts.id, opts.name));
+    bus.emit({ type: 'modelLoaded', modality: 'stt', id: idOrPath });
+    return model;
   },
   async loadTTS(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<TTSVoice> {
     const m = await resolveModel(idOrPath, opts);
-    return new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
+    const voice = new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
+    bus.emit({ type: 'modelLoaded', modality: 'tts', id: idOrPath });
+    return voice;
   },
 
   /** Start a multi-turn chat session over a loaded LLM (keeps history). */
@@ -287,5 +364,8 @@ export const RunAnywhere = {
     if (!initialized) return;
     addon.shutdown();
     initialized = false;
+    servicesReady = false;
+    servicesPromise = null;
+    bus.emit({ type: 'shutdown' });
   },
 };
