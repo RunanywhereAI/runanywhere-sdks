@@ -16,10 +16,15 @@ export type {
   GenerateObjectOptions,
   ToolSpec,
   ToolCall,
+  ToolRun,
+  LLMStreamEvent,
+  LLMGenerationResult,
 } from './RunAnywhere';
+export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException } from './errors';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
+export { streamWithMetrics } from './stream';
 export {
   float32ToPcm16,
   pcm16ToFloat32,
