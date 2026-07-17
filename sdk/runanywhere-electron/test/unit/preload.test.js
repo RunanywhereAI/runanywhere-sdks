@@ -82,7 +82,7 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
     'ready', 'version', 'initialize',
-    'loadLLM', 'generate', 'unloadLLM',
+    'loadLLM', 'generate', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
     'loadSTT', 'transcribe', 'unloadSTT',
@@ -91,6 +91,49 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
   }
+});
+
+test('generateObject builds a grammar, accumulates the stream, and parses JSON', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const schema = { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] };
+  const p = exposed.runanywhere.generateObject(4, 'Where is the Eiffel Tower?', schema);
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.equal(msg.args[0], 4);
+  assert.ok(typeof msg.args[2].grammar === 'string' && msg.args[2].grammar.includes('root ::='),
+    'a grammar was compiled and passed');
+  // Stream the JSON in pieces, then finish.
+  for (const piece of ['{"city":', '"Paris"', '}']) port.onmessage({ data: { id: msg.id, token: piece } });
+  port.onmessage({ data: { id: msg.id, done: true } });
+  assert.deepEqual(await p, { city: 'Paris' });
+});
+
+test('generateToolCall compiles an anyOf grammar and returns the parsed call', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const tools = [
+    { name: 'get_weather', parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] } },
+    { name: 'set_timer', parameters: { type: 'object', properties: { seconds: { type: 'integer' } }, required: ['seconds'] } },
+  ];
+  const p = exposed.runanywhere.generateToolCall(4, 'Weather in Rome?', tools);
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.ok(msg.args[1].includes('Available tools:'), 'the tool list is injected into the prompt');
+  assert.ok(msg.args[2].grammar.includes('get_weather'), 'the grammar names the tools');
+  for (const piece of ['{"name":"get_weather",', '"arguments":{"city":"Rome"}}']) {
+    port.onmessage({ data: { id: msg.id, token: piece } });
+  }
+  port.onmessage({ data: { id: msg.id, done: true } });
+  assert.deepEqual(await p, { name: 'get_weather', arguments: { city: 'Rome' } });
+});
+
+test('generateToolCall rejects an empty tools array', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  connect(state);
+  await assert.rejects(() => exposed.runanywhere.generateToolCall(4, 'hi', []), /at least one tool/);
 });
 
 test('exposes the runanywhereTest hook that forwards over ipc', { skip: SKIP }, () => {
