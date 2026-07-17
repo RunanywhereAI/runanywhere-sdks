@@ -16,5 +16,8 @@ export type RpcMessage =
   | { id: number; ok: true; result?: unknown } // unary reply
   | { id: number; ok: false; error: string }; // failure (unary or stream)
 
-/** Methods whose last logical argument is a per-token callback the host injects. */
-export const STREAMING_METHODS = new Set<string>(['generate', 'generateVlm']);
+/**
+ * Methods whose last logical argument is a per-event callback the host injects:
+ * generate/generateVlm stream tokens; downloadModel streams progress objects.
+ */
+export const STREAMING_METHODS = new Set<string>(['generate', 'generateVlm', 'downloadModel']);
