@@ -32,7 +32,25 @@ function finish(code, msg) {
   app.exit(code);
 }
 
+// Tiny JSON store in userData for conversation history + settings (demo-owned).
+const storePath = (name) => path.join(app.getPath('userData'), name);
+const readJson = (name, fallback) => {
+  try { return JSON.parse(fs.readFileSync(storePath(name), 'utf8')); } catch { return fallback; }
+};
+const writeJson = (name, data) => {
+  try {
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(storePath(name), JSON.stringify(data));
+    return true;
+  } catch { return false; }
+};
+
 app.whenReady().then(() => {
+  ipcMain.handle('demo:conversations:load', () => readJson('conversations.json', []));
+  ipcMain.handle('demo:conversations:save', (_e, data) => writeJson('conversations.json', data));
+  ipcMain.handle('demo:settings:load', () => readJson('settings.json', {}));
+  ipcMain.handle('demo:settings:save', (_e, data) => writeJson('settings.json', data));
+
   const ra = new RunAnywhereMain({
     hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),
     nativePath: process.env.RUNANYWHERE_NATIVE_PATH,
@@ -40,11 +58,11 @@ app.whenReady().then(() => {
   });
 
   const win = new BrowserWindow({
-    width: 900,
-    height: 680,
+    width: 1080,
+    height: 720,
     show: !SELFTEST,
     webPreferences: {
-      preload: path.join(SDK_ROOT, 'dist', 'process', 'preload.js'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
