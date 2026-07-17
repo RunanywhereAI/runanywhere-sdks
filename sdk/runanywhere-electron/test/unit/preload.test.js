@@ -88,6 +88,7 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
     'loadSTT', 'transcribe', 'unloadSTT',
     'loadTTS', 'synthesize', 'unloadTTS',
     'secureSet', 'secureGet', 'secureDelete',
+    'createVad', 'vadProcess', 'vadIsActive', 'vadSetThreshold', 'vadReset', 'unloadVad',
     'shutdown',
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
