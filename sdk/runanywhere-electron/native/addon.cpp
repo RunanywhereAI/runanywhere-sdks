@@ -716,8 +716,73 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+// =============================================================================
+// Secure key-value store (DPAPI-backed on Windows via the platform adapter).
+// Requires initialize() first. Values are encrypted at rest.
+// =============================================================================
+Napi::Value SecureSet(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
+        Napi::TypeError::New(env, "secureSet(key, value) expects strings").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (!g_adapter.secure_set) {
+        Napi::Error::New(env, "secure store unavailable").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string key = info[0].As<Napi::String>().Utf8Value();
+    std::string value = info[1].As<Napi::String>().Utf8Value();
+    rac_result_t rc = g_adapter.secure_set(key.c_str(), value.c_str(), g_adapter.user_data);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "secure_set failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+    }
+    return env.Undefined();
+}
+
+Napi::Value SecureGet(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "secureGet(key) expects a string").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (!g_adapter.secure_get) return env.Null();
+    std::string key = info[0].As<Napi::String>().Utf8Value();
+    char* out = nullptr;
+    rac_result_t rc = g_adapter.secure_get(key.c_str(), &out, g_adapter.user_data);
+    if (rc != RAC_SUCCESS || !out) {
+        if (out) rac_free(out);
+        return env.Null();  // clean miss
+    }
+    std::string val(out);
+    rac_free(out);
+    return Napi::String::New(env, val);
+}
+
+Napi::Value SecureDelete(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    if (info.Length() < 1 || !info[0].IsString()) return env.Undefined();
+    std::string key = info[0].As<Napi::String>().Utf8Value();
+    if (g_adapter.secure_delete) g_adapter.secure_delete(key.c_str(), g_adapter.user_data);
+    return env.Undefined();
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("initialize", Napi::Function::New(env, Initialize));
+    exports.Set("secureSet", Napi::Function::New(env, SecureSet));
+    exports.Set("secureGet", Napi::Function::New(env, SecureGet));
+    exports.Set("secureDelete", Napi::Function::New(env, SecureDelete));
     exports.Set("loadModel", Napi::Function::New(env, LoadModel));
     exports.Set("generate", Napi::Function::New(env, Generate));
     exports.Set("unloadModel", Napi::Function::New(env, UnloadModel));
