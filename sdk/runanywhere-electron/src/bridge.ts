@@ -13,6 +13,9 @@ export { toAsyncIterable } from './stream';
 export interface NativeAddon {
   readonly version: string;
   initialize(secureDir: string, baseDir?: string): void;
+  secureSet(key: string, value: string): void;
+  secureGet(key: string): string | null;
+  secureDelete(key: string): void;
   loadModel(modelPath: string, id?: string, name?: string): number;
   // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
   // detects whether arg 3 is the callback or a generation-options object.
