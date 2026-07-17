@@ -1,0 +1,6 @@
+{
+  "name": "runanywhere-electron-voice",
+  "version": "1.0.0",
+  "description": "RunAnywhere Electron SDK voice demo (mic to STT to LLM to TTS to speaker).",
+  "main": "main.js"
+}
