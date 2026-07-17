@@ -5,6 +5,10 @@
 // callback (contextBridge proxies it back to the page).
 import { contextBridge, ipcRenderer } from 'electron';
 
+import { jsonSchemaToGrammar } from '../grammar';
+import type { JsonSchema } from '../grammar';
+import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
+import type { ToolSpec } from '../structured';
 import type { RpcMessage } from './rpc';
 
 type Pending = {
@@ -66,6 +70,36 @@ contextBridge.exposeInMainWorld('runanywhere', {
     typeof optionsOrOnToken === 'function'
       ? send('generate', [handle, prompt], optionsOrOnToken)
       : send('generate', [handle, prompt, optionsOrOnToken], onToken),
+  // Structured output: constrain decoding to JSON matching `schema` and return
+  // the parsed object (grammar built here in the preload; streaming accumulated).
+  generateObject: async (
+    handle: number,
+    prompt: string,
+    schema: JsonSchema,
+    options: Record<string, unknown> = {}
+  ): Promise<unknown> => {
+    const grammar = jsonSchemaToGrammar(schema);
+    let out = '';
+    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
+      out += t;
+    });
+    return parseStructured(out, 'generateObject');
+  },
+  // Tool calling: force a well-formed { name, arguments } call for one of `tools`.
+  generateToolCall: async (
+    handle: number,
+    prompt: string,
+    tools: ToolSpec[],
+    options: Record<string, unknown> = {}
+  ): Promise<unknown> => {
+    if (!tools || !tools.length) throw new Error('generateToolCall: at least one tool is required');
+    const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
+    let out = '';
+    await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
+      out += t;
+    });
+    return parseStructured(out, 'generateToolCall');
+  },
   unloadLLM: (handle: number) => send('unloadModel', [handle]),
 
   loadVLM: (modelPath: string, mmprojPath: string) => send('loadVlmModel', [modelPath, mmprojPath]),
