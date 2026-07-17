@@ -141,6 +141,33 @@ Renderers that bundle the SDK (webpack/vite) can import the audio helpers:
 import { MicRecorder, SpeakerPlayer } from '@runanywhere/electron/audio';
 ```
 
+## Lifecycle, events, secure store, VAD
+
+```js
+RunAnywhere.initialize({ environment: 'production' }); // Phase 1 (sync)
+await RunAnywhere.completeServicesInitialization();     // Phase 2 (background services)
+RunAnywhere.isInitialized;      // true
+RunAnywhere.areServicesReady;   // true
+
+// Subscribe to lifecycle + telemetry events:
+RunAnywhere.events.on((e) => {
+  if (e.type === 'modelLoaded') console.log('loaded', e.modality, e.id);
+  if (e.type === 'generation') console.log('tok/s', e.result.tokensPerSecond);
+});
+
+// Encrypted key-value store (Windows DPAPI):
+RunAnywhere.secureSet('api-key', 'sk-…');
+RunAnywhere.secureGet('api-key'); // -> 'sk-…' (decrypted); null if absent
+
+// Voice activity detection (built-in energy VAD; no model):
+const vad = RunAnywhere.createVad();
+const speaking = vad.detect(float32Frame); // 16 kHz mono float samples
+vad.close();
+```
+
+Errors are thrown as `SDKException` (`.code` / `.category` / `.recoverySuggestion`),
+uniform across the RunAnywhere SDKs.
+
 ## Model catalog
 
 `loadLLM`/`loadVLM`/`loadEmbedder`/`loadSTT`/`loadTTS` accept a catalog id
