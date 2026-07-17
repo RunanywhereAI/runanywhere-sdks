@@ -6,6 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <wincrypt.h>  // DPAPI: CryptProtectData / CryptUnprotectData (crypt32)
 
 #include <chrono>
 #include <cstdio>
@@ -92,6 +93,11 @@ rac_result_t win_file_delete(const char* path, void*) {
 
 fs::path secure_path(const char* key) { return fs::path(g_secure_dir) / fs::path(key); }
 
+// Secure store backed by Windows DPAPI: values are encrypted with the current
+// user's credentials (CryptProtectData, no UI) before hitting disk and decrypted
+// on read, so a plaintext-file read cannot recover secrets. The description
+// string is bound into the blob; the CRYPTPROTECT_UI_FORBIDDEN flag keeps it
+// headless. Data is only decryptable by the same Windows user on this machine.
 rac_result_t win_secure_get(const char* key, char** out_value, void*) {
     if (!key || !out_value) return RAC_ERROR_INVALID_ARGUMENT;
     *out_value = nullptr;
@@ -107,14 +113,28 @@ rac_result_t win_secure_get(const char* key, char** out_value, void*) {
         fclose(f);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
-    char* buf = static_cast<char*>(rac_alloc(static_cast<size_t>(n) + 1));
+    std::string enc;
+    enc.resize(static_cast<size_t>(n));
+    size_t got = n ? fread(enc.data(), 1, static_cast<size_t>(n), f) : 0;
+    fclose(f);
+    if (got != static_cast<size_t>(n)) return RAC_ERROR_SECURE_STORAGE_FAILED;
+
+    DATA_BLOB in{static_cast<DWORD>(enc.size()), reinterpret_cast<BYTE*>(enc.data())};
+    DATA_BLOB out{0, nullptr};
+    if (!CryptUnprotectData(&in, nullptr, nullptr, nullptr, nullptr,
+                            CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        // Undecryptable (tampered, or a legacy plaintext blob) -> treat as a
+        // clean miss so the caller re-persists a fresh DPAPI-protected value.
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+    char* buf = static_cast<char*>(rac_alloc(static_cast<size_t>(out.cbData) + 1));
     if (!buf) {
-        fclose(f);
+        LocalFree(out.pbData);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    size_t got = fread(buf, 1, static_cast<size_t>(n), f);
-    fclose(f);
-    buf[got] = '\0';
+    std::memcpy(buf, out.pbData, out.cbData);
+    buf[out.cbData] = '\0';
+    LocalFree(out.pbData);
     *out_value = buf;
     return RAC_SUCCESS;
 }
@@ -123,12 +143,24 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
     if (!key || !value) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::create_directories(fs::path(g_secure_dir), ec);
+
+    DATA_BLOB in{static_cast<DWORD>(std::strlen(value)),
+                 reinterpret_cast<BYTE*>(const_cast<char*>(value))};
+    DATA_BLOB out{0, nullptr};
+    if (!CryptProtectData(&in, L"runanywhere-electron", nullptr, nullptr, nullptr,
+                          CRYPTPROTECT_UI_FORBIDDEN, &out)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
     FILE* f = fopen(secure_path(key).string().c_str(), "wb");
-    if (!f) return RAC_ERROR_SECURE_STORAGE_FAILED;
-    size_t len = std::strlen(value);
-    size_t put = len ? fwrite(value, 1, len, f) : 0;
+    if (!f) {
+        LocalFree(out.pbData);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    size_t put = out.cbData ? fwrite(out.pbData, 1, out.cbData, f) : 0;
     fclose(f);
-    return (put == len) ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+    bool ok = (put == out.cbData);
+    LocalFree(out.pbData);
+    return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
 }
 
 rac_result_t win_secure_delete(const char* key, void*) {
