@@ -19,8 +19,19 @@ export type {
   ToolRun,
   LLMStreamEvent,
   LLMGenerationResult,
+  Environment,
 } from './RunAnywhere';
 export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException } from './errors';
+export { EventBus } from './events';
+export type {
+  RunAnywhereEvent,
+  EventListener,
+  Modality,
+  LifecycleEvent,
+  ModelLoadedEvent,
+  ModelUnloadedEvent,
+  GenerationEvent,
+} from './events';
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
