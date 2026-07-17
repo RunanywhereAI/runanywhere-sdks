@@ -7,6 +7,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { addon, toAsyncIterable } from './bridge';
+import { streamWithMetrics } from './stream';
+import type { LLMStreamEvent, LLMGenerationResult } from './stream';
 import { resolveModel } from './download';
 import type { DownloadProgress, ResolvedModel } from './download';
 import { VoiceAgent } from './VoiceAgent';
@@ -20,7 +22,8 @@ import {
   toolCallPrompt,
   parseStructured,
 } from './structured';
-import type { ToolSpec, ToolCall } from './structured';
+import type { ToolSpec, ToolCall, ToolRun } from './structured';
+import { SDKException } from './errors';
 
 /** Per-request generation controls (all optional). */
 export interface GenerateOptions {
@@ -39,7 +42,8 @@ export interface GenerateObjectOptions extends GenerateOptions {
   schema: JsonSchema;
 }
 
-export type { ToolSpec, ToolCall } from './structured';
+export type { ToolSpec, ToolCall, ToolRun } from './structured';
+export type { LLMStreamEvent, LLMGenerationResult } from './stream';
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -66,6 +70,14 @@ export class LLMModel {
   generate(prompt: string, options: GenerateOptions = {}): AsyncIterableIterator<string> {
     return toAsyncIterable((onToken) => addon.generate(this.handle, prompt, options, onToken));
   }
+  /**
+   * Stream generation as events with metrics (mirrors the other SDKs'
+   * `generateStream`): each event carries a `token`; the final event carries the
+   * aggregated `result` (text, token count, time-to-first-token, tokens/second).
+   */
+  generateStream(prompt: string, options: GenerateOptions = {}): AsyncIterableIterator<LLMStreamEvent> {
+    return streamWithMetrics(this.generate(prompt, options));
+  }
   /** Convenience: collect the full completion. */
   async generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
     let out = '';
@@ -75,32 +87,57 @@ export class LLMModel {
   /**
    * Structured output: constrain decoding to JSON matching `schema` (via a GBNF
    * grammar) and return the parsed object. Output is guaranteed parseable.
+   * (House-uniform name; `generateObject` is a deprecated alias.)
    */
-  async generateObject<T = unknown>(prompt: string, options: GenerateObjectOptions): Promise<T> {
+  async generateStructured<T = unknown>(prompt: string, options: GenerateObjectOptions): Promise<T> {
     const { schema, ...rest } = options;
     const grammar = objectGrammar(schema);
     let out = '';
     for await (const t of this.generate(prompt, { ...rest, grammar })) out += t;
-    return parseStructured<T>(out, 'generateObject');
+    return parseStructured<T>(out, 'generateStructured');
+  }
+  /** @deprecated Use {@link generateStructured}. */
+  generateObject<T = unknown>(prompt: string, options: GenerateObjectOptions): Promise<T> {
+    return this.generateStructured<T>(prompt, options);
   }
   /**
-   * Tool calling: force the model to pick one of `tools` and emit a well-formed
-   * call `{ name, arguments }` (grammar-constrained, so the format is guaranteed
-   * — the model only decides *which* tool and *what* arguments). The caller is
-   * responsible for deciding *whether* a tool is needed before calling this.
+   * Tool calling primitive: force the model to pick one of `tools` and emit a
+   * well-formed call `{ name, arguments }` (grammar-constrained). The caller
+   * decides *whether* a tool is needed, and executes the call.
    */
   async generateToolCall(
     prompt: string,
     tools: ToolSpec[],
     options: GenerateOptions = {}
   ): Promise<ToolCall> {
-    if (!tools.length) throw new Error('generateToolCall: at least one tool is required');
+    if (!tools.length) {
+      throw SDKException.validationFailed({ fieldPath: 'tools', message: 'at least one tool is required' });
+    }
     const grammar = objectGrammar(toolCallSchema(tools));
     let out = '';
     for await (const t of this.generate(toolCallPrompt(prompt, tools), { ...options, grammar })) {
       out += t;
     }
     return parseStructured<ToolCall>(out, 'generateToolCall');
+  }
+  /**
+   * Tool calling (house-uniform): pick a tool AND run its `execute` function,
+   * returning `{ name, arguments, result }`. Tools without an `execute` behave
+   * like {@link generateToolCall} (no result). Whether-to-call remains the
+   * caller's decision.
+   */
+  async generateWithTools(
+    prompt: string,
+    tools: ToolSpec[],
+    options: GenerateOptions = {}
+  ): Promise<ToolRun> {
+    const call = await this.generateToolCall(prompt, tools, options);
+    const tool = tools.find((t) => t.name === call.name);
+    if (tool?.execute) {
+      const result = await tool.execute(call.arguments);
+      return { name: call.name, arguments: call.arguments, result };
+    }
+    return { name: call.name, arguments: call.arguments };
   }
   unload(): void {
     addon.unloadModel(this.handle);
@@ -197,7 +234,12 @@ export const RunAnywhere = {
   ): Promise<VLMModel> {
     const m = await resolveModel(idOrPath, opts);
     const mmproj = mmprojPath ?? m.mmproj;
-    if (!mmproj) throw new Error('loadVLM needs an mmproj path (or a catalog id that includes one)');
+    if (!mmproj) {
+      throw SDKException.validationFailed({
+        fieldPath: 'mmproj',
+        message: 'loadVLM needs an mmproj path (or a catalog id that includes one)',
+      });
+    }
     return new VLMModel(addon.loadVlmModel(m.primary, mmproj, opts.id, opts.name));
   },
   async loadEmbedder(idOrPath: string, opts: DownloadOptions = {}): Promise<Embedder> {
