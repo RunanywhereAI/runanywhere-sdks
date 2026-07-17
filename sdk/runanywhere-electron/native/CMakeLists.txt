@@ -23,7 +23,7 @@ if(RAC_BUILD_ELECTRON_HARNESS)
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include)
     target_compile_features(electron_m0_harness PRIVATE cxx_std_20)
-    target_link_libraries(electron_m0_harness PRIVATE rac_commons rac_backend_llamacpp)
+    target_link_libraries(electron_m0_harness PRIVATE rac_commons rac_backend_llamacpp Crypt32)
     if(MSVC)
         target_link_directories(electron_m0_harness PRIVATE "${_ra_bundled_dir}")
         target_compile_definitions(electron_m0_harness PRIVATE
@@ -73,7 +73,7 @@ if(RAC_BUILD_ELECTRON_ADDON)
         NAPI_VERSION=8 NODE_ADDON_API_DISABLE_DEPRECATED BUILDING_NODE_EXTENSION)
     target_compile_features(runanywhere_native PRIVATE cxx_std_20)
     target_link_libraries(runanywhere_native PRIVATE
-        rac_commons rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa "${RAC_NODE_LIB}")
+        rac_commons rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa Crypt32 "${RAC_NODE_LIB}")
 
     if(MSVC)
         target_link_directories(runanywhere_native PRIVATE "${_ra_bundled_dir}")
