@@ -1,20 +1,30 @@
 // preload.ts — runs in the RENDERER's isolated preload context. Receives the
 // MessagePort brokered by RunAnywhereMain, speaks the RPC protocol to the utility
-// host, and exposes a safe `window.runanywhere` API via contextBridge (no Node,
-// no direct port access leaks into the page). Streaming methods take an onToken
-// callback (contextBridge proxies it back to the page).
+// host, and exposes a safe `window.runanywhere` API via contextBridge (no direct
+// port access leaks into the page). Streaming methods take a callback that
+// contextBridge proxies back to the page. Runs with sandbox:false (it requires
+// SDK modules); a local event bus mirrors the facade's lifecycle/telemetry events
+// so a renderer can subscribe without the Node facade.
 import { contextBridge, ipcRenderer } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
+import { toAsyncIterable, streamWithMetrics } from '../stream';
+import type { LLMStreamEvent } from '../stream';
+import { bus } from '../events';
+import type { EventListener, Modality } from '../events';
+import { CATALOG } from '../catalog';
+import { modelsRoot } from '../download';
 import type { RpcMessage } from './rpc';
 
 type Pending = {
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
-  onToken?: (t: string) => void;
+  onToken?: (t: unknown) => void;
 };
 
 let port: MessagePort | null = null;
@@ -44,7 +54,7 @@ ipcRenderer.on('runanywhere-port', (event) => {
   markReady();
 });
 
-function send(method: string, args: unknown[], onToken?: (t: string) => void): Promise<unknown> {
+function send(method: string, args: unknown[], onToken?: (t: unknown) => void): Promise<unknown> {
   return ready.then(
     () =>
       new Promise((resolve, reject) => {
@@ -55,12 +65,67 @@ function send(method: string, args: unknown[], onToken?: (t: string) => void): P
   );
 }
 
+// Emit a lifecycle event after `p` resolves (fire-and-forget), then pass through.
+function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
+  return p.then((v) => {
+    event();
+    return v;
+  });
+}
+
+// Recursively sum file sizes under a directory (best-effort, bounded depth).
+function dirSize(dir: string, depth = 0): number {
+  if (depth > 4) return 0;
+  let total = 0;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
+      try {
+        const st = fs.statSync(p);
+        total += st.isDirectory() ? dirSize(p, depth + 1) : st.size;
+      } catch {
+        /* ignore unreadable entries */
+      }
+    }
+  } catch {
+    /* ignore missing dir */
+  }
+  return total;
+}
+
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
-  initialize: (secureDir?: string, baseDir?: string) => send('initialize', [secureDir, baseDir]),
+  initialize: (secureDir?: string, baseDir?: string) =>
+    emitAfter(send('initialize', [secureDir, baseDir]), () => bus.emit({ type: 'initialized' })),
 
-  loadLLM: (modelPath: string) => send('loadModel', [modelPath]),
+  // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
+  onEvent: (listener: EventListener) => bus.on(listener),
+
+  // ---- model catalog + storage (fs reads in the preload) ----
+  catalog: () => CATALOG,
+  modelStatus: () => {
+    const root = modelsRoot();
+    const out: Record<string, { downloaded: boolean; sizeBytes: number }> = {};
+    for (const [id, entry] of Object.entries(CATALOG)) {
+      const dir = path.join(root, id);
+      let downloaded = false;
+      try {
+        downloaded = fs.existsSync(path.join(dir, entry.primary));
+      } catch {
+        downloaded = false;
+      }
+      out[id] = { downloaded, sizeBytes: dirSize(dir) };
+    }
+    return out;
+  },
+  // Download a catalog model (runs in the utility host so the renderer stays
+  // responsive); onProgress receives { file, received, total, percent }.
+  downloadModel: (idOrPath: string, onProgress?: (p: unknown) => void) =>
+    send('downloadModel', [idOrPath], onProgress),
+
+  loadLLM: (modelPath: string) =>
+    emitAfter(send('loadModel', [modelPath]), () => bus.emit({ type: 'modelLoaded', modality: 'llm', id: modelPath })),
   generate: (
     handle: number,
     prompt: string,
@@ -68,10 +133,24 @@ contextBridge.exposeInMainWorld('runanywhere', {
     onToken?: (t: string) => void
   ) =>
     typeof optionsOrOnToken === 'function'
-      ? send('generate', [handle, prompt], optionsOrOnToken)
-      : send('generate', [handle, prompt, optionsOrOnToken], onToken),
-  // Structured output: constrain decoding to JSON matching `schema` and return
-  // the parsed object (grammar built here in the preload; streaming accumulated).
+      ? send('generate', [handle, prompt], optionsOrOnToken as (t: unknown) => void)
+      : send('generate', [handle, prompt, optionsOrOnToken], onToken as (t: unknown) => void),
+  // Stream generation as events with metrics (token per event; final event
+  // carries the aggregated result and fires a 'generation' telemetry event).
+  generateStream: async (
+    handle: number,
+    prompt: string,
+    options: Record<string, unknown>,
+    onEvent: (e: LLMStreamEvent) => void
+  ): Promise<void> => {
+    const source = toAsyncIterable((onToken) =>
+      send('generate', [handle, prompt, options], onToken as (t: unknown) => void) as Promise<void>
+    );
+    for await (const event of streamWithMetrics(source)) {
+      if (event.isFinal && event.result) bus.emit({ type: 'generation', result: event.result });
+      onEvent(event);
+    }
+  },
   generateStructured: async (
     handle: number,
     prompt: string,
@@ -81,7 +160,7 @@ contextBridge.exposeInMainWorld('runanywhere', {
     const grammar = jsonSchemaToGrammar(schema);
     let out = '';
     await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
-      out += t;
+      out += t as string;
     });
     return parseStructured(out, 'generateStructured');
   },
@@ -95,11 +174,10 @@ contextBridge.exposeInMainWorld('runanywhere', {
     const grammar = jsonSchemaToGrammar(schema);
     let out = '';
     await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
-      out += t;
+      out += t as string;
     });
     return parseStructured(out, 'generateStructured');
   },
-  // Tool calling: force a well-formed { name, arguments } call for one of `tools`.
   generateToolCall: async (
     handle: number,
     prompt: string,
@@ -110,28 +188,37 @@ contextBridge.exposeInMainWorld('runanywhere', {
     const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
     let out = '';
     await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
-      out += t;
+      out += t as string;
     });
     return parseStructured(out, 'generateToolCall');
   },
-  unloadLLM: (handle: number) => send('unloadModel', [handle]),
+  unloadLLM: (handle: number) =>
+    emitAfter(send('unloadModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'llm' })),
 
-  loadVLM: (modelPath: string, mmprojPath: string) => send('loadVlmModel', [modelPath, mmprojPath]),
+  loadVLM: (modelPath: string, mmprojPath: string) =>
+    emitAfter(send('loadVlmModel', [modelPath, mmprojPath]), () => bus.emit({ type: 'modelLoaded', modality: 'vlm', id: modelPath })),
   generateVlm: (handle: number, imagePath: string, prompt: string, onToken: (t: string) => void) =>
-    send('generateVlm', [handle, imagePath, prompt], onToken),
-  unloadVLM: (handle: number) => send('unloadVlmModel', [handle]),
+    send('generateVlm', [handle, imagePath, prompt], onToken as (t: unknown) => void),
+  unloadVLM: (handle: number) =>
+    emitAfter(send('unloadVlmModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'vlm' })),
 
-  loadEmbedder: (modelPath: string) => send('loadEmbeddingModel', [modelPath]),
+  loadEmbedder: (modelPath: string) =>
+    emitAfter(send('loadEmbeddingModel', [modelPath]), () => bus.emit({ type: 'modelLoaded', modality: 'embedder', id: modelPath })),
   embed: (handle: number, text: string) => send('embed', [handle, text]),
-  unloadEmbedder: (handle: number) => send('unloadEmbeddingModel', [handle]),
+  unloadEmbedder: (handle: number) =>
+    emitAfter(send('unloadEmbeddingModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'embedder' })),
 
-  loadSTT: (modelDir: string) => send('loadSttModel', [modelDir]),
+  loadSTT: (modelDir: string) =>
+    emitAfter(send('loadSttModel', [modelDir]), () => bus.emit({ type: 'modelLoaded', modality: 'stt', id: modelDir })),
   transcribe: (handle: number, pcm16: Uint8Array) => send('transcribe', [handle, pcm16]),
-  unloadSTT: (handle: number) => send('unloadSttModel', [handle]),
+  unloadSTT: (handle: number) =>
+    emitAfter(send('unloadSttModel', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'stt' })),
 
-  loadTTS: (voiceDir: string) => send('loadTtsVoice', [voiceDir]),
+  loadTTS: (voiceDir: string) =>
+    emitAfter(send('loadTtsVoice', [voiceDir]), () => bus.emit({ type: 'modelLoaded', modality: 'tts', id: voiceDir })),
   synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
-  unloadTTS: (handle: number) => send('unloadTtsVoice', [handle]),
+  unloadTTS: (handle: number) =>
+    emitAfter(send('unloadTtsVoice', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'tts' as Modality })),
 
   secureSet: (key: string, value: string) => send('secureSet', [key, value]),
   secureGet: (key: string) => send('secureGet', [key]),
