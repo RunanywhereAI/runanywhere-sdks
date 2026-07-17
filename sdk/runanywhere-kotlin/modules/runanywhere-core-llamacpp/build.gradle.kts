@@ -106,7 +106,10 @@ android {
 
     sourceSets {
         getByName("main").resources.srcDir(
-            layout.buildDirectory.dir("generated/runanywhere-license").get().asFile,
+            layout.buildDirectory
+                .dir("generated/runanywhere-license")
+                .get()
+                .asFile,
         )
     }
 
