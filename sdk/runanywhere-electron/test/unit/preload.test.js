@@ -82,7 +82,7 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
     'ready', 'version', 'initialize',
-    'loadLLM', 'generate', 'generateObject', 'generateToolCall', 'unloadLLM',
+    'loadLLM', 'generate', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
     'loadSTT', 'transcribe', 'unloadSTT',
@@ -105,6 +105,20 @@ test('generateObject builds a grammar, accumulates the stream, and parses JSON',
   assert.ok(typeof msg.args[2].grammar === 'string' && msg.args[2].grammar.includes('root ::='),
     'a grammar was compiled and passed');
   // Stream the JSON in pieces, then finish.
+  for (const piece of ['{"city":', '"Paris"', '}']) port.onmessage({ data: { id: msg.id, token: piece } });
+  port.onmessage({ data: { id: msg.id, done: true } });
+  assert.deepEqual(await p, { city: 'Paris' });
+});
+
+test('generateStructured (house-uniform name) builds a grammar and parses JSON', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const schema = { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] };
+  const p = exposed.runanywhere.generateStructured(4, 'Where is the Eiffel Tower?', schema);
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.ok(msg.args[2].grammar.includes('root ::='));
   for (const piece of ['{"city":', '"Paris"', '}']) port.onmessage({ data: { id: msg.id, token: piece } });
   port.onmessage({ data: { id: msg.id, done: true } });
   assert.deepEqual(await p, { city: 'Paris' });
