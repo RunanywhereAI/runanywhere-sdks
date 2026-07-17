@@ -137,6 +137,13 @@ contextBridge.exposeInMainWorld('runanywhere', {
   secureGet: (key: string) => send('secureGet', [key]),
   secureDelete: (key: string) => send('secureDelete', [key]),
 
+  createVad: (threshold?: number) => send('createVad', [threshold]),
+  vadProcess: (handle: number, samples: Float32Array) => send('vadProcess', [handle, samples]),
+  vadIsActive: (handle: number) => send('vadIsActive', [handle]),
+  vadSetThreshold: (handle: number, threshold: number) => send('vadSetThreshold', [handle, threshold]),
+  vadReset: (handle: number) => send('vadReset', [handle]),
+  unloadVad: (handle: number) => send('unloadVad', [handle]),
+
   shutdown: () => send('shutdown', []),
 });
 
