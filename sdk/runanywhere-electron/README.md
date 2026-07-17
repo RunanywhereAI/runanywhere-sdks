@@ -45,7 +45,7 @@ Decoding is constrained by a GBNF grammar compiled from your schema, so the
 result always parses:
 
 ```js
-const person = await llm.generateObject(
+const person = await llm.generateStructured(
   'Extract the person: "Ada Lovelace, 36, English mathematician."',
   {
     schema: {
@@ -62,10 +62,15 @@ const person = await llm.generateObject(
 // { name: 'Ada Lovelace', age: 36, interests: [...] }
 ```
 
+`generateStream(prompt, options?)` streams `LLMStreamEvent`s — a `token` per event
+and a final event carrying `result` (text, token count, time-to-first-token,
+tokens/second), matching the other SDKs. Errors are thrown as `SDKException`
+(`.code` / `.category` / `.recoverySuggestion`), uniform across platforms.
+
 ### Tool calling
 
 ```js
-const call = await llm.generateToolCall('Weather in Tokyo in celsius?', [
+const tools = [
   {
     name: 'get_weather',
     description: 'Current weather for a city',
@@ -74,9 +79,17 @@ const call = await llm.generateToolCall('Weather in Tokyo in celsius?', [
       properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } },
       required: ['city', 'unit'],
     },
+    execute: ({ city, unit }) => fetchWeather(city, unit), // optional
   },
-]);
+];
+
+// Pick a tool (the primitive):
+const call = await llm.generateToolCall('Weather in Tokyo in celsius?', tools);
 // { name: 'get_weather', arguments: { city: 'Tokyo', unit: 'celsius' } }
+
+// Pick AND run its executor (house-uniform):
+const run = await llm.generateWithTools('Weather in Tokyo in celsius?', tools);
+// { name: 'get_weather', arguments: { ... }, result: <fetchWeather return> }
 ```
 
 The grammar guarantees the *format* and a valid tool *name*; your prompt drives
