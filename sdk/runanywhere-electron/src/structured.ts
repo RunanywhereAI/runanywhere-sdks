@@ -3,6 +3,7 @@
 // build the same grammars/prompts and parse the same way (no duplication).
 import { jsonSchemaToGrammar } from './grammar';
 import type { JsonSchema } from './grammar';
+import { SDKException } from './errors';
 
 /** A tool the model may be asked to call. */
 export interface ToolSpec {
@@ -10,12 +11,22 @@ export interface ToolSpec {
   description?: string;
   /** JSON-schema (object) describing the call arguments. */
   parameters: JsonSchema;
+  /** Optional executor — when present, generateWithTools runs it on the chosen call. */
+  execute?: (args: Record<string, unknown>) => unknown | Promise<unknown>;
 }
 
 /** A parsed tool call chosen by the model. */
 export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
+}
+
+/** The outcome of generateWithTools: the chosen call plus its executor result. */
+export interface ToolRun {
+  name: string;
+  arguments: Record<string, unknown>;
+  /** Present when the chosen tool had an `execute` function. */
+  result?: unknown;
 }
 
 /** GBNF grammar constraining output to JSON matching `schema`. */
@@ -48,6 +59,6 @@ export function parseStructured<T>(text: string, what: string): T {
   try {
     return JSON.parse(trimmed) as T;
   } catch {
-    throw new Error(`${what}: model did not return valid JSON: ${trimmed}`);
+    throw SDKException.generationFailed(`${what}: model did not return valid JSON: ${trimmed}`);
   }
 }
