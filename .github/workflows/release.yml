@@ -279,14 +279,13 @@ jobs:
           NOTARY_KEY_BASE64: ${{ secrets.RCLI_NOTARY_API_KEY_P8_BASE64 }}
           NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.RCLI_NOTARY_APPLE_ID }}
+          NOTARY_APP_PASSWORD: ${{ secrets.RCLI_NOTARY_APP_SPECIFIC_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.RCLI_NOTARY_TEAM_ID }}
         run: |
           set -euo pipefail
-          for variable in \
-            CERTIFICATE_BASE64 \
-            CERTIFICATE_PASSWORD \
-            NOTARY_KEY_BASE64 \
-            NOTARY_KEY_ID \
-            NOTARY_ISSUER_ID; do
+          set +x
+          for variable in CERTIFICATE_BASE64 CERTIFICATE_PASSWORD; do
             [ -n "${!variable:-}" ] || {
               echo "::error::Required rcli signing secret is not configured: $variable"
               exit 1
@@ -295,12 +294,51 @@ jobs:
 
           KEYCHAIN="$RUNNER_TEMP/rcli-signing.keychain-db"
           CERTIFICATE="$RUNNER_TEMP/rcli-developer-id.p12"
-          NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          NOTARY_KEY=""
+          NOTARY_PROFILE=""
+          NOTARY_MODE=""
+
+          api_key_complete=1
+          for variable in NOTARY_KEY_BASE64 NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+            [ -n "${!variable:-}" ] || api_key_complete=0
+          done
+          apple_id_complete=1
+          for variable in NOTARY_APPLE_ID NOTARY_APP_PASSWORD NOTARY_TEAM_ID; do
+            [ -n "${!variable:-}" ] || apple_id_complete=0
+          done
+
+          if [ "$api_key_complete" -eq 1 ]; then
+            # Preserve the existing App Store Connect API-key authentication
+            # path as the preferred release mode when all three values exist.
+            NOTARY_MODE="api-key"
+            NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          elif [ "$apple_id_complete" -eq 1 ]; then
+            # Fallback for teams that already notarize with an Apple ID and an
+            # app-specific password. The run-scoped name and explicit keychain
+            # prevent accidental selection of a profile from the login keychain.
+            NOTARY_MODE="apple-id"
+            NOTARY_PROFILE="rcli-notary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          else
+            echo "::error::Configure either the complete rcli App Store Connect API-key secret set or the complete Apple ID/app-specific-password secret set."
+            exit 1
+          fi
+
+          cleanup_failed_setup() {
+            status=$?
+            trap - ERR
+            security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
+            rm -f "$CERTIFICATE" "$NOTARY_KEY"
+            exit "$status"
+          }
+          trap cleanup_failed_setup ERR
 
           printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE"
-          printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$NOTARY_KEY"
-          chmod 600 "$CERTIFICATE" "$NOTARY_KEY"
+          chmod 600 "$CERTIFICATE"
+          if [ "$NOTARY_MODE" = "api-key" ]; then
+            printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$NOTARY_KEY"
+            chmod 600 "$NOTARY_KEY"
+          fi
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
@@ -323,12 +361,25 @@ jobs:
             echo "::error::The imported certificate is not a Developer ID Application identity"
             exit 1
           }
+
+          if [ "$NOTARY_MODE" = "apple-id" ]; then
+            xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+              --apple-id "$NOTARY_APPLE_ID" \
+              --password "$NOTARY_APP_PASSWORD" \
+              --team-id "$NOTARY_TEAM_ID" \
+              --keychain "$KEYCHAIN" \
+              --validate >/dev/null
+          fi
+
           {
             echo "identity=$IDENTITY"
             echo "keychain=$KEYCHAIN"
             echo "certificate=$CERTIFICATE"
+            echo "notary-mode=$NOTARY_MODE"
             echo "notary-key=$NOTARY_KEY"
+            echo "notary-profile=$NOTARY_PROFILE"
           } >> "$GITHUB_OUTPUT"
+          trap - ERR
       - name: Package, sign, notarize, and staple rcli
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
@@ -337,6 +388,8 @@ jobs:
           RCLI_CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
           RCLI_CODESIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
           RCLI_MACOS_NOTARIZE: 1
+          RCLI_NOTARYTOOL_PROFILE: ${{ steps.signing.outputs.notary-profile }}
+          RCLI_NOTARYTOOL_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
           RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
           RCLI_NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
           RCLI_NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}

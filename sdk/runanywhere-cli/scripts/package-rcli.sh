@@ -16,8 +16,10 @@
 #
 # Developer ID distribution is opt-in so pull-request smoke packaging remains
 # credential-free. Set RCLI_CODESIGN_IDENTITY plus either a notarytool keychain
-# profile or App Store Connect API-key inputs, and RCLI_MACOS_NOTARIZE=1. The
-# notarized, stapled DMG is emitted alongside the Homebrew-compatible tarball.
+# profile (and RCLI_NOTARYTOOL_KEYCHAIN when the profile is in a non-default
+# keychain) or App Store Connect API-key inputs, and RCLI_MACOS_NOTARIZE=1.
+# The notarized, stapled DMG is emitted alongside the Homebrew-compatible
+# tarball.
 #
 #   platform-tag: macos-arm64 | linux-x86_64
 #   version:      $RAC_RELEASE_VERSION, else sdk/runanywhere-commons/VERSION
@@ -388,6 +390,13 @@ if [[ "${PLATFORM}" == macos-* && "${MACOS_NOTARIZE}" == "1" ]]; then
     notary_args=()
     if [ -n "${RCLI_NOTARYTOOL_PROFILE:-}" ]; then
         notary_args+=(--keychain-profile "${RCLI_NOTARYTOOL_PROFILE}")
+        if [ -n "${RCLI_NOTARYTOOL_KEYCHAIN:-}" ]; then
+            [ -f "${RCLI_NOTARYTOOL_KEYCHAIN}" ] || {
+                echo "ERROR: RCLI_NOTARYTOOL_KEYCHAIN does not exist" >&2
+                exit 1
+            }
+            notary_args+=(--keychain "${RCLI_NOTARYTOOL_KEYCHAIN}")
+        fi
     elif [ -n "${RCLI_NOTARY_KEY_PATH:-}" ] \
         && [ -n "${RCLI_NOTARY_KEY_ID:-}" ] \
         && [ -n "${RCLI_NOTARY_ISSUER_ID:-}" ]; then

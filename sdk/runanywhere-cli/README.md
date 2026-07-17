@@ -165,21 +165,38 @@ ephemeral keychain, signs the executable and compatibility libraries with the
 hardened runtime and secure timestamp, notarizes a DMG, staples and validates
 its ticket, then deletes the temporary keychain and credential files.
 
-The repository stores no signing material. Configure these GitHub Actions
-secrets before creating a release tag:
+The repository stores no signing material. Configure the Developer ID secrets
+and one complete notarization credential set before creating a release tag:
 
 - `RCLI_DEVELOPER_ID_CERT_P12_BASE64`
 - `RCLI_DEVELOPER_ID_CERT_PASSWORD`
+
+Preferred App Store Connect API-key notarization:
+
 - `RCLI_NOTARY_API_KEY_P8_BASE64`
 - `RCLI_NOTARY_KEY_ID`
 - `RCLI_NOTARY_ISSUER_ID`
 
+Apple ID fallback notarization:
+
+- `RCLI_NOTARY_APPLE_ID`
+- `RCLI_NOTARY_APP_SPECIFIC_PASSWORD`
+- `RCLI_NOTARY_TEAM_ID`
+
+When both notarization sets are complete, the workflow uses the App Store
+Connect API key. The Apple ID fallback stores its run-scoped notarytool profile
+only in the same ephemeral keychain as the imported Developer ID identity,
+passes that keychain explicitly during submission, and deletes it after the
+package step.
+
 For a local or external release runner, `scripts/package-rcli.sh` accepts an
 already-available identity through `RCLI_CODESIGN_IDENTITY` (and optionally
 `RCLI_CODESIGN_KEYCHAIN`). Set `RCLI_MACOS_NOTARIZE=1` and authenticate
-notarytool either with `RCLI_NOTARYTOOL_PROFILE` or the API-key path, key ID,
-and issuer ID variables documented at the top of that script. The normal
-credential-free packaging path remains ad-hoc signed for pull-request smoke.
+notarytool either with `RCLI_NOTARYTOOL_PROFILE` (plus
+`RCLI_NOTARYTOOL_KEYCHAIN` for a profile in a non-default keychain) or the
+API-key path, key ID, and issuer ID variables documented at the top of that
+script. The normal credential-free packaging path remains ad-hoc signed for
+pull-request smoke.
 
 ## Architecture
 
