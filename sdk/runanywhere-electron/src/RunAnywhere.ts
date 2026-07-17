@@ -221,6 +221,39 @@ export class TTSVoice {
   }
 }
 
+export interface VadOptions {
+  /** Energy threshold in [0,1] for the built-in energy VAD (default ~0.015). */
+  threshold?: number;
+}
+
+/**
+ * Voice activity detector (built-in energy VAD; no model needed). Feed 16 kHz
+ * mono float samples frame-by-frame to segment speech before STT.
+ */
+export class Vad {
+  constructor(private readonly handle: number) {}
+  /** True if this frame of float samples contains speech. */
+  detect(samples: Float32Array): boolean {
+    return addon.vadProcess(this.handle, samples);
+  }
+  /** True if speech is currently active (debounced across frames). */
+  isSpeechActive(): boolean {
+    return addon.vadIsActive(this.handle);
+  }
+  /** Adjust the energy threshold. */
+  setThreshold(threshold: number): void {
+    addon.vadSetThreshold(this.handle, threshold);
+  }
+  /** Reset detector state (e.g. between utterances). */
+  reset(): void {
+    addon.vadReset(this.handle);
+  }
+  /** Release the detector. */
+  close(): void {
+    addon.unloadVad(this.handle);
+  }
+}
+
 let initialized = false;
 let servicesReady = false;
 let servicesPromise: Promise<void> | null = null;
@@ -340,6 +373,11 @@ export const RunAnywhere = {
   /** Compose loaded STT + LLM + TTS models into a voice turn pipeline. */
   createVoiceAgent(models: VoiceAgentModels, opts?: VoiceAgentOptions): VoiceAgent {
     return new VoiceAgent(models, opts);
+  },
+
+  /** Create a voice activity detector (built-in energy VAD; requires initialize()). */
+  createVad(opts: VadOptions = {}): Vad {
+    return new Vad(addon.createVad(opts.threshold));
   },
 
   /**
