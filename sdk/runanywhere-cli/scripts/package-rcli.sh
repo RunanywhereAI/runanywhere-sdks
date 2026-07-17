@@ -195,10 +195,13 @@ if [[ "${PLATFORM}" == macos-* && "${MACOS_FULL_RELEASE}" == "1" ]]; then
     # Copy any Swift compatibility runtime required by the deployment target.
     # Current macOS provides the standard Swift runtime; this normally stages
     # only compatibility shims such as libswiftCompatibilitySpan.dylib.
+    # Xcode 26.6's swift-stdlib-tool resolves --unsigned-destination to `/`
+    # for this standalone executable layout. --destination preserves the
+    # requested directory; every copied dylib is signed explicitly below.
     xcrun swift-stdlib-tool --copy \
         --scan-executable "${STAGE}/bin/rcli" \
         --platform macosx \
-        --unsigned-destination "${STAGE}/lib"
+        --destination "${STAGE}/lib"
 fi
 
 # ----------------------------------------------------------------------------
