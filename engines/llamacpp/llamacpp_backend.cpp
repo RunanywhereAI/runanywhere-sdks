@@ -822,17 +822,14 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     int prompt_tokens = 0;
 
     auto start_time = std::chrono::high_resolution_clock::now();
-    auto first_token_time = start_time;
-    bool first_token_seen = false;
+    // Cleared here too (run_decode_loop also resets it) so a bail-out before the
+    // decode loop can't leave a stale capture from a previous generation.
+    first_token_captured_ = false;
 
     RAC_LOG_INFO("LLM.LlamaCpp", "generate(): calling generate_stream...");
     bool success = generate_stream(
         request,
         [&](const std::string& token) -> bool {
-            if (!first_token_seen) {
-                first_token_seen = true;
-                first_token_time = std::chrono::high_resolution_clock::now();
-            }
             generated_text += token;
             tokens_generated++;
             return !cancel_requested_.load();
@@ -845,10 +842,14 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     using fms = std::chrono::duration<double, std::milli>;
     const double total_ms = fms(end_time - start_time).count();
     // Prefill (prompt-eval) time is approximated by the time to the first
-    // produced token; the decode phase is everything after. Falling back to the
-    // full duration keeps decode throughput finite when no token was produced.
-    const double ttft_ms = first_token_seen ? fms(first_token_time - start_time).count() : 0.0;
-    const double decode_ms = first_token_seen ? fms(end_time - first_token_time).count() : total_ms;
+    // produced token; the decode phase is everything after. first_token_time_ is
+    // captured inside run_decode_loop at the actual first token (the stream
+    // callback is buffered and fires late). Falling back to the full duration
+    // keeps decode throughput finite when no token was produced.
+    const double ttft_ms =
+        first_token_captured_ ? fms(first_token_time_ - start_time).count() : 0.0;
+    const double decode_ms =
+        first_token_captured_ ? fms(end_time - first_token_time_).count() : total_ms;
 
     result.text = generated_text;
     result.tokens_generated = tokens_generated;
@@ -886,6 +887,8 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
     int tokens_generated = 0;
     bool stop_sequence_hit = false;
 
+    first_token_captured_ = false;
+
     while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
         const llama_token new_token_id = llama_sampler_sample(sampler, context_, -1);
 
@@ -894,6 +897,14 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
         if (llama_vocab_is_eog(vocab, new_token_id)) {
             RAC_LOG_INFO("LLM.LlamaCpp", "End of generation token received");
             break;
+        }
+
+        // TTFT is measured at the first genuinely produced token, before the
+        // stop-sequence lookahead buffers it — the stream callback fires several
+        // tokens late, so capturing there would inflate decode throughput.
+        if (!first_token_captured_) {
+            first_token_captured_ = true;
+            first_token_time_ = std::chrono::high_resolution_clock::now();
         }
 
         const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);

@@ -12,6 +12,7 @@
 #include <llama.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -249,6 +250,14 @@ class LlamaCppTextGeneration {
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};
     std::atomic<bool> decode_failed_{false};
+
+    // First-token timing, captured inside run_decode_loop the moment the first
+    // token is sampled. The stream callback is buffered by the stop-sequence
+    // lookahead window, so it fires several tokens late — measuring TTFT there
+    // would push early decode time into prefill and inflate tokens/sec. Only
+    // touched on the decode thread; reset at the start of each run_decode_loop.
+    bool first_token_captured_ = false;
+    std::chrono::high_resolution_clock::time_point first_token_time_{};
 
     std::string model_path_;
     nlohmann::json model_config_;
