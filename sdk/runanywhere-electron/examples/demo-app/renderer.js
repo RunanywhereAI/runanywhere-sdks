@@ -52,7 +52,7 @@ async function runChat(text, onToken) {
 }
 async function runStructured(text) {
   const h = await llm();
-  return ra.generateObject(h, `Extract the person as JSON. Text: "${text}"`, {
+  return ra.generateStructured(h, `Extract the person as JSON. Text: "${text}"`, {
     type: 'object',
     properties: {
       name: { type: 'string' },
@@ -72,6 +72,28 @@ async function runEmbeddings(a, b) {
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < ea.length; i++) { dot += ea[i] * eb[i]; na += ea[i] * ea[i]; nb += eb[i] * eb[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+async function runVision(imagePath, onToken) {
+  const h = await vlm();
+  let caption = '';
+  await ra.generateVlm(h, imagePath, 'Describe this image in one sentence.', (t) => { caption += t; onToken?.(t); });
+  return caption.trim();
+}
+async function runSecure(key, value) {
+  await ra.secureSet(key, value);
+  const got = await ra.secureGet(key);
+  await ra.secureDelete(key);
+  return got;
+}
+async function runVad() {
+  const handle = await ra.createVad();
+  const silence = () => new Float32Array(1600);
+  const loud = () => { const f = new Float32Array(1600); for (let i = 0; i < 1600; i++) f[i] = 0.5 * Math.sin((2 * Math.PI * 300 * i) / 16000); return f; };
+  for (let i = 0; i < 24; i++) await ra.vadProcess(handle, silence()); // calibrate on ambient
+  let detected = false;
+  for (let i = 0; i < 8; i++) if (await ra.vadProcess(handle, loud())) detected = true;
+  await ra.unloadVad(handle);
+  return detected;
 }
 
 // ---- tabs ----
@@ -212,6 +234,24 @@ async function selfTest() {
     const far = await runEmbeddings('a cat sat on the mat', 'the stock market fell today');
     if (!(close > far)) throw new Error(`embedding ordering wrong: ${close} !> ${far}`);
     log(`[selftest] embeddings OK: close=${close.toFixed(3)} far=${far.toFixed(3)}`);
+
+    const image = new URLSearchParams(location.search).get('image');
+    if (image) {
+      const caption = await runVision(image);
+      if (!caption || caption.length < 3) throw new Error('empty vision caption');
+      log('[selftest] vision OK: ' + JSON.stringify(caption.slice(0, 70)));
+    } else {
+      log('[selftest] vision SKIPPED (no test image)');
+    }
+
+    const secret = 'sk-demo-secret-12345';
+    const got = await runSecure('demo-selftest-key', secret);
+    if (got !== secret) throw new Error('secure store round-trip failed: ' + got);
+    log('[selftest] secure store OK (encrypted round-trip)');
+
+    const vadDetected = await runVad();
+    if (!vadDetected) throw new Error('vad did not detect speech after calibration');
+    log('[selftest] vad OK (speech detected)');
 
     log('[selftest] ALL PASS');
     window.runanywhereTest.done(true);
