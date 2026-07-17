@@ -55,7 +55,10 @@ app.whenReady().then(() => {
   ipcMain.on('runanywhere-test-done', (_e, ok) => { record(`[main] DONE ok=${ok}\n`); finish(ok ? 0 : 1, 'self-test ok=' + ok); });
 
   win.webContents.on('did-finish-load', () => ra.connect(win.webContents));
-  win.loadFile(path.join(__dirname, 'index.html'), { query: SELFTEST ? { selftest: '1' } : {} });
+  const query = SELFTEST
+    ? { selftest: '1', image: process.env.RA_TEST_IMAGE || 'e:\\codes\\qual\\models\\test_red_circle.jpg' }
+    : {};
+  win.loadFile(path.join(__dirname, 'index.html'), { query });
 
   if (SELFTEST) setTimeout(() => finish(3, 'TIMEOUT'), 240000);
 });
