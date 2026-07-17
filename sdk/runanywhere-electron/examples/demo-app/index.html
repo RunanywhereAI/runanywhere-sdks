@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:"
+    />
+    <title>RunAnywhere — Electron demo</title>
+    <style>
+      :root { --bg: #0f1115; --panel: #171a21; --edge: #262b36; --fg: #e6e8ec; --muted: #8b94a3; --accent: #5b9dff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+      header { padding: 14px 18px; border-bottom: 1px solid var(--edge); display: flex; align-items: center; gap: 12px; }
+      header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+      header #status { color: var(--muted); font-size: 12px; margin-left: auto; }
+      nav { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--edge); flex-wrap: wrap; }
+      nav button { background: none; border: 1px solid transparent; color: var(--muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+      nav button.active { color: var(--fg); background: var(--panel); border-color: var(--edge); }
+      main { padding: 18px; }
+      .panel { display: none; }
+      .panel.active { display: block; }
+      textarea, input[type=text] { width: 100%; background: var(--panel); color: var(--fg); border: 1px solid var(--edge); border-radius: 8px; padding: 10px; font: inherit; resize: vertical; }
+      button.go { background: var(--accent); color: #04122b; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+      button.go:disabled { opacity: 0.5; cursor: default; }
+      .out { margin-top: 12px; padding: 12px; background: var(--panel); border: 1px solid var(--edge); border-radius: 8px; white-space: pre-wrap; min-height: 40px; }
+      .row { display: flex; gap: 10px; }
+      .row > * { flex: 1; }
+      .label { color: var(--muted); font-size: 12px; margin: 12px 0 4px; }
+      code { color: var(--accent); }
+      .msg { margin: 8px 0; }
+      .msg .who { color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RunAnywhere · on-device AI</h1>
+      <span id="status">starting…</span>
+    </header>
+    <nav>
+      <button data-tab="chat" class="active">Chat</button>
+      <button data-tab="structured">Structured</button>
+      <button data-tab="tools">Tools</button>
+      <button data-tab="vision">Vision</button>
+      <button data-tab="embeddings">Embeddings</button>
+      <button data-tab="voice">Voice</button>
+    </nav>
+    <main>
+      <section class="panel active" id="chat">
+        <div class="label">Multi-turn chat (streaming)</div>
+        <div id="chatlog" class="out"></div>
+        <div class="row" style="margin-top: 10px">
+          <input id="chatinput" type="text" placeholder="Say something…" />
+        </div>
+        <button class="go" id="chatsend">Send</button>
+      </section>
+
+      <section class="panel" id="structured">
+        <div class="label">Extract typed JSON (grammar-constrained — always parses)</div>
+        <textarea id="structtext" rows="2">Ada Lovelace was a 36 year old English mathematician who loved poetry.</textarea>
+        <button class="go" id="structgo">Extract</button>
+        <div id="structout" class="out"></div>
+      </section>
+
+      <section class="panel" id="tools">
+        <div class="label">Tool calling (the model picks a tool + fills arguments)</div>
+        <textarea id="toolstext" rows="2">What is the weather in Tokyo in celsius?</textarea>
+        <button class="go" id="toolsgo">Choose tool</button>
+        <div id="toolsout" class="out"></div>
+      </section>
+
+      <section class="panel" id="vision">
+        <div class="label">Describe an image (VLM)</div>
+        <input id="visionfile" type="file" accept="image/*" />
+        <button class="go" id="visiongo" disabled>Caption</button>
+        <div id="visionout" class="out"></div>
+      </section>
+
+      <section class="panel" id="embeddings">
+        <div class="label">Semantic similarity (cosine of two embeddings)</div>
+        <div class="row">
+          <input id="emba" type="text" value="a cat sat on the mat" />
+          <input id="embb" type="text" value="a kitten rested on the rug" />
+        </div>
+        <button class="go" id="embgo">Compare</button>
+        <div id="embout" class="out"></div>
+      </section>
+
+      <section class="panel" id="voice">
+        <div class="label">Voice: hold to talk (mic → STT → LLM → TTS → speaker)</div>
+        <button class="go" id="voicebtn">Hold to talk</button>
+        <div class="label">Heard</div>
+        <div id="voiceheard" class="out"></div>
+        <div class="label">Reply</div>
+        <div id="voicereply" class="out"></div>
+      </section>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>
