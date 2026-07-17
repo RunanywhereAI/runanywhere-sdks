@@ -35,6 +35,8 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
+#include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
 // Internal (non-proto) embeddings service factory — its header lives under
@@ -60,6 +62,7 @@ std::unordered_map<int32_t, rac_handle_t> g_vlm_handles;
 std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
 std::unordered_map<int32_t, rac_handle_t> g_stt_handles;
 std::unordered_map<int32_t, rac_handle_t> g_tts_handles;
+std::unordered_map<int32_t, rac_handle_t> g_vad_handles;
 int32_t g_next_handle_id = 1;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -705,11 +708,13 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             for (auto& kv : g_embed_handles) rac_embeddings_destroy(kv.second);
             for (auto& kv : g_stt_handles) rac_stt_component_destroy(kv.second);
             for (auto& kv : g_tts_handles) rac_tts_component_destroy(kv.second);
+            for (auto& kv : g_vad_handles) rac_vad_component_destroy(kv.second);
             g_llm_handles.clear();
             g_vlm_handles.clear();
             g_embed_handles.clear();
             g_stt_handles.clear();
             g_tts_handles.clear();
+            g_vad_handles.clear();
         }
         rac_shutdown();
     }
@@ -778,11 +783,120 @@ Napi::Value SecureDelete(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
+// =============================================================================
+// Voice activity detection (built-in energy VAD; no model required).
+// =============================================================================
+Napi::Value CreateVad(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (!g_initialized.load()) {
+        Napi::Error::New(env, "not initialized").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = nullptr;
+    if (rac_vad_component_create(&h) != RAC_SUCCESS || !h) {
+        Napi::Error::New(env, "vad create failed").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_vad_config_t cfg = RAC_VAD_CONFIG_DEFAULT;
+    if (info.Length() >= 1 && info[0].IsNumber()) {
+        cfg.energy_threshold = info[0].As<Napi::Number>().FloatValue();
+    }
+    if (rac_vad_component_configure(h, &cfg) != RAC_SUCCESS ||
+        rac_vad_component_initialize(h) != RAC_SUCCESS) {
+        rac_vad_component_destroy(h);
+        Napi::Error::New(env, "vad configure/initialize failed").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        hid = g_next_handle_id++;
+        g_vad_handles[hid] = h;
+    }
+    return Napi::Number::New(env, hid);
+}
+
+// vadProcess(handleId, Float32Array) -> bool (speech in this frame).
+Napi::Value VadProcess(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
+        Napi::TypeError::New(env, "vadProcess(handleId, Float32Array) bad args")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Napi::TypedArray ta = info[1].As<Napi::TypedArray>();
+    if (ta.TypedArrayType() != napi_float32_array) {
+        Napi::TypeError::New(env, "vadProcess expects a Float32Array of samples")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) {
+        Napi::Error::New(env, "invalid vad handle").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Napi::Float32Array arr = ta.As<Napi::Float32Array>();
+    rac_bool_t is_speech = RAC_FALSE;
+    rac_result_t rc = rac_vad_component_process(h, arr.Data(), arr.ElementLength(), &is_speech);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "vad process failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return Napi::Boolean::New(env, is_speech == RAC_TRUE);
+}
+
+Napi::Value VadIsActive(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return Napi::Boolean::New(env, false);
+    rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) return Napi::Boolean::New(env, false);
+    return Napi::Boolean::New(env, rac_vad_component_is_speech_active(h) == RAC_TRUE);
+}
+
+Napi::Value VadSetThreshold(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsNumber()) return env.Undefined();
+    rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
+    if (h) rac_vad_component_set_energy_threshold(h, info[1].As<Napi::Number>().FloatValue());
+    return env.Undefined();
+}
+
+Napi::Value VadReset(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
+    if (h) rac_vad_component_reset(h);
+    return env.Undefined();
+}
+
+Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_vad_handles.find(hid);
+        if (it != g_vad_handles.end()) {
+            h = it->second;
+            g_vad_handles.erase(it);
+        }
+    }
+    if (h) rac_vad_component_destroy(h);
+    return env.Undefined();
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("secureSet", Napi::Function::New(env, SecureSet));
     exports.Set("secureGet", Napi::Function::New(env, SecureGet));
     exports.Set("secureDelete", Napi::Function::New(env, SecureDelete));
+    exports.Set("createVad", Napi::Function::New(env, CreateVad));
+    exports.Set("vadProcess", Napi::Function::New(env, VadProcess));
+    exports.Set("vadIsActive", Napi::Function::New(env, VadIsActive));
+    exports.Set("vadSetThreshold", Napi::Function::New(env, VadSetThreshold));
+    exports.Set("vadReset", Napi::Function::New(env, VadReset));
+    exports.Set("unloadVad", Napi::Function::New(env, UnloadVad));
     exports.Set("loadModel", Napi::Function::New(env, LoadModel));
     exports.Set("generate", Napi::Function::New(env, Generate));
     exports.Set("unloadModel", Napi::Function::New(env, UnloadModel));
