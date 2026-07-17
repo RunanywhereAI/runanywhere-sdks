@@ -81,8 +81,8 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   const api = exposed.runanywhere;
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
-    'ready', 'version', 'initialize',
-    'loadLLM', 'generate', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
+    'ready', 'version', 'initialize', 'onEvent', 'catalog', 'modelStatus', 'downloadModel',
+    'loadLLM', 'generate', 'generateStream', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
     'loadSTT', 'transcribe', 'unloadSTT',
@@ -249,6 +249,51 @@ test('generate streams tokens to onToken then resolves on done', { skip: SKIP },
   assert.deepEqual(tokens, ['a', 'b'], 'tokens routed to onToken in order');
   port.onmessage({ data: { id: msg.id, done: true } });
   await p; // resolves on done
+});
+
+test('generateStream yields token events then a final event with metrics', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const events = [];
+  const p = exposed.runanywhere.generateStream(3, 'hi', { maxTokens: 8 }, (e) => events.push(e));
+  await tick();
+  const msg = port.last();
+  assert.equal(msg.method, 'generate');
+  assert.deepEqual(msg.args, [3, 'hi', { maxTokens: 8 }]);
+  port.onmessage({ data: { id: msg.id, token: 'a' } });
+  port.onmessage({ data: { id: msg.id, token: 'b' } });
+  port.onmessage({ data: { id: msg.id, done: true } });
+  await p;
+  assert.ok(events.length >= 3, 'two token events + a final event');
+  assert.equal(events[0].token, 'a');
+  assert.equal(events[0].isFinal, false);
+  const final = events[events.length - 1];
+  assert.equal(final.isFinal, true);
+  assert.ok(final.result, 'final event carries metrics');
+  assert.equal(final.result.text, 'ab');
+  assert.equal(final.result.tokenCount, 2);
+});
+
+test('catalog() returns the built-in model catalog', { skip: SKIP }, () => {
+  const { exposed } = freshPreload();
+  const cat = exposed.runanywhere.catalog();
+  assert.equal(typeof cat, 'object');
+  assert.ok(cat['qwen2.5-0.5b'], 'includes a known catalog id');
+  assert.equal(cat['qwen2.5-0.5b'].type, 'llm');
+});
+
+test('onEvent subscribes to lifecycle events and returns an unsubscribe', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const seen = [];
+  const off = exposed.runanywhere.onEvent((e) => seen.push(e.type));
+  assert.equal(typeof off, 'function');
+  const p = exposed.runanywhere.initialize('/s', '/b');
+  await tick();
+  port.onmessage({ data: { id: port.last().id, ok: true } });
+  await p;
+  assert.ok(seen.includes('initialized'), 'initialize emits an initialized event');
+  off();
 });
 
 test('generate forwards a generation-options object before the callback', { skip: SKIP }, async () => {
