@@ -9,9 +9,10 @@ test('STREAMING_METHODS is a Set', () => {
   assert.ok(STREAMING_METHODS instanceof Set);
 });
 
-test('the streaming methods are exactly the token-callback methods', () => {
+test('the streaming methods are the callback-per-event methods', () => {
   assert.ok(STREAMING_METHODS.has('generate'), 'generate streams tokens');
   assert.ok(STREAMING_METHODS.has('generateVlm'), 'generateVlm streams tokens');
+  assert.ok(STREAMING_METHODS.has('downloadModel'), 'downloadModel streams progress');
 });
 
 test('unary methods are NOT marked streaming', () => {
@@ -20,6 +21,6 @@ test('unary methods are NOT marked streaming', () => {
   }
 });
 
-test('the streaming set has exactly two members', () => {
-  assert.equal(STREAMING_METHODS.size, 2);
+test('the streaming set has exactly three members', () => {
+  assert.equal(STREAMING_METHODS.size, 3);
 });
