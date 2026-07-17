@@ -103,10 +103,16 @@ export async function resolveModel(
   fs.mkdirSync(dir, { recursive: true });
   for (const f of entry.files) {
     const dest = path.join(dir, f.as);
-    const extracted = entry.archive && fs.existsSync(path.join(dir, entry.primary));
-    if (fs.existsSync(dest) || extracted) continue;
-    await downloadFile(f.url, dest, opts.onProgress);
-    if (entry.archive) extractTarBz2(dest, dir);
+    if (entry.archive) {
+      // For archives, "done" means the EXTRACTED primary exists — gating on the
+      // downloaded .tar.bz2 alone would skip forever after a failed/interrupted
+      // extract. Download the archive if missing, then (re-)extract.
+      if (fs.existsSync(path.join(dir, entry.primary))) continue;
+      if (!fs.existsSync(dest)) await downloadFile(f.url, dest, opts.onProgress);
+      extractTarBz2(dest, dir);
+    } else if (!fs.existsSync(dest)) {
+      await downloadFile(f.url, dest, opts.onProgress);
+    }
   }
   return {
     id: idOrPath,
