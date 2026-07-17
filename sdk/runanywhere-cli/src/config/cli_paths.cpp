@@ -7,7 +7,7 @@
 namespace rcli::paths {
 
 std::string normalize_dir(std::string dir) {
-    while (dir.size() > 1 && dir.back() == '/') {
+    while (dir.size() > 1 && (dir.back() == '/' || dir.back() == '\\')) {
         dir.pop_back();
     }
     return dir;
@@ -34,6 +34,14 @@ std::string state_dir() {
     if (const char* home = std::getenv("HOME"); home && home[0] != '\0') {
         return normalize_dir(home) + "/.local/state/runanywhere";
     }
+#if defined(_WIN32)
+    if (const char* local = std::getenv("LOCALAPPDATA"); local && local[0] != '\0') {
+        return normalize_dir(local) + "/RunAnywhere/state";
+    }
+    if (const char* profile = std::getenv("USERPROFILE"); profile && profile[0] != '\0') {
+        return normalize_dir(profile) + "/AppData/Local/RunAnywhere/state";
+    }
+#endif
     return {};
 }
 

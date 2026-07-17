@@ -2,7 +2,7 @@
  * @file test_desktop_adapter.cpp
  * @brief Unit tests for the desktop platform adapter (RAC_DESKTOP_ADAPTER).
  *
- * Exercises the POSIX adapter slots directly (no rac_init needed), the 0600
+ * Exercises the desktop adapter slots directly (no rac_init needed), secure
  * secure-store contract, the libcurl transport registration, and the
  * model-paths base-dir dedup rule the desktop layout depends on. Network
  * behavior is covered by the Docker CLI e2e (hermetic local-HTTP pull), not
@@ -11,15 +11,19 @@
 
 #include "test_common.h"
 
-#include <sys/stat.h>
-#include <unistd.h>
-
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/desktop/rac_desktop.h"
@@ -35,11 +39,14 @@ struct TempDir {
     std::string path;
 
     TempDir() {
-        std::string tmpl = (fs::temp_directory_path() / "rac_desktop_test_XXXXXX").string();
-        std::vector<char> buf(tmpl.begin(), tmpl.end());
-        buf.push_back('\0');
-        if (mkdtemp(buf.data()) != nullptr) {
-            path = buf.data();
+        const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
+        path = (fs::temp_directory_path() /
+                ("rac_desktop_test_" + std::to_string(unique)))
+                   .string();
+        std::error_code ec;
+        fs::create_directories(path, ec);
+        if (ec) {
+            path.clear();
         }
     }
 
@@ -222,8 +229,17 @@ TestResult test_secure_store() {
         return result;
     }
 
-    // Permission contract: file mode is exactly 0600, store dir 0700.
+    // Permission contract: POSIX uses 0600/0700. Windows stores a DPAPI blob.
     const std::string key_file = tmp.path + "/cfg/secure/rac.device.id";
+#if defined(_WIN32)
+    std::ifstream encrypted(key_file, std::ios::binary);
+    const std::string stored((std::istreambuf_iterator<char>(encrypted)),
+                             std::istreambuf_iterator<char>());
+    if (stored.empty() || stored.find("device-1234") != std::string::npos) {
+        result.details = "Windows secure-store value was not DPAPI protected";
+        return result;
+    }
+#else
     struct stat st {};
     if (stat(key_file.c_str(), &st) != 0) {
         result.details = "expected key file at " + key_file;
@@ -239,6 +255,7 @@ TestResult test_secure_store() {
         result.details = "secure dir mode is not 0700";
         return result;
     }
+#endif
 
     // Keys with separators must be encoded, not treated as paths.
     if (adapter.secure_set("a/b:c", "x", nullptr) != RAC_SUCCESS) {

@@ -1,11 +1,11 @@
 /**
  * @file desktop_adapter.cpp
- * @brief Desktop (macOS/Linux) rac_platform_adapter_t implementation.
+ * @brief Desktop (macOS/Linux/Windows) rac_platform_adapter_t implementation.
  *
- * Real POSIX counterparts of the stub adapter used by the commons tests
- * (tests/test_voice_agent.cpp): file I/O via <fcntl.h>/std::filesystem,
- * directory enumeration via opendir/readdir, memory info via host_statistics64
- * (macOS) / /proc/meminfo (Linux), logging to stderr. Secure storage lives in
+ * Native counterparts of the stub adapter used by the commons tests
+ * (tests/test_voice_agent.cpp): file I/O and enumeration via std::filesystem,
+ * memory info via host_statistics64 (macOS), /proc/meminfo (Linux), or
+ * GlobalMemoryStatusEx (Windows), logging to stderr. Secure storage lives in
  * desktop_secure_store.cpp; HTTP in http_transport_curl.cpp.
  *
  * Slots intentionally left NULL:
@@ -17,11 +17,6 @@
  *     UUID through secure storage instead.
  */
 
-#include <dirent.h>
-#include <fcntl.h>
-#include <pwd.h>
-#include <unistd.h>
-
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -29,8 +24,17 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
-#include <sys/stat.h>
 #include <system_error>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <pwd.h>
+#include <unistd.h>
+#endif
 
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -48,6 +52,15 @@ namespace fs = std::filesystem;
 namespace rac::desktop {
 
 std::string home_dir() {
+#if defined(_WIN32)
+    for (const char* key : {"USERPROFILE", "LOCALAPPDATA"}) {
+        const char* value = std::getenv(key);
+        if (value && value[0] != '\0') {
+            return value;
+        }
+    }
+    return {};
+#else
     const char* home = std::getenv("HOME");
     if (home && home[0] != '\0') {
         return home;
@@ -58,8 +71,10 @@ std::string home_dir() {
         }
     }
     return {};
+#endif
 }
 
+#if !defined(_WIN32)
 static std::string xdg_dir(const char* env_name, const char* home_suffix) {
     const char* env = std::getenv(env_name);
     std::string base;
@@ -77,13 +92,39 @@ static std::string xdg_dir(const char* env_name, const char* home_suffix) {
     }
     return base + "/runanywhere";
 }
+#else
+static std::string windows_app_dir(const char* preferred_env) {
+    const char* env = std::getenv(preferred_env);
+    std::string base;
+    if (env && env[0] != '\0') {
+        base = env;
+    } else {
+        base = home_dir();
+    }
+    if (base.empty()) {
+        return {};
+    }
+    while (!base.empty() && (base.back() == '/' || base.back() == '\\')) {
+        base.pop_back();
+    }
+    return base + "/RunAnywhere";
+}
+#endif
 
 std::string default_config_dir() {
+#if defined(_WIN32)
+    return windows_app_dir("APPDATA");
+#else
     return xdg_dir("XDG_CONFIG_HOME", "/.config");
+#endif
 }
 
 std::string default_data_dir() {
+#if defined(_WIN32)
+    return windows_app_dir("LOCALAPPDATA");
+#else
     return xdg_dir("XDG_DATA_HOME", "/.local/share");
+#endif
 }
 
 }  // namespace rac::desktop
@@ -104,6 +145,19 @@ rac_result_t errno_to_rac(int err, rac_result_t fallback) {
     }
 }
 
+rac_result_t filesystem_error_to_rac(const std::error_code& ec, rac_result_t fallback) {
+    if (ec == std::errc::no_such_file_or_directory) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+    if (ec == std::errc::permission_denied) {
+        return RAC_ERROR_PERMISSION_DENIED;
+    }
+    if (ec == std::errc::no_space_on_device) {
+        return RAC_ERROR_STORAGE_FULL;
+    }
+    return fallback;
+}
+
 // -----------------------------------------------------------------------------
 // File system
 // -----------------------------------------------------------------------------
@@ -113,8 +167,8 @@ rac_bool_t desktop_file_exists(const char* path, void* /*user_data*/) {
         return RAC_FALSE;
     }
     // Mirrors FileManager.fileExists(atPath:) — true for files AND directories.
-    struct stat st{};
-    return stat(path, &st) == 0 ? RAC_TRUE : RAC_FALSE;
+    std::error_code ec;
+    return fs::exists(fs::path(path), ec) && !ec ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t desktop_file_read(const char* path, void** out_data, size_t* out_size,
@@ -197,8 +251,8 @@ rac_result_t desktop_file_delete(const char* path, void* /*user_data*/) {
 // Directory enumeration
 // -----------------------------------------------------------------------------
 
-bool entry_is_hidden(const char* name) {
-    return name[0] == '.';
+bool entry_is_hidden(const std::string& name) {
+    return !name.empty() && name[0] == '.';
 }
 
 rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_entry_t* out_entries,
@@ -207,18 +261,24 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    DIR* dir = opendir(dir_path);
-    if (!dir) {
-        return errno_to_rac(errno, RAC_ERROR_STORAGE_ERROR);
-    }
-
     const size_t capacity = out_entries ? *in_out_count : 0;
     size_t count = 0;
-    while (dirent* entry = readdir(dir)) {
-        if (entry_is_hidden(entry->d_name)) {
+    std::error_code ec;
+    fs::directory_iterator iterator(fs::path(dir_path), ec);
+    if (ec) {
+        return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+    }
+    const fs::directory_iterator end;
+    for (; iterator != end; iterator.increment(ec)) {
+        if (ec) {
+            return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
+        }
+        const fs::directory_entry& entry = *iterator;
+        const std::string name = entry.path().filename().string();
+        if (entry_is_hidden(name)) {
             continue;
         }
-        const size_t name_len = std::strlen(entry->d_name);
+        const size_t name_len = name.size();
         if (name_len + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
             // Truncation contract: skip oversized names, never half-copy them.
             std::fprintf(stderr, "[WARN] [PlatformAdapter] skipping oversized entry in %s\n",
@@ -231,21 +291,19 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
                 break;
             }
             rac_directory_entry_t& dst = out_entries[count];
-            std::memcpy(dst.name, entry->d_name, name_len + 1);
+            std::memcpy(dst.name, name.c_str(), name_len + 1);
 
-            std::string full = std::string(dir_path) + "/" + entry->d_name;
-            struct stat st{};
-            if (stat(full.c_str(), &st) == 0) {
-                dst.is_dir = S_ISDIR(st.st_mode) ? RAC_TRUE : RAC_FALSE;
-                dst.size_bytes = S_ISDIR(st.st_mode) ? 0 : static_cast<int64_t>(st.st_size);
-            } else {
-                dst.is_dir = (entry->d_type == DT_DIR) ? RAC_TRUE : RAC_FALSE;
+            std::error_code type_ec;
+            const bool is_dir = entry.is_directory(type_ec);
+            dst.is_dir = !type_ec && is_dir ? RAC_TRUE : RAC_FALSE;
+            std::error_code size_ec;
+            dst.size_bytes = is_dir ? 0 : static_cast<int64_t>(entry.file_size(size_ec));
+            if (size_ec) {
                 dst.size_bytes = 0;
             }
         }
         ++count;
     }
-    closedir(dir);
 
     *in_out_count = count;
     return RAC_SUCCESS;
@@ -255,20 +313,9 @@ rac_bool_t desktop_is_non_empty_directory(const char* path, void* /*user_data*/)
     if (!path) {
         return RAC_FALSE;
     }
-    DIR* dir = opendir(path);
-    if (!dir) {
-        return RAC_FALSE;
-    }
-    rac_bool_t non_empty = RAC_FALSE;
-    while (dirent* entry = readdir(dir)) {
-        if (std::strcmp(entry->d_name, ".") == 0 || std::strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        non_empty = RAC_TRUE;
-        break;
-    }
-    closedir(dir);
-    return non_empty;
+    std::error_code ec;
+    fs::directory_iterator iterator(fs::path(path), ec);
+    return !ec && iterator != fs::directory_iterator{} ? RAC_TRUE : RAC_FALSE;
 }
 
 // -----------------------------------------------------------------------------
@@ -366,6 +413,16 @@ rac_result_t desktop_get_memory_info(rac_memory_info_t* out_info, void* /*user_d
     out_info->used_bytes = (out_info->total_bytes > out_info->available_bytes)
                                ? (out_info->total_bytes - out_info->available_bytes)
                                : 0;
+    return RAC_SUCCESS;
+#elif defined(_WIN32)
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    if (!GlobalMemoryStatusEx(&status)) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    out_info->total_bytes = status.ullTotalPhys;
+    out_info->available_bytes = status.ullAvailPhys;
+    out_info->used_bytes = status.ullTotalPhys - status.ullAvailPhys;
     return RAC_SUCCESS;
 #else
     return RAC_ERROR_NOT_SUPPORTED;

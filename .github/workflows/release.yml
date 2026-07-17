@@ -261,7 +261,7 @@ jobs:
           [ -x "$BIN_DIR/RunAnywhereMLXCLI" ]
           [ -s "$BIN_DIR/mlx.metallib" ]
           echo "bin-dir=$BIN_DIR" >> "$GITHUB_OUTPUT"
-      - name: Smoke combined host (modelless — llama.cpp + MLX)
+      - name: Smoke combined host (modelless — llama.cpp + MLX + Apple secondary engines)
         env:
           RCLI_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
         run: |
@@ -271,6 +271,8 @@ jobs:
           echo "$BACKENDS"
           echo "$BACKENDS" | grep -q '"name":"llamacpp"'
           echo "$BACKENDS" | grep -q '"name":"mlx"'
+          echo "$BACKENDS" | grep -q '"name":"sherpa"'
+          echo "$BACKENDS" | grep -q '"name":"coreml"'
           "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
           "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
       - name: Configure ephemeral Developer ID credentials
@@ -448,6 +450,92 @@ jobs:
           path: |
             sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz
             sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_rcli_windows:
+    needs: validate
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - name: Install static libcurl
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
+      - name: Sherpa-ONNX prebuilts
+        shell: cmd
+        run: sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+      - name: Build rcli (Windows x86_64)
+        shell: pwsh
+        run: |
+          cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
+          cmake --build --preset rcli-windows-release
+      - name: Add native runtimes to PATH
+        shell: pwsh
+        run: |
+          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
+            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
+            Select-Object -First 1
+          if (-not $Onnx) { throw "onnxruntime.dll not found" }
+          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\bin" |
+            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Unit tests
+        shell: pwsh
+        run: >-
+          ctest --test-dir build/rcli-windows-release
+          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
+      - name: Authenticode sign rcli.exe
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw "Configure RCLI_WINDOWS_CODESIGN_PFX_BASE64 and RCLI_WINDOWS_CODESIGN_PFX_PASSWORD"
+          }
+          $Binary = Get-ChildItem build/rcli-windows-release -Filter rcli.exe -File -Recurse |
+            Where-Object { $_.FullName -match 'runanywhere-cli' } |
+            Select-Object -ExpandProperty FullName -First 1
+          if (-not $Binary) { throw "rcli.exe not found" }
+          $Pfx = Join-Path $env:RUNNER_TEMP "rcli-windows-codesign.pfx"
+          [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          try {
+            $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Filter signtool.exe -File -Recurse |
+              Where-Object { $_.DirectoryName -match '\\x64$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -ExpandProperty FullName -First 1
+            if (-not $SignTool) { throw "signtool.exe not found" }
+            & $SignTool sign /f $Pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $Binary
+            if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed" }
+            $Signature = Get-AuthenticodeSignature $Binary
+            if ($Signature.Status -ne 'Valid') {
+              throw "Authenticode verification failed: $($Signature.Status)"
+            }
+          } finally {
+            Remove-Item $Pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Package rcli ZIP
+        shell: pwsh
+        run: >-
+          ./sdk/runanywhere-cli/scripts/package-rcli-windows.ps1
+          -BuildDir build/rcli-windows-release
+          -Version ${{ needs.validate.outputs.version }}
+      - name: Upload rcli Windows artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rcli-windows
+          path: |
+            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip
+            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -1541,6 +1629,7 @@ jobs:
       - native_linux
       - native_rcli_macos
       - native_rcli_linux
+      - native_rcli_windows
       - native_windows
       - native_web
       - sdk_kotlin
@@ -1571,6 +1660,7 @@ jobs:
       needs.native_linux.result == 'success' &&
       needs.native_rcli_macos.result == 'success' &&
       needs.native_rcli_linux.result == 'success' &&
+      needs.native_rcli_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
@@ -1670,6 +1760,7 @@ jobs:
           assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
           assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
+          assert_pair "rcli Windows x86_64"            "rcli-windows-x86_64-v${VERSION}.zip"
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"
           assert_pair "Web core package"               "runanywhere-web-${VERSION}.tgz"

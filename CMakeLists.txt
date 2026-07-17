@@ -77,7 +77,7 @@ option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Mode
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
-option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
+option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux/Windows) platform adapter + libcurl HTTP transport" OFF)
 
 # Protobuf is a private implementation detail of the serialized-byte C ABI.
 # Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime

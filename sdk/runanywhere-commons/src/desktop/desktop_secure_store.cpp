@@ -1,11 +1,10 @@
 /**
  * @file desktop_secure_store.cpp
- * @brief Desktop secure-storage slots backed by per-key files (mode 0600).
+ * @brief Desktop secure-storage slots backed by protected per-key files.
  *
- * Documented MVP trade-off (see rac_desktop.h): no Keychain/libsecret
- * dependency. Each key is stored as its own file under <store_dir>/secure/
- * (directory mode 0700), so there is no parser, writes are per-key atomic at
- * the filesystem level, and the not-found contract maps 1:1 onto ENOENT.
+ * POSIX stores each value in a 0600 file under a 0700 directory. Windows
+ * encrypts each value with the current user's DPAPI key before writing it
+ * under AppData. There is no shared parser and each key maps to one file.
  *
  * Contract (rac_platform_adapter.h secure_get docs):
  *   - clean miss            → RAC_ERROR_FILE_NOT_FOUND, *out_value untouched
@@ -13,16 +12,25 @@
  *   - success               → *out_value heap-allocated, freed via rac_free()
  */
 
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 #include <string>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <wincrypt.h>
+#else
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 #include "desktop/desktop_internal.h"
 #include "rac/core/rac_error.h"
@@ -30,6 +38,8 @@
 namespace rac::desktop {
 
 namespace {
+
+namespace fs = std::filesystem;
 
 std::mutex g_store_mutex;
 std::string g_store_dir;  // <config dir>; files live in <config dir>/secure/
@@ -61,12 +71,18 @@ std::string key_path_locked(const char* key) {
         return {};
     }
     const std::string secure_dir = g_store_dir + "/secure";
-    // mkdir -p with owner-only permissions; EEXIST is fine.
-    for (const std::string& dir : {g_store_dir, secure_dir}) {
-        if (mkdir(dir.c_str(), S_IRWXU) != 0 && errno != EEXIST) {
-            return {};
-        }
+    std::error_code ec;
+    fs::create_directories(secure_dir, ec);
+    if (ec) {
+        return {};
     }
+#if !defined(_WIN32)
+    // Existing directories may have wider permissions than the current umask.
+    if (chmod(g_store_dir.c_str(), S_IRWXU) != 0 ||
+        chmod(secure_dir.c_str(), S_IRWXU) != 0) {
+        return {};
+    }
+#endif
     return secure_dir + "/" + encode_key(key);
 }
 
@@ -75,7 +91,8 @@ std::string key_path_locked(const char* key) {
 void secure_store_set_dir(const std::string& dir) {
     std::lock_guard<std::mutex> lock(g_store_mutex);
     g_store_dir = dir;
-    while (!g_store_dir.empty() && g_store_dir.back() == '/') {
+    while (!g_store_dir.empty() &&
+           (g_store_dir.back() == '/' || g_store_dir.back() == '\\')) {
         g_store_dir.pop_back();
     }
 }
@@ -108,11 +125,30 @@ rac_result_t secure_get(const char* key, char** out_value, void* /*user_data*/) 
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 
+#if defined(_WIN32)
+    DATA_BLOB protected_blob{};
+    protected_blob.cbData = static_cast<DWORD>(value.size());
+    protected_blob.pbData = reinterpret_cast<BYTE*>(value.data());
+    DATA_BLOB clear_blob{};
+    if (!CryptUnprotectData(&protected_blob, nullptr, nullptr, nullptr, nullptr,
+                            CRYPTPROTECT_UI_FORBIDDEN, &clear_blob)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    char* copy = static_cast<char*>(std::malloc(clear_blob.cbData + 1));
+    if (!copy) {
+        LocalFree(clear_blob.pbData);
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    std::memcpy(copy, clear_blob.pbData, clear_blob.cbData);
+    copy[clear_blob.cbData] = '\0';
+    LocalFree(clear_blob.pbData);
+#else
     char* copy = static_cast<char*>(std::malloc(value.size() + 1));
     if (!copy) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     std::memcpy(copy, value.c_str(), value.size() + 1);
+#endif
     *out_value = copy;
     return RAC_SUCCESS;
 }
@@ -128,6 +164,26 @@ rac_result_t secure_set(const char* key, const char* value, void* /*user_data*/)
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 
+#if defined(_WIN32)
+    DATA_BLOB clear_blob{};
+    clear_blob.cbData = static_cast<DWORD>(std::strlen(value));
+    clear_blob.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(value));
+    DATA_BLOB protected_blob{};
+    if (!CryptProtectData(&clear_blob, L"RunAnywhere rcli", nullptr, nullptr, nullptr,
+                          CRYPTPROTECT_UI_FORBIDDEN, &protected_blob)) {
+        return RAC_ERROR_SECURE_STORAGE_FAILED;
+    }
+    FILE* file = std::fopen(path.c_str(), "wb");
+    bool ok = false;
+    if (file) {
+        const size_t written =
+            std::fwrite(protected_blob.pbData, 1, protected_blob.cbData, file);
+        const int close_rc = std::fclose(file);
+        ok = written == protected_blob.cbData && close_rc == 0;
+    }
+    LocalFree(protected_blob.pbData);
+    return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+#else
     // O_CREAT with 0600 so the value is never world-readable, even briefly.
     const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (fd < 0) {
@@ -152,6 +208,7 @@ rac_result_t secure_set(const char* key, const char* value, void* /*user_data*/)
     ok = (fchmod(fd, S_IRUSR | S_IWUSR) == 0) && ok;
     ok = (close(fd) == 0) && ok;
     return ok ? RAC_SUCCESS : RAC_ERROR_SECURE_STORAGE_FAILED;
+#endif
 }
 
 rac_result_t secure_delete(const char* key, void* /*user_data*/) {
@@ -165,7 +222,7 @@ rac_result_t secure_delete(const char* key, void* /*user_data*/) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 
-    if (unlink(path.c_str()) != 0 && errno != ENOENT) {
+    if (std::remove(path.c_str()) != 0 && errno != ENOENT) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     return RAC_SUCCESS;  // deleting an absent key is a no-op, like Keychain

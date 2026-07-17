@@ -20,22 +20,43 @@ $ rcli serve qwen3        # OpenAI-compatible API on :8080
 
 ## Install
 
-**Homebrew** (after the first tagged release; tap publishing is in
-`scripts/update-tap.sh`):
+**Homebrew** (macOS Apple Silicon or Linux x86_64):
 
 ```bash
 brew install runanywhere-ai/tap/rcli
 ```
 
-**Install script** (macOS Apple Silicon, Linux x86_64):
+**Install script** (macOS Apple Silicon or Linux x86_64):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/runanywhere-cli/scripts/install.sh | sh
 ```
 
+**PowerShell installer** (Windows x86_64; no administrator shell required):
+
+```powershell
+irm https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/runanywhere-cli/scripts/install.ps1 | iex
+```
+
+The Windows installer verifies the release checksum, installs `rcli.exe` and
+its pinned ONNX Runtime/Sherpa DLLs under `%LOCALAPPDATA%\Programs\rcli`, and
+adds that directory to the current user's `PATH`.
+
 The macOS GitHub Release also includes a Developer ID signed, notarized, and
 stapled disk image. Its `rcli-macos-arm64` directory has the same relocatable
 layout as the Homebrew tarball.
+
+Published release assets are platform-specific:
+
+| Platform | Asset | Included engines |
+|---|---|---|
+| macOS Apple Silicon | `rcli-macos-arm64-vX.Y.Z.tar.gz` and signed/notarized DMG | llama.cpp + MLX + Sherpa-ONNX + ONNX Runtime + CoreML |
+| Linux x86_64 | `rcli-linux-x86_64-vX.Y.Z.tar.gz` | llama.cpp + Sherpa-ONNX + ONNX Runtime |
+| Windows x86_64 | `rcli-windows-x86_64-vX.Y.Z.zip` | llama.cpp + Sherpa-ONNX + ONNX Runtime |
+
+MLX is Apple Silicon/macOS-only. The command surface is shared across all
+three platforms; commands that require an unavailable platform engine return a
+clear unsupported-backend error.
 
 **From source** — see [Building](#building-from-source).
 
@@ -126,6 +147,13 @@ CONFIGURATION=release ./sdk/runanywhere-cli/scripts/build-mlx-cli.sh
 cmake --preset rcli-linux-release
 cmake --build build/rcli-linux-release -j 2
 
+# Windows x86_64 (PowerShell, with vcpkg available on VCPKG_INSTALLATION_ROOT):
+& "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+cmake --preset rcli-windows-release
+cmake --build --preset rcli-windows-release
+./sdk/runanywhere-cli/scripts/package-rcli-windows.ps1
+
 # Lean dev loop (no backends — lifecycle/UX work only):
 cmake --preset macos-debug -DRAC_DESKTOP_ADAPTER=ON -DRAC_BUILD_CLI=ON
 cmake --build build/macos-debug -j 2 --target rcli test_rcli_unit
@@ -153,9 +181,10 @@ ctest --test-dir build/macos-debug -R "rcli_unit_tests|desktop_adapter_tests"
 bash sdk/runanywhere-commons/tests/scripts/run-cli-e2e-linux.sh
 ```
 
-CI: `pr-build.yml` builds both rcli presets and runs the modelless smoke +
-unit tests; `release.yml` packages `rcli-macos-arm64` / `rcli-linux-x86_64`
-tarballs (`scripts/package-rcli.sh`) and gates publishing on their presence.
+CI: `pr-build.yml` builds macOS, Linux, and Windows rcli targets and runs unit,
+backend-registration, relocatable-package, and modelless smoke checks. Windows
+is built natively on `windows-2022`. `release.yml` requires all three rcli
+packages before publishing the GitHub Release.
 
 ## macOS distribution signing
 
@@ -198,6 +227,18 @@ API-key path, key ID, and issuer ID variables documented at the top of that
 script. The normal credential-free packaging path remains ad-hoc signed for
 pull-request smoke.
 
+## Windows distribution signing
+
+The release workflow Authenticode-signs `rcli.exe`, validates the resulting
+signature, and only then creates the Windows ZIP. Configure these repository
+secrets before creating a release tag:
+
+- `RCLI_WINDOWS_CODESIGN_PFX_BASE64`
+- `RCLI_WINDOWS_CODESIGN_PFX_PASSWORD`
+
+Pull-request builds remain credential-free and validate the same unsigned
+binary/package layout before the protected release job performs signing.
+
 ## Architecture
 
 rcli is a 6th consumer of the `rac_*` C ABI — exactly like the mobile/web
@@ -206,11 +247,10 @@ lifecycle-owned model loading (`rac_model_lifecycle_load_proto` auto-pulls,
 resolves artifacts incl. VLM mmproj, loads the engine once), proto-byte
 streaming generation, the download orchestrator with the desktop libcurl
 transport, and the voice-agent pipeline. The reusable desktop platform layer
-(POSIX adapter + curl transport) lives in commons
+(native adapter + curl transport) lives in commons
 (`include/rac/desktop/rac_desktop.h`) and is shared with
 `runanywhere-server`, the tests and the Playground apps.
-See `AGENTS.md` (layering rules) and
-`thoughts/shared/plans/rcli_desktop_cli.md` (design + implementation log).
+See `AGENTS.md` for the package layering rules.
 
 ## Known limitations
 
@@ -219,4 +259,4 @@ See `AGENTS.md` (layering rules) and
 - `rcli voice` with thinking models (qwen3) speaks the `<think>` text — pick a
   non-thinking LLM (`--llm lfm2`) until voice-agent thinking control lands.
 - Raw-URL pulls get inferred metadata (size/modality may show as `-`/generic).
-- macOS x86_64 and Windows binaries are not published yet.
+- macOS x86_64, Linux ARM64, and Windows ARM64 binaries are not published yet.

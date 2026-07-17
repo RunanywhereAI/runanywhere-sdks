@@ -50,9 +50,16 @@ set(RCLI_SOURCES
 )
 
 # Vendored single-file deps. linenoise is C; compiled into the core object lib.
-set(RCLI_THIRD_PARTY_SOURCES
-    third_party/linenoise/linenoise.c
-)
+if(WIN32)
+    # The vendored linenoise implementation is POSIX-only. Windows consoles
+    # provide native line editing; repl.cpp supplies the small getline/history
+    # fallback so the command surface remains identical.
+    set(RCLI_THIRD_PARTY_SOURCES "")
+else()
+    set(RCLI_THIRD_PARTY_SOURCES
+        third_party/linenoise/linenoise.c
+    )
+endif()
 
 add_library(rcli_core OBJECT ${RCLI_SOURCES} ${RCLI_THIRD_PARTY_SOURCES})
 
@@ -74,6 +81,9 @@ target_compile_definitions(rcli_core PUBLIC
     # <codecvt>, which the standard library deprecated in C++17. Use CLI11's
     # maintained locale-conversion path instead.
     CLI11_HAS_CODECVT=0)
+if(WIN32)
+    target_compile_definitions(rcli_core PUBLIC RCLI_NO_LINENOISE=1)
+endif()
 
 # Proto-byte ABI access (DownloadProgress, ModelInfo, Register* requests).
 # Same internal-consumer pattern as commons tests' rac_test_define_have_protobuf:
