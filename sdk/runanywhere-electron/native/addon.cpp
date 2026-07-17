@@ -98,18 +98,26 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
         Napi::Error::New(env, "rac_init failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rc = rac_backend_llamacpp_register();
-    if (rc != RAC_SUCCESS) {
-        rac_shutdown();
-        Napi::Error::New(env, "rac_backend_llamacpp_register failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
-        return env.Undefined();
+    // Backend/plugin registration is process-global and persists across
+    // rac_shutdown(), so register exactly once — re-registering after a
+    // shutdown+re-init would fail (RAC already-registered), which is why
+    // initialize() must be safe to call again after shutdown().
+    static bool backends_registered = false;
+    if (!backends_registered) {
+        rc = rac_backend_llamacpp_register();
+        if (rc != RAC_SUCCESS) {
+            rac_shutdown();
+            Napi::Error::New(env, "rac_backend_llamacpp_register failed: " + std::to_string(rc))
+                .ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        // Embeddings engine (optional): register the ONNX backend. A failure here
+        // just means embeddings are unavailable, not a fatal init error.
+        rac_backend_onnx_register();
+        // Speech engine (optional): register sherpa for STT / TTS.
+        rac_backend_sherpa_register();
+        backends_registered = true;
     }
-    // Embeddings engine (optional): register the ONNX backend. A failure here
-    // just means embeddings are unavailable, not a fatal init error.
-    rac_backend_onnx_register();
-    // Speech engine (optional): register sherpa for STT / TTS.
-    rac_backend_sherpa_register();
     g_initialized.store(true);
     return env.Undefined();
 }
@@ -534,8 +542,11 @@ Napi::Value LoadSttModel(const Napi::CallbackInfo& info) {
 // off the UI. A dedicated worker-thread variant can come later.
 Napi::Value Transcribe(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsBuffer()) {
-        Napi::TypeError::New(env, "transcribe(handleId, pcm16Buffer) bad args")
+    // Accept a Node Buffer OR any TypedArray (the public API + MessagePort clones
+    // deliver a Uint8Array of PCM16 bytes, not necessarily a Buffer).
+    if (info.Length() < 2 || !info[0].IsNumber() ||
+        !(info[1].IsBuffer() || info[1].IsTypedArray())) {
+        Napi::TypeError::New(env, "transcribe(handleId, pcm16Bytes) bad args")
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
@@ -544,11 +555,22 @@ Napi::Value Transcribe(const Napi::CallbackInfo& info) {
         Napi::Error::New(env, "invalid stt handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    Napi::Buffer<uint8_t> buf = info[1].As<Napi::Buffer<uint8_t>>();
+    const uint8_t* pcm_data = nullptr;
+    size_t pcm_len = 0;
+    if (info[1].IsBuffer()) {
+        Napi::Buffer<uint8_t> buf = info[1].As<Napi::Buffer<uint8_t>>();
+        pcm_data = buf.Data();
+        pcm_len = buf.Length();
+    } else {
+        Napi::TypedArray ta = info[1].As<Napi::TypedArray>();
+        Napi::ArrayBuffer ab = ta.ArrayBuffer();
+        pcm_data = static_cast<uint8_t*>(ab.Data()) + ta.ByteOffset();
+        pcm_len = ta.ByteLength();
+    }
     rac_stt_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc =
-        rac_stt_component_transcribe(h, buf.Data(), buf.Length(), nullptr, &result);
+        rac_stt_component_transcribe(h, pcm_data, pcm_len, nullptr, &result);
     if (rc != RAC_SUCCESS) {
         Napi::Error::New(env, "transcribe failed: " + std::to_string(rc))
             .ThrowAsJavaScriptException();
@@ -672,7 +694,25 @@ Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
 // shutdown()
 // =============================================================================
 Napi::Value Shutdown(const Napi::CallbackInfo& info) {
-    if (g_initialized.exchange(false)) rac_shutdown();
+    if (g_initialized.exchange(false)) {
+        // Destroy every still-loaded component and clear the handle maps so no id
+        // outlives the runtime — a later unload/use can't touch freed native
+        // state, and a re-init starts from a clean slate.
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            for (auto& kv : g_llm_handles) rac_llm_component_destroy(kv.second);
+            for (auto& kv : g_vlm_handles) rac_vlm_component_destroy(kv.second);
+            for (auto& kv : g_embed_handles) rac_embeddings_destroy(kv.second);
+            for (auto& kv : g_stt_handles) rac_stt_component_destroy(kv.second);
+            for (auto& kv : g_tts_handles) rac_tts_component_destroy(kv.second);
+            g_llm_handles.clear();
+            g_vlm_handles.clear();
+            g_embed_handles.clear();
+            g_stt_handles.clear();
+            g_tts_handles.clear();
+        }
+        rac_shutdown();
+    }
     return info.Env().Undefined();
 }
 
