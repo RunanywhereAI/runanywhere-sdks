@@ -13,8 +13,14 @@ import { VoiceAgent } from './VoiceAgent';
 import type { VoiceAgentModels, VoiceAgentOptions } from './VoiceAgent';
 import { Chat } from './Chat';
 import type { ChatOptions } from './Chat';
-import { jsonSchemaToGrammar } from './grammar';
 import type { JsonSchema } from './grammar';
+import {
+  objectGrammar,
+  toolCallSchema,
+  toolCallPrompt,
+  parseStructured,
+} from './structured';
+import type { ToolSpec, ToolCall } from './structured';
 
 /** Per-request generation controls (all optional). */
 export interface GenerateOptions {
@@ -33,19 +39,7 @@ export interface GenerateObjectOptions extends GenerateOptions {
   schema: JsonSchema;
 }
 
-/** A tool the model may be asked to call. */
-export interface ToolSpec {
-  name: string;
-  description?: string;
-  /** JSON-schema (object) describing the call arguments. */
-  parameters: JsonSchema;
-}
-
-/** A parsed tool call chosen by the model. */
-export interface ToolCall {
-  name: string;
-  arguments: Record<string, unknown>;
-}
+export type { ToolSpec, ToolCall } from './structured';
 
 export interface InitOptions {
   /** Directory for the (encrypted, in a future release) secure store. */
@@ -84,15 +78,10 @@ export class LLMModel {
    */
   async generateObject<T = unknown>(prompt: string, options: GenerateObjectOptions): Promise<T> {
     const { schema, ...rest } = options;
-    const grammar = jsonSchemaToGrammar(schema);
+    const grammar = objectGrammar(schema);
     let out = '';
     for await (const t of this.generate(prompt, { ...rest, grammar })) out += t;
-    const text = out.trim();
-    try {
-      return JSON.parse(text) as T;
-    } catch (e) {
-      throw new Error(`generateObject: model did not return valid JSON: ${text}`);
-    }
+    return parseStructured<T>(out, 'generateObject');
   }
   /**
    * Tool calling: force the model to pick one of `tools` and emit a well-formed
@@ -106,26 +95,12 @@ export class LLMModel {
     options: GenerateOptions = {}
   ): Promise<ToolCall> {
     if (!tools.length) throw new Error('generateToolCall: at least one tool is required');
-    const schema: JsonSchema = {
-      anyOf: tools.map((t) => ({
-        type: 'object',
-        properties: { name: { const: t.name }, arguments: t.parameters },
-        required: ['name', 'arguments'],
-      })),
-    };
-    const grammar = jsonSchemaToGrammar(schema);
-    const doc = tools
-      .map((t) => `- ${t.name}${t.description ? ': ' + t.description : ''}`)
-      .join('\n');
-    const full = `${prompt}\n\nAvailable tools:\n${doc}\n\nReply with a single JSON tool call.`;
+    const grammar = objectGrammar(toolCallSchema(tools));
     let out = '';
-    for await (const t of this.generate(full, { ...options, grammar })) out += t;
-    const text = out.trim();
-    try {
-      return JSON.parse(text) as ToolCall;
-    } catch (e) {
-      throw new Error(`generateToolCall: model did not return a valid tool call: ${text}`);
+    for await (const t of this.generate(toolCallPrompt(prompt, tools), { ...options, grammar })) {
+      out += t;
     }
+    return parseStructured<ToolCall>(out, 'generateToolCall');
   }
   unload(): void {
     addon.unloadModel(this.handle);
