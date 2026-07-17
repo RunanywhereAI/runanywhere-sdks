@@ -822,11 +822,17 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     int prompt_tokens = 0;
 
     auto start_time = std::chrono::high_resolution_clock::now();
+    auto first_token_time = start_time;
+    bool first_token_seen = false;
 
     RAC_LOG_INFO("LLM.LlamaCpp", "generate(): calling generate_stream...");
     bool success = generate_stream(
         request,
         [&](const std::string& token) -> bool {
+            if (!first_token_seen) {
+                first_token_seen = true;
+                first_token_time = std::chrono::high_resolution_clock::now();
+            }
             generated_text += token;
             tokens_generated++;
             return !cancel_requested_.load();
@@ -836,12 +842,20 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
                  success, tokens_generated);
 
     auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    using fms = std::chrono::duration<double, std::milli>;
+    const double total_ms = fms(end_time - start_time).count();
+    // Prefill (prompt-eval) time is approximated by the time to the first
+    // produced token; the decode phase is everything after. Falling back to the
+    // full duration keeps decode throughput finite when no token was produced.
+    const double ttft_ms = first_token_seen ? fms(first_token_time - start_time).count() : 0.0;
+    const double decode_ms = first_token_seen ? fms(end_time - first_token_time).count() : total_ms;
 
     result.text = generated_text;
     result.tokens_generated = tokens_generated;
     result.prompt_tokens = prompt_tokens;
-    result.inference_time_ms = duration.count();
+    result.inference_time_ms = total_ms;
+    result.time_to_first_token_ms = ttft_ms;
+    result.decode_time_ms = decode_ms;
 
     if (decode_failed_) {
         result.finish_reason = "error";

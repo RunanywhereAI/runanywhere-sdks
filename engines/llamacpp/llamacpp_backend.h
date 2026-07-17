@@ -54,6 +54,11 @@ struct TextGenerationResult {
     int tokens_generated = 0;
     int prompt_tokens = 0;
     double inference_time_ms = 0.0;
+    // Time to the first produced token (~= prompt-eval / prefill time). The
+    // decode phase is everything after, so decode_time_ms isolates generation
+    // throughput from prefill. Mirrors the VLM backend timing split.
+    double time_to_first_token_ms = 0.0;
+    double decode_time_ms = 0.0;
     std::string finish_reason;  // "stop", "length", "cancelled"
 };
 
