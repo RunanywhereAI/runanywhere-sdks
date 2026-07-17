@@ -13,6 +13,10 @@ on:
       - 'sdk/runanywhere-electron/**'
       - '.github/workflows/electron-sdk-ci.yml'
 
+# Least-privilege: this workflow only needs to read the repo contents.
+permissions:
+  contents: read
+
 jobs:
   unit:
     runs-on: ubuntu-latest
