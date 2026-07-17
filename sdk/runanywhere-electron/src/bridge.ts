@@ -16,6 +16,12 @@ export interface NativeAddon {
   secureSet(key: string, value: string): void;
   secureGet(key: string): string | null;
   secureDelete(key: string): void;
+  createVad(threshold?: number): number;
+  vadProcess(handle: number, samples: Float32Array): boolean;
+  vadIsActive(handle: number): boolean;
+  vadSetThreshold(handle: number, threshold: number): void;
+  vadReset(handle: number): void;
+  unloadVad(handle: number): void;
   loadModel(modelPath: string, id?: string, name?: string): number;
   // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
   // detects whether arg 3 is the callback or a generation-options object.
