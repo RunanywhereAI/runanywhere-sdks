@@ -265,6 +265,23 @@ export const RunAnywhere = {
     return new VoiceAgent(models, opts);
   },
 
+  /**
+   * Encrypted key-value store (DPAPI-backed on Windows) for secrets like API
+   * keys. Requires initialize(). Values are encrypted at rest with the current
+   * user's credentials.
+   */
+  secureSet(key: string, value: string): void {
+    addon.secureSet(key, value);
+  },
+  /** Read a value from the secure store, or null if absent. */
+  secureGet(key: string): string | null {
+    return addon.secureGet(key);
+  },
+  /** Delete a value from the secure store (a missing key is a no-op). */
+  secureDelete(key: string): void {
+    addon.secureDelete(key);
+  },
+
   /** Tear down the runtime. Idempotent. */
   shutdown(): void {
     if (!initialized) return;
