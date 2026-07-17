@@ -7,6 +7,7 @@ export {
   Embedder,
   STTModel,
   TTSVoice,
+  Vad,
 } from './RunAnywhere';
 export type {
   InitOptions,
@@ -20,6 +21,7 @@ export type {
   LLMStreamEvent,
   LLMGenerationResult,
   Environment,
+  VadOptions,
 } from './RunAnywhere';
 export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException } from './errors';
 export { EventBus } from './events';
