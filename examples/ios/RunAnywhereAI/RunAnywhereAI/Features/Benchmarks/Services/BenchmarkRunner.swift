@@ -208,6 +208,7 @@ final class BenchmarkRunner {
                 scenario: item.scenario,
                 modelInfo: ComponentModelInfo(from: item.model),
                 metrics: aggregated,
+                requestedTrials: trialCount,
                 variance: variance
             ))
         }

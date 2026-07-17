@@ -197,6 +197,15 @@ struct AppColors {
     static let cardBackground = backgroundSecondary
     static let cardBackgroundDark = backgroundSecondaryDark
 
+    // Branded benchmark share card. These colors stay platform-invariant because
+    // the same view is rasterized for social sharing on iOS and macOS.
+    static let shareCardBackgroundTop = Color(hex: 0x1A0E06)
+    static let shareCardBackgroundBottom = Color(hex: 0x0B0B0C)
+    static let shareCardAccent = primaryAccent
+    static let shareCardTextPrimary = Color(hex: 0xF5F3F1)
+    static let shareCardTextSecondary = Color(hex: 0x9A938E)
+    static let shareCardRowBackground = Color.white.opacity(0.08)
+
     // ====================
     // TYPING INDICATOR - RunAnywhere Theme
     // ====================

@@ -146,7 +146,7 @@ struct BenchmarkDashboardView: View {
 
             // Run Controls — guide to model download when nothing is installed.
             Section {
-                if viewModel.availableModels.isEmpty {
+                if !viewModel.availableModels.values.contains(where: { !$0.isEmpty }) {
                     VStack(alignment: .leading, spacing: AppSpacing.small) {
                         Text("No models downloaded yet")
                             .font(AppTypography.subheadlineMedium)
@@ -169,7 +169,11 @@ struct BenchmarkDashboardView: View {
                         Label("Run Benchmark", systemImage: "play.fill")
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .disabled(viewModel.isRunning || viewModel.selectedCategories.isEmpty)
+                    .disabled(
+                        viewModel.isRunning
+                            || viewModel.selectedCategories.isEmpty
+                            || visibleModelCategories.isEmpty
+                    )
 
                     if viewModel.selectedCategories.isEmpty {
                         Text("Select at least one category to run benchmarks.")

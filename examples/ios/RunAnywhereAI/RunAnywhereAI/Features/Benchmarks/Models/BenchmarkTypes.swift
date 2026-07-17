@@ -227,18 +227,22 @@ struct BenchmarkResult: Codable, Sendable, Identifiable {
     let modelInfo: ComponentModelInfo
     // Median across `trials` measured passes (or the single pass when trials == 1).
     let metrics: BenchmarkMetrics
+    // Explicit requested count for new records. Optional so records written before
+    // trial metadata existed continue to decode.
+    let requestedTrials: Int?
     // Variance summary; nil for a single-trial run. Optional so older persisted
     // runs (written before trials existed) still decode.
     let variance: BenchmarkVariance?
 
-    /// Number of measured passes that contributed to `metrics`.
-    var trials: Int { variance?.trials ?? 1 }
+    /// Requested passes, with variance and single-pass fallbacks for legacy records.
+    var trials: Int { requestedTrials ?? variance?.trials ?? 1 }
 
     init(
         category: BenchmarkCategory,
         scenario: BenchmarkScenario,
         modelInfo: ComponentModelInfo,
         metrics: BenchmarkMetrics,
+        requestedTrials: Int? = nil,
         variance: BenchmarkVariance? = nil
     ) {
         self.id = UUID()
@@ -247,6 +251,7 @@ struct BenchmarkResult: Codable, Sendable, Identifiable {
         self.scenario = scenario
         self.modelInfo = modelInfo
         self.metrics = metrics
+        self.requestedTrials = requestedTrials
         self.variance = variance
     }
 }

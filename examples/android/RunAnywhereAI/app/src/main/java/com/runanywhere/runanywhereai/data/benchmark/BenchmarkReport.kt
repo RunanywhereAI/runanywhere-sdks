@@ -61,9 +61,9 @@ object BenchmarkReport {
                 m.promptEvalMs?.let(::num).orEmpty(), m.decodeMs?.let(::num).orEmpty(),
                 m.realTimeFactor?.let(::num).orEmpty(), m.audioLengthSeconds?.let(::num).orEmpty(),
                 m.audioDurationSeconds?.let(::num).orEmpty(), m.charactersProcessed?.toString().orEmpty(),
-                m.memoryDeltaBytes.toString(), (r.errorMessage ?: "").replace(',', ';'),
+                m.memoryDeltaBytes.toString(), r.errorMessage.orEmpty(),
             )
-            appendLine(cells.joinToString(","))
+            appendLine(cells.joinToString(",") { csvCell(it) })
         }
     }
 
@@ -101,5 +101,12 @@ object BenchmarkReport {
         else -> "$bytes B"
     }
 
-    private fun num(value: Double): String = "%.2f".format(value)
+    private fun num(value: Double): String = String.format(Locale.US, "%.2f", value)
+
+    private fun csvCell(value: String): String =
+        if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
+            "\"${value.replace("\"", "\"\"")}\""
+        } else {
+            value
+        }
 }

@@ -80,6 +80,27 @@ struct AppSpacing {
     static let shadowMedium: CGFloat = 3
     static let shadowLarge: CGFloat = 4
     static let shadowXLarge: CGFloat = 10
+
+    // Branded benchmark share card
+    static let shareCardStackSpacing: CGFloat = 0
+    static let shareCardHeaderToHero: CGFloat = 28
+    static let shareCardHeroToRows: CGFloat = 20
+    static let shareCardRowsToFooter: CGFloat = 12
+    static let shareCardHorizontalPadding: CGFloat = 26
+    static let shareCardVerticalPadding: CGFloat = 30
+    static let shareCardCornerRadius: CGFloat = 24
+    static let shareCardHeaderSpacing: CGFloat = 6
+    static let shareCardBrandSpacing: CGFloat = 10
+    static let shareCardHeroSpacing: CGFloat = 4
+    static let shareCardHeroMetricSpacing: CGFloat = 8
+    static let shareCardRowsSpacing: CGFloat = 6
+    static let shareCardFooterSpacing: CGFloat = 4
+    static let shareCardRowContentSpacing: CGFloat = 12
+    static let shareCardRowTextSpacing: CGFloat = 1
+    static let shareCardRowMetricSpacing: CGFloat = 8
+    static let shareCardRowHorizontalPadding: CGFloat = 12
+    static let shareCardRowVerticalPadding: CGFloat = 8
+    static let shareCardRowCornerRadius: CGFloat = 12
 }
 
 // MARK: - Layout Constants (from existing usage)
@@ -112,4 +133,10 @@ struct AppLayout {
     static let animationVerySlow: Double = 0.6
     static let animationLoop: Double = 1.0
     static let animationLoopSlow: Double = 2.0
+
+    // Branded benchmark share card
+    static let shareCardWidth: CGFloat = 320
+    static let shareCardAspectRatio: CGFloat = 9 / 16
+    static let shareCardLogoSize: CGFloat = 40
+    static let shareCardSingleLineLimit = 1
 }

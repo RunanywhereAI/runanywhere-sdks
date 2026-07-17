@@ -31,6 +31,13 @@ enum DeviceFormFactor {
 
 /// Provides adaptive sizes that scale appropriately for different platforms
 struct AdaptiveSizing {
+    /// Share cards use one platform-invariant canvas so exported images retain
+    /// identical geometry across share targets, while still respecting the
+    /// current form factor's sheet width.
+    static var shareCardWidth: CGFloat {
+        min(AppLayout.shareCardWidth, sheetMaxWidth)
+    }
+
     /// Microphone/main action button size
     static var micButtonSize: CGFloat {
         switch DeviceFormFactor.current {

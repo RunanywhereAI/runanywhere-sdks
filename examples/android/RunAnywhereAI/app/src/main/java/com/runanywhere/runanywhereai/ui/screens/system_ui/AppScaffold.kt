@@ -109,6 +109,7 @@ fun AppScaffold() {
                     navController = navController,
                     chatViewModel = chatViewModel,
                     onOpenModels = { showModelSheet = true },
+                    isModelSheetVisible = showModelSheet,
                     // This is an explicit request for live mode. Do not restore a
                     // previously saved photo-mode Vision destination over its argument.
                     onOpenVision = {

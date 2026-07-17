@@ -101,7 +101,7 @@ if count == 0:
     raise SystemExit(f"ERROR: full macOS host contains no reviewed {label} prefix")
 
 if len(stable_prefix) > len(source):
-    raise SystemExit(f"ERROR: {label} prefix is too short for privacy sanitization")
+    stable_prefix = b"/"
 replacement = stable_prefix + (b"_" * (len(source) - len(stable_prefix)))
 payload = payload.replace(source, replacement)
 if source in payload or len(payload) != artifact.stat().st_size:

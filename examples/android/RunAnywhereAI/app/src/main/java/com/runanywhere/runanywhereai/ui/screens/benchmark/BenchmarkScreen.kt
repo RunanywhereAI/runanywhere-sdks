@@ -15,13 +15,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.runanywhere.runanywhereai.util.isExpandedScreen
 
-// Responsive entry for the benchmark feature: a single dashboard on compact widths
-// (detail is a separate nav route), or a two-pane list ↔ detail layout on expanded
-// widths with in-pane selection.
+/**
+ * Responsive benchmark entry point: a dashboard on compact widths and a two-pane
+ * dashboard/detail layout on expanded widths.
+ *
+ * [isModelSheetVisible] lets the dashboard refresh downloaded-model availability when
+ * the model sheet closes while this screen remains mounted.
+ */
 @Composable
-fun BenchmarkScreen(onOpenDetail: (String) -> Unit, onOpenModels: () -> Unit = {}) {
+fun BenchmarkScreen(
+    onOpenDetail: (String) -> Unit,
+    onOpenModels: () -> Unit = {},
+    isModelSheetVisible: Boolean = false,
+) {
     if (!isExpandedScreen()) {
-        BenchmarkDashboardScreen(onOpenRun = onOpenDetail, onOpenModels = onOpenModels)
+        BenchmarkDashboardScreen(
+            onOpenRun = onOpenDetail,
+            onOpenModels = onOpenModels,
+            isModelSheetVisible = isModelSheetVisible,
+        )
         return
     }
 
@@ -30,6 +42,7 @@ fun BenchmarkScreen(onOpenDetail: (String) -> Unit, onOpenModels: () -> Unit = {
         BenchmarkDashboardScreen(
             onOpenRun = { selectedRunId = it },
             onOpenModels = onOpenModels,
+            isModelSheetVisible = isModelSheetVisible,
             selectedRunId = selectedRunId,
             modifier = Modifier.weight(1f),
         )

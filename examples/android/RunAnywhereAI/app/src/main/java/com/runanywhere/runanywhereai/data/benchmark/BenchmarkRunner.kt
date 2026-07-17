@@ -42,10 +42,10 @@ import java.io.File
 import java.io.FileOutputStream
 
 // Runs the benchmark suite: every downloaded model of each selected category, each
-// against a fixed set of deterministic scenarios. Each (model x scenario) is loaded
-// and warmed up ONCE, then measured over `trials` repeated passes whose per-metric
-// median is reported with an observed min/max range (variance). Metrics are read off
-// the SDK results (same fields the chat screen trusts), never estimated.
+// against a fixed set of deterministic scenarios. Each trial performs a complete
+// load -> warmup -> measure -> unload pass, then the per-metric median is reported
+// with an observed min/max range (variance). Metrics are read off the SDK results
+// (same fields the chat screen trusts), never estimated.
 //
 // The LLM path uses generateStream + aggregateStream (not one-shot generate) so TTFT
 // has a client-side first-token fallback when the backend does not surface it —
@@ -99,26 +99,36 @@ class BenchmarkRunner(private val context: Context) {
         work.forEachIndexed { index, w ->
             onProgress(BenchmarkProgress(index + 1, work.size, w.category, w.scenario, w.model.name))
             val outcome = runCatching {
-                when (w.category) {
-                    BenchmarkCategory.LLM -> llmRun(w.model, w.maxTokens, trialCount)
-                    BenchmarkCategory.STT -> sttRun(w.model, w.scenario, trialCount)
-                    BenchmarkCategory.TTS -> ttsRun(w.model, w.scenario, trialCount)
-                    BenchmarkCategory.VLM -> vlmRun(w.model, trialCount)
+                val perTrial = ArrayList<BenchmarkMetrics>(trialCount)
+                repeat(trialCount) {
+                    perTrial += when (w.category) {
+                        BenchmarkCategory.LLM -> llmRun(w.model, w.maxTokens)
+                        BenchmarkCategory.STT -> sttRun(w.model, w.scenario)
+                        BenchmarkCategory.TTS -> ttsRun(w.model, w.scenario)
+                        BenchmarkCategory.VLM -> vlmRun(w.model)
+                    }
                 }
+                aggregateTrials(perTrial)
             }
             onResult(
                 outcome.fold(
-                    onSuccess = { agg -> result(w, true, null, agg) },
+                    onSuccess = { agg -> result(w, true, null, agg, trialCount) },
                     onFailure = { e ->
                         if (e is kotlin.coroutines.cancellation.CancellationException) throw e
-                        result(w, false, e.message ?: "Benchmark failed", AggregatedBenchmark(BenchmarkMetrics(), null))
+                        result(
+                            w,
+                            false,
+                            e.message ?: "Benchmark failed",
+                            AggregatedBenchmark(BenchmarkMetrics(), null),
+                            trialCount,
+                        )
                     },
                 ),
             )
         }
     }
 
-    private fun result(w: Work, success: Boolean, error: String?, agg: AggregatedBenchmark) =
+    private fun result(w: Work, success: Boolean, error: String?, agg: AggregatedBenchmark, trials: Int) =
         BenchmarkResult(
             category = w.category,
             scenario = w.scenario,
@@ -128,30 +138,26 @@ class BenchmarkRunner(private val context: Context) {
             success = success,
             errorMessage = error,
             metrics = agg.metrics,
-            trials = agg.variance?.trials ?: 1,
+            trials = trials,
             variance = agg.variance,
         )
 
-    private suspend fun llmRun(model: RAModelInfo, maxTokens: Int, trials: Int): AggregatedBenchmark {
+    private suspend fun llmRun(model: RAModelInfo, maxTokens: Int): BenchmarkMetrics {
         // Ensure clean state: unload any LLM left over from chat or a previous run.
         unload(ModelCategory.MODEL_CATEGORY_LANGUAGE)
         val memBefore = SyntheticInput.availableMemoryBytes(context)
         val loadMs = load(model, ModelCategory.MODEL_CATEGORY_LANGUAGE)
         try {
             val warmupMs = measureMs { warmupLlm() }
-            val perTrial = ArrayList<BenchmarkMetrics>(trials)
-            repeat(trials) {
-                val (measured, e2eMs) = measureLlm(maxTokens)
-                val memAfter = SyntheticInput.availableMemoryBytes(context)
-                perTrial += llmBenchmarkMetrics(
-                    result = measured,
-                    loadTimeMs = loadMs,
-                    warmupTimeMs = warmupMs,
-                    measuredEndToEndMs = e2eMs,
-                    memoryDeltaBytes = memBefore - memAfter,
-                ).requireSuccessfulOutput(BenchmarkCategory.LLM)
-            }
-            return aggregateTrials(perTrial)
+            val (measured, e2eMs) = measureLlm(maxTokens)
+            val memAfter = SyntheticInput.availableMemoryBytes(context)
+            return llmBenchmarkMetrics(
+                result = measured,
+                loadTimeMs = loadMs,
+                warmupTimeMs = warmupMs,
+                measuredEndToEndMs = e2eMs,
+                memoryDeltaBytes = memBefore - memAfter,
+            ).requireSuccessfulOutput(BenchmarkCategory.LLM)
         } finally {
             unload(ModelCategory.MODEL_CATEGORY_LANGUAGE)
         }
@@ -197,7 +203,7 @@ class BenchmarkRunner(private val context: Context) {
         return measured to e2eMs
     }
 
-    private suspend fun sttRun(model: RAModelInfo, scenario: String, trials: Int): AggregatedBenchmark {
+    private suspend fun sttRun(model: RAModelInfo, scenario: String): BenchmarkMetrics {
         val memBefore = SyntheticInput.availableMemoryBytes(context)
         val loadMs = load(model, ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
         try {
@@ -212,30 +218,30 @@ class BenchmarkRunner(private val context: Context) {
             // Warmup: one discarded transcription so first-run cache/JIT cost is not
             // charged to the first measured pass (parity with the LLM/VLM warmup).
             val warmupMs = measureMs {
-                runCatching { RunAnywhere.transcribe(SyntheticInput.silentPcm(WARMUP_AUDIO_SECONDS), options) }
+                runCatching {
+                    RunAnywhere.transcribe(SyntheticInput.silentPcm(WARMUP_AUDIO_SECONDS), options)
+                }.onFailure { error ->
+                    if (error is kotlin.coroutines.cancellation.CancellationException) throw error
+                }
             }
-            val perTrial = ArrayList<BenchmarkMetrics>(trials)
-            repeat(trials) {
-                val start = System.nanoTime()
-                val out = RunAnywhere.transcribe(pcm, options)
-                val e2eMs = (System.nanoTime() - start) / 1_000_000.0
-                val memAfter = SyntheticInput.availableMemoryBytes(context)
-                perTrial += BenchmarkMetrics(
-                    loadTimeMs = loadMs,
-                    warmupTimeMs = warmupMs,
-                    endToEndLatencyMs = e2eMs,
-                    realTimeFactor = out.metadata?.real_time_factor?.toDouble()?.takeIf { it > 0 },
-                    audioLengthSeconds = seconds,
-                    memoryDeltaBytes = memBefore - memAfter,
-                )
-            }
-            return aggregateTrials(perTrial)
+            val start = System.nanoTime()
+            val out = RunAnywhere.transcribe(pcm, options)
+            val e2eMs = (System.nanoTime() - start) / 1_000_000.0
+            val memAfter = SyntheticInput.availableMemoryBytes(context)
+            return BenchmarkMetrics(
+                loadTimeMs = loadMs,
+                warmupTimeMs = warmupMs,
+                endToEndLatencyMs = e2eMs,
+                realTimeFactor = out.metadata?.real_time_factor?.toDouble()?.takeIf { it > 0 },
+                audioLengthSeconds = seconds,
+                memoryDeltaBytes = memBefore - memAfter,
+            )
         } finally {
             unload(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
         }
     }
 
-    private suspend fun ttsRun(model: RAModelInfo, scenario: String, trials: Int): AggregatedBenchmark {
+    private suspend fun ttsRun(model: RAModelInfo, scenario: String): BenchmarkMetrics {
         val text = if (scenario.contains("Short")) TTS_SHORT else TTS_MEDIUM
         val memBefore = SyntheticInput.availableMemoryBytes(context)
         val loadMs = load(model, ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
@@ -251,29 +257,28 @@ class BenchmarkRunner(private val context: Context) {
             // Warmup: one discarded synthesis so first-run cache/JIT cost is excluded.
             val warmupMs = measureMs {
                 runCatching { RunAnywhere.synthesize(TTS_WARMUP, options) }
+                    .onFailure { error ->
+                        if (error is kotlin.coroutines.cancellation.CancellationException) throw error
+                    }
             }
-            val perTrial = ArrayList<BenchmarkMetrics>(trials)
-            repeat(trials) {
-                val start = System.nanoTime()
-                val out = RunAnywhere.synthesize(text, options)
-                val e2eMs = (System.nanoTime() - start) / 1_000_000.0
-                val memAfter = SyntheticInput.availableMemoryBytes(context)
-                perTrial += BenchmarkMetrics(
-                    loadTimeMs = loadMs,
-                    warmupTimeMs = warmupMs,
-                    endToEndLatencyMs = e2eMs,
-                    audioDurationSeconds = out.duration_ms / 1000.0,
-                    charactersProcessed = out.metadata?.character_count ?: text.length,
-                    memoryDeltaBytes = memBefore - memAfter,
-                )
-            }
-            return aggregateTrials(perTrial)
+            val start = System.nanoTime()
+            val out = RunAnywhere.synthesize(text, options)
+            val e2eMs = (System.nanoTime() - start) / 1_000_000.0
+            val memAfter = SyntheticInput.availableMemoryBytes(context)
+            return BenchmarkMetrics(
+                loadTimeMs = loadMs,
+                warmupTimeMs = warmupMs,
+                endToEndLatencyMs = e2eMs,
+                audioDurationSeconds = out.duration_ms / 1000.0,
+                charactersProcessed = out.metadata?.character_count ?: text.length,
+                memoryDeltaBytes = memBefore - memAfter,
+            )
         } finally {
             unload(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
         }
     }
 
-    private suspend fun vlmRun(model: RAModelInfo, trials: Int): AggregatedBenchmark {
+    private suspend fun vlmRun(model: RAModelInfo): BenchmarkMetrics {
         // Ensure clean state: unload any leftover VLM plus any lingering LLM to free
         // memory headroom, then give the OS a moment to reclaim it before measuring.
         unload(ModelCategory.MODEL_CATEGORY_MULTIMODAL)
@@ -290,27 +295,23 @@ class BenchmarkRunner(private val context: Context) {
                         RunAnywhere.processImage(image, RAVLMGenerationOptions(prompt = "Hi", max_tokens = 1, temperature = 0f))
                     }
                 }
-                val perTrial = ArrayList<BenchmarkMetrics>(trials)
-                repeat(trials) {
-                    // Flush any lingering generation state / KV cache before each measured run.
-                    RunAnywhere.cancelVLMGeneration()
-                    val result = RunAnywhere.processImage(
-                        image,
-                        RAVLMGenerationOptions(prompt = VLM_PROMPT, max_tokens = 128, temperature = 0f),
-                    )
-                    val memAfter = SyntheticInput.availableMemoryBytes(context)
-                    perTrial += BenchmarkMetrics(
-                        loadTimeMs = loadMs,
-                        warmupTimeMs = warmupMs,
-                        endToEndLatencyMs = result.processing_time_ms.toDouble(),
-                        tokensPerSecond = result.tokens_per_second.toDouble().takeIf { it > 0 },
-                        ttftMs = result.time_to_first_token_ms.toDouble().takeIf { it > 0 },
-                        inputTokens = result.prompt_tokens,
-                        outputTokens = result.completion_tokens,
-                        memoryDeltaBytes = memBefore - memAfter,
-                    ).requireSuccessfulOutput(BenchmarkCategory.VLM)
-                }
-                return aggregateTrials(perTrial)
+                // Flush any lingering generation state / KV cache before the measured run.
+                RunAnywhere.cancelVLMGeneration()
+                val result = RunAnywhere.processImage(
+                    image,
+                    RAVLMGenerationOptions(prompt = VLM_PROMPT, max_tokens = 128, temperature = 0f),
+                )
+                val memAfter = SyntheticInput.availableMemoryBytes(context)
+                return BenchmarkMetrics(
+                    loadTimeMs = loadMs,
+                    warmupTimeMs = warmupMs,
+                    endToEndLatencyMs = result.processing_time_ms.toDouble(),
+                    tokensPerSecond = result.tokens_per_second.toDouble().takeIf { it > 0 },
+                    ttftMs = result.time_to_first_token_ms.toDouble().takeIf { it > 0 },
+                    inputTokens = result.prompt_tokens,
+                    outputTokens = result.completion_tokens,
+                    memoryDeltaBytes = memBefore - memAfter,
+                ).requireSuccessfulOutput(BenchmarkCategory.VLM)
             } finally {
                 file.delete()
             }
@@ -358,8 +359,11 @@ class BenchmarkRunner(private val context: Context) {
         return all.filter { accepts(category, it) && it.isDownloadedOnDisk && !isBuiltIn(it) }
     }
 
-    // True when at least one non-built-in model is downloaded on disk for any of the
-    // given categories — used to guide the user to the model screen when none exist.
+    /**
+     * Returns whether any selected category has a non-built-in model downloaded on disk.
+     *
+     * This powers the benchmark screen's prompt to download a model before starting a run.
+     */
     suspend fun hasDownloadedModels(categories: Set<BenchmarkCategory>): Boolean {
         val all = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
         return all.any { model ->

@@ -50,6 +50,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         private set
 
     private var job: Job? = null
+    private var availabilityJob: Job? = null
 
     val history: List<BenchmarkRun> get() = BenchmarkStore.runs
 
@@ -57,9 +58,20 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         refreshAvailability()
     }
 
+    /** Rechecks model availability for the current selection, replacing any in-flight check. */
     fun refreshAvailability() {
-        viewModelScope.launch(Dispatchers.Default) {
-            hasModels = runCatching { runner.hasDownloadedModels(selected.toSet()) }.getOrDefault(true)
+        val categories = selected.toSet()
+        availabilityJob?.cancel()
+        availabilityJob = viewModelScope.launch {
+            hasModels = try {
+                withContext(Dispatchers.Default) {
+                    runner.hasDownloadedModels(categories)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 
@@ -69,6 +81,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         refreshAvailability()
     }
 
+    /** Selects a supported trial count while no benchmark is running. */
     fun selectTrials(count: Int) {
         if (isRunning) return
         if (count in trialOptions) trials = count

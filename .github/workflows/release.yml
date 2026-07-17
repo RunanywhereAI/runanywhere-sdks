@@ -213,6 +213,8 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - run: brew install ninja protobuf
       - uses: actions/download-artifact@v8
         with:

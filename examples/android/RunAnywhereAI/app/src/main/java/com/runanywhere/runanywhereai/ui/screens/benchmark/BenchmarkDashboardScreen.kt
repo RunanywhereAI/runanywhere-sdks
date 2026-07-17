@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +50,7 @@ import java.util.Locale
 fun BenchmarkDashboardScreen(
     onOpenRun: (String) -> Unit,
     onOpenModels: () -> Unit = {},
+    isModelSheetVisible: Boolean = false,
     selectedRunId: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -56,9 +58,11 @@ fun BenchmarkDashboardScreen(
     val vm: BenchmarkViewModel = viewModel()
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.US) }
 
-    // Re-check model availability whenever the screen is shown (a model may have been
-    // downloaded elsewhere since this ViewModel was created).
-    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshAvailability() }
+    // Re-check when first shown and whenever Models is dismissed, since a model may
+    // have been downloaded while this screen remained mounted behind the sheet.
+    LaunchedEffect(isModelSheetVisible) {
+        if (!isModelSheetVisible) vm.refreshAvailability()
+    }
 
     LazyColumn(
         modifier = modifier

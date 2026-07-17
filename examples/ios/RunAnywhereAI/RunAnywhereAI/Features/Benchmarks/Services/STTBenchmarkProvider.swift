@@ -58,10 +58,16 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
             // Warmup: one discarded transcription so first-run cache/JIT cost is not
             // charged to the measured pass (parity with the LLM/VLM warmup).
             let warmupStart = Date()
-            _ = try? await RunAnywhere.transcribe(
-                audio: SyntheticInputGenerator.silentAudio(durationSeconds: 0.5),
-                options: options
-            )
+            do {
+                _ = try await RunAnywhere.transcribe(
+                    audio: SyntheticInputGenerator.silentAudio(durationSeconds: 0.5),
+                    options: options
+                )
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                // Warmup is best-effort.
+            }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
             // Transcribe

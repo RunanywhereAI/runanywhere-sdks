@@ -42,16 +42,15 @@ data class ShareCardData(
         // Keep the card clean — only the top few models make the social image.
         private const val MAX_ROWS = 3
 
-        // Modalities with at least one successful result, in canonical display order.
-        // Empty when the run produced nothing shareable (all failed / cancelled).
+        /** Returns categories with successful results in canonical display order. */
         fun availableModalities(run: BenchmarkRun): List<BenchmarkCategory> =
             BenchmarkCategory.entries.filter { category ->
                 run.results.any { it.success && it.category == category }
             }
 
-        // Builds the card for a single modality. Callers pass a category returned by
-        // [availableModalities]; the result always has at least one row for such a
-        // category.
+        /**
+         * Builds presentation-ready data for one category returned by [availableModalities].
+         */
         fun from(run: BenchmarkRun, category: BenchmarkCategory): ShareCardData {
             val successes = run.results
                 .filter { it.success && it.category == category }
@@ -113,11 +112,12 @@ data class ShareCardData(
             val m = result.metrics
             return when (category) {
                 BenchmarkCategory.LLM, BenchmarkCategory.VLM ->
-                    m.tokensPerSecond?.let { ShareCardMetric("%.0f".format(it), "tokens / sec") }
+                    m.tokensPerSecond?.let { ShareCardMetric("%.0f".format(Locale.US, it), "tokens / sec") }
                 BenchmarkCategory.STT ->
-                    m.realTimeFactor?.takeIf { it > 0 }?.let { ShareCardMetric("%.1f×".format(1.0 / it), "faster than realtime") }
+                    m.realTimeFactor?.takeIf { it > 0 }
+                        ?.let { ShareCardMetric("%.1f×".format(Locale.US, 1.0 / it), "faster than realtime") }
                 BenchmarkCategory.TTS ->
-                    result.charsPerSecond()?.let { ShareCardMetric("%.0f".format(it), "chars / sec") }
+                    result.charsPerSecond()?.let { ShareCardMetric("%.0f".format(Locale.US, it), "chars / sec") }
             }
         }
 
@@ -131,16 +131,16 @@ data class ShareCardData(
             val m = metrics
             val cells = when (category) {
                 BenchmarkCategory.LLM, BenchmarkCategory.VLM -> listOfNotNull(
-                    m.tokensPerSecond?.let { ShareCardMetric("%.1f".format(it), "tok/s") },
-                    m.ttftMs?.let { ShareCardMetric("${"%.0f".format(it)}ms", "TTFT") },
+                    m.tokensPerSecond?.let { ShareCardMetric("%.1f".format(Locale.US, it), "tok/s") },
+                    m.ttftMs?.let { ShareCardMetric("${"%.0f".format(Locale.US, it)}ms", "TTFT") },
                 )
                 BenchmarkCategory.STT -> listOfNotNull(
-                    m.realTimeFactor?.let { ShareCardMetric("${"%.2f".format(it)}x", "RTF") },
-                    ShareCardMetric("${"%.0f".format(m.loadTimeMs)}ms", "load"),
+                    m.realTimeFactor?.let { ShareCardMetric("${"%.2f".format(Locale.US, it)}x", "RTF") },
+                    ShareCardMetric("${"%.0f".format(Locale.US, m.loadTimeMs)}ms", "load"),
                 )
                 BenchmarkCategory.TTS -> listOfNotNull(
-                    charsPerSecond()?.let { ShareCardMetric("%.0f".format(it), "chars/s") },
-                    ShareCardMetric("${"%.0f".format(m.loadTimeMs)}ms", "load"),
+                    charsPerSecond()?.let { ShareCardMetric("%.0f".format(Locale.US, it), "chars/s") },
+                    ShareCardMetric("${"%.0f".format(Locale.US, m.loadTimeMs)}ms", "load"),
                 )
             }
             return ShareCardRow(model = modelName, framework = framework, metrics = cells)

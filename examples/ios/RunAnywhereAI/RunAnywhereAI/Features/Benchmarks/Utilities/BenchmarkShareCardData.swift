@@ -11,9 +11,7 @@
 //
 
 import Foundation
-#if canImport(UIKit)
-import UIKit
-#endif
+import RunAnywhere
 
 /// One labelled metric shown on the share card (e.g. "tok/s" -> "42").
 struct ShareCardMetric: Identifiable, Sendable {
@@ -48,6 +46,7 @@ struct ShareCardData: Sendable {
 
     // Keep the card clean — only the top few models make the social image.
     private static let maxRows = 3
+    private static let numericLocale = Locale(identifier: "en_US_POSIX")
 
     /// Modalities with at least one successful result, in canonical display order.
     /// Empty when the run produced nothing shareable (all failed / cancelled).
@@ -129,12 +128,19 @@ struct ShareCardData: Sendable {
         let m = result.metrics
         switch category {
         case .llm, .vlm:
-            return m.tokensPerSecond.map { ShareCardMetric(value: String(format: "%.0f", $0), label: "tokens / sec") }
+            return m.tokensPerSecond.map {
+                ShareCardMetric(value: String(format: "%.0f", locale: numericLocale, $0), label: "tokens / sec")
+            }
         case .stt:
             guard let rtf = m.realTimeFactor, rtf > 0 else { return nil }
-            return ShareCardMetric(value: String(format: "%.1f×", 1 / rtf), label: "faster than realtime")
+            return ShareCardMetric(
+                value: String(format: "%.1f×", locale: numericLocale, 1 / rtf),
+                label: "faster than realtime"
+            )
         case .tts:
-            return charsPerSecond(result).map { ShareCardMetric(value: String(format: "%.0f", $0), label: "chars / sec") }
+            return charsPerSecond(result).map {
+                ShareCardMetric(value: String(format: "%.0f", locale: numericLocale, $0), label: "chars / sec")
+            }
         }
     }
 
@@ -150,18 +156,26 @@ struct ShareCardData: Sendable {
         switch result.category {
         case .llm, .vlm:
             optionalCells = [
-                m.tokensPerSecond.map { ShareCardMetric(value: String(format: "%.1f", $0), label: "tok/s") },
-                m.ttftMs.map { ShareCardMetric(value: String(format: "%.0fms", $0), label: "TTFT") }
+                m.tokensPerSecond.map {
+                    ShareCardMetric(value: String(format: "%.1f", locale: numericLocale, $0), label: "tok/s")
+                },
+                m.ttftMs.map {
+                    ShareCardMetric(value: String(format: "%.0fms", locale: numericLocale, $0), label: "TTFT")
+                }
             ]
         case .stt:
             optionalCells = [
-                m.realTimeFactor.map { ShareCardMetric(value: String(format: "%.2fx", $0), label: "RTF") },
-                ShareCardMetric(value: String(format: "%.0fms", m.loadTimeMs), label: "load")
+                m.realTimeFactor.map {
+                    ShareCardMetric(value: String(format: "%.2fx", locale: numericLocale, $0), label: "RTF")
+                },
+                ShareCardMetric(value: String(format: "%.0fms", locale: numericLocale, m.loadTimeMs), label: "load")
             ]
         case .tts:
             optionalCells = [
-                charsPerSecond(result).map { ShareCardMetric(value: String(format: "%.0f", $0), label: "chars/s") },
-                ShareCardMetric(value: String(format: "%.0fms", m.loadTimeMs), label: "load")
+                charsPerSecond(result).map {
+                    ShareCardMetric(value: String(format: "%.0f", locale: numericLocale, $0), label: "chars/s")
+                },
+                ShareCardMetric(value: String(format: "%.0fms", locale: numericLocale, m.loadTimeMs), label: "load")
             ]
         }
         return ShareCardRow(
@@ -184,49 +198,10 @@ struct ShareCardData: Sendable {
 
 // MARK: - Device Marketing Name
 
-/// Resolves the current device's marketing name (e.g. "iPhone 16 Pro") from its
-/// hardware identifier. `BenchmarkDeviceInfo.modelName` is only the family name
-/// ("iPhone"), so we map the identifier here — sharing always happens on the same
-/// device that ran the benchmark, so reading it live is correct.
+/// Resolves the current device's marketing name from the SDK's canonical metadata.
 enum DeviceMarketName {
     static func resolve(fallback: String) -> String {
-        #if os(iOS)
-        let id = machineIdentifier()
-        return names[id] ?? (id.hasPrefix("iPhone") || id.hasPrefix("iPad") ? fallback : fallback)
-        #else
-        return fallback
-        #endif
+        let model = DeviceInfoFactory.current.deviceModel
+        return model.isEmpty || model == "Unknown" ? fallback : model
     }
-
-    #if os(iOS)
-    private static func machineIdentifier() -> String {
-        // Simulator reports the host arch via uname; the real model is in the env.
-        if let simID = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] {
-            return simID
-        }
-        var systemInfo = utsname()
-        uname(&systemInfo)
-        let machine = withUnsafeBytes(of: &systemInfo.machine) { raw -> String in
-            let ptr = raw.bindMemory(to: CChar.self).baseAddress!
-            return String(cString: ptr)
-        }
-        return machine
-    }
-
-    // Marketing names for the identifiers this app is likely to run on. Unknown
-    // identifiers fall back to the family name so the card never shows "iPhone17,1".
-    private static let names: [String: String] = [
-        "iPhone13,1": "iPhone 12 mini", "iPhone13,2": "iPhone 12",
-        "iPhone13,3": "iPhone 12 Pro", "iPhone13,4": "iPhone 12 Pro Max",
-        "iPhone14,4": "iPhone 13 mini", "iPhone14,5": "iPhone 13",
-        "iPhone14,2": "iPhone 13 Pro", "iPhone14,3": "iPhone 13 Pro Max",
-        "iPhone14,7": "iPhone 14", "iPhone14,8": "iPhone 14 Plus",
-        "iPhone15,2": "iPhone 14 Pro", "iPhone15,3": "iPhone 14 Pro Max",
-        "iPhone15,4": "iPhone 15", "iPhone15,5": "iPhone 15 Plus",
-        "iPhone16,1": "iPhone 15 Pro", "iPhone16,2": "iPhone 15 Pro Max",
-        "iPhone17,3": "iPhone 16", "iPhone17,4": "iPhone 16 Plus",
-        "iPhone17,1": "iPhone 16 Pro", "iPhone17,2": "iPhone 16 Pro Max",
-        "iPhone17,5": "iPhone 16e"
-    ]
-    #endif
 }

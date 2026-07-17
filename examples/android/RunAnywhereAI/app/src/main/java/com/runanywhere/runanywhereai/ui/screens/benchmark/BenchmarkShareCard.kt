@@ -57,6 +57,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 // RunAnywhere brand palette for the share card (kept local so the card renders the
 // same regardless of the app's active Material color scheme).
@@ -69,8 +71,7 @@ private val CardRowBackground = Color(0x14FFFFFF)
 
 private const val SHARE_MIME = "image/png"
 
-// The branded, shareable benchmark result card. Fixed 9:16 (Stories-friendly) so the
-// captured PNG drops cleanly into Instagram / X without awkward cropping.
+/** Renders a branded 9:16 benchmark card suitable for social sharing. */
 @Composable
 fun BenchmarkShareCard(data: ShareCardData, modifier: Modifier = Modifier) {
     Column(
@@ -184,9 +185,10 @@ private fun ShareRow(row: ShareCardRow) {
     }
 }
 
-// Bottom sheet that previews the card and shares it as a PNG. The preview card itself
-// is the capture source (rendered into a GraphicsLayer), so what the user sees is
-// exactly what gets shared.
+/**
+ * Previews each successful modality in [run] and shares the selected card as a PNG.
+ * The visible preview is also the capture source, so the shared image matches it.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BenchmarkShareSheet(run: BenchmarkRun, onDismiss: () -> Unit) {
@@ -278,16 +280,30 @@ private fun captureThen(
     then: (Uri) -> Unit,
 ) {
     scope.launch {
-        val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
-        val uri = saveShareImage(context, bitmap)
+        val uri = try {
+            val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+            saveShareImage(context, bitmap)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            Toast.makeText(context, "Could not create share image. Please try again.", Toast.LENGTH_SHORT).show()
+            return@launch
+        }
         then(uri)
     }
 }
 
 private suspend fun saveShareImage(context: Context, bitmap: Bitmap): Uri = withContext(Dispatchers.IO) {
-    val dir = File(context.cacheDir, "share").apply { mkdirs() }
+    val dir = File(context.cacheDir, "share")
+    if (!dir.mkdirs() && !dir.isDirectory) {
+        throw IOException("Could not create share image cache directory")
+    }
     val file = File(dir, "runanywhere_benchmark.png")
-    FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    FileOutputStream(file).use { output ->
+        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+            throw IOException("Could not encode benchmark share image")
+        }
+    }
     FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
