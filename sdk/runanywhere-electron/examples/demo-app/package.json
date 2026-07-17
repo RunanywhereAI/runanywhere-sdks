@@ -1,0 +1,6 @@
+{
+  "name": "runanywhere-electron-demo",
+  "version": "1.0.0",
+  "description": "RunAnywhere Electron SDK demo app (Chat, Structured, Tools, Vision, Embeddings, Voice).",
+  "main": "main.js"
+}
