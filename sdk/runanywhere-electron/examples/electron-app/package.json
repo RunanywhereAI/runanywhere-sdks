@@ -1,7 +1,0 @@
-{
-  "name": "runanywhere-electron-example",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Minimal headless example of the RunAnywhere Electron utility-process architecture.",
-  "main": "main.js"
-}
