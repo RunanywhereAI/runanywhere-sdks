@@ -2,17 +2,19 @@
 // opens a tabbed window that exercises the SDK: Chat, Structured output, Tool
 // calling, Vision, Embeddings, and Voice — all over the isolated MessagePort.
 //
-//   RUNANYWHERE_NATIVE_PATH=<...>.node npx electron examples/demo-app
+//   RUNANYWHERE_NATIVE_PATH=<...>.node npx electron examples/electron/RunAnywhereAI
 //
 // Headless self-test (loads models + runs Chat/Structured/Tools/Embeddings through
 // the app's real code paths, then exits 0/1):
-//   RA_SELFTEST=1 RUNANYWHERE_NATIVE_PATH=<...>.node npx electron examples/demo-app
+//   RA_SELFTEST=1 RUNANYWHERE_NATIVE_PATH=<...>.node npx electron examples/electron/RunAnywhereAI
 const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { RunAnywhereMain } = require('../../dist/process/main');
+const { RunAnywhereMain } = require('../../../sdk/runanywhere-electron/dist/process/main');
 
-const SDK_ROOT = path.join(__dirname, '..', '..');
+// This example lives at the repo root (examples/electron/RunAnywhereAI) and loads
+// the SDK from its built output under sdk/runanywhere-electron/dist.
+const SDK_ROOT = path.join(__dirname, '..', '..', '..', 'sdk', 'runanywhere-electron');
 const SELFTEST = process.env.RA_SELFTEST === '1';
 // Self-test output goes to a file too (Electron's GUI-subsystem stdout is not
 // reliably captured when launched from a shell).

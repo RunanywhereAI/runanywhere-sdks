@@ -1,7 +1,7 @@
 // Demo preload: loads the SDK preload (which sets up window.runanywhere +
 // window.runanywhereTest), then adds a tiny conversation/settings store backed by
 // the main process (JSON files in userData). Kept in the DEMO, not the SDK.
-require('../../dist/process/preload');
+require('../../../sdk/runanywhere-electron/dist/process/preload');
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('demoStore', {

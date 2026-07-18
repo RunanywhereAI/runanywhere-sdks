@@ -32,9 +32,9 @@ Models are catalog ids, auto-downloaded on first use (`qwen2.5-0.5b`,
 ## Run
 
 ```powershell
-# from sdk/runanywhere-electron
+# from the repo root (build the SDK first: cd sdk/runanywhere-electron && npm run build)
 $env:RUNANYWHERE_NATIVE_PATH = '<repo>\build\windows-release\sdk\runanywhere-electron\native\Release\runanywhere_native.node'
-npx electron examples/demo-app
+npx electron examples/electron/RunAnywhereAI
 # (unset ELECTRON_RUN_AS_NODE first if your shell sets it)
 ```
 
@@ -48,5 +48,5 @@ the SDK integration in CI-style checks:
 ```powershell
 $env:RA_SELFTEST = '1'
 $env:RUNANYWHERE_NATIVE_PATH = '<...>\runanywhere_native.node'
-npx electron examples/demo-app   # prints [selftest] ... ALL PASS, exit 0
+npx electron examples/electron/RunAnywhereAI   # prints [selftest] ... ALL PASS, exit 0
 ```
