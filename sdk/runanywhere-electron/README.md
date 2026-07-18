@@ -132,8 +132,9 @@ win.webContents.on('did-finish-load', () => ra.connect(win.webContents));
 Renderer preload — point `webPreferences.preload` at
 `@runanywhere/electron/preload`; it exposes `window.runanywhere` with the async
 API (`loadLLM`, `generate(handle, prompt[, options], onToken)`, `transcribe`,
-`synthesize`, …). See `examples/voice-app/` for a mic → STT → LLM → TTS → speaker
-loop, and `examples/electron-app/` for streaming.
+`synthesize`, …). See the sample app at `examples/electron/RunAnywhereAI/` (repo
+root) for chat/streaming, vision, embeddings, and a mic → STT → LLM → TTS → speaker
+voice loop.
 
 Renderers that bundle the SDK (webpack/vite) can import the audio helpers:
 
