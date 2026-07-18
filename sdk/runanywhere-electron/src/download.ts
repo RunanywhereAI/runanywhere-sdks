@@ -121,6 +121,19 @@ function extractTarBz2(archive: string, destDir: string): void {
   if (r.status !== 0) throw new Error('tar extraction failed for ' + archive + ' (need bsdtar/tar on PATH)');
 }
 
+// Dedup concurrent downloads to the SAME destination. Two resolveModel calls for
+// one source (e.g. a UI double-click, or an auto-load racing an explicit
+// download) would otherwise open two write streams on the same `.part` file and
+// corrupt it / race the rename. Callers share the first in-flight promise.
+const inFlight = new Map<string, Promise<void>>();
+function downloadOnce(url: string, dest: string, onProgress?: (p: DownloadProgress) => void): Promise<void> {
+  const existing = inFlight.get(dest);
+  if (existing) return existing;
+  const p = downloadFile(url, dest, onProgress).finally(() => inFlight.delete(dest));
+  inFlight.set(dest, p);
+  return p;
+}
+
 const RE_URL = /^https?:\/\//i;
 const RE_HF = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*(:[^\s]+)?$/;
 const RE_MODEL_EXT = /\.(gguf|onnx|bin|safetensors)$/i;
@@ -233,13 +246,20 @@ export async function resolveModel(
   if (!isCatalogId(idOrPath)) {
     // Direct URL to a model file.
     if (RE_URL.test(idOrPath)) {
-      // path.basename collapses any `../` in the URL so the write stays in `dir`.
-      const fname = path.basename(decodeURIComponent(new URL(idOrPath).pathname)) || 'model.bin';
+      let fname: string;
+      try {
+        // path.basename collapses any `../` in the URL so the write stays in `dir`.
+        fname = path.basename(decodeURIComponent(new URL(idOrPath).pathname)) || 'model.bin';
+      } catch {
+        // new URL() / decodeURIComponent throw on a malformed URL or bad %-escape;
+        // surface a clear message instead of a bare URIError/TypeError.
+        throw new Error(`invalid model URL: ${idOrPath}`);
+      }
       const cid = 'url-' + sanitizeId(fname.replace(/\.[^.]+$/, '')) + '-' + shortHash(idOrPath);
       const dir = path.join(opts.dir ?? modelsRoot(), cid);
       fs.mkdirSync(dir, { recursive: true });
       const dest = path.join(dir, fname);
-      if (!fs.existsSync(dest)) await downloadFile(idOrPath, dest, opts.onProgress);
+      if (!fs.existsSync(dest)) await downloadOnce(idOrPath, dest, opts.onProgress);
       return { id: cid, type: 'path', dir, primary: dest };
     }
     // HuggingFace repo — resolve a GGUF (+ mmproj for VLMs, + shards for splits).
@@ -255,15 +275,21 @@ export async function resolveModel(
       const cid = 'hf-' + sanitizeId(repo) + '-' + shortHash(idOrPath);
       const dir = path.join(opts.dir ?? modelsRoot(), cid);
       fs.mkdirSync(dir, { recursive: true });
+      const shardNames = new Set(shards.map((g) => path.basename(g)));
       for (const g of shards) {
         const d = path.join(dir, path.basename(g));
-        if (!fs.existsSync(d)) await downloadFile(`https://huggingface.co/${repo}/resolve/main/${g}`, d, opts.onProgress);
+        if (!fs.existsSync(d)) await downloadOnce(`https://huggingface.co/${repo}/resolve/main/${g}`, d, opts.onProgress);
       }
       let mmprojPath: string | undefined;
       if (mmproj) {
-        mmprojPath = path.join(dir, path.basename(mmproj));
+        // Files are flattened to their basename; if the mmproj basename collides
+        // with a model shard (subfolders like model/x.gguf + mmproj/x.gguf), the
+        // shard's existsSync would make us SKIP the mmproj and point at the model
+        // bytes. Namespace the mmproj so it always lands in its own file.
+        const mmName = path.basename(mmproj);
+        mmprojPath = path.join(dir, shardNames.has(mmName) ? 'mmproj-' + mmName : mmName);
         if (!fs.existsSync(mmprojPath)) {
-          await downloadFile(`https://huggingface.co/${repo}/resolve/main/${mmproj}`, mmprojPath, opts.onProgress);
+          await downloadOnce(`https://huggingface.co/${repo}/resolve/main/${mmproj}`, mmprojPath, opts.onProgress);
         }
       }
       return { id: cid, type: 'path', dir, primary: path.join(dir, path.basename(shards[0])), mmproj: mmprojPath };
@@ -281,10 +307,13 @@ export async function resolveModel(
       // downloaded .tar.bz2 alone would skip forever after a failed/interrupted
       // extract. Download the archive if missing, then (re-)extract.
       if (fs.existsSync(path.join(dir, entry.primary))) continue;
-      if (!fs.existsSync(dest)) await downloadFile(f.url, dest, opts.onProgress);
+      if (!fs.existsSync(dest)) await downloadOnce(f.url, dest, opts.onProgress);
       extractTarBz2(dest, dir);
+      // The extracted tree is what we load; drop the archive so it isn't kept
+      // (and double-counted by dirSize) forever.
+      try { fs.rmSync(dest, { force: true }); } catch { /* leave it if locked */ }
     } else if (!fs.existsSync(dest)) {
-      await downloadFile(f.url, dest, opts.onProgress);
+      await downloadOnce(f.url, dest, opts.onProgress);
     }
   }
   return {
