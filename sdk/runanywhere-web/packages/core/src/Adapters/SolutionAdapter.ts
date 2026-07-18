@@ -20,10 +20,12 @@ import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import { SDKException } from '../Foundation/SDKException.js';
 import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors.js';
 import {
-  getModuleForCapability,
-  tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule.js';
+import {
+  SolutionModuleCoordinator,
+  type SolutionKind,
+} from './SolutionModuleCoordinator.js';
 
 function assertOk(op: string, rc: number): void {
   if (rc === RAC_ERROR_FEATURE_NOT_AVAILABLE) {
@@ -41,6 +43,18 @@ function assertOk(op: string, rc: number): void {
 
 function isRagSolutionYaml(yaml: string): boolean {
   return /^\s*rag\s*:/m.test(yaml);
+}
+
+function solutionKindFromYaml(yaml: string): SolutionKind {
+  if (isRagSolutionYaml(yaml)) return 'rag';
+  if (/^\s*voice_agent\s*:/m.test(yaml)) return 'voice-agent';
+  return 'generic';
+}
+
+function solutionKindFromConfig(config: SolutionConfig): SolutionKind {
+  if (config.rag !== undefined) return 'rag';
+  if (config.voiceAgent !== undefined) return 'voice-agent';
+  return 'generic';
 }
 
 function moduleSupportsRAG(module: EmscriptenRunanywhereModule): boolean {
@@ -92,14 +106,26 @@ export class SolutionHandle {
     assertOk('cancel', this.module._rac_solution_cancel(this.requireHandle()));
   }
 
-  /** Feed one UTF-8 item into the root input edge. */
-  feed(item: string): void {
+  /**
+   * Feed one UTF-8 item into the root input edge.
+   *
+   * Bytes must be valid UTF-8 text because `rac_solution_feed` accepts a
+   * NUL-terminated `const char*`, not a byte payload. Use a solution-specific
+   * component API for binary audio or other opaque inputs.
+   */
+  feed(item: string | Uint8Array): void {
+    const text = typeof item === 'string'
+      ? item
+      : new TextDecoder('utf-8', { fatal: true }).decode(item);
+    if (text.includes('\0')) {
+      throw new Error('SolutionHandle.feed does not accept NUL bytes');
+    }
     const m = this.module;
     const handle = this.requireHandle();
-    const itemLen = m.lengthBytesUTF8(item) + 1;
+    const itemLen = m.lengthBytesUTF8(text) + 1;
     const itemPtr = m._malloc(itemLen);
     try {
-      m.stringToUTF8(item, itemPtr, itemLen);
+      m.stringToUTF8(text, itemPtr, itemLen);
       assertOk('feed', m._rac_solution_feed(handle, itemPtr));
     } finally {
       m._free(itemPtr);
@@ -124,6 +150,18 @@ export class SolutionHandle {
 
   /** Alias for [destroy] — gives the API a more conventional close-shape. */
   close(): void {
+    this.destroy();
+  }
+
+  /**
+   * Terminal asynchronous completion helper.
+   *
+   * The currently exported C ABI has no non-destructive `rac_solution_wait`
+   * or output callback. `rac_solution_destroy` is the only join operation;
+   * it cancels then joins native workers, so `wait()` is intentionally a
+   * deterministic teardown point rather than a graceful-output iterator.
+   */
+  async wait(): Promise<void> {
     this.destroy();
   }
 
@@ -186,10 +224,9 @@ export const SolutionAdapter = {
     };
 
     if (yaml !== undefined) {
-      const isRag = isRagSolutionYaml(yaml);
-      const selectedModule = module
-        ?? (isRag ? getModuleForCapability('rag') : null)
-        ?? tryRunanywhereModule();
+      const kind = solutionKindFromYaml(yaml);
+      const isRag = kind === 'rag';
+      const selectedModule = SolutionModuleCoordinator.resolve(kind, module).hostModule;
       return createFromYaml(
         yaml,
         requireSolutionModule(selectedModule, isRag ? 'RAG solution YAML' : 'Solutions'),
@@ -197,17 +234,17 @@ export const SolutionAdapter = {
     }
 
     let bytes: Uint8Array;
-    let isRag = false;
+    let kind: SolutionKind = 'generic';
     if (configBytes !== undefined) {
       bytes = configBytes;
       try {
-        isRag = SolutionConfig.decode(bytes).rag !== undefined;
+        kind = solutionKindFromConfig(SolutionConfig.decode(bytes));
       } catch {
         // Preserve native decode/error semantics for malformed raw bytes.
       }
     } else if (config !== undefined) {
       bytes = SolutionConfig.encode(config).finish();
-      isRag = config.rag !== undefined;
+      kind = solutionKindFromConfig(config);
     } else {
       throw new Error(
         'SolutionAdapter.run requires exactly one of config / configBytes / yaml',
@@ -220,9 +257,8 @@ export const SolutionAdapter = {
       );
     }
 
-    const selectedModule = module
-      ?? (isRag ? getModuleForCapability('rag') : null)
-      ?? tryRunanywhereModule();
+    const isRag = kind === 'rag';
+    const selectedModule = SolutionModuleCoordinator.resolve(kind, module).hostModule;
     return createFromProto(
       bytes,
       requireSolutionModule(selectedModule, isRag ? 'RAG solution config' : 'Solutions'),

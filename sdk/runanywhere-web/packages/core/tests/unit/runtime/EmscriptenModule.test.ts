@@ -112,6 +112,7 @@ describe('Emscripten module capability wiring', () => {
     const commonsCalls: SolutionCallCounters = { creates: 0, starts: 0, destroys: 0 };
     const ragCalls: SolutionCallCounters = { creates: 0, starts: 0, destroys: 0 };
     const commonsModule = fakeModule(commonsCalls);
+    const llamaModule = fakeModule();
     const ragModule = fakeModule(ragCalls);
     ragModule._rac_rag_session_create_proto = () => 0;
     ragModule._rac_rag_query_proto = () => 0;
@@ -120,7 +121,12 @@ describe('Emscripten module capability wiring', () => {
     // Registry replay is unrelated to this routing contract and the minimal
     // fake modules intentionally omit model-registry proto exports.
     ModelRegistryAdapter.clearDefaultModule();
-    registerWasmModule(['rag'], ragModule, ['onnx']);
+    registerWasmModule(['llm'], llamaModule, ['llamacpp']);
+    registerWasmModule(
+      ['rag', 'embedding', 'stt', 'tts', 'vad', 'voice-agent'],
+      ragModule,
+      ['onnx'],
+    );
 
     const ragHandle = SolutionAdapter.run({ yaml: 'rag:\n  embed_model_id: minilm' });
     ragHandle.start();
@@ -144,20 +150,20 @@ describe('Emscripten module capability wiring', () => {
     voiceHandle.start();
     voiceHandle.destroy();
 
-    expect(commonsCalls).toEqual({ creates: 1, starts: 1, destroys: 1 });
-    expect(ragCalls).toEqual({ creates: 3, starts: 3, destroys: 3 });
+    expect(commonsCalls).toEqual({ creates: 0, starts: 0, destroys: 0 });
+    expect(ragCalls).toEqual({ creates: 4, starts: 4, destroys: 4 });
   });
 
   it('fails every RAG input form honestly when no module has RAG exports', () => {
     registerWasmModule(['commons'], fakeModule());
     expect(() => SolutionAdapter.run({ yaml: 'rag:\n  embed_model_id: minilm' }))
-      .toThrow(/Backend not available for: RAG solution YAML/);
+      .toThrow(/Backend not available for: Solutions\.rag/);
     const ragConfig = SolutionConfig.fromPartial({ rag: { embedModelId: 'minilm' } });
     expect(() => SolutionAdapter.run({ config: ragConfig }))
-      .toThrow(/Backend not available for: RAG solution config/);
+      .toThrow(/Backend not available for: Solutions\.rag/);
     expect(() => SolutionAdapter.run({
       configBytes: SolutionConfig.encode(ragConfig).finish(),
-    })).toThrow(/Backend not available for: RAG solution config/);
+    })).toThrow(/Backend not available for: Solutions\.rag/);
   });
 
   it('clears ModelRegistryAdapter default module', () => {
