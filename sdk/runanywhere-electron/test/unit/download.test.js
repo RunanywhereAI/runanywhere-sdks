@@ -27,10 +27,41 @@ test('resolveModel is an exported function', () => {
 });
 
 test('module exports exactly the public surface', () => {
-  // Guard against accidental leakage of internal helpers (extractTarBz2 is not exported).
+  // Guard against accidental leakage of internal helpers (extractTarBz2, hfFiles,
+  // pickGguf, etc. are not exported).
   assert.equal(typeof download.extractTarBz2, 'undefined');
+  assert.equal(typeof download.hfFiles, 'undefined');
+  assert.equal(typeof download.pickGguf, 'undefined');
   const own = Object.keys(download).filter((k) => typeof download[k] === 'function');
-  assert.deepEqual(own.sort(), ['downloadFile', 'modelsRoot', 'resolveModel']);
+  assert.deepEqual(own.sort(), ['downloadFile', 'isRemoteSource', 'modelsRoot', 'resolveModel']);
+});
+
+// --- isRemoteSource() (pure classifier; no network) --------------------------
+
+test('isRemoteSource is true for http(s) URLs', () => {
+  assert.equal(download.isRemoteSource('https://example.com/model.gguf'), true);
+  assert.equal(download.isRemoteSource('http://example.com/a.bin'), true);
+});
+
+test('isRemoteSource is true for a HuggingFace repo id', () => {
+  assert.equal(download.isRemoteSource('bartowski/Qwen2.5-1.5B-Instruct-GGUF'), true);
+  // owner/repo:file form is still a remote source.
+  assert.equal(download.isRemoteSource('owner/repo:model-Q4_K_M.gguf'), true);
+});
+
+test('isRemoteSource is false for a Windows drive path', () => {
+  assert.equal(download.isRemoteSource('C:\\models\\weights.gguf'), false);
+  assert.equal(download.isRemoteSource('E:\\a\\b.bin'), false);
+});
+
+test('isRemoteSource is false for a bare id with no slash', () => {
+  assert.equal(download.isRemoteSource('smollm2-135m'), false);
+  assert.equal(download.isRemoteSource('unknown-model'), false);
+});
+
+test('isRemoteSource is false for a path with 3+ segments', () => {
+  // A real nested local path is not a HuggingFace owner/repo.
+  assert.equal(download.isRemoteSource('a/b/c/model.gguf'), false);
 });
 
 // --- modelsRoot() ------------------------------------------------------------
