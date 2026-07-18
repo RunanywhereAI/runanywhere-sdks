@@ -36,7 +36,20 @@ async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown
     );
   }
   const m = await resolveModel(first);
-  if (method === 'loadVlmModel') return [m.primary, m.mmproj ?? args[1], ...args.slice(2)];
+  if (method === 'loadVlmModel') {
+    // A bare model URL has no mmproj to auto-resolve; forwarding `undefined` to
+    // the addon (whose mmprojPath arg is a required string) yields an opaque
+    // native error. Fail with a clear message instead. Catalog ids and HF repos
+    // resolve their mmproj, so this only trips a direct-URL VLM source.
+    const mmproj = m.mmproj ?? args[1];
+    if (mmproj == null) {
+      throw new Error(
+        'vision models need an mmproj — load a VLM by catalog id or HuggingFace repo (auto-resolved) ' +
+          'or pass an explicit mmproj path; a bare model URL has none'
+      );
+    }
+    return [m.primary, mmproj, ...args.slice(2)];
+  }
   return [m.primary, ...args.slice(1)];
 }
 
