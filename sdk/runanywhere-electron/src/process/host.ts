@@ -6,15 +6,16 @@
 // the real addon + model resolver into it and manages the parent port.
 import { addon } from '../bridge';
 import { isCatalogId } from '../catalog';
-import { resolveModel } from '../download';
+import { resolveModel, isRemoteSource } from '../download';
 import { dispatch } from './dispatch';
 import { RpcRequest } from './rpc';
 
-// If a load method's first arg is a catalog id, download+resolve it (in the
-// utility process, which owns Node I/O) before handing paths to the addon.
+// If a load method's first arg is a catalog id, a URL, or a HuggingFace repo,
+// download+resolve it (in the utility process, which owns Node I/O) before
+// handing concrete paths to the addon. A plain local path passes through.
 async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown[]> {
   const first = args[0];
-  if (typeof first !== 'string' || !isCatalogId(first)) return args;
+  if (typeof first !== 'string' || (!isCatalogId(first) && !isRemoteSource(first))) return args;
   const m = await resolveModel(first);
   if (method === 'loadVlmModel') return [m.primary, m.mmproj ?? args[1], ...args.slice(2)];
   return [m.primary, ...args.slice(1)];
