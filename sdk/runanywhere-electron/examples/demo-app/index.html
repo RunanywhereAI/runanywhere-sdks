@@ -116,7 +116,14 @@
       textarea, input[type=text], input[type=number] { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); border-radius: 12px; padding: 11px 13px; font: inherit; outline: none; transition: .16s var(--ease); }
       textarea { resize: vertical; }
       textarea:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-      input[type=range] { accent-color: var(--accent); width: 100%; }
+      input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: var(--surface-3); border-radius: 4px; outline: none; }
+      input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-lift), var(--accent-2)); box-shadow: 0 2px 8px var(--accent-glow); cursor: pointer; transition: transform .12s var(--ease); }
+      input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.14); }
+      input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { opacity: .4; height: 22px; }
+      /* hide the native file input; a styled label triggers it */
+      input[type=file] { display: none; }
+      .filepick { display: flex; align-items: center; gap: 12px; }
+      .filepick .fname { color: var(--fg-3); font-size: 13px; }
       .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; letter-spacing: -.005em; box-shadow: 0 6px 18px var(--accent-glow); transition: .17s var(--ease); }
       .btn:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
       .btn:active { transform: translateY(0); filter: brightness(.98); }
@@ -279,8 +286,12 @@
           <section class="panel" id="vision"><div class="wrap">
             <h2 class="lead">Vision</h2>
             <p class="hint">Describe an image with the vision-language model.</p>
-            <input id="visionfile" type="file" accept="image/*" />
-            <div style="margin-top:12px"><button class="btn" id="visiongo" disabled>Caption</button></div>
+            <div class="filepick">
+              <label class="btn ghost" for="visionfile"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Choose image</label>
+              <input id="visionfile" type="file" accept="image/*" />
+              <span class="fname" id="visionfname">No image selected</span>
+            </div>
+            <div style="margin-top:14px"><button class="btn" id="visiongo" disabled>Caption</button></div>
             <div id="visionout" class="out"></div>
           </div></section>
 
@@ -298,7 +309,7 @@
           <section class="panel" id="voice"><div class="wrap">
             <h2 class="lead">Voice</h2>
             <p class="hint">Hold to talk — mic → speech-to-text → LLM → text-to-speech → speaker.</p>
-            <button class="btn" id="voicebtn">🎙 Hold to talk</button>
+            <button class="btn" id="voicebtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Hold to talk</button>
             <div class="label">Heard</div><div id="voiceheard" class="out"></div>
             <div class="label">Reply</div><div id="voicereply" class="out"></div>
           </div></section>
@@ -308,7 +319,7 @@
             <p class="hint">Built-in energy VAD. Hold and speak — the first ~2s calibrate ambient noise.</p>
             <div class="label">Threshold · <span id="vadthval">0.015</span></div>
             <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:340px" />
-            <div style="margin-top:14px"><button class="btn" id="vadbtn">🎤 Hold + speak</button></div>
+            <div style="margin-top:14px"><button class="btn" id="vadbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> Hold + speak</button></div>
             <div class="label">Detection</div>
             <div id="vadout" class="out">—</div>
           </div></section>
