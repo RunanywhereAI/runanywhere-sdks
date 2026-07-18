@@ -68,8 +68,11 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
 
 /**
  * Extracts thinking content with a caller-provided tag pair plus the built-in
- * fallbacks described by `rac_llm_extract_thinking`. If either custom tag is
- * empty, commons uses only the built-in recognizer.
+ * fallbacks described by `rac_llm_extract_thinking`. A caller-provided pair
+ * also recognizes chat-template-prefilled output where the opening tag is in
+ * the prompt and generated text begins with the thinking body followed by the
+ * closing tag. If either custom tag is empty, commons uses only the built-in
+ * recognizer.
  *
  * This is still a commons-internal parser; SDKs should consume the generated
  * proto fields populated by commons.

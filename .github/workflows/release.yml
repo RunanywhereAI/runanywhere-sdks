@@ -204,23 +204,212 @@ jobs:
           if-no-files-found: error
 
   native_rcli_macos:
-    needs: validate
-    # macos-14 pin: the rcli preset builds llama.cpp with GGML_METAL=ON, which
-    # Xcode 16's strict ARC rejects (same reason as pr-build macos jobs).
-    runs-on: macos-14
-    timeout-minutes: 90
+    needs: [validate, native_ios]
+    # The production rcli is the Swift host that registers the MLX callbacks
+    # before entering the shared C++ CLI. It consumes the exact Apple release
+    # candidates produced above and requires Swift 6.2+ for mlx-audio-swift.
+    # Pull-request smoke keeps the faster CMake-only macos-14 lane.
+    runs-on: macos-26
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - run: brew install ninja protobuf
-      - name: Build rcli (macOS arm64, Metal)
+      - uses: actions/download-artifact@v8
+        with:
+          name: native-ios-macos
+          path: native-ios-staging
+      - name: Stage exact Apple release candidates
         run: |
           set -euo pipefail
-          cmake --preset rcli-macos-release
-          cmake --build --preset rcli-macos-release
-      - name: Package rcli tarball
+          BINARIES="$GITHUB_WORKSPACE/sdk/runanywhere-swift/Binaries"
+          rm -rf "$BINARIES"
+          mkdir -p "$BINARIES"
+          for archive in "$GITHUB_WORKSPACE"/native-ios-staging/*-ios-v*.zip; do
+            [ -f "$archive" ] || continue
+            unzip -qo "$archive" -d "$BINARIES"
+          done
+          for framework in \
+            RACommons \
+            RABackendLLAMACPP \
+            RABackendONNX \
+            RABackendSherpa \
+            RABackendCoreML \
+            RABackendMLX \
+            RunAnywhereMLXRuntime \
+            RunAnywhereMLXMetal; do
+            [ -d "$BINARIES/${framework}.xcframework" ] || {
+              echo "::error::Missing staged ${framework}.xcframework"
+              exit 1
+            }
+          done
+          [ -d "$BINARIES/RunAnywhereMLXRuntimeResources" ] || {
+            echo "::error::Missing staged RunAnywhereMLXRuntimeResources"
+            exit 1
+          }
+      - name: Build combined rcli Swift/MLX host (macOS arm64)
+        id: mlx-host
+        env:
+          CONFIGURATION: release
+          SWIFT_BUILD_JOBS: 2
+        run: |
+          set -euo pipefail
+          bash sdk/runanywhere-cli/scripts/build-mlx-cli.sh
+          export RUNANYWHERE_USE_LOCAL_NATIVES=1
+          BIN_DIR="$(swift build -c release --show-bin-path)"
+          [ -x "$BIN_DIR/RunAnywhereMLXCLI" ]
+          [ -s "$BIN_DIR/mlx.metallib" ]
+          echo "bin-dir=$BIN_DIR" >> "$GITHUB_OUTPUT"
+      - name: Smoke combined host (modelless — llama.cpp + MLX + Apple secondary engines)
+        env:
+          RCLI_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
+        run: |
+          set -euo pipefail
+          RCLI="$RCLI_BIN_DIR/RunAnywhereMLXCLI"
+          BACKENDS="$("$RCLI" backends --json)"
+          echo "$BACKENDS"
+          echo "$BACKENDS" | grep -q '"name":"llamacpp"'
+          echo "$BACKENDS" | grep -q '"name":"mlx"'
+          echo "$BACKENDS" | grep -q '"name":"sherpa"'
+          echo "$BACKENDS" | grep -q '"name":"coreml"'
+          "$RCLI" list --all | grep -q 'bonsai-27b-q1_0'
+          "$RCLI" list --all | grep -q 'mlx-bonsai-27b-1bit'
+      - name: Configure ephemeral Developer ID credentials
+        id: signing
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.RCLI_DEVELOPER_ID_CERT_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.RCLI_DEVELOPER_ID_CERT_PASSWORD }}
+          NOTARY_KEY_BASE64: ${{ secrets.RCLI_NOTARY_API_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.RCLI_NOTARY_APPLE_ID }}
+          NOTARY_APP_PASSWORD: ${{ secrets.RCLI_NOTARY_APP_SPECIFIC_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.RCLI_NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          set +x
+          for variable in CERTIFICATE_BASE64 CERTIFICATE_PASSWORD; do
+            [ -n "${!variable:-}" ] || {
+              echo "::error::Required rcli signing secret is not configured: $variable"
+              exit 1
+            }
+          done
+
+          KEYCHAIN="$RUNNER_TEMP/rcli-signing.keychain-db"
+          CERTIFICATE="$RUNNER_TEMP/rcli-developer-id.p12"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
+          NOTARY_KEY=""
+          NOTARY_PROFILE=""
+          NOTARY_MODE=""
+
+          api_key_complete=1
+          for variable in NOTARY_KEY_BASE64 NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+            [ -n "${!variable:-}" ] || api_key_complete=0
+          done
+          apple_id_complete=1
+          for variable in NOTARY_APPLE_ID NOTARY_APP_PASSWORD NOTARY_TEAM_ID; do
+            [ -n "${!variable:-}" ] || apple_id_complete=0
+          done
+
+          if [ "$api_key_complete" -eq 1 ]; then
+            # Preserve the existing App Store Connect API-key authentication
+            # path as the preferred release mode when all three values exist.
+            NOTARY_MODE="api-key"
+            NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          elif [ "$apple_id_complete" -eq 1 ]; then
+            # Fallback for teams that already notarize with an Apple ID and an
+            # app-specific password. The run-scoped name and explicit keychain
+            # prevent accidental selection of a profile from the login keychain.
+            NOTARY_MODE="apple-id"
+            NOTARY_PROFILE="rcli-notary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          else
+            echo "::error::Configure either the complete rcli App Store Connect API-key secret set or the complete Apple ID/app-specific-password secret set."
+            exit 1
+          fi
+
+          cleanup_failed_setup() {
+            status=$?
+            trap - ERR
+            security delete-keychain "$KEYCHAIN" >/dev/null 2>&1 || true
+            rm -f "$CERTIFICATE" "$NOTARY_KEY"
+            exit "$status"
+          }
+          trap cleanup_failed_setup ERR
+
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE"
+          chmod 600 "$CERTIFICATE"
+          if [ "$NOTARY_MODE" = "api-key" ]; then
+            printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$NOTARY_KEY"
+            chmod 600 "$NOTARY_KEY"
+          fi
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERTIFICATE" \
+            -k "$KEYCHAIN" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk -F'"' '/Developer ID Application:/ { print $2; exit }')"
+          [ -n "$IDENTITY" ] || {
+            echo "::error::The imported certificate is not a Developer ID Application identity"
+            exit 1
+          }
+
+          if [ "$NOTARY_MODE" = "apple-id" ]; then
+            xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+              --apple-id "$NOTARY_APPLE_ID" \
+              --password "$NOTARY_APP_PASSWORD" \
+              --team-id "$NOTARY_TEAM_ID" \
+              --keychain "$KEYCHAIN" \
+              --validate >/dev/null
+          fi
+
+          {
+            echo "identity=$IDENTITY"
+            echo "keychain=$KEYCHAIN"
+            echo "certificate=$CERTIFICATE"
+            echo "notary-mode=$NOTARY_MODE"
+            echo "notary-key=$NOTARY_KEY"
+            echo "notary-profile=$NOTARY_PROFILE"
+          } >> "$GITHUB_OUTPUT"
+          trap - ERR
+      - name: Package, sign, notarize, and staple rcli
         env:
           RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+          RCLI_MACOS_FULL_RELEASE: 1
+          RCLI_MACOS_SWIFT_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
+          RCLI_CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+          RCLI_CODESIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+          RCLI_MACOS_NOTARIZE: 1
+          RCLI_NOTARYTOOL_PROFILE: ${{ steps.signing.outputs.notary-profile }}
+          RCLI_NOTARYTOOL_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+          RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
+          RCLI_NOTARY_KEY_ID: ${{ secrets.RCLI_NOTARY_KEY_ID }}
+          RCLI_NOTARY_ISSUER_ID: ${{ secrets.RCLI_NOTARY_ISSUER_ID }}
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh .build macos-arm64
+      - name: Remove ephemeral signing credentials
+        if: always()
+        env:
+          SIGNING_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
+          SIGNING_CERTIFICATE: ${{ steps.signing.outputs.certificate }}
+          SIGNING_NOTARY_KEY: ${{ steps.signing.outputs.notary-key }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SIGNING_KEYCHAIN" ] && [ -f "$SIGNING_KEYCHAIN" ]; then
+            security delete-keychain "$SIGNING_KEYCHAIN"
+          fi
+          rm -f "$SIGNING_CERTIFICATE" "$SIGNING_NOTARY_KEY"
       - name: Upload rcli macOS artifact
         uses: actions/upload-artifact@v7
         with:
@@ -228,6 +417,8 @@ jobs:
           path: |
             sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz
             sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz.sha256
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.dmg
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.dmg.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -259,6 +450,94 @@ jobs:
           path: |
             sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz
             sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_rcli_windows:
+    needs: validate
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - name: Install static libcurl
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
+      - name: Sherpa-ONNX prebuilts
+        shell: cmd
+        run: sdk\runanywhere-commons\scripts\windows\download-sherpa-onnx.bat
+      - name: Build rcli (Windows x86_64)
+        shell: pwsh
+        run: |
+          cmake --preset rcli-windows-release -DRAC_BUILD_TESTS=ON
+          cmake --build --preset rcli-windows-release
+      - name: Add native runtimes to PATH
+        shell: pwsh
+        run: |
+          $Onnx = Get-ChildItem build/rcli-windows-release -Filter onnxruntime.dll -File -Recurse |
+            Where-Object { $_.FullName -match 'onnxruntime-src[\\/]lib' } |
+            Select-Object -First 1
+          if (-not $Onnx) { throw "onnxruntime.dll not found" }
+          $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib" |
+            Out-File $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Unit tests
+        shell: pwsh
+        run: >-
+          ctest --test-dir build/rcli-windows-release
+          -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
+      - name: Authenticode sign rcli.exe
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw "Configure RCLI_WINDOWS_CODESIGN_PFX_BASE64 and RCLI_WINDOWS_CODESIGN_PFX_PASSWORD"
+          }
+          $Binary = Get-ChildItem build/rcli-windows-release -Filter rcli.exe -File -Recurse |
+            Where-Object { $_.FullName -match 'runanywhere-cli' } |
+            Select-Object -ExpandProperty FullName -First 1
+          if (-not $Binary) { throw "rcli.exe not found" }
+          $Pfx = Join-Path $env:RUNNER_TEMP "rcli-windows-codesign.pfx"
+          [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          try {
+            $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Filter signtool.exe -File -Recurse |
+              Where-Object { $_.DirectoryName -match '\\x64$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -ExpandProperty FullName -First 1
+            if (-not $SignTool) { throw "signtool.exe not found" }
+            & $SignTool sign /f $Pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $Binary
+            if ($LASTEXITCODE -ne 0) { throw "Authenticode signing failed" }
+            $Signature = Get-AuthenticodeSignature $Binary
+            if ($Signature.Status -ne 'Valid') {
+              throw "Authenticode verification failed: $($Signature.Status)"
+            }
+          } finally {
+            Remove-Item $Pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Package rcli ZIP
+        shell: pwsh
+        run: >-
+          ./sdk/runanywhere-cli/scripts/package-rcli-windows.ps1
+          -BuildDir build/rcli-windows-release
+          -Version ${{ needs.validate.outputs.version }}
+      - name: Upload rcli Windows artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: rcli-windows
+          path: |
+            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip
+            sdk/runanywhere-cli/dist/rcli-windows-x86_64-v*.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -1352,6 +1631,7 @@ jobs:
       - native_linux
       - native_rcli_macos
       - native_rcli_linux
+      - native_rcli_windows
       - native_windows
       - native_web
       - sdk_kotlin
@@ -1382,6 +1662,7 @@ jobs:
       needs.native_linux.result == 'success' &&
       needs.native_rcli_macos.result == 'success' &&
       needs.native_rcli_linux.result == 'success' &&
+      needs.native_rcli_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
@@ -1422,7 +1703,13 @@ jobs:
               continue
             fi
             cp "$src" "$dest"
-          done < <(find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.tgz" -o -name "*.sha256" \) -print0)
+          done < <(find release-artifacts -type f \( \
+            -name "*.zip" \
+            -o -name "*.tar.gz" \
+            -o -name "*.tgz" \
+            -o -name "*.dmg" \
+            -o -name "*.sha256" \
+          \) -print0)
           if [ "$collisions" -ne 0 ]; then
             echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
             exit 1
@@ -1473,7 +1760,9 @@ jobs:
           fi
           assert_pair "Web WASM"                       "RACommons-web-v${VERSION}.tar.gz"
           assert_pair "rcli macOS arm64"               "rcli-macos-arm64-v${VERSION}.tar.gz"
+          assert_pair "rcli macOS notarized disk image" "rcli-macos-arm64-v${VERSION}.dmg"
           assert_pair "rcli Linux x86_64"              "rcli-linux-x86_64-v${VERSION}.tar.gz"
+          assert_pair "rcli Windows x86_64"            "rcli-windows-x86_64-v${VERSION}.zip"
           assert_pair "Kotlin Maven repository"        "runanywhere-kotlin-maven-v${VERSION}.zip"
           assert_pair "Web proto package"              "runanywhere-proto-ts-${VERSION}.tgz"
           assert_pair "Web core package"               "runanywhere-web-${VERSION}.tgz"

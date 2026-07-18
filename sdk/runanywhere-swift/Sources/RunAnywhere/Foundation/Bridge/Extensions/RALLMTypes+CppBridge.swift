@@ -49,6 +49,12 @@ public extension RALLMGenerationOptions {
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
+        // Commons already classifies streamed output into ANSWER / THOUGHT
+        // token kinds and resolves a model's thinking tags from the registry,
+        // so a request-local thinking pattern is NOT required. Surface thought
+        // events whenever thinking is enabled (i.e. not explicitly disabled) so
+        // default catalog models still stream reasoning.
+        request.emitThoughts = !disableThinking
         // LLM generation controls have one canonical wire location.
         request.options = self
         return request

@@ -1,6 +1,6 @@
 name: runanywhere_qhexrt
 description: On-device NPU acceleration backend for RunAnywhere — LLM/VLM/STT/TTS on Qualcomm Snapdragon Hexagon (V75/V79/V81), Android arm64.
-version: 0.20.10
+version: 0.20.11
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
 issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
@@ -20,7 +20,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  runanywhere: ^0.20.10
+  runanywhere: ^0.20.11
   # Keep this bounded for pub.dev publish validation, matching the core
   # package's major-version range.
   ffi: '>=2.2.0 <3.0.0'

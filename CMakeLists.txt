@@ -79,7 +79,7 @@ option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
 option(RAC_BUILD_ELECTRON_HARNESS "Build the runanywhere-electron M0 Win32 inference harness" OFF)
 option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addon" OFF)
-option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
+option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux/Windows) platform adapter + libcurl HTTP transport" OFF)
 
 # Protobuf is a private implementation detail of the serialized-byte C ABI.
 # Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime
@@ -197,6 +197,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# M_PI and friends are POSIX/GNU math extensions, not standard C++. With
+# CMAKE_CXX_EXTENSIONS OFF (strict -std=c++20), MinGW/MSVC hide them unless
+# _USE_MATH_DEFINES is defined before <cmath>. llama.cpp's mtmd audio code uses
+# M_PI, so define it globally on Windows (harmless elsewhere; POSIX exposes it).
+# Set at the root so it reaches every subdirectory, including the llama.cpp
+# FetchContent tree under engines/.
+if(WIN32)
+    add_compile_definitions(_USE_MATH_DEFINES)
+endif()
 
 # =============================================================================
 # Subdirectories

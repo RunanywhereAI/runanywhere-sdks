@@ -59,4 +59,19 @@ struct AppTypography {
     static let monospacedCaption = Font.system(size: 9, weight: .bold, design: .monospaced)
     static let rounded10 = Font.system(size: 10, weight: .medium, design: .rounded)
     static let rounded11 = Font.system(size: 11, weight: .medium, design: .rounded)
+
+    // Branded benchmark share card
+    static let shareCardBrand = Font.system(size: 22, weight: .bold)
+    static let shareCardModality = Font.system(size: 12, weight: .semibold)
+    static let shareCardHeroValue = Font.system(size: 48, weight: .bold)
+    static let shareCardHeroLabel = Font.system(size: 15, weight: .medium)
+    static let shareCardHeroCaption = Font.system(size: 13, weight: .medium)
+    static let shareCardSupporting = Font.system(size: 12)
+    static let shareCardSection = Font.system(size: 10, weight: .semibold)
+    static let shareCardRowTitle = Font.system(size: 14, weight: .semibold)
+    static let shareCardRowSubtitle = Font.system(size: 11)
+    static let shareCardMetricValue = Font.system(size: 15, weight: .bold)
+    static let shareCardMetricLabel = Font.system(size: 10)
+    static let shareCardModalityTracking: CGFloat = 2
+    static let shareCardSectionTracking: CGFloat = 1.5
 }

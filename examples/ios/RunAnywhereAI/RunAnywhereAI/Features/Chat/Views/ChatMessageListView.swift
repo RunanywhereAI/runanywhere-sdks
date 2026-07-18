@@ -74,7 +74,12 @@ struct ChatMessageListView: View {
             #endif
             .onChange(of: viewModel.messages.last?.content) { _, _ in
                 if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    proxy.scrollTo(lastMessage.id.uuidString, anchor: .bottom)
+                }
+            }
+            .onChange(of: viewModel.messages.last?.thinkingContent) { _, _ in
+                if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
+                    proxy.scrollTo(lastMessage.id.uuidString, anchor: .bottom)
                 }
             }
         }
@@ -182,17 +187,12 @@ struct ChatMessageListView: View {
                     isGenerating: viewModel.isGenerating,
                     isStreamingTail: viewModel.isGenerating
                         && message.role == .assistant
-                        && message.id == viewModel.messages.last?.id
+                        && message.id == viewModel.messages.last?.id,
+                    loadedModelSupportsThinking: viewModel.loadedModelSupportsThinking
                 )
                 .id(message.id.uuidString)
                 .transition(messageTransition)
                 .animation(nil, value: message.content)
-            }
-
-            if viewModel.isGenerating, viewModel.messages.last?.content.isEmpty == true {
-                TypingIndicatorView()
-                    .id("typing")
-                    .transition(typingTransition)
             }
 
             Spacer(minLength: 20)
@@ -211,20 +211,11 @@ struct ChatMessageListView: View {
         )
     }
 
-    private var typingTransition: AnyTransition {
-        .asymmetric(
-            insertion: .scale(scale: 0.8).combined(with: .opacity),
-            removal: .scale(scale: 0.9).combined(with: .opacity)
-        )
-    }
-
     // MARK: - Scroll Helper
 
     func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
         let scrollToId: String
-        if viewModel.isGenerating {
-            scrollToId = "typing"
-        } else if let lastMessage = viewModel.messages.last {
+        if let lastMessage = viewModel.messages.last {
             scrollToId = lastMessage.id.uuidString
         } else {
             scrollToId = "bottom-spacer"
@@ -522,7 +513,6 @@ struct ChatInputAreaView: View {
             .cornerRadius(6)
         }
     }
-
 }
 
 private struct ImageAttachmentPill: View {

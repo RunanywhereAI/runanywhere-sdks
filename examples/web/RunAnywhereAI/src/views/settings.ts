@@ -27,8 +27,8 @@ let container: HTMLElement;
 
 const STORAGE_KEY = 'runanywhere-settings';
 
-// Defaults mirror iOS SettingsViewModel.swift:20-24
-// (temperature 0.7, maxTokens 10000, default system prompt, thinking off).
+// Generation defaults mirror iOS. A persisted explicit preference still wins
+// in loadSettings().
 const DEFAULT_SYSTEM_PROMPT = 'You are a helpful, concise AI assistant.';
 
 interface AppSettings {
@@ -94,7 +94,7 @@ const settings: AppSettings = {
   temperature: 0.7,
   maxTokens: 10000,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
-  thinkingModeEnabled: false,
+  thinkingModeEnabled: true,
   apiKey: '',
   baseURL: '',
 };
@@ -109,6 +109,22 @@ export interface APIConfiguration {
 export interface APIConfigurationApplyResult {
   environment: string;
   telemetryEnabled: boolean;
+}
+
+/**
+ * Resolve optional build-time production configuration for hosted clients.
+ * Vite exposes `VITE_*` values to the browser bundle, so this is suitable
+ * only for a publishable client key, never a server-side secret. The key is
+ * not copied into Settings or localStorage. Keep the hosted key and URL paired
+ * so a previously persisted custom URL cannot receive the hosted credential.
+ */
+export function getHostedAPIConfiguration(): APIConfiguration | null {
+  const apiKey = import.meta.env.VITE_RUNANYWHERE_API_KEY?.trim() ?? '';
+  const baseURL = normalizeProductionBaseURL(
+    import.meta.env.VITE_RUNANYWHERE_BASE_URL,
+  );
+  if (!isUsableCredential(apiKey) || !baseURL) return null;
+  return { apiKey, baseURL };
 }
 
 type APIConfigurationApplyHandler = (

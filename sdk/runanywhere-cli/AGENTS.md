@@ -42,11 +42,15 @@ Plan / design doc: `thoughts/shared/plans/rcli_desktop_cli.md`.
 cmake --preset macos-debug -DRAC_DESKTOP_ADAPTER=ON -DRAC_BUILD_CLI=ON
 cmake --build build/macos-debug -j 2 --target rcli test_rcli_unit
 
-# Full release build (backends + Metal on macOS):
+# Full release build (llama.cpp + MLX + Metal on macOS):
 cmake --preset rcli-macos-release && cmake --build build/rcli-macos-release -j 2
 ```
 
 Always `-j 2` (repo resource discipline). One heavy build at a time.
+
+macOS release CLI keeps **both** `RAC_BACKEND_LLAMACPP=ON` and `RAC_BACKEND_MLX=ON`.
+MLX inference needs the Swift host (`RunAnywhereMLXCLI` / `build-mlx-cli.sh`);
+the CMake `rcli` binary still links the MLX bridge and ships both catalogs.
 
 ## Vendored third_party
 

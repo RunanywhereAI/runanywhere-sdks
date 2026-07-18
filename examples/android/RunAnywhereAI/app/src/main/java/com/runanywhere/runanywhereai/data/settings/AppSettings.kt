@@ -15,11 +15,9 @@ data class AppSettings(
     val maxTokens: Int = 1024,
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     val streaming: Boolean = true,
-    // Reasoning off by default: the on-device models here run tight contexts (Qwen3.5-0.8B = 1024
-    // tokens), and a thinking pass burns the whole ~512-token output budget on reasoning, leaving no
-    // room for an answer (54s, empty reply). Users can re-enable via Settings > "Show reasoning".
-    // In practice this only changes Qwen3.5 — it's the one model the runtime has a no-think prefill for.
-    val disableThinking: Boolean = true,
+    // Show model-emitted reasoning by default. Users can still disable it in Settings for smaller
+    // context windows or faster answers.
+    val disableThinking: Boolean = false,
     val toolCallingEnabled: Boolean = false,
     val webSearchConsentScope: String = "",
     val hfToken: String = "",

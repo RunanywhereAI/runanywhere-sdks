@@ -1,13 +1,17 @@
 import Darwin
 import Foundation
 import MLXRuntime
+import ONNXRuntime
 import RCLIHost
 
+/// macOS CLI entry: registers MLX Swift callbacks, then hands off to the
+/// shared C++ rcli host. RCLIHost is built with both `RCLI_HAS_LLAMACPP` and
+/// `RCLI_HAS_MLX`, so GGUF (llama.cpp) and MLX catalog models are available.
 @main
 struct RunAnywhereMLXCLI {
     static func main() {
-        guard registerMLXRuntime() else {
-            stderrWrite("error: failed to register RunAnywhere MLX runtime callbacks\n")
+        guard registerAppleBackends() else {
+            stderrWrite("error: failed to register RunAnywhere Apple backend callbacks (MLX + ONNX)\n")
             Darwin.exit(1)
         }
 
@@ -24,17 +28,19 @@ struct RunAnywhereMLXCLI {
         Darwin.exit(exitCode)
     }
 
-    private static func registerMLXRuntime() -> Bool {
+    private static func registerAppleBackends() -> Bool {
         if Thread.isMainThread {
             return MainActor.assumeIsolated {
-                MLX.register()
+                ONNX.register()
+                return MLX.register()
             }
         }
 
         var registered = false
         DispatchQueue.main.sync {
             registered = MainActor.assumeIsolated {
-                MLX.register()
+                ONNX.register()
+                return MLX.register()
             }
         }
         return registered

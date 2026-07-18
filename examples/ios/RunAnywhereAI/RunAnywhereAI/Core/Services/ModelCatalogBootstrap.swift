@@ -137,6 +137,46 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_800_000_000,
             supportsThinking: true
         )
+        // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
+        // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
+        // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
+        await registerLLM(
+            id: "bonsai-1.7b-q1_0",
+            name: "Bonsai-1.7B 1-bit Q1_0 (CPU)",
+            url: "https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 248_302_272,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "bonsai-4b-q1_0",
+            name: "Bonsai-4B 1-bit Q1_0 (CPU)",
+            url: "https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 572_270_624,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "bonsai-8b-q1_0",
+            name: "Bonsai-8B 1-bit Q1_0 (CPU)",
+            url: "https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 1_158_654_496,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "bonsai-27b-q1_0",
+            name: "Bonsai-27B 1-bit Q1_0 (CPU)",
+            url: "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 3_803_452_480,
+            supportsThinking: true
+        )
+        // NOTE: Ternary-Bonsai GGUF (Q2_0/PQ2_0) is intentionally NOT registered.
+        // Verified via rcli this session: the pinned PrismML llama.cpp fork
+        // (prism-b9591-62061f9) rejects it — "invalid ggml type 142" — it only
+        // added Q1_0 (plain Bonsai) support, not Ternary-Bonsai's tensor encoding.
+        // Re-enable once the fork adds it. Ternary-Bonsai MLX (below) works fine.
         await registerLLM(
             id: "llama-3.2-3b-instruct-q4_k_m",
             name: "Llama 3.2 3B Instruct Q4_K_M (Tool Calling)",
@@ -154,6 +194,77 @@ enum ModelCatalogBootstrap {
             url: "https://huggingface.co/mlx-community/Qwen3-0.6B-4bit",
             framework: .mlx,
             memoryRequirement: 650_000_000,
+            supportsThinking: true
+        )
+        // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
+        // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
+        await registerLLM(
+            id: "mlx-bonsai-1.7b-1bit",
+            name: "MLX Bonsai-1.7B 1-bit",
+            url: "https://huggingface.co/prism-ml/Bonsai-1.7B-mlx-1bit",
+            framework: .mlx,
+            memoryRequirement: 269_060_904,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-bonsai-4b-1bit",
+            name: "MLX Bonsai-4B 1-bit",
+            url: "https://huggingface.co/prism-ml/Bonsai-4B-mlx-1bit",
+            framework: .mlx,
+            memoryRequirement: 628_865_840,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-bonsai-8b-1bit",
+            name: "MLX Bonsai-8B 1-bit",
+            url: "https://huggingface.co/prism-ml/Bonsai-8B-mlx-1bit",
+            framework: .mlx,
+            memoryRequirement: 1_280_131_424,
+            supportsThinking: true
+        )
+        // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
+        // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+        await registerLLM(
+            id: "mlx-bonsai-27b-1bit",
+            name: "MLX Bonsai-27B 1-bit",
+            url: "https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit",
+            framework: .mlx,
+            memoryRequirement: 5_129_115_752,
+            supportsThinking: true
+        )
+        // PrismML Ternary-Bonsai family at ternary/2-bit MLX. Same PrismML
+        // mlx-swift fork (bits=2 quantization support already covered by
+        // upstream MLX 0.31.6 — no additional patch needed beyond bits=1).
+        await registerLLM(
+            id: "mlx-ternary-bonsai-1.7b-2bit",
+            name: "MLX Ternary-Bonsai-1.7B 2-bit",
+            url: "https://huggingface.co/prism-ml/Ternary-Bonsai-1.7B-mlx-2bit",
+            framework: .mlx,
+            memoryRequirement: 484_049_216,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-ternary-bonsai-4b-2bit",
+            name: "MLX Ternary-Bonsai-4B 2-bit",
+            url: "https://huggingface.co/prism-ml/Ternary-Bonsai-4B-mlx-2bit",
+            framework: .mlx,
+            memoryRequirement: 1_131_565_944,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-ternary-bonsai-8b-2bit",
+            name: "MLX Ternary-Bonsai-8B 2-bit",
+            url: "https://huggingface.co/prism-ml/Ternary-Bonsai-8B-mlx-2bit",
+            framework: .mlx,
+            memoryRequirement: 2_303_661_704,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "mlx-ternary-bonsai-27b-2bit",
+            name: "MLX Ternary-Bonsai-27B 2-bit",
+            url: "https://huggingface.co/prism-ml/Ternary-Bonsai-27B-mlx-2bit",
+            framework: .mlx,
+            memoryRequirement: 8_490_785_104,
             supportsThinking: true
         )
         await registerLLM(

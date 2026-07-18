@@ -264,6 +264,8 @@ elseif(RAC_PLATFORM_WINDOWS)
     if(EXISTS "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
         set(SHERPA_ONNX_AVAILABLE ON)
         set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
+        # The k2-fsa shared bundle ships the DLLs in lib/ (bin/ holds only the
+        # example executables and a copy of onnxruntime.dll).
         set(SHERPA_DLL_PATH "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.dll")
         set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
 

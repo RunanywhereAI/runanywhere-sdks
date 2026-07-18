@@ -82,12 +82,15 @@ runs:
       if: inputs.platform == 'android'
       uses: android-actions/setup-android@v4
 
-    - name: Install pinned Android NDK
+    - name: Install pinned Android NDK + CMake
       if: inputs.platform == 'android'
       shell: bash
       run: |
         set -euo pipefail
-        echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" >/dev/null
+        echo "y" | sdkmanager --install \
+          "ndk;${NDK_VERSION}" \
+          "cmake;${ANDROID_CMAKE_VERSION}" >/dev/null
+        echo "${ANDROID_HOME}/cmake/${ANDROID_CMAKE_VERSION}/bin" >> "$GITHUB_PATH"
         echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
         echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
 

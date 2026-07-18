@@ -172,7 +172,7 @@ rac_result_t qhexrt_diffusion_create(const char* model_id, const char*, void** o
         return RAC_ERROR_INVALID_ARGUMENT;
     Session* session = session_open(model_id);
     if (session == nullptr)
-        return RAC_ERROR_BACKEND_UNAVAILABLE;
+        return RAC_ERROR_BACKEND_INIT_FAILED;
     *out_impl = session;
     return RAC_SUCCESS;
 }

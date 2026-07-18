@@ -29,7 +29,11 @@ import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
 } from '@runanywhere/proto-ts/download_service';
-import { getCatalog, type CatalogEntry } from '../services/model-catalog';
+import {
+  getCatalog,
+  webModelCompatibility,
+  type CatalogEntry,
+} from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
@@ -55,6 +59,7 @@ import {
 } from '../services/model-recommendation';
 import { showToast } from './dialogs';
 import { appLogger } from '../services/app-logger';
+import { openAddFromHuggingFace } from './add-from-huggingface';
 
 // ---------------------------------------------------------------------------
 // State (module-scope, one selection sheet per app)
@@ -386,6 +391,13 @@ function renderSheet(): void {
           <input id="model-sheet-search" class="model-search__input" type="search"
             placeholder="Search models, capabilities…" autocomplete="off" spellcheck="false" />
         </div>
+        <button type="button" class="btn btn-secondary btn-sm model-sheet-hf-btn" id="model-sheet-hf-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add from Hugging Face
+        </button>
         <div id="model-sheet-list"></div>
       </div>
     </div>
@@ -402,6 +414,10 @@ function renderSheet(): void {
   searchInput.addEventListener('input', () => {
     searchQuery = searchInput.value;
     renderRows();
+  });
+
+  modalEl.querySelector('#model-sheet-hf-btn')!.addEventListener('click', () => {
+    openAddFromHuggingFace();
   });
 
   // Probe hardware once, then re-render the banner + recommended section. The
@@ -763,6 +779,7 @@ function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
   const capabilityPill = capability
     ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
     : '';
+  const compatibilityReason = renderCompatibilityReason(entry);
 
   return `
     <div class="variant-row variant-row--${state.status}${isBest ? ' variant-row--best' : ''}" data-model-id="${escapeHtml(entry.id)}">
@@ -774,10 +791,11 @@ function renderVariantRow(entry: CatalogEntry, isBest: boolean): string {
           <span class="variant-row__feel">${escapeHtml(variantSizeFeel(entry))}</span>
           ${capabilityPill}
         </div>
+        ${compatibilityReason}
         ${progressBar}
         ${errorBar}
       </div>
-      ${actionButton(entry.id, state)}
+      ${actionButton(entry, state)}
     </div>
   `;
 }
@@ -847,6 +865,7 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: 
   const bestBadge = isDefault
     ? '<span class="reco-card__best">Best for this device</span>'
     : '';
+  const compatibilityReason = renderCompatibilityReason(entry);
   return `
     <div class="reco-card${isDefault ? ' reco-card--default' : ''} reco-card--${state.status}" data-model-id="${escapeHtml(entry.id)}">
       <div class="reco-card__head">
@@ -856,8 +875,9 @@ function renderRecommendedCard(entry: CatalogEntry, state: RowState, isDefault: 
           <div class="reco-card__size">${formatBytes(modelDisplaySizeBytes(entry))} ${renderBackendPill(entry)}</div>
           <div class="reco-card__tags">${tags}</div>
         </div>
-        ${actionButton(entry.id, state)}
+        ${actionButton(entry, state)}
       </div>
+      ${compatibilityReason}
       ${progressBar}
       ${errorBar}
     </div>
@@ -880,6 +900,7 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   const capabilityPill = capability
     ? `<span class="tag-pill tag-pill--capability">${escapeHtml(capability)}</span>`
     : '';
+  const compatibilityReason = renderCompatibilityReason(entry);
   return `
     <div class="model-row model-row--${state.status}" data-model-id="${escapeHtml(entry.id)}">
       <div class="model-logo">${modalityEmoji(entry.category)}</div>
@@ -890,16 +911,30 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
           ${renderBackendPill(entry)}
           ${capabilityPill}
         </div>
+        ${compatibilityReason}
         ${progressBar}
         ${errorBar}
       </div>
-      ${actionButton(entry.id, state)}
+      ${actionButton(entry, state)}
     </div>
   `;
 }
 
-function actionButton(modelId: string, state: RowState): string {
-  const safeModelId = escapeHtml(modelId);
+function renderCompatibilityReason(entry: CatalogEntry): string {
+  const compatibility = webModelCompatibility(entry);
+  if (compatibility.supported) return '';
+  const reference = compatibility.reference
+    ? ` <a href="${escapeHtml(compatibility.reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(compatibility.reference.label)} &nearr;</a>`
+    : '';
+  return `<div class="model-compatibility-reason" id="model-compatibility-${escapeHtml(entry.id)}" data-compatibility-code="${compatibility.code}">${escapeHtml(compatibility.reason)}${reference}</div>`;
+}
+
+function actionButton(entry: CatalogEntry, state: RowState): string {
+  const safeModelId = escapeHtml(entry.id);
+  const compatibility = webModelCompatibility(entry);
+  if (!compatibility.supported && state.status !== 'loaded') {
+    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>Unavailable in this app</button>`;
+  }
   switch (state.status) {
     case 'registered':
       return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${safeModelId}">Download</button>`;
@@ -941,6 +976,14 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
 }
 
 async function startDownload(modelId: string): Promise<void> {
+  const entry = getCatalog().find((candidate) => candidate.id === modelId);
+  if (entry) {
+    const compatibility = webModelCompatibility(entry);
+    if (!compatibility.supported) {
+      showToast(compatibility.reason, 'warning');
+      return;
+    }
+  }
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
@@ -972,6 +1015,14 @@ async function startDownload(modelId: string): Promise<void> {
 }
 
 async function loadModel(modelId: string): Promise<boolean> {
+  const entry = getCatalog().find((candidate) => candidate.id === modelId);
+  if (entry) {
+    const compatibility = webModelCompatibility(entry);
+    if (!compatibility.supported) {
+      showToast(compatibility.reason, 'warning');
+      return false;
+    }
+  }
   setRow(modelId, { status: 'loading' });
   try {
     const result = await RunAnywhere.loadModel({

@@ -35,10 +35,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
+import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 // A family plus its variants, ordered smaller → larger (by footprint) so the
@@ -50,6 +53,12 @@ data class FamilyGroup(
     val optionCount: Int get() = variants.size
     val hasNpuVariant: Boolean get() = family.key.endsWith("-npu")
 
+    // Category of the primary (lead) variant — drives the category-based family sort.
+    val category: ModelCategory get() = variants.first().category
+
+    // True when any variant is already downloaded or built in — ready families sort first.
+    val hasReadyVariant: Boolean get() = variants.any { it.isBuiltIn || it.isDownloadedOnDisk }
+
     // The single cleanest tag shown on the collapsed family card: prefer a notable
     // capability from the lead variant, else the lead variant's feel word.
     val headlineTag: ConsumerTag?
@@ -58,15 +67,33 @@ data class FamilyGroup(
         }
 }
 
-// Groups models into families, ordering variants smaller → larger and families by a
-// stable "richest first" heuristic (most options, then name).
+// Chat → vision → voice → documents → other. Mirrors iOS ModelFamilyCatalog.categoryRank.
+private fun ModelCategory.familyRank(): Int = when (this) {
+    ModelCategory.MODEL_CATEGORY_LANGUAGE -> 0
+    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    ModelCategory.MODEL_CATEGORY_VISION,
+    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> 1
+    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ModelCategory.MODEL_CATEGORY_AUDIO,
+    ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> 2
+    ModelCategory.MODEL_CATEGORY_EMBEDDING -> 3
+    else -> 4
+}
+
+// Groups models into families, ordering variants smaller → larger and families by
+// category (chat → vision → voice → docs → other), then ready-first, then name.
 fun List<RAModelInfo>.toFamilyGroups(): List<FamilyGroup> =
     groupBy { it.family().key }
         .map { (_, models) ->
             val family = models.first().family()
             FamilyGroup(family, models.sortedBy { it.effectiveBytes() })
         }
-        .sortedWith(compareByDescending<FamilyGroup> { it.optionCount }.thenBy { it.family.title })
+        .sortedWith(
+            compareBy<FamilyGroup> { it.category.familyRank() }
+                .thenByDescending { it.hasReadyVariant }
+                .thenBy { it.family.title.lowercase() },
+        )
 
 @Composable
 fun FamilyCard(

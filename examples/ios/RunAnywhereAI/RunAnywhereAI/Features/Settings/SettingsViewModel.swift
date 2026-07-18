@@ -20,7 +20,7 @@ class SettingsViewModel: ObservableObject {
     @Published var temperature: Double = 0.7
     @Published var maxTokens: Int = 10000
     @Published var systemPrompt: String = "You are a helpful, concise AI assistant."
-    @Published var thinkingModeEnabled: Bool = false
+    @Published var thinkingModeEnabled: Bool = true
     @Published private(set) var loadedModelSupportsThinking: Bool = false
 
     // API Configuration
@@ -223,8 +223,8 @@ class SettingsViewModel: ObservableObject {
             UserDefaults.standard.set(systemPrompt, forKey: systemPromptDefaultsKey)
         }
 
-        // Load thinking mode
-        thinkingModeEnabled = UserDefaults.standard.bool(forKey: thinkingModeKey)
+        // Show model-emitted reasoning by default while preserving an explicit user preference.
+        thinkingModeEnabled = UserDefaults.standard.object(forKey: thinkingModeKey) as? Bool ?? true
     }
 
     private func loadApiKeyConfiguration() {

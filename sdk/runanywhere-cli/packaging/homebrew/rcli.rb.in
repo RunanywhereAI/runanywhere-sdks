@@ -27,7 +27,11 @@ class Rcli < Formula
   end
 
   def install
-    bin.install "bin/rcli"
+    # Keep the executable colocated with its MLX metallib and SwiftPM resource
+    # bundles. The Linux archive contains only rcli here, so the same layout is
+    # harmless across both platforms.
+    libexec.install Dir["bin/*"]
+    bin.install_symlink libexec/"rcli"
     lib.install Dir["lib/*"] unless Dir["lib/*"].empty?
     doc.install "README.md"
   end
