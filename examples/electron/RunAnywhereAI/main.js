@@ -58,7 +58,12 @@ app.whenReady().then(() => {
   const ra = new RunAnywhereMain({
     hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),
     nativePath: process.env.RUNANYWHERE_NATIVE_PATH,
-    onExit: (c) => console.log('[main] utility exited:', c),
+    // On a host crash the preload has already failed the in-flight calls; re-fork
+    // + reconnect so the app recovers on the next action (skip during self-test).
+    onExit: (c) => {
+      console.log('[main] utility exited:', c);
+      if (!SELFTEST && win && !win.isDestroyed()) ra.connect(win.webContents);
+    },
   });
 
   const win = new BrowserWindow({
