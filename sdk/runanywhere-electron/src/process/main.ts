@@ -1,7 +1,9 @@
 // main.ts — runs in the Electron MAIN process. Forks the utilityProcess that
 // hosts the native addon and brokers a direct renderer<->utility MessagePort via
 // MessageChannelMain, so heavy inference never touches the main or renderer
-// process. Respawns the utility on crash (a fresh connect() re-forks it).
+// process. When the utility exits (crash or kill) it sends 'runanywhere-host-exited'
+// to every connected renderer (whose preload then fails all in-flight calls) and
+// lazily re-forks on the next connect() — call connect() again to recover.
 import * as path from 'path';
 
 import { MessageChannelMain, utilityProcess } from 'electron';
@@ -18,6 +20,7 @@ export interface RunAnywhereMainOptions {
 
 export class RunAnywhereMain {
   private child: UtilityProcess | undefined;
+  private readonly connected = new Set<WebContents>();
   private readonly hostPath: string;
   private readonly nativePath?: string;
   private readonly onExit?: (code: number) => void;
@@ -34,6 +37,9 @@ export class RunAnywhereMain {
     const { port1, port2 } = new MessageChannelMain();
     child.postMessage({ type: 'connect' }, [port1]);
     webContents.postMessage(channel, null, [port2]);
+    // Remember so we can notify this renderer if the host later dies.
+    this.connected.add(webContents);
+    webContents.once('destroyed', () => this.connected.delete(webContents));
   }
 
   /** Kill the utility (e.g. to exercise crash recovery); it re-forks on connect(). */
@@ -49,6 +55,11 @@ export class RunAnywhereMain {
     const child = utilityProcess.fork(this.hostPath, [], { env, stdio: 'inherit' });
     child.on('exit', (code) => {
       this.child = undefined; // lazily re-fork on the next connect()
+      // Tell every connected renderer so its preload rejects in-flight calls
+      // instead of hanging forever waiting on a reply that will never come.
+      for (const wc of this.connected) {
+        if (!wc.isDestroyed()) wc.send('runanywhere-host-exited', code);
+      }
       this.onExit?.(code);
     });
     this.child = child;
