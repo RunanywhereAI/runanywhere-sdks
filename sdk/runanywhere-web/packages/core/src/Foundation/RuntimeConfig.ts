@@ -22,6 +22,7 @@
 import { SDKLogger } from './SDKLogger.js';
 import { EventBus } from './EventBus.js';
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import { getBackendWorkerRuntimeDiagnostics } from '../runtime/BackendWorkerHost.js';
 import type {
   InferenceFramework,
   ModelCategory,
@@ -138,6 +139,20 @@ export const Runtime = {
 
   set streamingMode(mode: StreamingMode) {
     _streamingMode = mode;
+  },
+
+  /**
+   * Actual execution context of the active BackendWorkerHost. Until a backend
+   * wires a worker factory and successfully completes its handshake, this
+   * remains `'main'` and existing inference continues on the main thread.
+   */
+  get executionContext(): 'main' | 'worker' {
+    return getBackendWorkerRuntimeDiagnostics().executionContext;
+  },
+
+  /** Number of outstanding RPC calls on the active backend worker. */
+  get workerQueueDepth(): number {
+    return getBackendWorkerRuntimeDiagnostics().queueDepth;
   },
 };
 
