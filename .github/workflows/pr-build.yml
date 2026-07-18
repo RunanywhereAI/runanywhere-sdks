@@ -195,6 +195,7 @@ jobs:
     # Windows is compiled and exercised on the native runner. MLX remains
     # Apple-only; the portable CLI ships llama.cpp + Sherpa/ONNX on Windows.
     runs-on: windows-2022
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
