@@ -50,7 +50,18 @@ export type { BackendWorkerFactory } from './runtime/BackendWorkerHost.js';
 
 export { setVisionLanguageProvider } from './Public/Extensions/RunAnywhere+VisionLanguage.js';
 export type { VisionLanguageProvider } from './Public/Extensions/RunAnywhere+VisionLanguage.js';
-export { registerRAGProvider } from './Public/Extensions/RunAnywhere+RAG.js';
+export {
+  setDiffusionAvailabilityProvider,
+} from './Public/Extensions/RunAnywhere+Diffusion.js';
+export type {
+  DiffusionAvailability,
+  DiffusionAvailabilityProvider,
+} from './Public/Extensions/RunAnywhere+Diffusion.js';
+export {
+  createPersistentRAGProvider,
+  registerPersistentRAGProvider,
+  registerRAGProvider,
+} from './Public/Extensions/RunAnywhere+RAG.js';
 export type { RAGProvider } from './Public/Extensions/RunAnywhere+RAG.js';
 export { registerVoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent.js';
 export type { VoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent.js';

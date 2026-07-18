@@ -33,6 +33,7 @@ class FakeWorker implements BackendWorkerLike {
           return payload;
         },
         stream: async function* () {
+          yield undefined;
           await new Promise<void>(() => {});
         },
         cancel: () => undefined,

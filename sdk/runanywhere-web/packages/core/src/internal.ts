@@ -238,3 +238,10 @@ export type {
 
 export { SolutionAdapter, SolutionHandle } from './Adapters/SolutionAdapter.js';
 export type { SolutionRunInput } from './Adapters/SolutionAdapter.js';
+export {
+  SolutionModuleCoordinator,
+} from './Adapters/SolutionModuleCoordinator.js';
+export type {
+  SolutionKind,
+  SolutionModuleResolution,
+} from './Adapters/SolutionModuleCoordinator.js';

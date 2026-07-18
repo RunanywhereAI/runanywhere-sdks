@@ -3,7 +3,10 @@
 # sdk/runanywhere-web/scripts/package-sdk.sh
 # =============================================================================
 # Unified SDK packaging contract for the Web SDK. Consumes pre-built WASM
-# modules and produces npm tarballs (one per workspace) with checksums.
+# modules and produces npm tarballs for publishable workspaces with checksums.
+# `packages/diffusion` is intentionally a workspace-only API shell until a
+# real WebGPU/WASM diffusion module exists; do not add it to this release loop
+# until its artifact can pass normal package verification.
 #
 # USAGE:
 #   package-sdk.sh [--mode local|ci] [--natives-from PATH]
@@ -16,7 +19,7 @@
 #                        Default: in-place (assumes WASM already built)
 #
 # OUTPUTS:
-#   dist/sdk-web/*.tgz     + .sha256     (one per npm workspace)
+#   dist/sdk-web/*.tgz     + .sha256     (one per publishable npm workspace)
 # =============================================================================
 
 set -euo pipefail
@@ -48,7 +51,8 @@ if [ -n "$NATIVES_FROM" ]; then
         [ -f "$tar" ] || continue
         tar xzf "$tar" -C "$WEB_ROOT/packages/"
     done
-    # If loose {core,llamacpp,onnx}/wasm subdirs, copy them
+    # If loose {core,llamacpp,onnx}/wasm subdirs, copy them. Diffusion has no
+    # artifact yet and must not be staged or treated as a capability.
     for pkg in core llamacpp onnx; do
         if [ -d "$NATIVES_FROM/$pkg/wasm" ]; then
             mkdir -p "$WEB_ROOT/packages/$pkg/wasm"
@@ -97,6 +101,8 @@ python3 "$REPO_ROOT/scripts/release/rewrite_npm_package.py" \
     --archive "$PROTO_ARCHIVE" \
     --exact-version "$PACKAGE_VERSION"
 
+# Diffusion remains intentionally excluded until it ships a real WASM engine;
+# validate_public_packages.py enforces this exact publishable artifact set.
 for pkg in core llamacpp onnx; do
     pkg_dir="$WEB_ROOT/packages/$pkg"
     echo ">> npm pack packages/$pkg"

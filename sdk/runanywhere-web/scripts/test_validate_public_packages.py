@@ -31,6 +31,10 @@ PACKAGE_NAMES = {
     "web-llamacpp": "@runanywhere/web-llamacpp",
     "web-onnx": "@runanywhere/web-onnx",
 }
+# The diffusion workspace shell is intentionally absent: release artifacts
+# remain the established three publishable Web packages plus proto-ts until a
+# real diffusion WASM engine is available.
+UNPUBLISHED_WORKSPACE_PACKAGES = {"@runanywhere/web-diffusion"}
 PROTO_FILES = {
     "package.json": json.dumps(
         {
@@ -109,6 +113,9 @@ def _write_valid_set(dist: Path) -> None:
 
 
 class WebPackageValidationTest(unittest.TestCase):
+    def test_diffusion_shell_is_not_a_release_artifact_until_its_wasm_exists(self) -> None:
+        self.assertTrue(UNPUBLISHED_WORKSPACE_PACKAGES.isdisjoint(PACKAGE_NAMES.values()))
+
     def test_accepts_exact_self_contained_package_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             dist = Path(temporary)

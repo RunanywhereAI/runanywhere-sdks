@@ -61,6 +61,10 @@ type PendingRequest = UnaryPending | StreamPending;
 const defaultInitTimeoutMs = 10_000;
 let activeHost: BackendWorkerHost | null = null;
 
+function setActiveBackendWorkerHost(host: BackendWorkerHost | null): void {
+  activeHost = host;
+}
+
 /** Current worker-runtime state for `RunAnywhere.runtime` diagnostics. */
 export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
   return activeHost?.diagnostics ?? { executionContext: 'main', queueDepth: 0 };
@@ -84,7 +88,7 @@ export class BackendWorkerHost {
     private readonly factory: BackendWorkerFactory,
     private readonly options: BackendWorkerHostOptions = {},
   ) {
-    activeHost = this;
+    setActiveBackendWorkerHost(this);
   }
 
   get diagnostics(): BackendWorkerDiagnostics {
@@ -248,7 +252,7 @@ export class BackendWorkerHost {
     this.worker = null;
     this.ready = null;
     this.executionContext = 'main';
-    if (activeHost === this) activeHost = null;
+    if (activeHost === this) setActiveBackendWorkerHost(null);
   }
 
   private async request(
