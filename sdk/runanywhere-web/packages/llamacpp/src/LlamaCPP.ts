@@ -36,8 +36,11 @@ import {
   setModelLoadPreparation,
   setModelLoadFailureRecovery,
   setVisionLanguageProvider,
+  getBackendWorkerFactory,
+  setBackendWorkerFactory,
   SDKLogger,
   type BackendRegistrationState,
+  type BackendWorkerFactory,
   type RuntimeModelLoadRequest,
 } from '@runanywhere/web/backend';
 import {
@@ -48,6 +51,8 @@ import { LlamaCppBridge } from './Foundation/LlamaCppBridge.js';
 import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider.js';
 
 const logger = new SDKLogger('LlamaCPP');
+let _installedBackendWorkerFactory = false;
+let _backendWorkerFactory: BackendWorkerFactory | null = null;
 
 const MODULE_ID = 'llamacpp';
 
@@ -127,6 +132,12 @@ export interface LlamaCPPRegisterOptions {
   wasmUrl?: string;
   /** Override the URL to the racommons-llamacpp-webgpu.js glue file. */
   webgpuWasmUrl?: string;
+  /**
+   * Optional Stage 3 worker bootstrap. Consumers using Vite/Webpack provide
+   * the bundler-specific `new Worker(...)` factory here. Omit it to retain
+   * the current main-thread inference path.
+   */
+  backendWorkerFactory?: BackendWorkerFactory;
 }
 
 export const LlamaCPP = {
@@ -211,6 +222,11 @@ export const LlamaCPP = {
         });
 
         await bridge.ensureLoaded(options.acceleration ?? 'auto');
+        if (options.backendWorkerFactory) {
+          setBackendWorkerFactory(options.backendWorkerFactory);
+          _installedBackendWorkerFactory = true;
+          _backendWorkerFactory = options.backendWorkerFactory;
+        }
 
         // Publish the active mode so `RunAnywhere.runtime.active` reflects
         // what the bridge actually picked (auto → webgpu/cpu resolution).
@@ -241,6 +257,11 @@ export const LlamaCPP = {
         setModelLoadPreparation(null);
         setModelLoadFailureRecovery(null);
         setVisionLanguageProvider(null);
+        if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+          setBackendWorkerFactory(null);
+        }
+        _installedBackendWorkerFactory = false;
+        _backendWorkerFactory = null;
         bridge.shutdown();
         _isRegistered = false;
         _registrationState = 'failed';
@@ -266,6 +287,11 @@ export const LlamaCPP = {
     setModelLoadPreparation(null);
     setModelLoadFailureRecovery(null);
     setVisionLanguageProvider(null);
+    if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+      setBackendWorkerFactory(null);
+    }
+    _installedBackendWorkerFactory = false;
+    _backendWorkerFactory = null;
     LlamaCppBridge.shared.shutdown();
     _isRegistered = false;
     _registrationState = 'unregistered';

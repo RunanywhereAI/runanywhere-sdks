@@ -6,6 +6,8 @@ import { ModelLifecycleAdapter } from '../../../src/Adapters/ModelLifecycleAdapt
 import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
   clearRunanywhereModule,
+  getModuleForCapability,
+  getWasmModuleRecordForCapability,
   registerWasmModule,
   type EmscriptenRunanywhereModule,
   unregisterWasmModule,
@@ -194,5 +196,56 @@ describe('Emscripten module capability wiring', () => {
     expect(resetCommons).toHaveBeenCalledOnce();
     expect(resetA).toHaveBeenCalledOnce();
     expect(resetB).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['llamacpp then onnx', ['llamacpp', 'onnx'] as const],
+    ['onnx then llamacpp', ['onnx', 'llamacpp'] as const],
+  ])('routes sibling capabilities regardless of registration order: %s', (_name, order) => {
+    const llama = fakeModule();
+    const onnx = fakeModule();
+    for (const backend of order) {
+      if (backend === 'llamacpp') {
+        registerWasmModule(['llm', 'vlm'], llama, ['llamacpp'], {
+          backend: 'llamacpp',
+          acceleration: 'cpu',
+        });
+      } else {
+        registerWasmModule(['stt', 'tts', 'embedding'], onnx, ['onnx', 'sherpa'], {
+          backend: 'onnx-sherpa',
+          acceleration: 'cpu',
+        });
+      }
+    }
+    expect(getModuleForCapability('llm')).toBe(llama);
+    expect(getModuleForCapability('embedding')).toBe(onnx);
+    expect(getWasmModuleRecordForCapability('llm')).toMatchObject({
+      backend: 'llamacpp',
+      acceleration: 'cpu',
+      readiness: 'ready',
+    });
+  });
+
+  it('does not let an acceleration reload steal sibling capabilities', () => {
+    const onnx = fakeModule();
+    const llamaCpu = fakeModule();
+    const llamaWebGpu = fakeModule();
+    registerWasmModule(['stt', 'tts', 'embedding'], onnx, ['onnx'], {
+      backend: 'onnx-sherpa',
+      acceleration: 'cpu',
+    });
+    registerWasmModule(['llm', 'vlm'], llamaCpu, ['llamacpp'], {
+      backend: 'llamacpp',
+      acceleration: 'cpu',
+    });
+    unregisterWasmModule(llamaCpu);
+    registerWasmModule(['llm', 'vlm'], llamaWebGpu, ['llamacpp'], {
+      backend: 'llamacpp',
+      acceleration: 'webgpu',
+    });
+
+    expect(getModuleForCapability('llm')).toBe(llamaWebGpu);
+    expect(getModuleForCapability('embedding')).toBe(onnx);
+    expect(getWasmModuleRecordForCapability('embedding')?.generation).toBeGreaterThan(0);
   });
 });

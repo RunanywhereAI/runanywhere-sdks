@@ -105,6 +105,7 @@ import { CommonsModule } from '../runtime/CommonsModule.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
+import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -2125,6 +2126,7 @@ export const RunAnywhere = {
       }
       cleanup('Stream worker factory cleanup', () => setStreamWorkerFactory(null));
       cleanup('Stream worker state cleanup', () => setStreamWorkerInit(null));
+      cleanup('Backend worker factory cleanup', () => setBackendWorkerFactory(null));
 
       cleanup('Event bus cleanup', () => EventBus.reset());
 

@@ -40,8 +40,20 @@ export type {
   RuntimeModelLoadRequest,
 } from './Foundation/RuntimeConfig.js';
 
+// @internal Stage 3 worker bootstrap contract. Backends may opt in from
+// `register()` once they ship a bundler-specific worker entrypoint.
+export {
+  getBackendWorkerFactory,
+  setBackendWorkerFactory,
+} from './runtime/BackendWorkerFactoryRegistry.js';
+export type { BackendWorkerFactory } from './runtime/BackendWorkerHost.js';
+
 export { setVisionLanguageProvider } from './Public/Extensions/RunAnywhere+VisionLanguage.js';
 export type { VisionLanguageProvider } from './Public/Extensions/RunAnywhere+VisionLanguage.js';
+export { registerRAGProvider } from './Public/Extensions/RunAnywhere+RAG.js';
+export type { RAGProvider } from './Public/Extensions/RunAnywhere+RAG.js';
+export { registerVoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent.js';
+export type { VoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent.js';
 
 export { HTTPAdapter } from './Adapters/HTTPAdapter.js';
 export { VLMProtoAdapter } from './Adapters/ModalityProtoAdapter.js';

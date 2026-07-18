@@ -23,7 +23,12 @@ import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
 } from '../../Infrastructure/FrameworkOPFSPaths.js';
-import { getAllRegisteredModules } from '../../runtime/EmscriptenModule.js';
+import {
+  getAllRegisteredModules,
+  getModuleForModel,
+  recordModelLifecycle,
+} from '../../runtime/EmscriptenModule.js';
+import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
 
 export type {
   CurrentModelRequest,
@@ -55,6 +60,12 @@ function requireAdapter(
   return adapter;
 }
 
+function lifecycleModuleAsEmscripten(
+  adapter: ModelLifecycleAdapter,
+): EmscriptenRunanywhereModule {
+  return adapter.boundModule as unknown as EmscriptenRunanywhereModule;
+}
+
 function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {
   return getAllRegisteredModules().map((module) => (
     ModelLifecycleAdapter.fromModule(module)
@@ -70,6 +81,12 @@ function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {
  * signal (category-only, unknown model, or unscoped unload-all) must fan out.
  */
 function adaptersForUnload(request: ModelUnloadRequest): ModelLifecycleAdapter[] {
+  const ownedModule = request.modelId ? getModuleForModel(request.modelId) : null;
+  if (ownedModule) {
+    return [ModelLifecycleAdapter.fromModule(
+      ownedModule as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+    )];
+  }
   const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
   const framework = snapshot?.framework ?? request.framework;
   if (
@@ -116,7 +133,13 @@ function unloadAcrossAdapters(request: ModelUnloadRequest): ModelUnloadResult | 
   let firstError: unknown;
   for (const adapter of adaptersForUnload(request)) {
     try {
-      results.push(adapter.unload(request));
+      const result = adapter.unload(request);
+      results.push(result);
+      if (result?.success) {
+        for (const modelId of result.unloadedModelIds) {
+          recordModelLifecycle(modelId, lifecycleModuleAsEmscripten(adapter), false);
+        }
+      }
     } catch (error) {
       firstError ??= error;
     }
@@ -134,7 +157,13 @@ async function unloadAcrossAdaptersAsync(
   // state, and deterministic teardown is more important than parallelism here.
   for (const adapter of adaptersForUnload(request)) {
     try {
-      results.push(await adapter.unloadAsync(request));
+      const result = await adapter.unloadAsync(request);
+      results.push(result);
+      if (result?.success) {
+        for (const modelId of result.unloadedModelIds) {
+          recordModelLifecycle(modelId, lifecycleModuleAsEmscripten(adapter), false);
+        }
+      }
     } catch (error) {
       firstError ??= error;
     }
@@ -178,7 +207,10 @@ export const WebModelLifecycle = {
 
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
-    return requireAdapter(snapshot?.framework).load(request);
+    const adapter = requireAdapter(snapshot?.framework);
+    const result = adapter.load(request);
+    if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    return result;
   },
 
   async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
@@ -243,7 +275,10 @@ export const WebModelLifecycle = {
     }
 
     try {
-      return await requireAdapter(modelSnapshot?.framework).loadAsync(request);
+      const adapter = requireAdapter(modelSnapshot?.framework);
+      const result = await adapter.loadAsync(request);
+      if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+      return result;
     } catch (error) {
       const recovered = await recoverModelLoadFailure({
         request,
@@ -254,7 +289,10 @@ export const WebModelLifecycle = {
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
-      return requireAdapter(modelSnapshot?.framework).loadAsync(request);
+      const adapter = requireAdapter(modelSnapshot?.framework);
+      const result = await adapter.loadAsync(request);
+      if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+      return result;
     }
   },
 

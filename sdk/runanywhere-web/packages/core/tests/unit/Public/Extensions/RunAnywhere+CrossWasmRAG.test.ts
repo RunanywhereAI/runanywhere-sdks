@@ -18,6 +18,7 @@ import {
   RAG,
   ragCreatePipeline,
   ragDestroyPipeline,
+  registerRAGProvider,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
@@ -135,6 +136,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('increments the facade pipeline identity when a provider is replaced', async () => {
     installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     const configuration = createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
@@ -166,6 +168,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('invalidates provider identity during unconditional SDK cleanup', async () => {
     installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     await ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
@@ -183,6 +186,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('evicts a cached cross-WASM pipeline when a required backend disappears', async () => {
     const { supportsLLM } = installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     await ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',

@@ -92,6 +92,10 @@ interface EmscriptenFS {
   analyzePath?(path: string): { exists: boolean };
   readdir?(path: string): string[];
   isDir?(mode: number): boolean;
+  open?(path: string, flags: string): { fd: number };
+  close?(stream: { fd: number }): void;
+  read?(stream: { fd: number }, buffer: Uint8Array, offset: number, length: number, position: number): number;
+  write?(stream: { fd: number }, buffer: Uint8Array, offset: number, length: number, position: number): number;
 }
 
 /** Local structural type for the browser's async directory iterator surface. */
@@ -102,6 +106,8 @@ interface IterableFileSystemDirectoryHandle {
 
 /** Emscripten POSIX-style file-mode bit for "is directory" (S_IFDIR). */
 const S_IFDIR = 0o040000;
+/** Bound transfer memory without changing the public OPFS bridge API. */
+const OPFS_TRANSFER_CHUNK_BYTES = 4 * 1024 * 1024;
 
 function isMemfsDirectory(fs: EmscriptenFS, path: string): boolean {
   try {
@@ -281,6 +287,70 @@ async function readBytesFromOPFSFile(handle: FileSystemFileHandle): Promise<Uint
   const file = await handle.getFile();
   const buffer = await file.arrayBuffer();
   return new Uint8Array(buffer);
+}
+
+function supportsChunkedMemfsIO(fs: EmscriptenFS): boolean {
+  return typeof fs.open === 'function'
+    && typeof fs.close === 'function'
+    && typeof fs.read === 'function'
+    && typeof fs.write === 'function';
+}
+
+async function flushMemfsFileChunked(
+  fs: EmscriptenFS,
+  path: string,
+  handle: FileSystemFileHandle,
+  size: number,
+): Promise<boolean> {
+  if (!supportsChunkedMemfsIO(fs) || typeof (handle as { createWritable?: unknown }).createWritable !== 'function') {
+    return false;
+  }
+  const input = fs.open!(path, 'r');
+  const writable = await handle.createWritable!({ keepExistingData: false });
+  const chunk = new Uint8Array(Math.min(OPFS_TRANSFER_CHUNK_BYTES, Math.max(1, size)));
+  try {
+    for (let position = 0; position < size;) {
+      const length = Math.min(chunk.length, size - position);
+      const read = fs.read!(input, chunk, 0, length, position);
+      if (read <= 0) throw new Error(`MEMFS read ended early at ${position} for '${path}'`);
+      await writable.write({
+        type: 'write',
+        position,
+        data: toOwnedArrayBuffer(chunk.subarray(0, read)),
+      });
+      position += read;
+    }
+    await writable.close();
+    return true;
+  } finally {
+    fs.close!(input);
+  }
+}
+
+async function restoreOPFSFileChunked(
+  fs: EmscriptenFS,
+  path: string,
+  handle: FileSystemFileHandle,
+  size: number,
+): Promise<boolean> {
+  if (!supportsChunkedMemfsIO(fs)) return false;
+  const output = fs.open!(path, 'w+');
+  try {
+    const file = await handle.getFile();
+    for (let position = 0; position < size; position += OPFS_TRANSFER_CHUNK_BYTES) {
+      const bytes = new Uint8Array(await file.slice(
+        position,
+        Math.min(size, position + OPFS_TRANSFER_CHUNK_BYTES),
+      ).arrayBuffer());
+      const written = fs.write!(output, bytes, 0, bytes.length, position);
+      if (written !== bytes.length) {
+        throw new Error(`MEMFS write ended early at ${position} for '${path}'`);
+      }
+    }
+    return true;
+  } finally {
+    fs.close!(output);
+  }
 }
 
 export class OPFSBridge {
@@ -717,6 +787,18 @@ export class OPFSBridge {
       return OPFSBridge.flushDirectoryFromMemfs(fs, path);
     }
 
+    const fileName = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+    const dir = await resolveOPFSDirectory(dirSegments, true);
+    if (!dir) {
+      return 0;
+    }
+    const fileHandle = await dir.getFileHandle(fileName, { create: true });
+    const size = fs.stat(path).size;
+    if (await flushMemfsFileChunked(fs, path, fileHandle, size)) {
+      logger.info(`OPFS persisted ${size} bytes for '${path}' in chunks`);
+      return size;
+    }
     let bytes: Uint8Array;
     try {
       bytes = fs.readFile(path);
@@ -725,14 +807,6 @@ export class OPFSBridge {
       logger.warning(`flushFromMemfs: FS.readFile('${path}') failed: ${message}`);
       return 0;
     }
-
-    const fileName = segments[segments.length - 1];
-    const dirSegments = segments.slice(0, -1);
-    const dir = await resolveOPFSDirectory(dirSegments, true);
-    if (!dir) {
-      return 0;
-    }
-    const fileHandle = await dir.getFileHandle(fileName, { create: true });
     await writeBytesToOPFSFile(fileHandle, bytes);
     logger.info(`OPFS persisted ${bytes.length} bytes for '${path}'`);
     return bytes.length;
@@ -802,9 +876,14 @@ export class OPFSBridge {
       return 0;
     }
 
-    const bytes = await readBytesFromOPFSFile(fileHandle);
     const dirPath = path.slice(0, path.lastIndexOf('/'));
     ensureMemfsDirectory(fs, dirPath);
+    const size = (await fileHandle.getFile()).size;
+    if (await restoreOPFSFileChunked(fs, path, fileHandle, size)) {
+      logger.info(`OPFS restored ${size} bytes to '${path}' in chunks`);
+      return size;
+    }
+    const bytes = await readBytesFromOPFSFile(fileHandle);
     fs.writeFile(path, bytes);
     logger.info(`OPFS restored ${bytes.length} bytes to '${path}'`);
     return bytes.length;

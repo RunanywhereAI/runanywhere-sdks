@@ -56,6 +56,40 @@ export type {
   StreamingMode,
 } from './Foundation/RuntimeConfig.js';
 
+// Stage 3 backend-worker RPC scaffolding. Backends may register a factory
+// while their bundler-specific worker bootstrap is experimental; applications
+// should continue using the public RunAnywhere facade.
+export {
+  BackendWorkerHost,
+  BackendWorkerError,
+  BackendWorkerCrashedError,
+  getBackendWorkerRuntimeDiagnostics,
+} from './runtime/BackendWorkerHost.js';
+export type {
+  BackendWorkerFactory,
+  BackendWorkerHostOptions,
+  BackendWorkerLike,
+} from './runtime/BackendWorkerHost.js';
+export {
+  setBackendWorkerFactory,
+  getBackendWorkerFactory,
+  hasBackendWorkerFactory,
+} from './runtime/BackendWorkerFactoryRegistry.js';
+export {
+  runBackendWorker,
+} from './runtime/BackendWorker.js';
+export type {
+  BackendWorkerHandlers,
+  BackendWorkerScope,
+} from './runtime/BackendWorker.js';
+export type {
+  BackendWorkerDiagnostics,
+  BackendWorkerInferenceKind,
+  BackendWorkerModality,
+  BackendWorkerRequest,
+  BackendWorkerResponse,
+} from './runtime/BackendWorkerProtocol.js';
+
 // T6.1 — Worker streaming primitives. Backend packages call
 // `setStreamWorkerInit(...)` with their wasm bytes + factory id during
 // `register()`. App code does NOT use these — see `index.ts` for the

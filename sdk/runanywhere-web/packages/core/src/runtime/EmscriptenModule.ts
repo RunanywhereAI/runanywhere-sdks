@@ -831,8 +831,37 @@ export type WasmCapability =
   | 'lora'              // LoRA registry/apply/state
   | 'voice-agent';      // Voice-agent component (lives in same module as STT/TTS/VAD)
 
-/** Capability → module map. Backends register; facade looks up. */
-const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>();
+export type WasmBackendKind = 'commons' | 'llamacpp' | 'onnx-sherpa' | 'custom';
+export type WasmModuleReadiness = 'registering' | 'ready' | 'unregistered';
+
+/**
+ * Immutable-at-registration backend description.  This deliberately records
+ * ownership rather than treating a mutable "default module" as lifecycle
+ * truth: multiple Emscripten instances have isolated C++ static state.
+ */
+export interface WasmModuleRecord {
+  readonly module: EmscriptenRunanywhereModule;
+  readonly capabilities: readonly WasmCapability[];
+  readonly frameworks: readonly string[];
+  readonly backend: WasmBackendKind;
+  readonly acceleration: string | null;
+  readonly readiness: WasmModuleReadiness;
+  readonly generation: number;
+  /** Incremented when this module successfully changes a model lifecycle. */
+  readonly lifecycleGeneration: number;
+}
+
+export interface WasmModuleRegistration {
+  readonly backend?: WasmBackendKind;
+  readonly acceleration?: string | null;
+  readonly readiness?: Exclude<WasmModuleReadiness, 'unregistered'>;
+}
+
+/** Capability → owning backend record. Backends register; facade looks up. */
+const _recordByCapability = new Map<WasmCapability, WasmModuleRecord>();
+const _recordByModule = new Map<EmscriptenRunanywhereModule, WasmModuleRecord>();
+const _moduleByModelId = new Map<string, EmscriptenRunanywhereModule>();
+let _registrationGeneration = 0;
 
 /**
  * Framework → module map. Each backend WASM owns its own static
@@ -857,13 +886,13 @@ const BACKEND_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
 function reelectLifecycleAndRegistryPrimary(): void {
   let primary: EmscriptenRunanywhereModule | null = null;
   for (const capability of BACKEND_CAPABILITY_PRECEDENCE) {
-    const candidate = _moduleByCapability.get(capability);
+    const candidate = _recordByCapability.get(capability)?.module;
     if (candidate) {
       primary = candidate;
       break;
     }
   }
-  primary ??= _moduleByCapability.get('commons') ?? null;
+  primary ??= _recordByCapability.get('commons')?.module ?? null;
 
   if (primary) {
     ModelLifecycleAdapter.setDefaultModule(primary);
@@ -894,9 +923,30 @@ export function registerWasmModule(
   capabilities: readonly WasmCapability[],
   mod: EmscriptenRunanywhereModule,
   frameworks: readonly string[] = [],
+  registration: WasmModuleRegistration = {},
 ): void {
+  const prior = _recordByModule.get(mod);
+  const mergedCapabilities = new Set<WasmCapability>([
+    ...(prior?.capabilities ?? []),
+    ...capabilities,
+  ]);
+  const mergedFrameworks = new Set<string>([
+    ...(prior?.frameworks ?? []),
+    ...frameworks.filter(Boolean).map((framework) => framework.toLowerCase()),
+  ]);
+  const record: WasmModuleRecord = {
+    module: mod,
+    capabilities: [...mergedCapabilities],
+    frameworks: [...mergedFrameworks],
+    backend: registration.backend ?? prior?.backend ?? 'custom',
+    acceleration: registration.acceleration ?? prior?.acceleration ?? null,
+    readiness: registration.readiness ?? 'ready',
+    generation: ++_registrationGeneration,
+    lifecycleGeneration: prior?.lifecycleGeneration ?? 0,
+  };
+  _recordByModule.set(mod, record);
   for (const cap of capabilities) {
-    _moduleByCapability.set(cap, mod);
+    _recordByCapability.set(cap, record);
   }
   for (const fw of frameworks) {
     if (fw) _moduleByFramework.set(fw.toLowerCase(), mod);
@@ -938,6 +988,53 @@ export function registerWasmModule(
   ModalityProtoAdapter.registerModuleCapabilities(capabilities, mod);
 }
 
+/** Typed backend metadata for diagnostics and model-owner routing. */
+export function getWasmModuleRecord(
+  module: EmscriptenRunanywhereModule,
+): WasmModuleRecord | null {
+  return _recordByModule.get(module) ?? null;
+}
+
+/** Typed backend metadata for a capability's current owning module. */
+export function getWasmModuleRecordForCapability(
+  cap: WasmCapability,
+): WasmModuleRecord | null {
+  return _recordByCapability.get(cap) ?? null;
+}
+
+/** Module that owns the loaded lifecycle instance for a model, if known. */
+export function getModuleForModel(modelId: string): EmscriptenRunanywhereModule | null {
+  return _moduleByModelId.get(modelId) ?? null;
+}
+
+/**
+ * Commit lifecycle ownership after a successful load/unload. This is kept
+ * separate from catalog/framework routing: the model's live C++ state is the
+ * authoritative source for later unload/inference dispatch.
+ */
+export function recordModelLifecycle(
+  modelId: string,
+  module: EmscriptenRunanywhereModule,
+  loaded: boolean,
+): void {
+  if (!modelId) return;
+  if (loaded) _moduleByModelId.set(modelId, module);
+  else if (_moduleByModelId.get(modelId) === module) _moduleByModelId.delete(modelId);
+
+  const previous = _recordByModule.get(module);
+  if (!previous) return;
+  const record: WasmModuleRecord = {
+    ...previous,
+    lifecycleGeneration: previous.lifecycleGeneration + 1,
+  };
+  _recordByModule.set(module, record);
+  for (const capability of record.capabilities) {
+    if (_recordByCapability.get(capability)?.module === module) {
+      _recordByCapability.set(capability, record);
+    }
+  }
+}
+
 /**
  * Drop a single module from the registry. All capability slots that
  * point at this module are removed, and downstream adapters are cleared
@@ -949,11 +1046,15 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
     if (current === mod) _moduleByFramework.delete(fw);
   }
   const releasedCapabilities: WasmCapability[] = [];
-  for (const [cap, current] of Array.from(_moduleByCapability.entries())) {
-    if (current === mod) {
-      _moduleByCapability.delete(cap);
+  for (const [cap, current] of Array.from(_recordByCapability.entries())) {
+    if (current.module === mod) {
+      _recordByCapability.delete(cap);
       releasedCapabilities.push(cap);
     }
+  }
+  _recordByModule.delete(mod);
+  for (const [modelId, owner] of Array.from(_moduleByModelId.entries())) {
+    if (owner === mod) _moduleByModelId.delete(modelId);
   }
   // Drop THIS module from the ModelRegistryAdapter broadcast set
   // regardless of which capability it owned — the broadcast list mirrors
@@ -979,7 +1080,7 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
 export function getModuleForCapability(
   cap: WasmCapability,
 ): EmscriptenRunanywhereModule | null {
-  return _moduleByCapability.get(cap) ?? null;
+  return _recordByCapability.get(cap)?.module ?? null;
 }
 
 /**
@@ -994,15 +1095,17 @@ export function getModuleForCapability(
  */
 export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
   const unique = new Set<EmscriptenRunanywhereModule>();
-  for (const mod of _moduleByCapability.values()) {
-    unique.add(mod);
+  for (const record of _recordByCapability.values()) {
+    unique.add(record.module);
   }
   return Array.from(unique);
 }
 
 /** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {
-  _moduleByCapability.clear();
+  _recordByCapability.clear();
+  _recordByModule.clear();
+  _moduleByModelId.clear();
   // Framework→module map mirrors the capability registry and is populated
   // alongside it via `registerWasmModule(_, _, frameworks)`. Without this
   // clear, a fresh tab boot followed by re-registration would see stale
@@ -1052,10 +1155,10 @@ export function tryRunanywhereModule(): EmscriptenRunanywhereModule | null {
   // work when only a backend (not commons) is loaded. Deterministic
   // precedence (rather than insertion order) keeps `tryRunanywhereModule`
   // stable across register/unregister churn.
-  const commons = _moduleByCapability.get('commons');
+  const commons = _recordByCapability.get('commons')?.module;
   if (commons) return commons;
   for (const cap of FALLBACK_CAPABILITY_PRECEDENCE) {
-    const candidate = _moduleByCapability.get(cap);
+    const candidate = _recordByCapability.get(cap)?.module;
     if (candidate) return candidate;
   }
   return null;

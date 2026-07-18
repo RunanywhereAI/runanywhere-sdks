@@ -111,6 +111,20 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
   _provider = provider;
 }
 
+/**
+ * Explicit backend-registration hook for the split-WASM voice pipeline.
+ * Backend bridges invoke this after their capability registrations; facade
+ * calls never manufacture a cross-WASM provider as a hidden default.
+ */
+export function registerVoiceAgentProvider(provider?: VoiceAgentProvider): boolean {
+  const resolved = provider ?? (
+    supportsCrossWasmVoiceAgent() ? new CrossWasmVoiceAgentProvider() : null
+  );
+  if (!resolved) return false;
+  setVoiceAgentProvider(resolved);
+  return true;
+}
+
 export function createVoiceAgentHandleProvider(
   source: Extract<VoiceAgentStreamSource, { handle: number }>,
 ): VoiceAgentProvider {
@@ -150,9 +164,6 @@ function evictUnavailableCrossWasmProvider(): void {
 
 function activeProvider(): VoiceAgentProvider | null {
   evictUnavailableCrossWasmProvider();
-  if (!_provider && supportsCrossWasmVoiceAgent()) {
-    _provider = new CrossWasmVoiceAgentProvider();
-  }
   return _provider;
 }
 

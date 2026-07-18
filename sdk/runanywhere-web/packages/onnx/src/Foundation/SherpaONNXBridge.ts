@@ -38,6 +38,8 @@ import {
   SDKLogger,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
+  registerRAGProvider,
+  registerVoiceAgentProvider,
   registerWasmModule,
   speechBackendRequirementMessage,
   unregisterWasmModule,
@@ -287,7 +289,14 @@ export class SherpaONNXBridge {
         'embedding',
         'rag',
       ];
-      registerWasmModule(capabilities, this._module, ['onnx', 'sherpa']);
+      registerWasmModule(capabilities, this._module, ['onnx', 'sherpa'], {
+        backend: 'onnx-sherpa',
+        acceleration: 'cpu',
+      });
+      // Cross-WASM composition is installed only through this explicit
+      // backend hook once both sibling capability sets are available.
+      registerRAGProvider();
+      registerVoiceAgentProvider();
 
       // Phase 2: Register the ONNX + Sherpa backend vtables. Generic speech
       // component/proto exports are not enough for real STT/TTS/VAD inference.

@@ -128,6 +128,18 @@ export function setRAGProvider(provider: RAGProvider | null): void {
   advancePipelineState(null);
 }
 
+/**
+ * Explicit backend-registration hook for Web RAG providers. Split WASM
+ * backends call this after claiming their capabilities; it never runs as an
+ * implicit side effect of a RAG API call.
+ */
+export function registerRAGProvider(provider?: RAGProvider): boolean {
+  const resolved = provider ?? (supportsCrossWasmRAG() ? new CrossWasmRAGProvider() : null);
+  if (!resolved) return false;
+  setRAGProvider(resolved);
+  return true;
+}
+
 /** Core-lifecycle cleanup for shutdown paths where a provider destroy fails. */
 export function resetRAGFacadeState(): void {
   const hadState = _provider !== null || _pipelineConfiguration !== null;
@@ -1125,16 +1137,6 @@ export async function ragCreatePipeline(
     )
     : configOrEmbeddingModelId;
   let provider = activeProvider();
-  let installedCrossWasmProvider = false;
-  // The Web release deliberately keeps llama.cpp and ONNX in independent
-  // Emscripten modules. A native RAG session in either module can see only
-  // one half of the pipeline (LLM or embeddings), so compose those public
-  // primitives in TypeScript when both registered backends are available.
-  if (!provider && supportsCrossWasmRAG()) {
-    provider = new CrossWasmRAGProvider();
-    _provider = provider;
-    installedCrossWasmProvider = true;
-  }
   if (provider) {
     try {
       await provider.ragCreatePipeline(config);
@@ -1142,7 +1144,6 @@ export async function ragCreatePipeline(
       logger.info('RAG pipeline created');
       return;
     } catch (error) {
-      if (installedCrossWasmProvider && _provider === provider) _provider = null;
       throw error;
     }
   }

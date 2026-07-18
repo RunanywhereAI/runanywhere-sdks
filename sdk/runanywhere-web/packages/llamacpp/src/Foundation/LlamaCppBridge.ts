@@ -21,6 +21,8 @@ import {
   PlatformAdapter,
   ProtoErrorCode,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  registerRAGProvider,
+  registerVoiceAgentProvider,
   SDKException,
   SDKLogger,
   registerWasmModule,
@@ -338,7 +340,14 @@ export class LlamaCppBridge {
         'tool-calling',
         'lora',
       ];
-      registerWasmModule(capabilities, this._module, ['llamacpp']);
+      registerWasmModule(capabilities, this._module, ['llamacpp'], {
+        backend: 'llamacpp',
+        acceleration: this._accelerationMode,
+      });
+      // A split-WASM provider needs both llama and ONNX/Sherpa. This explicit
+      // registration is harmless until its sibling has completed registration.
+      registerRAGProvider();
+      registerVoiceAgentProvider();
       // HTTP transport — commons-level adapter. Install if no other
       // backend has bound it yet. ModelLifecycleAdapter + ModelRegistryAdapter
       // are bound by `registerWasmModule` because model load requires the
