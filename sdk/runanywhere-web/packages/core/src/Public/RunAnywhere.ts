@@ -78,13 +78,26 @@ import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywher
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD.js';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader.js';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
+import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
+import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
   VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
+import type {
+  DiffusionGenerationOptions,
+  DiffusionProgress,
+  DiffusionResult,
+} from '@runanywhere/proto-ts/diffusion_options';
 import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid.js';
+import {
+  Diffusion as DiffusionCapability,
+  cancelImageGeneration as cancelImageGenerationCapability,
+  generateImage as generateImageCapability,
+  generateImageStream as generateImageStreamCapability,
+} from './Extensions/RunAnywhere+Diffusion.js';
 import {
   createStorageNamespace,
   setRegisterModelHydrateHook,
@@ -809,6 +822,64 @@ async function planDownloadWithSelfHeal(
   return DownloadsCapability.plan(request);
 }
 
+async function assertBrowserStorageQuota(
+  modelId: string,
+  plan: DownloadPlanResult,
+  requiredFreeBytesAfterDownload: number,
+): Promise<void> {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') return;
+  const estimate = await navigator.storage.estimate();
+  const remaining = Math.max(0, (estimate.quota ?? 0) - (estimate.usage ?? 0));
+  const planWithSizes = plan as unknown as {
+    totalBytes?: number;
+    requiredBytes?: number;
+    files?: Array<{ totalBytes?: number; expectedBytes?: number; sizeBytes?: number; remainingBytes?: number }>;
+  };
+  const plannedBytes = planWithSizes.requiredBytes
+    ?? planWithSizes.totalBytes
+    ?? planWithSizes.files?.reduce(
+      (total, file) => total + (file.remainingBytes ?? file.expectedBytes ?? file.totalBytes ?? file.sizeBytes ?? 0),
+      0,
+    )
+    ?? 0;
+  const needed = plannedBytes + requiredFreeBytesAfterDownload;
+  // A plan without size metadata cannot be preflighted safely; commons still
+  // performs its native storage check before it starts the transfer.
+  if (needed > 0 && needed > remaining) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Insufficient browser storage for '${modelId}': need ${needed} bytes, only ${remaining} bytes remain.`,
+      'downloadModel',
+    );
+  }
+}
+
+async function pollDownloadWithRetry(
+  modelId: string,
+  taskId: string,
+  maxRetries = 3,
+): Promise<DownloadProgress | null> {
+  let failure: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return DownloadsCapability.poll({ modelId, taskId });
+    } catch (error) {
+      failure = error;
+      if (attempt === maxRetries) break;
+      const backoffMs = 100 * (2 ** attempt);
+      logger.warning(`Download poll failed; resuming '${modelId}' in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await delay(backoffMs);
+      // Native download tasks retain their resume token and partial bytes.
+      // Polling again is therefore resumable without restarting the transfer.
+    }
+  }
+  throw SDKException.fromCode(
+    -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    `Download polling failed after ${maxRetries + 1} attempts: ${failure instanceof Error ? failure.message : String(failure)}`,
+    'downloadModel',
+  );
+}
+
 // The previous in-TS multi-file
 // orchestrator that walked `model.multiFile.files`, fetched each URL,
 // wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
@@ -955,6 +1026,12 @@ export const RunAnywhere = {
     return Runtime;
   },
 
+  /** Browser-only CPU, memory, GPU and user-agent profile. */
+  hardware: HardwareCapability,
+
+  /** Configure the Hugging Face download token (or clear it with `null`). */
+  setHfToken,
+
   /** Convenience setter for the preferred acceleration. */
   async setRuntime(mode: 'cpu' | 'webgpu' | 'auto'): Promise<void> {
     if (mode === 'auto') {
@@ -1038,6 +1115,19 @@ export const RunAnywhere = {
           sdkVersion: SDK_VERSION,
         });
         throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+
+        // Re-apply any previously stored HF token so a rebuilt WASM artifact
+        // that exports `_rac_http_hf_token_set` receives it after commons load.
+        try {
+          const storedHfToken = getStoredHfToken();
+          if (storedHfToken) setHfToken(storedHfToken);
+        } catch (error) {
+          logger.debug(
+            `Hugging Face token hydration skipped: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
 
         _isInitialized = true;
 
@@ -1412,6 +1502,9 @@ export const RunAnywhere = {
   /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
   visionLanguage: VisionLanguageCapability,
 
+  /** Diffusion availability; image-generation methods remain flat for Swift parity. */
+  diffusion: DiffusionCapability,
+
   /** Model-registry proto bridge — `RunAnywhere.modelRegistry.registerModel(model)`
    * etc. (documented public namespace; the flat Swift-named verbs
    * `registerModel`/`listModels`/`refreshModelRegistry` delegate to it). */
@@ -1539,6 +1632,11 @@ export const RunAnywhere = {
         plan?.errorMessage || `Download plan for '${request.modelId}' could not start.`,
       );
     }
+    await assertBrowserStorageQuota(
+      request.modelId,
+      plan,
+      request.requiredFreeBytesAfterDownload ?? 0,
+    );
 
     // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
     // update the registry on completion; the explicit import below
@@ -1590,10 +1688,7 @@ export const RunAnywhere = {
       while (!lastProgress || !terminal.has(lastProgress.state)) {
         throwIfAborted(extra.signal, 'downloadModel');
         await delay(request.pollIntervalMs ?? 250);
-        const progress = DownloadsCapability.poll({
-          modelId: request.modelId,
-          taskId: start.taskId,
-        });
+        const progress = await pollDownloadWithRetry(request.modelId, start.taskId);
         if (!progress) continue;
         lastProgress = progress;
         // Defer COMPLETED to onProgress until OPFS flush finishes.
@@ -1960,6 +2055,40 @@ export const RunAnywhere = {
     return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
 
+  async generateImage(
+    options: Partial<DiffusionGenerationOptions>,
+    extra: CancellableCall = {},
+  ): Promise<DiffusionResult> {
+    throwIfAborted(extra.signal, 'generateImage');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateImage');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    return generateImageCapability(options).finally(detach);
+  },
+
+  async *generateImageStream(
+    options: Partial<DiffusionGenerationOptions>,
+    extra: CancellableCall = {},
+  ): AsyncIterable<DiffusionProgress> {
+    throwIfAborted(extra.signal, 'generateImageStream');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateImageStream');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    try {
+      yield* generateImageStreamCapability(options);
+    } finally {
+      detach();
+    }
+  },
+
+  async cancelImageGeneration(): Promise<void> {
+    await cancelImageGenerationCapability();
+  },
+
   // Explicit overloads (the capability function is overloaded; deriving the
   // param types via Parameters<> would collapse to the LAST overload and
   // reject VLMGenerationOptions at the facade).
@@ -2180,3 +2309,9 @@ setRegisterModelHydrateHook(() => {
     );
   });
 });
+
+/** Focused test hooks for browser-only download safeguards. */
+export const __testing__ = {
+  assertBrowserStorageQuota,
+  pollDownloadWithRetry,
+};

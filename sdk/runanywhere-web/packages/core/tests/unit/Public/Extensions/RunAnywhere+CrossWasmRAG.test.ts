@@ -24,10 +24,42 @@ import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
 
 afterEach(() => {
+  __testing__.clearPersistentRAGStore();
+  __testing__.resetFacadeState();
   vi.restoreAllMocks();
 });
 
 describe('CrossWasmRAGProvider', () => {
+  it('restores an IndexedDB-compatible persistent index after provider reload', async () => {
+    const { loadModel } = installBackendSpies();
+    vi.spyOn(Embeddings, 'embedBatch').mockResolvedValue(
+      embeddingsResult([vector([1, 0], 'Persistent Zephyr note', 0)]),
+    );
+    const config = createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+      persistIndex: true,
+      indexPath: 'vitest-persistent-rag',
+    });
+
+    __testing__.clearPersistentRAGStore();
+    const first = __testing__.createPersistentRAGProvider();
+    await first.ragCreatePipeline(config);
+    await first.ragIngest('Persistent Zephyr note', JSON.stringify({
+      docId: 'persistent-zephyr',
+      docName: 'Persistent Zephyr',
+    }));
+    await first.ragDestroyPipeline();
+
+    const reloaded = __testing__.createPersistentRAGProvider();
+    await reloaded.ragCreatePipeline(config);
+
+    await expect(reloaded.ragGetDocumentCount()).resolves.toBe(1);
+    expect(reloaded.ragGetCapabilities?.()).toMatchObject({ persistent: true });
+    expect(loadModel).toHaveBeenCalled();
+    __testing__.clearPersistentRAGStore();
+  });
+
   it('routes embeddings and grounded generation across independent backends', async () => {
     const { loadModel } = installBackendSpies();
     const embedBatch = vi.spyOn(Embeddings, 'embedBatch').mockImplementation(

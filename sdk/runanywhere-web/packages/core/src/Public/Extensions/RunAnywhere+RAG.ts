@@ -134,9 +134,20 @@ export function setRAGProvider(provider: RAGProvider | null): void {
  * implicit side effect of a RAG API call.
  */
 export function registerRAGProvider(provider?: RAGProvider): boolean {
-  const resolved = provider ?? (supportsCrossWasmRAG() ? new CrossWasmRAGProvider() : null);
+  // Default to the IndexedDB-backed provider so ONNX / llama.cpp registration
+  // installs durable RAG without apps having to opt in explicitly. Callers
+  // that need the in-memory index can still pass `createCrossWasm`-style
+  // providers or construct one through `__testing__`.
+  const resolved = provider ?? (supportsCrossWasmRAG() ? createPersistentRAGProvider() : null);
   if (!resolved) return false;
   setRAGProvider(resolved);
+  return true;
+}
+
+/** Install a browser-storage-backed cross-WASM RAG provider. */
+export function registerPersistentRAGProvider(): boolean {
+  if (_provider || !supportsCrossWasmRAG()) return false;
+  setRAGProvider(createPersistentRAGProvider());
   return true;
 }
 
@@ -291,6 +302,12 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    if (config.persistIndex) {
+      throw SDKException.backendNotAvailable(
+        'RAG.createPipeline',
+        NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+      );
+    }
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
     if (this.session != null) {
       this.adapter.destroySession(this.session);
@@ -453,6 +470,67 @@ interface CrossWasmRAGDocument {
   chunkCount: number;
 }
 
+interface PersistentRAGSnapshot {
+  config: RAGConfiguration;
+  chunks: CrossWasmRAGChunk[];
+  documents: Array<[string, CrossWasmRAGDocument]>;
+  lastUpdatedMs: number;
+  lastQueryMs: number;
+}
+
+const memoryPersistentRAGStore = new Map<string, PersistentRAGSnapshot>();
+
+async function readPersistentRAGSnapshot(key: string): Promise<PersistentRAGSnapshot | null> {
+  if (typeof indexedDB === 'undefined') return memoryPersistentRAGStore.get(key) ?? null;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('indexes', 'readonly');
+      const get = transaction.objectStore('indexes').get(key);
+      get.onsuccess = () => resolve((get.result as PersistentRAGSnapshot | undefined) ?? null);
+      get.onerror = () => reject(get.error);
+    };
+  });
+}
+
+async function writePersistentRAGSnapshot(key: string, snapshot: PersistentRAGSnapshot): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    memoryPersistentRAGStore.set(key, snapshot);
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('indexes', 'readwrite');
+      transaction.objectStore('indexes').put(snapshot, key);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    };
+  });
+}
+
+async function deletePersistentRAGSnapshot(key: string): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    memoryPersistentRAGStore.delete(key);
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const transaction = request.result.transaction('indexes', 'readwrite');
+      transaction.objectStore('indexes').delete(key);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    };
+  });
+}
+
 /**
  * Browser provider for the split-WASM release architecture.
  *
@@ -465,13 +543,13 @@ interface CrossWasmRAGDocument {
 class CrossWasmRAGProvider implements RAGProvider {
   readonly providerKind = 'cross-wasm' as const;
 
-  private config: RAGConfiguration = createDefaultRAGConfiguration();
-  private initialized = false;
-  private chunks: CrossWasmRAGChunk[] = [];
-  private documents = new Map<string, CrossWasmRAGDocument>();
-  private lastUpdatedMs = 0;
-  private lastQueryMs = 0;
-  private lifecycleVersion = 0;
+  protected config: RAGConfiguration = createDefaultRAGConfiguration();
+  protected initialized = false;
+  protected chunks: CrossWasmRAGChunk[] = [];
+  protected documents = new Map<string, CrossWasmRAGDocument>();
+  protected lastUpdatedMs = 0;
+  protected lastQueryMs = 0;
+  protected lifecycleVersion = 0;
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
@@ -754,7 +832,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     };
   }
 
-  private statistics(): RAGStatistics {
+  protected statistics(): RAGStatistics {
     const totalTokensIndexed = this.chunks.reduce(
       (sum, chunk) => sum + chunk.tokenCount,
       0,
@@ -778,22 +856,98 @@ class CrossWasmRAGProvider implements RAGProvider {
     };
   }
 
-  private removeDocumentInternal(id: string): void {
+  protected removeDocumentInternal(id: string): void {
     this.documents.delete(id);
     this.chunks = this.chunks.filter((chunk) => chunk.documentId !== id);
   }
 
-  private requireInitialized(feature: string): void {
+  protected requireInitialized(feature: string): void {
     if (!this.initialized) {
       throw SDKException.notInitialized(`${feature}: RAG pipeline is not ready`);
     }
   }
 
-  private assertCurrent(version: number, feature: string): void {
+  protected assertCurrent(version: number, feature: string): void {
     if (!this.initialized || version !== this.lifecycleVersion) {
       throw SDKException.notInitialized(`${feature}: RAG pipeline stopped or restarted`);
     }
   }
+}
+
+/**
+ * Cross-WASM RAG with a durable browser index. It persists chunks and embedding
+ * vectors in IndexedDB (with a same-interface memory fallback for non-browser
+ * test environments), while embeddings and generation remain backend-owned.
+ */
+class PersistentRAGProvider extends CrossWasmRAGProvider {
+  private storageKey = '';
+
+  async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    await super.ragCreatePipeline({ ...config, persistIndex: true });
+    this.storageKey = config.indexPath || `default:${config.embeddingModelId}:${config.llmModelId}`;
+    const snapshot = await readPersistentRAGSnapshot(this.storageKey);
+    if (snapshot) {
+      this.chunks = snapshot.chunks;
+      this.documents = new Map(snapshot.documents);
+      this.lastUpdatedMs = snapshot.lastUpdatedMs;
+      this.lastQueryMs = snapshot.lastQueryMs;
+      logger.info(`Restored persistent RAG index '${this.storageKey}'`);
+    }
+  }
+
+  async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
+    const result = await super.ragIngestDocument(document);
+    await this.persist();
+    return result;
+  }
+
+  async ragClearDocuments(): Promise<void> {
+    await super.ragClearDocuments();
+    await deletePersistentRAGSnapshot(this.storageKey);
+  }
+
+  async ragRemoveDocument(id: string): Promise<void> {
+    await super.ragRemoveDocument(id);
+    await this.persist();
+  }
+
+  ragGetCapabilities(): RAGProviderCapabilities {
+    return {
+      native: false,
+      persistent: true,
+      documentListing: true,
+      documentRemoval: true,
+    };
+  }
+
+  protected statistics(): RAGStatistics {
+    return {
+      ...super.statistics(),
+      indexPath: this.storageKey || this.config.indexPath,
+      isPersistent: true,
+      statsJson: JSON.stringify({
+        provider: 'persistent-cross-wasm',
+        persistent: true,
+        dimension: this.chunks[0]?.vector.dimension ?? 0,
+      }),
+    };
+  }
+
+  private async persist(): Promise<void> {
+    if (!this.storageKey) return;
+    await writePersistentRAGSnapshot(this.storageKey, {
+      config: { ...this.config, persistIndex: true },
+      chunks: this.chunks,
+      documents: [...this.documents.entries()],
+      lastUpdatedMs: this.lastUpdatedMs,
+      lastQueryMs: this.lastQueryMs,
+    });
+  }
+}
+
+/** Create a provider whose ingested index survives a browser reload. */
+export function createPersistentRAGProvider(): RAGProvider {
+  return new PersistentRAGProvider();
 }
 
 function supportsCrossWasmRAG(): boolean {
@@ -894,12 +1048,6 @@ function assertNativeHandle(handle: number, feature: string): number {
 }
 
 function validateNativeRAGConfiguration(config: RAGConfiguration, feature: string): void {
-  if (config.persistIndex) {
-    throw SDKException.backendNotAvailable(
-      feature,
-      NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
-    );
-  }
   if (!config.embeddingModelId.trim()) {
     throw SDKException.backendNotAvailable(
       feature,
@@ -1136,16 +1284,12 @@ export async function ragCreatePipeline(
       baseConfiguration,
     )
     : configOrEmbeddingModelId;
-  let provider = activeProvider();
+  const provider = activeProvider();
   if (provider) {
-    try {
-      await provider.ragCreatePipeline(config);
-      advancePipelineState(config);
-      logger.info('RAG pipeline created');
-      return;
-    } catch (error) {
-      throw error;
-    }
+    await provider.ragCreatePipeline(config);
+    advancePipelineState(config);
+    logger.info('RAG pipeline created');
+    return;
   }
 
   const adapter = RAGProtoAdapter.tryDefault();
@@ -1430,6 +1574,8 @@ export async function ragEnsureReady(
 /** Internal constructor used by focused split-WASM provider contract tests. */
 export const __testing__ = {
   createCrossWasmRAGProvider: (): RAGProvider => new CrossWasmRAGProvider(),
+  createPersistentRAGProvider: (): RAGProvider => new PersistentRAGProvider(),
+  clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
 };
 
@@ -1452,6 +1598,10 @@ export const RAG = {
   setProvider: setRAGProvider,
   /** @webOnly Construct a native (WASM-session-backed) RAG provider. */
   createNativeProvider: createRAGNativeProvider,
+  /** @webOnly Construct an IndexedDB-backed cross-WASM provider. */
+  createPersistentProvider: createPersistentRAGProvider,
+  /** @webOnly Install the default IndexedDB-backed cross-WASM provider. */
+  registerPersistentProvider: registerPersistentRAGProvider,
   /** @webOnly Install a pre-existing native RAG session handle as the active provider. */
   setSessionHandle: setRAGSessionHandle,
   /** @webOnly Inspect provider/availability without throwing. */
