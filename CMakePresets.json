@@ -163,7 +163,6 @@
                 "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
                 "GGML_METAL": "OFF"
             },
-            "comment": "RAC_BUILD_SERVER is OFF on Windows: the optional `rcli serve` HTTP server pulls in cpp-httplib, which does not compile under MinGW-w64 (uses GetAddrInfoExCancel, absent from MinGW's headers). Core CLI (run/manage/inference: llama.cpp + Sherpa/ONNX) is unaffected; `rcli serve` is macOS/Linux-only for now.",
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         },
 
