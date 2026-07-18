@@ -13,11 +13,19 @@ extern "C" {
 
 namespace rcli::repl {
 
+namespace {
+// MSVC's <filesystem>/<fstream> decode a narrow std::string through the ANSI
+// code page; build the path from UTF-8 so non-ASCII history paths (e.g. an
+// international Windows username) resolve correctly. POSIX is unaffected.
+std::filesystem::path utf8_path(const std::string& s) {
+    return std::filesystem::path(reinterpret_cast<const char8_t*>(s.c_str()));
+}
+}  // namespace
+
 LineEditor::LineEditor(std::string history_path) : history_path_(std::move(history_path)) {
     if (!history_path_.empty()) {
         std::error_code ec;
-        std::filesystem::create_directories(
-            std::filesystem::path(history_path_).parent_path(), ec);
+        std::filesystem::create_directories(utf8_path(history_path_).parent_path(), ec);
 #if !defined(RCLI_NO_LINENOISE)
         linenoiseHistoryLoad(history_path_.c_str());
         linenoiseHistorySetMaxLen(512);
@@ -53,7 +61,7 @@ void LineEditor::add_history(const std::string& line) {
     if (!line.empty()) {
 #if defined(RCLI_NO_LINENOISE)
         if (!history_path_.empty()) {
-            std::ofstream history(history_path_, std::ios::app);
+            std::ofstream history(utf8_path(history_path_), std::ios::app);
             history << line << '\n';
         }
 #else

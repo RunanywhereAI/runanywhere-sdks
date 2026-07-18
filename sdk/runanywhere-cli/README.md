@@ -39,8 +39,8 @@ irm https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/ru
 ```
 
 The Windows installer verifies the release checksum, installs `rcli.exe` and
-its pinned ONNX Runtime/Sherpa DLLs under `%LOCALAPPDATA%\Programs\rcli`, and
-adds that directory to the current user's `PATH`.
+its pinned ONNX Runtime/Sherpa DLLs under `%LOCALAPPDATA%\Programs\rcli\bin`,
+and adds that `bin` directory to the current user's `PATH`.
 
 The macOS GitHub Release also includes a Developer ID signed, notarized, and
 stapled disk image. Its `rcli-macos-arm64` directory has the same relocatable

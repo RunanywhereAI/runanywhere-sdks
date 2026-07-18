@@ -11,7 +11,7 @@ import RCLIHost
 struct RunAnywhereMLXCLI {
     static func main() {
         guard registerAppleBackends() else {
-            stderrWrite("error: failed to register RunAnywhere MLX runtime callbacks\n")
+            stderrWrite("error: failed to register RunAnywhere Apple backend callbacks (MLX + ONNX)\n")
             Darwin.exit(1)
         }
 

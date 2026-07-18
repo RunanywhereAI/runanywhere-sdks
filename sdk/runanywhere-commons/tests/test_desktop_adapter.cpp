@@ -40,9 +40,11 @@ struct TempDir {
 
     TempDir() {
         const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
-        path = (fs::temp_directory_path() /
-                ("rac_desktop_test_" + std::to_string(unique)))
-                   .string();
+        // u8string() (not string(), which uses the Windows ANSI code page) so the
+        // path handed to the UTF-8 adapter API round-trips on non-ASCII temp roots.
+        const auto u8 =
+            (fs::temp_directory_path() / ("rac_desktop_test_" + std::to_string(unique))).u8string();
+        path = std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
         std::error_code ec;
         fs::create_directories(path, ec);
         if (ec) {
@@ -99,8 +101,7 @@ TestResult test_file_roundtrip() {
         result.details = "file_read failed";
         return result;
     }
-    const bool content_ok =
-        size == payload.size() && std::memcmp(data, payload.data(), size) == 0;
+    const bool content_ok = size == payload.size() && std::memcmp(data, payload.data(), size) == 0;
     free(data);
     if (!content_ok) {
         result.details = "file_read returned different bytes";
@@ -232,7 +233,10 @@ TestResult test_secure_store() {
     // Permission contract: POSIX uses 0600/0700. Windows stores a DPAPI blob.
     const std::string key_file = tmp.path + "/cfg/secure/rac.device.id";
 #if defined(_WIN32)
-    std::ifstream encrypted(key_file, std::ios::binary);
+    // Construct the path from UTF-8 so MSVC's <fstream> does not reinterpret it
+    // through the ANSI code page.
+    std::ifstream encrypted(fs::path(reinterpret_cast<const char8_t*>(key_file.c_str())),
+                            std::ios::binary);
     const std::string stored((std::istreambuf_iterator<char>(encrypted)),
                              std::istreambuf_iterator<char>());
     if (stored.empty() || stored.find("device-1234") != std::string::npos) {
@@ -240,7 +244,7 @@ TestResult test_secure_store() {
         return result;
     }
 #else
-    struct stat st {};
+    struct stat st{};
     if (stat(key_file.c_str(), &st) != 0) {
         result.details = "expected key file at " + key_file;
         return result;
@@ -249,9 +253,8 @@ TestResult test_secure_store() {
         result.details = "key file mode is not 0600";
         return result;
     }
-    struct stat dir_st {};
-    if (stat((tmp.path + "/cfg/secure").c_str(), &dir_st) != 0 ||
-        (dir_st.st_mode & 0777) != 0700) {
+    struct stat dir_st{};
+    if (stat((tmp.path + "/cfg/secure").c_str(), &dir_st) != 0 || (dir_st.st_mode & 0777) != 0700) {
         result.details = "secure dir mode is not 0700";
         return result;
     }

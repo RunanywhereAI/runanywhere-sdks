@@ -24,15 +24,17 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
 #include <wincrypt.h>
+#include <windows.h>
 #else
 #include <fcntl.h>
-#include <sys/stat.h>
 #include <unistd.h>
+
+#include <sys/stat.h>
 #endif
 
 #include "desktop/desktop_internal.h"
+#include "desktop/desktop_path_utf8.h"  // utf8_to_path / utf8_fopen / utf8_remove
 #include "rac/core/rac_error.h"
 
 namespace rac::desktop {
@@ -72,14 +74,13 @@ std::string key_path_locked(const char* key) {
     }
     const std::string secure_dir = g_store_dir + "/secure";
     std::error_code ec;
-    fs::create_directories(secure_dir, ec);
+    fs::create_directories(utf8_to_path(secure_dir), ec);
     if (ec) {
         return {};
     }
 #if !defined(_WIN32)
     // Existing directories may have wider permissions than the current umask.
-    if (chmod(g_store_dir.c_str(), S_IRWXU) != 0 ||
-        chmod(secure_dir.c_str(), S_IRWXU) != 0) {
+    if (chmod(g_store_dir.c_str(), S_IRWXU) != 0 || chmod(secure_dir.c_str(), S_IRWXU) != 0) {
         return {};
     }
 #endif
@@ -91,8 +92,7 @@ std::string key_path_locked(const char* key) {
 void secure_store_set_dir(const std::string& dir) {
     std::lock_guard<std::mutex> lock(g_store_mutex);
     g_store_dir = dir;
-    while (!g_store_dir.empty() &&
-           (g_store_dir.back() == '/' || g_store_dir.back() == '\\')) {
+    while (!g_store_dir.empty() && (g_store_dir.back() == '/' || g_store_dir.back() == '\\')) {
         g_store_dir.pop_back();
     }
 }
@@ -108,7 +108,7 @@ rac_result_t secure_get(const char* key, char** out_value, void* /*user_data*/) 
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 
-    FILE* f = std::fopen(path.c_str(), "rb");
+    FILE* f = utf8_fopen(path.c_str(), "rb");
     if (!f) {
         return (errno == ENOENT) ? RAC_ERROR_FILE_NOT_FOUND : RAC_ERROR_SECURE_STORAGE_FAILED;
     }
@@ -173,11 +173,10 @@ rac_result_t secure_set(const char* key, const char* value, void* /*user_data*/)
                           CRYPTPROTECT_UI_FORBIDDEN, &protected_blob)) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
-    FILE* file = std::fopen(path.c_str(), "wb");
+    FILE* file = utf8_fopen(path.c_str(), "wb");
     bool ok = false;
     if (file) {
-        const size_t written =
-            std::fwrite(protected_blob.pbData, 1, protected_blob.cbData, file);
+        const size_t written = std::fwrite(protected_blob.pbData, 1, protected_blob.cbData, file);
         const int close_rc = std::fclose(file);
         ok = written == protected_blob.cbData && close_rc == 0;
     }
@@ -222,7 +221,7 @@ rac_result_t secure_delete(const char* key, void* /*user_data*/) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 
-    if (std::remove(path.c_str()) != 0 && errno != ENOENT) {
+    if (utf8_remove(path.c_str()) != 0 && errno != ENOENT) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
     return RAC_SUCCESS;  // deleting an absent key is a no-op, like Keychain

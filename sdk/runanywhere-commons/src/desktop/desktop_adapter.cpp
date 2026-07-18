@@ -44,10 +44,8 @@
 #include <sys/sysinfo.h>
 #endif
 
-#if defined(_WIN32)
-#include "core/internal/platform_compat.h"  // rac_to_wstring for UTF-8 path handling
-#endif
 #include "desktop/desktop_internal.h"
+#include "desktop/desktop_path_utf8.h"  // utf8_to_path / utf8_fopen / utf8_remove / filename_utf8
 #include "rac/desktop/rac_desktop.h"
 
 namespace fs = std::filesystem;
@@ -134,6 +132,11 @@ std::string default_data_dir() {
 
 namespace {
 
+using rac::desktop::filename_utf8;
+using rac::desktop::utf8_fopen;
+using rac::desktop::utf8_remove;
+using rac::desktop::utf8_to_path;
+
 rac_result_t errno_to_rac(int err, rac_result_t fallback) {
     switch (err) {
         case ENOENT:
@@ -159,51 +162,6 @@ rac_result_t filesystem_error_to_rac(const std::error_code& ec, rac_result_t fal
         return RAC_ERROR_STORAGE_FULL;
     }
     return fallback;
-}
-
-// -----------------------------------------------------------------------------
-// UTF-8 path helpers
-//
-// The platform-adapter contract documents every path/name as UTF-8. On Windows
-// the narrow std::fopen / std::remove / fs::path(const char*) overloads decode
-// bytes with the process ANSI code page, not UTF-8, so a non-ASCII path would
-// reach the wrong file (or spuriously report ENOENT). Convert to wide with the
-// shared rac_to_wstring helper (the same one ONNX Runtime session paths use) and
-// call the wide CRT/filesystem APIs. On POSIX the narrow byte string is already
-// UTF-8, so each helper reduces to the original call with no behavior change.
-// -----------------------------------------------------------------------------
-
-fs::path utf8_to_path(const char* utf8) {
-#if defined(_WIN32)
-    return fs::path(rac_to_wstring(utf8));
-#else
-    return fs::path(utf8);
-#endif
-}
-
-FILE* utf8_fopen(const char* utf8, const char* mode) {
-#if defined(_WIN32)
-    // mode is ASCII ("rb"/"wb"), so widening it byte-for-byte is safe.
-    return _wfopen(rac_to_wstring(utf8).c_str(), rac_to_wstring(mode).c_str());
-#else
-    return std::fopen(utf8, mode);
-#endif
-}
-
-int utf8_remove(const char* utf8) {
-#if defined(_WIN32)
-    return _wremove(rac_to_wstring(utf8).c_str());
-#else
-    return std::remove(utf8);
-#endif
-}
-
-// UTF-8 filename, never the ANSI code page: fs::path::string() throws on
-// Windows for code points the active code page cannot represent, and that
-// exception would escape this C-ABI callback. u8string() is always UTF-8.
-std::string filename_utf8(const fs::path& p) {
-    const auto name = p.filename().u8string();  // std::u8string, always UTF-8
-    return std::string(reinterpret_cast<const char*>(name.data()), name.size());
 }
 
 // -----------------------------------------------------------------------------
@@ -318,6 +276,9 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
     }
     const fs::directory_iterator end;
     for (; iterator != end; iterator.increment(ec)) {
+        // A failed increment can advance the iterator to `end`, ending the loop
+        // before this guard runs on the next pass — so the final increment is
+        // re-checked after the loop below.
         if (ec) {
             return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
         }
@@ -351,6 +312,12 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
             }
         }
         ++count;
+    }
+    // Catch a failure from the increment that advanced the iterator to `end`
+    // (the in-loop guard above never sees it). A capacity `break` leaves `ec`
+    // holding the previous, already-checked success, so it is not a false error.
+    if (ec) {
+        return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
     }
 
     *in_out_count = count;
