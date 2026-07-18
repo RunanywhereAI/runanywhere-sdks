@@ -4,4 +4,3 @@ node_modules/
 prebuilds/
 *.tgz
 *.log
-examples/**/selftest-result.log
