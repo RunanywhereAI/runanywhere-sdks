@@ -47,7 +47,14 @@ function md(text) {
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
     .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2">$1</a>');
   s = s.split(/\n{2,}/).map((p) => {
-    if (/^\s*[-*] /.test(p)) return '<ul>' + p.split('\n').map((l) => '<li>' + l.replace(/^\s*[-*] /, '') + '</li>').join('') + '</ul>';
+    // A standalone code block: emit <pre> at the top level, not nested in a <p>.
+    const t = p.trim();
+    if (/^\d+$/.test(t)) return t.replace(/(\d+)/g, (_m, i) => `<pre><code>${blocks[+i]}</code></pre>`);
+    // A list: only when every non-blank line is a bullet (don't fold stray lines).
+    const lines = p.split('\n');
+    if (lines.some((l) => /^\s*[-*] /.test(l)) && lines.every((l) => !l.trim() || /^\s*[-*] /.test(l))) {
+      return '<ul>' + lines.filter((l) => l.trim()).map((l) => '<li>' + l.replace(/^\s*[-*] /, '') + '</li>').join('') + '</ul>';
+    }
     if (/^#{1,3} /.test(p)) { const n = p.match(/^#+/)[0].length; return `<h${n + 2}>${p.replace(/^#+ /, '')}</h${n + 2}>`; }
     return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
   }).join('');
@@ -188,9 +195,12 @@ function buildCard(o) {
     const dl = mkbtn('Download', async () => {
       dl.disabled = true; dl.textContent = 'Downloading…';
       const bar = div.querySelector('.bar'); bar.style.display = 'block';
-      try { await ra.downloadModel(o.source, (p) => { bar.firstElementChild.style.width = (p.percent || 0) + '%'; }); }
+      let resolved;
+      try { resolved = await ra.downloadModel(o.source, (p) => { bar.firstElementChild.style.width = (p.percent || 0) + '%'; }); }
       catch (e) { dl.textContent = 'Failed'; dl.disabled = false; console.error(e); return; }
-      if (o.custom) { const c = customModels.find((m) => m.id === o.key); if (c) { c.downloaded = true; persistCustom(); } }
+      // Persist the resolved primary path so downloaded state is later recomputed
+      // from disk (via ra.exists), not trusted from a stale flag.
+      if (o.custom) { const c = customModels.find((m) => m.id === o.key); if (c) { c.primary = resolved && resolved.primary; persistCustom(); } }
       renderModels();
     });
     actions.appendChild(dl);
@@ -240,11 +250,14 @@ async function renderModels() {
     }
   }
   if (customModels.length) {
+    // Recompute each custom model's downloaded state from disk (its primary may
+    // have been deleted since it was fetched), rather than trusting a stale flag.
+    const onDisk = await Promise.all(customModels.map((m) => (m.primary ? ra.exists(m.primary) : Promise.resolve(false))));
     const h = document.createElement('div'); h.className = 'mgroup'; h.textContent = 'Your models'; el.appendChild(h);
-    for (const m of customModels) {
+    customModels.forEach((m, i) => {
       const sub = `${TYPE_LABEL[m.type] || m.type} · <span class="muted">${escapeHtml(m.source)}</span>`;
-      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, source: m.source, downloaded: !!m.downloaded, custom: true }));
-    }
+      el.appendChild(buildCard({ key: m.id, type: m.type, label: m.label || m.id, sub, source: m.source, downloaded: onDisk[i], custom: true }));
+    });
   }
 }
 
