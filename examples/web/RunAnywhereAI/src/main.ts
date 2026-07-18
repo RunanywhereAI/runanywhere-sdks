@@ -14,6 +14,7 @@ import {
   environmentDescription,
   environmentShouldSendTelemetry,
   RunAnywhere,
+  Cloud,
   modelInfoIsAvailableForUse,
   modelInfoIsDownloadedOnDisk,
 } from '@runanywhere/web';
@@ -465,6 +466,18 @@ async function startRuntime(
       ONNX.register(),
     );
     appLogger.info('[RunAnywhere] onnx/sherpa backend registered');
+    // Hybrid cloud STT is optional: the current artifact may omit the cloud
+    // engine, and credentials are supplied separately through Cloud.register().
+    // Never let this capability probe make local ONNX/Sherpa unavailable.
+    try {
+      const cloudRegistered = Cloud.registerBackend();
+      appLogger.info('[RunAnywhere] cloud STT backend registration:', cloudRegistered);
+    } catch (err) {
+      appLogger.warning(
+        '[RunAnywhere] cloud STT backend is unavailable; hybrid cloud routing is disabled:',
+        err,
+      );
+    }
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`onnx/sherpa: ${message}`);

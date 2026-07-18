@@ -310,6 +310,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_request_resume"
     "_rac_http_response_free"
     "_rac_http_download_execute"
+    # Hugging Face auth token — Swift/RN parity (`rac_http_hf_token_set`).
+    # Consumed by `RunAnywhere.setHfToken` when the rebuilt commons artifact
+    # is packaged; until then TypeScript falls back to localStorage.
+    "_rac_http_hf_token_set"
 
     # Platform HTTP transport registry. The
     # WASM shim in rac_http_client_emscripten.cpp registers an
@@ -409,6 +413,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_registry_plugin_count"
     "_rac_registry_list_plugins"
     "_rac_registry_free_plugin_list"
+    "_rac_plugin_find_for_engine"
 
     # Service registry
     # Legacy rac_service_* exports DELETED. Use rac_plugin_*
