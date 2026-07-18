@@ -123,6 +123,26 @@ test('modelStatus returns a {downloaded,sizeBytes} entry for every catalog id', 
   }
 });
 
+test('modelStatus reports a multi-file model as downloaded only when EVERY file is present', () => {
+  const { CATALOG } = require('../../dist/catalog');
+  // A non-archive entry with >1 file (e.g. a VLM: model.gguf + mmproj.gguf).
+  const id = Object.keys(CATALOG).find((k) => !CATALOG[k].archive && CATALOG[k].files.length > 1);
+  assert.ok(id, 'catalog has a multi-file non-archive entry');
+  const entry = CATALOG[id];
+  const root = freshTempRoot();
+  const dir = path.join(root, id);
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    // Only the primary present -> NOT downloaded (would fail to load without mmproj/vocab).
+    fs.writeFileSync(path.join(dir, entry.files[0].as), '1');
+    assert.equal(download.modelStatus(root)[id].downloaded, false, 'primary-only is not downloaded');
+    for (const f of entry.files) fs.writeFileSync(path.join(dir, f.as), '1');
+    assert.equal(download.modelStatus(root)[id].downloaded, true, 'all files present -> downloaded');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // --- modelsRoot() ------------------------------------------------------------
 
 test('modelsRoot returns an absolute path', () => {
@@ -451,7 +471,7 @@ function serve(body, opts = {}) {
     const m = range && /bytes=(\d+)-/.exec(range);
     if (m) {
       const start = parseInt(m[1], 10);
-      if (start >= body.length) { res.writeHead(416); res.end(); return; }
+      if (start >= body.length) { res.writeHead(416, { 'Content-Range': `bytes */${body.length}` }); res.end(); return; }
       res.writeHead(206, {
         'Content-Length': String(body.length - start),
         'Content-Range': `bytes ${start}-${body.length - 1}/${body.length}`,
@@ -515,7 +535,7 @@ test('downloadFile restarts when the server ignores Range (200)', async () => {
   }
 });
 
-test('downloadFile finalizes a .part that is already complete (416)', async () => {
+test('downloadFile finalizes a .part that is already complete (416 + matching Content-Range)', async () => {
   const body = Buffer.from('z'.repeat(4096));
   const { server, url } = await serve(body);
   const dir = freshTempRoot();
@@ -524,6 +544,23 @@ test('downloadFile finalizes a .part that is already complete (416)', async () =
   try {
     await download.downloadFile(url, dest);
     assert.deepEqual(fs.readFileSync(dest), body);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile discards an oversized .part on 416 and restarts (no wrong bytes)', async () => {
+  const body = Buffer.from('z'.repeat(4096));
+  const { server, url } = await serve(body);
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  // A stale/oversized .part (bigger than the real file): a 416 whose Content-Range
+  // total (4096) != the .part size (9000) must NOT be trusted as "complete".
+  fs.writeFileSync(dest + '.part', Buffer.from('q'.repeat(9000)));
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body, 'restarts to the correct bytes, not the oversized part');
   } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
