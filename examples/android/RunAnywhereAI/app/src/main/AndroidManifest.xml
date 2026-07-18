@@ -62,6 +62,18 @@
             android:authorities="${applicationId}.modeldownload.contextinit"
             android:exported="false"
             android:initOrder="100" />
+
+        <!-- Shares generated benchmark share-card PNGs from the cache dir via a
+             content:// URI so the system chooser / Instagram / X can read them. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -85,6 +85,12 @@ ktlint {
     }
 }
 
+val generateRunAnywhereLicenseResource by tasks.registering(Copy::class) {
+    from(rootProject.file("../../LICENSE"))
+    into(layout.buildDirectory.dir("generated/runanywhere-license/META-INF"))
+    rename { "LICENSE.runanywhere-onnx.txt" }
+}
+
 android {
     namespace = "com.runanywhere.sdk.core.onnx"
     compileSdk = 37
@@ -96,6 +102,15 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
+    }
+
+    sourceSets {
+        getByName("main").resources.srcDir(
+            layout.buildDirectory
+                .dir("generated/runanywhere-license")
+                .get()
+                .asFile,
+        )
     }
 
     buildTypes {
@@ -128,6 +143,10 @@ android {
             withSourcesJar()
         }
     }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(generateRunAnywhereLicenseResource)
 }
 
 kotlin {

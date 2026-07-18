@@ -20,7 +20,7 @@ end
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_llamacpp'
-  s.version          = '0.20.10'
+  s.version          = '0.20.11'
   s.summary          = 'RunAnywhere LlamaCPP: LLM text generation for Flutter'
   s.description      = <<-DESC
 LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation

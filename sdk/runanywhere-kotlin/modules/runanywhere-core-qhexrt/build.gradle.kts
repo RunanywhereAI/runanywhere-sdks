@@ -70,6 +70,12 @@ ktlint {
     }
 }
 
+val generateRunAnywhereLicenseResource by tasks.registering(Copy::class) {
+    from(rootProject.file("../../LICENSE"))
+    into(layout.buildDirectory.dir("generated/runanywhere-license/META-INF"))
+    rename { "LICENSE.runanywhere-qhexrt.txt" }
+}
+
 android {
     namespace = "com.runanywhere.sdk.npu.qhexrt"
     compileSdk = 37
@@ -80,6 +86,15 @@ android {
         ndk {
             abiFilters += qhexrtAbis
         }
+    }
+
+    sourceSets {
+        getByName("main").resources.srcDir(
+            layout.buildDirectory
+                .dir("generated/runanywhere-license")
+                .get()
+                .asFile,
+        )
     }
 
     buildTypes {
@@ -109,6 +124,10 @@ android {
             withSourcesJar()
         }
     }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(generateRunAnywhereLicenseResource)
 }
 
 kotlin {

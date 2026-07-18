@@ -33,6 +33,10 @@ brew install runanywhere-ai/tap/rcli
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/sdk/runanywhere-cli/scripts/install.sh | sh
 ```
 
+The macOS GitHub Release also includes a Developer ID signed, notarized, and
+stapled disk image. Its `rcli-macos-arm64` directory has the same relocatable
+layout as the Homebrew tarball.
+
 **From source** — see [Building](#building-from-source).
 
 ## Commands
@@ -109,9 +113,13 @@ Requires CMake ≥ 3.22, a C++20 compiler, and libcurl dev headers on Linux
 (`apt install libcurl4-openssl-dev`).
 
 ```bash
-# macOS (arm64; preset enables Metal + llama.cpp + MLX — needs Xcode ≤ 15.x, see note):
+# macOS CMake smoke build (arm64; llama.cpp + the MLX bridge/catalog, but no
+# Swift callbacks — use the combined host below for real MLX inference):
 cmake --preset rcli-macos-release
 cmake --build build/rcli-macos-release -j 2
+
+# Full macOS host (arm64; llama.cpp + working MLX LLM/VLM/STT/TTS):
+CONFIGURATION=release ./sdk/runanywhere-cli/scripts/build-mlx-cli.sh
 
 # Linux (x86_64/aarch64) — fetch sherpa/onnxruntime prebuilts first:
 ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
@@ -123,10 +131,11 @@ cmake --preset macos-debug -DRAC_DESKTOP_ADAPTER=ON -DRAC_BUILD_CLI=ON
 cmake --build build/macos-debug -j 2 --target rcli test_rcli_unit
 ```
 
-macOS release builds pin `RAC_BACKEND_LLAMACPP=ON` and `RAC_BACKEND_MLX=ON`.
-MLX inference still needs the Swift host (`./sdk/runanywhere-cli/scripts/build-mlx-cli.sh`
-→ `RunAnywhereMLXCLI`); the CMake `rcli` binary registers llama.cpp and ships
-both GGUF and MLX catalog entries.
+The tagged macOS release packages the `RunAnywhereMLXCLI` product as `bin/rcli`
+together with `mlx.metallib`, its SwiftPM resource bundles, and any deployment-
+target Swift compatibility libraries. The CMake `rcli` binary remains the fast,
+credential-free pull-request smoke target; it registers llama.cpp and exposes
+the dual catalog but cannot execute MLX without the Swift callbacks.
 
 > Xcode 16+ rejects llama.cpp's Metal ObjC casts — on newer Xcode add
 > `-DGGML_METAL=OFF` (CPU inference; CI builds Metal on macos-14 runners).
@@ -147,6 +156,47 @@ bash sdk/runanywhere-commons/tests/scripts/run-cli-e2e-linux.sh
 CI: `pr-build.yml` builds both rcli presets and runs the modelless smoke +
 unit tests; `release.yml` packages `rcli-macos-arm64` / `rcli-linux-x86_64`
 tarballs (`scripts/package-rcli.sh`) and gates publishing on their presence.
+
+## macOS distribution signing
+
+`release.yml` builds the combined Swift/C++ host from the same Apple artifacts
+as the SDK release, imports a Developer ID Application certificate into an
+ephemeral keychain, signs the executable and compatibility libraries with the
+hardened runtime and secure timestamp, notarizes a DMG, staples and validates
+its ticket, then deletes the temporary keychain and credential files.
+
+The repository stores no signing material. Configure the Developer ID secrets
+and one complete notarization credential set before creating a release tag:
+
+- `RCLI_DEVELOPER_ID_CERT_P12_BASE64`
+- `RCLI_DEVELOPER_ID_CERT_PASSWORD`
+
+Preferred App Store Connect API-key notarization:
+
+- `RCLI_NOTARY_API_KEY_P8_BASE64`
+- `RCLI_NOTARY_KEY_ID`
+- `RCLI_NOTARY_ISSUER_ID`
+
+Apple ID fallback notarization:
+
+- `RCLI_NOTARY_APPLE_ID`
+- `RCLI_NOTARY_APP_SPECIFIC_PASSWORD`
+- `RCLI_NOTARY_TEAM_ID`
+
+When both notarization sets are complete, the workflow uses the App Store
+Connect API key. The Apple ID fallback stores its run-scoped notarytool profile
+only in the same ephemeral keychain as the imported Developer ID identity,
+passes that keychain explicitly during submission, and deletes it after the
+package step.
+
+For a local or external release runner, `scripts/package-rcli.sh` accepts an
+already-available identity through `RCLI_CODESIGN_IDENTITY` (and optionally
+`RCLI_CODESIGN_KEYCHAIN`). Set `RCLI_MACOS_NOTARIZE=1` and authenticate
+notarytool either with `RCLI_NOTARYTOOL_PROFILE` (plus
+`RCLI_NOTARYTOOL_KEYCHAIN` for a profile in a non-default keychain) or the
+API-key path, key ID, and issuer ID variables documented at the top of that
+script. The normal credential-free packaging path remains ad-hoc signed for
+pull-request smoke.
 
 ## Architecture
 

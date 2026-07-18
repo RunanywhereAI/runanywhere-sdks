@@ -1,3 +1,7 @@
+## [0.20.11] - 2026-07-16
+
+- Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.
+
 ## [0.20.10] - 2026-07-13
 
 - CoreML diffusion enablement + macOS backend slice fixes (see SDK release notes).
