@@ -69,6 +69,9 @@ app.whenReady().then(() => {
     },
   });
 
+  win.webContents.on('console-message', (_e, level, message) => {
+    if (level >= 2) console.log('[renderer]', message); // surface warnings/errors
+  });
   ipcMain.on('runanywhere-test-log', (_e, line) => { process.stdout.write(line); record(line); });
   ipcMain.on('runanywhere-test-done', (_e, ok) => { record(`[main] DONE ok=${ok}\n`); finish(ok ? 0 : 1, 'self-test ok=' + ok); });
 
