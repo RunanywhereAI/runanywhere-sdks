@@ -77,8 +77,19 @@ function freshMain() {
 function fakeWebContents() {
   return {
     posts: [],
+    sent: [],
+    destroyed: false,
     postMessage(channel, message, transfer) {
       this.posts.push({ channel, message, transfer });
+    },
+    once() {
+      /* real WebContents is an EventEmitter; tests don't need destroy wiring */
+    },
+    isDestroyed() {
+      return this.destroyed;
+    },
+    send(channel, ...args) {
+      this.sent.push({ channel, args });
     },
   };
 }
@@ -173,6 +184,31 @@ test('child exit clears the child, notifies onExit, and re-forks on reconnect', 
   assert.equal(exitCode, 7, 'onExit called with the exit code');
   m.connect(fakeWebContents());
   assert.equal(state.forks.length, 2, 'crash recovery re-forks the utility');
+});
+
+test('child exit sends runanywhere-host-exited to every connected renderer', { skip: SKIP }, () => {
+  const { RunAnywhereMain, state } = freshMain();
+  const m = new RunAnywhereMain({ hostPath: '/x/host.js' });
+  const wc1 = fakeWebContents();
+  const wc2 = fakeWebContents();
+  m.connect(wc1);
+  m.connect(wc2); // reuses the same child
+  state.forks[0].child.emit('exit', 9);
+  for (const wc of [wc1, wc2]) {
+    const msg = wc.sent.find((s) => s.channel === 'runanywhere-host-exited');
+    assert.ok(msg, 'renderer notified of host exit');
+    assert.equal(msg.args[0], 9, 'exit code forwarded');
+  }
+});
+
+test('a destroyed renderer is not notified on host exit', { skip: SKIP }, () => {
+  const { RunAnywhereMain, state } = freshMain();
+  const m = new RunAnywhereMain({ hostPath: '/x/host.js' });
+  const wc = fakeWebContents();
+  m.connect(wc);
+  wc.destroyed = true;
+  state.forks[0].child.emit('exit', 1);
+  assert.equal(wc.sent.length, 0, 'no send() to a destroyed webContents');
 });
 
 test('default hostPath resolves to host.js beside the module', { skip: SKIP }, () => {
