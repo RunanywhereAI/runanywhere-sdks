@@ -234,11 +234,15 @@ TestResult test_secure_store() {
     const std::string key_file = tmp.path + "/cfg/secure/rac.device.id";
 #if defined(_WIN32)
     // Construct the path from UTF-8 so MSVC's <fstream> does not reinterpret it
-    // through the ANSI code page.
-    std::ifstream encrypted(fs::path(reinterpret_cast<const char8_t*>(key_file.c_str())),
-                            std::ios::binary);
-    const std::string stored((std::istreambuf_iterator<char>(encrypted)),
-                             std::istreambuf_iterator<char>());
+    // through the ANSI code page. Scope the stream so the handle is released
+    // before secure_delete below — Windows cannot unlink a file that is open.
+    std::string stored;
+    {
+        std::ifstream encrypted(fs::path(reinterpret_cast<const char8_t*>(key_file.c_str())),
+                                std::ios::binary);
+        stored.assign((std::istreambuf_iterator<char>(encrypted)),
+                      std::istreambuf_iterator<char>());
+    }
     if (stored.empty() || stored.find("device-1234") != std::string::npos) {
         result.details = "Windows secure-store value was not DPAPI protected";
         return result;
@@ -393,10 +397,19 @@ TestResult test_default_base_dir() {
         return result;
     }
     const std::string dir(buffer);
+#if defined(_WIN32)
+    // Windows: <LOCALAPPDATA>\RunAnywhere — drive-letter rooted, "RunAnywhere".
+    const bool rooted = dir.size() >= 2 && dir[1] == ':';
+    if (dir.empty() || dir.find("RunAnywhere") == std::string::npos || !rooted) {
+        result.details = "unexpected default base dir: " + dir;
+        return result;
+    }
+#else
     if (dir.empty() || dir.find("runanywhere") == std::string::npos || dir.front() != '/') {
         result.details = "unexpected default base dir: " + dir;
         return result;
     }
+#endif
 
     char tiny[4] = {};
     if (rac_desktop_default_base_dir(tiny, sizeof(tiny)) != RAC_ERROR_BUFFER_TOO_SMALL) {
