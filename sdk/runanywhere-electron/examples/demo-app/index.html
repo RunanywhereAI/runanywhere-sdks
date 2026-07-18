@@ -8,160 +8,217 @@
     />
     <title>RunAnywhere</title>
     <style>
-      /* RunAnywhere brand theme (matches AppColors.swift / runanywhere.ai):
-         orange-red #FF5500 accent on deep dark blue-gray #0F172A. */
+      /* ===== RunAnywhere brand system (AppColors/AppSpacing.swift, runanywhere.ai) =====
+         Vibrant orange-red #FF5500 accent on deep dark blue-gray #0F172A. */
       :root {
-        --bg: #0F172A; --sidebar: #111a2c; --surface: #1A1F2E; --surface2: #252B3A;
-        --edge: rgba(255,255,255,0.06); --edge2: rgba(255,255,255,0.11);
-        --fg: #F1F5F9; --muted: #94A3B8; --faint: #64748B;
-        --accent: #FF5500; --accent2: #E64500; --accentSoft: rgba(255,85,0,0.15);
-        --good: #10B981; --warn: #EAB308; --bad: #EF4444;
-        --r: 12px; --r2: 16px;
-        --shadow: 0 6px 24px rgba(0,0,0,0.35);
+        --bg: #0b1120;            /* app backdrop, a touch deeper than surfaces */
+        --bg2: #0f172a;           /* backgroundPrimaryDark */
+        --sidebar: #0c1322;
+        --surface: #161d2e;       /* card / elevated */
+        --surface-2: #1e2638;     /* higher elevation */
+        --surface-3: #262f44;
+        --line: rgba(255,255,255,0.07);
+        --line-2: rgba(255,255,255,0.12);
+        --fg: #f2f5fb;
+        --fg-2: #aab4c6;          /* secondary */
+        --fg-3: #6b7688;          /* tertiary / slate */
+        --accent: #ff5500;        /* primaryAccent */
+        --accent-2: #e64500;      /* gradient end / darker */
+        --accent-lift: #ff7a3d;
+        --accent-soft: rgba(255,85,0,0.14);
+        --accent-glow: rgba(255,85,0,0.35);
+        --green: #10b981;
+        --red: #ef4444;
+        --yellow: #eab308;
+        --ease: cubic-bezier(.16,.84,.44,1);
+        --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+        --shadow-2: 0 8px 24px rgba(0,0,0,.35);
+        --shadow-3: 0 16px 48px rgba(0,0,0,.45);
       }
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; }
       body {
-        font: 14px/1.55 -apple-system, 'Segoe UI', system-ui, sans-serif;
-        color: var(--fg); background:
-          radial-gradient(1100px 560px at 100% -10%, rgba(255,85,0,0.09), transparent 60%),
+        font-family: 'Segoe UI Variable Text','Segoe UI Variable','Segoe UI',-apple-system,system-ui,sans-serif;
+        font-size: 14px; line-height: 1.5; color: var(--fg);
+        -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+        background:
+          radial-gradient(1100px 620px at 88% -8%, rgba(255,85,0,.10), transparent 58%),
+          radial-gradient(900px 500px at -6% 108%, rgba(59,130,246,.05), transparent 55%),
           var(--bg);
-        display: flex; flex-direction: column; overflow: hidden;
+        display: flex; flex-direction: column; overflow: hidden; user-select: none;
       }
-      ::-webkit-scrollbar { width: 9px; height: 9px; }
-      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); background-clip: padding-box; }
-      button { font: inherit; cursor: pointer; }
+      ::selection { background: var(--accent-soft); }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.09); border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.16); background-clip: padding-box; }
+      input, textarea { user-select: text; }
+      button { font: inherit; cursor: pointer; color: inherit; }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+      @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
 
       .shell { flex: 1; display: flex; min-height: 0; }
 
       /* ---------------- sidebar ---------------- */
-      .sidebar { width: 258px; background: var(--sidebar); border-right: 1px solid var(--edge); display: flex; flex-direction: column; padding: 12px; gap: 10px; }
-      .brand { display: flex; align-items: center; gap: 9px; padding: 6px 6px 4px; font-weight: 650; letter-spacing: -0.01em; }
-      .brand .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 2px 10px rgba(255,85,0,0.5); }
-      .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--r); border: 1px solid var(--edge2); background: var(--surface); color: var(--fg); font-weight: 550; transition: .15s; }
-      .newchat:hover { background: var(--surface2); border-color: var(--accent); }
-      .nav { display: flex; flex-direction: column; gap: 2px; }
-      .nav .grouplabel { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 12px 8px 4px; }
-      .nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; border: none; background: none; color: var(--muted); font-size: 13.5px; text-align: left; transition: .13s; }
-      .nav button svg { width: 17px; height: 17px; flex: 0 0 auto; opacity: .85; }
-      .nav button:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
-      .nav button.active { background: var(--accentSoft); color: #fff; }
-      .nav button.active svg { opacity: 1; color: var(--accent2); }
-      .convs { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 4px; }
-      .convs .grouplabel { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 8px; }
-      #convlist { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1px; }
-      .conv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; color: var(--muted); font-size: 13px; transition: .12s; }
-      .conv:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
-      .conv.active { background: var(--surface); color: var(--fg); }
+      .sidebar { width: 280px; flex: 0 0 auto; background: linear-gradient(180deg, var(--sidebar), #0a0f1c); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 14px; }
+      .brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 14px; }
+      .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 4px 16px var(--accent-glow); }
+      .brand .logo svg { width: 17px; height: 17px; color: #fff; }
+      .brand .name { font-size: 15px; font-weight: 640; letter-spacing: -.01em; }
+      .brand .name small { display: block; font-size: 11px; font-weight: 500; color: var(--fg-3); letter-spacing: .01em; }
+      .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; margin-bottom: 14px; border-radius: 12px; border: none; color: #fff; font-weight: 600; letter-spacing: -.005em; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px var(--accent-glow); transition: .18s var(--ease); }
+      .newchat:hover { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
+      .newchat:active { transform: translateY(0); }
+      .nav { display: flex; flex-direction: column; gap: 3px; }
+      .nav .grouplabel { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); padding: 16px 10px 6px; font-weight: 650; }
+      .nav button { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 11px; border-radius: 11px; border: none; background: none; color: var(--fg-2); font-size: 14px; font-weight: 500; text-align: left; transition: .15s var(--ease); }
+      .nav button svg { width: 18px; height: 18px; flex: 0 0 auto; stroke-width: 1.7; color: var(--fg-3); transition: .15s; }
+      .nav button:hover { background: rgba(255,255,255,.045); color: var(--fg); }
+      .nav button:hover svg { color: var(--fg-2); }
+      .nav button.active { background: var(--accent-soft); color: #fff; font-weight: 560; }
+      .nav button.active svg { color: var(--accent-lift); }
+      .nav button.active::before { content: ''; position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--accent); }
+      .convs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .convs .grouplabel { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); padding: 16px 10px 6px; font-weight: 650; }
+      #convlist { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1px; padding-right: 2px; }
+      .conv { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 10px; color: var(--fg-2); font-size: 13.5px; transition: .13s var(--ease); }
+      .conv:hover { background: rgba(255,255,255,.045); }
+      .conv.active { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
       .conv .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-      .conv .del { opacity: 0; color: var(--faint); font-size: 15px; line-height: 1; cursor: pointer; }
+      .conv .del { opacity: 0; color: var(--fg-3); width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 14px; transition: .12s; }
       .conv:hover .del { opacity: 1; }
-      .conv .del:hover { color: var(--bad); }
+      .conv .del:hover { background: rgba(239,68,68,.15); color: var(--red); }
+      .sidefoot { padding: 12px 10px 2px; border-top: 1px solid var(--line); margin-top: 8px; font-size: 11.5px; color: var(--fg-3); display: flex; align-items: center; gap: 7px; }
+      .sidefoot .lock { width: 13px; height: 13px; }
 
       /* ---------------- main ---------------- */
-      .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-      .topbar { height: 54px; flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--edge); }
-      .topbar h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+      .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg2); }
+      .topbar { height: 60px; flex: 0 0 auto; display: flex; align-items: center; gap: 14px; padding: 0 24px; border-bottom: 1px solid var(--line); background: rgba(15,23,42,.55); backdrop-filter: blur(18px) saturate(1.3); z-index: 5; }
+      .topbar h2 { margin: 0; font-size: 16px; font-weight: 620; letter-spacing: -.015em; }
       .topbar .spacer { flex: 1; }
-      .device { display: inline-flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--edge2); color: var(--fg); border-radius: 20px; padding: 5px 12px; font-size: 12.5px; }
-      .device select { background: none; border: none; color: var(--fg); font: inherit; outline: none; }
-      .device select option { background: var(--surface2); }
-      .status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12.5px; }
-      .status .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
-      .status.busy .sdot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+      .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; color: var(--fg-2); }
+      .pill svg { width: 15px; height: 15px; color: var(--fg-3); }
+      .pill select { background: none; border: none; color: var(--fg); font: inherit; outline: none; cursor: pointer; }
+      .pill select option { background: var(--surface-2); color: var(--fg); }
+      .status { display: inline-flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 12.5px; }
+      .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px var(--green); }
+      .status.busy .dot { background: var(--yellow); box-shadow: 0 0 9px var(--yellow); animation: pulse 1.1s infinite; }
 
-      .content { flex: 1; min-height: 0; }
+      .content { flex: 1; min-height: 0; position: relative; }
       .panel { display: none; }
-      .panel.active { display: block; height: 100%; overflow-y: auto; padding: 26px 30px; }
-      .wrap { max-width: 760px; }
-      .hint { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
-      .label { color: var(--muted); font-size: 12px; margin: 16px 0 6px; font-weight: 500; }
-      textarea, input[type=text], input[type=number] { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--edge2); border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; transition: .15s; }
-      textarea:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentSoft); }
+      .panel.active { display: block; height: 100%; overflow-y: auto; padding: 32px 34px; animation: fadeUp .28s var(--ease); }
+      .wrap { max-width: 720px; }
+      .lead { font-size: 22px; font-weight: 640; letter-spacing: -.02em; margin: 0 0 6px; }
+      .hint { color: var(--fg-2); font-size: 14px; margin: 0 0 22px; }
+      .label { color: var(--fg-2); font-size: 12.5px; margin: 18px 0 7px; font-weight: 550; letter-spacing: .002em; }
+      textarea, input[type=text], input[type=number] { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); border-radius: 12px; padding: 11px 13px; font: inherit; outline: none; transition: .16s var(--ease); }
+      textarea { resize: vertical; }
+      textarea:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
       input[type=range] { accent-color: var(--accent); width: 100%; }
-      .btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; padding: 9px 18px; border-radius: 10px; font-weight: 600; box-shadow: 0 4px 14px rgba(255,85,0,0.30); transition: .15s; }
-      .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
-      .btn:disabled { opacity: .5; filter: none; transform: none; box-shadow: none; cursor: default; }
-      .btn.ghost { background: var(--surface); color: var(--fg); border: 1px solid var(--edge2); box-shadow: none; }
-      .btn.ghost:hover { background: var(--surface2); border-color: var(--accent); filter: none; }
-      .row { display: flex; gap: 14px; }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; letter-spacing: -.005em; box-shadow: 0 6px 18px var(--accent-glow); transition: .17s var(--ease); }
+      .btn:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
+      .btn:active { transform: translateY(0); filter: brightness(.98); }
+      .btn:disabled { opacity: .45; filter: grayscale(.4); transform: none; box-shadow: none; cursor: default; }
+      .btn.ghost { background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); box-shadow: none; }
+      .btn.ghost:hover { background: var(--surface-2); border-color: var(--accent); filter: none; }
+      .row { display: flex; gap: 16px; }
       .row > * { flex: 1; }
-      .out { margin-top: 14px; padding: 14px; background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r); white-space: pre-wrap; min-height: 40px; font-size: 13.5px; }
-      .card { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r2); padding: 22px; }
+      .out { margin-top: 16px; padding: 15px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; white-space: pre-wrap; min-height: 40px; font-size: 13.5px; line-height: 1.6; box-shadow: var(--shadow-1); }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow-1); }
+      .card + .card { margin-top: 16px; }
+      .muted { color: var(--fg-2); font-size: 13px; }
 
       /* ---------------- chat ---------------- */
-      #chat.active { display: flex; flex-direction: column; height: 100%; overflow: hidden; padding: 0; }
-      #chatlog { flex: 1; overflow-y: auto; padding: 24px 30px; }
-      #chatlog .empty { color: var(--faint); text-align: center; margin-top: 22vh; }
-      #chatlog .empty h3 { color: var(--muted); font-weight: 600; margin: 0 0 6px; }
-      .msg { max-width: 760px; margin: 0 auto 20px; display: flex; gap: 12px; }
-      .msg .av { width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
-      .msg.user .av { background: var(--surface2); color: var(--muted); }
-      .msg.assistant .av { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+      #chat.active { display: flex; flex-direction: column; height: 100%; overflow: hidden; padding: 0; animation: none; }
+      #chatlog { flex: 1; overflow-y: auto; padding: 30px 24px 12px; scroll-behavior: smooth; }
+      .thread { max-width: 760px; margin: 0 auto; }
+      .msg { display: flex; gap: 14px; margin-bottom: 26px; animation: fadeUp .3s var(--ease); }
+      .msg .av { width: 32px; height: 32px; border-radius: 10px; flex: 0 0 auto; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; margin-top: 1px; }
+      .msg.user .av { background: var(--surface-3); color: var(--fg-2); box-shadow: inset 0 0 0 1px var(--line-2); }
+      .msg.assistant .av { background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); box-shadow: 0 3px 12px var(--accent-glow); }
       .msg .col { min-width: 0; flex: 1; }
-      .msg .who { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
-      .msg .bubble { font-size: 14.5px; line-height: 1.6; border-radius: 18px; padding: 11px 15px; }
-      .msg.user .bubble { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 3px 12px rgba(255,85,0,0.25); }
-      .msg.assistant .bubble { background: var(--surface2); border: 1px solid var(--edge); }
-      .msg .metrics { color: var(--faint); font-size: 11.5px; margin-top: 7px; display: inline-flex; gap: 6px; align-items: center; }
-      .bubble p { margin: 0 0 10px; } .bubble p:last-child { margin: 0; }
-      .bubble pre { background: #07090d; border: 1px solid var(--edge); border-radius: 10px; padding: 12px; overflow-x: auto; margin: 8px 0; }
-      .bubble code { background: rgba(255,255,255,0.07); padding: 1px 6px; border-radius: 5px; font-size: 13px; }
-      .bubble pre code { background: none; padding: 0; color: #cdd6ff; }
-      .bubble a { color: var(--accent2); }
-      .bubble ul { margin: 6px 0; padding-left: 20px; }
-      .composer { flex: 0 0 auto; padding: 14px 30px 20px; }
-      .composer .box { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; background: var(--surface); border: 1px solid var(--edge2); border-radius: 16px; padding: 8px 8px 8px 16px; transition: .15s; }
-      .composer .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentSoft); }
-      .composer input { flex: 1; background: none; border: none; padding: 8px 0; outline: none; box-shadow: none; }
-      .composer .send { width: 38px; height: 38px; border-radius: 11px; padding: 0; display: grid; place-items: center; }
+      .msg .who { font-size: 12.5px; color: var(--fg-2); font-weight: 640; margin-bottom: 5px; letter-spacing: -.005em; }
+      .msg .bubble { font-size: 14.5px; line-height: 1.68; color: var(--fg); }
+      .msg.user .bubble { display: inline-block; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-radius: 16px 16px 16px 5px; padding: 10px 15px; box-shadow: 0 4px 14px var(--accent-glow); }
+      .msg.assistant .bubble.streaming::after { content: '▋'; margin-left: 2px; color: var(--accent-lift); animation: blink 1s steps(2) infinite; }
+      .msg .metrics { color: var(--fg-3); font-size: 11.5px; margin-top: 9px; display: inline-flex; gap: 7px; align-items: center; }
+      .bubble p { margin: 0 0 11px; } .bubble p:last-child { margin: 0; }
+      .bubble h3,.bubble h4,.bubble h5 { margin: 14px 0 8px; font-weight: 640; letter-spacing: -.01em; }
+      .bubble pre { background: #070b16; border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; overflow-x: auto; margin: 10px 0; font-size: 13px; }
+      .bubble code { background: rgba(255,255,255,.08); padding: 1.5px 6px; border-radius: 6px; font-size: 12.8px; font-family: 'Cascadia Code','Consolas',monospace; }
+      .bubble pre code { background: none; padding: 0; color: #d7e0f5; }
+      .bubble a { color: var(--accent-lift); }
+      .bubble ul { margin: 8px 0; padding-left: 20px; } .bubble li { margin: 3px 0; }
+      .empty { max-width: 540px; margin: 16vh auto 0; text-align: center; animation: pop .4s var(--ease); }
+      .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 12px 40px var(--accent-glow); }
+      .empty .logo svg { width: 30px; height: 30px; color: #fff; }
+      .empty h3 { font-size: 24px; font-weight: 680; letter-spacing: -.025em; margin: 0 0 8px; }
+      .empty p { color: var(--fg-2); margin: 0 0 24px; font-size: 14.5px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
+      .chip { background: var(--surface); border: 1px solid var(--line-2); color: var(--fg-2); border-radius: 12px; padding: 9px 14px; font-size: 13px; transition: .15s var(--ease); }
+      .chip:hover { border-color: var(--accent); color: var(--fg); background: var(--surface-2); transform: translateY(-1px); }
+      .composer { flex: 0 0 auto; padding: 12px 24px 22px; }
+      .composer .box { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; background: rgba(30,38,56,.7); backdrop-filter: blur(16px); border: 1px solid var(--line-2); border-radius: 20px; padding: 8px 8px 8px 18px; box-shadow: var(--shadow-2); transition: .18s var(--ease); }
+      .composer .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2); }
+      .composer input { flex: 1; background: none; border: none; padding: 9px 0; outline: none; font-size: 14.5px; }
+      .composer .send { width: 40px; height: 40px; border-radius: 13px; padding: 0; flex: 0 0 auto; }
+      .composer .send svg { width: 18px; height: 18px; }
 
       /* ---------------- models ---------------- */
-      .model { border: 1px solid var(--edge); border-radius: var(--r); padding: 16px; margin-bottom: 12px; background: var(--surface); }
+      .model { border: 1px solid var(--line); border-radius: 16px; padding: 17px 18px; margin-bottom: 12px; background: var(--surface); box-shadow: var(--shadow-1); transition: .16s var(--ease); }
+      .model:hover { border-color: var(--line-2); transform: translateY(-1px); box-shadow: var(--shadow-2); }
       .model .hd { display: flex; align-items: center; gap: 12px; }
-      .model .name { font-weight: 600; }
-      .badge { font-size: 11.5px; padding: 3px 9px; border-radius: 20px; border: 1px solid var(--edge2); color: var(--muted); }
-      .badge.on { color: var(--good); border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.08); }
-      .badge.type { background: var(--accentSoft); border-color: transparent; color: var(--accent2); text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; }
-      .model .actions { margin-left: auto; display: flex; gap: 8px; }
-      .bar { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin-top: 12px; }
-      .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width .2s; }
-      .muted { color: var(--muted); font-size: 12.5px; }
+      .model .mi { width: 38px; height: 38px; border-radius: 11px; flex: 0 0 auto; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-lift); }
+      .model .mi svg { width: 19px; height: 19px; }
+      .model .name { font-weight: 620; letter-spacing: -.01em; }
+      .model .sub { font-size: 12px; color: var(--fg-3); margin-top: 1px; }
+      .badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--fg-2); font-weight: 550; }
+      .badge.on { color: var(--green); border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.1); }
+      .badge.type { background: var(--accent-soft); border-color: transparent; color: var(--accent-lift); text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
+      .model .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+      .model .btn { padding: 8px 15px; font-size: 13px; }
+      .bar { height: 6px; background: var(--surface-3); border-radius: 4px; overflow: hidden; margin-top: 13px; }
+      .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-lift)); width: 0%; transition: width .25s var(--ease); box-shadow: 0 0 10px var(--accent-glow); }
     </style>
   </head>
   <body>
     <div class="shell">
       <aside class="sidebar">
-        <div class="brand"><span class="dot"></span> RunAnywhere</div>
-        <button class="newchat" id="newchat">＋ New chat</button>
+        <div class="brand">
+          <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></span>
+          <span class="name">RunAnywhere<small>on-device AI</small></span>
+        </div>
+        <button class="newchat" id="newchat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New chat</button>
         <div class="nav">
-          <button data-tab="chat" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
-          <button data-tab="models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg> Models</button>
-          <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 7 2.6h.1A1.6 1.6 0 0 0 8.2 1.1V1a2 2 0 0 1 4 0v.1A1.6 1.6 0 0 0 14 2.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1H23a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
+          <button data-tab="chat" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Chat</button>
+          <button data-tab="models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg> Models</button>
+          <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 2.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 7 4.6h.1A1.6 1.6 0 0 0 8 2.9V2a2 2 0 0 1 4 0v.1A1.6 1.6 0 0 0 15 3.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V8a1.6 1.6 0 0 0 1.5 1H23a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg> Settings</button>
           <div class="grouplabel">Workbenches</div>
-          <button data-tab="structured"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg> Structured</button>
-          <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3 18v3h3l6.5-6.5a4 4 0 0 0 5.2-5.2l-2.7 2.7-2-2z"/></svg> Tools</button>
-          <button data-tab="vision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Vision</button>
-          <button data-tab="embeddings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8M18 9l-5 7"/></svg> Embeddings</button>
-          <button data-tab="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Voice</button>
-          <button data-tab="vad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> VAD</button>
+          <button data-tab="structured"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg> Structured</button>
+          <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3 18v3h3l6.5-6.5a4 4 0 0 0 5.2-5.2l-2.7 2.7-2-2z"/></svg> Tools</button>
+          <button data-tab="vision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Vision</button>
+          <button data-tab="embeddings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8M18 9l-5 7"/></svg> Embeddings</button>
+          <button data-tab="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Voice</button>
+          <button data-tab="vad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> VAD</button>
         </div>
         <div class="convs">
           <div class="grouplabel">Recent</div>
           <div id="convlist"></div>
         </div>
+        <div class="sidefoot"><svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 100% on-device · private</div>
       </aside>
 
       <main class="main">
         <div class="topbar">
           <h2 id="sectiontitle">Chat</h2>
           <div class="spacer"></div>
-          <span class="device" title="This Windows build runs on CPU. GPU needs a Vulkan-enabled build.">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+          <span class="pill" title="This Windows build runs on CPU. GPU needs a Vulkan-enabled build.">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
             <select id="device"><option value="cpu">CPU</option><option value="gpu" disabled>GPU · needs build</option></select>
           </span>
-          <span class="status" id="statuswrap"><span class="sdot"></span><span id="status">starting…</span></span>
+          <span class="status" id="statuswrap"><span class="dot"></span><span id="status">starting…</span></span>
         </div>
 
         <div class="content">
@@ -169,69 +226,77 @@
             <div id="chatlog"></div>
             <div class="composer">
               <div class="box">
-                <input id="chatinput" type="text" placeholder="Message RunAnywhere…" />
-                <button class="btn send" id="chatsend" title="Send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+                <input id="chatinput" type="text" placeholder="Message RunAnywhere…" autocomplete="off" />
+                <button class="btn send" id="chatsend" title="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
               </div>
             </div>
           </section>
 
           <section class="panel" id="models"><div class="wrap">
-            <p class="hint">On-device models — download, load/unload, and storage. Nothing leaves your machine.</p>
+            <h2 class="lead">Models</h2>
+            <p class="hint">On-device models — download, load, and manage storage. Nothing leaves your machine.</p>
             <div id="modellist"></div>
           </div></section>
 
           <section class="panel" id="settings"><div class="wrap">
+            <h2 class="lead">Settings</h2>
+            <p class="hint">Generation defaults and secure credentials.</p>
             <div class="card">
               <div class="label" style="margin-top:0">System prompt</div>
               <textarea id="setsystem" rows="3"></textarea>
-              <div class="row" style="margin-top:14px">
+              <div class="row" style="margin-top:16px">
                 <div><div class="label">Temperature · <span id="settempval">0.7</span></div><input id="settemp" type="range" min="0" max="1" step="0.05" value="0.7" /></div>
                 <div><div class="label">Max tokens</div><input id="setmax" type="number" value="256" /></div>
               </div>
-              <div style="margin-top:16px"><button class="btn" id="setsave">Save settings</button> <span id="setstatus" class="muted"></span></div>
+              <div style="margin-top:18px"><button class="btn" id="setsave">Save settings</button> <span id="setstatus" class="muted"></span></div>
             </div>
-            <div class="card" style="margin-top:16px">
+            <div class="card">
               <div class="label" style="margin-top:0">API key <span class="muted">— stored encrypted (Windows DPAPI)</span></div>
-              <div class="row"><input id="setapikey" type="text" placeholder="sk-…" style="flex:1" /><button class="btn ghost" id="setapisave" style="flex:0 0 auto">Save key</button></div>
+              <div class="row" style="align-items:center"><input id="setapikey" type="text" placeholder="sk-…" style="flex:1" /><button class="btn ghost" id="setapisave" style="flex:0 0 auto">Save key</button></div>
             </div>
-            <div class="card" style="margin-top:16px">
+            <div class="card">
               <div class="label" style="margin-top:0">Compute device</div>
-              <p class="muted" style="margin:2px 0 0">Inference runs on the <b>CPU</b> in this build. GPU acceleration (Vulkan) is a separate build option and will appear here when enabled.</p>
+              <p class="muted" style="margin:2px 0 0">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. GPU acceleration (Vulkan) is a separate build option and will appear here when enabled.</p>
             </div>
           </div></section>
 
           <section class="panel" id="structured"><div class="wrap">
+            <h2 class="lead">Structured output</h2>
             <p class="hint">Extract typed JSON — decoding is grammar-constrained, so the output always parses.</p>
             <textarea id="structtext" rows="2">Ada Lovelace was a 36 year old English mathematician who loved poetry.</textarea>
-            <div style="margin-top:10px"><button class="btn" id="structgo">Extract</button></div>
+            <div style="margin-top:12px"><button class="btn" id="structgo">Extract</button></div>
             <div id="structout" class="out"></div>
           </div></section>
 
           <section class="panel" id="tools"><div class="wrap">
-            <p class="hint">Tool calling — the model picks a tool and fills its arguments.</p>
+            <h2 class="lead">Tool calling</h2>
+            <p class="hint">The model picks a tool and fills its arguments.</p>
             <textarea id="toolstext" rows="2">What is the weather in Tokyo in celsius?</textarea>
-            <div style="margin-top:10px"><button class="btn" id="toolsgo">Choose tool</button></div>
+            <div style="margin-top:12px"><button class="btn" id="toolsgo">Choose tool</button></div>
             <div id="toolsout" class="out"></div>
           </div></section>
 
           <section class="panel" id="vision"><div class="wrap">
+            <h2 class="lead">Vision</h2>
             <p class="hint">Describe an image with the vision-language model.</p>
             <input id="visionfile" type="file" accept="image/*" />
-            <div style="margin-top:10px"><button class="btn" id="visiongo" disabled>Caption</button></div>
+            <div style="margin-top:12px"><button class="btn" id="visiongo" disabled>Caption</button></div>
             <div id="visionout" class="out"></div>
           </div></section>
 
           <section class="panel" id="embeddings"><div class="wrap">
+            <h2 class="lead">Embeddings</h2>
             <p class="hint">Semantic similarity — cosine distance between two sentence embeddings.</p>
             <div class="row">
               <input id="emba" type="text" value="a cat sat on the mat" />
               <input id="embb" type="text" value="a kitten rested on the rug" />
             </div>
-            <div style="margin-top:10px"><button class="btn" id="embgo">Compare</button></div>
+            <div style="margin-top:12px"><button class="btn" id="embgo">Compare</button></div>
             <div id="embout" class="out"></div>
           </div></section>
 
           <section class="panel" id="voice"><div class="wrap">
+            <h2 class="lead">Voice</h2>
             <p class="hint">Hold to talk — mic → speech-to-text → LLM → text-to-speech → speaker.</p>
             <button class="btn" id="voicebtn">🎙 Hold to talk</button>
             <div class="label">Heard</div><div id="voiceheard" class="out"></div>
@@ -239,10 +304,11 @@
           </div></section>
 
           <section class="panel" id="vad"><div class="wrap">
-            <p class="hint">Live voice-activity detection (built-in energy VAD). Hold and speak — the first ~2s calibrate ambient noise.</p>
+            <h2 class="lead">Voice activity detection</h2>
+            <p class="hint">Built-in energy VAD. Hold and speak — the first ~2s calibrate ambient noise.</p>
             <div class="label">Threshold · <span id="vadthval">0.015</span></div>
-            <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:320px" />
-            <div style="margin-top:12px"><button class="btn" id="vadbtn">🎤 Hold + speak</button></div>
+            <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:340px" />
+            <div style="margin-top:14px"><button class="btn" id="vadbtn">🎤 Hold + speak</button></div>
             <div class="label">Detection</div>
             <div id="vadout" class="out">—</div>
           </div></section>
