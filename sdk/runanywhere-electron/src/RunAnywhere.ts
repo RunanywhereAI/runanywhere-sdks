@@ -9,7 +9,7 @@ import * as path from 'path';
 import { addon, toAsyncIterable } from './bridge';
 import { streamWithMetrics } from './stream';
 import type { LLMStreamEvent, LLMGenerationResult } from './stream';
-import { resolveModel } from './download';
+import { resolveModel, assertRemoteSupported } from './download';
 import type { DownloadProgress, ResolvedModel } from './download';
 import { VoiceAgent } from './VoiceAgent';
 import type { VoiceAgentModels, VoiceAgentOptions } from './VoiceAgent';
@@ -347,18 +347,21 @@ export const RunAnywhere = {
     return model;
   },
   async loadEmbedder(idOrPath: string, opts: DownloadOptions = {}): Promise<Embedder> {
+    assertRemoteSupported(idOrPath, 'embedder');
     const m = await resolveModel(idOrPath, opts);
     const model = new Embedder(addon.loadEmbeddingModel(m.primary));
     bus.emit({ type: 'modelLoaded', modality: 'embedder', id: idOrPath });
     return model;
   },
   async loadSTT(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<STTModel> {
+    assertRemoteSupported(idOrPath, 'stt');
     const m = await resolveModel(idOrPath, opts);
     const model = new STTModel(addon.loadSttModel(m.primary, opts.id, opts.name));
     bus.emit({ type: 'modelLoaded', modality: 'stt', id: idOrPath });
     return model;
   },
   async loadTTS(idOrPath: string, opts: LoadOptions & DownloadOptions = {}): Promise<TTSVoice> {
+    assertRemoteSupported(idOrPath, 'tts');
     const m = await resolveModel(idOrPath, opts);
     const voice = new TTSVoice(addon.loadTtsVoice(m.primary, opts.id, opts.name));
     bus.emit({ type: 'modelLoaded', modality: 'tts', id: idOrPath });
