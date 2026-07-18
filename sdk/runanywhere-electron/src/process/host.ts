@@ -6,19 +6,19 @@
 // the real addon + model resolver into it and manages the parent port.
 import { addon } from '../bridge';
 import { isCatalogId } from '../catalog';
-import { resolveModel, isRemoteSource } from '../download';
+import { resolveModel, isRemoteSource, assertRemoteSupported, ModelKind, modelStatus, pathExists } from '../download';
 import { dispatch } from './dispatch';
 import { RpcRequest } from './rpc';
 
-// Load methods whose model is a multi-file directory (sherpa STT/TTS) or an
-// ONNX+vocab pair (embedder). The remote resolver is GGUF/single-file-only, so
-// resolving a URL/HF repo for these would hand the addon a wrong-shaped path —
-// reject with a clear message instead. Catalog ids (archives) and local paths
-// still work.
-const REMOTE_UNSUPPORTED: Record<string, string> = {
-  loadSttModel: 'speech-to-text',
-  loadTtsVoice: 'text-to-speech',
-  loadEmbeddingModel: 'embedding',
+// Map each load method to its model kind so the shared remote-source guard
+// (assertRemoteSupported) rejects a URL/HF STT/TTS/embedder consistently with the
+// in-process facade. Catalog ids (archives) and local paths still work.
+const METHOD_KIND: Record<string, ModelKind> = {
+  loadModel: 'llm',
+  loadVlmModel: 'vlm',
+  loadEmbeddingModel: 'embedder',
+  loadSttModel: 'stt',
+  loadTtsVoice: 'tts',
 };
 
 // If a load method's first arg is a catalog id, a URL, or a HuggingFace repo,
@@ -27,14 +27,9 @@ const REMOTE_UNSUPPORTED: Record<string, string> = {
 async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown[]> {
   const first = args[0];
   if (typeof first !== 'string') return args;
-  const remote = isRemoteSource(first);
-  if (!isCatalogId(first) && !remote) return args;
-  if (remote && REMOTE_UNSUPPORTED[method]) {
-    throw new Error(
-      `loading a ${REMOTE_UNSUPPORTED[method]} model from a URL or HuggingFace repo is not supported yet — ` +
-        'use a built-in catalog id or a local path'
-    );
-  }
+  if (!isCatalogId(first) && !isRemoteSource(first)) return args;
+  const kind = METHOD_KIND[method];
+  if (kind) assertRemoteSupported(first, kind);
   const m = await resolveModel(first);
   if (method === 'loadVlmModel') {
     // A bare model URL has no mmproj to auto-resolve; forwarding `undefined` to
@@ -59,6 +54,7 @@ async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown
 interface Port {
   postMessage(message: unknown): void;
   on(event: 'message', cb: (e: { data: unknown }) => void): void;
+  on(event: 'close', cb: () => void): void;
   start(): void;
 }
 interface ParentPort {
@@ -77,6 +73,9 @@ const api = new Proxy(addonMap, {
       return (idOrPath: unknown, onProgress: unknown) =>
         resolveModel(idOrPath as string, { onProgress: onProgress as (p: unknown) => void });
     }
+    // Host-owned filesystem queries (kept off the renderer thread).
+    if (prop === 'modelStatus') return () => modelStatus();
+    if (prop === 'exists') return (p: unknown) => pathExists(p as string);
     const value = target[prop];
     return typeof value === 'function' ? value.bind(target) : value;
   },
@@ -91,7 +90,12 @@ const deps = {
 parentPort.on('message', (e) => {
   const port = e.ports[0];
   if (!port) return;
-  port.on('message', (ev) => dispatch(port, ev.data as RpcRequest, deps));
+  // A renderer reload closes its old port; stop dispatching to the dead one so
+  // in-flight work isn't posted into the void and the port can be released
+  // (avoids a per-reload port leak in the utility process).
+  let alive = true;
+  port.on('message', (ev) => { if (alive) dispatch(port, ev.data as RpcRequest, deps); });
+  port.on('close', () => { alive = false; });
   port.start();
   parentPort.postMessage({ ready: true });
 });
