@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RunAnywhere SDK — Architecture Explorer</title>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --line: #2b3340; --text: #e6edf3;
+    --muted: #8b949e; --accent: #58a6ff; --a: #58a6ff; --b: #f0883e;
+    --tel: #3fb950; --broken: #f85149; --sdk:#8957e5; --engine:#1f6feb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, sans-serif; }
+  #app { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: auto 1fr; height: 100vh; }
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 14px;
+    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .btns { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  button { background: #21262d; color: var(--text); border: 1px solid var(--line);
+    padding: 6px 11px; border-radius: 7px; font-size: 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #06101f; border-color: var(--accent); font-weight: 600; }
+  #cy { width: 100%; height: 100%; background:
+      radial-gradient(circle at 1px 1px, #1b2129 1px, transparent 0) 0 0 / 26px 26px, var(--bg); }
+  aside { border-left: 1px solid var(--line); background: var(--panel); padding: 16px; overflow-y: auto; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 6px; }
+  #detail-title { font-size: 16px; font-weight: 650; margin: 0 0 8px; }
+  #detail-body { font-size: 13px; line-height: 1.55; color: #c9d1d9; }
+  #detail-body code { background: #0d1117; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; margin: 3px 5px 3px 0; border: 1px solid var(--line); }
+  .tag.a { color: var(--a); border-color: #24476e; }
+  .tag.b { color: var(--b); border-color: #6e4a24; }
+  .tag.tel { color: var(--tel); border-color: #24552b; }
+  .legend { margin-top: 18px; font-size: 12px; color: var(--muted); }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .sw { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>RunAnywhere SDK — Architecture Explorer</h1>
+    <span class="sub">pan &amp; scroll to zoom · click any node</span>
+    <div class="btns">
+      <button data-view="all" class="on">Full architecture</button>
+      <button data-view="a">Lifecycle-proto path</button>
+      <button data-view="b">Raw component path</button>
+      <button data-view="tel">Telemetry flow</button>
+      <button id="fit">Fit</button>
+    </div>
+  </header>
+  <div id="cy"></div>
+  <aside>
+    <h2>Details</h2>
+    <div id="detail-title">Click a node</div>
+    <div id="detail-body">
+      Explore the layers of the C/C++ core and the two inference paths.
+      <b>LLM/VLM</b> (rcli <code>cmd_run</code>) use the <span style="color:var(--a)">lifecycle-proto</span>
+      path — the same ABI the platform SDKs use. <b>STT/TTS/VAD/Voice/Embed</b> (rcli <code>cmd_stt</code> …)
+      currently use the <span style="color:var(--b)">raw component</span> path, whose telemetry does not
+      reach the backend.
+    </div>
+    <div class="legend">
+      <div><span class="sw" style="background:var(--a)"></span> Lifecycle-proto path (SDK-canonical)</div>
+      <div><span class="sw" style="background:var(--b)"></span> Raw component path (rcli audio cmds)</div>
+      <div><span class="sw" style="background:var(--tel)"></span> Telemetry delivery (works)</div>
+      <div><span class="sw" style="background:var(--broken)"></span> Telemetry gap (raw path)</div>
+    </div>
+    <div class="hint">Tip: the <b>Raw component path</b> view shows where telemetry is emitted but never
+      delivered — the reason STT/TTS/VAD rows are missing when driven from rcli.</div>
+  </aside>
+</div>
+
+<script>
+// ---- Node data: [id, label, layer, x, y, description(html), paths[] ] --------
+const N = [
+  // Platform SDKs (thin bridges)
+  ["swift","Swift\n(XCFramework)","sdk",   -40, 0, "iOS/macOS bridge. Populates <code>rac_platform_adapter_t</code>, calls the C ABI. Uses the <b>lifecycle-proto</b> ABI for all modalities.", ["a"]],
+  ["kotlin","Kotlin\n(JNI)","sdk",          170, 0, "Android library via <code>librunanywhere_jni.so</code>. Lifecycle-proto ABI.", ["a"]],
+  ["flutter","Flutter\n(Dart FFI)","sdk",   380, 0, "Dart FFI bridge. Lifecycle-proto ABI.", ["a"]],
+  ["rn","React Native\n(NitroModules)","sdk",590, 0, "JSI HybridObject bridge. Lifecycle-proto ABI.", ["a"]],
+  ["web","Web\n(WASM)","sdk",               800, 0, "Emscripten WASM + TS. Lifecycle-proto ABI.", ["a"]],
+
+  ["adapter","Platform Adapter (IoC)\nrac_platform_adapter_t","adapter", -320, 300,
+     "Flat C struct of function pointers the SDK fills before <code>rac_init()</code>: file I/O, HTTP transport, secure storage, logging, memory. C++ never calls platform APIs directly.", ["a","b","tel"]],
+
+  ["cabi","Pure C ABI  (rac_*)","abi", 380, 150,
+     "The single boundary. Everything above is a thin bridge; everything below is shared C/C++ business logic.", ["a","b"]],
+
+  // two entry points
+  ["life_entry","rac_*_lifecycle_proto\n(SDK-canonical entry)","entryA", 190, 300,
+     "The proto-byte lifecycle entry the SDKs use, e.g. <code>rac_stt_transcribe_lifecycle_proto</code>, <code>rac_llm_generate_stream_proto</code>. Loads via the lifecycle manager and <b>emits telemetry that reaches the backend</b>.", ["a"]],
+  ["comp_entry","rac_*_component_*\n(raw component entry)","entryB", 640, 300,
+     "Low-level handle API: <code>rac_stt_component_create</code> + <code>load_model</code> + <code>transcribe</code>. rcli's <code>cmd_stt/tts/vad/voice/embed</code> use this directly (not what the SDKs use). Emits events, but they don't reach the telemetry backend.", ["b"]],
+
+  ["lifecycle","Lifecycle Manager\n(g_loaded · refcount pin)","core", 190, 450,
+     "Owns model lifecycle: <code>g_loaded</code> store, <code>active_refs</code> pin, auto-unload draining via condition_variable. Path-based <code>create_fn</code>, no registry lookup.", ["a"]],
+
+  ["component","Component Layer\nrac_*_component_*","core", 415, 600,
+     "Owns per-model lifecycle + <b>emits analytics/telemetry</b> (RAC_EVENT_*), handles cancel, streams tokens/audio. Both entries converge here.", ["a","b"]],
+
+  ["service","Service Layer\nrac_*_service.cpp","core", 415, 730,
+     "Thin dispatch: look up model → resolve <code>rac_inference_framework_t</code> → <code>rac_plugin_find()</code> → vtable dispatch. Wraps backend in <code>rac_*_service_t</code>.", ["a","b"]],
+
+  ["registry","Plugin Registry\nABI v4 vtable handshake","core", 415, 860,
+     "<code>RAC_PLUGIN_API_VERSION = 4</code>. Highest-priority plugin per primitive wins (no scoring). Static or dlopen. 7 primitive slots.", ["a","b"]],
+
+  // engines
+  ["llamacpp","llamacpp\nLLM · VLM","engine", 60, 1010, "GGUF via llama.cpp. Priority 100. Serves generate_text + vlm.", ["a","b"]],
+  ["sherpa","sherpa-onnx\nSTT · TTS · VAD","engine", 300, 1010, "Sherpa-ONNX C API. Priority 90. Serves transcribe/synthesize/detect_voice. (Needs the Linux sherpa-onnx libs downloaded.)", ["a","b"]],
+  ["onnx","onnx\nEmbeddings","engine", 540, 1010, "Sherpa-ONNX embeddings. Priority 50.", ["a","b"]],
+  ["qhexrt","qhexrt (NPU)\nLLM·VLM·STT·TTS·Diffusion","engine", 780, 1010, "Qualcomm Hexagon NPU. Priority 150 (QNN-context models). Runs diffusion/inpaint on Android.", ["a","b"]],
+  ["coreml","coreml / platform\nApple FM · TTS · Diffusion","engine", 1080, 1010, "Apple-only via Swift callbacks. CoreML Stable-Diffusion, Foundation Models, System TTS.", ["a","b"]],
+
+  // two-phase init + telemetry pipeline
+  ["phase1","Phase 1  init\nrac_sdk_init_phase1_proto","init", 1000, 150,
+     "Sets environment + api_key + base_url, persists via secure storage. Synchronous.", ["tel"]],
+  ["phase2","Phase 2  init\nrac_sdk_init_phase2_proto","init", 1000, 300,
+     "Authenticates (rac_auth_*), registers device, <b>enables telemetry flush</b>. Without Phase 2 nothing is sent — this is what rcli was missing.", ["tel"]],
+  ["telmgr","Telemetry Manager\nbatch · flush","tel", 1000, 600,
+     "Receives emitted events via the registered sink (<code>rac_events_set_telemetry_sink</code>). Batches; completion events flush immediately. Delivery goes through an app-provided HTTP callback — NOT the transport automatically.", ["tel"]],
+  ["telhttp","HTTP callback → transport","tel", 1000, 730,
+     "The app wires <code>set_http_callback</code> to POST batches (Bearer token). rcli now does this over the desktop transport; the raw component path's events still don't reach here.", ["tel"]],
+  ["backend","Backend API\n/api/v1/sdk/telemetry","backend", 1000, 860,
+     "FastAPI ingest. Synchronous commit → returns {events_received, events_stored, storage_version}. Routes modality llm/stt/tts → per-modality child tables.", ["tel"]],
+  ["db","Supabase Postgres\ntelemetry_events + *_telemetry","db", 1000, 1010,
+     "telemetry_events (envelope) + llm/stt/tts/vad/vlm/rag/... per-modality tables. Unique event id per row.", ["tel"]],
+];
+
+// ---- Edges: [source, target, pathClass] -------------------------------------
+const E = [
+  ["swift","cabi","a"],["kotlin","cabi","a"],["flutter","cabi","a"],["rn","cabi","a"],["web","cabi","a"],
+  ["cabi","life_entry","a"], ["cabi","comp_entry","b"],
+  ["life_entry","lifecycle","a"], ["lifecycle","component","a"],
+  ["comp_entry","component","b"],
+  ["component","service","a"], ["component","service","b2"],
+  ["service","registry","ab"],
+  ["registry","llamacpp","ab"],["registry","sherpa","ab"],["registry","onnx","ab"],["registry","qhexrt","ab"],["registry","coreml","ab"],
+  ["adapter","cabi","dep"],
+  // two-phase init
+  ["phase1","phase2","tel"], ["phase2","telmgr","tel"],
+  // telemetry delivery
+  ["component","telmgr","tel"],       // lifecycle path emits → sink → works
+  ["comp_entry","telmgr","broken"],   // raw path: emitted but not delivered
+  ["telmgr","telhttp","tel"],["telhttp","backend","tel"],["backend","db","tel"],
+  ["adapter","telhttp","dep"],
+];
+
+const layerColor = {
+  sdk:"#8957e5", adapter:"#6e7681", abi:"#d29922", entryA:"#58a6ff", entryB:"#f0883e",
+  core:"#1f6feb", engine:"#238636", init:"#a371f7", tel:"#3fb950", backend:"#db6d28", db:"#2f81f7"
+};
+
+const cy = cytoscape({
+  container: document.getElementById("cy"),
+  elements: [
+    ...N.map(n => ({ data:{ id:n[0], label:n[1], layer:n[2], desc:n[5], paths:n[6] }, position:{x:n[3], y:n[4]} })),
+    ...E.map((e,i) => ({ data:{ id:"e"+i, source:e[0], target:e[1], pcls:e[2] } })),
+  ],
+  layout: { name: "preset" },
+  wheelSensitivity: 0.25,
+  style: [
+    { selector:"node", style:{
+        "background-color": ele => layerColor[ele.data("layer")] || "#30363d",
+        "label":"data(label)", "color":"#e6edf3", "text-wrap":"wrap", "text-valign":"center",
+        "text-halign":"center", "font-size":"11px", "text-max-width":"150px",
+        "width":"160px","height":"58px","shape":"round-rectangle","border-width":1.5,
+        "border-color":"#0d1117","text-outline-width":0, "font-weight":600, "padding":"6px"
+    }},
+    { selector:"edge", style:{
+        "width":2, "curve-style":"bezier", "target-arrow-shape":"triangle",
+        "line-color":"#3d444d","target-arrow-color":"#3d444d","opacity":0.9
+    }},
+    { selector:'edge[pcls="a"]', style:{ "line-color":"#58a6ff","target-arrow-color":"#58a6ff","width":3 }},
+    { selector:'edge[pcls="b"]', style:{ "line-color":"#f0883e","target-arrow-color":"#f0883e","width":3 }},
+    { selector:'edge[pcls="b2"]', style:{ "line-color":"#f0883e","target-arrow-color":"#f0883e","width":3,"line-style":"dashed" }},
+    { selector:'edge[pcls="ab"]', style:{ "line-color":"#6e7681","target-arrow-color":"#6e7681" }},
+    { selector:'edge[pcls="tel"]', style:{ "line-color":"#3fb950","target-arrow-color":"#3fb950","width":2.5 }},
+    { selector:'edge[pcls="broken"]', style:{ "line-color":"#f85149","target-arrow-color":"#f85149","line-style":"dashed","width":2.5 }},
+    { selector:'edge[pcls="dep"]', style:{ "line-color":"#484f58","target-arrow-color":"#484f58","line-style":"dotted" }},
+    { selector:".dim", style:{ "opacity":0.12 }},
+    { selector:"node:selected", style:{ "border-width":3, "border-color":"#58a6ff" }},
+  ],
+});
+
+const title = document.getElementById("detail-title");
+const body = document.getElementById("detail-body");
+cy.on("tap","node", ev => {
+  const d = ev.target.data();
+  title.textContent = d.label.replace(/\n/g," · ");
+  const tags = (d.paths||[]).map(p => p==="a" ? '<span class="tag a">lifecycle-proto</span>'
+    : p==="b" ? '<span class="tag b">raw component</span>'
+    : '<span class="tag tel">telemetry</span>').join("");
+  body.innerHTML = d.desc + "<div style='margin-top:10px'>" + tags + "</div>";
+});
+cy.on("tap", ev => { if (ev.target === cy) { cy.elements().removeClass("dim"); } });
+
+function showView(v){
+  cy.elements().removeClass("dim");
+  if (v === "all") return;
+  const keep = new Set();
+  cy.edges().forEach(e => {
+    const c = e.data("pcls");
+    const match = (v==="a" && (c==="a"||c==="ab")) ||
+                  (v==="b" && (c==="b"||c==="b2"||c==="ab")) ||
+                  (v==="tel" && (c==="tel"||c==="broken"));
+    if (match){ keep.add(e.id()); keep.add(e.source().id()); keep.add(e.target().id()); }
+  });
+  cy.elements().forEach(el => { if (!keep.has(el.id())) el.addClass("dim"); });
+}
+document.querySelectorAll("[data-view]").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll("[data-view]").forEach(b => b.classList.remove("on"));
+  btn.classList.add("on"); showView(btn.dataset.view);
+}));
+document.getElementById("fit").addEventListener("click", () => cy.fit(null, 40));
+cy.fit(null, 40);
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@
  * - Production (FastAPI): Uses id, timestamp, skips modality/device_id (batch level)
  */
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -82,10 +83,13 @@ class JsonBuilder {
         }
     }
 
-    // Outputs double if is_valid is true, otherwise outputs null
+    // Outputs double if is_valid is true, otherwise outputs null. Non-finite
+    // values (NaN/Inf) are emitted as null — JSON has no nan/inf literals, and
+    // emitting them corrupts the whole batch (backend rejects with a JSON
+    // decode error), so a single unset metric must never poison the payload.
     void add_double_or_null(const char* key, double value, bool is_valid) {
         comma();
-        if (is_valid) {
+        if (is_valid && std::isfinite(value)) {
             ss_ << "\"" << key << "\":" << value;
         } else {
             ss_ << "\"" << key << "\":null";
@@ -93,17 +97,22 @@ class JsonBuilder {
     }
 
     void add_double(const char* key, double value) {
-        if (value == 0.0)
-            return;  // Skip zero values
+        if (value == 0.0 || !std::isfinite(value))
+            return;  // Skip zero and non-finite (NaN/Inf) — never emit invalid JSON.
         comma();
         ss_ << "\"" << key << "\":" << value;
     }
 
     // Emit even when 0 — for fields where 0 is a meaningful measurement
-    // (e.g. temperature=0.0 greedy decode) rather than "unset".
+    // (e.g. temperature=0.0 greedy decode) rather than "unset". Non-finite
+    // still degrades to null so the JSON stays valid.
     void add_double_always(const char* key, double value) {
         comma();
-        ss_ << "\"" << key << "\":" << value;
+        if (std::isfinite(value)) {
+            ss_ << "\"" << key << "\":" << value;
+        } else {
+            ss_ << "\"" << key << "\":null";
+        }
     }
 
     void add_bool(const char* key, rac_bool_t value, rac_bool_t has_value) {
@@ -335,12 +344,14 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_string("embedding_model", payload->embedding_model);
         json.add_bool("reranker_used", payload->reranker_used, payload->has_reranker_used);
     } else if (strcmp(modality, "embeddings") == 0) {
-        // input_count / vectors_produced / embedding_model / embedding_dimension
-        // have sources today (dimension via the properties carrier).
-        // total_tokens / batch_size still need a carrier.
+        // input_count / vectors_produced / embedding_model / embedding_dimension /
+        // total_tokens / batch_size all ride the properties carrier (dimension,
+        // total_tokens, batch_size) or the capability counts (input/vectors).
         json.add_int("input_count", payload->input_count);
         json.add_int("vectors_produced", payload->vectors_produced);
         json.add_int("embedding_dimension", payload->embedding_dimension);
+        json.add_int("total_tokens", payload->total_tokens);
+        json.add_int("batch_size", payload->batch_size);
         json.add_string("embedding_model", payload->model_id);
     } else if (strcmp(modality, "voice") == 0) {
         // Per-turn voice-agent pipeline summary (from MetricsEvent).
@@ -359,8 +370,8 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_int("segment_count", payload->segment_count);
         json.add_int("sample_rate", payload->sample_rate);
     } else if (strcmp(modality, "lora") == 0) {
-        // base model rides on model_id; adapter_id + operation via the carrier.
-        // adapter_size_bytes still needs a source (would require stat-ing the file).
+        // base model rides on model_id; adapter_id + operation + adapter_size_bytes
+        // via the carrier (size is stat-ed from the adapter path in rac_lora_service).
         json.add_string("operation", payload->operation);
         json.add_string("base_model_id", payload->model_id);
         json.add_string("adapter_id", payload->adapter_id);

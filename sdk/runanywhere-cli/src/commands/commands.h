@@ -36,6 +36,7 @@ void register_vad(CLI::App& app, GlobalOptions& options);
 void register_voice(CLI::App& app, GlobalOptions& options);
 void register_serve(CLI::App& app, GlobalOptions& options);
 void register_lora(CLI::App& app, GlobalOptions& options);
+void register_rag(CLI::App& app, GlobalOptions& options);
 
 /**
  * Shared pull flow (plan → start → progress → terminal state) for an

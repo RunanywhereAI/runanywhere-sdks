@@ -54,6 +54,7 @@ struct TextGenerationResult {
     int tokens_generated = 0;
     int prompt_tokens = 0;
     double inference_time_ms = 0.0;
+    double prompt_eval_time_ms = 0.0;  // prefill (prompt decode) wall-clock
     std::string finish_reason;  // "stop", "length", "cancelled"
 };
 
@@ -152,9 +153,10 @@ class LlamaCppTextGeneration {
      * @param request           Generation request.
      * @param callback          Streaming callback; return false to cancel.
      * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
+     * @param out_prompt_eval_ms Optional: prefill (prompt decode) time in ms (may be NULL).
      */
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens = nullptr);
+                         int* out_prompt_tokens = nullptr, double* out_prompt_eval_ms = nullptr);
 
     void cancel();
 

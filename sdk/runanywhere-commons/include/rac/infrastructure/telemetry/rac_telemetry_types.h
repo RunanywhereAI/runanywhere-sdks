@@ -122,10 +122,12 @@ typedef struct rac_telemetry_payload {
     // RAG-specific fields
     int32_t retrieved_docs_count;
 
-    // Embeddings-specific fields (embedding_model is read from model_id)
+    // Embeddings-specific fields (embedding_model is read from model_id;
+    // total_tokens reuses the shared LLM token field above)
     int32_t input_count;          // texts embedded in the op
     int32_t vectors_produced;     // vectors returned
     int32_t embedding_dimension;  // vector dimension (via properties carrier)
+    int32_t batch_size;           // texts submitted in the batch (via properties carrier)
 
     // RAG-specific extras (via properties carrier; retrieved_docs_count above)
     int32_t top_k;

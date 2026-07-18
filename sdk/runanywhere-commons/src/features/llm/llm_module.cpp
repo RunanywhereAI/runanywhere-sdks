@@ -191,7 +191,8 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
                                    double tokens_per_second, bool is_streaming,
                                    double time_to_first_token_ms,
                                    rac_inference_framework_t framework, float temperature,
-                                   int32_t max_tokens, int32_t context_length) {
+                                   int32_t max_tokens, int32_t context_length,
+                                   double prompt_eval_time_ms = 0.0) {
     runanywhere::v1::GenerationEvent g;
     g.set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
     if (model_id)
@@ -205,6 +206,9 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
     g.set_tokens_per_second(tokens_per_second);
     g.set_is_streaming(is_streaming);
     g.set_time_to_first_token_ms(static_cast<int64_t>(time_to_first_token_ms));
+    if (prompt_eval_time_ms > 0.0) {
+        g.set_prompt_eval_time_ms(static_cast<int64_t>(prompt_eval_time_ms));
+    }
     g.set_framework(rac::events::framework_to_proto_int(framework));
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
@@ -699,7 +703,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         generation_id.c_str(), model_id, model_name, out_result->prompt_tokens,
         out_result->completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/false, /*time_to_first_token_ms=*/0, component->actual_framework,
-        effective_options->temperature, effective_options->max_tokens, context_length);
+        effective_options->temperature, effective_options->max_tokens, context_length,
+        /*prompt_eval_time_ms=*/static_cast<double>(out_result->prompt_eval_time_ms));
 #endif
 
     return RAC_SUCCESS;
@@ -999,6 +1004,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             ctx.first_token_time - ctx.start_time);
         final_result.time_to_first_token_ms = ttft_duration.count();
+        final_result.prompt_eval_time_ms = ttft_duration.count();
         ttft_ms = static_cast<double>(ttft_duration.count());
     }
 
@@ -1024,7 +1030,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         generation_id.c_str(), model_id, model_name, final_result.prompt_tokens,
         final_result.completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/true, ttft_ms, component->actual_framework, effective_options->temperature,
-        effective_options->max_tokens, context_length);
+        effective_options->max_tokens, context_length,
+        /*prompt_eval_time_ms=*/static_cast<double>(final_result.prompt_eval_time_ms));
 #endif
 
     // Terminal success event on the proto stream.
@@ -1300,7 +1307,7 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
                               const char* framework_name = nullptr, double tokens_per_second = 0.0,
                               double ttft_ms = 0.0, float temperature = -1.0f,
                               int32_t max_tokens = 0, int32_t context_length = 0,
-                              bool is_streaming = false) {
+                              bool is_streaming = false, double prompt_eval_time_ms = 0.0) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -1349,6 +1356,9 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
     }
     if (ttft_ms > 0.0) {
         generation->set_time_to_first_token_ms(static_cast<int64_t>(ttft_ms));
+    }
+    if (prompt_eval_time_ms > 0.0) {
+        generation->set_prompt_eval_time_ms(static_cast<int64_t>(prompt_eval_time_ms));
     }
     // temperature 0.0 is a valid (greedy) setting, so the sentinel for "unset"
     // is a negative default — emit any non-negative value.
@@ -2105,7 +2115,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         raw.prompt_tokens > 0 ? raw.prompt_tokens : estimate_tokens(request.prompt().c_str()),
         ref.framework_name, static_cast<double>(raw.tokens_per_second),
         static_cast<double>(raw.time_to_first_token_ms), options.temperature, options.max_tokens,
-        lifecycle_context_length(ref), /*is_streaming=*/false);
+        lifecycle_context_length(ref), /*is_streaming=*/false,
+        /*prompt_eval_time_ms=*/static_cast<double>(raw.prompt_eval_time_ms));
 
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
@@ -2247,7 +2258,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                      : 0.0,
                                  static_cast<double>(stream_ttft), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),
-                                 /*is_streaming=*/true);
+                                 /*is_streaming=*/true,
+                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_ttft));
     }
 
     rac::llm::release_lifecycle_llm(&ref);

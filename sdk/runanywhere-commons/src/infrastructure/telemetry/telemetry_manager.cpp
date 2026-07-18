@@ -927,6 +927,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
                                                  ? static_cast<double>(g.time_to_first_token_ms())
                                                  : static_cast<double>(g.first_token_latency_ms());
+            payload.prompt_eval_time_ms = static_cast<double>(g.prompt_eval_time_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -1173,6 +1174,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (ttft_it != ev.properties().end()) {
                         payload.time_to_first_token_ms = std::atof(ttft_it->second.c_str());
                     }
+                    auto pe_it = ev.properties().find("prompt_eval_time_ms");
+                    if (pe_it != ev.properties().end()) {
+                        payload.prompt_eval_time_ms = std::atof(pe_it->second.c_str());
+                    }
                     auto temp_it = ev.properties().find("temperature");
                     if (temp_it != ev.properties().end()) {
                         payload.temperature = std::atof(temp_it->second.c_str());
@@ -1230,11 +1235,22 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     // embedding_model is read from model_id (set above) in the JSON.
                     payload.input_count = static_cast<int32_t>(c.input_count());
                     payload.vectors_produced = static_cast<int32_t>(c.output_count());
-                    // embedding_dimension rides the properties carrier (no proto field).
+                    // embedding_dimension / total_tokens / batch_size ride the
+                    // properties carrier (no CapabilityOperationEvent fields).
                     auto dim_it = ev.properties().find("embedding_dimension");
                     if (dim_it != ev.properties().end()) {
                         payload.embedding_dimension =
                             static_cast<int32_t>(std::atoi(dim_it->second.c_str()));
+                    }
+                    auto tok_it = ev.properties().find("total_tokens");
+                    if (tok_it != ev.properties().end()) {
+                        payload.total_tokens =
+                            static_cast<int32_t>(std::atoi(tok_it->second.c_str()));
+                    }
+                    auto bs_it = ev.properties().find("batch_size");
+                    if (bs_it != ev.properties().end()) {
+                        payload.batch_size =
+                            static_cast<int32_t>(std::atoi(bs_it->second.c_str()));
                     }
                     break;
                 }

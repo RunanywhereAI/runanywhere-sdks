@@ -2,7 +2,9 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <cstdio>
 #include <string>
+#include <vector>
 #if !defined(_WIN32)
 #include <unistd.h>
 #endif
@@ -14,6 +16,17 @@
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/core/rac_sdk_state.h"
+#include "rac/lifecycle/rac_sdk_init.h"
+#include "rac/foundation/rac_proto_buffer.h"
+
+#include "sdk_init.pb.h"
 
 #include "catalog/catalog.h"
 #include "config/cli_paths.h"
@@ -47,6 +60,10 @@ namespace {
 // rac_init requires the adapter pointer to stay valid until rac_shutdown.
 rac_platform_adapter_t g_adapter{};
 bool g_bootstrapped = false;
+
+// Owns the telemetry manager for the process lifetime so the terminal flush in
+// rac_shutdown() can deliver through our HTTP callback before teardown.
+rac_telemetry_manager_t *g_telemetry_manager = nullptr;
 
 rac_log_level_t log_level_for(const GlobalOptions &options) {
   if (options.verbose) {
@@ -150,6 +167,23 @@ const char *desktop_platform() {
 #endif
 }
 
+rac_environment_t environment_from_name(const std::string &name) {
+  if (name == "production" || name == "prod")
+    return RAC_ENV_PRODUCTION;
+  if (name == "staging")
+    return RAC_ENV_STAGING;
+  return RAC_ENV_DEVELOPMENT;
+}
+
+::runanywhere::v1::SdkInitEnvironment
+proto_environment_from_name(const std::string &name) {
+  if (name == "production" || name == "prod")
+    return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION;
+  if (name == "staging")
+    return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_STAGING;
+  return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+}
+
 void initialize_sdk_metadata() {
   char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
   const rac_result_t device_rc =
@@ -163,10 +197,17 @@ void initialize_sdk_metadata() {
   const std::string locale = detect_locale();
   const std::string timezone = detect_timezone();
 
+  const std::string api_key =
+      first_env_value("RUNANYWHERE_API_KEY", nullptr, nullptr);
+  const std::string base_url =
+      first_env_value("RUNANYWHERE_BASE_URL", nullptr, nullptr);
+  const std::string environment_name =
+      first_env_value("RUNANYWHERE_ENVIRONMENT", nullptr, nullptr);
+
   rac_sdk_config_t sdk_config = {};
-  sdk_config.environment = RAC_ENV_DEVELOPMENT;
-  sdk_config.api_key = "";
-  sdk_config.base_url = "";
+  sdk_config.environment = environment_from_name(environment_name);
+  sdk_config.api_key = api_key.c_str();
+  sdk_config.base_url = base_url.c_str();
   sdk_config.device_id = device_id[0] != '\0' ? device_id : "";
   sdk_config.platform = desktop_platform();
   sdk_config.sdk_version = RCLI_VERSION;
@@ -182,6 +223,216 @@ void initialize_sdk_metadata() {
   if (config_rc != RAC_VALIDATION_OK) {
     out::status_line(std::string("warning: SDK metadata init failed: ") +
                      rac_validation_error_message(config_rc));
+  }
+}
+
+// Delivers a queued telemetry batch over the desktop HTTP transport. Wired via
+// rac_telemetry_manager_set_http_callback (user_data = the manager) so the
+// outcome is reported back through rac_telemetry_manager_http_complete. Mirrors
+// the control-plane POST performed by commons' auth path.
+void rcli_telemetry_http_callback(void *user_data, const char *endpoint,
+                                  const char *json_body, size_t json_length,
+                                  rac_bool_t requires_auth) {
+  auto *manager = static_cast<rac_telemetry_manager_t *>(user_data);
+  const char *base_url = rac_state_get_base_url();
+  if (base_url == nullptr || base_url[0] == '\0' ||
+      rac_http_transport_is_registered() != RAC_TRUE) {
+    if (manager != nullptr) {
+      rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                          "telemetry transport unavailable");
+    }
+    return;
+  }
+
+  char url[2048] = {};
+  if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
+    if (manager != nullptr) {
+      rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                          "telemetry URL build failed");
+    }
+    return;
+  }
+
+  std::vector<rac_http_header_kv_t> headers;
+  const rac_http_header_kv_t *defaults = nullptr;
+  size_t default_count = 0;
+  if (rac_http_default_headers(&defaults, &default_count) == RAC_SUCCESS &&
+      defaults != nullptr) {
+    headers.assign(defaults, defaults + default_count);
+  }
+  std::string auth_value;
+  if (requires_auth == RAC_TRUE) {
+    const char *token = rac_auth_get_access_token();
+    if (token != nullptr && token[0] != '\0') {
+      auth_value = std::string("Bearer ") + token;
+      headers.push_back({"Authorization", auth_value.c_str()});
+    }
+  }
+
+  rac_http_client_t *client = nullptr;
+  if (rac_http_client_create(&client) != RAC_SUCCESS) {
+    if (manager != nullptr) {
+      rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                          "telemetry client create failed");
+    }
+    return;
+  }
+
+  rac_http_request_t request = {};
+  request.method = "POST";
+  request.url = url;
+  request.headers = headers.empty() ? nullptr : headers.data();
+  request.header_count = headers.size();
+  request.body_bytes = reinterpret_cast<const uint8_t *>(json_body);
+  request.body_len = json_length;
+  request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
+  request.follow_redirects = RAC_FALSE;
+
+  rac_http_response_t response = {};
+  const rac_result_t rc = rac_http_request_send(client, &request, &response);
+  rac_http_client_destroy(client);
+
+  const bool ok =
+      rc == RAC_SUCCESS && response.status >= 200 && response.status < 300;
+  std::string body;
+  if (response.body_bytes != nullptr && response.body_len > 0) {
+    body.assign(reinterpret_cast<const char *>(response.body_bytes),
+                response.body_len);
+  }
+  if (!ok) {
+    // Surface the exact backend rejection (status + response body) so schema
+    // mismatches (e.g. strict extra_forbidden 422s) are diagnosable from rcli.
+    out::status_line(std::string("telemetry POST ") + (endpoint ? endpoint : "?") +
+                     " -> rc=" + out::describe_result(rc) +
+                     " http=" + std::to_string(response.status) +
+                     " body=" + (body.empty() ? "(empty)" : body));
+    // DEBUG: dump the exact request JSON so a malformed offset can be inspected.
+    if (const char *dump = std::getenv("RCLI_TELEMETRY_DUMP");
+        dump != nullptr && dump[0] != '\0' && json_body != nullptr) {
+      if (FILE *fp = std::fopen(dump, "ab")) {
+        std::fwrite(json_body, 1, json_length, fp);
+        std::fputc('\n', fp);
+        std::fclose(fp);
+      }
+    }
+  }
+  if (manager != nullptr) {
+    rac_telemetry_manager_http_complete(manager, ok ? RAC_TRUE : RAC_FALSE,
+                                        body.empty() ? nullptr : body.c_str(),
+                                        ok ? nullptr : "telemetry POST failed");
+  }
+  rac_http_response_free(&response);
+}
+
+// Runs the canonical two-phase SDK init so rcli authenticates and telemetry
+// actually flushes. Phase 1 sets environment + credentials; Phase 2
+// authenticates, registers the device, and enables the telemetry sink.
+// Credentials come from the environment (RUNANYWHERE_API_KEY /
+// RUNANYWHERE_BASE_URL / RUNANYWHERE_ENVIRONMENT) so no secrets live in source.
+// When credentials are absent, rcli stays in local dev mode (no auth, no
+// telemetry) exactly as before.
+void initialize_telemetry_auth() {
+  const std::string api_key =
+      first_env_value("RUNANYWHERE_API_KEY", nullptr, nullptr);
+  const std::string base_url =
+      first_env_value("RUNANYWHERE_BASE_URL", nullptr, nullptr);
+  const std::string environment_name =
+      first_env_value("RUNANYWHERE_ENVIRONMENT", nullptr, nullptr);
+
+  if (api_key.empty() || base_url.empty()) {
+    return; // Local dev mode — telemetry not sent (staging/prod only).
+  }
+
+  // Enable the auth manager. NULL secure storage: tokens are not persisted
+  // across runs (fine for a CLI session); authentication still runs per run.
+  rac_auth_init(nullptr);
+
+  char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
+  if (rac_device_get_or_create_persistent_id(device_id, sizeof(device_id)) !=
+      RAC_SUCCESS) {
+    device_id[0] = '\0';
+  }
+
+  // Create + register the telemetry sink BEFORE Phase 2 so its flush has a sink
+  // and events emitted during subsequent commands are tracked. Delivery runs
+  // through rcli_telemetry_http_callback over the desktop HTTP transport; the
+  // terminal batch flushes in rac_shutdown() during teardown.
+  g_telemetry_manager = rac_telemetry_manager_create(
+      environment_from_name(environment_name),
+      device_id[0] != '\0' ? device_id : "", desktop_platform(), RCLI_VERSION);
+  if (g_telemetry_manager != nullptr) {
+    rac_telemetry_manager_set_http_callback(
+        g_telemetry_manager, rcli_telemetry_http_callback, g_telemetry_manager);
+    rac_events_set_telemetry_sink(g_telemetry_manager);
+  }
+
+  ::runanywhere::v1::SdkInitPhase1Request phase1;
+  phase1.set_environment(proto_environment_from_name(environment_name));
+  phase1.set_api_key(api_key);
+  phase1.set_base_url(base_url);
+  if (device_id[0] != '\0') {
+    phase1.set_device_id(device_id);
+  }
+  phase1.set_platform(desktop_platform());
+  phase1.set_sdk_version(RCLI_VERSION);
+
+  std::string phase1_bytes;
+  if (!phase1.SerializeToString(&phase1_bytes)) {
+    out::status_line("warning: telemetry phase 1 serialize failed");
+    return;
+  }
+
+  rac_proto_buffer_t phase1_out;
+  rac_proto_buffer_init(&phase1_out);
+  rac_result_t rc = rac_sdk_init_phase1_proto(
+      reinterpret_cast<const uint8_t *>(phase1_bytes.data()),
+      phase1_bytes.size(), &phase1_out);
+  rac_proto_buffer_free(&phase1_out);
+  if (rc != RAC_SUCCESS) {
+    out::status_line("warning: telemetry phase 1 failed: " +
+                     out::describe_result(rc));
+    return;
+  }
+
+  ::runanywhere::v1::SdkInitPhase2Request phase2;
+  phase2.set_flush_telemetry(true);
+  phase2.set_discover_downloaded_models(true);
+  phase2.set_rescan_local_models(true);
+
+  std::string phase2_bytes;
+  if (!phase2.SerializeToString(&phase2_bytes)) {
+    out::status_line("warning: telemetry phase 2 serialize failed");
+    return;
+  }
+
+  rac_proto_buffer_t phase2_out;
+  rac_proto_buffer_init(&phase2_out);
+  rc = rac_sdk_init_phase2_proto(
+      reinterpret_cast<const uint8_t *>(phase2_bytes.data()),
+      phase2_bytes.size(), &phase2_out);
+
+  ::runanywhere::v1::SdkInitResult result;
+  const bool parsed = phase2_out.status == RAC_SUCCESS &&
+                      phase2_out.data != nullptr &&
+                      result.ParseFromArray(phase2_out.data,
+                                            static_cast<int>(phase2_out.size));
+  rac_proto_buffer_free(&phase2_out);
+
+  if (rc != RAC_SUCCESS) {
+    out::status_line("warning: telemetry phase 2 failed: " +
+                     out::describe_result(rc));
+    return;
+  }
+
+  if (parsed) {
+    std::string note = std::string("telemetry ready | http_configured=") +
+                       (result.http_configured() ? "yes" : "no") +
+                       " device_registered=" +
+                       (result.device_registered() ? "yes" : "no");
+    if (!result.warning().empty()) {
+      note += " | " + result.warning();
+    }
+    out::status_line(note);
   }
 }
 
@@ -235,6 +486,7 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
     }
 
     initialize_sdk_metadata();
+    initialize_telemetry_auth();
 
 #if defined(RCLI_HAS_LLAMACPP)
     if (rac_backend_llamacpp_register() != RAC_SUCCESS) {
@@ -288,7 +540,14 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
 
 void shutdown() {
   if (g_bootstrapped) {
+    // rac_shutdown() flushes the terminal telemetry batch through the
+    // registered sink (our HTTP callback) before clearing lifetime state.
     rac_shutdown();
+    rac_events_set_telemetry_sink(nullptr);
+    if (g_telemetry_manager != nullptr) {
+      rac_telemetry_manager_destroy(g_telemetry_manager);
+      g_telemetry_manager = nullptr;
+    }
     g_bootstrapped = false;
   }
 }
