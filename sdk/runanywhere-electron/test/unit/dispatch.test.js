@@ -81,6 +81,29 @@ test('streaming method whose promise rejects posts {ok:false,error} and no done'
   );
 });
 
+test('streaming method that resolves a value carries it on the done message', async () => {
+  const port = makePort();
+  const resolved = { id: 'hf-x', dir: '/models/hf-x', primary: '/models/hf-x/model.gguf' };
+  const deps = makeDeps({
+    streamingMethods: new Set(['downloadModel']),
+    api: {
+      downloadModel: (...allArgs) => {
+        const onProgress = allArgs[allArgs.length - 1];
+        onProgress({ percent: 100 });
+        return Promise.resolve(resolved);
+      },
+    },
+  });
+
+  dispatch(port, { id: 21, method: 'downloadModel', args: ['owner/repo'] }, deps);
+  await tick();
+
+  assert.deepEqual(port.posts, [
+    { id: 21, token: { percent: 100 } },
+    { id: 21, done: true, result: resolved },
+  ]);
+});
+
 // ---- VERSION ------------------------------------------------------------
 
 test('version method uses getVersion and does not consult api', async () => {
