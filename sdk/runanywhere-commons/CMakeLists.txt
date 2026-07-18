@@ -400,6 +400,13 @@ set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
+# MSVC has no libc regcomp, so libarchive's POSIX_REGEX_LIB=AUTO falls through to
+# a PCRE/libgcc branch that hard-errors ("libgcc not found") at configure time.
+# We only use libarchive for extraction (no archive_match/regex), so disable the
+# POSIX regex search entirely on Windows.
+if(WIN32)
+    set(POSIX_REGEX_LIB "NONE" CACHE STRING "" FORCE)
+endif()
 # libarchive's ENABLE_LIBGCC gates a `find_library(GCC_LIBRARY gcc)` / `-lgcc`
 # link. Needed on MSVC for the bundled runtime; a no-op on Apple/Clang (no
 # libgcc); on Linux+GCC keep it OFF so we don't add an explicit -lgcc to the
