@@ -98,7 +98,7 @@ echo [EXTRACT] Decompressing (7-Zip)...
 mkdir "%DEST_DIR%" 2>nul
 7z x -y "%TEMP_DL%\sherpa-onnx.tar.bz2" -o"%TEMP_DL%"
 if errorlevel 1 (
-    echo [ERROR] bzip2 decompression (7-Zip) failed.
+    echo [ERROR] 7-Zip bzip2 decompression failed.
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1
 )
