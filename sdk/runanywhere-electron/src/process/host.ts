@@ -10,12 +10,31 @@ import { resolveModel, isRemoteSource } from '../download';
 import { dispatch } from './dispatch';
 import { RpcRequest } from './rpc';
 
+// Load methods whose model is a multi-file directory (sherpa STT/TTS) or an
+// ONNX+vocab pair (embedder). The remote resolver is GGUF/single-file-only, so
+// resolving a URL/HF repo for these would hand the addon a wrong-shaped path —
+// reject with a clear message instead. Catalog ids (archives) and local paths
+// still work.
+const REMOTE_UNSUPPORTED: Record<string, string> = {
+  loadSttModel: 'speech-to-text',
+  loadTtsVoice: 'text-to-speech',
+  loadEmbeddingModel: 'embedding',
+};
+
 // If a load method's first arg is a catalog id, a URL, or a HuggingFace repo,
 // download+resolve it (in the utility process, which owns Node I/O) before
 // handing concrete paths to the addon. A plain local path passes through.
 async function resolveLoadArgs(method: string, args: unknown[]): Promise<unknown[]> {
   const first = args[0];
-  if (typeof first !== 'string' || (!isCatalogId(first) && !isRemoteSource(first))) return args;
+  if (typeof first !== 'string') return args;
+  const remote = isRemoteSource(first);
+  if (!isCatalogId(first) && !remote) return args;
+  if (remote && REMOTE_UNSUPPORTED[method]) {
+    throw new Error(
+      `loading a ${REMOTE_UNSUPPORTED[method]} model from a URL or HuggingFace repo is not supported yet — ` +
+        'use a built-in catalog id or a local path'
+    );
+  }
   const m = await resolveModel(first);
   if (method === 'loadVlmModel') return [m.primary, m.mmproj ?? args[1], ...args.slice(2)];
   return [m.primary, ...args.slice(1)];
