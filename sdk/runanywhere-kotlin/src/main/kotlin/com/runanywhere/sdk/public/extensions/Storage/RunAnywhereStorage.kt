@@ -14,6 +14,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ArchiveArtifact
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
@@ -140,8 +141,14 @@ suspend fun RunAnywhere.registerModel(
     // Preserve the structure on the archive artifact. The URL-form inferred
     // artifact only captures the archive type, not the nested/directory
     // layout, so patch it here and re-persist through the registry's proto
-    // save path (mirroring Swift's archive overload).
-    val archive = model.archiveArtifact ?: return model
+    // save path (mirroring Swift's archive overload). When the URL suffix
+    // doesn't reveal an archive (query strings, presigned CDN URLs), the
+    // URL-form registration produced a single_file artifact; Swift still
+    // persists an archive artifact carrying the caller's type and structure,
+    // so build one here instead of dropping the caller's intent.
+    val archive =
+        model.archiveArtifact
+            ?: ArchiveArtifact(type = archiveType ?: ArchiveType.ARCHIVE_TYPE_UNSPECIFIED)
     model =
         model
             .setArchiveArtifact(archive.copy(structure = structure))
