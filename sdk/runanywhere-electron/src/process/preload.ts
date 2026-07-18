@@ -6,8 +6,6 @@
 // SDK modules); a local event bus mirrors the facade's lifecycle/telemetry events
 // so a renderer can subscribe without the Node facade.
 import { contextBridge, ipcRenderer } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import type { JsonSchema } from '../grammar';
@@ -18,7 +16,6 @@ import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
 import type { EventListener, Modality } from '../events';
 import { CATALOG } from '../catalog';
-import { modelsRoot } from '../download';
 import type { RpcMessage } from './rpc';
 
 type Pending = {
@@ -95,26 +92,6 @@ function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
   });
 }
 
-// Recursively sum file sizes under a directory (best-effort, bounded depth).
-function dirSize(dir: string, depth = 0): number {
-  if (depth > 4) return 0;
-  let total = 0;
-  try {
-    for (const name of fs.readdirSync(dir)) {
-      const p = path.join(dir, name);
-      try {
-        const st = fs.statSync(p);
-        total += st.isDirectory() ? dirSize(p, depth + 1) : st.size;
-      } catch {
-        /* ignore unreadable entries */
-      }
-    }
-  } catch {
-    /* ignore missing dir */
-  }
-  return total;
-}
-
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
@@ -124,23 +101,12 @@ contextBridge.exposeInMainWorld('runanywhere', {
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
 
-  // ---- model catalog + storage (fs reads in the preload) ----
+  // ---- model catalog + storage ----
   catalog: () => CATALOG,
-  modelStatus: () => {
-    const root = modelsRoot();
-    const out: Record<string, { downloaded: boolean; sizeBytes: number }> = {};
-    for (const [id, entry] of Object.entries(CATALOG)) {
-      const dir = path.join(root, id);
-      let downloaded = false;
-      try {
-        downloaded = fs.existsSync(path.join(dir, entry.primary));
-      } catch {
-        downloaded = false;
-      }
-      out[id] = { downloaded, sizeBytes: dirSize(dir) };
-    }
-    return out;
-  },
+  // modelStatus/exists run their fs work in the utility host (off the renderer
+  // thread), so both are async RPCs.
+  modelStatus: () => send('modelStatus', []),
+  exists: (p: string) => send('exists', [p]),
   // Download a catalog model (runs in the utility host so the renderer stays
   // responsive); onProgress receives { file, received, total, percent }.
   downloadModel: (idOrPath: string, onProgress?: (p: unknown) => void) =>
