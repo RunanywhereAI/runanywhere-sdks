@@ -37,9 +37,13 @@ export class RunAnywhereMain {
     const { port1, port2 } = new MessageChannelMain();
     child.postMessage({ type: 'connect' }, [port1]);
     webContents.postMessage(channel, null, [port2]);
-    // Remember so we can notify this renderer if the host later dies.
-    this.connected.add(webContents);
-    webContents.once('destroyed', () => this.connected.delete(webContents));
+    // Remember so we can notify this renderer if the host later dies. Register the
+    // 'destroyed' cleanup only ONCE per webContents — connect() is called on every
+    // renderer reload, and adding a listener each time leaks them.
+    if (!this.connected.has(webContents)) {
+      this.connected.add(webContents);
+      webContents.once('destroyed', () => this.connected.delete(webContents));
+    }
   }
 
   /** Kill the utility (e.g. to exercise crash recovery); it re-forks on connect(). */
@@ -54,7 +58,10 @@ export class RunAnywhereMain {
     if (this.nativePath) env.RUNANYWHERE_NATIVE_PATH = this.nativePath;
     const child = utilityProcess.fork(this.hostPath, [], { env, stdio: 'inherit' });
     child.on('exit', (code) => {
-      this.child = undefined; // lazily re-fork on the next connect()
+      // Only clear if THIS child is still current — a kill() + connect() may have
+      // already forked a replacement, and a late exit from the old child must not
+      // drop the new one.
+      if (this.child === child) this.child = undefined; // lazily re-fork on the next connect()
       // Tell every connected renderer so its preload rejects in-flight calls
       // instead of hanging forever waiting on a reply that will never come.
       for (const wc of this.connected) {
