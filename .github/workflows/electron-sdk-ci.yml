@@ -19,7 +19,10 @@ permissions:
 
 jobs:
   unit:
-    runs-on: ubuntu-latest
+    # The unit tests are platform-agnostic, but the package declares `os: win32`
+    # (it ships a prebuilt Windows native addon), so `npm install` only succeeds
+    # on a Windows runner.
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: sdk/runanywhere-electron
