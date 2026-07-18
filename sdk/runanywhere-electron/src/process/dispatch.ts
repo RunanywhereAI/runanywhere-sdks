@@ -42,8 +42,13 @@ export function dispatch(port: DispatchPort, req: RpcRequest, deps: DispatchDeps
   try {
     if (streaming.has(method)) {
       const onToken = (token: string) => port.postMessage({ id, token });
-      (api[method](...args, onToken) as Promise<void>)
-        .then(() => port.postMessage({ id, done: true }))
+      // Carry the resolved value on completion so a streaming method that also
+      // returns data (downloadModel -> ResolvedModel) isn't silently dropped;
+      // token-only streams (generate) resolve void, so keep their message bare.
+      (api[method](...args, onToken) as Promise<unknown>)
+        .then((result) =>
+          port.postMessage(result === undefined ? { id, done: true } : { id, done: true, result })
+        )
         .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
       return;
     }
