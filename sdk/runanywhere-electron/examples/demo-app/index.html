@@ -8,12 +8,14 @@
     />
     <title>RunAnywhere</title>
     <style>
+      /* RunAnywhere brand theme (matches AppColors.swift / runanywhere.ai):
+         orange-red #FF5500 accent on deep dark blue-gray #0F172A. */
       :root {
-        --bg: #0a0b0f; --sidebar: #0d0f15; --surface: #141722; --surface2: #1a1e2b;
-        --edge: rgba(255,255,255,0.07); --edge2: rgba(255,255,255,0.12);
-        --fg: #eceef3; --muted: #8a93a6; --faint: #5c6474;
-        --accent: #7c6cff; --accent2: #9d7bff; --accentSoft: rgba(124,108,255,0.14);
-        --good: #4ade80; --warn: #fbbf24; --bad: #f87171;
+        --bg: #0F172A; --sidebar: #111a2c; --surface: #1A1F2E; --surface2: #252B3A;
+        --edge: rgba(255,255,255,0.06); --edge2: rgba(255,255,255,0.11);
+        --fg: #F1F5F9; --muted: #94A3B8; --faint: #64748B;
+        --accent: #FF5500; --accent2: #E64500; --accentSoft: rgba(255,85,0,0.15);
+        --good: #10B981; --warn: #EAB308; --bad: #EF4444;
         --r: 12px; --r2: 16px;
         --shadow: 0 6px 24px rgba(0,0,0,0.35);
       }
@@ -22,8 +24,7 @@
       body {
         font: 14px/1.55 -apple-system, 'Segoe UI', system-ui, sans-serif;
         color: var(--fg); background:
-          radial-gradient(1200px 600px at 100% -10%, rgba(124,108,255,0.10), transparent 60%),
-          radial-gradient(900px 500px at -10% 110%, rgba(76,222,128,0.05), transparent 55%),
+          radial-gradient(1100px 560px at 100% -10%, rgba(255,85,0,0.09), transparent 60%),
           var(--bg);
         display: flex; flex-direction: column; overflow: hidden;
       }
@@ -37,7 +38,7 @@
       /* ---------------- sidebar ---------------- */
       .sidebar { width: 258px; background: var(--sidebar); border-right: 1px solid var(--edge); display: flex; flex-direction: column; padding: 12px; gap: 10px; }
       .brand { display: flex; align-items: center; gap: 9px; padding: 6px 6px 4px; font-weight: 650; letter-spacing: -0.01em; }
-      .brand .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 2px 10px rgba(124,108,255,0.5); }
+      .brand .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 2px 10px rgba(255,85,0,0.5); }
       .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--r); border: 1px solid var(--edge2); background: var(--surface); color: var(--fg); font-weight: 550; transition: .15s; }
       .newchat:hover { background: var(--surface2); border-color: var(--accent); }
       .nav { display: flex; flex-direction: column; gap: 2px; }
@@ -79,7 +80,7 @@
       textarea, input[type=text], input[type=number] { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--edge2); border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; transition: .15s; }
       textarea:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentSoft); }
       input[type=range] { accent-color: var(--accent); width: 100%; }
-      .btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; padding: 9px 18px; border-radius: 10px; font-weight: 600; box-shadow: 0 4px 14px rgba(124,108,255,0.35); transition: .15s; }
+      .btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none; padding: 9px 18px; border-radius: 10px; font-weight: 600; box-shadow: 0 4px 14px rgba(255,85,0,0.30); transition: .15s; }
       .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
       .btn:disabled { opacity: .5; filter: none; transform: none; box-shadow: none; cursor: default; }
       .btn.ghost { background: var(--surface); color: var(--fg); border: 1px solid var(--edge2); box-shadow: none; }
@@ -99,8 +100,10 @@
       .msg.user .av { background: var(--surface2); color: var(--muted); }
       .msg.assistant .av { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
       .msg .col { min-width: 0; flex: 1; }
-      .msg .who { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
-      .msg .bubble { font-size: 14.5px; line-height: 1.6; }
+      .msg .who { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+      .msg .bubble { font-size: 14.5px; line-height: 1.6; border-radius: 18px; padding: 11px 15px; }
+      .msg.user .bubble { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 3px 12px rgba(255,85,0,0.25); }
+      .msg.assistant .bubble { background: var(--surface2); border: 1px solid var(--edge); }
       .msg .metrics { color: var(--faint); font-size: 11.5px; margin-top: 7px; display: inline-flex; gap: 6px; align-items: center; }
       .bubble p { margin: 0 0 10px; } .bubble p:last-child { margin: 0; }
       .bubble pre { background: #07090d; border: 1px solid var(--edge); border-radius: 10px; padding: 12px; overflow-x: auto; margin: 8px 0; }
