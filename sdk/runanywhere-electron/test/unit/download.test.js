@@ -64,6 +64,20 @@ test('isRemoteSource is false for a path with 3+ segments', () => {
   assert.equal(download.isRemoteSource('a/b/c/model.gguf'), false);
 });
 
+test('isRemoteSource is false for a 2-segment path ending in a model extension', () => {
+  // `dir/weights.gguf` is a relative local path, not a HuggingFace repo id
+  // (repo ids never end in .gguf/.onnx/.bin/.safetensors).
+  assert.equal(download.isRemoteSource('models/foo.gguf'), false);
+  assert.equal(download.isRemoteSource('data/model.onnx'), false);
+  assert.equal(download.isRemoteSource('out/weights.safetensors'), false);
+});
+
+test('isRemoteSource keeps an HF repo with an explicit :file (ext is on the file, not the repo)', () => {
+  // The extension guard applies to the pre-`:` repo part, so owner/repo:file.gguf
+  // is still a remote source.
+  assert.equal(download.isRemoteSource('owner/repo:model-Q4_K_M.gguf'), true);
+});
+
 // --- modelsRoot() ------------------------------------------------------------
 
 test('modelsRoot returns an absolute path', () => {
