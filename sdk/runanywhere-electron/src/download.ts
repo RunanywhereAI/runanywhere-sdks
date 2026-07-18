@@ -71,12 +71,18 @@ function dirSize(dir: string, depth = 0): number {
  * Downloaded state + on-disk size for every catalog model. Runs in the utility
  * host (Node), so the recursive fs walk stays off the renderer thread.
  */
-export function modelStatus(): Record<string, { downloaded: boolean; sizeBytes: number }> {
-  const root = modelsRoot();
+export function modelStatus(root: string = modelsRoot()): Record<string, { downloaded: boolean; sizeBytes: number }> {
   const out: Record<string, { downloaded: boolean; sizeBytes: number }> = {};
   for (const [id, entry] of Object.entries(CATALOG)) {
     const dir = path.join(root, id);
-    out[id] = { downloaded: pathExists(path.join(dir, entry.primary)), sizeBytes: dirSize(dir) };
+    // Archives: the extracted primary is the completeness signal (the .tar.bz2 is
+    // removed after extract). Everything else: EVERY file must be present — a VLM
+    // missing its mmproj, or an embedder missing vocab.txt, is not loadable, so a
+    // primary-only check would wrongly report it downloaded.
+    const downloaded = entry.archive
+      ? pathExists(path.join(dir, entry.primary))
+      : entry.files.every((f) => pathExists(path.join(dir, f.as)));
+    out[id] = { downloaded, sizeBytes: dirSize(dir) };
   }
   return out;
 }
@@ -100,9 +106,10 @@ export function downloadFile(
   const finalize = (resolve: () => void, reject: (e: Error) => void): void => {
     // renameSync runs outside the Promise executor's synchronous scope, so a throw
     // (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes) would not be
-    // caught — settle explicitly instead of hanging/crashing.
+    // caught — settle explicitly instead of hanging/crashing. KEEP the completed
+    // .part on failure so a retry finalizes it (via 416) rather than refetching.
     try { fs.renameSync(tmp, dest); resolve(); }
-    catch (e) { try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ } reject(e as Error); }
+    catch (e) { reject(e as Error); }
   };
   return new Promise((resolve, reject) => {
     const get = (u: string, redirects = 0): void => {
@@ -117,13 +124,31 @@ export function downloadFile(
         const code = res.statusCode ?? 0;
         if (code >= 300 && code < 400 && res.headers.location) {
           res.resume();
-          get(new URL(res.headers.location, u).toString(), redirects + 1);
+          let next: string;
+          try {
+            next = new URL(res.headers.location, u).toString();
+          } catch {
+            reject(new Error(`invalid redirect location from ${u}: ${res.headers.location}`));
+            return;
+          }
+          get(next, redirects + 1);
           return;
         }
-        // 416: our `.part` already covers the whole file — just finalize it.
+        // 416: only finalize if the `.part` is EXACTLY the whole file. A 416 whose
+        // Content-Range total doesn't match our size means the `.part` is stale/
+        // oversized — discard it and restart, rather than caching wrong bytes.
         if (code === 416 && startAt > 0) {
           res.resume();
-          finalize(resolve, reject);
+          const cr = res.headers['content-range'];
+          const m = typeof cr === 'string' ? cr.match(/\/\s*(\d+)\s*$/) : null;
+          const total = m ? parseInt(m[1], 10) : NaN;
+          if (Number.isFinite(total) && startAt === total) {
+            finalize(resolve, reject);
+          } else {
+            try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+            startAt = 0;
+            get(u, redirects); // restart from scratch (no Range header)
+          }
           return;
         }
         if (code !== 200 && code !== 206) {
@@ -154,12 +179,16 @@ export function downloadFile(
         out.on('error', fail);
         res.on('data', (chunk: Buffer) => {
           received += chunk.length;
-          onProgress?.({
-            file: path.basename(dest),
-            received,
-            total,
-            percent: total ? Math.round((100 * received) / total) : 0,
-          });
+          try {
+            onProgress?.({
+              file: path.basename(dest),
+              received,
+              total,
+              percent: total ? Math.round((100 * received) / total) : 0,
+            });
+          } catch {
+            /* a throwing progress callback must not crash the host or abort the download */
+          }
         });
         res.pipe(out);
         out.on('finish', () => {
