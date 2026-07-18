@@ -31,6 +31,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
+import kotlinx.coroutines.CancellationException
 
 // MARK: - Registry Discovery (Swift parity)
 
@@ -56,7 +57,9 @@ suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest(
     }
     try {
         ensureServicesReady()
-    } catch (_: Throwable) {
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
     }
     val infoList =
         if (request.query != null) {
@@ -76,7 +79,9 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     }
     try {
         ensureServicesReady()
-    } catch (_: Throwable) {
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
     }
     if (request.model_id.isEmpty()) {
         return ModelGetResult(found = false, error_message = "model_id is required")
@@ -98,7 +103,9 @@ suspend fun RunAnywhere.refreshModelRegistry(
     if (!isInitialized) return
     try {
         ensureServicesReady()
-    } catch (_: Throwable) {
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
     }
 
     if (rescanLocal) {
