@@ -236,19 +236,24 @@ async function renderModels() {
   }
 }
 
-// Derive a friendly label from a source (repo/url/path).
+// Derive a friendly label from a source (repo / url / path). ':' means different
+// things per format (URL scheme, Windows drive, HF :file), so handle each.
 function deriveLabel(source) {
-  const s = source.split(':')[0].replace(/[\\/]+$/, '');
+  let s = source;
+  if (/^https?:\/\//i.test(s)) { try { s = new URL(s).pathname; } catch (_) { /* keep */ } }
+  else { s = s.replace(/^[A-Za-z]:/, ''); const ci = s.indexOf(':'); if (ci >= 0) s = s.slice(0, ci); }
+  s = s.replace(/[\\/]+$/, '');
   const seg = s.split(/[\\/]/).pop() || s;
-  return seg.replace(/\.tar\.bz2$/i, '').replace(/\.(gguf|onnx|bin)$/i, '');
+  return seg.replace(/\.tar\.bz2$/i, '').replace(/\.(gguf|onnx|bin)$/i, '') || source;
 }
 function wireModels() {
   const hintEl = $('addhint');
   const hintHtml = hintEl.innerHTML;
   const flash = (msg) => { hintEl.textContent = msg; hintEl.style.color = 'var(--accent-lift)'; setTimeout(() => { hintEl.innerHTML = hintHtml; hintEl.style.color = ''; }, 2800); };
   const add = () => {
-    const source = $('addsrc').value.trim();
-    if (!source) return flash('Enter a HuggingFace repo, URL, or file path.');
+    const raw = $('addsrc').value.trim();
+    if (!raw) return flash('Enter a HuggingFace repo, URL, or file path.');
+    const source = raw.replace(/[\\/]+$/, ''); // normalize so owner/repo and owner/repo/ don't double
     const type = $('addtype').value;
     const id = 'custom:' + source;
     if (customModels.some((m) => m.id === id)) return flash('That model is already in your list.');
