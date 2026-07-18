@@ -8,7 +8,9 @@ const ra = window.runanywhere;
 const store = window.demoStore;
 const $ = (id) => document.getElementById(id);
 const setStatus = (s) => { $('status').textContent = s; $('statuswrap').classList.toggle('busy', s !== 'ready'); };
-const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+// Escape quotes too: md() builds an <a href="…"> from (escaped) text, so an
+// unescaped " in a link URL would break out of the attribute.
+const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB');
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
@@ -115,9 +117,15 @@ function buildPrompt(priorMessages, userText) {
   for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
   return p + 'User: ' + userText + '\nAssistant:';
 }
+let generating = false;
 async function sendChat() {
+  // One generation at a time: a second Enter while streaming would run a
+  // concurrent generate() on the SAME shared llm() handle.
+  if (generating) return;
   const text = $('chatinput').value.trim();
   if (!text) return;
+  generating = true;
+  $('chatsend').disabled = true;
   $('chatinput').value = '';
   const conv = activeConv() || newConversation();
   const prior = conv.messages.slice();
@@ -142,7 +150,7 @@ async function sendChat() {
     renderChat();
     persist();
   } catch (e) { asst.content = 'error: ' + e.message; renderChat(); }
-  setStatus('ready');
+  finally { generating = false; $('chatsend').disabled = false; setStatus('ready'); }
 }
 
 // ---- models panel ----
@@ -188,11 +196,15 @@ function buildCard(o) {
     actions.appendChild(dl);
   } else {
     const b = mkbtn(loaded ? 'Unload' : 'Load', async () => {
-      b.disabled = true; b.textContent = loaded ? 'Unloading…' : 'Loading…';
+      // Disable the whole row: Remove during an in-flight Load would drop the card
+      // before loadedById[key] is set, leaking the (multi-GB) native handle.
+      const btns = actions.querySelectorAll('button');
+      btns.forEach((x) => (x.disabled = true));
+      b.textContent = loaded ? 'Unloading…' : 'Loading…';
       try {
         if (loaded) { await unloaders[o.type](loaded); delete loadedById[o.key]; }
         else { loadedById[o.key] = await loaders[o.type](o.source); }
-      } catch (e) { b.textContent = 'Error'; b.disabled = false; console.error(e); return; }
+      } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
     });
     actions.appendChild(b);
@@ -246,6 +258,12 @@ function deriveLabel(source) {
   const seg = s.split(/[\\/]/).pop() || s;
   return seg.replace(/\.tar\.bz2$/i, '').replace(/\.(gguf|onnx|bin)$/i, '') || source;
 }
+// A URL or a HuggingFace owner/repo (vs a local path). Mirrors the SDK's
+// isRemoteSource loosely — only to gate what the add-form allows.
+function looksRemote(source) {
+  if (/^https?:\/\//i.test(source)) return true;
+  return /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/.test(source) && !source.includes('\\') && !/^[A-Za-z]:/.test(source);
+}
 function wireModels() {
   const hintEl = $('addhint');
   const hintHtml = hintEl.innerHTML;
@@ -255,6 +273,12 @@ function wireModels() {
     if (!raw) return flash('Enter a HuggingFace repo, URL, or file path.');
     const source = raw.replace(/[\\/]+$/, ''); // normalize so owner/repo and owner/repo/ don't double
     const type = $('addtype').value;
+    // The remote resolver is GGUF/single-file-only; speech/embedding models need a
+    // directory or ONNX+vocab, so the SDK rejects remote STT/TTS/embedder. Block it
+    // here too instead of letting the user download bytes that won't load.
+    if (looksRemote(source) && (type === 'stt' || type === 'tts' || type === 'embedder')) {
+      return flash('Speech/embedding models can’t be added from a URL or HF repo yet — use a built-in catalog entry or a local path.');
+    }
     const id = 'custom:' + source;
     if (customModels.some((m) => m.id === id)) return flash('That model is already in your list.');
     customModels.unshift({ id, source, type, label: deriveLabel(source), downloaded: false });
