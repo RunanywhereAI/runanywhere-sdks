@@ -113,9 +113,10 @@
       .lead { font-size: 22px; font-weight: 640; letter-spacing: -.02em; margin: 0 0 6px; }
       .hint { color: var(--fg-2); font-size: 14px; margin: 0 0 22px; }
       .label { color: var(--fg-2); font-size: 12.5px; margin: 18px 0 7px; font-weight: 550; letter-spacing: .002em; }
-      textarea, input[type=text], input[type=number] { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); border-radius: 12px; padding: 11px 13px; font: inherit; outline: none; transition: .16s var(--ease); }
+      textarea, input[type=text], input[type=number], select { width: 100%; background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); border-radius: 12px; padding: 11px 13px; font: inherit; outline: none; transition: .16s var(--ease); }
       textarea { resize: vertical; }
-      textarea:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      select { -webkit-appearance: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+      textarea:focus, input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
       input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: var(--surface-3); border-radius: 4px; outline: none; }
       input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-lift), var(--accent-2)); box-shadow: 0 2px 8px var(--accent-glow); cursor: pointer; transition: transform .12s var(--ease); }
       input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.14); }
@@ -186,6 +187,13 @@
       .badge.type { background: var(--accent-soft); border-color: transparent; color: var(--accent-lift); text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
       .model .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
       .model .btn { padding: 8px 15px; font-size: 13px; }
+      .mgroup { font-size: 11px; font-weight: 620; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); margin: 22px 2px 11px; display: flex; align-items: center; gap: 9px; }
+      .mgroup::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+      .mgroup:first-child { margin-top: 4px; }
+      .model .badge.heavy { color: #f59e0b; border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.1); }
+      .addgrid { display: grid; grid-template-columns: 1fr 170px auto; gap: 10px; align-items: end; }
+      .addgrid .label { margin: 0 0 6px; }
+      @media (max-width: 720px) { .addgrid { grid-template-columns: 1fr; } }
       .bar { height: 6px; background: var(--surface-3); border-radius: 4px; overflow: hidden; margin-top: 13px; }
       .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-lift)); width: 0%; transition: width .25s var(--ease); box-shadow: 0 0 10px var(--accent-glow); }
     </style>
@@ -242,6 +250,28 @@
           <section class="panel" id="models"><div class="wrap">
             <h2 class="lead">Models</h2>
             <p class="hint">On-device models — download, load, and manage storage. Nothing leaves your machine.</p>
+            <div class="card">
+              <div class="label" style="margin-top:0">Add any model</div>
+              <p class="muted" style="margin:2px 0 14px">Load any compatible model by HuggingFace repo, direct URL, or local file path.</p>
+              <div class="addgrid">
+                <div>
+                  <div class="label">Source</div>
+                  <input id="addsrc" type="text" placeholder="bartowski/Qwen2.5-1.5B-Instruct-GGUF" />
+                </div>
+                <div>
+                  <div class="label">Type</div>
+                  <select id="addtype">
+                    <option value="llm">Language (chat)</option>
+                    <option value="vlm">Vision-language</option>
+                    <option value="embedder">Embeddings</option>
+                    <option value="stt">Speech-to-text</option>
+                    <option value="tts">Text-to-speech</option>
+                  </select>
+                </div>
+                <button class="btn" id="addgo" style="height:44px">Add</button>
+              </div>
+              <p class="muted" id="addhint" style="margin:11px 0 0; font-size:12px">Examples: <code>unsloth/gemma-3-1b-it-GGUF</code> · <code>https://…/model.gguf</code> · <code>C:\models\model.gguf</code>. GGUF + mmproj are auto-resolved for vision models.</p>
+            </div>
             <div id="modellist"></div>
           </div></section>
 
