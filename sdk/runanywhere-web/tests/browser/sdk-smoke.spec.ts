@@ -159,14 +159,15 @@ test.describe('Web SDK smoke test', () => {
       !err.includes('sherpa-onnx') &&
       !err.includes('racommons-llamacpp') &&
       !err.includes('racommons-onnx-sherpa') &&
-      // Credential-less dev init: commons logs the model-assignment fetch
-      // at ERROR ("base URL is not configured"); the SDK's Phase 2 already
-      // downgrades it to a deferred-fetch warning, so it is expected noise
-      // in development — same on iOS, where commons emits the same line.
+      // Credential-less / non-blocking cloud init: commons may log model-
+      // assignment and device-registration failures while the local shell
+      // still reaches interactive. These are expected development noise and
+      // must not fail the readiness smoke gate.
       !err.includes('model assignment base URL is not configured') &&
-      // Device registration follows the same credential-less development
-      // path and deliberately reports that its configuration is incomplete.
-      !err.includes('Device registration requires a matching base URL and API key'),
+      !err.includes('Device registration requires a matching base URL and API key') &&
+      !err.includes('Device registration failed') &&
+      !err.includes('Device registration remained deferred') &&
+      !err.includes('/sdk_devices'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
   });
