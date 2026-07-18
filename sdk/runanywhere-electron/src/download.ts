@@ -38,12 +38,72 @@ export function modelsRoot(): string {
   return path.join(os.homedir(), '.runanywhere', 'models');
 }
 
-/** Stream a URL to `dest` (following redirects), reporting byte progress. */
+/** Does a path exist on disk? (Used to check a custom model's downloaded state.) */
+export function pathExists(p: string): boolean {
+  try {
+    return fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}
+
+// Recursively sum file sizes under a directory (best-effort, bounded depth).
+function dirSize(dir: string, depth = 0): number {
+  if (depth > 4) return 0;
+  let total = 0;
+  try {
+    for (const name of fs.readdirSync(dir)) {
+      const p = path.join(dir, name);
+      try {
+        const st = fs.statSync(p);
+        total += st.isDirectory() ? dirSize(p, depth + 1) : st.size;
+      } catch {
+        /* ignore unreadable entries */
+      }
+    }
+  } catch {
+    /* ignore missing dir */
+  }
+  return total;
+}
+
+/**
+ * Downloaded state + on-disk size for every catalog model. Runs in the utility
+ * host (Node), so the recursive fs walk stays off the renderer thread.
+ */
+export function modelStatus(): Record<string, { downloaded: boolean; sizeBytes: number }> {
+  const root = modelsRoot();
+  const out: Record<string, { downloaded: boolean; sizeBytes: number }> = {};
+  for (const [id, entry] of Object.entries(CATALOG)) {
+    const dir = path.join(root, id);
+    out[id] = { downloaded: pathExists(path.join(dir, entry.primary)), sizeBytes: dirSize(dir) };
+  }
+  return out;
+}
+
+/**
+ * Stream a URL to `dest` (following redirects), reporting byte progress. Downloads
+ * to `dest + '.part'` and renames on success. If a `.part` from an interrupted
+ * attempt survives, resumes it with a Range request (falls back to a full restart
+ * if the server ignores Range, and finalizes on 416 when the part is already
+ * complete). A failed attempt LEAVES the `.part` so the next call can resume — a
+ * `.part` is only ever renamed after a completeness check, never loaded directly.
+ */
 export function downloadFile(
   url: string,
   dest: string,
   onProgress?: (p: DownloadProgress) => void
 ): Promise<void> {
+  const tmp = dest + '.part';
+  let startAt = 0;
+  try { startAt = fs.statSync(tmp).size; } catch { startAt = 0; }
+  const finalize = (resolve: () => void, reject: (e: Error) => void): void => {
+    // renameSync runs outside the Promise executor's synchronous scope, so a throw
+    // (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes) would not be
+    // caught — settle explicitly instead of hanging/crashing.
+    try { fs.renameSync(tmp, dest); resolve(); }
+    catch (e) { try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ } reject(e as Error); }
+  };
   return new Promise((resolve, reject) => {
     const get = (u: string, redirects = 0): void => {
       if (redirects > 6) {
@@ -51,32 +111,46 @@ export function downloadFile(
         return;
       }
       const lib = new URL(u).protocol === 'http:' ? http : https;
-      const req = lib.get(u, { headers: { 'User-Agent': 'runanywhere-electron' } }, (res) => {
+      const headers: Record<string, string> = { 'User-Agent': 'runanywhere-electron' };
+      if (startAt > 0) headers.Range = `bytes=${startAt}-`;
+      const req = lib.get(u, { headers }, (res) => {
         const code = res.statusCode ?? 0;
         if (code >= 300 && code < 400 && res.headers.location) {
           res.resume();
           get(new URL(res.headers.location, u).toString(), redirects + 1);
           return;
         }
-        if (code !== 200) {
+        // 416: our `.part` already covers the whole file — just finalize it.
+        if (code === 416 && startAt > 0) {
+          res.resume();
+          finalize(resolve, reject);
+          return;
+        }
+        if (code !== 200 && code !== 206) {
           res.resume();
           reject(new Error(`HTTP ${code} for ${u}`));
           return;
         }
-        const total = parseInt((res.headers['content-length'] as string) || '0', 10);
-        let received = 0;
-        const tmp = dest + '.part';
-        const out = fs.createWriteStream(tmp);
+        // 206 => resuming (its content-length is the REMAINING bytes); 200 => the
+        // server ignored Range, so restart from scratch (truncate the `.part`).
+        const resuming = code === 206 && startAt > 0;
+        const len = parseInt((res.headers['content-length'] as string) || '0', 10);
+        const total = resuming ? startAt + len : len;
+        let received = resuming ? startAt : 0;
+        const out = fs.createWriteStream(tmp, { flags: resuming ? 'a' : 'w' });
         // res.pipe(out) does NOT forward source errors to the destination, so a
         // mid-stream TCP reset / TLS error would otherwise settle nothing and the
-        // awaiting load would hang forever. Fail explicitly on either stream.
+        // awaiting load would hang forever. Fail explicitly on either stream, and
+        // KEEP the `.part` so the next attempt resumes instead of refetching.
         const fail = (e: Error): void => {
           out.destroy();
           res.destroy();
-          try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
           reject(e);
         };
         res.on('error', fail);
+        // A server/proxy that drops the socket mid-response may emit only 'aborted'
+        // (not 'error'); catch it so the download rejects instead of hanging.
+        res.on('aborted', () => fail(new Error(`connection aborted for ${u}`)));
         out.on('error', fail);
         res.on('data', (chunk: Buffer) => {
           received += chunk.length;
@@ -90,23 +164,12 @@ export function downloadFile(
         res.pipe(out);
         out.on('finish', () => {
           // A clean-but-early EOF (proxy cutoff, disk-full) still fires 'finish';
-          // reject on a byte-count mismatch so a truncated file is never cached.
+          // reject on a byte-count mismatch so a truncated file is never renamed.
           if (total > 0 && received !== total) {
             fail(new Error(`incomplete download for ${u}: got ${received} of ${total} bytes`));
             return;
           }
-          out.close(() => {
-            // renameSync runs outside the Promise executor's synchronous scope, so
-            // a throw (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes)
-            // would not be caught — settle explicitly instead of hanging/crashing.
-            try {
-              fs.renameSync(tmp, dest);
-              resolve();
-            } catch (e) {
-              try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
-              reject(e as Error);
-            }
-          });
+          out.close(() => finalize(resolve, reject));
         });
       });
       req.on('error', reject);
@@ -147,6 +210,25 @@ export function isRemoteSource(s: string): boolean {
   // ids never end in a model extension). Guard the pre-`:file` part.
   if (RE_MODEL_EXT.test(s.split(':')[0])) return false;
   return !fs.existsSync(s);
+}
+
+// Model kinds whose on-disk shape is a directory (sherpa STT/TTS) or an
+// ONNX+vocab pair (embedder). The remote resolver is GGUF/single-file-only, so a
+// URL/HF source can't produce the right shape — reject it up front with one
+// message, uniformly across every load surface (facade + RPC host).
+const REMOTE_UNSUPPORTED_KINDS: Record<string, string> = {
+  stt: 'speech-to-text',
+  tts: 'text-to-speech',
+  embedder: 'embedding',
+};
+export type ModelKind = 'llm' | 'vlm' | 'embedder' | 'stt' | 'tts';
+export function assertRemoteSupported(idOrPath: string, kind: ModelKind): void {
+  if (REMOTE_UNSUPPORTED_KINDS[kind] && isRemoteSource(idOrPath)) {
+    throw new Error(
+      `loading a ${REMOTE_UNSUPPORTED_KINDS[kind]} model from a URL or HuggingFace repo is not supported yet — ` +
+        'use a built-in catalog id or a local path'
+    );
+  }
 }
 
 function sanitizeId(s: string): string {
