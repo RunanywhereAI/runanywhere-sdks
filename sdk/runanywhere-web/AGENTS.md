@@ -197,6 +197,22 @@ await RunAnywhere.completeServicesInitialization();
 
 `ONNX.register()` accepts an optional `wasmUrl` override. The previous `skipProtoBytePlugins` / `skipStandaloneSpeech` options have been removed — the proto-byte path is the only path.
 
+### Demo boot and runtime honesty
+
+- The example boots in this order: `RunAnywhere.initialize()` → backend
+  registration → `completeServicesInitialization()` (Phase 2) → model catalog
+  registration/hydration. Production identity is asynchronous after this path
+  and must never block local shell readiness.
+- `BackendWorkerHost` is protocol/diagnostics scaffolding today. Backends may
+  opt into a Worker factory later; until a successful handshake, inference uses
+  the supported main-thread fallback and `RunAnywhere.runtime.executionContext`
+  reports `'main'`.
+- The `packages/diffusion` workspace is not a publishable production runtime
+  until it ships a WASM artifact. Do not claim or package diffusion alongside
+  the four current canonical JS/WASM pairs.
+- Hybrid STT registers `Cloud.registerBackend()` only after `ONNX.register()`;
+  a missing optional cloud engine must not make local ONNX/Sherpa unavailable.
+
 ## Build Artifacts
 
 Expected publish-time artifacts:

@@ -51,6 +51,35 @@ export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
 export type StreamingMode = 'auto' | 'worker' | 'main';
 
 /**
+ * Advisory per-module memory ceilings for the 32-bit WebAssembly address
+ * space. They are diagnostics, not reservations or hard runtime limits:
+ * model metadata and browser memory pressure remain the source of truth.
+ *
+ * Keep every limit below WASM32's 4 GiB address space so a single module has
+ * headroom for Emscripten allocations, JavaScript views, and stack growth.
+ */
+export interface RuntimeMemoryBudget {
+  readonly wasm32AddressSpaceBytes: number;
+  readonly perModuleSoftLimitBytes: Readonly<{
+    core: number;
+    llamacppCpu: number;
+    llamacppWebGPU: number;
+    onnxSherpa: number;
+  }>;
+}
+
+const gibibyte = 1024 ** 3;
+const memoryBudget: RuntimeMemoryBudget = Object.freeze({
+  wasm32AddressSpaceBytes: 4 * gibibyte,
+  perModuleSoftLimitBytes: Object.freeze({
+    core: 512 * 1024 ** 2,
+    llamacppCpu: 3 * gibibyte,
+    llamacppWebGPU: 3 * gibibyte,
+    onnxSherpa: 1536 * 1024 ** 2,
+  }),
+});
+
+/**
  * Function installed by a backend (typically the llamacpp bridge) to perform
  * the acceleration switch. Should be idempotent and must report the mode it
  * actually loaded through `setActiveAccelerationMode(...)` before resolving.
@@ -153,6 +182,14 @@ export const Runtime = {
   /** Number of outstanding RPC calls on the active backend worker. */
   get workerQueueDepth(): number {
     return getBackendWorkerRuntimeDiagnostics().queueDepth;
+  },
+
+  /**
+   * Advisory WASM32 memory limits for diagnostics and preflight UI. These
+   * numbers do not allocate memory or override browser/device quota checks.
+   */
+  get memoryBudget(): RuntimeMemoryBudget {
+    return memoryBudget;
   },
 };
 

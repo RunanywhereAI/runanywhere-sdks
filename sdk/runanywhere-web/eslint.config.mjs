@@ -40,6 +40,7 @@ export default tseslint.config(
         project: [
           './packages/core/tsconfig.json',
           './packages/core/tsconfig.test.json',
+          './packages/diffusion/tsconfig.json',
           './packages/llamacpp/tsconfig.json',
           './packages/onnx/tsconfig.json',
         ],
@@ -78,6 +79,8 @@ export default tseslint.config(
             '@runanywhere/web-llamacpp/*',
             '@runanywhere/web-onnx',
             '@runanywhere/web-onnx/*',
+            '@runanywhere/web-diffusion',
+            '@runanywhere/web-diffusion/*',
           ],
         },
       ],
@@ -85,6 +88,7 @@ export default tseslint.config(
   },
   {
     files: [
+      'packages/diffusion/src/**/*.ts',
       'packages/llamacpp/src/**/*.ts',
       'packages/onnx/src/**/*.ts',
     ],
@@ -100,6 +104,8 @@ export default tseslint.config(
             '@runanywhere/web-llamacpp/*',
             '@runanywhere/web-onnx',
             '@runanywhere/web-onnx/*',
+            '@runanywhere/web-diffusion',
+            '@runanywhere/web-diffusion/*',
           ],
         },
       ],

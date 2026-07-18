@@ -306,18 +306,21 @@ Three npm packages: `@runanywhere/web` (core TS), `@runanywhere/web-llamacpp` (W
 cd sdk/runanywhere-web/
 
 # Build WASM (requires Emscripten SDK)
-./wasm/scripts/build.sh --llamacpp --vlm       # CPU variant
-./wasm/scripts/build.sh --llamacpp --webgpu     # WebGPU variant
-./wasm/scripts/build-sherpa-onnx.sh             # Sherpa-ONNX WASM
+npm run build:wasm -- --core
+npm run build:wasm -- --llamacpp                 # CPU variant
+npm run build:wasm -- --webgpu                   # WebGPU variant
+npm run build:wasm -- --onnx                     # ONNX + Sherpa artifact
 
 # Build TypeScript
-npm run build:ts
+npm run build
 
 # Type-check
 npm run typecheck
 ```
 
-WASM outputs: `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`, `packages/onnx/wasm/sherpa/sherpa-onnx.wasm`
+The current artifact and deployment contract is maintained in
+`sdk/runanywhere-web/AGENTS.md`; it supersedes historical standalone
+`wasm/sherpa/` paths. Do not use or recreate those removed paths.
 
 ### IDL Codegen
 

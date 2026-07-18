@@ -119,6 +119,22 @@ non-threaded, but its canonical glue is still required. Production output must
 therefore contain and serve all four canonical JS/WASM pairs with JavaScript
 and `application/wasm` MIME types.
 
+## Boot and availability rules
+
+- Boot in this order: `RunAnywhere.initialize()` → llama.cpp/ONNX backend
+  registration → `completeServicesInitialization()` (Phase 2) → model catalog
+  registration/hydration. Production identity continues asynchronously and must
+  not block local interactive readiness; its state remains in the readiness
+  snapshot.
+- `BackendWorkerHost` is currently a Worker-runtime scaffold. Until a backend
+  supplies a worker factory and completes its handshake, inference uses the
+  supported main-thread fallback.
+- `packages/diffusion` is workspace-only. Do not show diffusion as available
+  or add it to packaging until it has a production WASM artifact.
+- Register hybrid Cloud STT with `Cloud.registerBackend()` after
+  `ONNX.register()`. Cloud failure is optional and must leave local
+  ONNX/Sherpa speech capability truthful and independently available.
+
 ## Validation Standard
 
 A passing build or app launch is only smoke validation. End-to-end modality validation requires browser launch, model download, model load, real inference, and reviewed logs/screenshots. Keep automated release coverage in `../../../sdk/runanywhere-web/tests/browser/`.
