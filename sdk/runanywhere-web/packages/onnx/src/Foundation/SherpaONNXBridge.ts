@@ -36,7 +36,6 @@ import {
   PlatformAdapter,
   SDKException,
   SDKLogger,
-  completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
   registerWasmModule,
@@ -51,6 +50,10 @@ import type {
 } from '@runanywhere/web/backend';
 
 const logger = new SDKLogger('SherpaONNXBridge');
+
+function logTimedStep(step: string, startedAt: number): void {
+  logger.info(`${step} completed in ${Date.now() - startedAt}ms`);
+}
 
 /**
  * Subset of the Emscripten module surface touched directly by the ONNX bridge.
@@ -296,7 +299,9 @@ export class SherpaONNXBridge {
         );
       }
 
+      const onnxRegistrationStartedAt = Date.now();
       const rc = await this._callMaybeAsync(this._module, 'rac_backend_onnx_register');
+      logTimedStep('rac_backend_onnx_register', onnxRegistrationStartedAt);
       if (!this._isRegistrationSuccess(rc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
@@ -305,7 +310,9 @@ export class SherpaONNXBridge {
       }
       this._onnxBackendRegistered = true;
 
+      const sherpaRegistrationStartedAt = Date.now();
       const sherpaRc = await this._callMaybeAsync(this._module, 'rac_backend_sherpa_register');
+      logTimedStep('rac_backend_sherpa_register', sherpaRegistrationStartedAt);
       if (!this._isRegistrationSuccess(sherpaRc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
@@ -314,11 +321,10 @@ export class SherpaONNXBridge {
       }
       this._sherpaBackendRegistered = true;
       this._loaded = true;
-      await completeDeferredServicesInitialization();
       logger.info('ONNX + Sherpa backends registered (STT/TTS/VAD vtables installed)');
     } catch (err) {
-      // Covers adapter registration, rac_init, capability registration, either
-      // backend registration, and deferred-service completion. Teardown keeps
+      // Covers adapter registration, rac_init, capability registration, and
+      // either backend registration. Teardown keeps
       // the adapter alive until native shutdown has finished.
       this._teardown();
       throw err;
@@ -398,11 +404,13 @@ export class SherpaONNXBridge {
 
     let module: CommonsModule;
     try {
+      const factoryStartedAt = Date.now();
       module = await factory({
         print: (text: string) => logger.info(text),
         printErr: (text: string) => logger.error(text),
         locateFile: (path: string) => baseUrl + path,
       });
+      logTimedStep('racommons-onnx-sherpa factory()', factoryStartedAt);
     } catch (err) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
@@ -475,7 +483,9 @@ export class SherpaONNXBridge {
         module.setValue(configPtr + logLevelOffset, 2, 'i32');
       }
 
+      const racInitStartedAt = Date.now();
       const rc = await this._callMaybeAsync(module, 'rac_init', ['number'], [configPtr]);
+      logTimedStep('rac_init', racInitStartedAt);
       if (!this._isRegistrationSuccess(rc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',

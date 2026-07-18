@@ -34,6 +34,10 @@ import {
 
 const logger = new SDKLogger('LlamaCppBridge');
 
+function logTimedStep(step: string, startedAt: number): void {
+  logger.info(`${step} completed in ${Date.now() - startedAt}ms`);
+}
+
 // ---------------------------------------------------------------------------
 // LlamaCppModule — extends the typed core module surface with the few
 // LLAMACPP-specific exports the bridge needs (rac_init, ping, sizeof helpers,
@@ -273,11 +277,13 @@ export class LlamaCppBridge {
       // .wasm binary from the same directory regardless of bundler output.
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
+      const factoryStartedAt = Date.now();
       this._module = await createModule({
         print: (text) => logger.info(text),
         printErr: (text) => logger.info(text),
         locateFile: (path) => baseUrl + path,
       });
+      logTimedStep('racommons-llamacpp factory()', factoryStartedAt);
 
       // Smoke check
       const pingFn = this._module._rac_wasm_ping;
@@ -403,6 +409,7 @@ export class LlamaCppBridge {
       const logLevelOffset = m._rac_wasm_offsetof_config_log_level();
       m.setValue(configPtr + logLevelOffset, 2, 'i32');
 
+      const racInitStartedAt = Date.now();
       const result = (await m.ccall(
         'rac_init',
         'number',
@@ -410,6 +417,7 @@ export class LlamaCppBridge {
         [configPtr],
         { async: true },
       )) as number;
+      logTimedStep('rac_init', racInitStartedAt);
 
       if (result !== 0) {
         const errPtr = m._rac_error_message?.(result) ?? 0;
@@ -487,6 +495,7 @@ export class LlamaCppBridge {
       );
     }
 
+    const backendRegistrationStartedAt = Date.now();
     const llmResult = (await m.ccall(
       'rac_backend_llamacpp_register',
       'number',
@@ -494,6 +503,7 @@ export class LlamaCppBridge {
       [],
       { async: true },
     )) as number;
+    logTimedStep('rac_backend_llamacpp_register', backendRegistrationStartedAt);
     if (llmResult !== 0 && llmResult !== RAC_ERROR_MODULE_ALREADY_REGISTERED) {
       throw new SDKException(
         -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,

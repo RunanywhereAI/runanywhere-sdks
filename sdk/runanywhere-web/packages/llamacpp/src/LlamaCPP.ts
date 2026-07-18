@@ -31,7 +31,6 @@
  */
 
 import {
-  completeDeferredServicesInitialization,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setModelLoadPreparation,
@@ -230,8 +229,6 @@ export const LlamaCPP = {
             'VLM backend not registered — RunAnywhere.visionLanguage will report as unavailable.',
           );
         }
-        await completeDeferredServicesInitialization();
-
         _isRegistered = true;
         _registrationState = 'registered';
         logger.info(`LlamaCpp backend registered (${bridge.accelerationMode})`);
