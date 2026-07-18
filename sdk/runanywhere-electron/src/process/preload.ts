@@ -30,10 +30,23 @@ type Pending = {
 let port: MessagePort | null = null;
 let nextId = 1;
 const pending = new Map<number, Pending>();
+let ready: Promise<void>;
 let markReady: () => void;
-const ready = new Promise<void>((r) => {
-  markReady = r;
-});
+// (Re)create the ready gate so a fresh port (initial connect OR a reconnect after
+// a host crash) re-enables send().
+function armReady(): void {
+  ready = new Promise<void>((r) => {
+    markReady = r;
+  });
+}
+armReady();
+
+// Reject every in-flight request — used when the utility host dies, so awaiting
+// loadLLM/generate calls settle with a clear error instead of hanging forever.
+function rejectAllPending(err: Error): void {
+  for (const [, p] of pending) p.reject(err);
+  pending.clear();
+}
 
 ipcRenderer.on('runanywhere-port', (event) => {
   port = event.ports[0];
@@ -46,12 +59,21 @@ ipcRenderer.on('runanywhere-port', (event) => {
       return;
     }
     pending.delete(m.id);
-    if ('done' in m) p.resolve(undefined);
+    if ('done' in m) p.resolve((m as { result?: unknown }).result);
     else if (m.ok) p.resolve(m.result);
     else p.reject(new Error(m.error));
   };
+  port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
   markReady();
+});
+
+// The main process reports when the utility host exits (crash or kill). Fail all
+// outstanding calls and re-arm the gate so a subsequent connect() recovers.
+ipcRenderer.on('runanywhere-host-exited', (_e, code?: number) => {
+  port = null;
+  armReady();
+  rejectAllPending(new Error(`inference host exited unexpectedly (code ${code ?? 'unknown'}) — retrying`));
 });
 
 function send(method: string, args: unknown[], onToken?: (t: unknown) => void): Promise<unknown> {
