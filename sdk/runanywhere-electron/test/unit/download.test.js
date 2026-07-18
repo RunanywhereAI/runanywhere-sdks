@@ -33,7 +33,15 @@ test('module exports exactly the public surface', () => {
   assert.equal(typeof download.hfFiles, 'undefined');
   assert.equal(typeof download.pickGguf, 'undefined');
   const own = Object.keys(download).filter((k) => typeof download[k] === 'function');
-  assert.deepEqual(own.sort(), ['downloadFile', 'isRemoteSource', 'modelsRoot', 'resolveModel']);
+  assert.deepEqual(own.sort(), [
+    'assertRemoteSupported',
+    'downloadFile',
+    'isRemoteSource',
+    'modelStatus',
+    'modelsRoot',
+    'pathExists',
+    'resolveModel',
+  ]);
 });
 
 // --- isRemoteSource() (pure classifier; no network) --------------------------
@@ -76,6 +84,43 @@ test('isRemoteSource keeps an HF repo with an explicit :file (ext is on the file
   // The extension guard applies to the pre-`:` repo part, so owner/repo:file.gguf
   // is still a remote source.
   assert.equal(download.isRemoteSource('owner/repo:model-Q4_K_M.gguf'), true);
+});
+
+// --- assertRemoteSupported() -------------------------------------------------
+
+test('assertRemoteSupported rejects a remote STT/TTS/embedder source', () => {
+  for (const kind of ['stt', 'tts', 'embedder']) {
+    assert.throws(() => download.assertRemoteSupported('owner/repo', kind), /not supported yet/, `${kind} remote should throw`);
+    assert.throws(() => download.assertRemoteSupported('https://h/m.gguf', kind), /not supported yet/);
+  }
+});
+
+test('assertRemoteSupported allows remote LLM/VLM and any local path', () => {
+  assert.doesNotThrow(() => download.assertRemoteSupported('owner/repo', 'llm'));
+  assert.doesNotThrow(() => download.assertRemoteSupported('owner/repo', 'vlm'));
+  // A local path is not remote, so even STT/TTS/embedder pass.
+  assert.doesNotThrow(() => download.assertRemoteSupported(path.join(os.tmpdir(), 'whisper'), 'stt'));
+  assert.doesNotThrow(() => download.assertRemoteSupported('whisper-base', 'stt')); // bare id -> not remote
+});
+
+// --- pathExists() / modelStatus() --------------------------------------------
+
+test('pathExists reflects the filesystem', () => {
+  const f = path.join(freshTempRoot(), 'x');
+  assert.equal(download.pathExists(f), false);
+  fs.writeFileSync(f, '1');
+  assert.equal(download.pathExists(f), true);
+  fs.rmSync(path.dirname(f), { recursive: true, force: true });
+});
+
+test('modelStatus returns a {downloaded,sizeBytes} entry for every catalog id', () => {
+  const { CATALOG } = require('../../dist/catalog');
+  const status = download.modelStatus();
+  for (const id of Object.keys(CATALOG)) {
+    assert.ok(status[id], `status has ${id}`);
+    assert.equal(typeof status[id].downloaded, 'boolean');
+    assert.equal(typeof status[id].sizeBytes, 'number');
+  }
 });
 
 // --- modelsRoot() ------------------------------------------------------------
@@ -390,4 +435,119 @@ test('downloadFile does not invoke onProgress when the request fails to connect'
     })
   );
   assert.equal(progressCalls, 0, 'onProgress must not fire when the connection never succeeds');
+});
+
+// --- downloadFile resume (hermetic: a local http server with Range support) --
+
+const http = require('node:http');
+
+// Serve `body` from a localhost server. Records each request's Range header in
+// `seen`. `ignoreRange` makes it reply 200 (full) even when a Range is sent.
+function serve(body, opts = {}) {
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    seen.push(req.headers.range || null);
+    const range = opts.ignoreRange ? null : req.headers.range;
+    const m = range && /bytes=(\d+)-/.exec(range);
+    if (m) {
+      const start = parseInt(m[1], 10);
+      if (start >= body.length) { res.writeHead(416); res.end(); return; }
+      res.writeHead(206, {
+        'Content-Length': String(body.length - start),
+        'Content-Range': `bytes ${start}-${body.length - 1}/${body.length}`,
+      });
+      res.end(body.subarray(start));
+      return;
+    }
+    res.writeHead(200, { 'Content-Length': String(body.length) });
+    res.end(body);
+  });
+  return new Promise((resolve) =>
+    server.listen(0, '127.0.0.1', () =>
+      resolve({ server, seen, url: `http://127.0.0.1:${server.address().port}/f.bin` })
+    )
+  );
+}
+
+test('downloadFile fetches a whole file and renames off .part', async () => {
+  const body = Buffer.from('x'.repeat(5000));
+  const { server, url } = await serve(body);
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body);
+    assert.ok(!fs.existsSync(dest + '.part'), '.part removed on success');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile resumes an interrupted .part with a Range request', async () => {
+  const body = Buffer.from(Array.from({ length: 8000 }, (_, i) => i % 251));
+  const { server, seen, url } = await serve(body);
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  fs.writeFileSync(dest + '.part', body.subarray(0, 3000)); // interrupted at 3000 bytes
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body, 'resumed file matches the original bytes');
+    assert.ok(seen.includes('bytes=3000-'), 'sent a Range from the .part size');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile restarts when the server ignores Range (200)', async () => {
+  const body = Buffer.from('y'.repeat(6000));
+  const { server, url } = await serve(body, { ignoreRange: true });
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  fs.writeFileSync(dest + '.part', Buffer.from('stale-partial-bytes'));
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body, 'a full 200 restart overwrites the stale .part');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile finalizes a .part that is already complete (416)', async () => {
+  const body = Buffer.from('z'.repeat(4096));
+  const { server, url } = await serve(body);
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  fs.writeFileSync(dest + '.part', body); // already the whole file
+  try {
+    await download.downloadFile(url, dest);
+    assert.deepEqual(fs.readFileSync(dest), body);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('downloadFile keeps the .part when the connection drops mid-stream', async () => {
+  const body = Buffer.from('w'.repeat(10000));
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Length': String(body.length) });
+    // Flush a partial, let the client receive + persist it, THEN drop the socket
+    // (a realistic mid-download interruption, not an instant reset).
+    res.write(body.subarray(0, 4000), () => setTimeout(() => res.destroy(), 40));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}/f.bin`;
+  const dir = freshTempRoot();
+  const dest = path.join(dir, 'f.bin');
+  try {
+    await assert.rejects(download.downloadFile(url, dest));
+    assert.ok(!fs.existsSync(dest), 'no final file on failure');
+    assert.ok(fs.existsSync(dest + '.part'), '.part kept for a later resume');
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
