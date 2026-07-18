@@ -222,7 +222,7 @@ jobs:
             Select-Object -First 1
           if (-not $Onnx) { throw "onnxruntime.dll not found" }
           $Onnx.DirectoryName | Out-File $env:GITHUB_PATH -Encoding utf8 -Append
-          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\bin" |
+          "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib" |
             Out-File $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Unit tests
         shell: pwsh

@@ -70,8 +70,10 @@ if (-not $OnnxDll) {
 }
 Copy-Item $OnnxDll (Join-Path $BinDir "onnxruntime.dll")
 
-$SherpaBin = Join-Path $RepoRoot "sdk\runanywhere-commons\third_party\sherpa-onnx-windows\bin"
-Copy-RuntimeDlls $SherpaBin @("onnxruntime.dll")
+# Sherpa ships sherpa-onnx-c-api.dll and its siblings in lib/ (bin/ holds only
+# the example executables and a duplicate onnxruntime.dll).
+$SherpaLib = Join-Path $RepoRoot "sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib"
+Copy-RuntimeDlls $SherpaLib @("onnxruntime.dll")
 if (-not (Test-Path (Join-Path $BinDir "sherpa-onnx-c-api.dll"))) {
     throw "sherpa-onnx-c-api.dll was not staged"
 }

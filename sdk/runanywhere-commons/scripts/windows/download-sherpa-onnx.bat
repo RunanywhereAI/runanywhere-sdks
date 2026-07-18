@@ -38,8 +38,12 @@ if exist "%DEST_DIR%\lib" if "%FORCE%"=="0" (
 )
 
 :: Determine URL
-set "URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v%VERSION%/sherpa-onnx-v%VERSION%-win-x64-shared.tar.bz2"
-set "ARCHIVE_NAME=sherpa-onnx-v%VERSION%-win-x64-shared"
+:: k2-fsa publishes the Windows x64 build as MSVC-runtime + config variants;
+:: there is no plain "-win-x64-shared" asset (that URL 404s). Use the static-CRT
+:: Release variant (-MT-Release) so the bundled DLLs carry no VC++ redist
+:: dependency, matching the /MT rcli build (CMAKE_MSVC_RUNTIME_LIBRARY).
+set "URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v%VERSION%/sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release.tar.bz2"
+set "ARCHIVE_NAME=sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release"
 
 echo.
 echo ========================================
@@ -63,9 +67,20 @@ mkdir "%TEMP_DL%" 2>nul
 
 :: Download
 echo [DOWNLOAD] Downloading Sherpa-ONNX v%VERSION%...
-curl -L -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
+:: --fail turns an HTTP 404 into a non-zero exit instead of silently writing the
+:: error body (which then fails opaquely at the tar step).
+curl -L --fail --show-error --retry 3 -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
 if errorlevel 1 (
-    echo [ERROR] Download failed.
+    echo [ERROR] Download failed for %URL%
+    rmdir /s /q "%TEMP_DL%" 2>nul
+    exit /b 1
+)
+
+:: Guard against a truncated or HTML/error body slipping past curl.
+set "DL_SIZE=0"
+for %%A in ("%TEMP_DL%\sherpa-onnx.tar.bz2") do set "DL_SIZE=%%~zA"
+if %DL_SIZE% LSS 1000000 (
+    echo [ERROR] Downloaded archive is only %DL_SIZE% bytes; expected a multi-MB tarball.
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1
 )
