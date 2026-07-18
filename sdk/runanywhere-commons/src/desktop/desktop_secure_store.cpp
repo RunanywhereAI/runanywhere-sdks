@@ -24,8 +24,12 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <wincrypt.h>
+// clang-format off
+// windows.h must precede wincrypt.h — wincrypt.h relies on its base types
+// (LONG/DWORD/BYTE/...). Alphabetical include sorting would break the build.
 #include <windows.h>
+#include <wincrypt.h>
+// clang-format on
 #else
 #include <fcntl.h>
 #include <unistd.h>
