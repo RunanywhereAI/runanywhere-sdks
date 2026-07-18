@@ -44,6 +44,9 @@
 #include <sys/sysinfo.h>
 #endif
 
+#if defined(_WIN32)
+#include "core/internal/platform_compat.h"  // rac_to_wstring for UTF-8 path handling
+#endif
 #include "desktop/desktop_internal.h"
 #include "rac/desktop/rac_desktop.h"
 
@@ -159,6 +162,51 @@ rac_result_t filesystem_error_to_rac(const std::error_code& ec, rac_result_t fal
 }
 
 // -----------------------------------------------------------------------------
+// UTF-8 path helpers
+//
+// The platform-adapter contract documents every path/name as UTF-8. On Windows
+// the narrow std::fopen / std::remove / fs::path(const char*) overloads decode
+// bytes with the process ANSI code page, not UTF-8, so a non-ASCII path would
+// reach the wrong file (or spuriously report ENOENT). Convert to wide with the
+// shared rac_to_wstring helper (the same one ONNX Runtime session paths use) and
+// call the wide CRT/filesystem APIs. On POSIX the narrow byte string is already
+// UTF-8, so each helper reduces to the original call with no behavior change.
+// -----------------------------------------------------------------------------
+
+fs::path utf8_to_path(const char* utf8) {
+#if defined(_WIN32)
+    return fs::path(rac_to_wstring(utf8));
+#else
+    return fs::path(utf8);
+#endif
+}
+
+FILE* utf8_fopen(const char* utf8, const char* mode) {
+#if defined(_WIN32)
+    // mode is ASCII ("rb"/"wb"), so widening it byte-for-byte is safe.
+    return _wfopen(rac_to_wstring(utf8).c_str(), rac_to_wstring(mode).c_str());
+#else
+    return std::fopen(utf8, mode);
+#endif
+}
+
+int utf8_remove(const char* utf8) {
+#if defined(_WIN32)
+    return _wremove(rac_to_wstring(utf8).c_str());
+#else
+    return std::remove(utf8);
+#endif
+}
+
+// UTF-8 filename, never the ANSI code page: fs::path::string() throws on
+// Windows for code points the active code page cannot represent, and that
+// exception would escape this C-ABI callback. u8string() is always UTF-8.
+std::string filename_utf8(const fs::path& p) {
+    const auto name = p.filename().u8string();  // std::u8string, always UTF-8
+    return std::string(reinterpret_cast<const char*>(name.data()), name.size());
+}
+
+// -----------------------------------------------------------------------------
 // File system
 // -----------------------------------------------------------------------------
 
@@ -168,7 +216,7 @@ rac_bool_t desktop_file_exists(const char* path, void* /*user_data*/) {
     }
     // Mirrors FileManager.fileExists(atPath:) — true for files AND directories.
     std::error_code ec;
-    return fs::exists(fs::path(path), ec) && !ec ? RAC_TRUE : RAC_FALSE;
+    return fs::exists(utf8_to_path(path), ec) && !ec ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t desktop_file_read(const char* path, void** out_data, size_t* out_size,
@@ -179,7 +227,7 @@ rac_result_t desktop_file_read(const char* path, void** out_data, size_t* out_si
     *out_data = nullptr;
     *out_size = 0;
 
-    FILE* f = std::fopen(path, "rb");
+    FILE* f = utf8_fopen(path, "rb");
     if (!f) {
         return errno_to_rac(errno, RAC_ERROR_FILE_READ_FAILED);
     }
@@ -220,12 +268,12 @@ rac_result_t desktop_file_write(const char* path, const void* data, size_t size,
     }
 
     std::error_code ec;
-    fs::path parent = fs::path(path).parent_path();
+    fs::path parent = utf8_to_path(path).parent_path();
     if (!parent.empty()) {
         fs::create_directories(parent, ec);  // ec ignored: fopen below surfaces failure
     }
 
-    FILE* f = std::fopen(path, "wb");
+    FILE* f = utf8_fopen(path, "wb");
     if (!f) {
         return errno_to_rac(errno, RAC_ERROR_FILE_WRITE_FAILED);
     }
@@ -241,7 +289,7 @@ rac_result_t desktop_file_delete(const char* path, void* /*user_data*/) {
     if (!path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (std::remove(path) != 0) {
+    if (utf8_remove(path) != 0) {
         return errno_to_rac(errno, RAC_ERROR_FILE_DELETE_FAILED);
     }
     return RAC_SUCCESS;
@@ -264,7 +312,7 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
     const size_t capacity = out_entries ? *in_out_count : 0;
     size_t count = 0;
     std::error_code ec;
-    fs::directory_iterator iterator(fs::path(dir_path), ec);
+    fs::directory_iterator iterator(utf8_to_path(dir_path), ec);
     if (ec) {
         return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
     }
@@ -274,7 +322,7 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
             return filesystem_error_to_rac(ec, RAC_ERROR_STORAGE_ERROR);
         }
         const fs::directory_entry& entry = *iterator;
-        const std::string name = entry.path().filename().string();
+        const std::string name = filename_utf8(entry.path());
         if (entry_is_hidden(name)) {
             continue;
         }
@@ -314,7 +362,7 @@ rac_bool_t desktop_is_non_empty_directory(const char* path, void* /*user_data*/)
         return RAC_FALSE;
     }
     std::error_code ec;
-    fs::directory_iterator iterator(fs::path(path), ec);
+    fs::directory_iterator iterator(utf8_to_path(path), ec);
     return !ec && iterator != fs::directory_iterator{} ? RAC_TRUE : RAC_FALSE;
 }
 
