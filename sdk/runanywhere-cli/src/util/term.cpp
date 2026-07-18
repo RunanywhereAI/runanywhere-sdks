@@ -1,5 +1,6 @@
 #include "util/term.h"
 
+#include <cstdio>   // stdout/stderr/stdin, _fileno (Windows TTY checks below)
 #include <cstdlib>
 
 #if defined(_WIN32)
