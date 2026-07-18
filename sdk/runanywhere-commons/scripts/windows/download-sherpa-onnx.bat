@@ -89,12 +89,21 @@ if %DL_SIZE% LSS 1000000 (
     exit /b 1
 )
 
-:: Extract straight into DEST_DIR, dropping the archive's top-level directory.
-:: --strip-components=1 avoids a second copy pass (the old xcopy step could hang
-:: on cmd's "File or Directory?" prompt with no stdin on CI).
-echo [EXTRACT] Extracting archive...
+:: Extract. Windows' bundled bsdtar hangs indefinitely decompressing .tar.bz2
+:: on CI (its bzip2 filter stalls with no console), so use 7-Zip — preinstalled
+:: on GitHub windows runners — to turn .tar.bz2 into a plain .tar, then plain
+:: tar (no bzip2) to lay it down, dropping the archive's top-level directory.
+:: -y answers any 7-Zip prompt so it can never block on stdin.
+echo [EXTRACT] Decompressing (7-Zip)...
 mkdir "%DEST_DIR%" 2>nul
-tar -xjf "%TEMP_DL%\sherpa-onnx.tar.bz2" --strip-components=1 -C "%DEST_DIR%"
+7z x -y "%TEMP_DL%\sherpa-onnx.tar.bz2" -o"%TEMP_DL%"
+if errorlevel 1 (
+    echo [ERROR] bzip2 decompression (7-Zip) failed.
+    rmdir /s /q "%TEMP_DL%" 2>nul
+    exit /b 1
+)
+echo [EXTRACT] Unpacking tar...
+tar -xf "%TEMP_DL%\sherpa-onnx.tar" --strip-components=1 -C "%DEST_DIR%"
 if errorlevel 1 (
     echo [ERROR] Extraction failed.
     rmdir /s /q "%TEMP_DL%" 2>nul
