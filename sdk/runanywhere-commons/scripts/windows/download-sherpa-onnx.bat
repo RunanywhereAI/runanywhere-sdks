@@ -38,8 +38,12 @@ if exist "%DEST_DIR%\lib" if "%FORCE%"=="0" (
 )
 
 :: Determine URL
-set "URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v%VERSION%/sherpa-onnx-v%VERSION%-win-x64-shared.tar.bz2"
-set "ARCHIVE_NAME=sherpa-onnx-v%VERSION%-win-x64-shared"
+:: k2-fsa publishes the Windows x64 build as MSVC-runtime + config variants;
+:: there is no plain "-win-x64-shared" asset (that URL 404s). Use the static-CRT
+:: Release variant (-MT-Release) so the bundled DLLs carry no VC++ redist
+:: dependency, matching the /MT rcli build (CMAKE_MSVC_RUNTIME_LIBRARY).
+set "URL=https://github.com/k2-fsa/sherpa-onnx/releases/download/v%VERSION%/sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release.tar.bz2"
+set "ARCHIVE_NAME=sherpa-onnx-v%VERSION%-win-x64-shared-MT-Release"
 
 echo.
 echo ========================================
@@ -63,26 +67,47 @@ mkdir "%TEMP_DL%" 2>nul
 
 :: Download
 echo [DOWNLOAD] Downloading Sherpa-ONNX v%VERSION%...
-curl -L -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
+:: --fail turns an HTTP 404 into a non-zero exit instead of silently writing the
+:: error body (which then fails opaquely at the tar step). --connect-timeout /
+:: --max-time bound a stalled transfer (curl has no default timeout and would
+:: otherwise hang the CI job indefinitely); --retry-all-errors retries the
+:: timeout too.
+curl -L --fail --show-error --connect-timeout 30 --max-time 900 --retry 3 ^
+    --retry-delay 5 --retry-all-errors -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
 if errorlevel 1 (
-    echo [ERROR] Download failed.
+    echo [ERROR] Download failed for %URL%
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1
 )
 
-:: Extract
-echo [EXTRACT] Extracting archive...
+:: Guard against a truncated or HTML/error body slipping past curl.
+set "DL_SIZE=0"
+for %%A in ("%TEMP_DL%\sherpa-onnx.tar.bz2") do set "DL_SIZE=%%~zA"
+if %DL_SIZE% LSS 1000000 (
+    echo [ERROR] Downloaded archive is only %DL_SIZE% bytes; expected a multi-MB tarball.
+    rmdir /s /q "%TEMP_DL%" 2>nul
+    exit /b 1
+)
+
+:: Extract. Windows' bundled bsdtar hangs indefinitely decompressing .tar.bz2
+:: on CI (its bzip2 filter stalls with no console), so use 7-Zip — preinstalled
+:: on GitHub windows runners — to turn .tar.bz2 into a plain .tar, then plain
+:: tar (no bzip2) to lay it down, dropping the archive's top-level directory.
+:: -y answers any 7-Zip prompt so it can never block on stdin.
+echo [EXTRACT] Decompressing (7-Zip)...
 mkdir "%DEST_DIR%" 2>nul
-tar -xjf "%TEMP_DL%\sherpa-onnx.tar.bz2" -C "%TEMP_DL%"
+7z x -y "%TEMP_DL%\sherpa-onnx.tar.bz2" -o"%TEMP_DL%"
+if errorlevel 1 (
+    echo [ERROR] 7-Zip bzip2 decompression failed.
+    rmdir /s /q "%TEMP_DL%" 2>nul
+    exit /b 1
+)
+echo [EXTRACT] Unpacking tar...
+tar -xf "%TEMP_DL%\sherpa-onnx.tar" --strip-components=1 -C "%DEST_DIR%"
 if errorlevel 1 (
     echo [ERROR] Extraction failed.
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1
-)
-
-:: Move contents (strip top-level directory)
-for /d %%d in ("%TEMP_DL%\sherpa-onnx-*") do (
-    xcopy /s /y /q "%%d\*" "%DEST_DIR%\" >nul
 )
 
 :: Download C API headers if missing

@@ -2,7 +2,7 @@
  * @file test_desktop_adapter.cpp
  * @brief Unit tests for the desktop platform adapter (RAC_DESKTOP_ADAPTER).
  *
- * Exercises the POSIX adapter slots directly (no rac_init needed), the 0600
+ * Exercises the desktop adapter slots directly (no rac_init needed), secure
  * secure-store contract, the libcurl transport registration, and the
  * model-paths base-dir dedup rule the desktop layout depends on. Network
  * behavior is covered by the Docker CLI e2e (hermetic local-HTTP pull), not
@@ -11,15 +11,19 @@
 
 #include "test_common.h"
 
-#include <sys/stat.h>
-#include <unistd.h>
-
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <vector>
+
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/desktop/rac_desktop.h"
@@ -35,11 +39,16 @@ struct TempDir {
     std::string path;
 
     TempDir() {
-        std::string tmpl = (fs::temp_directory_path() / "rac_desktop_test_XXXXXX").string();
-        std::vector<char> buf(tmpl.begin(), tmpl.end());
-        buf.push_back('\0');
-        if (mkdtemp(buf.data()) != nullptr) {
-            path = buf.data();
+        const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
+        // u8string() (not string(), which uses the Windows ANSI code page) so the
+        // path handed to the UTF-8 adapter API round-trips on non-ASCII temp roots.
+        const auto u8 =
+            (fs::temp_directory_path() / ("rac_desktop_test_" + std::to_string(unique))).u8string();
+        path = std::string(reinterpret_cast<const char*>(u8.data()), u8.size());
+        std::error_code ec;
+        fs::create_directories(path, ec);
+        if (ec) {
+            path.clear();
         }
     }
 
@@ -92,8 +101,7 @@ TestResult test_file_roundtrip() {
         result.details = "file_read failed";
         return result;
     }
-    const bool content_ok =
-        size == payload.size() && std::memcmp(data, payload.data(), size) == 0;
+    const bool content_ok = size == payload.size() && std::memcmp(data, payload.data(), size) == 0;
     free(data);
     if (!content_ok) {
         result.details = "file_read returned different bytes";
@@ -222,9 +230,25 @@ TestResult test_secure_store() {
         return result;
     }
 
-    // Permission contract: file mode is exactly 0600, store dir 0700.
+    // Permission contract: POSIX uses 0600/0700. Windows stores a DPAPI blob.
     const std::string key_file = tmp.path + "/cfg/secure/rac.device.id";
-    struct stat st {};
+#if defined(_WIN32)
+    // Construct the path from UTF-8 so MSVC's <fstream> does not reinterpret it
+    // through the ANSI code page. Scope the stream so the handle is released
+    // before secure_delete below — Windows cannot unlink a file that is open.
+    std::string stored;
+    {
+        std::ifstream encrypted(fs::path(reinterpret_cast<const char8_t*>(key_file.c_str())),
+                                std::ios::binary);
+        stored.assign((std::istreambuf_iterator<char>(encrypted)),
+                      std::istreambuf_iterator<char>());
+    }
+    if (stored.empty() || stored.find("device-1234") != std::string::npos) {
+        result.details = "Windows secure-store value was not DPAPI protected";
+        return result;
+    }
+#else
+    struct stat st{};
     if (stat(key_file.c_str(), &st) != 0) {
         result.details = "expected key file at " + key_file;
         return result;
@@ -233,12 +257,12 @@ TestResult test_secure_store() {
         result.details = "key file mode is not 0600";
         return result;
     }
-    struct stat dir_st {};
-    if (stat((tmp.path + "/cfg/secure").c_str(), &dir_st) != 0 ||
-        (dir_st.st_mode & 0777) != 0700) {
+    struct stat dir_st{};
+    if (stat((tmp.path + "/cfg/secure").c_str(), &dir_st) != 0 || (dir_st.st_mode & 0777) != 0700) {
         result.details = "secure dir mode is not 0700";
         return result;
     }
+#endif
 
     // Keys with separators must be encoded, not treated as paths.
     if (adapter.secure_set("a/b:c", "x", nullptr) != RAC_SUCCESS) {
@@ -373,10 +397,19 @@ TestResult test_default_base_dir() {
         return result;
     }
     const std::string dir(buffer);
+#if defined(_WIN32)
+    // Windows: <LOCALAPPDATA>\RunAnywhere — drive-letter rooted, "RunAnywhere".
+    const bool rooted = dir.size() >= 2 && dir[1] == ':';
+    if (dir.empty() || dir.find("RunAnywhere") == std::string::npos || !rooted) {
+        result.details = "unexpected default base dir: " + dir;
+        return result;
+    }
+#else
     if (dir.empty() || dir.find("runanywhere") == std::string::npos || dir.front() != '/') {
         result.details = "unexpected default base dir: " + dir;
         return result;
     }
+#endif
 
     char tiny[4] = {};
     if (rac_desktop_default_base_dir(tiny, sizeof(tiny)) != RAC_ERROR_BUFFER_TOO_SMALL) {

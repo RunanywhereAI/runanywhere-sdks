@@ -425,6 +425,7 @@ let package = Package(
                 "RADesktopHostAdapter",
                 "RABackendLlamaCPPBinary",
                 "RABackendMLXBinary",
+                "RABackendCoreMLBinary",
             ],
             path: "sdk/runanywhere-cli",
             exclude: [
@@ -474,6 +475,7 @@ let package = Package(
                 .define("CLI11_HAS_CODECVT", to: "0"),
                 .define("RCLI_HAS_LLAMACPP", to: "1"),
                 .define("RCLI_HAS_MLX", to: "1"),
+                .define("RCLI_HAS_COREML", to: "1"),
                 .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
                 .headerSearchPath("include"),
                 .headerSearchPath("src"),
@@ -506,6 +508,7 @@ let package = Package(
             name: "RunAnywhereMLXCLI",
             dependencies: [
                 "MLXRuntime",
+                "ONNXRuntime",
                 "RCLIHost",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhereMLXCLI"

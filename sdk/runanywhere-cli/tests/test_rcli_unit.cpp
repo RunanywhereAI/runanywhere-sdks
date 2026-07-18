@@ -36,16 +36,32 @@ public:
       prev_ = prev;
     }
     if (value) {
+#if defined(_WIN32)
+      _putenv_s(name, value);
+#else
       setenv(name, value, 1);
+#endif
     } else {
+#if defined(_WIN32)
+      _putenv_s(name, "");
+#else
       unsetenv(name);
+#endif
     }
   }
   ~EnvVar() {
     if (had_prev_) {
+#if defined(_WIN32)
+      _putenv_s(name_.c_str(), prev_.c_str());
+#else
       setenv(name_.c_str(), prev_.c_str(), 1);
+#endif
     } else {
+#if defined(_WIN32)
+      _putenv_s(name_.c_str(), "");
+#else
       unsetenv(name_.c_str());
+#endif
     }
   }
 
@@ -171,12 +187,21 @@ TestResult test_resolve_home_precedence() {
   {
     // Default: XDG data dir under runanywhere.
     EnvVar env("RUNANYWHERE_HOME", nullptr);
+#if defined(_WIN32)
+    EnvVar local("LOCALAPPDATA", "C:/rcli-local");
+    const std::string home = rcli::paths::resolve_home("");
+    if (home != "C:/rcli-local/RunAnywhere") {
+      result.details = "expected C:/rcli-local/RunAnywhere, got " + home;
+      return result;
+    }
+#else
     EnvVar xdg("XDG_DATA_HOME", "/xdg-data");
     const std::string home = rcli::paths::resolve_home("");
     if (home != "/xdg-data/runanywhere") {
       result.details = "expected /xdg-data/runanywhere, got " + home;
       return result;
     }
+#endif
   }
   result.passed = true;
   return result;

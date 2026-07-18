@@ -17,6 +17,20 @@ if(NOT RAC_DESKTOP_ADAPTER)
     message(FATAL_ERROR "rcli requires -DRAC_DESKTOP_ADAPTER=ON (desktop platform adapter + curl transport)")
 endif()
 
+# winnt.h (via windows.h, pulled in by Abseil/protobuf) defines
+# ERROR_SEVERITY_WARNING/ERROR_SEVERITY_ERROR as macros that clobber the proto
+# enum runanywhere::v1::ErrorSeverity, breaking errors.pb.h in any TU that sees
+# windows.h before the proto header (e.g. cmd_run.cpp). Force-include a prefix
+# header that includes windows.h once and undefs those two collisions. Directory
+# scope so it covers rcli_core, the rcli binary, and the tests subdirectory.
+if(WIN32)
+    if(MSVC)
+        add_compile_options("/FI${CMAKE_CURRENT_SOURCE_DIR}/src/windows_proto_compat.h")
+    else()
+        add_compile_options(-include "${CMAKE_CURRENT_SOURCE_DIR}/src/windows_proto_compat.h")
+    endif()
+endif()
+
 set(RCLI_SOURCES
     src/app.cpp
     src/bootstrap.cpp
@@ -50,9 +64,16 @@ set(RCLI_SOURCES
 )
 
 # Vendored single-file deps. linenoise is C; compiled into the core object lib.
-set(RCLI_THIRD_PARTY_SOURCES
-    third_party/linenoise/linenoise.c
-)
+if(WIN32)
+    # The vendored linenoise implementation is POSIX-only. Windows consoles
+    # provide native line editing; repl.cpp supplies the small getline/history
+    # fallback so the command surface remains identical.
+    set(RCLI_THIRD_PARTY_SOURCES "")
+else()
+    set(RCLI_THIRD_PARTY_SOURCES
+        third_party/linenoise/linenoise.c
+    )
+endif()
 
 add_library(rcli_core OBJECT ${RCLI_SOURCES} ${RCLI_THIRD_PARTY_SOURCES})
 
@@ -74,6 +95,9 @@ target_compile_definitions(rcli_core PUBLIC
     # <codecvt>, which the standard library deprecated in C++17. Use CLI11's
     # maintained locale-conversion path instead.
     CLI11_HAS_CODECVT=0)
+if(WIN32)
+    target_compile_definitions(rcli_core PUBLIC RCLI_NO_LINENOISE=1)
+endif()
 
 # Proto-byte ABI access (DownloadProgress, ModelInfo, Register* requests).
 # Same internal-consumer pattern as commons tests' rac_test_define_have_protobuf:
