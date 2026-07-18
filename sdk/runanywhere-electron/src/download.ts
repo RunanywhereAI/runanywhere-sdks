@@ -137,7 +137,14 @@ export function isRemoteSource(s: string): boolean {
 }
 
 function sanitizeId(s: string): string {
-  return s.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'model';
+  const cleaned = s.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 64);
+  // Trim leading/trailing '-' with a linear scan rather than /^-+|-+$/g, whose
+  // per-position `-+$` backtracking is polynomial on a run of dashes (CodeQL).
+  let a = 0;
+  let b = cleaned.length;
+  while (a < b && cleaned[a] === '-') a++;
+  while (b > a && cleaned[b - 1] === '-') b--;
+  return cleaned.slice(a, b) || 'model';
 }
 // Short digest of the full source so two distinct sources that sanitize to the
 // same stem (e.g. hostA/model.gguf vs hostB/model.gguf) get distinct cache dirs
