@@ -12,7 +12,7 @@ export interface RpcRequest {
 /** utility host -> renderer/main. Either a stream event or a terminal reply. */
 export type RpcMessage =
   | { id: number; token: string } // a streamed token (generate / generateVlm)
-  | { id: number; done: true } // stream finished OK
+  | { id: number; done: true; result?: unknown } // stream finished OK (result = resolved value, e.g. downloadModel's ResolvedModel)
   | { id: number; ok: true; result?: unknown } // unary reply
   | { id: number; ok: false; error: string }; // failure (unary or stream)
 
