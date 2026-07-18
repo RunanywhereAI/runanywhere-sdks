@@ -50,6 +50,8 @@ app.whenReady().then(() => {
   ipcMain.handle('demo:conversations:save', (_e, data) => writeJson('conversations.json', data));
   ipcMain.handle('demo:settings:load', () => readJson('settings.json', {}));
   ipcMain.handle('demo:settings:save', (_e, data) => writeJson('settings.json', data));
+  ipcMain.handle('demo:models:load', () => readJson('custom-models.json', []));
+  ipcMain.handle('demo:models:save', (_e, data) => writeJson('custom-models.json', data));
 
   const ra = new RunAnywhereMain({
     hostPath: path.join(SDK_ROOT, 'dist', 'process', 'host.js'),
