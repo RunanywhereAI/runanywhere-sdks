@@ -206,7 +206,7 @@ jobs:
       - name: Install static libcurl
         shell: pwsh
         run: |
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-windows-static
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install curl:x64-mingw-static --host-triplet=x64-mingw-static
           if ($LASTEXITCODE -ne 0) { throw "vcpkg curl install failed" }
       - name: Sherpa-ONNX prebuilts
         shell: cmd
