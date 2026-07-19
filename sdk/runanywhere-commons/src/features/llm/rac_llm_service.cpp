@@ -148,7 +148,7 @@ rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
     const std::string effective_prompt =
         rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
     return service->ops->generate_stream(service->impl, effective_prompt.c_str(), options, callback,
-                                         user_data);
+                                         user_data, /*out_tokens_generated=*/nullptr);
 }
 
 rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info) {

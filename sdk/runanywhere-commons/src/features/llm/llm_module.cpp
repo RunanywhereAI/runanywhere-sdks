@@ -2253,9 +2253,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // SDKs it would be undefined behaviour through a C ABI return.
     const std::string effective_prompt =
         rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
+    int32_t backend_tokens_generated = 0;
     try {
         rc = ref.ops->generate_stream(ref.impl, effective_prompt.c_str(), &options,
-                                      stream_token_callback, &ctx);
+                                      stream_token_callback, &ctx, &backend_tokens_generated);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
         rc = RAC_ERROR_INFERENCE_FAILED;
@@ -2288,8 +2289,13 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         // streaming proto generation looks like a natural stop, which breaks
         // OpenAI parity for direct streaming proto callers (JNI, Web, etc.)
         // and diverges from the non-streaming proto path.
+        // Prefer the backend's authoritative decoded-token count; the streaming
+        // callback fires per buffered chunk, so ctx.token_count (callback count)
+        // under-reports. Fall back to it only when the backend didn't populate.
+        const int64_t final_tokens =
+            backend_tokens_generated > 0 ? backend_tokens_generated : ctx.token_count;
         const char* finish_reason =
-            (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
+            (options.max_tokens > 0 && final_tokens >= options.max_tokens) ? "length" : "stop";
         dispatch_terminal_once(&ctx, finish_reason, nullptr);
         const int64_t stream_elapsed = now_ms() - ctx.started_ms;
         // Tokens/sec over decode time only, not prefill-inclusive wall time.
@@ -2300,10 +2306,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                           : stream_elapsed;
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
-                                 nullptr, ref.model_id, ctx.token_count, stream_elapsed,
+                                 nullptr, ref.model_id, final_tokens, stream_elapsed,
                                  ctx.prompt_tokens, ref.framework_name,
-                                 (ctx.token_count > 0 && stream_decode > 0)
-                                     ? ctx.token_count * 1000.0 / static_cast<double>(stream_decode)
+                                 (final_tokens > 0 && stream_decode > 0)
+                                     ? final_tokens * 1000.0 / static_cast<double>(stream_decode)
                                      : 0.0,
                                  static_cast<double>(stream_ttft), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),

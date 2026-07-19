@@ -353,7 +353,10 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
 rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* prompt,
                                               const rac_llm_options_t* options,
                                               rac_llm_llamacpp_stream_callback_fn callback,
-                                              void* user_data) {
+                                              void* user_data, int32_t* out_tokens_generated) {
+    if (out_tokens_generated != nullptr) {
+        *out_tokens_generated = 0;
+    }
     if (handle == nullptr || prompt == nullptr || callback == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -421,9 +424,11 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     bool terminal_emitted = false;
 
     bool success = false;
+    int decoded_tokens = 0;
     try {
         success = h->text_gen->generate_stream(
-            request, [&](const std::string& token) -> bool {
+            request,
+            [&](const std::string& token) -> bool {
                 if (user_stops.empty()) {
                     return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
                 }
@@ -445,7 +450,8 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                     return callback(safe_chunk.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
                 }
                 return true;
-            });
+            },
+            /*out_prompt_tokens=*/nullptr, /*out_prompt_eval_ms=*/nullptr, &decoded_tokens);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
         if (!terminal_emitted) {
@@ -474,6 +480,9 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         }
         callback("", RAC_TRUE, user_data);  // Final token
         terminal_emitted = true;
+        if (out_tokens_generated != nullptr) {
+            *out_tokens_generated = decoded_tokens;
+        }
         return RAC_SUCCESS;
     }
 

@@ -148,7 +148,8 @@ typedef rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
-    rac_llm_llamacpp_stream_callback_fn callback, void* user_data);
+    rac_llm_llamacpp_stream_callback_fn callback, void* user_data,
+    int32_t* out_tokens_generated);
 
 /**
  * Cancels ongoing generation.

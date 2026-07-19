@@ -328,7 +328,12 @@ rac_result_t llm_generate(void* impl, const char* prompt, const rac_llm_options_
 }
 
 rac_result_t llm_generate_stream(void* impl, const char* prompt, const rac_llm_options_t* options,
-                                 rac_llm_stream_callback_fn callback, void* user_data) {
+                                 rac_llm_stream_callback_fn callback, void* user_data,
+                                 int32_t* out_tokens_generated) {
+    // The MLX Swift callback path does not surface a decoded-token count here;
+    // leave out_tokens_generated untouched so callers fall back to the streaming
+    // callback count.
+    (void)out_tokens_generated;
     if (!prompt || !callback) {
         return RAC_ERROR_NULL_POINTER;
     }

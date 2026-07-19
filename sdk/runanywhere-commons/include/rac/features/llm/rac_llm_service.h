@@ -50,10 +50,18 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*generate)(void* impl, const char* prompt, const rac_llm_options_t* options,
                              rac_llm_result_t* out_result);
 
-    /** Generate text with streaming callback */
+    /** Generate text with streaming callback.
+     *
+     * out_tokens_generated (optional, may be NULL): receives the backend's
+     * authoritative decoded-token count. Prefer this over counting streaming
+     * callback invocations — the callback delivers buffered chunks, not one call
+     * per token, so callback counts under-report generated tokens. A backend
+     * that does not populate it leaves it untouched; callers fall back to the
+     * callback count. */
     rac_result_t (*generate_stream)(void* impl, const char* prompt,
                                     const rac_llm_options_t* options,
-                                    rac_llm_stream_callback_fn callback, void* user_data);
+                                    rac_llm_stream_callback_fn callback, void* user_data,
+                                    int32_t* out_tokens_generated);
 
     /** Get service info */
     rac_result_t (*get_info)(void* impl, rac_llm_info_t* out_info);
