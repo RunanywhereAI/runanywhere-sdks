@@ -21,6 +21,13 @@ data class NpuBundle(
     val url: String,
 )
 
+data class NpuCatalogSeedResult(
+    val registeredIds: Set<String> = emptySet(),
+    val registeredCount: Int = registeredIds.size,
+    val failedCount: Int = 0,
+    val arch: String? = null,
+)
+
 /**
  * The 17-bundle NPU (QHexRT) catalog — one manifest-pinned hf.co folder ref
  * per bundle. Commons + the engine-registered QHexRT bundle policy resolve
@@ -82,21 +89,23 @@ private val logger = SDKLogger("QHexRT")
  * separately (before or after catalog seeding) so the two concerns stay
  * decoupled: "enable the engine" vs "populate the catalog."
  *
- * On unsupported devices this is a no-op (no bundles match) and returns 0.
+ * On unsupported devices this is a no-op (no bundles match) and returns an
+ * empty result.
  *
- * @return The number of NPU bundles successfully registered.
+ * @return The registered bundle ids and summary counts.
  */
-suspend fun QHexRT.seedCatalog(): Int {
+suspend fun QHexRT.seedCatalog(): NpuCatalogSeedResult {
     val npuArch = runCatching {
         probeNpu().takeIf { it.qhexrt_supported }?.arch_name
     }.getOrNull()
 
     if (npuArch == null) {
         logger.info("QHexRT NPU not supported on this device; skipping NPU catalog seed")
-        return 0
+        return NpuCatalogSeedResult()
     }
 
     val bundles = qhexrtBundles.filter { it.arch == npuArch }
+    val registeredIds = mutableSetOf<String>()
     var ok = 0
     var fail = 0
     for (bundle in bundles) {
@@ -109,6 +118,7 @@ suspend fun QHexRT.seedCatalog(): Int {
                 modality = bundle.category,
                 memoryRequirement = 0L,
             )
+            registeredIds += bundle.id
             ok++
         } catch (e: CancellationException) {
             throw e
@@ -119,5 +129,10 @@ suspend fun QHexRT.seedCatalog(): Int {
     }
 
     logger.info("QHexRT NPU catalog seeded for arch $npuArch: ok=$ok failed=$fail")
-    return ok
+    return NpuCatalogSeedResult(
+        registeredIds = registeredIds,
+        registeredCount = ok,
+        failedCount = fail,
+        arch = npuArch,
+    )
 }
