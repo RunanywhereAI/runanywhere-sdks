@@ -335,12 +335,15 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         json.add_double("vision_encode_time_ms", payload->vision_encode_time_ms);
         json.add_string("image_resolution", payload->image_resolution);
     } else if (strcmp(modality, "rag") == 0) {
-        // retrieved_docs_count / top_k / retrieval_time_ms / embedding_model have
-        // sources today (via the properties carrier). query_token_count /
-        // reranker_used / context_tokens still need carriers.
+        // retrieved_docs_count / top_k / retrieval_time_ms / embedding_model /
+        // reranker_used / query_token_count / context_tokens all ride the
+        // properties carrier (token counts estimated ~4 chars/token in
+        // rac_rag_proto_abi, matching the pipeline's context budget).
         json.add_int("retrieved_docs_count", payload->retrieved_docs_count);
         json.add_int("top_k", payload->top_k);
         json.add_double("retrieval_time_ms", payload->retrieval_time_ms);
+        json.add_int("query_token_count", payload->query_token_count);
+        json.add_int("context_tokens", payload->context_tokens);
         json.add_string("embedding_model", payload->embedding_model);
         json.add_bool("reranker_used", payload->reranker_used, payload->has_reranker_used);
     } else if (strcmp(modality, "embeddings") == 0) {

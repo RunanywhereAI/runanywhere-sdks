@@ -132,6 +132,8 @@ typedef struct rac_telemetry_payload {
     // RAG-specific extras (via properties carrier; retrieved_docs_count above)
     int32_t top_k;
     double retrieval_time_ms;
+    int32_t query_token_count;    // estimated tokens in the query (via properties carrier)
+    int32_t context_tokens;       // estimated tokens in the retrieved context (via carrier)
     const char* embedding_model;  // RAG embedding model (string → dup'd/freed)
     rac_bool_t reranker_used;      // LLM-pointwise rerank enabled for the query
     rac_bool_t has_reranker_used;  // whether reranker_used is set
