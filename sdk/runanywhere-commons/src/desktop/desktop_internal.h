@@ -24,13 +24,13 @@ rac_result_t secure_delete(const char* key, void* user_data);
 
 // --- shared path helpers (desktop_adapter.cpp) -------------------------------
 
-/** $HOME with fallback to getpwuid; empty string when unresolvable. */
+/** User home/profile directory; empty string when unresolvable. */
 std::string home_dir();
 
-/** ${XDG_CONFIG_HOME:-$HOME/.config}/runanywhere (no trailing slash). */
+/** XDG config directory on POSIX, AppData on Windows (no trailing slash). */
 std::string default_config_dir();
 
-/** ${XDG_DATA_HOME:-$HOME/.local/share}/runanywhere (no trailing slash). */
+/** XDG data directory on POSIX, LocalAppData on Windows (no trailing slash). */
 std::string default_data_dir();
 
 }  // namespace rac::desktop

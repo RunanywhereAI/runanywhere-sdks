@@ -1311,8 +1311,15 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
             while ((diag_entry = readdir(diag_dir)) != nullptr) {
                 if (diag_entry->d_name[0] == '.')
                     continue;
-                RAC_LOG_INFO("Sherpa.TTS", "  [%s] %s",
-                             diag_entry->d_type == DT_DIR ? "DIR" : "FILE", diag_entry->d_name);
+                // struct dirent::d_type / DT_DIR are POSIX extensions absent on
+                // MinGW; stat the entry instead (portable, matches the checks
+                // above).
+                struct stat entry_stat;
+                const std::string entry_path = model_path + "/" + diag_entry->d_name;
+                const bool is_dir =
+                    stat(entry_path.c_str(), &entry_stat) == 0 && S_ISDIR(entry_stat.st_mode);
+                RAC_LOG_INFO("Sherpa.TTS", "  [%s] %s", is_dir ? "DIR" : "FILE",
+                             diag_entry->d_name);
             }
             closedir(diag_dir);
             RAC_LOG_INFO("Sherpa.TTS", "=== End directory listing ===");

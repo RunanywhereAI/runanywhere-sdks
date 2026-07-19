@@ -138,6 +138,33 @@
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
         },
+        {
+            "name": "rcli-windows-release",
+            "displayName": "rcli — Windows x86_64 Release",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+                "VCPKG_HOST_TRIPLET": "x64-mingw-static",
+                "RAC_BUILD_CLI": "ON",
+                "RAC_DESKTOP_ADAPTER": "ON",
+                "RAC_BUILD_BACKENDS": "ON",
+                "RAC_BACKEND_LLAMACPP": "ON",
+                "RAC_BACKEND_SHERPA": "ON",
+                "RAC_BACKEND_ONNX": "ON",
+                "RAC_BACKEND_MLX": "OFF",
+                "RAC_BACKEND_COREML": "OFF",
+                "RAC_RUNTIME_ONNXRT": "ON",
+                "RAC_BACKEND_RAG": "OFF",
+                "RAC_BUILD_SERVER": "OFF",
+                "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_SHARED": "OFF",
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_INCLUDE_LOCAL_DEV_CONFIG": "OFF",
+                "GGML_METAL": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
 
         {
             "name": "android-arm64",
@@ -243,6 +270,7 @@
         { "name": "linux-asan",       "configurePreset": "linux-asan" },
         { "name": "rcli-macos-release", "configurePreset": "rcli-macos-release" },
         { "name": "rcli-linux-release", "configurePreset": "rcli-linux-release" },
+        { "name": "rcli-windows-release", "configurePreset": "rcli-windows-release" },
         { "name": "android-arm64",    "configurePreset": "android-arm64" },
         { "name": "android-armv7",    "configurePreset": "android-armv7" },
         { "name": "android-x86_64",   "configurePreset": "android-x86_64" },
@@ -256,6 +284,7 @@
     "testPresets": [
         { "name": "macos-debug",   "configurePreset": "macos-debug",   "output": { "outputOnFailure": true } },
         { "name": "linux-debug",   "configurePreset": "linux-debug",   "output": { "outputOnFailure": true } },
-        { "name": "linux-asan",    "configurePreset": "linux-asan",    "output": { "outputOnFailure": true } }
+        { "name": "linux-asan",    "configurePreset": "linux-asan",    "output": { "outputOnFailure": true } },
+        { "name": "rcli-windows-release", "configurePreset": "rcli-windows-release", "output": { "outputOnFailure": true } }
     ]
 }
