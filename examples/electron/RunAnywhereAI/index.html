@@ -229,7 +229,7 @@
         <div class="topbar">
           <h2 id="sectiontitle">Chat</h2>
           <div class="spacer"></div>
-          <span class="pill" title="This Windows build runs on CPU. GPU needs a Vulkan-enabled build.">
+          <span class="pill" id="devicepill" title="Inference runs on the CPU in this build.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
             <select id="device"><option value="cpu">CPU</option><option value="gpu" disabled>GPU · needs build</option></select>
           </span>
@@ -293,7 +293,7 @@
             </div>
             <div class="card">
               <div class="label" style="margin-top:0">Compute device</div>
-              <p class="muted" style="margin:2px 0 0">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. GPU acceleration (Vulkan) is a separate build option and will appear here when enabled.</p>
+              <p class="muted" style="margin:2px 0 0" id="devicenote">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>run-demo-gpu.cmd</code>.</p>
             </div>
           </div></section>
 
