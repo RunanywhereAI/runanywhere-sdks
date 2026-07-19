@@ -17,6 +17,20 @@ if(NOT RAC_DESKTOP_ADAPTER)
     message(FATAL_ERROR "rcli requires -DRAC_DESKTOP_ADAPTER=ON (desktop platform adapter + curl transport)")
 endif()
 
+# winnt.h (via windows.h, pulled in by Abseil/protobuf) defines
+# ERROR_SEVERITY_WARNING/ERROR_SEVERITY_ERROR as macros that clobber the proto
+# enum runanywhere::v1::ErrorSeverity, breaking errors.pb.h in any TU that sees
+# windows.h before the proto header (e.g. cmd_run.cpp). Force-include a prefix
+# header that includes windows.h once and undefs those two collisions. Directory
+# scope so it covers rcli_core, the rcli binary, and the tests subdirectory.
+if(WIN32)
+    if(MSVC)
+        add_compile_options("/FI${CMAKE_CURRENT_SOURCE_DIR}/src/windows_proto_compat.h")
+    else()
+        add_compile_options(-include "${CMAKE_CURRENT_SOURCE_DIR}/src/windows_proto_compat.h")
+    endif()
+endif()
+
 set(RCLI_SOURCES
     src/app.cpp
     src/bootstrap.cpp
@@ -30,6 +44,7 @@ set(RCLI_SOURCES
     src/commands/cmd_pull.cpp
     src/commands/cmd_rm.cpp
     src/commands/cmd_run.cpp
+    src/commands/cmd_image.cpp
     src/commands/cmd_serve.cpp
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
@@ -41,6 +56,7 @@ set(RCLI_SOURCES
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
     src/io/wav_io.cpp
+    src/io/image_io.cpp
     src/io/output.cpp
     src/progress/progress_bar.cpp
     src/repl/repl.cpp
@@ -48,9 +64,16 @@ set(RCLI_SOURCES
 )
 
 # Vendored single-file deps. linenoise is C; compiled into the core object lib.
-set(RCLI_THIRD_PARTY_SOURCES
-    third_party/linenoise/linenoise.c
-)
+if(WIN32)
+    # The vendored linenoise implementation is POSIX-only. Windows consoles
+    # provide native line editing; repl.cpp supplies the small getline/history
+    # fallback so the command surface remains identical.
+    set(RCLI_THIRD_PARTY_SOURCES "")
+else()
+    set(RCLI_THIRD_PARTY_SOURCES
+        third_party/linenoise/linenoise.c
+    )
+endif()
 
 add_library(rcli_core OBJECT ${RCLI_SOURCES} ${RCLI_THIRD_PARTY_SOURCES})
 
@@ -72,6 +95,9 @@ target_compile_definitions(rcli_core PUBLIC
     # <codecvt>, which the standard library deprecated in C++17. Use CLI11's
     # maintained locale-conversion path instead.
     CLI11_HAS_CODECVT=0)
+if(WIN32)
+    target_compile_definitions(rcli_core PUBLIC RCLI_NO_LINENOISE=1)
+endif()
 
 # Proto-byte ABI access (DownloadProgress, ModelInfo, Register* requests).
 # Same internal-consumer pattern as commons tests' rac_test_define_have_protobuf:
@@ -108,7 +134,11 @@ endif()
 
 # Per-backend availability defines, mirroring tools/CMakeLists.txt's
 # if(TARGET ...) pattern so the CLI builds with any backend subset.
-foreach(_rcli_backend llamacpp onnx sherpa mlx)
+# coreml is Apple-only (serves DIFFUSION); its target only exists on Apple, so
+# the if(TARGET ...) guard keeps this list cross-platform. Unlike the others it
+# has no rac_backend_coreml_register() fn — bootstrap.cpp registers its plugin
+# entry directly under RCLI_HAS_COREML.
+foreach(_rcli_backend llamacpp onnx sherpa mlx coreml)
     if(TARGET rac_backend_${_rcli_backend})
         string(TOUPPER ${_rcli_backend} _rcli_backend_upper)
         target_compile_definitions(rcli_core PUBLIC RCLI_HAS_${_rcli_backend_upper}=1)

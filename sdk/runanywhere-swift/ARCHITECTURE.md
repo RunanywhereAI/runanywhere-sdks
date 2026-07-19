@@ -41,7 +41,7 @@ The Swift SDK (`sdk/runanywhere-swift/`) is a thin platform bridge that adapts A
 - macOS deployment target: 14.5
 - Swift tools version: 5.9 (`Package.swift:1`)
 - Xcode required: 15+
-- Current SDK version: `0.20.0` (`sdk/runanywhere-swift/VERSION:1`)
+- Current SDK version: `0.20.11` (`sdk/runanywhere-swift/VERSION:1`)
 
 ### §1.3 Package layout (preview)
 
@@ -87,7 +87,7 @@ The full slot map and per-slot implementation notes are documented in §6.5.18 (
 sdk/runanywhere-swift/
 ├── Package.swift               ← local dev manifest (references Binaries/)
 ├── Package.resolved
-├── VERSION                     ← 0.20.0
+├── VERSION                     ← 0.20.11
 ├── AGENTS.md
 ├── README.md
 ├── ARCHITECTURE.md             ← this document
@@ -1568,7 +1568,7 @@ Seven files under `Foundation/Bridge/Extensions/` form the type-conversion layer
 
 | Constant | Value / Derivation |
 |---|---|
-| `version` | `"0.20.0"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
+| `version` | `"0.20.11"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
 | `name` | `"RunAnywhere SDK"` (line 17) |
 | `userAgent` | `"\(name)/\(version) (Swift)"` (line 20) |
 | `platform` | Compile-time conditional (lines 23–33): `"ios"`, `"macos"`, `"tvos"`, `"watchos"`, or `"unknown"` |

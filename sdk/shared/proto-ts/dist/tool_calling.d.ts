@@ -362,6 +362,14 @@ export interface ToolCallingSessionCreateRequest {
     autoExecute?: boolean | undefined;
     replaceSystemPrompt: boolean;
     requireJsonArguments: boolean;
+    /**
+     * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+     * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+     * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+     * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+     * cross-proto import cycle.
+     */
+    history: string[];
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;

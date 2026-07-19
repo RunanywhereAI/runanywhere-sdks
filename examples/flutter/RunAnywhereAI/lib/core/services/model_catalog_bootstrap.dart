@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
@@ -137,6 +139,18 @@ abstract final class ModelCatalogBootstrap {
           'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 2800000000,
+      supportsThinking: true,
+    );
+    // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
+    // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
+    await _registerLLM(
+      id: 'bonsai-27b-q1_0',
+      name: 'Bonsai-27B 1-bit Q1_0 (CPU)',
+      url:
+          'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 3803452480,
       supportsThinking: true,
     );
     await _registerLLM(
@@ -282,6 +296,21 @@ abstract final class ModelCatalogBootstrap {
     );
     debugPrint('ONNX Embedding models registered');
 
+    // --- Diffusion (image generation, Apple CoreML-only) -------------------
+    // The Swift facade + CoreML Stable-Diffusion backend landed in 0.20.10.
+    // There is no Android/CoreML diffusion backend, so the row is registered
+    // only on Apple platforms and never appears on Android.
+    if (Platform.isIOS || Platform.isMacOS) {
+      await _registerDiffusion(
+        id: 'stable-diffusion-v1-5-coreml',
+        name: 'Stable Diffusion 1.5 (CoreML)',
+        url:
+            'https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized',
+        memoryRequirement: 1200000000,
+      );
+      debugPrint('Diffusion (CoreML) models registered');
+    }
+
     // --- LoRA adapters ------------------------------------------------------
     // Mirrors iOS `registerLoraAdapters` / Android `ModelBootstrap.seedLora`.
     await _registerLoraAdapters();
@@ -310,6 +339,16 @@ abstract final class ModelCatalogBootstrap {
       url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
       memoryRequirement: 650000000,
+      supportsThinking: true,
+    );
+    // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
+    // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+    await _registerLLM(
+      id: 'mlx-bonsai-27b-1bit',
+      name: 'MLX Bonsai-27B 1-bit',
+      url: 'https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+      memoryRequirement: 5129115752,
       supportsThinking: true,
     );
     await _registerLLM(
@@ -458,6 +497,29 @@ abstract final class ModelCatalogBootstrap {
       );
     } catch (e) {
       debugPrint('Failed to register model $id: $e');
+    }
+  }
+
+  /// Register the Apple CoreML Stable-Diffusion catalog row (image generation).
+  /// Framework is CoreML and modality is image-generation so the SDK routes it
+  /// to the diffusion component. Swallow-and-warn like the other helpers.
+  static Future<void> _registerDiffusion({
+    required String id,
+    required String name,
+    required String url,
+    required int memoryRequirement,
+  }) async {
+    try {
+      await RunAnywhere.models.register(
+        id: id,
+        name: name,
+        url: url,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+        modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+        memoryRequirement: memoryRequirement,
+      );
+    } catch (e) {
+      debugPrint('Failed to register diffusion model $id: $e');
     }
   }
 

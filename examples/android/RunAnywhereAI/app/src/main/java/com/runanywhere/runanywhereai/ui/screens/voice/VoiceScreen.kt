@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.voice
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,6 +39,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.screens.models.DeviceInfo
@@ -79,6 +83,18 @@ fun VoiceScreen() {
         onDispose { voiceVm.stop() }
     }
 
+    // onDispose fires on nav-away but NOT when the Activity is backgrounded
+    // (Home/lock) mid-conversation. Stop Talk on ON_STOP too so the mic doesn't
+    // stay hot behind the lock screen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, voiceVm) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) voiceVm.stop()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val device = remember { runCatching { DeviceInfo.current() }.getOrNull() }
 
     // Pure recommendation over the union of all voice modalities, so the whole trio
@@ -92,17 +108,38 @@ fun VoiceScreen() {
         )
     }
 
+    // A component's shown model must follow the user's live selection (loaded model), not the static
+    // recommendation — otherwise picking e.g. LFM2.5 350M in "Change" loads it but the row keeps
+    // showing the recommended Qwen3.5 0.8B. Fall back to the recommendation when nothing is selected.
+    fun effective(vm: ModelSelectionViewModel, fallback: com.runanywhere.sdk.public.types.RAModelInfo?) =
+        vm.state.currentModelId?.let { id -> vm.state.models.firstOrNull { it.id == id } } ?: fallback
+
+    val sttModel = effective(sttVm, pipeline.stt)
+    val llmModel = effective(llmVm, pipeline.llm)
+    val ttsModel = effective(ttsVm, pipeline.tts)
+    val vadModel = effective(vadVm, pipeline.vad)
+
+    // Both STT + chat model on the single-slot NPU can't co-reside, so Talk swaps them per turn (see
+    // VoiceViewModel). Tell the VM the current selection so its mic branch can load each in turn.
+    val isNpuSwap = sttModel?.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
+        llmModel?.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+    LaunchedEffect(sttModel?.id, llmModel?.id, ttsModel?.id, isNpuSwap) {
+        voiceVm.setPipeline(sttModel, llmModel, ttsModel)
+    }
+
     val components = listOf(
-        VoiceComponent("Listen", RACIcons.Outline.Brain, sttVm, pipeline.stt),
-        VoiceComponent("Assistant", RACIcons.Outline.MessageCircle, llmVm, pipeline.llm),
-        VoiceComponent("Speak", RACIcons.Outline.Robot, ttsVm, pipeline.tts),
-        VoiceComponent("Turn-taking", RACIcons.Outline.Activity, vadVm, pipeline.vad, optional = true),
+        VoiceComponent("Listen", RACIcons.Outline.Brain, sttVm, sttModel),
+        VoiceComponent("Assistant", RACIcons.Outline.MessageCircle, llmVm, llmModel),
+        VoiceComponent("Speak", RACIcons.Outline.Robot, ttsVm, ttsModel),
+        VoiceComponent("Turn-taking", RACIcons.Outline.Activity, vadVm, vadModel, optional = true),
     )
 
-    // Ready = the three core components are loaded (current). VAD is optional; the agent
-    // auto-ensures it. LLM readiness is reflected in GlobalState after loading.
+    // Readiness: the co-resident agent path needs STT+LLM+TTS all loaded; the NPU per-turn-swap path
+    // loads models on demand, so the mic is ready once STT + LLM are merely DOWNLOADED.
     val coreReady = listOf(sttVm, llmVm, ttsVm).all { it.state.currentModelId != null }
-    val ready = coreReady && GlobalState.model.isLoaded
+    val downloaded = listOf(sttModel to sttVm, llmModel to llmVm, ttsModel to ttsVm)
+        .all { (m, vm) -> m != null && vm.isReady(m) }
+    val ready = if (isNpuSwap) downloaded else (coreReady && GlobalState.model.isLoaded)
 
     fun prepareAll() {
         if (isPreparing) return
@@ -169,6 +206,9 @@ fun VoiceScreen() {
         VoiceSetupCard(
             components = components,
             allReady = ready,
+            // NPU swap loads models on demand, so a downloaded component is "ready"; the co-resident
+            // agent path needs them actually loaded.
+            requireLoaded = !isNpuSwap,
             isPreparing = isPreparing,
             onPrepareAll = ::prepareAll,
             onChange = { sheet = it.viewModel },
@@ -202,6 +242,21 @@ fun VoiceScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
             )
+        }
+        // Surface a silent "Set up Voice AI" failure (e.g. missing HF token or a component load error)
+        // that otherwise leaves the setup card grey with a dead mic and no explanation. Skip this for the
+        // NPU-swap path: there a component being "not loaded" is expected (the mic loads each per turn), so
+        // those load-state errors are noise — real turn errors come through voiceVm.error instead.
+        if (voiceVm.error == null && !isNpuSwap) {
+            components.firstNotNullOfOrNull { it.viewModel.state.error }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         if (permissionDenied) {
             PermissionRecoveryCard(

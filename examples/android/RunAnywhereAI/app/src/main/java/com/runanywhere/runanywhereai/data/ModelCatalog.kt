@@ -42,18 +42,25 @@ internal object ModelCatalog {
      * which rows register.
      */
     val npuCatalog: List<SingleFileModel> = listOf(
-        SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 886_089_241L, contextLength = 512),
+        SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 538_771_163L, contextLength = 512),
         SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048),
-        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_848L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_510L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 4_817_344_861L, contextLength = 1_024),
         SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 6_177_585_629L, contextLength = 1_024),
         SingleFileModel("qwen3_0_6b", "Qwen3 0.6B (HNPU)", "https://huggingface.co/runanywhere/qwen3_0_6b_HNPU/qwen3-0.6b-1024final.json", QHEXRT, LANGUAGE, 1_823_248_798L, contextLength = 1_024),
-        SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L),
+        // contextLength MUST match the bundle's manifest max_ctx (512 here — Llama's 32
+        // attention heads break the hand-rolled decode above 512, so the bundle is capped).
+        // Without it the chat budget can't cap output, generation overruns 512 into the KV
+        // ring, degenerates into garbage, and the decode fails with rc=-130.
+        SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L, contextLength = 512),
         SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 2_367_579_370L, contextLength = 1_024),
-        SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 6_100_212_369L),
+        SingleFileModel("bonsai_4b_1bit", "Bonsai-4B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json", QHEXRT, LANGUAGE, 1_358_352_318L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("bonsai_8b_1bit", "Bonsai-8B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json", QHEXRT, LANGUAGE, 2_323_975_102L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("bonsai_27b_1bit", "Bonsai-27B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/bonsai-27b-1024.json", QHEXRT, LANGUAGE, 6_400_000_000L, contextLength = 1_024, supportsThinking = true),
+        SingleFileModel("phi_tiny_moe", "Phi Tiny MoE (HNPU)", "https://huggingface.co/runanywhere/phi_tiny_moe_HNPU/phimoe.json", QHEXRT, LANGUAGE, 4_721_494_520L),
         SingleFileModel("embeddinggemma_300m", "EmbeddingGemma 300M (HNPU)", "https://huggingface.co/runanywhere/embeddinggemma_300m_HNPU", QHEXRT, EMBEDDING, 566_263_339L),
         SingleFileModel("gemma3n_e4b", "Gemma 3n E4B (HNPU)", "https://huggingface.co/runanywhere/gemma3n_e4b_HNPU/gemma-3n-E4B-it.json", QHEXRT, LANGUAGE, 10_929_816_419L),
-        SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 10_532_159_450L),
+        SingleFileModel("gemma4_e2b", "Gemma 4 E2B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b.json", QHEXRT, LANGUAGE, 9_252_275_672L),
         SingleFileModel("gemma4_e4b", "Gemma 4 E4B (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B.json", QHEXRT, LANGUAGE, 13_435_056_195L),
         SingleFileModel("llama_embed_nemotron_8b", "Llama Embed Nemotron 8B (HNPU)", "https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU", QHEXRT, EMBEDDING, 8_079_101_598L),
         SingleFileModel("nv_embedcode_7b", "NV-EmbedCode 7B (HNPU)", "https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU", QHEXRT, EMBEDDING, 7_276_868_122L),
@@ -64,10 +71,13 @@ internal object ModelCatalog {
         SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 8_609_694_487L),
         SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
         SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L),
-        SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 3_220_397_297L, contextLength = 512),
-        SingleFileModel("qwen3_vl", "Qwen3-VL 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json", QHEXRT, MULTIMODAL, 3_220_397_297L, contextLength = 512),
+        SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 2_364_667_194L, contextLength = 512),
+        // The image path only exists under v79/ (QHexRT README footnote: v81 is text-path
+        // only — the merger+deepstack vision graph isn't exported for v81 yet). Size below
+        // is measured from the v79/ bundle since that's the only arch this row resolves on.
+        SingleFileModel("qwen3_vl", "Qwen3-VL 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-vlm-512.json", QHEXRT, MULTIMODAL, 3_220_398_168L, contextLength = 512),
         SingleFileModel("internvl3_5_1b", "InternVL3.5 1B (HNPU)", "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU", QHEXRT, MULTIMODAL, 3_067_933_894L, contextLength = 512),
-        SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 10_532_159_450L),
+        SingleFileModel("gemma4_e2b_vlm", "Gemma 4 E2B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e2b_HNPU/gemma4-e2b-vlm.json", QHEXRT, MULTIMODAL, 9_252_275_672L),
         SingleFileModel("gemma4_e4b_vlm", "Gemma 4 E4B Image (HNPU)", "https://huggingface.co/runanywhere/gemma4_e4b_HNPU/gemma-4-E4B-vlm.json", QHEXRT, MULTIMODAL, 13_435_056_195L),
         SingleFileModel("nemotron_nano_vl_8b", "Llama 3.1 Nemotron Nano VL 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_vl_8b_HNPU/nemotron-vl-8b-vlm.json", QHEXRT, MULTIMODAL, 10_057_258_051L),
         SingleFileModel("lama_dilated", "LaMa Dilated (HNPU)", "https://huggingface.co/runanywhere/lama_dilated_HNPU", QHEXRT, IMAGE_GENERATION, 98_509_597L),
@@ -92,12 +102,9 @@ internal object ModelCatalog {
         SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 1_361_283_432L),
         SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 120_439_053L),
         SingleFileModel("kokoro_en", "Kokoro-82M EN (HNPU)", "https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json", QHEXRT, TTS, 470_739_484L),
-        SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 95_842_227L),
-        SingleFileModel("kitten_mini_0_1", "Kitten-mini-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json", QHEXRT, TTS, 449_672_060L),
-        SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 778_828_575L),
-        SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 338_682_302L),
-        SingleFileModel("kitten_nano_0_2", "Kitten-nano-0.2 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json", QHEXRT, TTS, 105_235_740L),
-        SingleFileModel("kitten_nano_0_1", "Kitten-nano-0.1 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json", QHEXRT, TTS, 104_733_291L),
+        SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 44_135_896L),
+        SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 184_334_815L),
+        SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 103_930_338L),
     )
 
     // The Play build intentionally ships no refusal-removal or safety-bypass adapters.
@@ -181,6 +188,55 @@ internal object ModelCatalog {
             2_800_000_000,
             supportsThinking = true
         ),
+        // Bonsai family at TRUE 1-bit (Q1_0, ~1.125 bit/wt) on CPU via llama.cpp — the same GGUF
+        // that runs on the NPU (bonsai_{4b,8b,27b}_1bit, QHEXRT). Requires a llama.cpp build with
+        // qwen3_5 GatedDeltaNet + Q1_0 support (the app's LlamaCPP engine must be the patched fork).
+        SingleFileModel(
+            "bonsai-1.7b-q1_0",
+            "Bonsai-1.7B 1-bit Q1_0 (CPU)",
+            "https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            248_302_272,
+            contextLength = 1_024,
+            supportsThinking = true
+        ),
+        SingleFileModel(
+            "bonsai-4b-q1_0",
+            "Bonsai-4B 1-bit Q1_0 (CPU)",
+            "https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            572_270_624,
+            contextLength = 1_024,
+            supportsThinking = true
+        ),
+        SingleFileModel(
+            "bonsai-8b-q1_0",
+            "Bonsai-8B 1-bit Q1_0 (CPU)",
+            "https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            1_158_654_496,
+            contextLength = 1_024,
+            supportsThinking = true
+        ),
+        SingleFileModel(
+            "bonsai-27b-q1_0",
+            "Bonsai-27B 1-bit Q1_0 (CPU)",
+            "https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            3_803_452_480,
+            contextLength = 1_024,
+            supportsThinking = true
+        ),
+        // NOTE: Ternary-Bonsai GGUF (Q2_0/PQ2_0) is intentionally NOT registered.
+        // Verified via rcli this session: the pinned PrismML llama.cpp fork
+        // (prism-b9591-62061f9, see sdk/runanywhere-commons/VERSIONS) rejects it —
+        // "invalid ggml type 142" — it only added Q1_0 (plain Bonsai) support, not
+        // Ternary-Bonsai's tensor encoding. Re-enable once the fork adds it.
+        // Ternary-Bonsai MLX works fine (iOS/macOS only — no MLX on Android).
         SingleFileModel(
             "lfm2-350m-q4_k_m",
             "LiquidAI LFM2 350M Q4_K_M",

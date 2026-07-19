@@ -239,8 +239,12 @@ export class VoiceAgentMicDriver {
       }
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error));
+      if (this.stopped || epoch !== this.sessionEpoch) {
+        logger.debug(`Discarded cancelled voice turn: ${normalized.message}`);
+        return;
+      }
       logger.warning(`Voice turn failed: ${normalized.message}`);
-      if (!this.stopped && epoch === this.sessionEpoch) this.callbacks.onError?.(normalized);
+      this.callbacks.onError?.(normalized);
     } finally {
       if (epoch === this.sessionEpoch) {
         this.processing = false;

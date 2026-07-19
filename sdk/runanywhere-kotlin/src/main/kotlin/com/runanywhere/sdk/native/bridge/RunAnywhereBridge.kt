@@ -1292,6 +1292,20 @@ object RunAnywhereBridge {
     /** Request-scoped query wrapper used by cancellable Kotlin calls. */
     @JvmStatic external fun racRagQueryRequestProto(requestId: Long, handle: Long, queryProto: ByteArray): ByteArray?
 
+    /**
+     * Request-scoped streaming query: blocks on the calling thread, invoking
+     * [listener] with each serialized RAGStreamEvent (TOKEN…, then COMPLETED or
+     * ERROR). Returns the pipeline rac_result_t. [listener] returns false to stop
+     * early (backpressure). Cancel this exact stream via [racRagCancelRequestProto]
+     * with the same [requestId], so concurrent collectors cannot cancel each other.
+     */
+    @JvmStatic external fun racRagQueryStreamRequestProto(
+        requestId: Long,
+        handle: Long,
+        queryProto: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
     /** Request cancellation of the active query on this RAG session. */
     @JvmStatic external fun racRagCancelProto(handle: Long): Int
 

@@ -71,7 +71,11 @@ internal fun RALLMGenerationOptions?.toGenerateRequest(
         )
     return RALLMGenerateRequest(
         prompt = prompt,
-        emit_thoughts = options.thinking_pattern != null,
+        // Commons resolves a model's thinking tags from the registry, so a
+        // request-local thinking_pattern is NOT required to surface thought
+        // events. Emit thoughts whenever thinking is enabled (i.e. not
+        // explicitly disabled) so default catalog models still stream reasoning.
+        emit_thoughts = !requestOptions.disable_thinking,
         options = requestOptions,
     )
 }

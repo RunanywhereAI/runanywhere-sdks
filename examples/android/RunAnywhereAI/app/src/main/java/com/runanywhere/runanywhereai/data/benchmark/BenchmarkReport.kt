@@ -41,32 +41,44 @@ object BenchmarkReport {
     }
 
     fun toCsv(run: BenchmarkRun): String = buildString {
-        appendLine("Category,Scenario,Model,Framework,Success,LoadMs,WarmupMs,E2EMs,TokensPerSec,TtftMs,InTokens,OutTokens,PromptEvalMs,DecodeMs,RTF,AudioLenS,AudioDurS,Chars,MemDeltaBytes,Error")
+        appendLine(
+            "Category,Scenario,Model,Framework,Trials,Success,LoadMs,WarmupMs,E2EMs,E2EMinMs,E2EMaxMs," +
+                "TokensPerSec,TokensPerSecMin,TokensPerSecMax,TtftMs,TtftMinMs,TtftMaxMs," +
+                "InTokens,OutTokens,PromptEvalMs,DecodeMs,RTF,AudioLenS,AudioDurS,Chars,MemDeltaBytes,Error",
+        )
         run.results.forEach { r ->
             val m = r.metrics
+            val v = r.variance
             val cells = listOf(
-                r.category.name, r.scenario, r.modelName, r.framework, r.success.toString(),
+                r.category.name, r.scenario, r.modelName, r.framework, r.trials.toString(), r.success.toString(),
                 num(m.loadTimeMs), num(m.warmupTimeMs), num(m.endToEndLatencyMs),
-                m.tokensPerSecond?.let(::num).orEmpty(), m.ttftMs?.let(::num).orEmpty(),
+                v?.endToEndLatencyMs?.min?.let(::num).orEmpty(), v?.endToEndLatencyMs?.max?.let(::num).orEmpty(),
+                m.tokensPerSecond?.let(::num).orEmpty(),
+                v?.tokensPerSecond?.min?.let(::num).orEmpty(), v?.tokensPerSecond?.max?.let(::num).orEmpty(),
+                m.ttftMs?.let(::num).orEmpty(),
+                v?.ttftMs?.min?.let(::num).orEmpty(), v?.ttftMs?.max?.let(::num).orEmpty(),
                 m.inputTokens?.toString().orEmpty(), m.outputTokens?.toString().orEmpty(),
                 m.promptEvalMs?.let(::num).orEmpty(), m.decodeMs?.let(::num).orEmpty(),
                 m.realTimeFactor?.let(::num).orEmpty(), m.audioLengthSeconds?.let(::num).orEmpty(),
                 m.audioDurationSeconds?.let(::num).orEmpty(), m.charactersProcessed?.toString().orEmpty(),
-                m.memoryDeltaBytes.toString(), (r.errorMessage ?: "").replace(',', ';'),
+                m.memoryDeltaBytes.toString(), r.errorMessage.orEmpty(),
             )
-            appendLine(cells.joinToString(","))
+            appendLine(cells.joinToString(",") { csvCell(it) })
         }
     }
 
-    // The metric label/value pairs shown for a successful result, by category.
+    // The metric label/value pairs shown for a successful result, by category. When a
+    // run had multiple trials, the median is shown with the observed min–max range.
     fun metricRows(result: BenchmarkResult): List<Pair<String, String>> {
         val m = result.metrics
+        val v = result.variance
         return buildList {
+            if (result.trials > 1) add("Trials" to "${result.trials} (median shown)")
             add("Load" to "${"%.0f".format(m.loadTimeMs)}ms")
             if (m.warmupTimeMs > 0) add("Warmup" to "${"%.0f".format(m.warmupTimeMs)}ms")
-            add("End-to-end" to "${"%.0f".format(m.endToEndLatencyMs)}ms")
-            m.tokensPerSecond?.let { add("Tokens/s" to "%.1f".format(it)) }
-            m.ttftMs?.let { add("TTFT" to "${"%.0f".format(it)}ms") }
+            add("End-to-end" to withRange("${"%.0f".format(m.endToEndLatencyMs)}ms", v?.endToEndLatencyMs) { "%.0f".format(it) })
+            m.tokensPerSecond?.let { add("Tokens/s" to withRange("%.1f".format(it), v?.tokensPerSecond) { "%.1f".format(it) }) }
+            m.ttftMs?.let { add("TTFT" to withRange("${"%.0f".format(it)}ms", v?.ttftMs) { "%.0f".format(it) }) }
             m.promptEvalMs?.let { add("Prompt eval" to "${"%.0f".format(it)}ms") }
             m.decodeMs?.let { add("Decode" to "${"%.0f".format(it)}ms") }
             m.outputTokens?.let { add("Out tokens" to it.toString()) }
@@ -78,6 +90,10 @@ object BenchmarkReport {
         }
     }
 
+    // Appends " (min–max)" to a formatted median when a variance range is present.
+    private fun withRange(base: String, range: MetricRange?, fmt: (Double) -> String): String =
+        if (range == null) base else "$base (${fmt(range.min)}–${fmt(range.max)})"
+
     fun gb(bytes: Long): String = when {
         bytes >= 1_000_000_000 -> "%.1f GB".format(bytes / 1_000_000_000.0)
         bytes >= 1_000_000 -> "%.0f MB".format(bytes / 1_000_000.0)
@@ -85,5 +101,12 @@ object BenchmarkReport {
         else -> "$bytes B"
     }
 
-    private fun num(value: Double): String = "%.2f".format(value)
+    private fun num(value: Double): String = String.format(Locale.US, "%.2f", value)
+
+    private fun csvCell(value: String): String =
+        if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
+            "\"${value.replace("\"", "\"\"")}\""
+        } else {
+            value
+        }
 }

@@ -144,6 +144,79 @@ struct BenchmarkMetrics: Codable, Sendable {
     var didSucceed: Bool { errorMessage == nil }
 }
 
+// MARK: - Trial Aggregation
+
+/// Observed [min, max] spread of a metric across the measured trials. Present only
+/// when more than one trial ran; the `BenchmarkMetrics` snapshot carries the median
+/// (representative) value for the same metric.
+struct MetricRange: Codable, Sendable {
+    let min: Double
+    let max: Double
+}
+
+/// Per-result variance summary across repeated trials. Only the headline metrics
+/// carry a range; the full median snapshot lives in `BenchmarkResult.metrics`.
+struct BenchmarkVariance: Codable, Sendable {
+    let trials: Int
+    let tokensPerSecond: MetricRange?
+    let ttftMs: MetricRange?
+    let endToEndLatencyMs: MetricRange?
+}
+
+extension BenchmarkMetrics {
+    /// Reduce repeated benchmark trials to a per-metric **median** representative
+    /// plus an observed min/max range. A single measured pass is noisy (thermal
+    /// throttling, background work, cold cache); the median is robust to a single
+    /// outlier while the range keeps the report honest about spread. Returns a nil
+    /// variance for a single trial (nothing to summarise).
+    static func aggregate(_ trials: [BenchmarkMetrics]) -> (metrics: BenchmarkMetrics, variance: BenchmarkVariance?) {
+        guard let first = trials.first else { return (BenchmarkMetrics(), nil) }
+        guard trials.count > 1 else { return (first, nil) }
+
+        func median(_ select: (BenchmarkMetrics) -> Double?) -> Double? {
+            let values = trials.compactMap(select).filter { $0.isFinite }.sorted()
+            guard !values.isEmpty else { return nil }
+            let mid = values.count / 2
+            return values.count % 2 == 1 ? values[mid] : (values[mid - 1] + values[mid]) / 2
+        }
+        func medianInt(_ select: (BenchmarkMetrics) -> Int?) -> Int? {
+            median { select($0).map(Double.init) }.map { Int($0.rounded()) }
+        }
+        func range(_ select: (BenchmarkMetrics) -> Double?) -> MetricRange? {
+            let values = trials.compactMap(select).filter { $0.isFinite }
+            guard values.count > 1, let lo = values.min(), let hi = values.max() else { return nil }
+            return MetricRange(min: lo, max: hi)
+        }
+
+        var m = BenchmarkMetrics()
+        m.endToEndLatencyMs = median { $0.endToEndLatencyMs } ?? 0
+        m.loadTimeMs = median { $0.loadTimeMs } ?? 0
+        m.warmupTimeMs = median { $0.warmupTimeMs } ?? 0
+        m.memoryDeltaBytes = Int64((median { Double($0.memoryDeltaBytes) } ?? 0).rounded())
+        m.ttftMs = median { $0.ttftMs }
+        m.tokensPerSecond = median { $0.tokensPerSecond }
+        m.prefillTokensPerSecond = median { $0.prefillTokensPerSecond }
+        m.decodeTokensPerSecond = median { $0.decodeTokensPerSecond }
+        m.inputTokens = medianInt { $0.inputTokens }
+        m.outputTokens = medianInt { $0.outputTokens }
+        m.audioLengthSeconds = median { $0.audioLengthSeconds }
+        m.realTimeFactor = median { $0.realTimeFactor }
+        m.audioDurationSeconds = median { $0.audioDurationSeconds }
+        m.charactersProcessed = medianInt { $0.charactersProcessed }
+        m.promptTokens = medianInt { $0.promptTokens }
+        m.completionTokens = medianInt { $0.completionTokens }
+        m.generationTimeMs = median { $0.generationTimeMs }
+
+        let variance = BenchmarkVariance(
+            trials: trials.count,
+            tokensPerSecond: range { $0.tokensPerSecond },
+            ttftMs: range { $0.ttftMs },
+            endToEndLatencyMs: range { $0.endToEndLatencyMs }
+        )
+        return (m, variance)
+    }
+}
+
 // MARK: - Benchmark Result
 
 struct BenchmarkResult: Codable, Sendable, Identifiable {
@@ -152,13 +225,25 @@ struct BenchmarkResult: Codable, Sendable, Identifiable {
     let category: BenchmarkCategory
     let scenario: BenchmarkScenario
     let modelInfo: ComponentModelInfo
+    // Median across `trials` measured passes (or the single pass when trials == 1).
     let metrics: BenchmarkMetrics
+    // Explicit requested count for new records. Optional so records written before
+    // trial metadata existed continue to decode.
+    let requestedTrials: Int?
+    // Variance summary; nil for a single-trial run. Optional so older persisted
+    // runs (written before trials existed) still decode.
+    let variance: BenchmarkVariance?
+
+    /// Requested passes, with variance and single-pass fallbacks for legacy records.
+    var trials: Int { requestedTrials ?? variance?.trials ?? 1 }
 
     init(
         category: BenchmarkCategory,
         scenario: BenchmarkScenario,
         modelInfo: ComponentModelInfo,
-        metrics: BenchmarkMetrics
+        metrics: BenchmarkMetrics,
+        requestedTrials: Int? = nil,
+        variance: BenchmarkVariance? = nil
     ) {
         self.id = UUID()
         self.timestamp = Date()
@@ -166,6 +251,8 @@ struct BenchmarkResult: Codable, Sendable, Identifiable {
         self.scenario = scenario
         self.modelInfo = modelInfo
         self.metrics = metrics
+        self.requestedTrials = requestedTrials
+        self.variance = variance
     }
 }
 

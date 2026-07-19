@@ -8,10 +8,10 @@
  * CRITICAL: This is a direct port of Swift implementation - do NOT add custom logic!
  *
  * This is an in-memory model metadata store. This TU is the slim core after the
- * SRP split: registry lifecycle, struct-based CRUD, download-state
- * normalization, and the proto snapshot helpers. The proto<->C conversion, the
- * proto-byte ABI surface, filesystem discovery, and refresh/fetch live in the
- * sibling model_registry_{convert,proto,discovery,refresh}.cpp TUs, all sharing
+ * SRP split: registry lifecycle, struct-based CRUD, model-state normalization,
+ * and the proto snapshot helpers. The proto<->C conversion, the proto-byte ABI
+ * surface, filesystem discovery, and refresh/fetch live in the sibling
+ * model_registry_{convert,proto,discovery,refresh}.cpp TUs, all sharing
  * model_registry_internal.h.
  *
  * Edge cases handled:
@@ -60,8 +60,35 @@ using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
 namespace rac::infra::model_registry::detail {
 
+namespace {
+
+constexpr char kDefaultThinkingOpenTag[] = "<think>";
+constexpr char kDefaultThinkingCloseTag[] = "</think>";
+
+// Keep the typed capability and its parser configuration in lockstep at the
+// registry boundary. All single-file, multi-file, direct-proto, and restored
+// model registrations pass through this normalization, so consumers never
+// need to synthesize model-specific parser state in their UI or command layer.
+void normalize_thinking_capability(ModelInfo* model) {
+    if (!model->supports_thinking()) {
+        model->clear_thinking_pattern();
+        return;
+    }
+
+    if (model->has_thinking_pattern() && !model->thinking_pattern().open_tag().empty() &&
+        !model->thinking_pattern().close_tag().empty()) {
+        return;
+    }
+
+    auto* pattern = model->mutable_thinking_pattern();
+    pattern->set_open_tag(kDefaultThinkingOpenTag);
+    pattern->set_close_tag(kDefaultThinkingCloseTag);
+}
+
+}  // namespace
+
 // -----------------------------------------------------------------------------
-// Download-state normalization
+// Model-state normalization
 // -----------------------------------------------------------------------------
 
 bool has_nonempty_local_path(const ModelInfo& model) {
@@ -99,6 +126,8 @@ void normalize_model_registry_state(ModelInfo* model) {
     if (!model) {
         return;
     }
+
+    normalize_thinking_capability(model);
 
     if (has_nonempty_local_path(*model)) {
         overwrite_download_state_from_local_path(model);

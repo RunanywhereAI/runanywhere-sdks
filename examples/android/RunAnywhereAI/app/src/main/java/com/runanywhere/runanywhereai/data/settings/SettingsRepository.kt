@@ -95,9 +95,9 @@ object SettingsRepository {
         settings = AppSettings(
             temperature = p.getFloat(KEY_TEMPERATURE, AppSettings().temperature),
             maxTokens = p.getInt(KEY_MAX_TOKENS, AppSettings().maxTokens),
-            systemPrompt = p.getString(KEY_SYSTEM_PROMPT, "").orEmpty(),
+            systemPrompt = p.getString(KEY_SYSTEM_PROMPT, AppSettings().systemPrompt).orEmpty(),
             streaming = p.getBoolean(KEY_STREAMING, true),
-            disableThinking = p.getBoolean(KEY_DISABLE_THINKING, false),
+            disableThinking = p.getBoolean(KEY_DISABLE_THINKING, AppSettings().disableThinking),
             toolCallingEnabled = toolsEnabled,
             webSearchConsentScope = acceptedWebSearchScope,
             hfToken = hfToken,

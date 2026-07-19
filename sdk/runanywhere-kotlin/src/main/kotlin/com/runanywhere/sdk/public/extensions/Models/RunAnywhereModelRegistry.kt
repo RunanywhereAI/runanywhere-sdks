@@ -31,6 +31,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
+import kotlinx.coroutines.CancellationException
 
 // MARK: - Registry Discovery (Swift parity)
 
@@ -54,7 +55,12 @@ suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest(
     if (!isInitialized) {
         return ModelListResult(success = false, error_message = "SDK not initialized")
     }
-    ensureServicesReady()
+    try {
+        ensureServicesReady()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+    }
     val infoList =
         if (request.query != null) {
             CppBridgeModelRegistry.query(request.query)
@@ -71,7 +77,12 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     if (!isInitialized) {
         return ModelGetResult(found = false, error_message = "SDK not initialized")
     }
-    ensureServicesReady()
+    try {
+        ensureServicesReady()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+    }
     if (request.model_id.isEmpty()) {
         return ModelGetResult(found = false, error_message = "model_id is required")
     }
@@ -90,7 +101,12 @@ suspend fun RunAnywhere.refreshModelRegistry(
     pruneOrphans: Boolean = false,
 ) {
     if (!isInitialized) return
-    ensureServicesReady()
+    try {
+        ensureServicesReady()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+    }
 
     if (rescanLocal) {
         CppBridgeModelRegistry.discoverDownloadedModels()

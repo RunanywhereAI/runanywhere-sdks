@@ -79,11 +79,11 @@ if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX AND NOT RAC_WASM_RAG_STANDALONE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
-# Desktop (macOS/Linux) platform adapter: POSIX file I/O + 0600-file secure
-# storage + libcurl HTTP transport. Consumed by desktop binaries that link
+# Desktop (macOS/Linux/Windows) platform adapter: native file I/O, protected
+# secure storage + libcurl HTTP transport. Consumed by desktop binaries that link
 # rac_commons directly (rcli, runanywhere-server, real-inference tests,
 # Playground apps). See include/rac/desktop/rac_desktop.h.
-option(RAC_DESKTOP_ADAPTER "Build desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
+option(RAC_DESKTOP_ADAPTER "Build desktop (macOS/Linux/Windows) platform adapter + libcurl HTTP transport" OFF)
 
 # Opt-in proto regeneration.
 #
@@ -400,6 +400,13 @@ set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
+# MSVC has no libc regcomp, so libarchive's POSIX_REGEX_LIB=AUTO falls through to
+# a PCRE/libgcc branch that hard-errors ("libgcc not found") at configure time.
+# We only use libarchive for extraction (no archive_match/regex), so disable the
+# POSIX regex search entirely on Windows.
+if(WIN32)
+    set(POSIX_REGEX_LIB "NONE" CACHE STRING "" FORCE)
+endif()
 # libarchive's ENABLE_LIBGCC gates a `find_library(GCC_LIBRARY gcc)` / `-lgcc`
 # link. Needed on MSVC for the bundled runtime; a no-op on Apple/Clang (no
 # libgcc); on Linux+GCC keep it OFF so we don't add an explicit -lgcc to the
@@ -659,8 +666,23 @@ else()
         message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
     endif()
     set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
-    configure_file("${DEV_CONFIG_TEMPLATE}" "${RAC_DEV_CONFIG_SOURCE}" COPYONLY)
-    message(STATUS "Using credential-free development config stub")
+    # The tracked template carries only "YOUR_*" placeholders (never real
+    # credentials). Release/CI builds substitute the real values from the
+    # environment (GitHub Actions secrets SUPABASE_URL / SUPABASE_ANON_KEY /
+    # BUILD_TOKEN) into the generated source — so credentials live in CI secrets,
+    # never in the public source tree. When the env is unset (normal local build)
+    # the placeholders pass through and the dev config stays the credential-free
+    # stub (usability checks treat "YOUR_*" as unavailable).
+    file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
+    if(NOT "$ENV{SUPABASE_URL}" STREQUAL "")
+        string(REPLACE "YOUR_SUPABASE_PROJECT_URL" "$ENV{SUPABASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
+        string(REPLACE "YOUR_SUPABASE_ANON_KEY" "$ENV{SUPABASE_ANON_KEY}" _rac_dev_cfg "${_rac_dev_cfg}")
+        string(REPLACE "YOUR_BUILD_TOKEN" "$ENV{BUILD_TOKEN}" _rac_dev_cfg "${_rac_dev_cfg}")
+        message(STATUS "Injected development config from environment (CI secrets)")
+    else()
+        message(STATUS "Using credential-free development config stub")
+    endif()
+    file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
 endif()
 
 # =============================================================================
@@ -951,10 +973,10 @@ set(RAC_FEATURES_SOURCES
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:src/features/result_free.cpp>
 )
 
-# Desktop platform adapter (POSIX + libcurl) — macOS/Linux binaries only
+# Desktop platform adapter (native filesystem + libcurl) — desktop hosts only
 if(RAC_DESKTOP_ADAPTER)
-    if(ANDROID OR EMSCRIPTEN OR WIN32 OR (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
-        message(FATAL_ERROR "RAC_DESKTOP_ADAPTER is only supported on desktop macOS/Linux builds "
+    if(ANDROID OR EMSCRIPTEN OR (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+        message(FATAL_ERROR "RAC_DESKTOP_ADAPTER is only supported on desktop macOS/Linux/Windows builds "
                             "(got CMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME})")
     endif()
     set(RAC_DESKTOP_SOURCES
@@ -962,7 +984,7 @@ if(RAC_DESKTOP_ADAPTER)
         src/desktop/desktop_secure_store.cpp
         src/desktop/http_transport_curl.cpp
     )
-    message(STATUS "Building desktop platform adapter (POSIX file I/O + libcurl HTTP transport)")
+    message(STATUS "Building desktop platform adapter (native file I/O + libcurl HTTP transport)")
 else()
     set(RAC_DESKTOP_SOURCES "")
 endif()
@@ -1231,6 +1253,10 @@ endif()
 if(RAC_DESKTOP_ADAPTER)
     find_package(CURL REQUIRED)
     target_link_libraries(rac_commons PUBLIC CURL::libcurl)
+    if(WIN32)
+        # CryptProtectData/CryptUnprotectData protect the per-user secure store.
+        target_link_libraries(rac_commons PUBLIC crypt32)
+    endif()
 endif()
 
 # =============================================================================

@@ -132,6 +132,16 @@ fun InferenceFramework.backendIcon(): ImageVector = when (this) {
     else -> RACIcons.Outline.Stack
 }
 
+// Short, tidy label used on the backend filter chips. NPU/QHexRT stays prominent.
+fun InferenceFramework.filterLabel(): String = when (this) {
+    InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Llama.cpp"
+    InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT -> "NPU"
+    InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "Sherpa"
+    InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX"
+    InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "MLX"
+    else -> shortLabel()
+}
+
 fun RAModelInfo.consumerGroup(): ConsumerModelGroup = when {
     framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
         framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> ConsumerModelGroup.APPLE_BUILT_IN
@@ -158,68 +168,144 @@ private fun RAModelInfo.isLoraAdapterEntry(): Boolean =
 // Whisper). The picker shows one card per family; tapping expands its variants.
 data class ModelFamily(val key: String, val title: String, val tagline: String)
 
+// Coarse capability bucket derived from the model's category. Family matchers are
+// SCOPED to a bucket so a chat-brand token (e.g. "llama") can never pull an embedding
+// or vision model (e.g. "Llama Embed Nemotron", "Nemotron Nano VL") into a chat family.
+// Mirrors the iOS categoryRank grouping (ModelFamily.swift).
+enum class ModelCategoryBucket { CHAT, VISION, VOICE, EMBEDDING, OTHER }
+
+fun RAModelInfo.categoryBucket(): ModelCategoryBucket = when (category) {
+    ModelCategory.MODEL_CATEGORY_LANGUAGE -> ModelCategoryBucket.CHAT
+    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    ModelCategory.MODEL_CATEGORY_VISION,
+    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> ModelCategoryBucket.VISION
+    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ModelCategory.MODEL_CATEGORY_AUDIO,
+    ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> ModelCategoryBucket.VOICE
+    ModelCategory.MODEL_CATEGORY_EMBEDDING -> ModelCategoryBucket.EMBEDDING
+    else -> ModelCategoryBucket.OTHER
+}
+
 // Ordered family matchers. First match wins; each entry maps id/name substrings to a
-// friendly family. Kept as a pure list so families are easy to extend without touching
-// UI. HNPU (on-device accelerated) families are distinguished from their GGUF cousins
-// by the "_HNPU"/"(HNPU)" marker so the two never collapse into one card.
+// friendly family within a specific category bucket. Kept as a pure list so families
+// are easy to extend without touching UI. Each matcher is pinned to a [bucket] and an
+// [npu] flag, so:
+//   * A brand token only matches its own modality (chat vs vision vs embedding vs voice).
+//   * NPU (QHexRT) families are distinct keys from their GGUF cousins — the two never
+//     collapse into one card, and NPU families keep the "(On-device)" flavor.
+// Within a bucket, specific tokens MUST precede generic ones (first match wins), e.g.
+// deepseek/nemotron/phi before llama/qwen3, and qwen3_vl before qwen3.
 private data class FamilyMatcher(
     val key: String,
     val title: String,
     val tagline: String,
-    val matches: (String) -> Boolean,
-)
+    val bucket: ModelCategoryBucket,
+    val npu: Boolean,
+    val tokens: List<String>,
+) {
+    fun matches(haystack: String, bucket: ModelCategoryBucket, npu: Boolean): Boolean =
+        this.bucket == bucket && this.npu == npu && tokens.any { it in haystack }
+}
 
-private fun containsAll(vararg needles: String): (String) -> Boolean =
-    { h -> needles.all { it in h } }
+private fun matcher(
+    key: String,
+    title: String,
+    tagline: String,
+    bucket: ModelCategoryBucket,
+    npu: Boolean,
+    vararg tokens: String,
+) = FamilyMatcher(key, title, tagline, bucket, npu, tokens.toList())
 
-private fun containsAny(vararg needles: String): (String) -> Boolean =
-    { h -> needles.any { it in h } }
+private val CHAT = ModelCategoryBucket.CHAT
+private val VISION = ModelCategoryBucket.VISION
+private val VOICE = ModelCategoryBucket.VOICE
+private val EMBEDDING = ModelCategoryBucket.EMBEDDING
 
 private val familyMatchers: List<FamilyMatcher> = listOf(
-    // On-device accelerated (HNPU) families first — the marker keeps them separate.
-    FamilyMatcher("qwen3-npu", "Qwen3 (On-device)", "Accelerated Qwen chat", containsAll("qwen3", "hnpu")),
-    FamilyMatcher("lfm2-npu", "LFM2 (On-device)", "Accelerated Liquid chat", containsAll("lfm2", "hnpu")),
-    FamilyMatcher("llama-npu", "Llama (On-device)", "Accelerated Meta chat", containsAll("llama", "hnpu")),
-    FamilyMatcher("gemma-npu", "Gemma (On-device)", "Accelerated Google chat", containsAll("gemma", "hnpu")),
-    FamilyMatcher("deepseek-npu", "DeepSeek (On-device)", "Accelerated reasoning", containsAll("deepseek", "hnpu")),
-    FamilyMatcher("nemotron-npu", "Nemotron (On-device)", "Accelerated NVIDIA models", containsAll("nemotron", "hnpu")),
-    FamilyMatcher("qwenvl-npu", "Qwen-VL (On-device)", "Accelerated vision chat", containsAll("qwen3_vl", "hnpu")),
-    FamilyMatcher("whisper-npu", "Whisper (On-device)", "Accelerated speech-to-text", containsAll("whisper", "hnpu")),
-    FamilyMatcher("kokoro-npu", "Kokoro (On-device)", "Accelerated read-aloud", containsAll("kokoro", "hnpu")),
-    FamilyMatcher("kitten-npu", "Kitten (On-device)", "Accelerated read-aloud", containsAll("kitten", "hnpu")),
-    FamilyMatcher("embed-npu", "On-device Embeddings", "Accelerated document search", containsAll("embed", "hnpu")),
+    // ── Chat, NPU (QHexRT LANGUAGE) — specific brands before generic ──
+    matcher("deepseek-npu", "DeepSeek (On-device)", "Accelerated reasoning", CHAT, true, "deepseek"),
+    matcher("nemoguard-npu", "NemoGuard (On-device)", "Accelerated safety models", CHAT, true, "nemoguard"),
+    matcher("nemotron-npu", "Nemotron (On-device)", "Accelerated NVIDIA chat", CHAT, true, "nemotron"),
+    matcher("phi-npu", "Phi (On-device)", "Accelerated Microsoft chat", CHAT, true, "phi"),
+    matcher("bonsai-npu", "Bonsai (On-device)", "Accelerated reasoning", CHAT, true, "bonsai"),
+    matcher("llama-npu", "Llama (On-device)", "Accelerated Meta chat", CHAT, true, "llama"),
+    matcher("qwen3-npu", "Qwen3 (On-device)", "Accelerated Qwen chat", CHAT, true, "qwen3"),
+    matcher("lfm2-npu", "LFM2 (On-device)", "Accelerated Liquid chat", CHAT, true, "lfm2"),
+    matcher("gemma-npu", "Gemma (On-device)", "Accelerated Google chat", CHAT, true, "gemma"),
 
-    // Standard on-device families.
-    FamilyMatcher("qwen3", "Qwen3", "Fast, capable chat", containsAny("qwen3", "qwen 3")),
-    FamilyMatcher("qwen25", "Qwen2.5", "Reliable everyday chat", containsAny("qwen2.5", "qwen 2.5")),
-    FamilyMatcher("qwen2vl", "Qwen2-VL", "Chat about photos", containsAny("qwen2-vl", "qwen2.5-vl")),
-    FamilyMatcher("lfm2", "LFM2", "Efficient Liquid chat", containsAny("lfm2")),
-    FamilyMatcher("smol", "SmolLM / SmolVLM", "Tiny, quick assistants", containsAny("smol")),
-    FamilyMatcher("llama", "Llama", "Meta's open chat", containsAny("llama")),
-    FamilyMatcher("mistral", "Mistral", "Balanced open chat", containsAny("mistral")),
-    FamilyMatcher("gemma", "Gemma", "Google's open chat", containsAny("gemma")),
-    FamilyMatcher("whisper", "Whisper", "Speech-to-text", containsAny("whisper")),
-    FamilyMatcher("piper", "Piper", "Natural read-aloud", containsAny("piper")),
-    FamilyMatcher("minilm", "MiniLM", "Document search", containsAny("minilm")),
-    FamilyMatcher("silero", "Silero", "Detects speech", containsAny("silero")),
+    // ── Vision, NPU (QHexRT MULTIMODAL / IMAGE_GENERATION) ──
+    matcher("qwen3vl-npu", "Qwen3-VL (On-device)", "Accelerated vision chat", VISION, true, "qwen3_vl"),
+    matcher("internvl-npu", "InternVL (On-device)", "Accelerated vision chat", VISION, true, "internvl"),
+    matcher("nemotron-ocr-npu", "Nemotron OCR (On-device)", "Accelerated document OCR", VISION, true, "nemotron_ocr"),
+    matcher("nemotron-vl-npu", "Nemotron Vision (On-device)", "Accelerated vision chat", VISION, true, "nemotron_nano_vl"),
+    matcher("gemma-vl-npu", "Gemma Vision (On-device)", "Accelerated image chat", VISION, true, "gemma"),
+
+    // ── Embedding, NPU (QHexRT EMBEDDING) — never chat ──
+    matcher("embeddinggemma-npu", "EmbeddingGemma (On-device)", "Accelerated document search", EMBEDDING, true, "embeddinggemma"),
+    matcher("llama-embed-npu", "Llama Embed (On-device)", "Accelerated document search", EMBEDDING, true, "llama_embed"),
+    matcher("nv-rerank-npu", "NV-Rerank (On-device)", "Accelerated reranking", EMBEDDING, true, "rerank"),
+    matcher("nv-embed-npu", "NV-Embed (On-device)", "Accelerated document search", EMBEDDING, true, "nv_embed"),
+    matcher("siglip-npu", "SigLIP2 (On-device)", "Accelerated image search", EMBEDDING, true, "siglip"),
+
+    // ── Voice, NPU (QHexRT STT / TTS) ──
+    matcher("whisper-npu", "Whisper (On-device)", "Accelerated speech-to-text", VOICE, true, "whisper"),
+    matcher("moonshine-npu", "Moonshine (On-device)", "Accelerated speech-to-text", VOICE, true, "moonshine"),
+    matcher("parakeet-npu", "Parakeet (On-device)", "Accelerated speech-to-text", VOICE, true, "parakeet"),
+    matcher("nemotron-asr-npu", "Nemotron ASR (On-device)", "Accelerated speech-to-text", VOICE, true, "nemotron_asr"),
+    matcher("canary-npu", "Canary (On-device)", "Accelerated speech-to-text", VOICE, true, "canary"),
+    matcher("melotts-npu", "MeloTTS (On-device)", "Accelerated read-aloud", VOICE, true, "melotts"),
+    matcher("kokoro-npu", "Kokoro (On-device)", "Accelerated read-aloud", VOICE, true, "kokoro"),
+    matcher("kitten-npu", "Kitten (On-device)", "Accelerated read-aloud", VOICE, true, "kitten"),
+
+    // ── Chat, standard (GGUF LANGUAGE) ──
+    matcher("smollm", "SmolLM", "Tiny, quick assistants", CHAT, false, "smollm"),
+    matcher("mistral", "Mistral", "Balanced open chat", CHAT, false, "mistral"),
+    matcher("bonsai", "Bonsai", "Compact reasoning", CHAT, false, "bonsai"),
+    matcher("llama", "Llama", "Meta's open chat", CHAT, false, "llama"),
+    matcher("qwen3", "Qwen3", "Fast, capable chat", CHAT, false, "qwen3"),
+    matcher("qwen25", "Qwen2.5", "Reliable everyday chat", CHAT, false, "qwen2.5", "qwen2"),
+    matcher("lfm2", "LFM2", "Efficient Liquid chat", CHAT, false, "lfm2"),
+
+    // ── Vision, standard (GGUF MULTIMODAL) ──
+    matcher("smolvlm", "SmolVLM", "Tiny models that can see", VISION, false, "smolvlm"),
+    matcher("qwen2vl", "Qwen2-VL", "Chat about photos", VISION, false, "qwen2-vl", "qwen2.5-vl"),
+    matcher("lfm2vl", "LFM2 Vision", "Compact models that can see", VISION, false, "lfm2-vl"),
+    matcher("gemma-vl", "Gemma Vision", "Google's image models", VISION, false, "gemma"),
+
+    // ── Voice, standard (Sherpa STT/TTS, ONNX VAD) ──
+    matcher("whisper", "Whisper", "Speech-to-text", VOICE, false, "whisper"),
+    matcher("piper", "Piper", "Natural read-aloud", VOICE, false, "piper"),
+    matcher("silero", "Silero", "Detects speech", VOICE, false, "silero"),
+
+    // ── Embedding, standard (ONNX EMBEDDING) ──
+    matcher("minilm", "MiniLM", "Document search", EMBEDDING, false, "minilm"),
 )
 
-// Pure family derivation from id + name. Falls back to a category-based family so every
-// model lands somewhere sensible.
+// Per-model fallback tagline (iOS-style) for models matched by no rule.
+private fun ModelCategoryBucket.fallbackTagline(npu: Boolean): String {
+    val base = when (this) {
+        ModelCategoryBucket.CHAT -> "On-device assistant"
+        ModelCategoryBucket.VISION -> "Understands images"
+        ModelCategoryBucket.VOICE -> "Speech and voice"
+        ModelCategoryBucket.EMBEDDING -> "Document search"
+        ModelCategoryBucket.OTHER -> "On-device model"
+    }
+    return if (npu) "Accelerated · $base" else base
+}
+
+// Pure family derivation from id + name, scoped by category bucket + NPU flag. Any model
+// matched by no rule gets its OWN family keyed "model-<id>" (iOS ModelFamilyCatalog.
+// fallbackKey), so unrelated singletons (Phi, NemoGuard, Nemotron OCR/Parse, LaMa) never
+// collapse into a shared "Other" bucket.
 fun RAModelInfo.family(): ModelFamily {
     val haystack = "$id $name".lowercase()
-    familyMatchers.firstOrNull { it.matches(haystack) }?.let {
+    val bucket = categoryBucket()
+    val npu = framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+    familyMatchers.firstOrNull { it.matches(haystack, bucket, npu) }?.let {
         return ModelFamily(it.key, it.title, it.tagline)
     }
-    return when (consumerGroup()) {
-        ConsumerModelGroup.VISION_MODELS -> ModelFamily("other-vision", "Vision Models", "Chat about photos")
-        ConsumerModelGroup.VOICE_MODELS -> ModelFamily("other-voice", "Voice Models", "Speech and read-aloud")
-        ConsumerModelGroup.DOCUMENT_MODELS -> ModelFamily("other-docs", "Document Models", "Search your documents")
-        ConsumerModelGroup.LORA_ADAPTERS -> ModelFamily("other-lora", "Adapters", "Fine-tune a chat model")
-        ConsumerModelGroup.CHAT_MODELS,
-        ConsumerModelGroup.APPLE_BUILT_IN -> ModelFamily("other-chat", "Other Chat Models", "More assistants")
-        ConsumerModelGroup.OTHER -> ModelFamily("other", "Other Models", "Additional models")
-    }
+    return ModelFamily("model-$id", displayTitle(), bucket.fallbackTagline(npu))
 }
 
 

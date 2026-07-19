@@ -360,13 +360,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     estimatedSizeBytes: 95_842_227,
   },
   {
-    id: 'kitten_mini_0_1',
-    name: 'Kitten-mini-0.1 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/kitten_mini01_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 449_672_060,
-  },
-  {
     id: 'kitten_mini_0_8',
     name: 'Kitten-mini-0.8 (HNPU)',
     url: 'https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json',
@@ -379,20 +372,6 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     url: 'https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json',
     modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
     estimatedSizeBytes: 338_682_302,
-  },
-  {
-    id: 'kitten_nano_0_2',
-    name: 'Kitten-nano-0.2 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_nano_0_2_HNPU/kitten_nano02_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 105_235_740,
-  },
-  {
-    id: 'kitten_nano_0_1',
-    name: 'Kitten-nano-0.1 (HNPU)',
-    url: 'https://huggingface.co/runanywhere/kitten_nano_0_1_HNPU/kitten_nano01_v81.json',
-    modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    estimatedSizeBytes: 104_733_291,
   },
 ];
 

@@ -1,3 +1,16 @@
+## [0.20.11] - 2026-07-16
+
+- Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.
+
+## [0.20.10] - 2026-07-13
+
+- CoreML diffusion enablement + macOS backend slice fixes (see SDK release notes).
+
+## [0.20.9] - 2026-07-13
+
+### Changed
+- Version-aligned 0.20.9 release across all RunAnywhere SDKs; dev-analytics config baked into the native core at build time.
+
 ## [0.20.0] - 2026-07-12
 
 - Restore the Apple MLX backend as an optional Flutter iOS plugin.

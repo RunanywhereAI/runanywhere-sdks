@@ -26,9 +26,16 @@ final class BenchmarkViewModel {
     var completedCount: Int = 0
     var totalCount: Int = 0
     var pastRuns: [BenchmarkRun] = []
-    var selectedCategories: Set<BenchmarkCategory> = Set(BenchmarkCategory.allCases)
+    // Default to LLM only — the most common benchmark; users can add STT/TTS/VLM.
+    var selectedCategories: Set<BenchmarkCategory> = [.llm]
     var errorMessage: String?
     var showClearConfirmation = false
+
+    /// Selectable trial counts and the current selection. Each (model × scenario) is
+    /// measured this many times; the median is reported with an observed min/max
+    /// range. 3 balances noise-robustness against total run time.
+    let trialOptions = [1, 3, 5]
+    var trials = 3
 
     /// Brief toast message shown after clipboard copy
     var copiedToastMessage: String?
@@ -148,7 +155,8 @@ final class BenchmarkViewModel {
             let modelIds: Set<String>? = availableIds.isEmpty ? nil : availableIds
             let output = try await runner.runBenchmarks(
                 categories: categoriesToRun,
-                modelIds: modelIds
+                modelIds: modelIds,
+                trials: trials
             ) { [weak self] update in
                 Task { @MainActor in
                     self?.progress = update.progress

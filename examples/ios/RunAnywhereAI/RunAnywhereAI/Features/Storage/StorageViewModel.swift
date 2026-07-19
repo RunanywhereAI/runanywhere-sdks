@@ -91,5 +91,9 @@ class StorageViewModel: ObservableObject {
         }
 
         await refreshData()
+        // Keep the Models tab in sync (it's a separate singleton with cached
+        // rows) so a model deleted here doesn't still show as Installed/Active
+        // there and fail to load when tapped.
+        await ModelListViewModel.shared.loadModelsFromRegistry()
     }
 }

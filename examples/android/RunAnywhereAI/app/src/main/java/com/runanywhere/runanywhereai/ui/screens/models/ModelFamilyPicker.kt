@@ -35,10 +35,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
+import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 // A family plus its variants, ordered smaller → larger (by footprint) so the
@@ -50,6 +53,12 @@ data class FamilyGroup(
     val optionCount: Int get() = variants.size
     val hasNpuVariant: Boolean get() = family.key.endsWith("-npu")
 
+    // Category of the primary (lead) variant — drives the category-based family sort.
+    val category: ModelCategory get() = variants.first().category
+
+    // True when any variant is already downloaded or built in — ready families sort first.
+    val hasReadyVariant: Boolean get() = variants.any { it.isBuiltIn || it.isDownloadedOnDisk }
+
     // The single cleanest tag shown on the collapsed family card: prefer a notable
     // capability from the lead variant, else the lead variant's feel word.
     val headlineTag: ConsumerTag?
@@ -58,15 +67,33 @@ data class FamilyGroup(
         }
 }
 
-// Groups models into families, ordering variants smaller → larger and families by a
-// stable "richest first" heuristic (most options, then name).
+// Chat → vision → voice → documents → other. Mirrors iOS ModelFamilyCatalog.categoryRank.
+private fun ModelCategory.familyRank(): Int = when (this) {
+    ModelCategory.MODEL_CATEGORY_LANGUAGE -> 0
+    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    ModelCategory.MODEL_CATEGORY_VISION,
+    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> 1
+    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ModelCategory.MODEL_CATEGORY_AUDIO,
+    ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> 2
+    ModelCategory.MODEL_CATEGORY_EMBEDDING -> 3
+    else -> 4
+}
+
+// Groups models into families, ordering variants smaller → larger and families by
+// category (chat → vision → voice → docs → other), then ready-first, then name.
 fun List<RAModelInfo>.toFamilyGroups(): List<FamilyGroup> =
     groupBy { it.family().key }
         .map { (_, models) ->
             val family = models.first().family()
             FamilyGroup(family, models.sortedBy { it.effectiveBytes() })
         }
-        .sortedWith(compareByDescending<FamilyGroup> { it.optionCount }.thenBy { it.family.title })
+        .sortedWith(
+            compareBy<FamilyGroup> { it.category.familyRank() }
+                .thenByDescending { it.hasReadyVariant }
+                .thenBy { it.family.title.lowercase() },
+        )
 
 @Composable
 fun FamilyCard(
@@ -155,6 +182,7 @@ fun FamilyCard(
                             progressPercent = if (state.busyModelId == variant.id) state.progressPercent else null,
                             onSelect = { onSelect(variant) },
                             onDownload = { onDownload(variant) },
+                            onCancel = { viewModel.cancelDownload(variant.id) },
                             onDelete = if (viewModel.isDeletable(variant)) ({ onDelete(variant) }) else null,
                         )
                         if (index < group.variants.lastIndex) {
@@ -182,6 +210,7 @@ private fun VariantRow(
     progressPercent: Int?,
     onSelect: () -> Unit,
     onDownload: () -> Unit,
+    onCancel: (() -> Unit)? = null,
     onDelete: (() -> Unit)?,
 ) {
     val dimens = LocalDimens.current
@@ -237,7 +266,7 @@ private fun VariantRow(
         }
         Spacer(Modifier.width(dimens.spacingSm))
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-            VariantAction(isCurrent, isReady, isBusy, variant, onDownload)
+            VariantAction(isCurrent, isReady, isBusy, variant, onDownload, onCancel)
             if (onDelete != null && isReady) {
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                     Icon(
@@ -259,14 +288,11 @@ private fun VariantAction(
     isBusy: Boolean,
     variant: RAModelInfo,
     onDownload: () -> Unit,
+    onCancel: (() -> Unit)? = null,
 ) {
     when {
         isCurrent -> TagPill("Loaded", primaryGreen)
-        isBusy -> CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
+        isBusy -> VariantProgressAction(onCancel)
         isReady -> TagPill("Use", primaryGreen)
         else -> {
             val dimens = LocalDimens.current
@@ -284,6 +310,35 @@ private fun VariantAction(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+        }
+    }
+}
+
+// Busy-state control. With [onCancel] the spinner becomes a tap-to-cancel target
+// that stops the in-flight download; without it, a plain progress indicator.
+@Composable
+private fun VariantProgressAction(onCancel: (() -> Unit)?) {
+    if (onCancel == null) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(20.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        return
+    }
+    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                imageVector = RACIcons.Outline.Close,
+                contentDescription = "Cancel download",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp),
+            )
         }
     }
 }

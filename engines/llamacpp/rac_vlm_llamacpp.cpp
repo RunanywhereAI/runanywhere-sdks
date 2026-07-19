@@ -89,14 +89,11 @@ struct MtmdBitmapDelete {
 };
 using MtmdBitmapPtr = std::unique_ptr<mtmd_bitmap, MtmdBitmapDelete>;
 
-struct MtmdVideoDelete {
-    void operator()(mtmd_helper_video* v) const {
-        if (v)
-            mtmd_helper_video_free(v);
-    }
-};
-using MtmdVideoPtr = std::unique_ptr<mtmd_helper_video, MtmdVideoDelete>;
-
+// PrismML llama.cpp (prism-b9591 / mtmd before the video-helper split) returns
+// mtmd_bitmap* directly from mtmd_helper_bitmap_init_from_file. Upstream
+// b9959+ returns a {bitmap, video_ctx} wrapper; we pin PrismML for Bonsai
+// Q1_0, so stay on the bitmap-only path. Video frames are still loaded as
+// bitmaps when the helper auto-detects them.
 struct MtmdChunksDelete {
     void operator()(mtmd_input_chunks* c) const {
         if (c)
@@ -146,6 +143,15 @@ struct LlamaCppVLMBackend {
     std::string mmproj_path;
     int context_size = 0;
     llama_pos n_past = 0;
+
+    // Vision token count of the most recent prepare (image chunks only), carried
+    // from prepare_vlm_context() to process()/process_stream() for telemetry.
+    int32_t last_image_tokens = 0;
+    // Decoded image dimensions of the most recent prepare (0 when text-only).
+    // The caller's rac_vlm_image often carries no dims for encoded inputs, so the
+    // real resolution is only known after mtmd decodes the bitmap.
+    int32_t last_image_width = 0;
+    int32_t last_image_height = 0;
 
     // Detected model type for chat template
     VLMModelType model_type = VLMModelType::Unknown;
@@ -730,6 +736,9 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
         llama_memory_clear(mem, true);
     }
     backend->n_past = 0;
+    backend->last_image_tokens = 0;
+    backend->last_image_width = 0;
+    backend->last_image_height = 0;
 
     // Resolve effective model type: options override > auto-detected at load time
     VLMModelType effective_model_type = resolve_effective_model_type(backend->model_type, options);
@@ -753,15 +762,13 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
     }
 
     MtmdBitmapPtr bitmap;
-    MtmdVideoPtr video;
 
     if (image && backend->mtmd_ctx) {
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
-            auto wrapper =
-                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false);
-            bitmap.reset(wrapper.bitmap);
-            video.reset(wrapper.video_ctx);
+            // PrismML mtmd: returns mtmd_bitmap* (not a {bitmap,video} wrapper).
+            bitmap.reset(
+                mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path, false));
         } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
             bitmap.reset(mtmd_bitmap_init(image->width, image->height, image->pixel_data));
@@ -782,6 +789,8 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
             RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
             return RAC_ERROR_INVALID_INPUT;
         }
+        backend->last_image_width = static_cast<int32_t>(mtmd_bitmap_get_nx(bitmap.get()));
+        backend->last_image_height = static_cast<int32_t>(mtmd_bitmap_get_ny(bitmap.get()));
     }
 
     const rac_vlm_chat_template_t* custom_chat_template =
@@ -813,6 +822,19 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
             RAC_LOG_ERROR(LOG_CAT, "Failed to tokenize prompt with image: %d", tokenize_result);
             return RAC_ERROR_PROCESSING_FAILED;
         }
+
+        // Sum tokens across image chunks so telemetry can report the vision-token
+        // count (distinct from the text prompt tokens).
+        int32_t image_token_count = 0;
+        const size_t chunk_count = mtmd_input_chunks_size(chunks.get());
+        for (size_t ci = 0; ci < chunk_count; ci++) {
+            const mtmd_input_chunk* chunk = mtmd_input_chunks_get(chunks.get(), ci);
+            if (chunk != nullptr &&
+                mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) {
+                image_token_count += static_cast<int32_t>(mtmd_input_chunk_get_n_tokens(chunk));
+            }
+        }
+        backend->last_image_tokens = image_token_count;
 
         llama_pos new_n_past = 0;
         RAC_LOG_INFO(LOG_CAT, "[v3-prep] evaluating image/text chunks");
@@ -1265,11 +1287,14 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     // Shared context preparation: reset, configure sampler, build prompt,
-    // evaluate
+    // evaluate. Time it as the multimodal encode/prefill (image + prompt).
+    const auto t_start = std::chrono::steady_clock::now();
     rac_result_t prep_result = prepare_vlm_context(backend, image, prompt, options);
     if (prep_result != RAC_SUCCESS) {
         return prep_result;
     }
+    const auto t_after_prep = std::chrono::steady_clock::now();
+    auto t_first_token = t_after_prep;  // overwritten when the first token is produced
 
     // Generate response (batch mode — accumulate all tokens)
     const int max_tokens =
@@ -1370,6 +1395,9 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
         }
         prev_token = token;
 
+        if (tokens_generated == 0) {
+            t_first_token = std::chrono::steady_clock::now();
+        }
         char buf[256];
         int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
         if (len > 0) {
@@ -1426,6 +1454,23 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     out_result->completion_tokens = tokens_generated;
     out_result->prompt_tokens = backend->n_past - tokens_generated;
     out_result->total_tokens = backend->n_past;
+    out_result->image_tokens = backend->last_image_tokens;
+    out_result->image_width = backend->last_image_width;
+    out_result->image_height = backend->last_image_height;
+    out_result->context_length =
+        backend->ctx != nullptr ? static_cast<int32_t>(llama_n_ctx(backend->ctx))
+                                : backend->context_size;
+
+    // Timing metrics (were previously left 0 → null in telemetry).
+    const auto t_end = std::chrono::steady_clock::now();
+    using ms = std::chrono::duration<double, std::milli>;
+    const double total_ms = ms(t_end - t_start).count();
+    const double decode_ms = ms(t_end - t_after_prep).count();
+    out_result->total_time_ms = static_cast<int64_t>(total_ms);
+    out_result->image_encode_time_ms = static_cast<int64_t>(ms(t_after_prep - t_start).count());
+    out_result->time_to_first_token_ms = static_cast<int64_t>(ms(t_first_token - t_start).count());
+    out_result->tokens_per_second =
+        decode_ms > 0.0 ? static_cast<float>(tokens_generated / (decode_ms / 1000.0)) : 0.0f;
 
     RAC_LOG_INFO(LOG_CAT, "Generated %d tokens", tokens_generated);
     return RAC_SUCCESS;

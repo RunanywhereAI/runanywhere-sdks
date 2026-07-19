@@ -34,6 +34,12 @@ class MarkdownDetector {
     }
 
     /// Analyze content for markdown patterns
+    // Compiled once. Recompiling per call was a hot-path cost: the streaming tail
+    // bubble re-runs detection on every token, so a per-render NSRegularExpression
+    // build ran once per token over the whole message.
+    private static let boldRegex = try? NSRegularExpression(pattern: "\\*\\*[^*]+\\*\\*")
+    private static let inlineCodeRegex = try? NSRegularExpression(pattern: "`[^`]+`")
+
     private func analyzeContent(_ content: String) -> ContentAnalysis {
         var analysis = ContentAnalysis()
 
@@ -54,17 +60,11 @@ class MarkdownDetector {
             }.count
         analysis.headingCount = headingCount
 
-        // Detect bold (**text**) - use regex to match proper pairs
-        let boldPattern = "\\*\\*[^*]+\\*\\*"
-        let boldRegex = try? NSRegularExpression(pattern: boldPattern)
-        let boldMatches = boldRegex?.matches(in: content, range: NSRange(content.startIndex..., in: content)) ?? []
-        analysis.boldCount = boldMatches.count
-
-        // Detect inline code (`code`) - use regex to match proper pairs
-        let codePattern = "`[^`]+`"
-        let codeRegex = try? NSRegularExpression(pattern: codePattern)
-        let codeMatches = codeRegex?.matches(in: content, range: NSRange(content.startIndex..., in: content)) ?? []
-        analysis.inlineCodeCount = codeMatches.count
+        // Detect bold (**text**) and inline code (`code`) with the pre-compiled
+        // regexes above.
+        let fullRange = NSRange(content.startIndex..., in: content)
+        analysis.boldCount = Self.boldRegex?.matches(in: content, range: fullRange).count ?? 0
+        analysis.inlineCodeCount = Self.inlineCodeRegex?.matches(in: content, range: fullRange).count ?? 0
 
         // Detect lists (only count lines that start with list markers after trimming leading spaces)
         let listCount = content.components(separatedBy: .newlines)

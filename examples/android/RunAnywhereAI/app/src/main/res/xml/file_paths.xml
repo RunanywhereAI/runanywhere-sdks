@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Benchmark share-card PNGs are written to cacheDir/share before being
+         exposed to the system share sheet / social apps as content:// URIs. -->
+    <cache-path name="share" path="share/" />
+</paths>

@@ -31,6 +31,13 @@ enum DeviceFormFactor {
 
 /// Provides adaptive sizes that scale appropriately for different platforms
 struct AdaptiveSizing {
+    /// Share cards use one platform-invariant canvas so exported images retain
+    /// identical geometry across share targets, while still respecting the
+    /// current form factor's sheet width.
+    static var shareCardWidth: CGFloat {
+        min(AppLayout.shareCardWidth, sheetMaxWidth)
+    }
+
     /// Microphone/main action button size
     static var micButtonSize: CGFloat {
         switch DeviceFormFactor.current {
@@ -197,13 +204,16 @@ struct AdaptiveSizing {
 // MARK: - Adaptive Modal/Sheet Wrapper
 struct AdaptiveSheet<SheetContent: View>: ViewModifier {
     @Binding var isPresented: Bool
+    let onDismiss: (() -> Void)?
     let sheetContent: () -> SheetContent
 
     func body(content: Content) -> some View {
         #if os(macOS)
         content
-            .sheet(isPresented: $isPresented) {
-                self.sheetContent()
+            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
+                AdaptiveSheetChrome(isPresented: $isPresented) {
+                    self.sheetContent()
+                }
                     .frame(
                         minWidth: AdaptiveSizing.sheetMinWidth,
                         idealWidth: AdaptiveSizing.sheetIdealWidth,
@@ -215,12 +225,49 @@ struct AdaptiveSheet<SheetContent: View>: ViewModifier {
             }
         #else
         content
-            .sheet(isPresented: $isPresented) {
+            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
                 self.sheetContent()
             }
         #endif
     }
 }
+
+/// Adds a consistent, discoverable close affordance to macOS sheet content.
+/// SwiftUI sheets do not reliably expose the hosting window's close button when
+/// the presented view supplies its own content chrome, so keep the affordance in
+/// the shared sheet wrapper instead of duplicating it in every feature view.
+#if os(macOS)
+private struct AdaptiveSheetChrome<Content: View>: View {
+    @Binding var isPresented: Bool
+    let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer(minLength: 0)
+                Button {
+                    isPresented = false
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(.secondary.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Close")
+                .help("Close")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            content()
+        }
+    }
+}
+#endif
 
 // MARK: - Adaptive Form Style
 struct AdaptiveFormStyle: ViewModifier {
@@ -300,9 +347,14 @@ struct AdaptiveButtonStyle: ButtonStyle {
 extension View {
     func adaptiveSheet<Content: View>(
         isPresented: Binding<Bool>,
+        onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
-        modifier(AdaptiveSheet(isPresented: isPresented, sheetContent: content))
+        modifier(AdaptiveSheet(
+            isPresented: isPresented,
+            onDismiss: onDismiss,
+            sheetContent: content
+        ))
     }
 
     func adaptiveFormStyle() -> some View {

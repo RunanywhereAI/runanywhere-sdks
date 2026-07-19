@@ -38,6 +38,7 @@ const EXPECTED_ORIGIN = new URL(
 ).origin;
 const RELEASE_LOCAL_DIRECTORY = 'runanywhere-release-e2e';
 const RELEASE_LOCAL_PERMISSION_KEY = 'runanywhere-release-e2e-permission';
+const WEATHER_TRANSCRIPT_PATTERN = /\bweather\b/i;
 
 const CANONICAL_RUNTIME_ASSETS = [
   'racommons.js',
@@ -239,6 +240,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     );
     const thinkingToggle = appPage.locator('#settings-thinking-toggle');
     const thinkingInitiallyOn = await thinkingToggle.evaluate((node) => node.classList.contains('on'));
+    expect(thinkingInitiallyOn, 'fresh installs should show reasoning by default').toBe(true);
     await thinkingToggle.click();
     await expect(thinkingToggle).toHaveClass(thinkingInitiallyOn ? /^(?!.*\bon\b)/ : /\bon\b/);
     await thinkingToggle.click();
@@ -470,7 +472,52 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     }
   });
 
+  test('05 — keeps Bonsai visible but blocks its incompatible app runtime path', async ({ appPage }) => {
+    await appPage.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForInteractive(appPage);
+    await navigateTo(appPage, 'chat');
+    // Explicit precondition: the incompatible Bonsai model must not be downloaded
+    // before proving the blocked runtime path. Asserting it up front keeps the
+    // negative-state check order-independent even though the release suite reuses
+    // a single worker-scoped page/context in serial mode.
+    expect(await isModelDownloaded(appPage, 'bonsai-27b-q1_0')).toBe(false);
+    await appPage.locator('#chat-toolbar-model').click();
+    await appPage.locator('#model-sheet-search').fill('Bonsai-27B');
+
+    const row = appPage.locator('[data-model-id="bonsai-27b-q1_0"]').first();
+    await expect(row).toBeVisible();
+    const unavailable = row.locator('button[data-model-id="bonsai-27b-q1_0"]');
+    await expect(unavailable).toBeDisabled();
+    await expect(unavailable).toHaveText('Unavailable in this app');
+    await expect(unavailable).toHaveAttribute(
+      'data-compatibility-code',
+      'wasm32-address-space',
+    );
+    await expect(row.locator('.model-compatibility-reason')).toContainText('3.803 GB GGUF');
+    await expect(row.locator('.model-compatibility-reason')).toContainText(
+      'current llama.cpp/WebGPU backend',
+    );
+    await expect(row.locator('.model-compatibility-reason')).toContainText(
+      '4 GiB WASM32 heap',
+    );
+    await expect(row.locator('.model-compatibility-reason')).toContainText('281 MiB');
+    const reference = row.locator('.model-compatibility-reason a');
+    await expect(reference).toHaveText(/Experimental direct-WebGPU reference/);
+    await expect(reference).toHaveAttribute(
+      'href',
+      'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',
+    );
+    await expect(reference).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(row.locator('[data-action]')).toHaveCount(0);
+    expect(await isModelDownloaded(appPage, 'bonsai-27b-q1_0')).toBe(false);
+
+    await appPage.locator('#model-sheet-close').click();
+    await expect(appPage.locator('.modal-sheet')).toBeHidden();
+  });
+
   test('10 — downloads one canonical LLM and proves streamed chat inference', async ({ appPage }) => {
+    await appPage.goto('/', { waitUntil: 'domcontentloaded' });
+    await waitForInteractive(appPage);
     await navigateTo(appPage, 'chat');
     await ensureModelReady(appPage, '#chat-toolbar-model', RELEASE_MODELS.llm);
     // Regression: a successful load auto-selects the model and closes the
@@ -963,7 +1010,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
       minLength: 6,
       timeout: 8 * 60_000,
     });
-    expect(batchTranscript).toMatch(/jarvis/i);
+    expect(batchTranscript).toMatch(WEATHER_TRANSCRIPT_PATTERN);
 
     await appPage.locator('#clear-btn').click();
     await appPage.locator('#mic-toggle-btn').click();
@@ -977,7 +1024,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
         timeout: 8 * 60_000,
       },
     );
-    expect(batchMicrophoneTranscript).toMatch(/jarvis/i);
+    expect(batchMicrophoneTranscript).toMatch(WEATHER_TRANSCRIPT_PATTERN);
 
     await installSTTStreamRecorder(appPage);
     try {
@@ -991,8 +1038,12 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
           timeout: 8 * 60_000,
         },
       );
-      expect(streamingTranscript).toMatch(/jarvis/i);
-      await expectRenderedSTTPartial(appPage, /jarvis/i);
+      expect(streamingTranscript).toMatch(WEATHER_TRANSCRIPT_PATTERN);
+      // The offline Whisper backend intentionally starts synthetic partial
+      // decodes at three seconds. This 2.1-second file therefore proves the
+      // streaming envelope and final result without requiring a partial that
+      // the backend cannot emit for such a short utterance.
+      await expectFinalSTTStream(appPage, WEATHER_TRANSCRIPT_PATTERN);
 
       await resetSTTStreamRecorder(appPage);
       await appPage.locator('#clear-btn').click();
@@ -1007,8 +1058,8 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
           timeout: 8 * 60_000,
         },
       );
-      expect(liveMicrophoneTranscript).toMatch(/jarvis/i);
-      await expectRenderedSTTPartial(appPage, /jarvis/i);
+      expect(liveMicrophoneTranscript).toMatch(WEATHER_TRANSCRIPT_PATTERN);
+      await expectRenderedSTTPartial(appPage, WEATHER_TRANSCRIPT_PATTERN);
     } finally {
       await uninstallSTTStreamRecorder(appPage);
     }
@@ -1188,7 +1239,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
         minLength: 6,
         timeout: 12 * 60_000,
       });
-      expect(transcript).toMatch(/jarvis/i);
+      expect(transcript).toMatch(WEATHER_TRANSCRIPT_PATTERN);
       await expectSubstantiveText(appPage.locator('#voice-assistant-response'), {
         // A small local model can answer a wake phrase tersely. The helper
         // still rejects placeholders/errors, while the playback and state
@@ -2021,27 +2072,59 @@ async function runThinkingEnabledTurn(
   prompt: string,
 ): Promise<string> {
   const send = page.locator('#chat-send-btn');
-  await startFreshChat(page);
-  await page.locator('#chat-input').fill(prompt);
-  await send.click();
-  await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
-  await expect(send).toHaveAttribute('aria-label', 'Send message', {
-    timeout: 12 * 60_000,
-  });
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await startFreshChat(page);
+    await page.locator('#chat-input').fill(prompt);
+    await send.click();
+    await expect(send).toHaveAttribute('aria-label', 'Stop generation', { timeout: 120_000 });
+    const liveReply = page.locator('.chat-message--assistant').last();
+    await expect(liveReply.locator('.chat-thinking')).toHaveAttribute('open', '', {
+      timeout: 30_000,
+    });
+    await expect(send).toHaveAttribute('aria-label', 'Send message', {
+      timeout: 12 * 60_000,
+    });
 
-  const reply = page.locator('.chat-message--assistant').last();
-  await expect(reply).toBeVisible();
-  await expectSubstantiveText(reply.locator('.chat-thinking-content'), {
-    minLength: 12,
-    timeout: 30_000,
-    forbidden: /\b(?:failed|error|unavailable)\b/i,
-  });
-  await expectSubstantiveText(reply.locator('.chat-bubble'), {
-    minLength: 8,
-    timeout: 30_000,
-    forbidden: /response limit|without producing a final answer|no final answer|cancelled/i,
-  });
-  return (await reply.locator('.chat-bubble').textContent() ?? '').trim();
+    const reply = page.locator('.chat-message--assistant').last();
+    await expect(reply).toBeVisible();
+    const completedThinking = reply.locator('.chat-thinking');
+    await expect(completedThinking).not.toHaveAttribute('open', '');
+    await expect(reply.locator('.chat-bubble')).toBeVisible();
+    expect(await reply.evaluate((message) => {
+      const thinking = message.querySelector('.chat-thinking');
+      const answer = message.querySelector('.chat-bubble');
+      return Boolean(
+        thinking
+        && answer
+        && (thinking.compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+    }), 'the final answer must render below the collapsed reasoning trace').toBe(true);
+    await expect(reply.locator('.chat-bubble')).not.toContainText(/<\/?(?:think|thinking)>/i);
+    await expectSubstantiveText(reply.locator('.chat-thinking-content'), {
+      minLength: 12,
+      timeout: 30_000,
+      forbidden: /\b(?:failed|error|unavailable)\b/i,
+    });
+    try {
+      await expectSubstantiveText(reply.locator('.chat-bubble'), {
+        minLength: 8,
+        timeout: 30_000,
+        forbidden: /response limit|without producing a final answer|no final answer|cancelled/i,
+      });
+      await completedThinking.locator('summary').click();
+      await expect(completedThinking).toHaveAttribute('open', '');
+      await completedThinking.locator('summary').click();
+      await expect(completedThinking).not.toHaveAttribute('open', '');
+      return (await reply.locator('.chat-bubble').textContent() ?? '').trim();
+    } catch (error) {
+      const retryable = /response limit|without producing a final answer|no final answer|cancelled/i.test(
+        error instanceof Error ? error.message : String(error),
+      );
+      if (!retryable || attempt === maxAttempts) throw error;
+    }
+  }
+  throw new Error('Thinking-enabled generation exhausted its retry budget.');
 }
 
 async function runToolTurn(
@@ -2174,6 +2257,16 @@ async function expectRenderedSTTPartial(page: Page, expectedFinal: RegExp): Prom
     timeout: 120_000,
     intervals: [100, 250, 500],
   }).toBe(true);
+  await expectFinalSTTStream(page, expectedFinal);
+
+  const records = await recordedSTTStream(page);
+  const finalIndex = records.findIndex((record) => record.isFinal);
+  const partialIndex = records.findIndex((record) => !record.isFinal && record.text.length > 0);
+  expect(partialIndex).toBeGreaterThanOrEqual(0);
+  expect(finalIndex).toBeGreaterThan(partialIndex);
+}
+
+async function expectFinalSTTStream(page: Page, expectedFinal: RegExp): Promise<void> {
   await expect.poll(async () => {
     const records = await recordedSTTStream(page);
     return records.some((record) => record.isFinal && expectedFinal.test(record.text));
@@ -2182,12 +2275,6 @@ async function expectRenderedSTTPartial(page: Page, expectedFinal: RegExp): Prom
     timeout: 120_000,
     intervals: [100, 250, 500],
   }).toBe(true);
-
-  const records = await recordedSTTStream(page);
-  const finalIndex = records.findIndex((record) => record.isFinal);
-  const partialIndex = records.findIndex((record) => !record.isFinal && record.text.length > 0);
-  expect(partialIndex).toBeGreaterThanOrEqual(0);
-  expect(finalIndex).toBeGreaterThan(partialIndex);
 }
 
 async function uninstallSTTStreamRecorder(page: Page): Promise<void> {

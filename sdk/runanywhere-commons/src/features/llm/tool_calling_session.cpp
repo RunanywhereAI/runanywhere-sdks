@@ -761,6 +761,18 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
     session->generation.top_p = request.top_p();
     session->generation.system_prompt = request.system_prompt();
     session->generation.disable_thinking = request.disable_thinking();
+    // Prior conversation turns (tool_calling.proto field 19). The session path
+    // shares run_generate_once (via generation_for_tool_step), which flattens
+    // generation.history into options.history for EVERY generate — so setting it
+    // here gives Web/Flutter (session ABI) the same multi-turn context the
+    // run-loop ABI already threads. request.history already EXCLUDES the current
+    // turn and is pre-alternated [user,asst,...]; drop a dangling trailing turn
+    // on an odd count so the positional role assignment stays aligned (mirrors
+    // tool_calling_run_loop.cpp and the standard path's trailing-user pop).
+    session->generation.history.assign(request.history().begin(), request.history().end());
+    if (session->generation.history.size() % 2 != 0) {
+        session->generation.history.pop_back();
+    }
 
     session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
                           ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON

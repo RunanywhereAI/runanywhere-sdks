@@ -44,6 +44,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
@@ -75,6 +78,18 @@ fun SttScreen() {
 
     DisposableEffect(sttVm) {
         onDispose { sttVm.cancel() }
+    }
+
+    // onDispose fires on nav-away but NOT when the Activity is backgrounded
+    // (Home/lock) mid-recording. Release the mic on ON_STOP too so it doesn't
+    // stay hot behind the lock screen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, sttVm) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) sttVm.cancel()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }

@@ -248,6 +248,26 @@ void toolsProtoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* 
     }
 }
 
+// Bool-returning variant for rac_rag_query_stream_proto (RAC_FALSE stops the
+// native loop). RN's onEventBytes carries no backpressure signal, so this
+// always keeps going; consumer cancellation goes through ragCancelProto.
+rac_bool_t ragStreamProtoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* userData) {
+    if (!protoBytes || protoSize == 0 || !userData) {
+        return RAC_TRUE;
+    }
+    auto* callback =
+        static_cast<std::function<void(const std::shared_ptr<ArrayBuffer>&)>*>(userData);
+    if (!callback || !(*callback)) {
+        return RAC_TRUE;
+    }
+    try {
+        (*callback)(ArrayBuffer::copy(protoBytes, protoSize));
+    } catch (...) {
+        LOGE("rag stream proto callback dispatch failed");
+    }
+    return RAC_TRUE;
+}
+
 std::shared_ptr<ArrayBuffer> callRagBufferProto(const std::vector<uint8_t>& bytes,
                                                 RagBufferProtoFn fn,
                                                 const char* operation) {
@@ -537,6 +557,52 @@ HybridRunAnywhereCore::ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBy
     auto bytes = copyToolsArrayBufferBytes(queryBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callRagBufferProto(bytes, rac_rag_query_proto, "ragQueryProto");
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::ragQueryStreamProto(
+    const std::shared_ptr<ArrayBuffer>& queryBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto bytes = copyToolsArrayBufferBytes(queryBytes);
+    return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
+        rac_handle_t session = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
+            session = g_ragProtoSession;
+        }
+        if (!session) {
+            LOGE("ragQueryStreamProto: RAG proto session not created");
+            return;
+        }
+        // rac_rag_query_stream_proto is blocking-synchronous: every RAGStreamEvent
+        // fires before it returns, so the callback holder can die at lambda end.
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = rac_rag_query_stream_proto(
+            session, data, bytes.size(), ragStreamProtoBytesCallback, callback.get());
+        if (rc != RAC_SUCCESS) {
+            LOGE("ragQueryStreamProto: rc=%d", rc);
+        }
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ragCancelProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_handle_t session = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
+            session = g_ragProtoSession;
+        }
+        if (!session) {
+            return emptyToolsProtoBuffer();
+        }
+        rac_result_t rc = rac_rag_cancel_proto(session);
+        if (rc != RAC_SUCCESS) {
+            LOGE("ragCancelProto: rc=%d", rc);
+        }
+        return emptyToolsProtoBuffer();
     });
 }
 

@@ -11,9 +11,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// STRICT locking is a release/CI reproducibility gate; locally (and during
+// Android Studio sync, which resolves synthetic *Copy configs and IDE-only
+// source artifacts) it only causes friction, so relax to LENIENT off-CI.
+val strictDependencyLocks = providers.environmentVariable("CI").isPresent ||
+    providers.gradleProperty("runanywhere.strictLocks").map { it.toBoolean() }.orElse(false).get() ||
+    gradle.startParameter.isWriteDependencyLocks
+
 dependencyLocking {
     lockAllConfigurations()
-    lockMode.set(LockMode.STRICT)
+    lockMode.set(if (strictDependencyLocks) LockMode.STRICT else LockMode.LENIENT)
 }
 
 // Backend config comes from CI-safe environment variables first, then the
@@ -87,8 +94,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 37
-        versionCode = 21
-        versionName = "0.1.12"
+        versionCode = 25
+        versionName = "0.1.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

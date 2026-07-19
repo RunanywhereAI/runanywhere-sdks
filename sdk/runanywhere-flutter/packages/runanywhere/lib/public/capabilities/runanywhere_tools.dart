@@ -195,6 +195,12 @@ class RunAnywhereTools {
   /// generation [llmOptions]; `top_p` always comes from the LLM options;
   /// `validate_calls` is left UNSET unless the caller supplies it (commons
   /// applies its documented default).
+  ///
+  /// [history] carries prior conversation turns as a flat alternating list
+  /// `[user0, asst0, user1, asst1, ...]`, EXCLUDING the current turn (which
+  /// travels as [prompt]). commons threads it through the session path so
+  /// multi-turn tool use keeps context, matching the standard generate path's
+  /// message history as strings. Defaulted empty for source compatibility.
   Future<ToolCallingResult> generateWithTools(
     String prompt, {
     LLMGenerationOptions? llmOptions,
@@ -202,6 +208,7 @@ class RunAnywhereTools {
     ToolChoiceMode? toolChoice,
     String? forcedToolName,
     bool? validateCalls,
+    List<String> history = const [],
   }) async {
     // Swift default: `options: RALLMGenerationOptions = .defaults()`.
     final llm = llmOptions ?? _defaultLLMOptions();
@@ -239,6 +246,11 @@ class RunAnywhereTools {
       autoExecute: autoExecute,
       replaceSystemPrompt: opts.replaceSystemPrompt,
       requireJsonArguments: opts.requireJsonArguments,
+      // Prior conversation turns as a flat alternating list
+      // [user0, asst0, ...], EXCLUDING the current turn (which is `prompt`).
+      // Flutter uses the session ABI — commons threads these into every
+      // generate in the loop so multi-turn tool use keeps context.
+      history: history,
     );
     // `validate_calls` is `optional bool` on the proto — leave it UNSET when
     // the caller did not supply a value so commons applies its documented

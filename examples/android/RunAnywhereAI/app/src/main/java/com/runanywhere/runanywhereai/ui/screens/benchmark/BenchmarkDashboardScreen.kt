@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,12 +49,20 @@ import java.util.Locale
 @Composable
 fun BenchmarkDashboardScreen(
     onOpenRun: (String) -> Unit,
+    onOpenModels: () -> Unit = {},
+    isModelSheetVisible: Boolean = false,
     selectedRunId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val dimens = LocalDimens.current
     val vm: BenchmarkViewModel = viewModel()
     val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.US) }
+
+    // Re-check when first shown and whenever Models is dismissed, since a model may
+    // have been downloaded while this screen remained mounted behind the sheet.
+    LaunchedEffect(isModelSheetVisible) {
+        if (!isModelSheetVisible) vm.refreshAvailability()
+    }
 
     LazyColumn(
         modifier = modifier
@@ -81,6 +90,22 @@ fun BenchmarkDashboardScreen(
         }
 
         item {
+            Text("Trials per test", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
+                vm.trialOptions.forEach { count ->
+                    FilterChip(
+                        selected = vm.trials == count,
+                        onClick = { vm.selectTrials(count) },
+                        enabled = !vm.isRunning,
+                        label = { Text(if (count == 1) "1 (fast)" else "$count") },
+                    )
+                }
+            }
+        }
+
+        item {
             if (vm.isRunning) {
                 RunningCard(
                     current = vm.progress?.current ?: 0,
@@ -88,6 +113,8 @@ fun BenchmarkDashboardScreen(
                     label = vm.progress?.let { "${it.category.label} · ${it.scenario} · ${it.model}" } ?: "Preparing…",
                     onCancel = vm::cancel,
                 )
+            } else if (!vm.hasModels) {
+                NoModelsCard(onOpenModels = onOpenModels)
             } else {
                 Button(
                     onClick = vm::run,
@@ -95,7 +122,7 @@ fun BenchmarkDashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(RACIcons.Outline.PlayerPlay, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
-                    Text("Run selected (${vm.selected.size})", modifier = Modifier.padding(start = dimens.spacingSm))
+                    Text("Run benchmark", modifier = Modifier.padding(start = dimens.spacingSm))
                 }
             }
         }
@@ -170,6 +197,32 @@ private fun DeviceCard(info: BenchDeviceInfo) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoModelsCard(onOpenModels: () -> Unit) {
+    val dimens = LocalDimens.current
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(dimens.radiusLg),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(dimens.spacingLg),
+            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        ) {
+            Text("No models downloaded yet", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Download an on-device model to run benchmarks.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onOpenModels, modifier = Modifier.fillMaxWidth()) {
+                Icon(RACIcons.Outline.Download, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+                Text("Download models", modifier = Modifier.padding(start = dimens.spacingSm))
             }
         }
     }

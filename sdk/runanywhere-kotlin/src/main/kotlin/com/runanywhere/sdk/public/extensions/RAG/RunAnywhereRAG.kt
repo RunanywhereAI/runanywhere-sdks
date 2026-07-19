@@ -14,6 +14,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.generated.convenience.defaults
@@ -27,6 +28,10 @@ import com.runanywhere.sdk.public.types.RARAGDocument
 import com.runanywhere.sdk.public.types.RARAGStatistics
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 // MARK: - Pipeline Lifecycle
@@ -198,6 +203,55 @@ suspend fun RunAnywhere.ragQuery(
 
 suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
     ragQuery(options.question, options)
+
+/**
+ * Streaming RAG query. Emits a [RAGStreamEvent] per generated token
+ * (kind = TOKEN) as the answer is produced, then a terminal COMPLETED event
+ * carrying the full [RAGResult] (answer + retrieved chunks), or an ERROR event.
+ *
+ * Because tokens surface as they generate, callers render progress live and do
+ * NOT need a wall-clock timeout around the call. Cancelling collection stops the
+ * native query request-scoped (via racRagCancelRequestProto), so concurrent
+ * collectors and unary queries serialize instead of cancelling each other.
+ */
+fun RunAnywhere.ragQueryStream(
+    question: String,
+    options: RAGQueryOptions? = null,
+): Flow<RAGStreamEvent> =
+    callbackFlow {
+        if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+        ensureServicesReady()
+        val queryOptions =
+            (options ?: RAGQueryOptions.defaults(question)).let {
+                if (it.question.isEmpty()) it.copy(question = question) else it
+            }
+        val nativeRequest = CppBridgeRAG.prepareQuery(queryOptions)
+        // Run the blocking native stream through the RAG request coordinator so
+        // cancellation targets this exact request (via cancelQueryRequest) rather
+        // than any query on the session. trySend returning false stops the native
+        // producer through backpressure; collecting cancellation cancels the worker,
+        // which the coordinator turns into the request-scoped native cancel.
+        val worker =
+            launch {
+                try {
+                    runCancellableNativeRagQuery(
+                        query = { requestId ->
+                            CppBridgeRAG.queryStreamRequest(requestId, nativeRequest) { event ->
+                                trySend(event).isSuccess
+                            }
+                        },
+                        cancel = CppBridgeRAG::cancelQueryRequest,
+                    )
+                    close()
+                } catch (t: Throwable) {
+                    close(t)
+                }
+            }
+        awaitClose { worker.cancel() }
+    }
+
+fun RunAnywhere.ragQueryStream(options: RAGQueryOptions): Flow<RAGStreamEvent> =
+    ragQueryStream(options.question, options)
 
 /** Immediately request cancellation of the active native RAG query. */
 suspend fun RunAnywhere.ragCancelQuery() {

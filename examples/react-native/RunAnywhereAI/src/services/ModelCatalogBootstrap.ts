@@ -8,6 +8,7 @@
  * launch — commons merges runtime fields on re-registration.
  */
 
+import { Platform } from 'react-native';
 import { RunAnywhere } from '@runanywhere/core';
 import { QHexRT, seedNpuCatalog } from '@runanywhere/qhexrt';
 import {
@@ -106,6 +107,17 @@ export async function registerAll(
         url: 'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirement: 2_497_281_312,
+        supportsThinking: true,
+      }),
+      // PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant, qwen3_5
+      // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
+      // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
+      registerModel({
+        id: 'bonsai-27b-q1_0',
+        name: 'Bonsai-27B 1-bit Q1_0 (CPU)',
+        url: 'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirement: 3_803_452_480,
         supportsThinking: true,
       }),
       registerModel({
@@ -234,6 +246,16 @@ export async function registerAll(
         url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
         memoryRequirement: 650_000_000,
+        supportsThinking: true,
+      }),
+      // PrismML Bonsai-27B 1-bit MLX (~5.1 GB). Experimental — needs
+      // mlx-swift-lm support for qwen3_5 / 1-bit Bonsai.
+      registerModel({
+        id: 'mlx-bonsai-27b-1bit',
+        name: 'MLX Bonsai-27B 1-bit',
+        url: 'https://huggingface.co/prism-ml/Bonsai-27B-mlx-1bit',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+        memoryRequirement: 5_129_115_752,
         supportsThinking: true,
       }),
       registerModel({
@@ -387,6 +409,32 @@ export async function registerAll(
         memoryRequirement: 90_619_114,
       }),
     ]);
+  }
+
+  // =========================================================================
+  // Diffusion (CoreML / Apple platform backend) — image generation
+  // Apple-only: the DIFFUSION primitive is served exclusively by the CoreML
+  // Stable-Diffusion backend, so register only on iOS/macOS. Mirrors the
+  // built-in commons diffusion registry entry
+  // (diffusion_model_registry.cpp MODEL_SD15_COREML). registerModel is safe to
+  // re-run — commons merges runtime fields on re-registration. Wrapped so a
+  // registration hiccup never blocks the rest of catalog bootstrap.
+  // =========================================================================
+  if (Platform.OS === 'ios' || Platform.OS === 'macos') {
+    try {
+      await registerModel({
+        id: 'stable-diffusion-v1-5-coreml',
+        name: 'Stable Diffusion 1.5',
+        url: 'https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+        modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+        memoryRequirement: 1_200_000_000,
+      });
+    } catch (error) {
+      logDiagnostic(
+        `[App] Skipping CoreML diffusion model registration: ${String(error)}`
+      );
+    }
   }
 
   // =========================================================================

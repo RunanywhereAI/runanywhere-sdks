@@ -10,12 +10,12 @@ AAR; all three copies come from the same NDK runtime for a given ABI.
 
 | Artifact | Native Libs | Description |
 |----------|-------------|-------------|
-| `io.github.sanchitmonga22:runanywhere-sdk-android` | 5 per ABI | Core SDK and cloud backend |
-| `io.github.sanchitmonga22:runanywhere-llamacpp-android` | 4 per ABI | LlamaCPP LLM/VLM backend |
-| `io.github.sanchitmonga22:runanywhere-onnx-android` | 9 per ABI | ONNX and Sherpa STT/TTS/VAD backends |
-| `io.github.sanchitmonga22:runanywhere-sdk` | - | KMP metadata |
-| `io.github.sanchitmonga22:runanywhere-llamacpp` | - | KMP metadata |
-| `io.github.sanchitmonga22:runanywhere-onnx` | - | KMP metadata |
+| `io.github.sanchitmonga22:runanywhere-sdk` | 5 per ABI | Core SDK and cloud backend |
+| `io.github.sanchitmonga22:runanywhere-llamacpp` | 4 per ABI | LlamaCPP LLM/VLM backend |
+| `io.github.sanchitmonga22:runanywhere-onnx` | 9 per ABI | ONNX and Sherpa STT/TTS/VAD backends |
+
+The SDK is a single-target Android library (not KMP), so there are no `-android`
+variants or separate KMP metadata artifacts — these three are the whole set.
 
 With three ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`), the Maven bundle
 contains 15 core, 12 LlamaCPP, and 27 ONNX/Sherpa entries: **54 `.so` entries**.
@@ -29,7 +29,7 @@ validates that tree, rejects undeclared or private QHexRT/QNN inputs, and routes
 each component into its owning AAR.
 
 ```
-runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runanywhere-onnx-android AAR
+runanywhere-sdk AAR                  runanywhere-llamacpp AAR             runanywhere-onnx AAR
   jni/{abi}/                           jni/{abi}/                           jni/{abi}/
     libc++_shared.so                     libc++_shared.so                      libc++_shared.so
     libomp.so                            librac_backend_llamacpp.so            libonnxruntime.so
@@ -53,9 +53,9 @@ runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runany
 
 | Archive subtree | Maven artifact |
 |-----------------|----------------|
-| `{abi}/jni` | `runanywhere-sdk-android` |
-| `{abi}/llamacpp` | `runanywhere-llamacpp-android` |
-| `{abi}/onnx` | `runanywhere-onnx-android` |
+| `{abi}/jni` | `runanywhere-sdk` |
+| `{abi}/llamacpp` | `runanywhere-llamacpp` |
+| `{abi}/onnx` | `runanywhere-onnx` |
 
 ---
 
@@ -215,7 +215,7 @@ curl -X POST -u "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_PASSWORD" \
 Artifacts take 10-30 minutes to propagate.
 
 ```bash
-for a in runanywhere-sdk-android runanywhere-llamacpp-android runanywhere-onnx-android; do
+for a in runanywhere-sdk runanywhere-llamacpp runanywhere-onnx; do
   echo "$a: $(curl -s -o /dev/null -w '%{http_code}' \
     "https://repo1.maven.org/maven2/io/github/sanchitmonga22/$a/$SDK_VERSION/$a-$SDK_VERSION.pom")"
 done
@@ -245,13 +245,13 @@ repositories {
 // build.gradle.kts
 dependencies {
     // Required: core SDK
-    implementation("io.github.sanchitmonga22:runanywhere-sdk-android:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.6")
 
     // Optional: LLM + VLM (add only if you need text/vision generation)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp-android:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.6")
 
     // Optional: STT/TTS/VAD (add only if you need speech features)
-    implementation("io.github.sanchitmonga22:runanywhere-onnx-android:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.6")
 }
 ```
 

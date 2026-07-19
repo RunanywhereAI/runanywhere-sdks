@@ -11,6 +11,7 @@ import RunAnywhere
 struct BenchmarkDashboardView: View {
     @State private var viewModel = BenchmarkViewModel()
     @StateObject private var deviceService = DeviceInfoService.shared
+    @State private var showModelDownload = false
 
     var body: some View {
         let visibleModelCategories = BenchmarkCategory.allCases.filter {
@@ -79,6 +80,19 @@ struct BenchmarkDashboardView: View {
                 }
             }
 
+            Section("Trials per test") {
+                Picker("Trials", selection: $viewModel.trials) {
+                    ForEach(viewModel.trialOptions, id: \.self) { count in
+                        Text(count == 1 ? "1 (fast)" : "\(count)").tag(count)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(viewModel.isRunning)
+                Text("Each test runs this many times; the median is reported with the observed range.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             // Model Selection
             if !visibleModelCategories.isEmpty {
                 Section {
@@ -130,32 +144,42 @@ struct BenchmarkDashboardView: View {
                 }
             }
 
-            // Run Controls
+            // Run Controls — guide to model download when nothing is installed.
             Section {
-                Button {
-                    viewModel.selectedCategories = Set(BenchmarkCategory.allCases)
-                    viewModel.runBenchmarks()
-                } label: {
-                    Label("Run All Benchmarks", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .disabled(viewModel.isRunning)
-
-                if viewModel.selectedCategories.count < BenchmarkCategory.allCases.count,
-                   !viewModel.selectedCategories.isEmpty {
+                if !viewModel.availableModels.values.contains(where: { !$0.isEmpty }) {
+                    VStack(alignment: .leading, spacing: AppSpacing.small) {
+                        Text("No models downloaded yet")
+                            .font(AppTypography.subheadlineMedium)
+                        Text("Download an on-device model to run benchmarks.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        Button {
+                            showModelDownload = true
+                        } label: {
+                            Label("Download Models", systemImage: "arrow.down.circle.fill")
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, AppSpacing.xxSmall)
+                    }
+                } else {
                     Button {
                         viewModel.runBenchmarks()
                     } label: {
-                        Label("Run Selected (\(viewModel.selectedCategories.count))", systemImage: "play")
+                        Label("Run Benchmark", systemImage: "play.fill")
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .disabled(viewModel.isRunning)
-                }
+                    .disabled(
+                        viewModel.isRunning
+                            || viewModel.selectedCategories.isEmpty
+                            || visibleModelCategories.isEmpty
+                    )
 
-                if viewModel.selectedCategories.isEmpty {
-                    Text("Select at least one category to run benchmarks.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.statusOrange)
+                    if viewModel.selectedCategories.isEmpty {
+                        Text("Select at least one category to run benchmarks.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.statusOrange)
+                    }
                 }
             }
 
@@ -232,7 +256,7 @@ struct BenchmarkDashboardView: View {
                 Text(error)
             }
         }
-        .sheet(isPresented: $viewModel.isRunning) {
+        .adaptiveSheet(isPresented: $viewModel.isRunning) {
             BenchmarkProgressView(
                 progress: viewModel.progress,
                 currentScenario: viewModel.currentScenario,
@@ -243,6 +267,14 @@ struct BenchmarkDashboardView: View {
                 viewModel.cancel()
             }
             .interactiveDismissDisabled()
+        }
+        .sheet(isPresented: $showModelDownload, onDismiss: {
+            viewModel.refreshAvailableModels()
+        }) {
+            ModelSelectionSheet(context: .llm) { _ in
+                showModelDownload = false
+                viewModel.refreshAvailableModels()
+            }
         }
         .task {
             viewModel.loadPastRuns()

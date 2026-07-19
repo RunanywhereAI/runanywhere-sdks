@@ -1061,6 +1061,7 @@ set(RAC_EXPORTED_FUNCTIONS_RAG
     "_rac_rag_session_destroy_proto"
     "_rac_rag_ingest_proto"
     "_rac_rag_query_proto"
+    "_rac_rag_query_stream_proto"
     "_rac_rag_clear_proto"
     "_rac_rag_stats_proto"
 )
@@ -1100,6 +1101,8 @@ set(RAC_JSPI_EXPORTS
     "rac_vlm_component_unload"
     "rac_vlm_generate_proto"
     "rac_vlm_stream_proto"
+    # RAG streaming drives LLM generation, which can suspend under JSPI/WebGPU
+    "rac_rag_query_stream_proto"
 )
 
 # =============================================================================

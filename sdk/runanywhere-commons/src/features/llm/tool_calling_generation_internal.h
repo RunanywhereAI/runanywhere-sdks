@@ -4,6 +4,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/llm_thinking_tags_internal.h"
@@ -33,6 +34,13 @@ struct GenerationState {
     bool thinking_tags_resolved = false;
     std::string thinking_open_tag;
     std::string thinking_close_tag;
+    // Prior conversation turns as a flat alternating list [user0, asst0, ...],
+    // EXCLUDING the current turn. Owned here (not borrowed) so it survives the
+    // GenerationState copies the loop makes per step / for follow-ups; each
+    // run_generate_once flattens it into rac_llm_options_t.history. Unlike
+    // llm_module's history normalizer, this is already current-turn-free and
+    // pre-alternated, so run_generate_once forwards it as-is (no trailing pop).
+    std::vector<std::string> history;
 };
 
 struct GenerationCancelBinding {
@@ -242,6 +250,21 @@ inline bool run_generate_once(GenerationState& generation,
     options.system_prompt =
         generation.system_prompt.empty() ? nullptr : generation.system_prompt.c_str();
     options.disable_thinking = generation.disable_thinking ? RAC_TRUE : RAC_FALSE;
+
+    // Prior conversation turns (tool_calling.proto ToolCallingSessionCreateRequest.history).
+    // Already excludes the current turn and is pre-alternated [user,asst,...], so unlike
+    // llm_module's normalizer we forward it verbatim (no leading/trailing role fixups). The
+    // pointer array must outlive ops->generate, so it lives in this call frame; the backing
+    // strings are owned by generation.history.
+    std::vector<const char*> history_ptrs;
+    if (!generation.history.empty()) {
+        history_ptrs.reserve(generation.history.size());
+        for (const auto& turn : generation.history) {
+            history_ptrs.push_back(turn.c_str());
+        }
+    }
+    options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
+    options.n_history = static_cast<int32_t>(history_ptrs.size());
 
     clear_lifecycle_llm_cancel(&ref);
 

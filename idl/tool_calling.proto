@@ -392,6 +392,13 @@ message ToolCallingSessionCreateRequest {
     optional bool auto_execute = 16;
     bool replace_system_prompt = 17;
     bool require_json_arguments = 18;
+
+    // Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+    // EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+    // in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+    // ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+    // cross-proto import cycle.
+    repeated string history = 19;
 }
 
 message ToolCallingSessionCreateResult {

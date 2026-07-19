@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.settings
 
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import androidx.compose.runtime.getValue
@@ -10,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.settings.AppSettings
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
@@ -20,6 +22,7 @@ import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.getStorageInfo
 import com.runanywhere.sdk.public.extensions.listModels
+import com.runanywhere.sdk.public.extensions.matchesLifecycleCategory
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -141,6 +144,14 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             storage = storage.copy(busyId = model.id, message = null)
             try {
+                // Deleting the actively-generating LLM tears down process-wide
+                // native state. Let the chat's interlock revoke and fully cancel
+                // any in-flight request first, mirroring
+                // ModelSelectionViewModel.delete, so we don't race native
+                // teardown. Non-LLM models have no such interlock.
+                if (model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE)) {
+                    LlmModelChangeInterlock.awaitReadyForModelChange()
+                }
                 RunAnywhere.deleteModel(model.id)
                 RuntimeModelSelection.clearModelEverywhere(model.id)
             } catch (e: CancellationException) {

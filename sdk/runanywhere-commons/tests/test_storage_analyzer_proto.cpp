@@ -452,20 +452,30 @@ int test_delete_plan_blocks_loaded_missing_and_missing_path() {
 }
 
 int test_delete_dry_run_vs_execute() {
+    ASSERT_EQ(rac_model_paths_set_base_dir("/base"), RAC_SUCCESS);
     rac_sdk_event_clear_queue();
+
+    // Model deletion now removes the whole per-model folder
+    // ({base}/RunAnywhere/Models/{framework}/{model_id}/) so it reclaims
+    // interrupted-download "<final>.part" partials and the folder itself, not
+    // just the single registry local_path file. The delete plan's byte
+    // accounting (dry run + execute) is therefore keyed on that folder. The
+    // framework is RAC_FRAMEWORK_LLAMACPP (see model()), whose raw value is
+    // "LlamaCpp", so the resolved folder for "m1" is the constant below.
+    const char* kModelFolder = "/base/RunAnywhere/Models/LlamaCpp/m1";
 
     MockStorage storage;
     storage.total_space = 2000;
     storage.free_space = 500;
-    storage.path_sizes["/models/m1"] = 100;
-    storage.existing_paths = {"/models/m1"};
+    storage.path_sizes[kModelFolder] = 100;
+    storage.existing_paths = {kModelFolder};
 
     rac_storage_callbacks_t callbacks = callbacks_for(&storage);
     rac_storage_analyzer_handle_t analyzer = nullptr;
     rac_model_registry_handle_t registry = nullptr;
     ASSERT_EQ(rac_storage_analyzer_create(&callbacks, &analyzer), RAC_SUCCESS);
     ASSERT_EQ(rac_model_registry_create(&registry), RAC_SUCCESS);
-    ASSERT_EQ(save_model(registry, "m1", "Model 1", "/models/m1", 100, 20), 0);
+    ASSERT_EQ(save_model(registry, "m1", "Model 1", kModelFolder, 100, 20), 0);
 
     runanywhere::v1::StorageDeleteRequest request;
     request.add_model_ids("m1");
@@ -519,7 +529,8 @@ int test_delete_dry_run_vs_execute() {
     ASSERT_TRUE(executed.files_deleted());
     ASSERT_TRUE(executed.registry_updated());
     ASSERT_EQ(storage.deleted_paths.size(), 1U);
-    ASSERT_EQ(storage.deleted_paths[0], "/models/m1");
+    // The whole per-model folder is deleted (A8), not the single local_path file.
+    ASSERT_EQ(storage.deleted_paths[0], kModelFolder);
 
     rac_model_info_t** downloaded = nullptr;
     size_t downloaded_count = 99;

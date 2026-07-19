@@ -9,7 +9,7 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.0")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.20.11")
 //   No environment override is needed. SPM downloads the checksum-verified
 //   XCFramework archives from the GitHub release by default.
 //
@@ -39,7 +39,12 @@ import Foundation
 // avoids committing a local-only manifest or hand-editing it around a tag.
 //
 // =============================================================================
+let localNativesMarkerPath = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .appendingPathComponent(".runanywhere-local-natives")
+    .path
 let useLocalNatives = ProcessInfo.processInfo.environment["RUNANYWHERE_USE_LOCAL_NATIVES"] == "1"
+    || FileManager.default.fileExists(atPath: localNativesMarkerPath)
 
 // Release tooling asks SwiftPM for a static product that contains the Swift
 // MLX implementation and its MLX dependencies, but deliberately leaves the
@@ -84,7 +89,7 @@ let mlxRuntimeDistributionSwiftSettings: [SwiftSetting] = buildMLXDistributionFr
 
 // Version for remote XCFrameworks (used unless local natives are explicitly enabled).
 // Updated by scripts/release/sync-versions.sh during release preparation.
-let sdkVersion = "0.20.0"
+let sdkVersion = "0.20.11"
 
 let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_PREFIX"]
     ?? ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
@@ -100,6 +105,12 @@ let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
 ]
+
+// PrismML's Bonsai 1-bit weights require kernels that are not yet available
+// in upstream mlx-swift. This revision is the maintained Prism delta applied
+// directly on top of upstream mlx-swift 0.31.6, which keeps mlx-swift-lm
+// 3.31.x API-compatible while enabling bits=1 / group_size=128 models.
+let prismMLXSwiftRevision = "563961dfcfd4589755190d285555e4f9eface890"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -143,8 +154,8 @@ let package = Package(
         ),
 
         // =================================================================
-        // macOS MLX CLI host - registers real mlx-swift callbacks, then
-        // delegates to the existing C++ rcli command stack in-process.
+        // macOS CLI host — registers real mlx-swift callbacks, then
+        // delegates to the C++ rcli stack with llama.cpp + MLX both enabled.
         // =================================================================
         .executable(
             name: "RunAnywhereMLXCLI",
@@ -171,7 +182,10 @@ let package = Package(
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
         // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.6")),
+        .package(
+            url: "https://github.com/PrismML-Eng/mlx-swift.git",
+            revision: prismMLXSwiftRevision
+        ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
@@ -268,7 +282,11 @@ let package = Package(
             exclude: [
                 "CRACommons",
                 "Generated/router.pb.swift",
-                "Generated/diffusion_options.pb.swift",
+                // `diffusion_options.pb.swift` is compiled into the module: the
+                // CoreML Stable-Diffusion facade (RunAnywhere+Diffusion /
+                // CppBridge+Diffusion) consumes RADiffusionGenerationOptions /
+                // RADiffusionResult / RADiffusionStreamEvent.
+                //
                 // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and
@@ -307,6 +325,12 @@ let package = Package(
                 "ONNXBackend",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
+                // Apple CoreML Stable-Diffusion engine. `ONNX.register()`
+                // bundles the Apple secondary backends, and this target already
+                // links CoreML + Accelerate, so it is the natural home for the
+                // diffusion engine archive. The coreml plugin auto-wins the
+                // DIFFUSION slot (priority 100) once linked.
+                "RABackendCoreMLBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include", "README.md"],
@@ -365,11 +389,12 @@ let package = Package(
         ),
 
         // =================================================================
-        // rcli host bridge for the macOS MLX CLI executable.
+        // rcli host bridge for the macOS CLI executable (RunAnywhereMLXCLI).
         //
-        // This CLI uses the MLX backend specifically, while the other binary
-        // targets also carry macOS slices for their own published products.
-        // Linux/Windows keep using the normal CMake-built pure C++ rcli.
+        // Release builds keep BOTH llama.cpp (GGUF) and MLX enabled. MLX
+        // needs Swift runtime callbacks from MLXRuntime; llama.cpp registers
+        // from C++ bootstrap via RCLI_HAS_LLAMACPP. Linux/Windows keep using
+        // the CMake-built pure C++ rcli (llama.cpp; MLX is Apple-only).
         // =================================================================
         .target(
             name: "RADesktopHostAdapter",
@@ -398,9 +423,14 @@ let package = Package(
             dependencies: [
                 "CRACommons",
                 "RADesktopHostAdapter",
+                "RABackendLlamaCPPBinary",
                 "RABackendMLXBinary",
+                "RABackendCoreMLBinary",
             ],
             path: "sdk/runanywhere-cli",
+            exclude: [
+                "dist",
+            ],
             sources: [
                 "src/app.cpp",
                 "src/bootstrap.cpp",
@@ -421,10 +451,12 @@ let package = Package(
                 "src/commands/cmd_tts.cpp",
                 "src/commands/cmd_vad.cpp",
                 "src/commands/cmd_voice.cpp",
+                "src/commands/cmd_image.cpp",
                 "src/commands/engine_options.cpp",
                 "src/commands/model_setup.cpp",
                 "src/config/cli_paths.cpp",
                 "src/io/wav_io.cpp",
+                "src/io/image_io.cpp",
                 "src/io/output.cpp",
                 "src/progress/progress_bar.cpp",
                 "src/repl/repl.cpp",
@@ -441,7 +473,9 @@ let package = Package(
                 // CLI11's C++20 codecvt path uses APIs deprecated since C++17.
                 // Select its current locale-conversion implementation.
                 .define("CLI11_HAS_CODECVT", to: "0"),
+                .define("RCLI_HAS_LLAMACPP", to: "1"),
                 .define("RCLI_HAS_MLX", to: "1"),
+                .define("RCLI_HAS_COREML", to: "1"),
                 .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
                 .headerSearchPath("include"),
                 .headerSearchPath("src"),
@@ -462,7 +496,10 @@ let package = Package(
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
                 .linkedLibrary("z"),
+                .linkedFramework("Accelerate"),
                 .linkedFramework("CoreFoundation"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
                 .linkedFramework("Security"),
             ]
         ),
@@ -471,6 +508,7 @@ let package = Package(
             name: "RunAnywhereMLXCLI",
             dependencies: [
                 "MLXRuntime",
+                "ONNXRuntime",
                 "RCLIHost",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhereMLXCLI"
@@ -530,6 +568,10 @@ func binaryTargets() -> [Target] {
                 path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
             .binaryTarget(
+                name: "RABackendCoreMLBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework"
+            ),
+            .binaryTarget(
                 name: "RABackendMLXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework"
             ),
@@ -569,22 +611,32 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "de1e00a343475ef5f575037ec94df1a25226f5b9581a3cd0b393d4ed071d1aa4"
+                checksum: "8c1129e2fb680a7d37b111d194191976055a6f276eda5562968f535ca02bee9f"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "4d7124cac80657d4a982c1c28f39830b06688b09945ec59a4a685404109ae535"
+                checksum: "5c837259d302f66aecc2c6d52332af0ee4fb43beeedbd6a3f3fd762147b37765"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "1a6d67e40d69f5da56de317413b307d07d42a7c6e2fbb1ad07f79ff4b63dd914"
+                checksum: "b50a9ebcf49a34f1cbefa6be445ced74cfa3ef47281fccfa7b1b272ba81aef79"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "a75a3c160dfec4ca36e786e4e828d04fb38fbc88b2b61d868f1acaab5f39b399"
+                checksum: "75735609334d61180c623fbf2e09f8e74a2d990b84799b3ebde1334a5ac4f38c"
+            ),
+            // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
+            // unconditional dependency on this, so the remote list must carry it.
+            // PLACEHOLDER checksum — `scripts/sync-checksums.sh` overwrites this
+            // with the real SHA-256 of RABackendCoreML-ios-v<version>.zip before
+            // tagging (release choreography), exactly like the peers above.
+            .binaryTarget(
+                name: "RABackendCoreMLBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendCoreML-ios-v\(sdkVersion).zip",
+                checksum: "93cb97b0a3e64dca8996214ebb85945202fa413e05907c260908fa6ab2b41e24"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",

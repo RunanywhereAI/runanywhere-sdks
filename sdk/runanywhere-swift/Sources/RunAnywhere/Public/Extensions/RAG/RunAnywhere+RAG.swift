@@ -172,6 +172,31 @@ public extension RunAnywhere {
 
         return try await CppBridge.RAG.shared.runQuery(options)
     }
+
+    /// Streaming RAG query. Emits a `RARAGStreamEvent` per generated token
+    /// (kind = TOKEN) as the answer is produced, then a terminal COMPLETED event
+    /// carrying the full `RARAGResult` (answer + retrieved chunks), or an ERROR.
+    ///
+    /// Because tokens surface as they generate, callers render progress live and
+    /// do not need a wall-clock timeout. Breaking out of the stream stops the
+    /// native query via backpressure.
+    static func ragQueryStream(question: String, options: RARAGQueryOptions? = nil) async throws -> AsyncStream<RARAGStreamEvent> {
+        var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
+        if queryOptions.question.isEmpty {
+            queryOptions.question = question
+        }
+        return try await ragQueryStream(queryOptions)
+    }
+
+    /// Streaming query through the generated-proto C++ RAG ABI.
+    static func ragQueryStream(_ options: RARAGQueryOptions) async throws -> AsyncStream<RARAGStreamEvent> {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+
+        return try await CppBridge.RAG.shared.runQueryStream(options)
+    }
 }
 
 private extension RunAnywhere {

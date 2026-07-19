@@ -578,6 +578,14 @@ export interface ToolCallingSessionCreateRequest {
   autoExecute?: boolean | undefined;
   replaceSystemPrompt: boolean;
   requireJsonArguments: boolean;
+  /**
+   * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+   * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+   * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+   * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+   * cross-proto import cycle.
+   */
+  history: string[];
 }
 
 export interface ToolCallingSessionCreateResult {
@@ -3441,6 +3449,7 @@ function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRe
     autoExecute: undefined,
     replaceSystemPrompt: false,
     requireJsonArguments: false,
+    history: [],
   };
 }
 
@@ -3493,6 +3502,9 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     }
     if (message.requireJsonArguments !== false) {
       writer.uint32(144).bool(message.requireJsonArguments);
+    }
+    for (const v of message.history) {
+      writer.uint32(154).string(v!);
     }
     return writer;
   },
@@ -3632,6 +3644,14 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
           message.requireJsonArguments = reader.bool();
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.history.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3709,6 +3729,9 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
         : isSet(object.require_json_arguments)
         ? globalThis.Boolean(object.require_json_arguments)
         : false,
+      history: globalThis.Array.isArray(object?.history)
+        ? object.history.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -3762,6 +3785,9 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     if (message.requireJsonArguments !== false) {
       obj.requireJsonArguments = message.requireJsonArguments;
     }
+    if (message.history?.length) {
+      obj.history = message.history;
+    }
     return obj;
   },
 
@@ -3788,6 +3814,7 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
     message.autoExecute = object.autoExecute ?? undefined;
     message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
     message.requireJsonArguments = object.requireJsonArguments ?? false;
+    message.history = object.history?.map((e) => e) || [];
     return message;
   },
 };

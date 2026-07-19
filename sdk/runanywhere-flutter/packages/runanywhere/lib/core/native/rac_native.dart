@@ -1255,6 +1255,15 @@ class RacBindings {
                   RaFlutterVoiceAgentProcessTurnNativePortDart
                 >('ra_flutter_voice_agent_process_turn_proto_native_port'),
           ),
+      ra_flutter_rag_query_stream_proto_native_port =
+          _lookupOptionalIn<RaFlutterVoiceAgentProcessTurnNativePortDart>(
+            _helperLookupLibraries(lib, helperLib),
+            (library) =>
+                library.lookupFunction<
+                  RaFlutterVoiceAgentProcessTurnNativePortNative,
+                  RaFlutterVoiceAgentProcessTurnNativePortDart
+                >('ra_flutter_rag_query_stream_proto_native_port'),
+          ),
       ra_flutter_voice_agent_set_proto_callback_native_port =
           _lookupOptionalIn<RaFlutterVoiceAgentSetProtoCallbackNativePortDart>(
             _helperLookupLibraries(lib, helperLib),
@@ -2095,6 +2104,12 @@ class RacBindings {
 
   final RaFlutterVoiceAgentProcessTurnNativePortDart?
   ra_flutter_voice_agent_process_turn_proto_native_port;
+
+  /// RAG streaming query helper. Reuses the handle-taking native-port shape
+  /// (session ptr + request bytes + Dart port + postCObject) — the C++ helper
+  /// copies each RAGStreamEvent and posts it, then posts the rc sentinel.
+  final RaFlutterVoiceAgentProcessTurnNativePortDart?
+  ra_flutter_rag_query_stream_proto_native_port;
 
   final RaFlutterVoiceAgentSetProtoCallbackNativePortDart?
   ra_flutter_voice_agent_set_proto_callback_native_port;

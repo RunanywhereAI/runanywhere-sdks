@@ -14,6 +14,7 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.defaults
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -194,8 +195,10 @@ internal data class LLMStreamModelIdentity(
  *   when the backend does not surface it directly.
  * @param events Flow of stream events from [generateStream]. Consumed until
  *   [RALLMStreamEvent.is_final] is true or the flow completes.
- * @param onToken Optional callback invoked for each non-empty token text with the
- *   accumulated transcript so far (suitable for live UI updates).
+ * @param onThinking Optional callback invoked for each typed thought token with
+ *   the accumulated model-emitted reasoning text so far.
+ * @param onToken Optional callback invoked for each typed answer token with the
+ *   accumulated answer transcript so far.
  * @return A populated [RALLMGenerationResult] whose [RALLMGenerationResult.framework]
  *   matches the loaded LLM model's analytics key; on terminal error events the
  *   [RALLMGenerationResult.error_message] is propagated.
@@ -203,12 +206,14 @@ internal data class LLMStreamModelIdentity(
 suspend fun RunAnywhere.aggregateStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,
+    onThinking: (suspend (String) -> Unit)? = null,
     onToken: (suspend (String) -> Unit)? = null,
 ): RALLMGenerationResult =
     aggregateLLMStream(
         prompt = prompt,
         events = events,
         onToken = onToken,
+        onThinking = onThinking,
         resolveModelIdentity = {
             val snapshot =
                 currentModel(
@@ -233,8 +238,10 @@ internal suspend fun aggregateLLMStream(
     onToken: (suspend (String) -> Unit)?,
     resolveModelIdentity: suspend () -> LLMStreamModelIdentity,
     nowMillis: () -> Long = System::currentTimeMillis,
+    onThinking: (suspend (String) -> Unit)? = null,
 ): RALLMGenerationResult {
-    val fullResponse = StringBuilder()
+    val answerResponse = StringBuilder()
+    val thinkingResponse = StringBuilder()
     var tokenCount = 0
     var firstTokenTimeMs: Long? = null
     val startTimeMs = nowMillis()
@@ -249,9 +256,18 @@ internal suspend fun aggregateLLMStream(
         }.collect { event ->
             if (event.token.isNotEmpty()) {
                 if (firstTokenTimeMs == null) firstTokenTimeMs = nowMillis()
-                fullResponse.append(event.token)
                 tokenCount += 1
-                onToken?.invoke(fullResponse.toString())
+                when (event.kind) {
+                    TokenKind.TOKEN_KIND_THOUGHT -> {
+                        thinkingResponse.append(event.token)
+                        onThinking?.invoke(thinkingResponse.toString())
+                    }
+                    TokenKind.TOKEN_KIND_TOOL_CALL -> Unit
+                    else -> {
+                        answerResponse.append(event.token)
+                        onToken?.invoke(answerResponse.toString())
+                    }
+                }
             }
             if (event.is_final) {
                 finalEvent = event
@@ -271,8 +287,8 @@ internal suspend fun aggregateLLMStream(
     val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
     val tokensGenerated = final?.completion_tokens ?: tokenCount
     return RALLMGenerationResult(
-        text = final?.text ?: fullResponse.toString(),
-        thinking_content = final?.thinking_content,
+        text = final?.text ?: answerResponse.toString(),
+        thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
         input_tokens = inputTokens,
         tokens_generated = tokensGenerated,
         response_tokens = tokensGenerated,

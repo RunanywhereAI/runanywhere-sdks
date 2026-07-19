@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -46,6 +47,9 @@ fun ModelRow(
     onSelect: () -> Unit,
     onDownload: () -> Unit,
     onDelete: (() -> Unit)? = null,
+    // When non-null, the busy spinner becomes a tap-to-cancel control so an
+    // in-flight download can be stopped. Null keeps the plain progress spinner.
+    onCancel: (() -> Unit)? = null,
     highlightLabel: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -136,7 +140,7 @@ fun ModelRow(
 
             Spacer(Modifier.width(dimens.spacingSm))
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                TrailingAction(isCurrent, isReady, isBusy, model, onDownload)
+                TrailingAction(isCurrent, isReady, isBusy, model, onDownload, onCancel)
                 if (onDelete != null && isReady) {
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                         Icon(
@@ -166,16 +170,42 @@ private fun TrailingAction(
     isBusy: Boolean,
     model: RAModelInfo,
     onDownload: () -> Unit,
+    onCancel: (() -> Unit)? = null,
 ) {
     when {
         isCurrent -> Pill("Loaded", primaryGreen)
-        isBusy -> CircularProgressIndicator(
+        isBusy -> DownloadProgressAction(onCancel)
+        isReady -> Pill("Use", primaryGreen)
+        else -> DownloadChip(model = model, onDownload = onDownload)
+    }
+}
+
+// Busy-state control. With [onCancel] the spinner sits inside a tap target that
+// stops the download; without it, it stays a plain progress indicator.
+@Composable
+private fun DownloadProgressAction(onCancel: (() -> Unit)?) {
+    if (onCancel == null) {
+        CircularProgressIndicator(
             modifier = Modifier.size(20.dp),
             strokeWidth = 2.dp,
             color = MaterialTheme.colorScheme.primary,
         )
-        isReady -> Pill("Use", primaryGreen)
-        else -> DownloadChip(model = model, onDownload = onDownload)
+        return
+    }
+    IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Icon(
+                imageVector = RACIcons.Outline.Close,
+                contentDescription = "Cancel download",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(12.dp),
+            )
+        }
     }
 }
 

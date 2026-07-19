@@ -74,6 +74,31 @@ export interface CatalogFileEntry {
   isRequired?: boolean;
 }
 
+/**
+ * Browser-runtime compatibility is separate from model-format compatibility:
+ * a GGUF may be valid for the PrismML llama.cpp backend while still being too
+ * large for the WebAssembly 32-bit address space once runtime/KV overhead is
+ * included. Keep this typed so every Web consumer renders the same reason.
+ */
+export enum WebModelCompatibilityCode {
+  WASM32_ADDRESS_SPACE = 'wasm32-address-space',
+}
+
+export type WebModelCompatibility =
+  | { supported: true }
+  | {
+      supported: false;
+      code: WebModelCompatibilityCode;
+      reason: string;
+      reference?: {
+        label: string;
+        url: string;
+      };
+    };
+
+const WASM32_ADDRESS_SPACE_BYTES = 2 ** 32;
+const MINIMUM_WASM_RUNTIME_HEADROOM_BYTES = 512 * 1024 * 1024;
+
 const CATALOG: readonly CatalogEntry[] = [
   // ---------- Language (LLM) ----------
   {
@@ -149,6 +174,81 @@ const CATALOG: readonly CatalogEntry[] = [
       'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
     downloadSizeBytes: 2_497_281_312,
     memoryRequiredBytes: 3_000_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
+    // GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS. Unlike the 27B sibling below, this
+    // size comfortably clears the WASM 4 GB heap gate with runtime/KV
+    // headroom to spare, so it's a normal, fully-usable in-browser entry.
+    id: 'bonsai-1.7b-q1_0',
+    name: 'Bonsai-1.7B 1-bit Q1_0',
+    description: 'PrismML 1-bit 1.7B LLM. Small enough to run comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf',
+    downloadSizeBytes: 248_302_272,
+    memoryRequiredBytes: 350_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-4b-q1_0',
+    name: 'Bonsai-4B 1-bit Q1_0',
+    description: 'PrismML 1-bit 4B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf',
+    downloadSizeBytes: 572_270_624,
+    memoryRequiredBytes: 700_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-8b-q1_0',
+    name: 'Bonsai-8B 1-bit Q1_0',
+    description: 'PrismML 1-bit 8B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf',
+    downloadSizeBytes: 1_158_654_496,
+    memoryRequiredBytes: 1_400_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // EXPERIMENTAL: PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant,
+    // qwen3_5 GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS. At ~3.8 GB the artifact sits at the
+    // WASM 4 GB heap ceiling and cannot leave the minimum runtime/KV-cache
+    // headroom required by this llama.cpp path. The catalog keeps the entry
+    // visible for cross-platform discovery, while `webModelCompatibility`
+    // prevents Web download/load and points users to a native app. PrismML's own browser demo
+    // ("Bonsai 27B WebGPU Kernels" HF Space) uses a separate custom kernel
+    // stack, not this WASM llama.cpp path.
+    id: 'bonsai-27b-q1_0',
+    name: 'Bonsai-27B 1-bit Q1_0 (Experimental)',
+    description:
+      'PrismML 1-bit 27B LLM. ~3.8 GB download at the WASM heap limit — likely to run out of memory in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
+    downloadSizeBytes: 3_803_452_480,
+    memoryRequiredBytes: 4_000_000_000,
     contextLength: 4096,
     supportsThinking: true,
   },
@@ -402,6 +502,59 @@ export function registerModelCatalog(): number {
 /** Get the declarative catalog. Safe to call before SDK initialization. */
 export function getCatalog(): readonly CatalogEntry[] {
   return CATALOG;
+}
+
+/**
+ * Decide whether a catalog entry can complete the Web download/load path.
+ *
+ * Downloads currently pass through a WASM32 MEMFS before being persisted to
+ * OPFS, and inference needs the same linear address space for runtime state
+ * and KV cache. Reserve a conservative 512 MiB for that non-model state. The
+ * 3.803 GB Bonsai artifact therefore exceeds the 4 GiB WASM32 ceiling before
+ * inference can begin, even on a machine with abundant physical memory.
+ */
+export function webModelCompatibility(entry: CatalogEntry): WebModelCompatibility {
+  const base = webSizeCompatibility(entry.downloadSizeBytes, entry.memoryRequiredBytes);
+  if (base.supported) return base;
+  if (entry.id === 'bonsai-27b-q1_0') {
+    return {
+      ...base,
+      reference: {
+        label: 'Experimental direct-WebGPU reference',
+        url: 'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',
+      },
+    };
+  }
+  return base;
+}
+
+/**
+ * Same 4 GiB WASM32 gate as `webModelCompatibility`, expressed over raw sizes so
+ * ad-hoc models (e.g. an arbitrary Hugging Face GGUF added at runtime) can reuse
+ * the identical check without first being promoted to a `CatalogEntry`.
+ */
+export function webSizeCompatibility(
+  downloadSizeBytes: number,
+  memoryRequiredBytes: number,
+): WebModelCompatibility {
+  const modelBytes = Math.max(downloadSizeBytes, memoryRequiredBytes);
+  if (modelBytes + MINIMUM_WASM_RUNTIME_HEADROOM_BYTES <= WASM32_ADDRESS_SPACE_BYTES) {
+    return { supported: true };
+  }
+
+  const remainingMiB = Math.max(
+    0,
+    Math.round((WASM32_ADDRESS_SPACE_BYTES - modelBytes) / (1024 * 1024)),
+  );
+  return {
+    supported: false,
+    code: WebModelCompatibilityCode.WASM32_ADDRESS_SPACE,
+    reason:
+      `RunAnywhere's current llama.cpp/WebGPU backend must stage this `
+      + `${(downloadSizeBytes / 1_000_000_000).toFixed(3)} GB GGUF in a 4 GiB WASM32 heap `
+      + `before GPU upload, leaving only ${remainingMiB} MiB for loader, runtime, and KV-cache state. `
+      + 'This model is likely to run out of memory in-browser; use a native app instead.',
+  };
 }
 
 // ---------------------------------------------------------------------------

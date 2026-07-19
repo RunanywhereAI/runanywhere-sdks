@@ -21,6 +21,7 @@
 #include <mutex>
 #include <new>
 #include <random>
+#include <map>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -609,9 +610,22 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
         voice.set_framework(rac::events::framework_to_proto_int(fw));
     }
     voice.set_is_streaming(is_streaming);
+    // Plain (non-hybrid) STT attribution: the model that served it, with no
+    // fallback and a single attempt. The hybrid router overrides these via its
+    // own emit; here they fill the STT row's routed_backend/was_fallback/
+    // attempt_count columns instead of leaving them null. Only on a successful
+    // transcription (a start/failure carries no routing outcome).
+    std::map<std::string, std::string> props;
+    if (kind == runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED && model_id != nullptr &&
+        model_id[0] != '\0') {
+        props["routed_backend"] = model_id;
+        props["was_fallback"] = "0";
+        props["attempt_count"] = "1";
+    }
     rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                       runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                      transcription_id);
+                                      transcription_id, runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED,
+                                      props.empty() ? nullptr : &props);
 }
 
 #endif  // RAC_HAVE_PROTOBUF

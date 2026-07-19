@@ -49,6 +49,15 @@ std::mutex g_lifecycle_mutex;
 std::condition_variable g_lifecycle_cv;
 std::map<runanywhere::v1::SDKComponent, std::shared_ptr<LoadedModel>> g_loaded;
 
+// Backend creation is intentionally performed outside g_lifecycle_mutex, but
+// the complete check/create/install sequence still has to be single-filed.
+// Without this admission gate, concurrent cold loads can both miss the READY
+// fast path, initialize duplicate backends, and then replace one another in the
+// component slot. Keep this mutex separate from g_lifecycle_mutex: lifecycle
+// accessors and destroy_loaded_model() must remain able to drain active refs
+// while a load is in progress.
+std::mutex g_load_admission_mutex;
+
 // Map a model's declared inference framework to the registered plugin engine
 // name (the manifest `.name` each engine publishes). Returns nullptr for
 // frameworks that have no dedicated engine (UNSPECIFIED), which keeps the
@@ -101,6 +110,42 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->embeddings_ops = nullptr;
     model->vlm_ops = nullptr;
     model->diffusion_ops = nullptr;
+}
+
+// Cross-modality DSP eviction. A single Hexagon NPU cannot hold an LLM, a VLM,
+// and an embedding backend co-resident — each QHexRT context reserves DSP
+// memory at create() time, so loading a second QHexRT-framework model into a
+// different component slot OOMs the DSP instead of transparently paging. Before
+// creating a new QHexRT (NPU) backend we therefore evict every OTHER component's
+// QHexRT model, freeing their DSP contexts. Same-component replacement is handled
+// separately by the caller's create-then-swap. Only QHexRT entries are touched:
+// CPU/cloud backends (llamacpp, ONNX, platform) are memory-independent and stay
+// resident. destroy_loaded_model() drains active_refs, so a model mid-generate
+// is never yanked out from under an in-flight request.
+std::vector<std::shared_ptr<LoadedModel>>
+evict_other_qhexrt_models(runanywhere::v1::SDKComponent keep_component) {
+    std::vector<std::shared_ptr<LoadedModel>> victims;
+    {
+        std::lock_guard<std::mutex> lock(g_lifecycle_mutex);
+        for (auto it = g_loaded.begin(); it != g_loaded.end();) {
+            if (it->first != keep_component && it->second &&
+                it->second->framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT) {
+                it->second->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+                it->second->updated_at_ms = now_ms();
+                victims.push_back(it->second);
+                it = g_loaded.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    for (const auto& victim : victims) {
+        RAC_LOG_INFO("model_lifecycle",
+                     "Evicting co-resident QHexRT model '%s' to free DSP memory for a new NPU load",
+                     victim->model_id.c_str());
+        destroy_loaded_model(victim);
+    }
+    return victims;
 }
 
 namespace {
@@ -321,6 +366,37 @@ install_loaded_entry(runanywhere::v1::SDKComponent component,
     return displaced;
 }
 
+// Failure-path installer for create-then-swap (A12). A new load that fails
+// must not strand the caller with an empty slot: if the previous READY model
+// (`preserve`) is still the current occupant, leave it in place and drop the
+// error sentinel, so the caller keeps a usable backend. Only when the slot no
+// longer holds the preserved model (nothing was resident, a force_reload tore
+// it down, or a concurrent load replaced it) does the sentinel take the slot,
+// returning the displaced occupant for the caller to destroy. Returns true when
+// the preserved model was kept (the sentinel was not installed).
+bool install_failed_entry_preserving(
+    runanywhere::v1::SDKComponent component,
+    const std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel>& preserve,
+    std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> failed,
+    std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel>* out_displaced) {
+    namespace detail = rac::core::model_lifecycle::detail;
+    std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
+    auto it = detail::g_loaded.find(component);
+    if (preserve && it != detail::g_loaded.end() && it->second == preserve &&
+        preserve->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
+        return true;  // keep the resident model; discard the error sentinel
+    }
+    std::shared_ptr<detail::LoadedModel> displaced;
+    if (it != detail::g_loaded.end()) {
+        displaced = std::move(it->second);
+    }
+    detail::g_loaded[component] = std::move(failed);
+    if (out_displaced != nullptr) {
+        *out_displaced = std::move(displaced);
+    }
+    return false;
+}
+
 constexpr const char* kLoraAdapterModelIDPrefix = "lora-adapter:";
 constexpr const char* kLoraAdapterTag = "lora-adapter";
 constexpr const char* kLegacyLoraAdapterTag = "lora";
@@ -527,13 +603,27 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         return detail::copy_proto(result, out_result);
     }
 
-    // The same-model READY fast path and the eviction of the previous slot
-    // occupant must observe the same g_loaded state — two separate lock
-    // acquisitions would let a concurrent load slip in between and be evicted
-    // (or returned) incorrectly. The destroy itself stays outside the lock
-    // because destroy_loaded_model() re-acquires g_lifecycle_mutex to wait
+    // Serialize the mutating load phase across all component slots. This is
+    // deliberately broader than a same-model gate: QHexRT contexts share one
+    // process-wide DSP, and different-model loads targeting the same component
+    // also need deterministic admission order. Registry lookup, auto-download,
+    // and artifact resolution stay outside the gate; the download orchestrator
+    // already deduplicates active work for a model.
+    std::unique_lock<std::mutex> load_admission_lock(detail::g_load_admission_mutex);
+
+    // Same-component slot handling. The READY fast path is re-checked only
+    // after admission, so a concurrent non-force follower observes the model
+    // installed by the leader and returns without creating another backend.
+    // The previous occupant is captured but left installed so a failed new
+    // load does not strand the caller with an empty slot (create-then-swap: the
+    // old backend is destroyed only after the new one is created successfully,
+    // or explicitly for a same-model force_reload). The destroy stays outside
+    // g_lifecycle_mutex because destroy_loaded_model() re-acquires it to wait
     // for active_refs to drain.
+    // `previous_loaded` is torn down up front (force-reload only). `swap_previous`
+    // is the create-then-swap occupant left installed and displaced on success.
     std::shared_ptr<detail::LoadedModel> previous_loaded;
+    std::shared_ptr<detail::LoadedModel> swap_previous;
     ComponentLifecycleState previous_state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     {
         std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
@@ -548,15 +638,50 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                 return detail::copy_proto(result, out_result);
             }
             previous_state = existing->second->state;
-            previous_loaded = existing->second;
-            detail::g_loaded.erase(existing);
+            // A same-model force_reload cannot hold two backends for one context
+            // at once (the reload targets the very DSP/context the old one owns),
+            // so tear the old one down up front. A DIFFERENT model keeps the old
+            // backend resident until the new one is proven, then swaps.
+            if (request.force_reload() && existing->second->model_id == request.model_id()) {
+                previous_loaded = existing->second;
+                detail::g_loaded.erase(existing);
+            } else {
+                swap_previous = existing->second;
+            }
         }
     }
     detail::destroy_loaded_model(previous_loaded);
 
-    detail::publish_component_event(component, previous_state,
-                                    runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                    request.model_id(), nullptr, nullptr, nullptr);
+    // Cross-modality guard (A5): a new QHexRT/NPU backend cannot co-reside with
+    // another component's QHexRT context on the DSP. Evict them before create so
+    // the new load has DSP memory; done after the same-component teardown above
+    // so a same-model force_reload frees its own context first.
+    std::vector<std::shared_ptr<detail::LoadedModel>> evicted_qhexrt_models;
+    if (framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT) {
+        evicted_qhexrt_models = detail::evict_other_qhexrt_models(component);
+    }
+
+    // Component event subscribers are external callbacks and may synchronously
+    // re-enter lifecycle APIs. Publish only after releasing the admission gate.
+    // The load's transitions are collected here and emitted in their original
+    // LOADING-then-terminal order after the slot has reached its terminal state.
+    // `emit_loading_transition` is false when a preserved-load failure keeps the
+    // resident model: publishing `previous_state -> LOADING` for the failed
+    // request.model_id() would be spurious (that model never loaded) and would
+    // leak a phantom LOADING transition onto a slot whose resident never moved.
+    const auto publish_deferred_transitions = [&](bool emit_loading_transition) {
+        for (const auto& evicted : evicted_qhexrt_models) {
+            detail::publish_component_event(evicted->component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_UNLOADING,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+                                            evicted->model_id, nullptr, nullptr, nullptr);
+        }
+        if (emit_loading_transition) {
+            detail::publish_component_event(component, previous_state,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            request.model_id(), nullptr, nullptr, nullptr);
+        }
+    };
 
     // Pin the engine the model was built for when its framework is known
     // (priority order alone cannot tell two backends serving the same primitive
@@ -589,11 +714,33 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
         failed->updated_at_ms = detail::now_ms();
         failed->error_message = error;
-        detail::destroy_loaded_model(install_loaded_entry(component, std::move(failed)));
-        detail::publish_component_event(
-            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
-            result.error_message().c_str());
+        std::shared_ptr<detail::LoadedModel> displaced;
+        const bool preserved = install_failed_entry_preserving(component, swap_previous,
+                                                               std::move(failed), &displaced);
+        detail::destroy_loaded_model(displaced);
+        load_admission_lock.unlock();
+        publish_deferred_transitions(!preserved);
+        if (preserved) {
+            // The resident model was kept. Emit a benign READY->READY for the
+            // PRESERVED (resident) model — not the failed request — carrying its
+            // own result so subscribers never see the failed id or its error
+            // message attributed to a working model. `swap_previous` is
+            // guaranteed non-null + READY whenever preserved is true.
+            ModelLoadResult resident = detail::make_load_result(
+                true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
+                swap_previous->resolved_path, swap_previous->resolved_artifacts,
+                swap_previous->loaded_at_ms, "");
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            swap_previous->model_id, &resident, nullptr, nullptr);
+        } else {
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                            request.model_id(), &result, nullptr,
+                                            result.error_message().c_str());
+        }
         return detail::copy_proto(result, out_result);
     }
 
@@ -602,9 +749,19 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     rc = detail::create_backend_impl(vt, primitive, resolved_path, artifact_resolution.mmproj_path,
                                      &impl, &destroy);
     if (rc != RAC_SUCCESS) {
+        // Compose the generic per-code message with the backend's "caused by"
+        // detail (set via rac_error_set_details inside create/initialize, e.g.
+        // the real MLX weight-mismatch error) so the caller sees the actual
+        // reason instead of only "Failed to load the model".
+        const char* generic = rac_error_message(rc);
+        const char* detail_str = rac_error_get_details();
+        std::string load_error = generic ? generic : "";
+        if (detail_str != nullptr && detail_str[0] != '\0') {
+            load_error.append(": ").append(detail_str);
+        }
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
-                                     artifact_resolution.artifacts, 0, rac_error_message(rc));
+                                     artifact_resolution.artifacts, 0, load_error);
         auto failed = std::make_shared<detail::LoadedModel>();
         failed->component = component;
         failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
@@ -617,11 +774,36 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
         failed->updated_at_ms = detail::now_ms();
         failed->error_message = result.error_message();
-        detail::destroy_loaded_model(install_loaded_entry(component, std::move(failed)));
-        detail::publish_component_event(
-            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
-            result.error_message().c_str());
+        // Create-then-swap (A12): the previous READY backend was never torn down
+        // for a different-model load, so a failed create keeps it resident
+        // instead of stranding the slot.
+        std::shared_ptr<detail::LoadedModel> displaced;
+        const bool preserved = install_failed_entry_preserving(component, swap_previous,
+                                                               std::move(failed), &displaced);
+        detail::destroy_loaded_model(displaced);
+        load_admission_lock.unlock();
+        publish_deferred_transitions(!preserved);
+        if (preserved) {
+            // The resident model was kept. Emit a benign READY->READY for the
+            // PRESERVED (resident) model — not the failed request — carrying its
+            // own result so subscribers never see the failed id or its error
+            // message attributed to a working model. `swap_previous` is
+            // guaranteed non-null + READY whenever preserved is true.
+            ModelLoadResult resident = detail::make_load_result(
+                true, swap_previous->model_id, swap_previous->category, swap_previous->framework,
+                swap_previous->resolved_path, swap_previous->resolved_artifacts,
+                swap_previous->loaded_at_ms, "");
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+                                            swap_previous->model_id, &resident, nullptr, nullptr);
+        } else {
+            detail::publish_component_event(component,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
+                                            request.model_id(), &result, nullptr,
+                                            result.error_message().c_str());
+        }
         return detail::copy_proto(result, out_result);
     }
 
@@ -662,6 +844,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     ModelLoadResult result =
         detail::make_load_result(true, request.model_id(), category, framework, resolved_path,
                                  artifact_resolution.artifacts, loaded_at_ms, "");
+    load_admission_lock.unlock();
+    publish_deferred_transitions(true);
     detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                     runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                     request.model_id(), &result, nullptr, nullptr);

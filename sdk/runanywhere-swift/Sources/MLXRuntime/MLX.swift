@@ -293,6 +293,13 @@ private struct MLXLLMOptionsSnapshot: Sendable {
     let frequencyPenalty: Float
     let seed: Int64
     let disableThinking: Bool
+    /// System prompt (options.system_prompt); nil when NULL/empty. MLX used to
+    /// ignore this, so the model never saw the system instruction.
+    let systemPrompt: String?
+    /// Prior conversation turns (options.history/n_history), alternating
+    /// user,assistant in chronological order (commons-normalized). MLX used to
+    /// ignore these, so the model had no memory across turns.
+    let history: [String]
 
     init(_ options: UnsafePointer<rac_llm_options_t>?) {
         guard let options = options?.pointee else {
@@ -307,6 +314,8 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             frequencyPenalty = 0
             seed = 0
             disableThinking = false
+            systemPrompt = nil
+            history = []
             return
         }
 
@@ -321,6 +330,16 @@ private struct MLXLLMOptionsSnapshot: Sendable {
         frequencyPenalty = options.frequency_penalty
         seed = options.seed
         disableThinking = options.disable_thinking == RAC_TRUE
+        if let sys = options.system_prompt.map({ String(cString: $0) }), !sys.isEmpty {
+            systemPrompt = sys
+        } else {
+            systemPrompt = nil
+        }
+        if let entries = options.history, options.n_history > 0 {
+            history = (0..<Int(options.n_history)).compactMap { entries[$0].map { String(cString: $0) } }
+        } else {
+            history = []
+        }
     }
 }
 
@@ -652,10 +671,7 @@ private final class MLXSession: @unchecked Sendable {
     func generate(prompt: String, options: MLXLLMOptionsSnapshot) async throws
         -> (String, MLXGenerationMetrics) {
         let params = generateParameters(from: options)
-        let input = UserInput(
-            prompt: prompt,
-            additionalContext: llmAdditionalContext(from: options)
-        )
+        let input = llmUserInput(prompt: prompt, options: options)
         return try await collect(input: input, parameters: params)
     }
 
@@ -666,10 +682,7 @@ private final class MLXSession: @unchecked Sendable {
         userData: MLXCallbackUserData
     ) async throws -> MLXGenerationMetrics {
         let params = generateParameters(from: options)
-        let input = UserInput(
-            prompt: prompt,
-            additionalContext: llmAdditionalContext(from: options)
-        )
+        let input = llmUserInput(prompt: prompt, options: options)
         return try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
             return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
@@ -799,8 +812,7 @@ private final class MLXSession: @unchecked Sendable {
 
         generationLoop: for try await event in events {
             if isCancelled {
-                shouldFlushHeldTokens = false
-                break
+                throw CancellationError()
             }
             switch event {
             case .chunk(let token):
@@ -863,7 +875,7 @@ private final class MLXSession: @unchecked Sendable {
 
         for await event in events {
             if isCancelled {
-                break
+                throw CancellationError()
             }
             switch event {
             case .chunk(let token):
@@ -1238,16 +1250,37 @@ private func describeMLXError(_ error: Error) -> String {
     return "\(described): \(localized)"
 }
 
+/// Maps a raw MLX error to a concise, user-facing explanation for known failure
+/// shapes. Returns nil when there is no friendlier form, in which case callers
+/// fall back to the raw description (which is always logged in full anyway).
+private func friendlyMLXLoadReason(_ error: Error) -> String? {
+    let described = String(describing: error)
+    // mlx-swift-lm raises `keyNotFound(...)` when a checkpoint's weights don't
+    // line up with the model implementation it selected — i.e. the on-device
+    // MLX runtime is too old for (or otherwise incompatible with) this model's
+    // architecture. Show that plainly instead of the raw tensor-key dump.
+    if described.contains("keyNotFound") || described.contains("not found in") {
+        return "This model isn't compatible with the current on-device MLX runtime "
+            + "— its architecture needs a newer MLX version. Try a different model."
+    }
+    return nil
+}
+
 private func recordMLXFailure(_ operation: String, error: Error, modelPath: String? = nil) {
     let reason = describeMLXError(error)
-    let detail: String
+    let rawDetail: String
     if let modelPath, !modelPath.isEmpty {
-        detail = "\(operation) failed for \(modelPath): \(reason)"
+        rawDetail = "\(operation) failed for \(modelPath): \(reason)"
     } else {
-        detail = "\(operation) failed: \(reason)"
+        rawDetail = "\(operation) failed: \(reason)"
     }
-    detail.withCString { rac_error_set_details($0) }
-    mlxRuntimeLogger.error("\(detail)")
+    // The full raw detail always goes to the logs so developers can debug the
+    // exact cause (e.g. the missing tensor key).
+    mlxRuntimeLogger.error("\(rawDetail)")
+    // The caller-facing detail (surfaced in the UI via rac_error_get_details)
+    // prefers a friendly summary for known failures; otherwise the raw detail.
+    let userDetail = friendlyMLXLoadReason(error) ?? rawDetail
+    userDetail.withCString { rac_error_set_details($0) }
 }
 
 private final class SyncResultBox<T>: @unchecked Sendable {
@@ -1276,6 +1309,29 @@ private func llmAdditionalContext(from options: MLXLLMOptionsSnapshot) -> [Strin
         return nil
     }
     return ["enable_thinking": false]
+}
+
+/// Build the MLX `UserInput` for an LLM turn. Reconstructs the full conversation
+/// — `{system, history, current prompt}` — so the model's own chat template
+/// renders prior turns and the system instruction. Without this the MLX runtime
+/// only ever saw the current prompt (no memory, no system prompt); llama.cpp
+/// already renders this in commons, and MLX owns its template so it must do the
+/// same here. Falls back to the single-prompt path when there is no history and
+/// no system prompt.
+private func llmUserInput(prompt: String, options: MLXLLMOptionsSnapshot) -> UserInput {
+    let context = llmAdditionalContext(from: options)
+    guard options.systemPrompt != nil || !options.history.isEmpty else {
+        return UserInput(prompt: prompt, additionalContext: context)
+    }
+    var chat: [Chat.Message] = []
+    if let system = options.systemPrompt {
+        chat.append(.system(system))
+    }
+    for (index, turn) in options.history.enumerated() {
+        chat.append(index.isMultiple(of: 2) ? .user(turn) : .assistant(turn))
+    }
+    chat.append(.user(prompt))
+    return UserInput(chat: chat, additionalContext: context)
 }
 
 private func generateParameters(from options: MLXVLMOptionsSnapshot) -> GenerateParameters {
@@ -1536,6 +1592,9 @@ private let mlxLLMGenerate: rac_mlx_llm_generate_fn = { handle, promptPtr, optio
         outResult.pointee.tokens_per_second = output.1.tokensPerSecond
         return outResult.pointee.text == nil ? RAC_ERROR_OUT_OF_MEMORY : RAC_SUCCESS
     case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
         recordMLXFailure("MLX text generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
     }
@@ -1559,6 +1618,9 @@ private let mlxLLMGenerateStream: rac_mlx_llm_generate_stream_fn = { handle, pro
     case .success:
         return RAC_SUCCESS
     case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
         recordMLXFailure("MLX streaming text generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
     }
@@ -1587,6 +1649,9 @@ private let mlxVLMProcess: rac_mlx_vlm_process_fn = { handle, image, promptPtr, 
         outResult.pointee.tokens_per_second = output.1.tokensPerSecond
         return outResult.pointee.text == nil ? RAC_ERROR_OUT_OF_MEMORY : RAC_SUCCESS
     case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
         recordMLXFailure("MLX vision generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
     }
@@ -1618,6 +1683,9 @@ private let mlxVLMProcessStream: rac_mlx_vlm_process_stream_fn = { handle, image
     case .success:
         return RAC_SUCCESS
     case .failure(let error):
+        if error is CancellationError {
+            return RAC_ERROR_CANCELLED
+        }
         recordMLXFailure("MLX streaming vision generation", error: error)
         return RAC_ERROR_GENERATION_FAILED
     }

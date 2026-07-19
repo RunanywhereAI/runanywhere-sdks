@@ -12,7 +12,9 @@ import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
+import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGDocument
@@ -80,6 +82,32 @@ object CppBridgeRAG {
             ),
             "racRagQueryRequestProto",
         )
+
+    /**
+     * Request-scoped streaming query: blocks the calling thread, invoking [onEvent]
+     * with each RAGStreamEvent (TOKEN…, then COMPLETED or ERROR). [onEvent] returns
+     * false to stop early (backpressure). Cancel this exact stream from another
+     * thread via [cancelQueryRequest] with the same [requestId], so concurrent
+     * collectors cannot cancel each other.
+     */
+    internal fun queryStreamRequest(
+        requestId: Long,
+        request: NativeRAGQueryRequest,
+        onEvent: (RAGStreamEvent) -> Boolean,
+    ) {
+        val rc =
+            RunAnywhereBridge.racRagQueryStreamRequestProto(
+                requestId,
+                // The coordinator owns the lifecycle gate before this method is
+                // called, so the current handle is exactly this request's session.
+                requireSession(),
+                request.queryProto,
+                NativeProtoProgressListener { bytes -> onEvent(RAGStreamEvent.ADAPTER.decode(bytes)) },
+            )
+        if (rc != RunAnywhereBridge.RAC_SUCCESS && rc != RunAnywhereBridge.RAC_ERROR_CANCELLED) {
+            throw SDKException.operation("racRagQueryStreamRequestProto failed: $rc")
+        }
+    }
 
     /** Cancel only the matching request-scoped JNI query wrapper. */
     internal fun cancelQueryRequest(

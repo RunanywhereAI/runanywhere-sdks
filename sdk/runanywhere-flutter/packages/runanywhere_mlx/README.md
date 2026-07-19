@@ -18,8 +18,8 @@ preserves that required layout without introducing SwiftPM module collisions.
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.0
-  runanywhere_mlx: ^0.20.0
+  runanywhere: ^0.20.11
+  runanywhere_mlx: ^0.20.11
 ```
 
 Register the backend before initializing the core SDK:

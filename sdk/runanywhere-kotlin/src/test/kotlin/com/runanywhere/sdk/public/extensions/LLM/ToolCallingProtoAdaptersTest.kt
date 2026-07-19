@@ -98,6 +98,25 @@ class ToolCallingProtoAdaptersTest {
     }
 
     @Test
+    fun `run loop request carries multi-turn history onto the request`() {
+        val priorTurns = listOf("What is the weather in Paris?", "It is 18C and sunny in Paris.")
+        val request =
+            makeToolCallingRunLoopRequest(
+                prompt = "and in London?",
+                options = ToolCallingOptions(tools = emptyList()),
+                llmOptions = LLMGenerationOptions(max_tokens = 128),
+                tools = emptyList(),
+                validateCalls = null,
+                history = priorTurns,
+            )
+
+        // History is threaded verbatim onto ToolCallingSessionCreateRequest.history
+        // (proto field 19); the current turn stays in `prompt`, not history.
+        assertEquals(priorTurns, request.history)
+        assertEquals("and in London?", request.prompt)
+    }
+
+    @Test
     fun `tool executor consumes and returns RAToolValue map`() {
         val executor: ToolExecutor = { args ->
             val input = args["value"]?.string

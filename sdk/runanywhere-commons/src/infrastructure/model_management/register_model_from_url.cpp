@@ -247,9 +247,19 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     if (request.has_source()) {
         multi_file.set_source(request.source());
     }
-    multi_file.set_download_size_bytes(request.has_download_size_bytes()
-                                           ? request.download_size_bytes()
-                                           : resolved.total_size_bytes);
+    // Prefer the resolver's live folder total over the caller's
+    // download_size_bytes. The caller value is frequently a stale catalog
+    // estimate copied from an older revision of the repo, whereas
+    // resolved.total_size_bytes is summed from the tree listing we just
+    // fetched. A stale (usually too-small) size under-reports the download and
+    // can slip past the pre-flight storage gate; the fresh total is the ground
+    // truth. Fall back to the caller's value only when the resolver could not
+    // determine a total (e.g. the tree listing carried no per-file sizes).
+    if (resolved.total_size_bytes > 0) {
+        multi_file.set_download_size_bytes(resolved.total_size_bytes);
+    } else if (request.has_download_size_bytes()) {
+        multi_file.set_download_size_bytes(request.download_size_bytes());
+    }
     if (request.has_memory_required_bytes()) {
         multi_file.set_memory_required_bytes(request.memory_required_bytes());
     }

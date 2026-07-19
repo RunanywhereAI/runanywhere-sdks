@@ -23,13 +23,13 @@
     },
     {
       "customType": "regex",
-      "description": "Native-toolchain pins in sdk/runanywhere-commons/VERSIONS (shell KEY=VALUE) — GitHub-tag-sourced C/C++ deps. Keyed on concrete KEY names rather than the previous `# renovate:` annotation gate (no such annotations exist in the file, which made the manager match zero entries). LLAMACPP_VERSION → ggerganov/llama.cpp.",
+      "description": "Native-toolchain pins in sdk/runanywhere-commons/VERSIONS (shell KEY=VALUE) — GitHub-tag-sourced C/C++ deps. Keyed on concrete KEY names rather than the previous `# renovate:` annotation gate (no such annotations exist in the file, which made the manager match zero entries). LLAMACPP_VERSION → PrismML-Eng/llama.cpp (Bonsai fork pin; do not point back at ggerganov tags while the prism-* pin is active).",
       "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
       "matchStrings": [
         "^LLAMACPP_VERSION=(?<currentValue>\\S+)"
       ],
       "matchStringsStrategy": "any",
-      "depNameTemplate": "ggerganov/llama.cpp",
+      "depNameTemplate": "PrismML-Eng/llama.cpp",
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "loose"
     },

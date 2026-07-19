@@ -58,6 +58,7 @@ import * as StructuredOutput from './Extensions/LLM/RunAnywhere+StructuredOutput
 import * as ToolCalling from './Extensions/LLM/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RAG/RunAnywhere+RAG';
 import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
+import * as Diffusion from './Extensions/Diffusion/RunAnywhere+Diffusion';
 import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
 import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
 import { embeddings as EmbeddingsCapability } from './Extensions/Embeddings/RunAnywhere+Embeddings';
@@ -745,6 +746,15 @@ export const RunAnywhere = {
   cancelVLMGeneration: VLM.cancelVLMGeneration,
 
   // ============================================================================
+  // Diffusion / Image Generation (Swift-shaped public extension, Apple-only)
+  // Matches Swift: RunAnywhere+Diffusion.swift
+  // ============================================================================
+
+  generateImage: Diffusion.generateImage,
+  generateImageStream: Diffusion.generateImageStream,
+  cancelImageGeneration: Diffusion.cancelImageGeneration,
+
+  // ============================================================================
   // LoRA Adapters — canonical `RunAnywhere.lora.*` namespace
   // Matches Swift: RunAnywhere+LoRA.swift
   // ============================================================================
@@ -760,6 +770,7 @@ export const RunAnywhere = {
   ragIngest: RAG.ragIngest,
   ragAddDocumentsBatch: RAG.ragAddDocumentsBatch,
   ragQuery: RAG.ragQuery,
+  ragQueryStream: RAG.ragQueryStream,
   ragClearDocuments: RAG.ragClearDocuments,
   ragGetDocumentCount: RAG.ragGetDocumentCount,
   ragDocumentCount: RAG.ragDocumentCount,

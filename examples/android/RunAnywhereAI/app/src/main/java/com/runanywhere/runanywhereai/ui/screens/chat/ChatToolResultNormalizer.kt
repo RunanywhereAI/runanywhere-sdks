@@ -24,8 +24,13 @@ internal object ChatToolResultNormalizer {
         pattern = "<\\s*(/?)\\s*(?:think|thinking)\\b[^>]*>",
         option = RegexOption.IGNORE_CASE,
     )
+    // Also catches a stream stopped mid-tag ("answer <thi"): a trailing `<`, an
+    // optional `/`, then any strict prefix of think/thinking with no closing `>`.
+    // The full-word alternation keeps the prior behavior of trimming an unclosed
+    // `<think ...` that carries attributes. A lone trailing `<` stays untouched so
+    // a legitimate less-than at the end of an answer is preserved.
     private val incompleteThinkingTag = Regex(
-        pattern = "<\\s*/?\\s*(?:think|thinking)\\b[^>]*$",
+        pattern = "<\\s*/?\\s*(?:(?:think|thinking)\\b[^>]*|t(?:h(?:i(?:n(?:k(?:i(?:n(?:g)?)?)?)?)?)?)?)$",
         options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
     )
 

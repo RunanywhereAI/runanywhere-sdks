@@ -11,7 +11,7 @@
 // Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
 
 group = 'ai.runanywhere.sdk'
-version = '0.20.0'
+version = '0.20.11'
 
 // Load binary configuration
 apply from: 'binary_config.gradle'

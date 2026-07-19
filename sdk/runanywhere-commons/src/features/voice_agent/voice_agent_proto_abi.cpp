@@ -301,6 +301,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     rac_result_t rc = RAC_SUCCESS;
     std::string error_message;
     rac_result_t error_code = RAC_SUCCESS;
+    // Monotonic 0-based turn index for this agent, stamped onto the turn metrics.
+    const int32_t turn_index = handle->turn_counter.fetch_add(1, std::memory_order_relaxed);
 
     // Per-turn timing for the telemetry MetricsEvent, read at both exits below.
     // Declared here (function scope) so the cleanup_and_return path can publish
@@ -567,7 +569,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                /*session_id=*/nullptr,
                                turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
                                turn_framework.empty() ? nullptr : turn_framework.c_str(),
-                               turn_transcript_chars, turn_response_chars, RAC_SUCCESS, nullptr);
+                               turn_transcript_chars, turn_response_chars, turn_index,
+                               /*interrupted=*/RAC_FALSE, RAC_SUCCESS, nullptr);
     return copy_proto_message(result, out_result);
 
 cleanup_and_return:
@@ -576,7 +579,9 @@ cleanup_and_return:
         stt_ms, llm_ms, tts_ms, ms_since(turn_start), turn_tokens,
         /*session_id=*/nullptr, turn_model_id.empty() ? nullptr : turn_model_id.c_str(),
         turn_framework.empty() ? nullptr : turn_framework.c_str(), turn_transcript_chars,
-        turn_response_chars, error_code, error_message.c_str());
+        turn_response_chars, turn_index,
+        error_code == RAC_ERROR_CANCELLED ? RAC_TRUE : RAC_FALSE, error_code,
+        error_message.c_str());
     return rac_proto_buffer_set_error(out_result, error_code, error_message.c_str());
 #endif
 }

@@ -180,6 +180,7 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 15,
   )
   public val require_json_arguments: Boolean = false,
+  history: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -189,6 +190,21 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 5,
   )
   public val tools: List<ToolDefinition> = immutableCopyOf("tools", tools)
+
+  /**
+   * Prior conversation turns as a flat alternating list \[user0, asst0, user1, asst1, ...\],
+   * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+   * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+   * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+   * cross-proto import cycle.
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 16,
+  )
+  public val history: List<String> = immutableCopyOf("history", history)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -216,6 +232,7 @@ public class ToolCallingSessionCreateRequest(
     if (auto_execute != other.auto_execute) return false
     if (replace_system_prompt != other.replace_system_prompt) return false
     if (require_json_arguments != other.require_json_arguments) return false
+    if (history != other.history) return false
     return true
   }
 
@@ -239,6 +256,7 @@ public class ToolCallingSessionCreateRequest(
       result = result * 37 + (auto_execute?.hashCode() ?: 0)
       result = result * 37 + replace_system_prompt.hashCode()
       result = result * 37 + require_json_arguments.hashCode()
+      result = result * 37 + history.hashCode()
       super.hashCode = result
     }
     return result
@@ -262,6 +280,7 @@ public class ToolCallingSessionCreateRequest(
     if (auto_execute != null) result += """auto_execute=$auto_execute"""
     result += """replace_system_prompt=$replace_system_prompt"""
     result += """require_json_arguments=$require_json_arguments"""
+    if (history.isNotEmpty()) result += """history=${sanitize(history)}"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -282,8 +301,9 @@ public class ToolCallingSessionCreateRequest(
     auto_execute: Boolean? = this.auto_execute,
     replace_system_prompt: Boolean = this.replace_system_prompt,
     require_json_arguments: Boolean = this.require_json_arguments,
+    history: List<String> = this.history,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format, max_tool_calls, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, auto_execute, replace_system_prompt, require_json_arguments, unknownFields)
+  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format, max_tool_calls, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, auto_execute, replace_system_prompt, require_json_arguments, history, unknownFields)
 
   public companion object {
     @JvmField
@@ -336,6 +356,7 @@ public class ToolCallingSessionCreateRequest(
         if (value.require_json_arguments != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(18, value.require_json_arguments)
         }
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(19, value.history)
         return size
       }
 
@@ -378,11 +399,13 @@ public class ToolCallingSessionCreateRequest(
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
         }
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 19, value.history)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 19, value.history)
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.require_json_arguments)
         }
@@ -440,6 +463,7 @@ public class ToolCallingSessionCreateRequest(
         var auto_execute: Boolean? = null
         var replace_system_prompt: Boolean = false
         var require_json_arguments: Boolean = false
+        val history = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -466,6 +490,7 @@ public class ToolCallingSessionCreateRequest(
             16 -> auto_execute = ProtoAdapter.BOOL.decode(reader)
             17 -> replace_system_prompt = ProtoAdapter.BOOL.decode(reader)
             18 -> require_json_arguments = ProtoAdapter.BOOL.decode(reader)
+            19 -> history.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -486,6 +511,7 @@ public class ToolCallingSessionCreateRequest(
           auto_execute = auto_execute,
           replace_system_prompt = replace_system_prompt,
           require_json_arguments = require_json_arguments,
+          history = history,
           unknownFields = unknownFields
         )
       }

@@ -64,8 +64,15 @@ import java.util.concurrent.atomic.AtomicReference
 object OkHttpHttpTransport {
     private val logger = SDKLogger("OkHttpHttpTransport")
 
-    /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
-    private const val STREAM_CHUNK_SIZE = 32 * 1024
+    /**
+     * Chunk size used for streaming body delivery. Bumped from 32 KB to 256 KB:
+     * every chunk crosses the JNI boundary into `deliverChunkNative` and drives a
+     * native progress emit + proto serialization, so a 32 KB chunk on a multi-GB
+     * GGUF produced ~65k JNI round-trips per gigabyte. 256 KB cuts that ~8x while
+     * still delivering cancellation promptly (the native side checks
+     * `cancel_requested` on every delivered chunk).
+     */
+    private const val STREAM_CHUNK_SIZE = 256 * 1024
 
     /**
      * Default OkHttp client backing the buffered `request_send` path.
@@ -112,6 +119,12 @@ object OkHttpHttpTransport {
                 .readTimeout(24, TimeUnit.HOURS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .callTimeout(0, TimeUnit.MILLISECONDS)
+                // Screen-off / doze can drop the socket mid-transfer; let OkHttp
+                // transparently retry a failed connection instead of bubbling the
+                // IOException straight up as a fatal transport error. The native
+                // download runner adds a resume-from-byte retry loop on top of
+                // this for failures OkHttp cannot recover from silently.
+                .retryOnConnectionFailure(true)
                 .build()
         }
 

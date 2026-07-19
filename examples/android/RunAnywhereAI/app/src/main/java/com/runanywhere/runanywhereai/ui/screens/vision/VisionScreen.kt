@@ -106,7 +106,8 @@ fun VisionScreen(openLiveCamera: Boolean = false) {
         }
     }
 
-    val canDescribe = model != null && visionVm.image != null && !visionVm.isGenerating
+    val canDescribe = model != null && visionVm.image != null &&
+        visionVm.prompt.isNotBlank() && !visionVm.isGenerating
 
     Column(
         modifier = Modifier
@@ -357,13 +358,44 @@ private fun StatsCard(metrics: VlmMetrics) {
     }
 }
 
-private fun decodeBitmap(context: Context, uri: Uri): Bitmap? = runCatching {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-        return@runCatching context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+// Cap the longest edge so a 12-50MP photo does not decode at full native
+// resolution and blow the heap. VLM backends downscale well below this anyway.
+private const val MAX_DECODE_EDGE = 1568
+
+private fun decodeBitmap(context: Context, uri: Uri): Bitmap? =
+    // Catch Throwable (not just Exception): a huge photo can raise
+    // OutOfMemoryError even after downsampling, and we want that to degrade to a
+    // null image (empty preview) rather than crash. runCatching{} only covers
+    // Exception, so the decode is wrapped in an explicit try/catch instead.
+    try {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+            decodeDownsampled(context, uri)
+        } else {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                val longest = maxOf(info.size.width, info.size.height)
+                if (longest > MAX_DECODE_EDGE) decoder.setTargetSampleSize(sampleSizeFor(longest))
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                decoder.isMutableRequired = false
+            }
+        }
+    } catch (t: Throwable) {
+        null
     }
-    val source = ImageDecoder.createSource(context.contentResolver, uri)
-    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-        decoder.isMutableRequired = false
+
+private fun decodeDownsampled(context: Context, uri: Uri): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = if (longest > MAX_DECODE_EDGE) sampleSizeFor(longest) else 1
     }
-}.getOrNull()
+    return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+}
+
+/** Smallest power-of-two sample size that brings [longest] at or under [MAX_DECODE_EDGE]. */
+private fun sampleSizeFor(longest: Int): Int {
+    var sample = 1
+    while (longest / sample > MAX_DECODE_EDGE) sample *= 2
+    return sample
+}

@@ -26,8 +26,10 @@ class ConversationStore: ObservableObject {
     }
     private let conversationsDirectory: URL
     private let attachmentsDirectory: URL
-    private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    /// Serial queue for all disk I/O (encode/write/read) so persistence never
+    /// blocks the main thread and writes to a file stay FIFO-ordered.
+    private let ioQueue = DispatchQueue(label: "com.runanywhere.conversationstore.io", qos: .utility)
 
     private init() {
         documentsDirectory = Self.getDocumentsDirectory()
@@ -38,12 +40,10 @@ class ConversationStore: ObservableObject {
         try? FileManager.default.createDirectory(at: conversationsDirectory, withIntermediateDirectories: true)
         try? FileManager.default.createDirectory(at: attachmentsDirectory, withIntermediateDirectories: true)
 
-        // Set up encoder/decoder
-        encoder.outputFormatting = .prettyPrinted
-        encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
 
-        // Load existing conversations
+        // Load existing conversations off the main thread so launch isn't blocked
+        // decoding every conversation file.
         loadConversations()
     }
 
@@ -67,6 +67,10 @@ class ConversationStore: ObservableObject {
         return conversation
     }
 
+    /// Ids of conversations the user deleted this session. A late write from an
+    /// in-flight generation (or a stale ViewModel) must not resurrect them.
+    private var deletedConversationIds: Set<String> = []
+
     func updateConversation(_ conversation: Conversation) {
         var updated = conversation
         updated.updatedAt = Date()
@@ -74,6 +78,11 @@ class ConversationStore: ObservableObject {
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
             // Update existing conversation
             conversations[index] = updated
+        } else if deletedConversationIds.contains(conversation.id) {
+            // Tombstoned: a write arriving after the user deleted this chat (e.g.
+            // an in-flight generation finalizing) must not re-create it on disk
+            // or in the list.
+            return
         } else {
             // First time adding this conversation (when first message is sent)
             conversations.insert(updated, at: 0)
@@ -87,6 +96,7 @@ class ConversationStore: ObservableObject {
     }
 
     func deleteConversation(_ conversation: Conversation) {
+        deletedConversationIds.insert(conversation.id)
         conversations.removeAll { $0.id == conversation.id }
 
         if currentConversation?.id == conversation.id {
@@ -97,6 +107,9 @@ class ConversationStore: ObservableObject {
         let fileURL = conversationFileURL(for: conversation.id)
         try? FileManager.default.removeItem(at: fileURL)
         try? FileManager.default.removeItem(at: attachmentDirectory(for: conversation.id))
+
+        // Let the chat ViewModel reset if it was viewing/generating this one.
+        NotificationCenter.default.post(name: .conversationDeleted, object: conversation.id)
     }
 
     func addMessage(_ message: Message, to conversation: Conversation) {
@@ -260,38 +273,43 @@ class ConversationStore: ObservableObject {
     // MARK: - Private Methods
 
     private func loadConversations() {
-        do {
-            let files = try FileManager.default.contentsOfDirectory(
-                at: conversationsDirectory,
-                includingPropertiesForKeys: [.contentModificationDateKey]
-            )
-
-            var loadedConversations: [Conversation] = []
-
-            for file in files where file.pathExtension == "json" {
-                if let data = try? Data(contentsOf: file),
-                   let conversation = try? decoder.decode(Conversation.self, from: data) {
-                    loadedConversations.append(conversation)
+        let directory = conversationsDirectory
+        ioQueue.async { [weak self] in
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let files = (try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: nil)) ?? []
+            let loaded: [Conversation] = files
+                .filter { $0.pathExtension == "json" }
+                .compactMap { file in
+                    guard let data = try? Data(contentsOf: file) else { return nil }
+                    return try? decoder.decode(Conversation.self, from: data)
                 }
+            Task { @MainActor in
+                guard let self else { return }
+                // Merge (not replace): dedupe by id so a conversation created during
+                // the async-load window isn't clobbered. Sort newest-first.
+                let existing = Set(self.conversations.map { $0.id })
+                let merged = self.conversations + loaded.filter { !existing.contains($0.id) }
+                self.conversations = merged.sorted { $0.updatedAt > $1.updatedAt }
             }
-
-            // Sort by update date, newest first
-            conversations = loadedConversations.sorted { $0.updatedAt > $1.updatedAt }
-
-            // Don't automatically set current conversation - let ChatViewModel create a new one
-        } catch {
-            print("Error loading conversations: \(error)")
         }
     }
 
     private func saveConversation(_ conversation: Conversation) {
         let fileURL = conversationFileURL(for: conversation.id)
-
-        do {
-            let data = try encoder.encode(conversation)
-            try data.write(to: fileURL)
-        } catch {
-            print("Error saving conversation: \(error)")
+        // Encode + write off the main thread. The serial queue keeps writes to the
+        // same file FIFO-ordered (last write wins, as before), so moving off-main
+        // can't reorder a turn's successive saves.
+        ioQueue.async {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            do {
+                let data = try encoder.encode(conversation)
+                try data.write(to: fileURL, options: [.atomic])
+            } catch {
+                // Best-effort persistence; a failed write is retried on the next save.
+            }
         }
     }
 

@@ -53,9 +53,25 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
                 audioData = SyntheticInputGenerator.sineWaveAudio(durationSeconds: audioDuration)
             }
 
+            let options = RASTTOptions.defaults()
+
+            // Warmup: one discarded transcription so first-run cache/JIT cost is not
+            // charged to the measured pass (parity with the LLM/VLM warmup).
+            let warmupStart = Date()
+            do {
+                _ = try await RunAnywhere.transcribe(
+                    audio: SyntheticInputGenerator.silentAudio(durationSeconds: 0.5),
+                    options: options
+                )
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                // Warmup is best-effort.
+            }
+            metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
+
             // Transcribe
             let benchStart = Date()
-            let options = RASTTOptions.defaults()
             let result = try await RunAnywhere.transcribe(audio: audioData, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 

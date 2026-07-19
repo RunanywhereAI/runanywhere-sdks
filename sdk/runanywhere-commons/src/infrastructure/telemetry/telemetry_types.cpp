@@ -11,6 +11,7 @@
 
 rac_telemetry_payload_t rac_telemetry_payload_default(void) {
     rac_telemetry_payload_t payload = {};
+    payload.has_processing_time_ms = RAC_FALSE;
     payload.success = RAC_FALSE;
     payload.has_success = RAC_FALSE;
     payload.is_streaming = RAC_FALSE;

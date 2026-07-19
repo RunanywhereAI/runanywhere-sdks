@@ -49,6 +49,7 @@ import {
   ragGetStatistics as ragGetStatisticsImpl,
   ragIngest as ragIngestImpl,
   ragQuery as ragQueryImpl,
+  ragQueryStream as ragQueryStreamImpl,
   ragResolvedConfiguration as ragResolvedConfigurationImpl,
 } from './RunAnywhere+RAG.js';
 import {
@@ -355,6 +356,12 @@ export const flatFacade = {
     ...args: Parameters<typeof ragQueryImpl>
   ): ReturnType<typeof ragQueryImpl> {
     return ragQueryImpl(...args);
+  },
+
+  ragQueryStream(
+    ...args: Parameters<typeof ragQueryStreamImpl>
+  ): ReturnType<typeof ragQueryStreamImpl> {
+    return ragQueryStreamImpl(...args);
   },
 
   // -------------------------------------------------------------------------

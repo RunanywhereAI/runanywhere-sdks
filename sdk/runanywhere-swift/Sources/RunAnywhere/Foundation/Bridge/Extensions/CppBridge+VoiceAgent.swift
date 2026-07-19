@@ -88,6 +88,17 @@ extension CppBridge {
         /// Destroy the component
         public func destroy() {
             if let handle = handle {
+                // Voice-agent streams have NO terminal event, so a consumer can
+                // still hold the C callback registration at shutdown. Tear that
+                // registration down BEFORE freeing the handle:
+                // VoiceAgentStreamAdapter.tearDown() unregisters the callback,
+                // quiesces any in-flight C dispatch, releases the retained
+                // trampoline context, and finishes every consumer (safe no-op
+                // when no stream is active). Without this, rac_voice_agent_destroy
+                // frees the handle while a dispatch may still be inside the
+                // trampoline, and a later stream cancellation would call
+                // rac_voice_agent_set_proto_callback on the freed handle — a UAF.
+                VoiceAgentStreamAdapter(handle: handle).tearDown()
                 rac_voice_agent_cleanup(handle)
                 rac_voice_agent_destroy(handle)
                 self.handle = nil

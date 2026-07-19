@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Model downloads run in a foreground service so multi-GB NPU bundles keep
+         transferring when the screen turns off (Doze). WAKE_LOCK keeps the CPU
+         servicing the socket; POST_NOTIFICATIONS backs the required progress
+         notification (runtime-requested on Android 13+). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Vision screen Live mode (in-app CameraX preview). NOTE: because CAMERA is
          declared, the system-camera intent (TakePicturePreview) also requires the
          runtime grant — VisionScreen requests it before either capture path. -->
@@ -37,6 +46,34 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Keeps model downloads alive across screen-off (Doze). dataSync matches
+             a network file transfer; the type is also passed to startForeground. -->
+        <service
+            android:name=".download.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Zero-dependency ContentProvider that captures the application Context
+             before Application.onCreate so the Context-less model picker can launch
+             ModelDownloadService. Performs no data operations. -->
+        <provider
+            android:name=".download.ModelDownloadService$ContextInitializer"
+            android:authorities="${applicationId}.modeldownload.contextinit"
+            android:exported="false"
+            android:initOrder="100" />
+
+        <!-- Shares generated benchmark share-card PNGs from the cache dir via a
+             content:// URI so the system chooser / Instagram / X can read them. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

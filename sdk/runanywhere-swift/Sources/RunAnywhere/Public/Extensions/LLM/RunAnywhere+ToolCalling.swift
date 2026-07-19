@@ -231,6 +231,11 @@ public extension RunAnywhere {
     ///                    C++ loop forwards every parsed call to the executor
     ///                    without short-circuiting on registry / schema
     ///                    mismatches.
+    ///   - history: Prior conversation turns as a flat alternating list
+    ///              `[user0, asst0, user1, asst1, ...]`, EXCLUDING the current
+    ///              turn (which travels as `prompt`). Threaded into commons so
+    ///              the tool-calling loop keeps multi-turn context, matching the
+    ///              standard path. Defaulted empty for source compatibility.
     /// - Returns: Generated `RAToolCallingResult` with final text, tool calls,
     ///            and any executed tool results.
     ///
@@ -247,7 +252,8 @@ public extension RunAnywhere {
         toolOptions: RAToolCallingOptions? = nil,
         toolChoice: RAToolChoiceMode? = nil,
         forcedToolName: String? = nil,
-        validateCalls: Bool? = nil
+        validateCalls: Bool? = nil,
+        history: [String] = []
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -269,7 +275,8 @@ public extension RunAnywhere {
             options: options,
             toolOptions: tcOpts,
             tools: tools,
-            validateCalls: validateCalls
+            validateCalls: validateCalls,
+            history: history
         )
         let requestBytes = try request.serializedData()
         let runLoop = try NativeProtoABI.require(
@@ -385,7 +392,13 @@ public extension RunAnywhere {
         options: RALLMGenerationOptions,
         toolOptions: RAToolCallingOptions,
         tools: [RAToolDefinition],
-        validateCalls: Bool? = nil
+        validateCalls: Bool? = nil,
+        // Prior conversation turns as a flat alternating list
+        // `[user0, asst0, ...]`, EXCLUDING the current turn (which is `prompt`).
+        // commons threads these into every generate in the loop so multi-turn
+        // tool use keeps context. Same contract as the standard path's
+        // ChatMessage history, as strings.
+        history: [String] = []
     ) -> RAToolCallingSessionCreateRequest {
         var request = RAToolCallingSessionCreateRequest()
         request.prompt = prompt
@@ -441,6 +454,12 @@ public extension RunAnywhere {
         }
         // Suppress thinking when either options surface asks for it.
         request.disableThinking = toolOptions.disableThinking || options.disableThinking
+        // Prior conversation turns (flat alternating [user, asst, ...] of prior
+        // turns, excluding the current turn) so the commons run-loop keeps
+        // multi-turn context. `history` is a swift-protobuf repeated field
+        // (proto field 19), assignable directly. Empty by default — a no-op
+        // for single-turn callers.
+        request.history = history
         return request
     }
 }
