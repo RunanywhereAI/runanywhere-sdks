@@ -28,6 +28,20 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
                    "RunAnywhere home directory (default: $RUNANYWHERE_HOME or "
                    "~/.local/share/runanywhere; models live under <home>/Models)");
 
+    // Control-plane connection. Absent flags keep the historical offline
+    // development-mode defaults; validation happens in resolve_connection().
+    app.add_option("--environment", options.environment,
+                   "Control-plane environment: dev (default, offline), staging "
+                   "(http + localhost allowed) or prod (https only)")
+        ->envname("RUNANYWHERE_ENV")
+        ->check(CLI::IsMember({"dev", "development", "staging", "prod", "production"}));
+    app.add_option("--base-url", options.base_url,
+                   "Control-plane base URL, e.g. https://api.runanywhere.ai or "
+                   "http://localhost:8000 (staging/prod)")
+        ->envname("RUNANYWHERE_BASE_URL");
+    app.add_option("--api-key", options.api_key, "Control-plane API key (staging/prod)")
+        ->envname("RUNANYWHERE_API_KEY");
+
     commands::register_version(app, options);
     commands::register_info(app, options);
     commands::register_backends(app, options);
@@ -44,6 +58,8 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     commands::register_vad(app, options);
     commands::register_voice(app, options);
     commands::register_serve(app, options);
+    commands::register_auth(app, options);
+    commands::register_telemetry(app, options);
 }
 
 int run(int argc, char** argv) {

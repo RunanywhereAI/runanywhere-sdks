@@ -10,6 +10,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_sdk_state.h"
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -18,6 +19,7 @@
 #include "catalog/catalog.h"
 #include "config/cli_paths.h"
 #include "io/output.h"
+#include "net/control_plane.h"
 
 #if defined(RCLI_HAS_LLAMACPP)
 #include "rac/backends/rac_llm_llamacpp.h"
@@ -150,7 +152,7 @@ const char *desktop_platform() {
 #endif
 }
 
-void initialize_sdk_metadata() {
+void initialize_sdk_metadata(const Connection &connection) {
   char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
   const rac_result_t device_rc =
       rac_device_get_or_create_persistent_id(device_id, sizeof(device_id));
@@ -163,10 +165,21 @@ void initialize_sdk_metadata() {
   const std::string locale = detect_locale();
   const std::string timezone = detect_timezone();
 
+  // Mirror rac_sdk_init_phase1_proto's step order: runtime state first (the
+  // auth / device-registration / telemetry paths read env + credentials from
+  // rac_state), then the copied SDK configuration + client info.
+  const rac_result_t state_rc = rac_state_initialize(
+      connection.environment, connection.api_key.c_str(),
+      connection.base_url.c_str(), device_id[0] != '\0' ? device_id : "");
+  if (state_rc != RAC_SUCCESS) {
+    out::status_line("warning: SDK state init failed: " +
+                     out::describe_result(state_rc));
+  }
+
   rac_sdk_config_t sdk_config = {};
-  sdk_config.environment = RAC_ENV_DEVELOPMENT;
-  sdk_config.api_key = "";
-  sdk_config.base_url = "";
+  sdk_config.environment = connection.environment;
+  sdk_config.api_key = connection.api_key.c_str();
+  sdk_config.base_url = connection.base_url.c_str();
   sdk_config.device_id = device_id[0] != '\0' ? device_id : "";
   sdk_config.platform = desktop_platform();
   sdk_config.sdk_version = RCLI_VERSION;
@@ -185,13 +198,92 @@ void initialize_sdk_metadata() {
   }
 }
 
+bool parse_environment_name(const std::string &name, rac_environment_t *out) {
+  if (name.empty() || name == "dev" || name == "development") {
+    *out = RAC_ENV_DEVELOPMENT;
+    return true;
+  }
+  if (name == "staging") {
+    *out = RAC_ENV_STAGING;
+    return true;
+  }
+  if (name == "prod" || name == "production") {
+    *out = RAC_ENV_PRODUCTION;
+    return true;
+  }
+  return false;
+}
+
 } // namespace
+
+rac_result_t resolve_connection(const GlobalOptions &options, Connection *out,
+                                std::string *error) {
+  Connection connection;
+  if (!parse_environment_name(options.environment, &connection.environment)) {
+    if (error) {
+      *error = "invalid --environment '" + options.environment +
+               "' (expected dev, staging or prod)";
+    }
+    return RAC_ERROR_INVALID_CONFIGURATION;
+  }
+  connection.base_url = options.base_url;
+  connection.api_key = options.api_key;
+
+  if (connection.environment == RAC_ENV_DEVELOPMENT) {
+    if (!connection.api_key.empty() || !connection.base_url.empty()) {
+      if (error) {
+        *error = "development mode (the default) has no control plane; pass "
+                 "--environment staging (or prod) together with --base-url "
+                 "and --api-key";
+      }
+      return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+    if (out) {
+      *out = connection;
+    }
+    return RAC_SUCCESS;
+  }
+
+  const rac_validation_result_t key_rc = rac_validate_api_key(
+      connection.api_key.empty() ? nullptr : connection.api_key.c_str(),
+      connection.environment);
+  if (key_rc != RAC_VALIDATION_OK) {
+    if (error) {
+      *error = std::string(rac_validation_error_message(key_rc)) +
+               " (--api-key / RUNANYWHERE_API_KEY)";
+    }
+    return RAC_ERROR_INVALID_CONFIGURATION;
+  }
+  const rac_validation_result_t url_rc = rac_validate_base_url(
+      connection.base_url.empty() ? nullptr : connection.base_url.c_str(),
+      connection.environment);
+  if (url_rc != RAC_VALIDATION_OK) {
+    if (error) {
+      *error = std::string(rac_validation_error_message(url_rc)) +
+               " (--base-url / RUNANYWHERE_BASE_URL)";
+    }
+    return RAC_ERROR_INVALID_CONFIGURATION;
+  }
+
+  if (out) {
+    *out = connection;
+  }
+  return RAC_SUCCESS;
+}
 
 rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
   const std::string home = paths::resolve_home(options.home_override);
   if (home.empty()) {
     out::error_line("cannot resolve RunAnywhere home ($HOME unset?)");
     return RAC_ERROR_NOT_INITIALIZED;
+  }
+
+  Connection connection;
+  std::string connection_error;
+  if (resolve_connection(options, &connection, &connection_error) !=
+      RAC_SUCCESS) {
+    out::error_line(connection_error);
+    return RAC_ERROR_INVALID_CONFIGURATION;
   }
 
   if (!g_bootstrapped) {
@@ -234,7 +326,13 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
       return rc;
     }
 
-    initialize_sdk_metadata();
+    initialize_sdk_metadata(connection);
+
+    // Platform wiring for the control-plane flows (`rcli auth login`,
+    // `rcli telemetry ...`): device-manager callbacks route registration
+    // POSTs through the registered curl transport. Same role the per-SDK
+    // bridges play; a no-op for commands that never touch the network.
+    net::register_device_callbacks();
 
 #if defined(RCLI_HAS_LLAMACPP)
     if (rac_backend_llamacpp_register() != RAC_SUCCESS) {
