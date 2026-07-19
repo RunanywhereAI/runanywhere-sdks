@@ -10,6 +10,11 @@ import Foundation
 import Network
 import SwiftProtobuf
 
+// The transport below is one queue-confined protocol state machine. Keeping its
+// framing, heartbeat, host, and client transitions together makes ownership and
+// cancellation invariants auditable.
+// swiftlint:disable file_length
+
 #if os(iOS)
 import UIKit
 #endif
@@ -53,7 +58,7 @@ public struct ConnectModel: Identifiable, Equatable, Sendable {
         self.supportsStreaming = supportsStreaming
     }
 
-    fileprivate init(_ descriptor: RAConnectModelDescriptor) {
+    init(_ descriptor: RAConnectModelDescriptor) {
         self.init(
             id: descriptor.modelID,
             displayName: descriptor.displayName,
@@ -63,7 +68,7 @@ public struct ConnectModel: Identifiable, Equatable, Sendable {
         )
     }
 
-    fileprivate var proto: RAConnectModelDescriptor {
+    var proto: RAConnectModelDescriptor {
         var descriptor = RAConnectModelDescriptor()
         descriptor.modelID = id
         descriptor.displayName = displayName
@@ -447,7 +452,8 @@ private enum ConnectTransportError: LocalizedError {
     }
 }
 
-/// Serial-queue-confined Network.framework adapter.
+// Serial-queue-confined Network.framework adapter.
+// swiftlint:disable:next type_body_length
 private final class ConnectTransport: @unchecked Sendable {
     static let serviceType = "_runanywhere-connect._tcp"
     static let protocolVersion: UInt32 = 1
