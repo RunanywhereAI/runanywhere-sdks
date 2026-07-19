@@ -52,6 +52,7 @@ internal object ModelCatalog {
         // ring, degenerates into garbage, and the decode fails with rc=-130.
         SingleFileModel("llama3_2_1b", "Llama 3.2 1B (HNPU)", "https://huggingface.co/runanywhere/llama3_2_1b_HNPU/llama-3.2-1b.json", QHEXRT, LANGUAGE, 3_023_821_212L, contextLength = 512),
         SingleFileModel("ternary_bonsai_1_7b", "Ternary Bonsai 1.7B (HNPU)", "https://huggingface.co/runanywhere/ternary_bonsai_1_7b_HNPU/ternary-bonsai-1.7b-1024.json", QHEXRT, LANGUAGE, 2_367_579_370L, contextLength = 1_024),
+        SingleFileModel("bonsai_1_7b_1bit", "Bonsai-1.7B 1-bit (HNPU, fully-on-NPU)", "https://huggingface.co/runanywhere/bonsai_1_7b_1bit_HNPU/bonsai-1.7b-1bit-1024.json", QHEXRT, LANGUAGE, 902_000_000L, contextLength = 1_024),
         SingleFileModel("bonsai_4b_1bit", "Bonsai-4B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_4b_1bit_HNPU/bonsai-4b-1024.json", QHEXRT, LANGUAGE, 1_358_352_318L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("bonsai_8b_1bit", "Bonsai-8B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_8b_1bit_HNPU/bonsai-8b-1024.json", QHEXRT, LANGUAGE, 2_323_975_102L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("bonsai_27b_1bit", "Bonsai-27B 1-bit (HNPU)", "https://huggingface.co/runanywhere/bonsai_27b_1bit_HNPU/bonsai-27b-1024.json", QHEXRT, LANGUAGE, 6_400_000_000L, contextLength = 1_024, supportsThinking = true),

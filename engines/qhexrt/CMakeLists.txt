@@ -442,6 +442,33 @@ if(RAC_PLATFORM_ANDROID AND _qhexrt_prebuilt_valid)
         ${CMAKE_DL_LIBS})
     find_package(Threads REQUIRED)
     list(APPEND QHEXRT_LINK_LIBS Threads::Threads)
+
+    # A Bonsai-enabled core archive pulls in the FastRPC transport stub
+    # (run_main_on_hexagon_stub.c + bonsai_npu.cpp): rpcmem_* / remote_handle64_* /
+    # remote_session_control, provided by libcdsprpc.so — a /vendor system lib on
+    # device that the app already bundles in jniLibs. Detect the stub in the
+    # prebuilt core and link the matching cdsprpc stub so the static link resolves;
+    # the real vendor lib backs it at runtime. Override with -DQHEXRT_LIBCDSPRPC=.
+    file(STRINGS "${QHEXRT_CORE_LIB}" _qhexrt_core_fastrpc
+        REGEX "remote_handle64_open" LIMIT_COUNT 1)
+    if(_qhexrt_core_fastrpc)
+        if(NOT QHEXRT_LIBCDSPRPC)
+            find_file(QHEXRT_LIBCDSPRPC libcdsprpc.so
+                PATHS
+                    "$ENV{HEXAGON_SDK_ROOT}/ipc/fastrpc/remote/ship/android_aarch64"
+                    "${CMAKE_SOURCE_DIR}/../hexagon-sdk/root/Hexagon_SDK/6.6.0.0/ipc/fastrpc/remote/ship/android_aarch64"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-kotlin/src/main/jniLibs/arm64-v8a"
+                NO_DEFAULT_PATH)
+        endif()
+        if(QHEXRT_LIBCDSPRPC AND EXISTS "${QHEXRT_LIBCDSPRPC}")
+            message(STATUS "  QHexRT: Bonsai FastRPC core -> linking libcdsprpc: ${QHEXRT_LIBCDSPRPC}")
+            list(APPEND QHEXRT_LINK_LIBS "${QHEXRT_LIBCDSPRPC}")
+        else()
+            message(FATAL_ERROR
+                "QHexRT prebuilt core needs FastRPC (libcdsprpc.so) but none was found; "
+                "set -DQHEXRT_LIBCDSPRPC=/path/to/libcdsprpc.so")
+        endif()
+    endif()
 else()
     set(RAC_QHEXRT_ENGINE_AVAILABLE 0)
     list(APPEND QHEXRT_COMPILE_DEFS RAC_QHEXRT_ENGINE_AVAILABLE=0)
