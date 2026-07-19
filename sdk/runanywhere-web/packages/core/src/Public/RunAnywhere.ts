@@ -44,7 +44,7 @@ import {
 import type { SDKInitOptions } from '../types/models.js';
 import { EventBus } from '../Foundation/EventBus.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
-import { requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
+import { ensureDownloadStorageReady, requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage.js';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
 import {
@@ -1671,6 +1671,9 @@ export const RunAnywhere = {
     // recursively flushes the directory contents to OPFS + mirrors them
     // into every module's MEMFS. No Web-specific orchestrator below.
 
+    const requiredBytes = Math.max(0, Number(model.downloadSizeBytes ?? 0));
+    const storageReady = await ensureDownloadStorageReady({ requiredBytes });
+
     await prepareModelLoad({
       request: {
         modelId: request.modelId,
@@ -1684,11 +1687,12 @@ export const RunAnywhere = {
     // Prefer the browser OPFS/origin quota over MEMFS leftovers. Shipping a
     // real `availableStorageBytes` into the commons planner avoids the false
     // "only 2 GB is free" refusal on multi-GB models (Qwen3 4B, etc.).
-    await requestPersistentStorage().catch(() => undefined);
     let browserAvailableBytes = request.availableStorageBytes !== undefined
       && request.availableStorageBytes > 0
       ? request.availableStorageBytes
-      : await resolveBrowserAvailableStorageBytes();
+      : storageReady.availableBytes > 0
+        ? storageReady.availableBytes
+        : await resolveBrowserAvailableStorageBytes();
     // When estimate() is unavailable, still avoid the MEMFS ~2 GB figure that
     // commons would otherwise read via fs::space. OPFS quota is enforced by the
     // browser during the write; assertBrowserStorageQuota remains best-effort.

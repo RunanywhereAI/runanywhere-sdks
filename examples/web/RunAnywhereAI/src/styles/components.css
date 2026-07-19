@@ -1979,7 +1979,6 @@
   flex-direction: column;
   gap: var(--space-xs);
   border-top: 1px solid var(--border-light);
-  animation: fade-in var(--duration-fast) ease-out;
 }
 
 .variant-row {

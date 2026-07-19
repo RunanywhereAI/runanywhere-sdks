@@ -739,8 +739,11 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
       : 0;
     // Large models (and OPFS-only partial resumes) stream straight to OPFS so
     // WASM MEMFS heap leftovers cannot refuse a multi-GB download mid-write.
+    // When Content-Length is missing, still prefer OPFS — chunked CDN responses
+    // would otherwise buffer the full payload in MEMFS and fail mid-transfer.
     opfsDirect = underOpfs
       && (projectedTotal >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES
+        || projectedTotal === 0
         || (memfsExisting <= 0 && opfsExisting > 0));
 
     let received = resuming ? existing : 0;

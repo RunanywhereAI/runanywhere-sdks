@@ -833,12 +833,26 @@ export class OPFSBridge {
 
     const fileName = segments[segments.length - 1];
     const dirSegments = segments.slice(0, -1);
+    // Large downloads stream straight to OPFS, bypassing MEMFS. When the source
+    // is not in MEMFS there is nothing to copy — `fs.stat` throws an Emscripten
+    // ErrnoError (ENOENT). Treat an absent MEMFS source as "nothing to flush" (0)
+    // so `ensureDownloadPersisted` verifies the existing OPFS copy instead of
+    // surfacing an opaque `[object Object]` as a failed download. Mirrors the
+    // guarded pattern already used by `memfsFileSize`.
+    let size: number;
+    try {
+      size = fs.stat(path).size;
+    } catch {
+      logger.debug(
+        `flushFromMemfs: '${path}' absent from MEMFS (already streamed to OPFS?); nothing to flush`,
+      );
+      return 0;
+    }
     const dir = await resolveOPFSDirectory(dirSegments, true);
     if (!dir) {
       return 0;
     }
     const fileHandle = await dir.getFileHandle(fileName, { create: true });
-    const size = fs.stat(path).size;
     if (await flushMemfsFileChunked(fs, path, fileHandle, size)) {
       logger.info(`OPFS persisted ${size} bytes for '${path}' in chunks`);
       return size;

@@ -25,6 +25,10 @@ import {
   RunAnywhere,
   ModelCategory,
 } from '@runanywhere/web';
+import {
+  ensureDownloadStorageReady,
+  LARGE_DOWNLOAD_BYTES,
+} from '@runanywhere/web/browser';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
@@ -991,19 +995,61 @@ async function startDownload(modelId: string): Promise<void> {
       return;
     }
   }
+
+  const model = RunAnywhere.getModel(modelId);
+  if (!model) {
+    showToast(`Model ${modelId} not found in registry`, 'warning');
+    return;
+  }
+
+  const requiredBytes = entry
+    ? modelDisplaySizeBytes(entry)
+    : Math.max(0, Number(model.downloadSizeBytes ?? 0));
+
+  // First async step after the Download click — request persist() while the
+  // user gesture is still active, then verify origin quota.
+  const storage = await ensureDownloadStorageReady({ requiredBytes });
+  if (requiredBytes > 0 && !storage.sufficient) {
+    showToast(
+      `Not enough browser storage for this model (need ${formatBytes(requiredBytes)}, `
+        + `${formatBytes(storage.availableBytes)} free). Free space or open Storage → Choose Storage Folder.`,
+      'warning',
+      6000,
+    );
+    return;
+  }
+
+  if (
+    requiredBytes >= LARGE_DOWNLOAD_BYTES
+    && !storage.persisted
+    && !RunAnywhere.storage.isLocalStorageReady
+    && RunAnywhere.storage.isLocalStorageSupported
+  ) {
+    showToast('Choose a folder on disk to store this large model reliably.', 'info', 4000);
+    const picked = await RunAnywhere.storage.chooseLocalStorageDirectory();
+    if (!picked) {
+      showToast(
+        'No folder selected — download will use browser OPFS and may stop if storage is cleared.',
+        'warning',
+        6000,
+      );
+    }
+  } else if (requiredBytes >= LARGE_DOWNLOAD_BYTES && !storage.persisted) {
+    showToast(
+      'Durable browser storage was not granted. If the download stops, use Storage → Choose Storage Folder.',
+      'warning',
+      6000,
+    );
+  }
+
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const model = RunAnywhere.getModel(modelId);
-    if (!model) {
-      throw new Error(`Model ${modelId} not found in registry`);
-    }
-
     const progress = await RunAnywhere.downloadModel({
       modelId,
       model,
       allowMeteredNetwork: true,
-      resumeExisting: false,
+      resumeExisting: true,
       verifyChecksums: false,
       validateExistingBytes: false,
       updateRegistryOnCompletion: true,
@@ -1121,9 +1167,35 @@ function applyProgress(modelId: string, progress: DownloadProgress): void {
 // State + toolbar updates
 // ---------------------------------------------------------------------------
 
+/** Patch progress UI in place so download ticks do not rebuild the whole sheet. */
+function updateDownloadProgressInPlace(modelId: string, progress: number): boolean {
+  const host = document.getElementById('model-sheet-list');
+  if (!host) return false;
+
+  const row = host.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
+  if (!row) return false;
+
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+  const progressBtn = row.querySelector('.model-action-btn--progress');
+  if (progressBtn) progressBtn.textContent = `${pct}%`;
+
+  const fill = row.querySelector('.progress-fill') as HTMLElement | null;
+  if (fill) {
+    fill.style.width = `${pct}%`;
+    return true;
+  }
+  return progressBtn !== null;
+}
+
 function setRow(modelId: string, state: RowState): void {
+  const previous = rowStates.get(modelId);
   rowStates.set(modelId, state);
-  if (modalEl) renderRows();
+  if (modalEl) {
+    const progressOnly = previous?.status === 'downloading'
+      && state.status === 'downloading'
+      && updateDownloadProgressInPlace(modelId, state.progress);
+    if (!progressOnly) renderRows();
+  }
   refreshToolbarLabel();
   refreshOverlayVisibility();
   for (const listener of listeners) {

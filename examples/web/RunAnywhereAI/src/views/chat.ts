@@ -742,15 +742,26 @@ async function generateStreaming(
     },
   );
 
-  assistantMsg.thinking = result.thinkingContent?.trim()
-    || (receivedThinking ? assistantMsg.thinking : undefined);
+  const thinkingText = result.thinkingContent?.trim()
+    || (receivedThinking ? assistantMsg.thinking?.trim() : undefined);
+  assistantMsg.thinking = thinkingText || undefined;
   assistantMsg.content = result.text.trim();
   if (!assistantMsg.content) {
-    assistantMsg.content = result.finishReason === 'cancelled'
-      ? 'Cancelled.'
-      : result.finishReason === 'length'
-        ? 'The response limit was reached before a final answer. Increase Max tokens in Settings or turn off thinking, then try again.'
-        : 'The model finished without producing a final answer. Try again or turn off thinking.';
+    if (result.finishReason === 'cancelled') {
+      assistantMsg.content = 'Cancelled.';
+    } else if (result.finishReason === 'length') {
+      assistantMsg.content = 'The response limit was reached before a final answer. '
+        + 'Increase Max tokens in Settings or turn off thinking, then try again.';
+    } else if (thinkingText) {
+      // Reasoning models (especially heavily quantized ones) sometimes emit their
+      // entire reply inside the thinking channel and never close the block, so the
+      // answer channel arrives empty. Surface the reasoning as the answer rather
+      // than a dead-end error — the response is right there.
+      assistantMsg.content = thinkingText;
+      assistantMsg.thinking = undefined;
+    } else {
+      assistantMsg.content = 'The model finished without producing a final answer. Try again or turn off thinking.';
+    }
   }
   // Generation is terminal now, even though onSend's persistence cleanup is
   // still pending. Collapse reasoning immediately so the final answer below
