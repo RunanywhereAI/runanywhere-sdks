@@ -176,11 +176,10 @@ static rac_bool_t stream_adapter_callback(const char* token, rac_bool_t is_final
 static rac_result_t llamacpp_vtable_generate_stream(void* impl, const char* prompt,
                                                     const rac_llm_options_t* options,
                                                     rac_llm_stream_callback_fn callback,
-                                                    void* user_data,
-                                                    int32_t* out_tokens_generated) {
+                                                    void* user_data) {
     StreamAdapter adapter = {callback, user_data};
     return rac_llm_llamacpp_generate_stream(legacy_handle(impl), prompt, options,
-                                            stream_adapter_callback, &adapter, out_tokens_generated);
+                                            stream_adapter_callback, &adapter);
 }
 
 // Get info

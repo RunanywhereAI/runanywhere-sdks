@@ -1555,8 +1555,7 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
     // rac_llm_proto_service.cpp generate_stream path.
     try {
         rc = ref.ops->generate_stream(ref.impl, prepared_prompt.c_str(), &options,
-                                      structured_stream_token_callback, &ctx,
-                                      /*out_tokens_generated=*/nullptr);
+                                      structured_stream_token_callback, &ctx);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
         rc = RAC_ERROR_INFERENCE_FAILED;
