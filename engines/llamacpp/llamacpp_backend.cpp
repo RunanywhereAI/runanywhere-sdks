@@ -818,7 +818,8 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.finish_reason = "error";
 
     std::string generated_text;
-    int tokens_generated = 0;
+    int callback_pieces = 0;
+    int decoded_tokens = 0;
     int prompt_tokens = 0;
     double prompt_eval_ms = 0.0;
 
@@ -829,10 +830,14 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
         request,
         [&](const std::string& token) -> bool {
             generated_text += token;
-            tokens_generated++;
+            callback_pieces++;
             return !cancel_requested_.load();
         },
-        &prompt_tokens, &prompt_eval_ms);
+        &prompt_tokens, &prompt_eval_ms, &decoded_tokens);
+    // The streaming callback flushes buffered chunks, not one call per token, so
+    // callback_pieces under-counts. Use the decode loop's authoritative count;
+    // fall back to the piece count only if the out-param wasn't populated.
+    const int tokens_generated = decoded_tokens > 0 ? decoded_tokens : callback_pieces;
     RAC_LOG_INFO("LLM.LlamaCpp", "generate(): generate_stream returned success=%d, tokens=%d",
                  success, tokens_generated);
 
@@ -975,7 +980,7 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
 
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
                                              TextStreamCallback callback, int* out_prompt_tokens,
-                                             double* out_prompt_eval_ms) {
+                                             double* out_prompt_eval_ms, int* out_tokens_generated) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!is_ready_locked()) {
@@ -1158,6 +1163,9 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     // generate_from_context() via run_decode_loop().
     const int tokens_generated =
         run_decode_loop(sampler_, batch, batch.n_tokens, effective_max_tokens, callback);
+    if (out_tokens_generated != nullptr) {
+        *out_tokens_generated = tokens_generated;
+    }
 
     // TODO(streaming-tools): Emit tool_call_delta events during stream.
     // To support generateWithToolsStream for Web and RN, the generate_stream

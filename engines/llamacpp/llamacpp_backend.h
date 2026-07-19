@@ -154,9 +154,14 @@ class LlamaCppTextGeneration {
      * @param callback          Streaming callback; return false to cancel.
      * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
      * @param out_prompt_eval_ms Optional: prefill (prompt decode) time in ms (may be NULL).
+     * @param out_tokens_generated Optional: authoritative decoded-token count from
+     *        the decode loop (may be NULL). Prefer this over counting streaming
+     *        callback invocations — the callback flushes buffered chunks, not one
+     *        call per token, so callback counts under-report generated tokens.
      */
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens = nullptr, double* out_prompt_eval_ms = nullptr);
+                         int* out_prompt_tokens = nullptr, double* out_prompt_eval_ms = nullptr,
+                         int* out_tokens_generated = nullptr);
 
     void cancel();
 
