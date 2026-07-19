@@ -15,6 +15,16 @@ import kotlin.coroutines.cancellation.CancellationException
 // before RunAnywhere.initialize().
 object ModelBootstrap {
 
+    private val npuCatalogState = NpuCatalogState()
+
+    /** QHexRT rows accepted by the native device-aware catalog facade this run. */
+    internal val registeredNpuModelIds: Set<String>
+        get() = npuCatalogState.snapshots.value.registeredModelIds
+
+    /** Emits after every completed native catalog seed/refresh. */
+    internal val npuCatalogSnapshots
+        get() = npuCatalogState.snapshots
+
     suspend fun setupModels() {
         registerRemoteBackends()
         seedCatalog()
@@ -50,15 +60,14 @@ object ModelBootstrap {
 
         // NPU catalog is now owned by the SDK — probe, arch-filter, register,
         // and refresh all happen inside QHexRT.seedCatalog().
-        // QHexRT.register() must be called first so the backend is initialized.
-        QHexRT.register()
-        val npuCount = QHexRT.seedCatalog()
-        RACLog.i("catalog seeded: ok=$ok failed=$fail npu=$npuCount")
+        val npu = QHexRT.seedCatalog()
+        npuCatalogState.publish(npu.registeredIds)
+        RACLog.i("catalog seeded: ok=$ok failed=$fail npu=${npu.registeredCount}")
     }
 
     // NPU catalog is now owned by the SDK — delegate to QHexRT.seedCatalog().
     suspend fun refreshNpuCatalog() {
-        val npuCount = QHexRT.seedCatalog()
+        val npu = QHexRT.seedCatalog()
         val registryRefreshed = try {
             RunAnywhere.refreshModelRegistry()
             true
@@ -68,7 +77,8 @@ object ModelBootstrap {
             RACLog.e("npu catalog registry refresh failed", e)
             false
         }
-        RACLog.i("npu catalog refreshed: seedCount=$npuCount registryRefreshed=$registryRefreshed")
+        npuCatalogState.publish(npu.registeredIds)
+        RACLog.i("npu catalog refreshed: seedCount=${npu.registeredCount} registryRefreshed=$registryRefreshed")
     }
 
     private suspend fun seedLora() {
