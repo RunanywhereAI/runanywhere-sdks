@@ -39,6 +39,7 @@ set(RCLI_SOURCES
     src/commands/cmd_vad.cpp
     src/commands/cmd_voice.cpp
     src/commands/cmd_rag.cpp
+    src/commands/cmd_bench.cpp
     src/commands/engine_options.cpp
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp

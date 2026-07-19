@@ -44,6 +44,7 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     commands::register_vad(app, options);
     commands::register_voice(app, options);
     commands::register_rag(app, options);
+    commands::register_bench(app, options);
     commands::register_serve(app, options);
 }
 
