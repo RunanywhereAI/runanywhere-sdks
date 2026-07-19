@@ -192,6 +192,29 @@ npm run test:integration
 
 See `native/CMakeLists.txt` and the repo build docs for compiling the addon.
 
+### Building for GPU (CUDA / NVIDIA)
+
+The default build is CPU-only. To offload inference to an NVIDIA GPU, build with
+`-DRAC_GPU_CUDA=ON` (needs the CUDA toolkit **≥ 12.4** and MSVC). This compiles
+llama.cpp's CUDA backend; at load time `common_fit_params` auto-offloads as many
+layers as fit VRAM — no runtime code changes.
+
+```powershell
+# From the repo root. Set CMAKE_CUDA_ARCHITECTURES to your GPU (86 = RTX 30-series).
+$env:NVCC_PREPEND_FLAGS = '-allow-unsupported-compiler'   # only if MSVC is newer than the CUDA toolkit officially supports
+cmake -S . -B build/windows-cuda -G "Visual Studio 17 2022" -A x64 `
+  -T cuda="C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6" `
+  -DRAC_GPU_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 `
+  -DRAC_BUILD_ELECTRON_ADDON=ON -DRAC_BUILD_BACKENDS=ON -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_SHARED=OFF
+cmake --build build/windows-cuda --config Release --target runanywhere_native --parallel
+```
+
+Then put the built `runanywhere_native.node` in `prebuilds/win32-x64-cuda/`
+beside the DLLs it links: `cudart64_12.dll`, `cublas64_12.dll`,
+`cublasLt64_12.dll` (from the CUDA `bin/`) plus `onnxruntime.dll`,
+`onnxruntime_providers_shared.dll`, `sherpa-onnx-c-api.dll`. The demo's
+`examples/electron/RunAnywhereAI/run-demo-gpu.cmd` launches against that prebuild.
+
 ## License
 
 See the repository `LICENSE`.
