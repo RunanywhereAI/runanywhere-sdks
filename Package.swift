@@ -434,6 +434,7 @@ let package = Package(
             sources: [
                 "src/app.cpp",
                 "src/bootstrap.cpp",
+                "src/net/control_plane.cpp",
                 "src/catalog/catalog.cpp",
                 "src/catalog/model_ref.cpp",
                 "src/commands/cmd_version.cpp",
@@ -452,6 +453,8 @@ let package = Package(
                 "src/commands/cmd_vad.cpp",
                 "src/commands/cmd_voice.cpp",
                 "src/commands/cmd_image.cpp",
+                "src/commands/cmd_auth.cpp",
+                "src/commands/cmd_telemetry.cpp",
                 "src/commands/engine_options.cpp",
                 "src/commands/model_setup.cpp",
                 "src/config/cli_paths.cpp",
