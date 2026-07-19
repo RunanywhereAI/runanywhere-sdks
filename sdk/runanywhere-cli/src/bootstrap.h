@@ -18,6 +18,8 @@
 
 #include "rac/core/rac_types.h"
 
+typedef struct rac_telemetry_manager rac_telemetry_manager_t;
+
 namespace rcli {
 
 /** Global flags shared by all subcommands (parsed in main.cpp). */
@@ -45,6 +47,13 @@ rac_result_t bootstrap(const GlobalOptions& options, Bootstrapped* out);
 
 /** rac_shutdown() wrapper; safe to call when bootstrap never ran. */
 void shutdown();
+
+/**
+ * The process telemetry manager created by bootstrap() (NULL if telemetry was
+ * not initialized, e.g. no creds). Exposed for the live telemetry integration
+ * test, which overrides its HTTP callback to observe the backend's response.
+ */
+rac_telemetry_manager_t* active_telemetry_manager();
 
 }  // namespace rcli
 

@@ -552,4 +552,6 @@ void shutdown() {
   }
 }
 
+rac_telemetry_manager_t *active_telemetry_manager() { return g_telemetry_manager; }
+
 } // namespace rcli
