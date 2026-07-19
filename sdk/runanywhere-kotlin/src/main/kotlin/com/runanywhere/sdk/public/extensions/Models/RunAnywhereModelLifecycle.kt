@@ -24,6 +24,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -48,7 +49,9 @@ suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResul
         }
         try {
             ensureServicesReady()
-        } catch (_: Throwable) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
         val result =
             CppBridgeModelLifecycle.load(request)

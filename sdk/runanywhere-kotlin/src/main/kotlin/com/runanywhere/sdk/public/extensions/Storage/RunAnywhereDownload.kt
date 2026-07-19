@@ -146,7 +146,7 @@ suspend fun RunAnywhere.downloadModel(
                     downloadLogger.info(
                         "Download cancelled for ${resolvedModel.id} (task=${startResult.task_id})",
                     )
-                } catch (e: Throwable) {
+                } catch (e: Exception) {
                     downloadLogger.warn(
                         "Failed to cancel native download for ${resolvedModel.id} " +
                             "(task=${startResult.task_id}): ${e.message}",

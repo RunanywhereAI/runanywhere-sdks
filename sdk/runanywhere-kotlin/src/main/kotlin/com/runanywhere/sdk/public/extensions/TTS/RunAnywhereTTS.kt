@@ -24,6 +24,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -127,7 +128,9 @@ fun RunAnywhere.synthesizeStream(
                             trySend(output).isSuccess
                         }
                     }
-                } catch (t: Throwable) {
+                } catch (t: CancellationException) {
+                    throw t
+                } catch (t: Exception) {
                     ttsLogger.warn("synthesizeStream errored: ${t.message}")
                 } finally {
                     close()
