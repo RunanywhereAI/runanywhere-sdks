@@ -2,17 +2,17 @@ package com.runanywhere.runanywhereai.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary tonal — Orange
-val Primary20 = Color(0xFF4E1C00)
-val Primary30 = Color(0xFF732B00)
-val Primary60 = Color(0xFFE65500)
-val Primary70 = Color(0xFFFF6D1F)
-val Primary80 = Color(0xFFFFB693)
-val Primary90 = Color(0xFFFFDBCA)
+// Primary tonal — RunAnywhere brand orange (#FF6900 hue); see examples/DESIGN_GUIDELINE.md
+val Primary20 = Color(0xFF4C1F00)
+val Primary30 = Color(0xFF732F00)
+val Primary60 = Color(0xFFE65E00)
+val Primary70 = Color(0xFFFF7B1F)
+val Primary80 = Color(0xFFFFC094)
+val Primary90 = Color(0xFFFFE1CC)
 
-// Canonical brand accent shared with the iOS and web examples (#FF5500).
+// Canonical brand accent — the RunAnywhere logo orange (#FF6900), shared with every example app.
 // Used as the dark-scheme primary so brand moments match across platforms.
-val BrandOrange = Color(0xFFFF5500)
+val BrandOrange = Color(0xFFFF6900)
 
 // Secondary tonal — Warm Neutral
 val Secondary10 = Color(0xFF1F1A17)

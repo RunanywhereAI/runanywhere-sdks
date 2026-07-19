@@ -7,7 +7,7 @@
 //
 //  Purpose: Start the background AVAudioSession and instruct the user to swipe
 //  back to the host app. Dismisses automatically once the session is ready.
-//  Branded with RunAnywhere color palette (#FF5500 primary accent).
+//  Branded with RunAnywhere color palette (#FF6900 primary accent).
 //
 
 #if os(iOS)

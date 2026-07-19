@@ -15,15 +15,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../../theme/system';
 import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import { RunAnywhere } from '@runanywhere/core';
-import {
-  getFrameworkColor,
-  getFrameworkIcon,
-} from '../../utils/modelDisplay';
+import { getFrameworkColor, getFrameworkIcon } from '../../utils/modelDisplay';
 
 interface ModelStatusBannerProps {
   /** Model name if loaded */
@@ -48,12 +48,15 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   onSelectModel,
   placeholder = 'Select a model to get started',
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   // Loading state
   if (isLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="small" color={Colors.primaryBlue} />
+          <ActivityIndicator size="small" color={colors.primary} />
           <Text style={styles.loadingText}>
             Loading model...
             {loadProgress !== undefined &&
@@ -80,16 +83,12 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.emptyContent}>
-          <Icon
-            name="add-circle-outline"
-            size={20}
-            color={Colors.primaryBlue}
-          />
+          <Icon name="add-circle-outline" size={20} color={colors.primary} />
           <Text style={styles.emptyText}>{placeholder}</Text>
         </View>
         <View style={styles.selectButton}>
           <Text style={styles.selectButtonText}>Select Model</Text>
-          <Icon name="chevron-forward" size={16} color={Colors.primaryBlue} />
+          <Icon name="chevron-forward" size={16} color={colors.primary} />
         </View>
       </TouchableOpacity>
     );
@@ -134,98 +133,99 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding12,
-    marginHorizontal: Padding.padding16,
-    marginVertical: Spacing.small,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  emptyContainer: {
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    borderStyle: 'dashed',
-  },
-  emptyContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-  },
-  emptyText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-  },
-  selectButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  loadingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    flex: 1,
-  },
-  loadingText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  progressBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: Colors.backgroundGray5,
-    borderBottomLeftRadius: BorderRadius.medium,
-    borderBottomRightRadius: BorderRadius.medium,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-  },
-  loadedContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    flex: 1,
-  },
-  frameworkBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xSmall,
-    paddingHorizontal: Spacing.smallMedium,
-    paddingVertical: Spacing.xSmall,
-    borderRadius: BorderRadius.small,
-  },
-  frameworkText: {
-    ...Typography.caption,
-    fontWeight: '600',
-  },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  changeButton: {
-    paddingHorizontal: Spacing.medium,
-    paddingVertical: Spacing.small,
-  },
-  changeButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 10,
+      padding: 12,
+      marginHorizontal: 16,
+      marginVertical: 6,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    emptyContainer: {
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      borderStyle: 'dashed',
+    },
+    emptyContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyText: {
+      ...typography.bodyMedium,
+      color: colors.onSurfaceVariant,
+    },
+    selectButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    selectButtonText: {
+      ...typography.bodyMedium,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    loadingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    loadingText: {
+      ...typography.bodyMedium,
+      color: colors.onSurfaceVariant,
+    },
+    progressBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      backgroundColor: colors.surfaceContainerHighest,
+      borderBottomLeftRadius: 10,
+      borderBottomRightRadius: 10,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+    },
+    loadedContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    frameworkBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 4,
+    },
+    frameworkText: {
+      ...typography.bodySmall,
+      fontWeight: '600',
+    },
+    modelName: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+      flex: 1,
+    },
+    changeButton: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    changeButtonText: {
+      ...typography.bodyMedium,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+  });
 
 export default ModelStatusBanner;

@@ -204,16 +204,6 @@ RAC_API rac_result_t
 rac_telemetry_manager_batch_to_json(const rac_telemetry_batch_request_t* request,
                                     rac_environment_t env, char** out_json, size_t* out_length);
 
-/**
- * @brief Parse batch response from JSON
- *
- * @param json JSON response string
- * @param out_response Output: Parsed response (caller must free)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_telemetry_manager_parse_response(
-    const char* json, rac_telemetry_batch_response_t* out_response);
-
 // =============================================================================
 // DEVICE REGISTRATION
 // =============================================================================

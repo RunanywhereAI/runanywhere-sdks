@@ -8,9 +8,12 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Modal } from 'react-native';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../../theme/system';
 
 interface LoadingOverlayProps {
   /** Whether to show the overlay */
@@ -29,6 +32,9 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   progress,
   modal = true,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   if (!visible) {
     return null;
   }
@@ -36,7 +42,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   const content = (
     <View style={styles.container}>
       <View style={styles.card}>
-        <ActivityIndicator size="large" color={Colors.primaryBlue} />
+        <ActivityIndicator size="large" color={colors.primary} />
 
         {message && <Text style={styles.message}>{message}</Text>}
 
@@ -67,53 +73,54 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   return content;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.overlayLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  card: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderRadius: BorderRadius.xLarge,
-    padding: Padding.padding30,
-    alignItems: 'center',
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  message: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    marginTop: Spacing.large,
-    textAlign: 'center',
-  },
-  progressContainer: {
-    width: '100%',
-    marginTop: Spacing.large,
-    alignItems: 'center',
-  },
-  progressBar: {
-    width: '100%',
-    height: 6,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 3,
-  },
-  progressText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: Spacing.small,
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 30,
+      alignItems: 'center',
+      minWidth: 200,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    message: {
+      ...typography.bodyLarge,
+      color: colors.onSurface,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+    progressContainer: {
+      width: '100%',
+      marginTop: 16,
+      alignItems: 'center',
+    },
+    progressBar: {
+      width: '100%',
+      height: 6,
+      backgroundColor: colors.surfaceContainerHighest,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 3,
+    },
+    progressText: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+      marginTop: 6,
+    },
+  });
 
 export default LoadingOverlay;
