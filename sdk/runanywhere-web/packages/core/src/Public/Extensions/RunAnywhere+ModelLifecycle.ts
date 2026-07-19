@@ -183,11 +183,71 @@ async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null
 
   const opfsPath = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}/${filename}`;
   if (!(await OPFSBridge.exists(opfsPath))) return null;
+  if (!(await isOpfsArtifactComplete(opfsPath, expectedDownloadBytes(model)))) return null;
 
   const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
   return isMultiFile
     ? `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`
     : opfsPath;
+}
+
+/** Expected on-disk payload size for completeness checks after interrupted downloads. */
+function expectedDownloadBytes(model: ModelInfo): number {
+  const fromFiles = (model.multiFile?.files ?? []).reduce(
+    (total, file) => total + Math.max(0, Number(file.sizeBytes ?? 0)),
+    0,
+  );
+  return Math.max(0, Number(model.downloadSizeBytes ?? 0), fromFiles);
+}
+
+/**
+ * True when OPFS holds enough of the payload to treat the download as finished.
+ * Uses the same 80% threshold as commons `validate_downloaded_sizes` so a
+ * mid-refresh partial never masquerades as a ready model.
+ */
+async function isOpfsArtifactComplete(path: string, expectedBytes: number): Promise<boolean> {
+  const size = await OPFSBridge.fileSize(path);
+  if (size <= 0) return false;
+  if (expectedBytes <= 0) return true;
+  return size * 5 >= expectedBytes * 4;
+}
+
+async function assertDownloadedArtifactReady(model: ModelInfo): Promise<void> {
+  const localPath = model.localPath;
+  if (!localPath) return;
+  const expected = expectedDownloadBytes(model);
+  const files = model.multiFile?.files ?? [];
+  if (files.length > 1) {
+    for (const file of files) {
+      if (!file.filename) continue;
+      const filePath = `${localPath}/${file.filename}`;
+      const fileExpected = Math.max(0, Number(file.sizeBytes ?? 0));
+      if (!(await OPFSBridge.exists(filePath))
+        || !(await isOpfsArtifactComplete(filePath, fileExpected))) {
+        throw new Error(
+          `Model download is incomplete for '${file.filename}'. `
+          + 'Tap Retry to finish downloading before using this model.',
+        );
+      }
+    }
+    return;
+  }
+  if (!(await OPFSBridge.exists(localPath))
+    || !(await isOpfsArtifactComplete(localPath, expected))) {
+    const actual = await OPFSBridge.fileSize(localPath);
+    throw new Error(
+      `Model download is incomplete`
+      + (expected > 0 ? ` (${actual} of ~${expected} bytes)` : '')
+      + '. Tap Retry to finish downloading before using this model.',
+    );
+  }
+}
+
+function isIncompleteDownloadError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /incomplete|interrupted|not found in browser storage|is empty in browser storage/i.test(
+    message,
+  );
 }
 
 // Web-internal lifecycle namespace. The cross-SDK canonical contract lives on
@@ -236,46 +296,49 @@ export const WebModelLifecycle = {
     // Multi-WASM caveat: each Emscripten WASM artifact (commons, llamacpp,
     // onnx-sherpa) has its OWN private MEMFS. The C++ engine `fopen`
     // executes inside whichever backend WASM owns the plugin route — NOT
-    // necessarily commons. Restoring into commons alone leaves the
-    // backend's `fopen` returning ENOENT (see post-OPFS E2E report, Bug A:
-    // "gguf_init_from_file ... No such file or directory"). Fan the
-    // restore out to every registered backend module so the file is
-    // reachable from whichever vtable claims the load. This is unique to
-    // Web/Emscripten — iOS/Android/Flutter/RN share one libc filesystem
-    // and have no equivalent isolation.
+    // necessarily commons. Hydrate ONLY that load-target module: copying a
+    // 2.5 GB GGUF into commons + llamacpp + onnx at once OOMs the tab and
+    // surfaces as "missing from 3 MEMFS module(s) after OPFS restore".
+    const adapter = requireAdapter(modelSnapshot?.framework);
     if (modelSnapshot?.localPath) {
-      const modules = getAllRegisteredModules();
-      if (modules.length > 0) {
-        try {
-          // Multi-file models (VLM = primary GGUF + mmproj sidecar,
-          // embeddings = model.onnx + vocab.txt) store every file inside the
-          // model folder; `localPath` is the folder. OPFS `getFileHandle` on
-          // a directory throws DOMException, so restoring the path as a
-          // single file silently produces zero bytes — the C++ engine then
-          // fails with "No such file or directory" (e.g. SmolVLM2 load).
-          // Iterate each file under the folder and restore individually.
-          const files = modelSnapshot.multiFile?.files ?? [];
-          if (files.length > 1) {
-            for (const file of files) {
-              if (!file.filename) continue;
-              const filePath = `${modelSnapshot.localPath}/${file.filename}`;
-              await OPFSBridge.ensureModelPathReadyForLoad(modules, filePath);
-            }
-          } else {
-            await OPFSBridge.ensureModelPathReadyForLoad(modules, modelSnapshot.localPath);
+      const loadModule = lifecycleModuleAsEmscripten(adapter);
+      const modules = [loadModule];
+      try {
+        await assertDownloadedArtifactReady(modelSnapshot);
+        // Multi-file models (VLM = primary GGUF + mmproj sidecar,
+        // embeddings = model.onnx + vocab.txt) store every file inside the
+        // model folder; `localPath` is the folder. OPFS `getFileHandle` on
+        // a directory throws DOMException, so restoring the path as a
+        // single file silently produces zero bytes — the C++ engine then
+        // fails with "No such file or directory" (e.g. SmolVLM2 load).
+        // Iterate each file under the folder and restore individually.
+        const files = modelSnapshot.multiFile?.files ?? [];
+        if (files.length > 1) {
+          for (const file of files) {
+            if (!file.filename) continue;
+            const filePath = `${modelSnapshot.localPath}/${file.filename}`;
+            await OPFSBridge.ensureModelPathReadyForLoad(modules, filePath);
           }
-        } catch (err) {
-          throw SDKException.fromCode(
-            -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
-            err instanceof Error ? err.message : String(err),
-            'loadModel',
-          );
+        } else {
+          await OPFSBridge.ensureModelPathReadyForLoad(modules, modelSnapshot.localPath);
         }
+      } catch (err) {
+        // Incomplete OPFS after a mid-download refresh: clear the registry
+        // flag so the UI swaps "Use" back to "Retry".
+        if (modelSnapshot.id && isIncompleteDownloadError(err)) {
+          try {
+            ModelRegistry.updateDownloadStatus(modelSnapshot.id, null);
+          } catch { /* ignore */ }
+        }
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+          err instanceof Error ? err.message : String(err),
+          'loadModel',
+        );
       }
     }
 
     try {
-      const adapter = requireAdapter(modelSnapshot?.framework);
       const result = await adapter.loadAsync(request);
       if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
       return result;

@@ -111,6 +111,17 @@ std::string human_size(int64_t bytes) {
 // not exist yet, so walk up to the nearest existing ancestor. Returns -1 when
 // it cannot be determined (e.g. WASM/MEMFS), so callers can skip the gate.
 int64_t filesystem_available_bytes(const std::string& path) {
+#if defined(__EMSCRIPTEN__)
+    // MEMFS `fs::space` reports WASM-heap leftovers (often ~1–2 GB), not the
+    // browser Origin Private File System quota. Trusting that figure falsely
+    // refuses multi-GB model downloads even when OPFS has tens of GB free.
+    // The Web SDK passes `available_storage_bytes` from
+    // `navigator.storage.estimate()`; when it does not, treat free space as
+    // unknown so the EMSCRIPTEN fail-open path (require_free_space=false)
+    // applies instead of a misleading MEMFS comparison.
+    (void)path;
+    return -1;
+#else
     std::error_code ec;
     fs::path probe(path);
     while (!probe.empty()) {
@@ -131,6 +142,7 @@ int64_t filesystem_available_bytes(const std::string& path) {
     if (si.available > static_cast<uintmax_t>(INT64_MAX))
         return INT64_MAX;
     return static_cast<int64_t>(si.available);
+#endif
 }
 
 // Synchronous HTTP HEAD to learn a remote file's Content-Length. Returns the

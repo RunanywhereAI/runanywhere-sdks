@@ -353,6 +353,14 @@ async function restoreOPFSFileChunked(
   }
 }
 
+/** Streaming sink used by `PlatformAdapter` http_download for large `/opfs/` files. */
+export interface OPFSStreamingWriter {
+  /** Bytes already present when the writer was opened (resume offset). */
+  readonly existingBytes: number;
+  write(chunk: Uint8Array): Promise<void>;
+  close(): Promise<void>;
+}
+
 export class OPFSBridge {
   /**
    * Paths whose synchronous MEMFS deletion has committed but whose async OPFS
@@ -362,6 +370,12 @@ export class OPFSBridge {
    */
   private static readonly suppressedPaths = new Map<string, SuppressedPersistentPath>();
   private static readonly pendingRemovals = new Map<string, Promise<void>>();
+
+  /**
+   * Above this size, `http_download` streams into OPFS and only installs a
+   * MEMFS size stub for commons validation — full bytes hydrate at load time.
+   */
+  static readonly DIRECT_DOWNLOAD_THRESHOLD_BYTES = 256 * 1024 * 1024;
 
   /** Whether the browser supports the OPFS APIs OPFSBridge needs. */
   static get isSupported(): boolean {
@@ -532,6 +546,11 @@ export class OPFSBridge {
    * After a download completes, flush MEMFS → OPFS and mirror bytes into every
    * backend module's MEMFS. Throws when persistence cannot be verified so
    * callers cannot race `loadModel` against an in-flight OPFS write.
+   *
+   * Large OPFS-direct downloads may leave MEMFS empty on purpose (bytes live
+   * only in OPFS until `ensureModelPathReadyForLoad`). In that case we verify
+   * OPFS durability and skip eager multi-module hydration so a 2.5 GB model
+   * does not get copied into every WASM heap at once.
    */
   static async ensureDownloadPersisted(
     localPath: string,
@@ -582,6 +601,16 @@ export class OPFSBridge {
       // each persisted file, so a module containing only one companion file
       // cannot masquerade as a fully hydrated model bundle.
       await OPFSBridge.restoreDirectoryToMemfsAll(filesystemModules, localPath);
+      return;
+    }
+
+    const opfsSize = opfsExpected ? await OPFSBridge.fileSize(localPath) : 0;
+    // Large OPFS-direct downloads: durable bytes are in OPFS; hydrate at load.
+    if (opfsSize >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES) {
+      logger.info(
+        `Deferred MEMFS hydration for large download '${localPath}' `
+        + `(${opfsSize} bytes in OPFS; will restore on load)`,
+      );
       return;
     }
 
@@ -651,15 +680,30 @@ export class OPFSBridge {
     if (missingModules.length === 0) return;
 
     if (opfsSupported && !(await OPFSBridge.exists(path))) {
-      throw new Error(`Model load failed: '${path}' not found in OPFS`);
+      throw new Error(
+        `Model load failed: '${path}' not found in browser storage. `
+        + 'The download may have been interrupted — tap Retry to finish downloading.',
+      );
+    }
+
+    const opfsSize = opfsSupported ? await OPFSBridge.fileSize(path) : 0;
+    if (opfsSupported && opfsSize <= 0) {
+      throw new Error(
+        `Model load failed: '${path}' is empty in browser storage. `
+        + 'Tap Retry to re-download the model.',
+      );
     }
 
     await OPFSBridge.restoreToMemfsAll(missingModules, path);
     missingModules = OPFSBridge.modulesMissingPath(missingModules, path);
     if (missingModules.length > 0) {
       throw new Error(
-        `Model load failed: '${path}' is missing from `
-        + `${missingModules.length} MEMFS module(s) after OPFS restore`,
+        `Model load failed: could not load '${path}' into memory `
+        + `(${opfsSize > 0 ? `${opfsSize} bytes on disk, ` : ''}`
+        + `${missingModules.length} WASM module(s) still empty). `
+        + 'This usually means the download was incomplete after a refresh, '
+        + 'or the model is too large for available memory. Tap Retry to finish '
+        + 'downloading, then try Use again.',
       );
     }
   }
@@ -896,12 +940,12 @@ export class OPFSBridge {
    * owns a private MEMFS — writing into one is invisible to another.
    * The model-load path in C++ runs inside the backend WASM that owns
    * the engine vtable (e.g. llamacpp), so restoring into the commons
-   * module alone leaves the backend's `fopen` returning ENOENT. To
-   * match the per-WASM isolation, mirror the file into every backend
-   * module the SDK has installed.
+   * module alone leaves the backend's `fopen` returning ENOENT.
    *
-   * Reads the file from OPFS exactly once and reuses the bytes across
-   * every MEMFS write so we do not pay N x OPFS-read cost.
+   * Large models (≥ DIRECT_DOWNLOAD_THRESHOLD) are restored with chunked
+   * MEMFS I/O so we never materialize a multi-GB `Uint8Array` in JS (that
+   * OOM'd Qwen3 4B loads after a refresh). Small files still read once and
+   * reuse the buffer across modules.
    *
    * Returns the number of bytes restored to each module (max across
    * all modules) — 0 means OPFS lookup failed or no module had an FS
@@ -927,9 +971,31 @@ export class OPFSBridge {
       return 0;
     }
 
-    const bytes = await readBytesFromOPFSFile(fileHandle);
+    const opfsSize = (await fileHandle.getFile()).size;
+    if (opfsSize <= 0) return 0;
+
     const dirPath = path.slice(0, path.lastIndexOf('/'));
+    const useChunked = opfsSize >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES
+      || modules.some((module) => {
+        const fs = getFS(module);
+        return fs !== null && supportsChunkedMemfsIO(fs);
+      });
+
+    // Small-file fast path: one OPFS read, writeFile into each MEMFS.
+    let sharedBytes: Uint8Array | null = null;
+    if (!useChunked || opfsSize < OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES) {
+      try {
+        sharedBytes = await readBytesFromOPFSFile(fileHandle);
+      } catch (err) {
+        logger.warning(
+          `restoreToMemfsAll: full OPFS read failed for '${path}' `
+          + `(${err instanceof Error ? err.message : String(err)}); falling back to chunked I/O`,
+        );
+      }
+    }
+
     let maxWritten = 0;
+    const failures: string[] = [];
     for (const module of modules) {
       const fs = getFS(module);
       if (!fs) continue;
@@ -949,15 +1015,32 @@ export class OPFSBridge {
       }
       try {
         ensureMemfsDirectory(fs, dirPath);
+        if (await restoreOPFSFileChunked(fs, path, fileHandle, opfsSize)) {
+          if (opfsSize > maxWritten) maxWritten = opfsSize;
+          continue;
+        }
+        if (sharedBytes) {
+          fs.writeFile(path, sharedBytes);
+          if (sharedBytes.length > maxWritten) maxWritten = sharedBytes.length;
+          continue;
+        }
+        // Last resort: stream chunks even when open/write was reported unsupported
+        // above (some modules expose writeFile only).
+        const bytes = await readBytesFromOPFSFile(fileHandle);
         fs.writeFile(path, bytes);
         if (bytes.length > maxWritten) maxWritten = bytes.length;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        failures.push(message);
         logger.warning(`restoreToMemfsAll: MEMFS write failed for '${path}' on a module: ${message}`);
       }
     }
     if (maxWritten > 0) {
       logger.info(`OPFS restored ${maxWritten} bytes to '${path}' across ${modules.length} module(s)`);
+    } else if (failures.length > 0) {
+      logger.warning(
+        `restoreToMemfsAll: failed to restore '${path}' (${opfsSize} bytes): ${failures[0]}`,
+      );
     }
     return maxWritten;
   }
@@ -1032,6 +1115,116 @@ export class OPFSBridge {
     const fileName = segments[segments.length - 1];
     const handle = await dir.getFileHandle(fileName, { create: true });
     await writeBytesToOPFSFile(handle, bytes);
+  }
+
+  /** Byte length of an OPFS file under the synthetic `/opfs/` path, or 0. */
+  static async fileSize(path: string): Promise<number> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return 0;
+    if (OPFSBridge.isSuppressed(path)) return 0;
+    try {
+      const dir = await resolveOPFSDirectory(segments.slice(0, -1), false);
+      if (!dir) return 0;
+      const handle = await dir.getFileHandle(segments[segments.length - 1]);
+      const file = await handle.getFile();
+      return file.size;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Open a resumable OPFS writable for streaming downloads under `/opfs/`.
+   * Returns null when OPFS is unavailable or `path` is not under the prefix.
+   *
+   * Large models (multi-GB) must land in OPFS during fetch — WASM MEMFS only
+   * has a few GB of heap headroom and falsely trips commons free-space gates.
+   */
+  static async openStreamingWriter(
+    path: string,
+    options: { resumeFrom?: number } = {},
+  ): Promise<OPFSStreamingWriter | null> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return null;
+    await OPFSBridge.preparePathForWrite(path);
+    const dir = await resolveOPFSDirectory(segments.slice(0, -1), true);
+    if (!dir) return null;
+    const fileName = segments[segments.length - 1];
+    const handle = await dir.getFileHandle(fileName, { create: true });
+    const resumeFrom = Math.max(0, options.resumeFrom ?? 0);
+    const existing = resumeFrom > 0 ? (await handle.getFile()).size : 0;
+    const startAt = resumeFrom > 0 ? Math.min(resumeFrom, existing) : 0;
+
+    if (typeof (handle as { createWritable?: unknown }).createWritable === 'function') {
+      try {
+        const writable = await handle.createWritable!({
+          keepExistingData: startAt > 0,
+        });
+        if (startAt === 0) {
+          await writable.truncate(0);
+        }
+        let position = startAt;
+        return {
+          existingBytes: startAt,
+          async write(chunk: Uint8Array): Promise<void> {
+            if (chunk.length === 0) return;
+            await writable.write({
+              type: 'write',
+              position,
+              data: toOwnedArrayBuffer(chunk),
+            });
+            position += chunk.length;
+          },
+          async close(): Promise<void> {
+            await writable.close();
+          },
+        };
+      } catch (err) {
+        logger.debug(
+          `OPFS streaming createWritable failed, trying sync-access handle: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    const syncCapable = handle as unknown as {
+      createSyncAccessHandle?: () => Promise<{
+        write(data: ArrayBufferView | ArrayBuffer, opts?: { at?: number }): number;
+        truncate(size: number): void;
+        getSize(): number;
+        flush(): void;
+        close(): void;
+      }>;
+    };
+    if (typeof syncCapable.createSyncAccessHandle !== 'function') {
+      throw new Error('OPFS streaming writer unavailable on this FileSystemFileHandle');
+    }
+    const sync = await syncCapable.createSyncAccessHandle();
+    try {
+      if (startAt === 0) {
+        sync.truncate(0);
+      }
+      let position = startAt > 0 ? Math.min(startAt, sync.getSize()) : 0;
+      return {
+        existingBytes: position,
+        async write(chunk: Uint8Array): Promise<void> {
+          if (chunk.length === 0) return;
+          sync.write(toOwnedArrayBuffer(chunk), { at: position });
+          position += chunk.length;
+        },
+        async close(): Promise<void> {
+          try {
+            sync.flush();
+          } finally {
+            sync.close();
+          }
+        },
+      };
+    } catch (err) {
+      try { sync.close(); } catch { /* noop */ }
+      throw err;
+    }
   }
 
   /**

@@ -840,17 +840,18 @@ function stateOf(id: string): RowState {
 function matchesSearch(entry: CatalogEntry, query: string): boolean {
   if (!query) return true;
   const family = modelFamily(entry);
-  const haystack = [
+  const normalize = (value: string): string => value.toLowerCase().replace(/[-_./]+/g, ' ');
+  const haystack = normalize([
+    entry.id,
     entry.name,
     entry.description,
     family.name,
     family.tagline,
     variantSizeFeel(entry),
     ...consumerTags(entry).map((tag) => tag.label),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  ].join(' '));
+  const needle = normalize(query).trim();
+  return needle.length === 0 || haystack.includes(needle);
 }
 
 /** Render a rich recommended card with a single clean tag row. */
@@ -920,8 +921,14 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   `;
 }
 
+function compatibilityFor(entry: CatalogEntry) {
+  return webModelCompatibility(entry, {
+    hasWebGPU: capabilitiesCache?.hasWebGPU,
+  });
+}
+
 function renderCompatibilityReason(entry: CatalogEntry): string {
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (compatibility.supported) return '';
   const reference = compatibility.reference
     ? ` <a href="${escapeHtml(compatibility.reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(compatibility.reference.label)} &nearr;</a>`
@@ -931,9 +938,9 @@ function renderCompatibilityReason(entry: CatalogEntry): string {
 
 function actionButton(entry: CatalogEntry, state: RowState): string {
   const safeModelId = escapeHtml(entry.id);
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (!compatibility.supported && state.status !== 'loaded') {
-    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>Unavailable in this app</button>`;
+    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>${escapeHtml(compatibility.actionLabel)}</button>`;
   }
   switch (state.status) {
     case 'registered':
@@ -978,7 +985,7 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
 async function startDownload(modelId: string): Promise<void> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return;
@@ -1017,7 +1024,7 @@ async function startDownload(modelId: string): Promise<void> {
 async function loadModel(modelId: string): Promise<boolean> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return false;

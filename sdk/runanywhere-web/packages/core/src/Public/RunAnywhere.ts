@@ -641,6 +641,23 @@ function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): s
   return reportedPath;
 }
 
+/** Expected payload size used to reject mid-refresh partial OPFS files. */
+function expectedHydrationBytes(model: ModelInfo): number {
+  const fromFiles = (model.multiFile?.files ?? []).reduce(
+    (total, file) => total + Math.max(0, Number(file.sizeBytes ?? 0)),
+    0,
+  );
+  return Math.max(0, Number(model.downloadSizeBytes ?? 0), fromFiles);
+}
+
+async function isCompleteOpfsFile(path: string, expectedBytes: number): Promise<boolean> {
+  const size = await OPFSBridge.fileSize(path);
+  if (size <= 0) return false;
+  if (expectedBytes <= 0) return true;
+  // Match commons validate_downloaded_sizes (80% threshold).
+  return size * 5 >= expectedBytes * 4;
+}
+
 async function resolveHydratedModelPath(
   model: ModelInfo,
   frameworkDir: string,
@@ -655,6 +672,23 @@ async function resolveHydratedModelPath(
       model.id,
     ]);
     if (hasDir) {
+      // Multi-file / archive: require the primary file (when known) to look
+      // complete so a partial extract after refresh does not show "Use".
+      const filename = primaryFilenameFromModel(model);
+      if (filename) {
+        const primaryPath = `${modelDir}/${filename}`;
+        const primaryExpected = Math.max(
+          0,
+          Number(
+            model.multiFile?.files?.find((file) => file.filename === filename)?.sizeBytes
+              ?? model.downloadSizeBytes
+              ?? 0,
+          ),
+        );
+        if (!(await isCompleteOpfsFile(primaryPath, primaryExpected))) {
+          return { exists: false, localPath: modelDir };
+        }
+      }
       return { exists: true, localPath: modelDir };
     }
   }
@@ -663,7 +697,8 @@ async function resolveHydratedModelPath(
     return { exists: false, localPath: modelDir };
   }
   const opfsPath = `${modelDir}/${filename}`;
-  const exists = await OPFSBridge.exists(opfsPath);
+  const exists = await OPFSBridge.exists(opfsPath)
+    && await isCompleteOpfsFile(opfsPath, expectedHydrationBytes(model));
   return { exists, localPath: exists ? opfsPath : modelDir };
 }
 
@@ -822,14 +857,37 @@ async function planDownloadWithSelfHeal(
   return DownloadsCapability.plan(request);
 }
 
+/**
+ * Browser OPFS / origin free space from `navigator.storage.estimate()`.
+ * Returns 0 when the API is unavailable so callers can fall back to other
+ * gates. Never returns MEMFS/WASM-heap leftovers — those falsely refuse
+ * multi-GB downloads (see download_orchestrator filesystem_available_bytes).
+ */
+async function resolveBrowserAvailableStorageBytes(): Promise<number> {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') {
+    return 0;
+  }
+  try {
+    const estimate = await navigator.storage.estimate();
+    const quota = Number(estimate.quota ?? 0);
+    const usage = Number(estimate.usage ?? 0);
+    if (!Number.isFinite(quota) || quota <= 0) return 0;
+    return Math.max(0, quota - (Number.isFinite(usage) ? Math.min(quota, usage) : 0));
+  } catch {
+    return 0;
+  }
+}
+
 async function assertBrowserStorageQuota(
   modelId: string,
   plan: DownloadPlanResult,
   requiredFreeBytesAfterDownload: number,
+  availableStorageBytes?: number,
 ): Promise<void> {
-  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') return;
-  const estimate = await navigator.storage.estimate();
-  const remaining = Math.max(0, (estimate.quota ?? 0) - (estimate.usage ?? 0));
+  const remaining = availableStorageBytes !== undefined && availableStorageBytes > 0
+    ? availableStorageBytes
+    : await resolveBrowserAvailableStorageBytes();
+  if (remaining <= 0) return;
   const planWithSizes = plan as unknown as {
     totalBytes?: number;
     requiredBytes?: number;
@@ -852,6 +910,19 @@ async function assertBrowserStorageQuota(
       'downloadModel',
     );
   }
+}
+
+/** Map a failed download plan/start/terminal state to a storage or download error. */
+function throwDownloadFailure(feature: string, message: string, reason?: DownloadFailureReason): never {
+  const storageFailure = reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE
+    || /not enough storage|insufficient (browser )?storage|free space/i.test(message);
+  throw SDKException.fromCode(
+    storageFailure
+      ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
+      : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    message,
+    feature,
+  );
 }
 
 async function pollDownloadWithRetry(
@@ -1610,6 +1681,24 @@ export const RunAnywhere = {
     });
     ModelRegistryCapability.registerModel(model);
 
+    // Prefer the browser OPFS/origin quota over MEMFS leftovers. Shipping a
+    // real `availableStorageBytes` into the commons planner avoids the false
+    // "only 2 GB is free" refusal on multi-GB models (Qwen3 4B, etc.).
+    await requestPersistentStorage().catch(() => undefined);
+    let browserAvailableBytes = request.availableStorageBytes !== undefined
+      && request.availableStorageBytes > 0
+      ? request.availableStorageBytes
+      : await resolveBrowserAvailableStorageBytes();
+    // When estimate() is unavailable, still avoid the MEMFS ~2 GB figure that
+    // commons would otherwise read via fs::space. OPFS quota is enforced by the
+    // browser during the write; assertBrowserStorageQuota remains best-effort.
+    if (browserAvailableBytes <= 0 && OPFSBridge.isSupported) {
+      browserAvailableBytes = Number.MAX_SAFE_INTEGER;
+      logger.debug(
+        'navigator.storage.estimate() unavailable — skipping MEMFS free-space gate for OPFS download',
+      );
+    }
+
     // Plan defaults mirror Swift RunAnywhere+Storage.swift:187-189:
     // resumeExisting=true, validateExistingBytes=true,
     // verifyChecksums=!checksum.isEmpty.
@@ -1617,7 +1706,7 @@ export const RunAnywhere = {
       modelId: request.modelId,
       model,
       resumeExisting: request.resumeExisting ?? true,
-      availableStorageBytes: request.availableStorageBytes ?? 0,
+      availableStorageBytes: browserAvailableBytes,
       allowMeteredNetwork: request.allowMeteredNetwork ?? true,
       storageNamespace: request.storageNamespace ?? '',
       validateExistingBytes: request.validateExistingBytes ?? true,
@@ -1627,15 +1716,17 @@ export const RunAnywhere = {
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         plan?.errorMessage || `Download plan for '${request.modelId}' could not start.`,
+        plan?.failureReason,
       );
     }
     await assertBrowserStorageQuota(
       request.modelId,
       plan,
       request.requiredFreeBytesAfterDownload ?? 0,
+      browserAvailableBytes,
     );
 
     // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
@@ -1651,7 +1742,7 @@ export const RunAnywhere = {
       updateRegistryOnCompletion: false,
     });
     if (!start?.accepted) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         start?.errorMessage || `Download start for '${request.modelId}' was rejected.`,
       );
@@ -1703,7 +1794,7 @@ export const RunAnywhere = {
     }
 
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         lastProgress.errorMessage || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
       );
@@ -1862,10 +1953,10 @@ export const RunAnywhere = {
 
       const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
 
-      // clearSiteStorage (or manual OPFS purge)
-      // wipes bytes but the registry can still report isDownloaded=true from
-      // a prior session. Reconcile: if the canonical OPFS path is gone, clear
-      // the flag so the next downloadModel() re-fetches instead of no-oping.
+      // clearSiteStorage (or manual OPFS purge) — and mid-download refresh —
+      // can leave a partial OPFS file while the registry still says
+      // isDownloaded=true. Reconcile: missing OR incomplete bytes clear the
+      // flag so the UI shows Retry instead of a broken Use.
       if (!exists) {
         if (existing.localPath || existing.isDownloaded) {
           try {
@@ -2314,4 +2405,6 @@ setRegisterModelHydrateHook(() => {
 export const __testing__ = {
   assertBrowserStorageQuota,
   pollDownloadWithRetry,
+  resolveBrowserAvailableStorageBytes,
+  throwDownloadFailure,
 };

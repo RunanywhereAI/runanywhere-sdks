@@ -23,6 +23,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { OPFSBridge, type OPFSStreamingWriter } from '../Infrastructure/OPFSBridge.js';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -550,6 +551,9 @@ interface StreamingFS {
   mkdirTree?(path: string): void;
   analyzePath?(path: string): { exists: boolean };
   stat?(path: string): { size?: number };
+  writeFile?(path: string, data: Uint8Array): void;
+  unlink?(path: string): void;
+  lookupPath?(path: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
 }
 
 function streamingFsOf(m: PlatformAdapterModule): StreamingFS | null {
@@ -639,10 +643,50 @@ interface HttpDownloadArgs {
 }
 
 /**
+ * Install a MEMFS size placeholder so commons `validate_downloaded_sizes`
+ * sees the correct byte length after an OPFS-direct download. Contents are
+ * empty on purpose — the real bytes live in OPFS and hydrate on load.
+ */
+function installMemfsSizeStub(fs: StreamingFS, dest: string, size: number): void {
+  const parent = dest.slice(0, dest.lastIndexOf('/')) || '/';
+  try { fs.mkdirTree?.(parent); } catch { /* dir may already exist */ }
+  if (typeof fs.writeFile === 'function') {
+    fs.writeFile(dest, new Uint8Array(0));
+  } else {
+    const stream = fs.open(dest, 'w');
+    fs.close(stream);
+  }
+  try {
+    const node = fs.lookupPath?.(dest)?.node;
+    if (node) {
+      node.usedBytes = size;
+      if (node.contents && node.contents.length === 0) {
+        // Keep an empty backing store; size comes from usedBytes.
+      }
+    }
+  } catch {
+    // If the stub cannot be sized, leave the empty file — validation may
+    // fail closed and the caller will retry with a clearer error.
+  }
+}
+
+function removeMemfsPath(fs: StreamingFS, dest: string): void {
+  try {
+    if (fs.analyzePath && !fs.analyzePath(dest)?.exists) return;
+    fs.unlink?.(dest);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
  * Stream `url` into the MEMFS file at `dest`, reporting incremental progress.
  * Resumes from any bytes already on disk via a Range request when the server
  * honours it (HTTP 206); otherwise restarts from zero. Always finishes by
  * invoking the C complete callback (success, cancel, or error) exactly once.
+ *
+ * Large `/opfs/` downloads stream directly into Origin Private File System
+ * so multi-GB models are not refused by WASM MEMFS free-space leftovers.
  */
 async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs): Promise<void> {
   const { url, dest, progressCbPtr, completeCbPtr, cbUserData, controller } = args;
@@ -653,11 +697,18 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
   }
 
   let stream: unknown = null;
+  let opfsWriter: OPFSStreamingWriter | null = null;
+  let opfsDirect = false;
   try {
     const parent = dest.slice(0, dest.lastIndexOf('/')) || '/';
     try { fs.mkdirTree?.(parent); } catch { /* dir may already exist */ }
 
-    const existing = memfsFileSize(fs, dest);
+    const underOpfs = dest.startsWith('/opfs/') && OPFSBridge.isSupported;
+    const memfsExisting = memfsFileSize(fs, dest);
+    const opfsExisting = underOpfs ? await OPFSBridge.fileSize(dest) : 0;
+    // Prefer MEMFS resume when both exist so the Range offset matches the
+    // stream we will append to. OPFS-only partials resume via OPFS-direct.
+    const existing = memfsExisting > 0 ? memfsExisting : opfsExisting;
     const headers: Record<string, string> = {};
     if (existing > 0) headers.Range = `bytes=${existing}-`;
 
@@ -665,29 +716,55 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
 
     // 416 Range Not Satisfiable on a resume request means the file on disk is
     // already at/past the requested offset — i.e. the download is complete.
-    // Report success without rewriting so a re-trigger of an already-present
-    // model is a no-op rather than a hard failure.
     if (existing > 0 && response.status === 416) {
+      const completeBytes = Math.max(memfsExisting, opfsExisting);
+      if (memfsExisting <= 0 && completeBytes > 0) {
+        installMemfsSizeStub(fs, dest, completeBytes);
+      }
       invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+      if (memfsExisting <= 0 && completeBytes > 0) {
+        removeMemfsPath(fs, dest);
+      }
       return;
     }
 
-    let received = 0;
-    let position = 0;
-    if (existing > 0 && response.status === 206) {
-      // Server honoured the range — append to the partial file.
-      received = existing;
-      position = existing;
-      stream = fs.open(dest, 'r+');
-    } else {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      // Fresh download (or server ignored Range) — truncate and restart.
-      stream = fs.open(dest, 'w');
+    const resuming = existing > 0 && response.status === 206;
+    if (!resuming && !response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    const contentLength = Number(response.headers.get('Content-Length') ?? 0);
-    const totalBytes = contentLength > 0 ? received + contentLength : 0;
+    const contentLengthHeader = Number(response.headers.get('Content-Length') ?? 0);
+    const projectedTotal = contentLengthHeader > 0
+      ? (resuming ? existing + contentLengthHeader : contentLengthHeader)
+      : 0;
+    // Large models (and OPFS-only partial resumes) stream straight to OPFS so
+    // WASM MEMFS heap leftovers cannot refuse a multi-GB download mid-write.
+    opfsDirect = underOpfs
+      && (projectedTotal >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES
+        || (memfsExisting <= 0 && opfsExisting > 0));
 
+    let received = resuming ? existing : 0;
+    let position = received;
+
+    if (opfsDirect) {
+      opfsWriter = await OPFSBridge.openStreamingWriter(dest, {
+        resumeFrom: resuming ? existing : 0,
+      });
+      if (!opfsWriter) {
+        throw new Error('OPFS streaming writer unavailable for large model download');
+      }
+      received = resuming ? opfsWriter.existingBytes : 0;
+      position = received;
+    } else {
+      stream = fs.open(dest, resuming && memfsExisting > 0 ? 'r+' : 'w');
+      if (underOpfs) {
+        opfsWriter = await OPFSBridge.openStreamingWriter(dest, {
+          resumeFrom: resuming ? received : 0,
+        });
+      }
+    }
+
+    const totalBytes = contentLengthHeader > 0 ? received + contentLengthHeader : projectedTotal;
     if (!response.body) throw new Error('response has no readable body');
     const reader = response.body.getReader();
 
@@ -697,19 +774,41 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
       const { done, value } = await reader.read();
       if (done) break;
       if (value && value.length > 0) {
-        fs.write(stream, value, 0, value.length, position);
+        if (opfsWriter) {
+          await opfsWriter.write(value);
+        }
+        if (!opfsDirect && stream) {
+          fs.write(stream, value, 0, value.length, position);
+        }
         position += value.length;
         received += value.length;
         invokeProgressCallback(m, progressCbPtr, received, totalBytes, cbUserData);
       }
     }
 
-    fs.close(stream);
-    stream = null;
+    if (stream) {
+      fs.close(stream);
+      stream = null;
+    }
+    if (opfsWriter) {
+      await opfsWriter.close();
+      opfsWriter = null;
+    }
+
+    if (opfsDirect) {
+      installMemfsSizeStub(fs, dest, received);
+    }
     invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+    // Drop the size stub after commons validation so load hydrates real OPFS bytes.
+    if (opfsDirect) {
+      removeMemfsPath(fs, dest);
+    }
   } catch (error) {
     if (stream) {
       try { fs.close(stream); } catch { /* noop */ }
+    }
+    if (opfsWriter) {
+      try { await opfsWriter.close(); } catch { /* noop */ }
     }
     const aborted = controller.signal.aborted
       || (error instanceof DOMException && error.name === 'AbortError');
