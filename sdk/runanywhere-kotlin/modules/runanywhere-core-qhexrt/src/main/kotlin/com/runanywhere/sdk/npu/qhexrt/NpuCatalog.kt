@@ -40,42 +40,128 @@ data class NpuCatalogSeedResult(
  * Kept in lockstep with the Flutter (`runanywhere_qhexrt`) and React Native
  * (`@runanywhere/qhexrt`) packages.
  */
-val qhexrtBundles: List<NpuBundle> = listOf(
-    NpuBundle("lfm2_5_230m_v79", "LFM2.5 230M (HNPU)", ModelCategory.MODEL_CATEGORY_LANGUAGE, "v79",
-        "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v79/lfm2-5-230m.json"),
-    NpuBundle("lfm2_5_230m_v81", "LFM2.5 230M (HNPU)", ModelCategory.MODEL_CATEGORY_LANGUAGE, "v81",
-        "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v81/lfm2-5-230m.json"),
-    NpuBundle("lfm2_5_350m_v79", "LFM2.5 350M (HNPU)", ModelCategory.MODEL_CATEGORY_LANGUAGE, "v79",
-        "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v79/lfm2-5-350m-2048.json"),
-    NpuBundle("lfm2_5_350m_v81", "LFM2.5 350M (HNPU)", ModelCategory.MODEL_CATEGORY_LANGUAGE, "v81",
-        "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v81/lfm2-5-350m-2048.json"),
-    NpuBundle("qwen3_5_0_8b_v81", "Qwen3.5 0.8B (HNPU)", ModelCategory.MODEL_CATEGORY_LANGUAGE, "v81",
-        "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/v81/qwen3.5-0.8b-1024.json"),
-    NpuBundle("qwen3_vl_v79", "Qwen3-VL 2B (HNPU)", ModelCategory.MODEL_CATEGORY_MULTIMODAL, "v79",
-        "https://huggingface.co/runanywhere/qwen3_vl_HNPU/v79/qwen3vl-2b-vlm-512.json"),
-    NpuBundle("internvl3_5_1b_v79", "InternVL3.5 1B (HNPU)", ModelCategory.MODEL_CATEGORY_MULTIMODAL, "v79",
-        "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v79/internvl3_5-1b-512.json"),
-    NpuBundle("internvl3_5_1b_v81", "InternVL3.5 1B (HNPU)", ModelCategory.MODEL_CATEGORY_MULTIMODAL, "v81",
-        "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v81/internvl3_5-1b.json"),
-    NpuBundle("whisper_base_v79", "Whisper Base (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, "v79",
-        "https://huggingface.co/runanywhere/whisper_base_HNPU/v79/whisper-base.json"),
-    NpuBundle("whisper_small_v79", "Whisper Small (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, "v79",
-        "https://huggingface.co/runanywhere/whisper_small_HNPU/v79/whisper-small.json"),
-    NpuBundle("moonshine_tiny_v81", "Moonshine Tiny (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, "v81",
-        "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/v81/moonshine-tiny.json"),
-    NpuBundle("moonshine_base_v81", "Moonshine Base (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, "v81",
-        "https://huggingface.co/runanywhere/moonshine_base_HNPU/v81/moonshine-base.json"),
-    NpuBundle("melotts_en_v79", "MeloTTS EN (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, "v79",
-        "https://huggingface.co/runanywhere/melotts_en_HNPU/v79/melotts-en.json"),
-    NpuBundle("melotts_en_v81", "MeloTTS EN (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, "v81",
-        "https://huggingface.co/runanywhere/melotts_en_HNPU/v81/melotts-en.json"),
-    NpuBundle("kokoro_en_v81", "Kokoro-82M EN (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, "v81",
-        "https://huggingface.co/runanywhere/kokoro_en_HNPU/v81/kokoro-en.json"),
-    NpuBundle("kitten_nano_0_8_v81", "Kitten-nano-0.8-fp32 (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, "v81",
-        "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/v81/kitten_nano08_v81.json"),
-    NpuBundle("kitten_mini_0_1_v81", "Kitten-mini-0.1 (HNPU)", ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS, "v81",
-        "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/v81/kitten_mini01_v81.json"),
-)
+val qhexrtBundles: List<NpuBundle> =
+    listOf(
+        NpuBundle(
+            "lfm2_5_230m_v79",
+            "LFM2.5 230M (HNPU)",
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            "v79",
+            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v79/lfm2-5-230m.json",
+        ),
+        NpuBundle(
+            "lfm2_5_230m_v81",
+            "LFM2.5 230M (HNPU)",
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            "v81",
+            "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/v81/lfm2-5-230m.json",
+        ),
+        NpuBundle(
+            "lfm2_5_350m_v79",
+            "LFM2.5 350M (HNPU)",
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            "v79",
+            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v79/lfm2-5-350m-2048.json",
+        ),
+        NpuBundle(
+            "lfm2_5_350m_v81",
+            "LFM2.5 350M (HNPU)",
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            "v81",
+            "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/v81/lfm2-5-350m-2048.json",
+        ),
+        NpuBundle(
+            "qwen3_5_0_8b_v81",
+            "Qwen3.5 0.8B (HNPU)",
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            "v81",
+            "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/v81/qwen3.5-0.8b-1024.json",
+        ),
+        NpuBundle(
+            "qwen3_vl_v79",
+            "Qwen3-VL 2B (HNPU)",
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+            "v79",
+            "https://huggingface.co/runanywhere/qwen3_vl_HNPU/v79/qwen3vl-2b-vlm-512.json",
+        ),
+        NpuBundle(
+            "internvl3_5_1b_v79",
+            "InternVL3.5 1B (HNPU)",
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+            "v79",
+            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v79/internvl3_5-1b-512.json",
+        ),
+        NpuBundle(
+            "internvl3_5_1b_v81",
+            "InternVL3.5 1B (HNPU)",
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+            "v81",
+            "https://huggingface.co/runanywhere/internvl3_5_1b_HNPU/v81/internvl3_5-1b.json",
+        ),
+        NpuBundle(
+            "whisper_base_v79",
+            "Whisper Base (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            "v79",
+            "https://huggingface.co/runanywhere/whisper_base_HNPU/v79/whisper-base.json",
+        ),
+        NpuBundle(
+            "whisper_small_v79",
+            "Whisper Small (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            "v79",
+            "https://huggingface.co/runanywhere/whisper_small_HNPU/v79/whisper-small.json",
+        ),
+        NpuBundle(
+            "moonshine_tiny_v81",
+            "Moonshine Tiny (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            "v81",
+            "https://huggingface.co/runanywhere/moonshine_tiny_HNPU/v81/moonshine-tiny.json",
+        ),
+        NpuBundle(
+            "moonshine_base_v81",
+            "Moonshine Base (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            "v81",
+            "https://huggingface.co/runanywhere/moonshine_base_HNPU/v81/moonshine-base.json",
+        ),
+        NpuBundle(
+            "melotts_en_v79",
+            "MeloTTS EN (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            "v79",
+            "https://huggingface.co/runanywhere/melotts_en_HNPU/v79/melotts-en.json",
+        ),
+        NpuBundle(
+            "melotts_en_v81",
+            "MeloTTS EN (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            "v81",
+            "https://huggingface.co/runanywhere/melotts_en_HNPU/v81/melotts-en.json",
+        ),
+        NpuBundle(
+            "kokoro_en_v81",
+            "Kokoro-82M EN (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            "v81",
+            "https://huggingface.co/runanywhere/kokoro_en_HNPU/v81/kokoro-en.json",
+        ),
+        NpuBundle(
+            "kitten_nano_0_8_v81",
+            "Kitten-nano-0.8-fp32 (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            "v81",
+            "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/v81/kitten_nano08_v81.json",
+        ),
+        NpuBundle(
+            "kitten_mini_0_1_v81",
+            "Kitten-mini-0.1 (HNPU)",
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            "v81",
+            "https://huggingface.co/runanywhere/kitten_mini_0_1_HNPU/v81/kitten_mini01_v81.json",
+        ),
+    )
 
 private val logger = SDKLogger("QHexRT")
 
@@ -95,9 +181,10 @@ private val logger = SDKLogger("QHexRT")
  * @return The registered bundle ids and summary counts.
  */
 suspend fun QHexRT.seedCatalog(): NpuCatalogSeedResult {
-    val npuArch = runCatching {
-        probeNpu().takeIf { it.qhexrt_supported }?.arch_name
-    }.getOrNull()
+    val npuArch =
+        runCatching {
+            probeNpu().takeIf { it.qhexrt_supported }?.arch_name
+        }.getOrNull()
 
     if (npuArch == null) {
         logger.info("QHexRT NPU not supported on this device; skipping NPU catalog seed")
