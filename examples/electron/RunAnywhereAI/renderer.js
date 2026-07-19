@@ -277,6 +277,19 @@ function looksRemote(source) {
   if (/^https?:\/\//i.test(source)) return true;
   return /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/.test(source) && !source.includes('\\') && !/^[A-Za-z]:/.test(source);
 }
+// Reflect the actual compute device (passed by main.js from the addon path).
+function applyDeviceUi() {
+  const device = new URLSearchParams(location.search).get('device') || 'cpu';
+  if (device !== 'gpu') return;
+  const sel = $('device');
+  const gpuOpt = sel && sel.querySelector('option[value="gpu"]');
+  if (gpuOpt) { gpuOpt.disabled = false; gpuOpt.textContent = 'GPU · CUDA'; }
+  if (sel) sel.value = 'gpu';
+  const pill = $('devicepill');
+  if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
+  const note = $('devicenote');
+  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.';
+}
 function wireModels() {
   const hintEl = $('addhint');
   const hintHtml = hintEl.innerHTML;
@@ -362,6 +375,7 @@ document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('clic
 // ---- UI wiring ----
 function wireUi() {
   applySettingsToUi();
+  applyDeviceUi();
   renderSidebar(); renderChat();
   wireModels();
   $('newchat').addEventListener('click', () => { newConversation(); showTab('chat'); $('chatinput').focus(); });
