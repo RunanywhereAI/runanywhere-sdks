@@ -111,6 +111,12 @@ if(NOT RAC_PROTOBUF_RUNTIME_ENABLED
                         "for the model-lifecycle proto ABI")
 endif()
 target_compile_definitions(rcli_core PUBLIC RAC_HAVE_PROTOBUF=1)
+# The RAG pipeline is folded into rac_commons only when RAC_BACKEND_RAG is ON
+# (it is OFF on the Windows CLI preset). rac_commons keeps RAC_HAVE_RAG PRIVATE,
+# so re-attach it here to gate the `rag` command's rac_rag_*_proto references.
+if(RAC_BACKEND_RAG)
+    target_compile_definitions(rcli_core PUBLIC RAC_HAVE_RAG=1)
+endif()
 if(RAC_PROTOBUF_NAMESPACE_ISOLATED)
     # Generated messages and the statically bundled runtime must use the same
     # private namespace token rewrite. rac_commons keeps this definition

@@ -17,6 +17,22 @@
 
 #include "commands/commands.h"
 
+#if !defined(RAC_HAVE_RAG)
+
+// The RAG pipeline is not folded into this binary (RAC_BACKEND_RAG=OFF, e.g. the
+// Windows CLI preset), so the rac_rag_*_proto symbols are unavailable. Register
+// no `rag` subcommand rather than fail to link.
+namespace rcli::commands {
+
+void register_rag(CLI::App& app, GlobalOptions& options) {
+    (void)app;
+    (void)options;
+}
+
+}  // namespace rcli::commands
+
+#else
+
 #include <fstream>
 #include <memory>
 #include <sstream>
@@ -219,3 +235,5 @@ void register_rag(CLI::App& app, GlobalOptions& options) {
 }
 
 }  // namespace rcli::commands
+
+#endif  // RAC_HAVE_RAG

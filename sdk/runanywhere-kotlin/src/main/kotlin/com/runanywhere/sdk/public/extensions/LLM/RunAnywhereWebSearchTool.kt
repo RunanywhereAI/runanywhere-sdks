@@ -77,7 +77,8 @@ private object WebSearchTool {
     private const val SNIPPET_TAIL_CHARS = 1_500
 
     private val client =
-        OkHttpClient.Builder()
+        OkHttpClient
+            .Builder()
             .callTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -185,7 +186,8 @@ private object WebSearchTool {
     private suspend fun httpGet(url: HttpUrl): String =
         withContext(Dispatchers.IO) {
             val request =
-                Request.Builder()
+                Request
+                    .Builder()
                     .url(url)
                     .header(USER_AGENT_HEADER, USER_AGENT)
                     .build()
@@ -226,15 +228,17 @@ private object WebSearchTool {
     }
 
     private fun parseLiteResults(html: String): List<SearchResult> =
-        resultLinkRegex.findAll(html).mapNotNull { match ->
-            val href = match.groupValues.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-            val rawTitle = match.groupValues.getOrNull(2) ?: return@mapNotNull null
-            val resolvedURL = redirectURL(decodeHTML(href))
-            val cleanTitle = cleanHTML(rawTitle)
-            if (cleanTitle.isEmpty() || resolvedURL.isEmpty()) return@mapNotNull null
-            val snippet = snippetAfter(match.range.last + 1, html) ?: cleanTitle
-            SearchResult(title = cleanTitle, url = resolvedURL, snippet = snippet)
-        }.toList()
+        resultLinkRegex
+            .findAll(html)
+            .mapNotNull { match ->
+                val href = match.groupValues.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+                val rawTitle = match.groupValues.getOrNull(2) ?: return@mapNotNull null
+                val resolvedURL = redirectURL(decodeHTML(href))
+                val cleanTitle = cleanHTML(rawTitle)
+                if (cleanTitle.isEmpty() || resolvedURL.isEmpty()) return@mapNotNull null
+                val snippet = snippetAfter(match.range.last + 1, html) ?: cleanTitle
+                SearchResult(title = cleanTitle, url = resolvedURL, snippet = snippet)
+            }.toList()
 
     private fun snippetAfter(startIndex: Int, html: String): String? {
         if (startIndex >= html.length) return null
@@ -295,7 +299,8 @@ private object WebSearchTool {
 
     private fun makeLiteSearchURL(query: String): HttpUrl? =
         runCatching {
-            HttpUrl.Builder()
+            HttpUrl
+                .Builder()
                 .scheme("https")
                 .host("lite.duckduckgo.com")
                 .addPathSegment("lite")
@@ -306,7 +311,8 @@ private object WebSearchTool {
 
     private fun makeInstantAnswerURL(query: String): HttpUrl? =
         runCatching {
-            HttpUrl.Builder()
+            HttpUrl
+                .Builder()
                 .scheme("https")
                 .host("api.duckduckgo.com")
                 .addQueryParameter("q", query)
@@ -319,7 +325,8 @@ private object WebSearchTool {
 
     private fun makeSearchResultsURL(query: String): HttpUrl? =
         runCatching {
-            HttpUrl.Builder()
+            HttpUrl
+                .Builder()
                 .scheme("https")
                 .host("duckduckgo.com")
                 .addPathSegment("")
@@ -336,7 +343,11 @@ private object WebSearchTool {
         ToolValue(object_value = ToolValueObject(fields = fields))
 
     private fun JsonObject.stringField(key: String): String =
-        (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim().orEmpty()
+        (this[key] as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.content
+            ?.trim()
+            .orEmpty()
 
     private val resultLinkRegex =
         Regex(
