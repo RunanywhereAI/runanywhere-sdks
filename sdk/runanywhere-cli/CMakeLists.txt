@@ -38,6 +38,7 @@ set(RCLI_SOURCES
     src/catalog/model_ref.cpp
     src/commands/cmd_version.cpp
     src/commands/cmd_info.cpp
+    src/commands/cmd_auth.cpp
     src/commands/cmd_backends.cpp
     src/commands/cmd_list.cpp
     src/commands/cmd_lora.cpp
@@ -49,6 +50,7 @@ set(RCLI_SOURCES
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
     src/commands/cmd_embed.cpp
+    src/commands/cmd_telemetry.cpp
     src/commands/cmd_tts.cpp
     src/commands/cmd_vad.cpp
     src/commands/cmd_voice.cpp
@@ -58,6 +60,7 @@ set(RCLI_SOURCES
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
     src/device_info.cpp
+    src/net/control_plane.cpp
     src/io/wav_io.cpp
     src/io/image_io.cpp
     src/io/output.cpp
