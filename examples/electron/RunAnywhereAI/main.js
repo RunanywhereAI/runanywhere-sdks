@@ -85,9 +85,12 @@ app.whenReady().then(() => {
   ipcMain.on('runanywhere-test-done', (_e, ok) => { record(`[main] DONE ok=${ok}\n`); finish(ok ? 0 : 1, 'self-test ok=' + ok); });
 
   win.webContents.on('did-finish-load', () => ra.connect(win.webContents));
+  // The GPU (CUDA) build is a separate prebuild; infer it from the addon path so
+  // the UI can reflect the real compute device.
+  const device = /cuda|gpu/i.test(process.env.RUNANYWHERE_NATIVE_PATH || '') ? 'gpu' : 'cpu';
   const query = SELFTEST
-    ? { selftest: '1', image: process.env.RA_TEST_IMAGE || 'e:\\codes\\qual\\models\\test_red_circle.jpg' }
-    : {};
+    ? { selftest: '1', device, image: process.env.RA_TEST_IMAGE || 'e:\\codes\\qual\\models\\test_red_circle.jpg' }
+    : { device };
   win.loadFile(path.join(__dirname, 'index.html'), { query });
 
   if (SELFTEST) setTimeout(() => finish(3, 'TIMEOUT'), 240000);
