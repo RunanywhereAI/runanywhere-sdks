@@ -568,6 +568,19 @@ target_compile_features(test_sdk_events_service_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_sdk_events_service_proto_abi)
 add_test(NAME sdk_events_service_proto_abi_tests COMMAND test_sdk_events_service_proto_abi)
 
+# Telemetry extraction → routing → JSON pipeline (regression guards for the
+# per-modality telemetry field bugs). Needs protobuf for the SDKEvent builders.
+add_executable(test_telemetry_extraction test_telemetry_extraction.cpp)
+target_include_directories(test_telemetry_extraction PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_telemetry_extraction PRIVATE rac_commons)
+rac_link_archive_deps(test_telemetry_extraction)
+target_compile_features(test_telemetry_extraction PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_telemetry_extraction)
+add_test(NAME telemetry_extraction_tests COMMAND test_telemetry_extraction)
+
 # --- ToolCalling generated service descriptor test --------------------------
 add_executable(test_tool_calling_service_proto_abi test_tool_calling_service_proto_abi.cpp)
 target_include_directories(test_tool_calling_service_proto_abi PRIVATE
