@@ -577,7 +577,7 @@ target_include_directories(test_telemetry_extraction PRIVATE
 )
 target_link_libraries(test_telemetry_extraction PRIVATE rac_commons)
 rac_link_archive_deps(test_telemetry_extraction)
-target_compile_features(test_telemetry_extraction PRIVATE cxx_std_17)
+target_compile_features(test_telemetry_extraction PRIVATE cxx_std_20)
 rac_test_define_have_protobuf(test_telemetry_extraction)
 add_test(NAME telemetry_extraction_tests COMMAND test_telemetry_extraction)
 
