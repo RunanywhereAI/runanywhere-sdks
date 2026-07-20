@@ -278,6 +278,13 @@ jobs:
           $env:PATH = "$env:GITHUB_WORKSPACE\sdk\runanywhere-commons\third_party\sherpa-onnx-windows\lib;$env:PATH"
           $wheel = Get-ChildItem dist/*.whl | Select-Object -First 1
           delvewheel repair -w wheelhouse $wheel.FullName
+      - name: Validate release boundary (no host paths, no binaries in sdist)
+        shell: pwsh
+        working-directory: sdk/runanywhere-python
+        run: |
+          python -m build --sdist -o wheelhouse
+          $ver = (Get-Content ..\runanywhere-commons\VERSION -Raw).Trim()
+          python scripts/validate_public_packages.py --dist wheelhouse --expected-version $ver
       - name: Install + hermetic tests
         shell: pwsh
         working-directory: sdk/runanywhere-python
