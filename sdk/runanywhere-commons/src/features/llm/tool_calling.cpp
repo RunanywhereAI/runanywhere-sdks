@@ -1943,9 +1943,26 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
         // The C parser extracts one envelope per invocation, so re-parse the
         // clean text it hands back until no envelope remains. Only the caller
         // that opted in pays this cost; the default path stays single-parse.
+        //
+        // Guardrails against a real failure mode observed with small models
+        // under AUTO (no grammar constraint): the model repeats the SAME
+        // tool call verbatim several times instead of moving on (a known
+        // small-model repetition/looping artifact, not distinct intent).
+        // Without a stop condition, harvesting every envelope in the output
+        // turns one stutter into N "legitimate" parallel calls, burns the
+        // max_tool_calls budget on duplicates, and starves the rest of the
+        // user's request. Stop harvesting the moment a call repeats the
+        // immediately-preceding (name, arguments) pair, and never harvest
+        // more than the request's own max_tool_calls budget.
         if (request.has_options() && request.options().parallel_tool_calls()) {
+            const int32_t budget =
+                request.options().has_max_tool_calls() && request.options().max_tool_calls() > 0
+                    ? request.options().max_tool_calls()
+                    : 5;
+            std::string last_name = parsed.tool_name ? parsed.tool_name : "";
+            std::string last_args = parsed.arguments_json ? parsed.arguments_json : "{}";
             std::string remainder = parsed.clean_text ? parsed.clean_text : "";
-            while (!remainder.empty()) {
+            while (!remainder.empty() && result.tool_calls_size() < budget) {
                 rac_tool_call_t next{};
                 const rac_result_t next_rc =
                     use_explicit_format
@@ -1959,8 +1976,18 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
                     rac_tool_call_free(&next);
                     break;
                 }
+                const std::string next_name = next.tool_name ? next.tool_name : "";
+                const std::string next_args = next.arguments_json ? next.arguments_json : "{}";
+                if (next_name == last_name && next_args == last_args) {
+                    // Repetition, not a second distinct call — stop here
+                    // rather than treat the stutter as further intent.
+                    rac_tool_call_free(&next);
+                    break;
+                }
                 append_parsed_call(next);
                 remainder = next.clean_text ? next.clean_text : "";
+                last_name = next_name;
+                last_args = next_args;
                 rac_tool_call_free(&next);
             }
             result.set_remaining_text(remainder);

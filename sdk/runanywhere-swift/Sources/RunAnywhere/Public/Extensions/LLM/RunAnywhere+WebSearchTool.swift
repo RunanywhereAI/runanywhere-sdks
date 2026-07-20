@@ -25,7 +25,23 @@ public extension RunAnywhere {
 private enum WebSearchTool {
     private enum Tool {
         static let name = "search_web"
-        static let description = "Searches the web for current information using DuckDuckGo Instant Answer API"
+        // Directive, not just descriptive: under AUTO tool_choice the model
+        // decides on its own whether to call a tool, so the wording itself
+        // is what makes that decision reliable. Explicitly naming the
+        // trigger conditions (recency, post-cutoff events, prices, live
+        // data) measurably improves AUTO-mode call rate versus a purely
+        // descriptive sentence — this is the Perplexity-style "does the
+        // question need current info" heuristic, expressed in the one
+        // channel the model actually reads.
+        static let description = """
+            Searches the live web via DuckDuckGo. Call this whenever the question needs \
+            information that could have changed after your training data, or that you are \
+            not certain about: current events or news, today's date or "latest"/"current"/\
+            "recent" anything, prices, scores, weather (if no weather tool is available), \
+            release dates, or facts about people/products/versions newer than your \
+            knowledge. Do not call this for general knowledge, definitions, math, or \
+            anything you already know with confidence.
+            """
         static let category = "Web"
     }
 

@@ -19,7 +19,14 @@ extension LLMViewModel {
     ) async throws {
         // The SDK derives the tool-calling format from the loaded model and
         // orchestrates the tool call → execute → respond loop internally.
-        let result = try await RunAnywhere.generateWithTools(prompt: prompt, options: options)
+        // parallelToolCalls: true lets one turn request multiple tools (e.g.
+        // weather + time) and get them all executed before one follow-up
+        // reply, instead of one round-trip per tool.
+        let result = try await RunAnywhere.generateWithTools(
+            prompt: prompt,
+            options: options,
+            parallelToolCalls: true
+        )
         let toolCallInfo = ToolCallInfo(from: result)
 
         // Drop the write if this generation was superseded while awaiting.
