@@ -6,7 +6,6 @@
   "workspaces": [
     "../shared/proto-ts",
     "packages/core",
-    "packages/diffusion",
     "packages/llamacpp",
     "packages/onnx"
   ],
@@ -18,19 +17,20 @@
     "vendor:wasm:onnxruntime": "wasm/scripts/vendor-onnxruntime-wasm.sh",
     "vendor:wasm:sherpa": "wasm/scripts/vendor-sherpa-onnx-wasm.sh",
     "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
-    "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/diffusion && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
+    "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
     "fix:esm-specifiers": "node scripts/ensure-node-esm-specifiers.mjs --write",
     "check:esm-specifiers": "node scripts/ensure-node-esm-specifiers.mjs",
     "verify:nodenext": "npm run check:esm-specifiers && npm run build:ts && tsc -p tsconfig.nodenext.json && node tests/types/nodenext-runtime.mjs",
-    "lint": "npm run lint -w packages/core && npm run lint -w packages/diffusion && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx && eslint playwright.config.ts tests/browser --max-warnings 0",
-    "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/diffusion && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx && tsc -p tsconfig.browser.json && npm run verify:nodenext",
+    "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx && eslint playwright.config.ts tests/browser --max-warnings 0",
+    "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx && tsc -p tsconfig.browser.json && npm run verify:nodenext",
     "test": "npm run test -w packages/core",
     "test:browser": "playwright test",
+    "test:browser:smoke": "playwright test tests/browser/backend-readiness.spec.ts tests/browser/hybrid-stt.spec.ts",
     "test:browser:release": "RA_RUN_FULL_E2E=1 playwright test tests/browser/release-app.e2e.spec.ts",
     "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
-    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/diffusion/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
+    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
   },
   "engines": {
     "node": ">=22.12.0"

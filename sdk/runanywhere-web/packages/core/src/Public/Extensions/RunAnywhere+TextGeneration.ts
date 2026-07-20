@@ -102,7 +102,12 @@ function buildLLMGenerateRequest(
   });
   return {
     prompt,
-    emitThoughts: options.thinkingPattern != null,
+    // Emit typed thinking events unless the caller explicitly disabled
+    // thinking. `thinkingPattern` remains an additional opt-in for custom
+    // delimiters; disableThinking is the commons no-think directive.
+    emitThoughts: options.disableThinking === true
+      ? false
+      : (options.thinkingPattern != null || options.disableThinking === false),
     requestId: '',
     modelId: '',
     conversationId: conversationId ?? '',
@@ -266,9 +271,14 @@ function finalLLMResult(
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
   const toolCalls = final?.toolCalls?.length ? final.toolCalls : streamedToolCalls;
+  const thinkingContent = final?.thinkingContent || thinkingText || undefined;
+  // Thinking-only / length-truncated replies must still settle with observable
+  // text so UI consumers never remain stuck on an empty answer channel.
+  const answerText = (final?.text ?? fullText).trim();
+  const text = answerText || thinkingContent || '';
   return {
-    text: final?.text ?? fullText,
-    thinkingContent: final?.thinkingContent || thinkingText || undefined,
+    text,
+    thinkingContent: answerText ? thinkingContent : undefined,
     inputTokens,
     tokensGenerated,
     modelUsed: '',

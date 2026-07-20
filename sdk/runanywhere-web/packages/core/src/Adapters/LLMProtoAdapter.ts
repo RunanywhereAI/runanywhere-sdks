@@ -14,6 +14,8 @@ import {
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { SDKException } from '../Foundation/SDKException.js';
@@ -44,6 +46,15 @@ export class LLMProtoAdapter {
   }
 
   async generate(request: ProtoLLMGenerateRequest): Promise<ProtoLLMGenerationResult | null> {
+    const host = getActiveBackendWorkerHost();
+    if (host && hasBackendWorkerOwnedModels()) {
+      const encoded = LLMGenerateRequest.encode(request).finish();
+      const response = await host.infer('llm.generate', { requestBytes: encoded }) as {
+        resultBytes?: Uint8Array;
+      };
+      if (!response?.resultBytes) return null;
+      return LLMGenerationResult.decode(response.resultBytes);
+    }
     if (!this.ensureExports('llm.generate', ['_rac_llm_generate_proto'])) return null;
     return this.bridge().withEncodedRequestAsync(
       request,
@@ -72,6 +83,36 @@ export class LLMProtoAdapter {
         streamingEnabled: true,
       }),
     }).finish();
+
+    // Prefer the model-owning BackendWorker when it holds the loaded LLM.
+    const host = getActiveBackendWorkerHost();
+    if (host && hasBackendWorkerOwnedModels()) {
+      const events = host.stream('llm.generate', { requestBytes: encoded });
+      return {
+        [Symbol.asyncIterator]: (): AsyncIterator<ProtoLLMStreamEvent> => {
+          const iterator = events[Symbol.asyncIterator]();
+          return {
+            async next(): Promise<IteratorResult<ProtoLLMStreamEvent>> {
+              const item = await iterator.next();
+              if (item.done) return { value: undefined, done: true };
+              const payload = item.value;
+              const bytes = payload instanceof Uint8Array
+                ? payload
+                : (payload as { eventBytes?: Uint8Array })?.eventBytes;
+              if (!bytes) {
+                return { value: LLMStreamEvent.fromPartial({ isFinal: false }), done: false };
+              }
+              return { value: LLMStreamEvent.decode(bytes), done: false };
+            },
+            async return(): Promise<IteratorResult<ProtoLLMStreamEvent>> {
+              await iterator.return?.();
+              return { value: undefined, done: true };
+            },
+          };
+        },
+      };
+    }
+
     // T6.1: prefer the Worker path when a streamWorkerFactory is
     // registered (and `streamingMode !== 'main'`); transparently fall
     // back to the existing main-thread `streamCallback` MVP otherwise.
@@ -121,6 +162,11 @@ export class LLMProtoAdapter {
   }
 
   cancel(): ProtoSDKEvent | null {
+    const host = getActiveBackendWorkerHost();
+    if (host && hasBackendWorkerOwnedModels()) {
+      host.cancelActiveStreams();
+      return SDKEvent.fromPartial({});
+    }
     if (!this.ensureExports('llm.cancel', ['_rac_llm_cancel_proto'])) return null;
     return this.bridge().callResultProto(
       SDKEvent,

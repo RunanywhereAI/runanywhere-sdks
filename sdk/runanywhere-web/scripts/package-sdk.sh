@@ -4,9 +4,8 @@
 # =============================================================================
 # Unified SDK packaging contract for the Web SDK. Consumes pre-built WASM
 # modules and produces npm tarballs for publishable workspaces with checksums.
-# `packages/diffusion` is intentionally a workspace-only API shell until a
-# real WebGPU/WASM diffusion module exists; do not add it to this release loop
-# until its artifact can pass normal package verification.
+# Diffusion is exposed through `@runanywhere/web` core (Swift/Kotlin parity);
+# browser engine artifacts register via core rather than a separate package.
 #
 # USAGE:
 #   package-sdk.sh [--mode local|ci] [--natives-from PATH]

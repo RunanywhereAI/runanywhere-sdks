@@ -203,11 +203,12 @@ await RunAnywhere.completeServicesInitialization();
   registration → `completeServicesInitialization()` (Phase 2) → model catalog
   registration/hydration. Production identity is asynchronous after this path
   and must never block local shell readiness.
-- `BackendWorkerHost` is protocol/diagnostics scaffolding today. Backends may
-  opt into a Worker factory later; until a successful handshake, inference uses
-  the supported main-thread fallback and `RunAnywhere.runtime.executionContext`
-  reports `'main'`.
-- The `packages/diffusion` workspace is not a publishable production runtime
+- `BackendWorkerHost` is the production LlamaCPP inference path when
+  `Worker` is available: `LlamaCPP.register()` installs `backendWorker.ts`,
+  loads models in the worker, and sets `RunAnywhere.runtime.executionContext`
+  to `'worker'`. On handshake failure, `runtime.degradedReason` explains the
+  main-thread fallback.
+- Diffusion is exposed through `@runanywhere/web` core (Swift/Kotlin parity); there is no separate `@runanywhere/web-diffusion` package
   until it ships a WASM artifact. Do not claim or package diffusion alongside
   the four current canonical JS/WASM pairs.
 - Hybrid STT registers `Cloud.registerBackend()` only after `ONNX.register()`;

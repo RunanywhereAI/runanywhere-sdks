@@ -52,7 +52,10 @@ import {
   MessageRole,
   type ChatMessage,
 } from '@runanywhere/proto-ts/chat';
-import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule.js';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -117,12 +120,54 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
  * calls never manufacture a cross-WASM provider as a hidden default.
  */
 export function registerVoiceAgentProvider(provider?: VoiceAgentProvider): boolean {
-  const resolved = provider ?? (
-    supportsCrossWasmVoiceAgent() ? new CrossWasmVoiceAgentProvider() : null
-  );
+  // Prefer commons native handle orchestration (Swift/Kotlin parity). Only
+  // fall back to CrossWasm composition when the native create/init ABI is
+  // unavailable and the split STT/LLM/TTS backends can be composed.
+  let resolved = provider ?? null;
+  if (!resolved && _provider?.providerKind === 'wasm-handle') {
+    resolved = _provider;
+  }
+  if (!resolved) {
+    resolved = tryCreateNativeVoiceAgentProvider();
+  }
+  if (!resolved && supportsCrossWasmVoiceAgent()) {
+    resolved = new CrossWasmVoiceAgentProvider();
+  }
   if (!resolved) return false;
   setVoiceAgentProvider(resolved);
   return true;
+}
+
+function tryCreateNativeVoiceAgentProvider(): VoiceAgentProvider | null {
+  const adapter = VoiceAgentProtoAdapter.tryDefault();
+  if (!adapter?.supportsProtoVoiceAgent()) return null;
+  const module = getModuleForCapability('voice-agent') as
+    | (EmscriptenRunanywhereModule & {
+      _rac_voice_agent_create_standalone?: (outHandle: number) => number;
+    })
+    | null;
+  if (
+    !module
+    || typeof module._rac_voice_agent_create_standalone !== 'function'
+    || typeof module._malloc !== 'function'
+    || typeof module._free !== 'function'
+    || typeof module.getValue !== 'function'
+  ) {
+    return null;
+  }
+  const outPtr = module._malloc(4);
+  if (!outPtr) return null;
+  try {
+    const rc = module._rac_voice_agent_create_standalone(outPtr);
+    if (rc !== 0) return null;
+    const handle = module.getValue(outPtr, '*');
+    if (!handle) return null;
+    return createVoiceAgentHandleProvider({ handle, module });
+  } catch {
+    return null;
+  } finally {
+    module._free(outPtr);
+  }
 }
 
 export function createVoiceAgentHandleProvider(

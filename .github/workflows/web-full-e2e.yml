@@ -1,0 +1,54 @@
+name: Web full real-model E2E
+
+# Opt-in / scheduled gate for the serial real-model browser matrix.
+# PR CI stays on lightweight smoke (web-browser-smoke in pr-build.yml).
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: '0 6 * * 1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  full-e2e:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
+      - name: Install Web SDK workspace
+        working-directory: sdk/runanywhere-web
+        run: npm ci --no-audit --no-fund
+      - name: Install proto-ts dependencies
+        working-directory: sdk/shared/proto-ts
+        run: npm ci --no-audit --no-fund --workspaces=false
+      - name: Install example app dependencies
+        working-directory: examples/web/RunAnywhereAI
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright Chrome
+        working-directory: sdk/runanywhere-web
+        run: npx playwright install --with-deps chrome
+      - name: Full release browser journey
+        working-directory: sdk/runanywhere-web
+        env:
+          RA_RUN_FULL_E2E: '1'
+          RA_E2E_TRACE: '1'
+        run: npm run test:browser:release
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-full-e2e-artifacts
+          path: |
+            sdk/runanywhere-web/playwright-report
+            sdk/runanywhere-web/test-results
+          if-no-files-found: ignore

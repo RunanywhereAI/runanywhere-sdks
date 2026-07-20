@@ -728,19 +728,46 @@ async function generateStreaming(
   }
 
   let receivedThinking = false;
+  let sawAnyToken = false;
+  const firstTokenTimeoutMs = 120_000;
+  const firstTokenTimer = window.setTimeout(() => {
+    if (sawAnyToken || !isGenerating) return;
+    try {
+      stream.cancel();
+    } catch {
+      /* ignore */
+    }
+  }, firstTokenTimeoutMs);
+
   const result = await RunAnywhere.textGeneration.aggregateStream(
     prompt,
     stream,
     (answer) => {
+      sawAnyToken = true;
+      window.clearTimeout(firstTokenTimer);
       assistantMsg.content = answer;
       renderLastMessage(messagesEl, assistantMsg);
     },
     (thinking) => {
+      sawAnyToken = true;
+      window.clearTimeout(firstTokenTimer);
       receivedThinking = true;
       assistantMsg.thinking = thinking;
       renderLastMessage(messagesEl, assistantMsg);
     },
-  );
+  ).finally(() => {
+    window.clearTimeout(firstTokenTimer);
+  });
+
+  if (!sawAnyToken && !result.text.trim() && !result.thinkingContent?.trim()) {
+    assistantMsg.thinking = undefined;
+    assistantMsg.content = result.finishReason === 'cancelled'
+      ? 'Cancelled — no tokens arrived before the first-token timeout or stop.'
+      : 'No tokens arrived within 2 minutes. The model may still be loading '
+        + 'into WebGPU, or generation stalled. Try Stop, reload the model, or switch to a smaller model.';
+    renderLastMessage(messagesEl, assistantMsg, false);
+    return;
+  }
 
   const thinkingText = result.thinkingContent?.trim()
     || (receivedThinking ? assistantMsg.thinking?.trim() : undefined);

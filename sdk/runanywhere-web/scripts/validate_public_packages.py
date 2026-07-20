@@ -19,9 +19,8 @@ EXPECTED_PACKAGES = {
     "@runanywhere/web-llamacpp",
     "@runanywhere/web-onnx",
 }
-# `@runanywhere/web-diffusion` is a workspace API shell, not a publishable
-# artifact yet. It is added here only when a real, validated WebGPU/WASM
-# diffusion engine is shipped and package-sdk.sh packs its artifact.
+# Diffusion lives in `@runanywhere/web` (Swift/Kotlin parity). A future
+# browser engine artifact is registered through core, not a separate package.
 PROTO_CONSUMERS = {"@runanywhere/web", "@runanywhere/web-llamacpp"}
 PROTO_RUNTIME_DEPENDENCIES = {"@bufbuild/protobuf": "^2.12.1"}
 BUNDLED_PROTO_PREFIX = "package/node_modules/@runanywhere/proto-ts/"

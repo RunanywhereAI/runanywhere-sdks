@@ -282,7 +282,6 @@ echo ">> Web SDK:"
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-web/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/core/package.json" \
-    "${REPO_ROOT}/sdk/runanywhere-web/packages/diffusion/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/llamacpp/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/onnx/package.json"; do
     bump_json_version "$pkg"

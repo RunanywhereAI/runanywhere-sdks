@@ -1,9 +1,10 @@
 /**
  * RunAnywhere+RAG.ts
  *
- * Public RAG facade. Web views own browser file picking/reading; native or
- * registered providers own session, ingestion, retrieval, and generation via
- * generated proto request/result models.
+ * Public RAG facade. Browser I/O (file picking, IndexedDB/OPFS persistence)
+ * stays in Web adapters; chunking/retrieval/prompt assembly belong in the
+ * commons native RAG session when exports are present. CrossWasm IndexedDB
+ * orchestration is a fallback only when the native session ABI is missing.
  */
 
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
@@ -134,11 +135,23 @@ export function setRAGProvider(provider: RAGProvider | null): void {
  * implicit side effect of a RAG API call.
  */
 export function registerRAGProvider(provider?: RAGProvider): boolean {
-  // Default to the IndexedDB-backed provider so ONNX / llama.cpp registration
-  // installs durable RAG without apps having to opt in explicitly. Callers
-  // that need the in-memory index can still pass `createCrossWasm`-style
-  // providers or construct one through `__testing__`.
-  const resolved = provider ?? (supportsCrossWasmRAG() ? createPersistentRAGProvider() : null);
+  // Prefer the commons native RAG session when exports are present (Swift /
+  // Kotlin parity). Fall back to the IndexedDB-backed CrossWasm provider only
+  // when the native session ABI is unavailable in this WASM build.
+  let resolved = provider ?? null;
+  if (!resolved) {
+    const nativeAdapter = RAGProtoAdapter.tryDefault();
+    if (nativeAdapter?.supportsProtoRAG()) {
+      try {
+        resolved = createRAGNativeProvider({ adapter: nativeAdapter });
+      } catch {
+        resolved = null;
+      }
+    }
+  }
+  if (!resolved && supportsCrossWasmRAG()) {
+    resolved = createPersistentRAGProvider();
+  }
   if (!resolved) return false;
   setRAGProvider(resolved);
   return true;

@@ -31,13 +31,17 @@
  */
 
 import {
+  BackendWorkerHost,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setModelLoadPreparation,
   setModelLoadFailureRecovery,
+  setRuntimeDegradedReason,
   setVisionLanguageProvider,
   getBackendWorkerFactory,
   setBackendWorkerFactory,
+  setStreamWorkerFactory,
+  setStreamWorkerInit,
   SDKLogger,
   type BackendRegistrationState,
   type BackendWorkerFactory,
@@ -48,11 +52,17 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge.js';
+import {
+  LLAMACPP_STREAM_WORKER_FACTORY_ID,
+  LLAMACPP_STREAM_WORKER_WEBGPU_FACTORY_ID,
+} from './streamWorkerFactoryId.js';
 import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider.js';
 
 const logger = new SDKLogger('LlamaCPP');
 let _installedBackendWorkerFactory = false;
 let _backendWorkerFactory: BackendWorkerFactory | null = null;
+let _backendWorkerHost: BackendWorkerHost | null = null;
+let _installedStreamWorker = false;
 
 const MODULE_ID = 'llamacpp';
 
@@ -133,11 +143,27 @@ export interface LlamaCPPRegisterOptions {
   /** Override the URL to the racommons-llamacpp-webgpu.js glue file. */
   webgpuWasmUrl?: string;
   /**
-   * Optional Stage 3 worker bootstrap. Consumers using Vite/Webpack provide
-   * the bundler-specific `new Worker(...)` factory here. Omit it to retain
-   * the current main-thread inference path.
+   * Optional Stage 3 worker bootstrap. When omitted and `preferBackendWorker`
+   * is enabled, LlamaCPP installs a Vite-friendly default factory that loads
+   * `./backendWorker.ts`.
    */
   backendWorkerFactory?: BackendWorkerFactory;
+  /**
+   * Prefer the model-owning BackendWorker for LLM load/stream. Defaults to
+   * `true` when `Worker` + `URL` are available. Failure falls back to the
+   * main thread unless `requireBackendWorker` is set.
+   */
+  preferBackendWorker?: boolean;
+  /**
+   * Fail registration when the BackendWorker handshake cannot complete.
+   * Defaults to `false` so unit tests and non-COI environments still work.
+   */
+  requireBackendWorker?: boolean;
+  /**
+   * Install the T6.1 stream-worker mirror. Opt-in only and mutually exclusive
+   * with the model-owning BackendWorker path. Defaults to `false`.
+   */
+  enableStreamWorker?: boolean;
 }
 
 export const LlamaCPP = {
@@ -222,10 +248,22 @@ export const LlamaCPP = {
         });
 
         await bridge.ensureLoaded(options.acceleration ?? 'auto');
-        if (options.backendWorkerFactory) {
-          setBackendWorkerFactory(options.backendWorkerFactory);
-          _installedBackendWorkerFactory = true;
-          _backendWorkerFactory = options.backendWorkerFactory;
+        await installLlamaCppBackendWorker(options, bridge.accelerationMode);
+        const enableStreamWorker = options.enableStreamWorker === true
+          && typeof Worker !== 'undefined'
+          && typeof URL !== 'undefined'
+          && _backendWorkerHost == null;
+        if (enableStreamWorker) {
+          try {
+            await installLlamaCppStreamWorker(bridge.accelerationMode === 'webgpu');
+            _installedStreamWorker = true;
+          } catch (error) {
+            logger.warning(
+              `Stream worker bootstrap failed; keeping main-thread streaming: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
         }
 
         // Publish the active mode so `RunAnywhere.runtime.active` reflects
@@ -257,11 +295,8 @@ export const LlamaCPP = {
         setModelLoadPreparation(null);
         setModelLoadFailureRecovery(null);
         setVisionLanguageProvider(null);
-        if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
-          setBackendWorkerFactory(null);
-        }
-        _installedBackendWorkerFactory = false;
-        _backendWorkerFactory = null;
+        clearLlamaCppBackendWorker();
+        clearLlamaCppStreamWorker();
         bridge.shutdown();
         _isRegistered = false;
         _registrationState = 'failed';
@@ -287,17 +322,120 @@ export const LlamaCPP = {
     setModelLoadPreparation(null);
     setModelLoadFailureRecovery(null);
     setVisionLanguageProvider(null);
-    if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
-      setBackendWorkerFactory(null);
-    }
-    _installedBackendWorkerFactory = false;
-    _backendWorkerFactory = null;
+    clearLlamaCppBackendWorker();
+    clearLlamaCppStreamWorker();
     LlamaCppBridge.shared.shutdown();
     _isRegistered = false;
     _registrationState = 'unregistered';
     logger.info('LlamaCpp backend unregistered');
   },
 };
+
+async function installLlamaCppBackendWorker(
+  options: LlamaCPPRegisterOptions,
+  accelerationMode: 'cpu' | 'webgpu',
+): Promise<void> {
+  const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+  const prefer = options.preferBackendWorker !== false && workerAvailable;
+  if (!prefer) {
+    const reason = !workerAvailable
+      ? 'Web Worker API unavailable; LLM inference stays on the main thread.'
+      : 'BackendWorker disabled via LlamaCPP.register({ preferBackendWorker: false }).';
+    setRuntimeDegradedReason(reason);
+    if (options.requireBackendWorker) {
+      throw new Error(reason);
+    }
+    return;
+  }
+
+  if (!globalThis.crossOriginIsolated) {
+    logger.warning(
+      'crossOriginIsolated is false; pthread-backed BackendWorker WASM may fail. '
+      + 'Serve with COOP/COEP headers for production worker inference.',
+    );
+  }
+
+  const factory = options.backendWorkerFactory
+    ?? (() => new Worker(new URL('./backendWorker.ts', import.meta.url), {
+      type: 'module',
+      name: 'runanywhere-llamacpp-backend',
+    }));
+  setBackendWorkerFactory(factory);
+  _installedBackendWorkerFactory = true;
+  _backendWorkerFactory = factory;
+
+  const host = new BackendWorkerHost(factory, { initTimeoutMs: 120_000 });
+  _backendWorkerHost = host;
+  try {
+    await host.init({
+      acceleration: accelerationMode === 'webgpu' ? 'webgpu' : 'auto',
+    });
+    setRuntimeDegradedReason(null);
+    logger.info(`BackendWorker ready (executionContext=worker, ${accelerationMode})`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    host.dispose();
+    _backendWorkerHost = null;
+    if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+      setBackendWorkerFactory(null);
+    }
+    _installedBackendWorkerFactory = false;
+    _backendWorkerFactory = null;
+    const reason = `BackendWorker handshake failed: ${message}`;
+    setRuntimeDegradedReason(reason);
+    logger.warning(`${reason}; keeping main-thread inference`);
+    if (options.requireBackendWorker) {
+      throw error instanceof Error ? error : new Error(reason);
+    }
+  }
+}
+
+function clearLlamaCppBackendWorker(): void {
+  if (_backendWorkerHost) {
+    try {
+      _backendWorkerHost.dispose();
+    } catch {
+      /* ignore */
+    }
+    _backendWorkerHost = null;
+  }
+  if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+    setBackendWorkerFactory(null);
+  }
+  _installedBackendWorkerFactory = false;
+  _backendWorkerFactory = null;
+  setRuntimeDegradedReason(null);
+}
+
+async function installLlamaCppStreamWorker(useWebGPU: boolean): Promise<void> {
+  const wasmName = useWebGPU
+    ? 'racommons-llamacpp-webgpu.wasm'
+    : 'racommons-llamacpp.wasm';
+  const wasmUrl = new URL(`../wasm/${wasmName}`, import.meta.url).href;
+  const wasmResponse = await fetch(wasmUrl);
+  if (!wasmResponse.ok) {
+    throw new Error(`Failed to fetch stream-worker WASM (${wasmResponse.status}): ${wasmName}`);
+  }
+  const wasmBytes = await wasmResponse.arrayBuffer();
+  setStreamWorkerFactory(() => new Worker(new URL('./streamWorker.ts', import.meta.url), {
+    type: 'module',
+    name: 'runanywhere-llamacpp-stream',
+  }));
+  setStreamWorkerInit({
+    wasmBytes,
+    moduleFactoryId: useWebGPU
+      ? LLAMACPP_STREAM_WORKER_WEBGPU_FACTORY_ID
+      : LLAMACPP_STREAM_WORKER_FACTORY_ID,
+  });
+  logger.info(`Stream worker installed (${useWebGPU ? 'webgpu' : 'cpu'})`);
+}
+
+function clearLlamaCppStreamWorker(): void {
+  if (!_installedStreamWorker) return;
+  setStreamWorkerFactory(null);
+  setStreamWorkerInit(null);
+  _installedStreamWorker = false;
+}
 
 /**
  * Auto-register the llama.cpp backend.

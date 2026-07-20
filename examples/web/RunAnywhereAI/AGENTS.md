@@ -129,7 +129,7 @@ and `application/wasm` MIME types.
 - `BackendWorkerHost` is currently a Worker-runtime scaffold. Until a backend
   supplies a worker factory and completes its handshake, inference uses the
   supported main-thread fallback.
-- `packages/diffusion` is workspace-only. Do not show diffusion as available
+- Diffusion is a core `@runanywhere/web` facade. Do not show it as available until a browser engine registers the `diffusion` capability
   or add it to packaging until it has a production WASM artifact.
 - Register hybrid Cloud STT with `Cloud.registerBackend()` after
   `ONNX.register()`. Cloud failure is optional and must leave local

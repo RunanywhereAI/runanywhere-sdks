@@ -261,6 +261,7 @@ set(WASM_PLATFORM_SOURCES
 
 set(WASM_EXPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm_exports.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rac_diffusion_webgpu_ops.cpp
 )
 
 # =============================================================================
@@ -832,11 +833,15 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_structured_output_generate_stream_proto"
     "_rac_structured_output_schema_to_json_proto"
 
-    # Diffusion proto ABI
+    # Diffusion proto ABI (lifecycle is the SDK-facing path; handle APIs retained for engine smoke)
+    "_rac_diffusion_generate_lifecycle_proto"
     "_rac_diffusion_generate_proto"
     "_rac_diffusion_generate_with_progress_proto"
     "_rac_diffusion_cancel_proto"
     "_rac_diffusion_result_free"
+    "_rac_diffusion_stream_start_proto"
+    "_rac_diffusion_stream_stop_proto"
+    "_rac_diffusion_stream_cancel_proto"
 
     # Embeddings proto ABI
     "_rac_embeddings_create_proto"

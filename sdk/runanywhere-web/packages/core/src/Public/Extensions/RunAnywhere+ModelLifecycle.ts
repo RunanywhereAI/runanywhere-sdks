@@ -8,7 +8,13 @@ import type {
   ModelUnloadRequest,
   ModelUnloadResult,
 } from '@runanywhere/proto-ts/model_types';
-import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+import {
+  InferenceFramework,
+  ModelCategory as ModelCategoryEnum,
+  ModelLoadRequest as ModelLoadRequestCodec,
+  ModelLoadResult as ModelLoadResultCodec,
+  ModelUnloadRequest as ModelUnloadRequestCodec,
+} from '@runanywhere/proto-ts/model_types';
 import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
@@ -29,6 +35,12 @@ import {
   recordModelLifecycle,
 } from '../../runtime/EmscriptenModule.js';
 import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import {
+  clearModelOwnedByBackendWorker,
+  isModelOwnedByBackendWorker,
+  markModelOwnedByBackendWorker,
+} from '../../runtime/BackendWorkerModelOwnership.js';
 
 export type {
   CurrentModelRequest,
@@ -64,6 +76,70 @@ function lifecycleModuleAsEmscripten(
   adapter: ModelLifecycleAdapter,
 ): EmscriptenRunanywhereModule {
   return adapter.boundModule as unknown as EmscriptenRunanywhereModule;
+}
+
+function isBackendWorkerEligibleLLM(
+  model: ModelInfo | null,
+  request: ModelLoadRequest,
+): boolean {
+  const framework = model?.framework ?? request.framework;
+  if (
+    framework !== undefined
+    && framework !== null
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+    && framework !== InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+  ) {
+    return false;
+  }
+  const category = model?.category ?? request.category;
+  return (
+    category === ModelCategoryEnum.MODEL_CATEGORY_LANGUAGE
+    || category === ModelCategoryEnum.MODEL_CATEGORY_VISION
+    || category === ModelCategoryEnum.MODEL_CATEGORY_MULTIMODAL
+    || category === undefined
+  );
+}
+
+function hydratePathsForModel(model: ModelInfo | null): string[] {
+  if (!model?.localPath) return [];
+  const files = model.multiFile?.files ?? [];
+  if (files.length > 1) {
+    return files
+      .map((file) => (file.filename ? `${model.localPath}/${file.filename}` : ''))
+      .filter(Boolean);
+  }
+  return [model.localPath];
+}
+
+async function loadModelViaBackendWorker(
+  request: ModelLoadRequest,
+  model: ModelInfo | null,
+  adapter: ModelLifecycleAdapter,
+): Promise<ModelLoadResult | null> {
+  const host = getActiveBackendWorkerHost();
+  if (!host || !isBackendWorkerEligibleLLM(model, request)) return null;
+
+  const requestBytes = ModelLoadRequestCodec.encode(request).finish();
+  const response = await host.loadModel(
+    'llm',
+    {
+      requestBytes,
+      hydratePaths: hydratePathsForModel(model),
+    },
+  ) as { resultBytes?: Uint8Array };
+  if (!response?.resultBytes) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+      'BackendWorker model load returned no result bytes',
+      'loadModel',
+    );
+  }
+  const result = ModelLoadResultCodec.decode(response.resultBytes);
+  if (result.success) {
+    markModelOwnedByBackendWorker(request.modelId);
+    recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+  }
+  return result;
 }
 
 function registeredLifecycleAdapters(): ModelLifecycleAdapter[] {
@@ -299,8 +375,16 @@ export const WebModelLifecycle = {
     // necessarily commons. Hydrate ONLY that load-target module: copying a
     // 2.5 GB GGUF into commons + llamacpp + onnx at once OOMs the tab and
     // surfaces as "missing from 3 MEMFS module(s) after OPFS restore".
+    //
+    // When the BackendWorker owns LLM load/inference, skip main-thread
+    // hydration so we do not keep a second copy of the GGUF in UI-thread
+    // MEMFS. The worker hydrates its own MEMFS during loadModel RPC.
     const adapter = requireAdapter(modelSnapshot?.framework);
-    if (modelSnapshot?.localPath) {
+    const workerEligible = Boolean(
+      getActiveBackendWorkerHost()
+      && isBackendWorkerEligibleLLM(modelSnapshot, request),
+    );
+    if (modelSnapshot?.localPath && !workerEligible) {
       const loadModule = lifecycleModuleAsEmscripten(adapter);
       const modules = [loadModule];
       try {
@@ -336,11 +420,32 @@ export const WebModelLifecycle = {
           'loadModel',
         );
       }
+    } else if (modelSnapshot?.localPath && workerEligible) {
+      try {
+        await assertDownloadedArtifactReady(modelSnapshot);
+      } catch (err) {
+        if (modelSnapshot.id && isIncompleteDownloadError(err)) {
+          try {
+            ModelRegistry.updateDownloadStatus(modelSnapshot.id, null);
+          } catch { /* ignore */ }
+        }
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+          err instanceof Error ? err.message : String(err),
+          'loadModel',
+        );
+      }
     }
 
     try {
+      const workerResult = await loadModelViaBackendWorker(request, modelSnapshot, adapter);
+      if (workerResult) return workerResult;
+
       const result = await adapter.loadAsync(request);
-      if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+      if (result?.success) {
+        clearModelOwnedByBackendWorker(request.modelId);
+        recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+      }
       return result;
     } catch (error) {
       const recovered = await recoverModelLoadFailure({
@@ -352,18 +457,41 @@ export const WebModelLifecycle = {
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
-      const adapter = requireAdapter(modelSnapshot?.framework);
-      const result = await adapter.loadAsync(request);
-      if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+      const retryAdapter = requireAdapter(modelSnapshot?.framework);
+      const workerResult = await loadModelViaBackendWorker(request, modelSnapshot, retryAdapter);
+      if (workerResult) return workerResult;
+      const result = await retryAdapter.loadAsync(request);
+      if (result?.success) {
+        clearModelOwnedByBackendWorker(request.modelId);
+        recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(retryAdapter), true);
+      }
       return result;
     }
   },
 
   unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
+    if (request.modelId && isModelOwnedByBackendWorker(request.modelId)) {
+      clearModelOwnedByBackendWorker(request.modelId);
+    } else if (request.unloadAll) {
+      clearModelOwnedByBackendWorker();
+    }
     return unloadAcrossAdapters(request);
   },
 
-  unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
+  async unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
+    const host = getActiveBackendWorkerHost();
+    if (
+      host
+      && (
+        (request.modelId && isModelOwnedByBackendWorker(request.modelId))
+        || request.unloadAll
+      )
+    ) {
+      const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+      await host.unloadModel('llm', { requestBytes });
+      if (request.unloadAll) clearModelOwnedByBackendWorker();
+      else clearModelOwnedByBackendWorker(request.modelId);
+    }
     return unloadAcrossAdaptersAsync(request);
   },
 

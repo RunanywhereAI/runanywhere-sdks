@@ -453,6 +453,42 @@ jobs:
         working-directory: sdk/runanywhere-web
         run: npm test
 
+  # Lightweight browser readiness/stream gate. Uses checked-in WASM artifacts
+  # and the example Vite alias path — no real-model downloads. Full real-model
+  # matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
+  web-browser-smoke:
+    runs-on: ubuntu-22.04
+    needs: [web-typecheck]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
+      - name: Install Web SDK workspace
+        working-directory: sdk/runanywhere-web
+        run: npm ci --no-audit --no-fund
+      - name: Install proto-ts dependencies
+        working-directory: sdk/shared/proto-ts
+        run: npm ci --no-audit --no-fund --workspaces=false
+      - name: Install example app dependencies
+        working-directory: examples/web/RunAnywhereAI
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright Chromium
+        working-directory: sdk/runanywhere-web
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke (readiness + hybrid STT surface)
+        working-directory: sdk/runanywhere-web
+        run: npm run test:browser:smoke
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-smoke-artifacts
+          path: |
+            sdk/runanywhere-web/playwright-report
+            sdk/runanywhere-web/test-results
+          if-no-files-found: ignore
+
   # Dedicated validation lane — runs the source-of-truth validation scripts
   # so deprecated-surface drift and RAC_API export drift cannot land silently.
   validation:

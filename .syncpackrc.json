@@ -19,7 +19,6 @@
         "@runanywhere/llamacpp",
         "@runanywhere/onnx",
         "@runanywhere/web",
-        "@runanywhere/web-diffusion",
         "@runanywhere/web-llamacpp",
         "@runanywhere/web-onnx",
         "@runanywhere/proto-ts"

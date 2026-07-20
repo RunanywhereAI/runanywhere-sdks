@@ -90,6 +90,7 @@ import type {
   DiffusionGenerationOptions,
   DiffusionProgress,
   DiffusionResult,
+  DiffusionStreamEvent,
 } from '@runanywhere/proto-ts/diffusion_options';
 import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid.js';
 import {
@@ -97,6 +98,7 @@ import {
   cancelImageGeneration as cancelImageGenerationCapability,
   generateImage as generateImageCapability,
   generateImageStream as generateImageStreamCapability,
+  inpaint as inpaintCapability,
 } from './Extensions/RunAnywhere+Diffusion.js';
 import {
   createStorageNamespace,
@@ -2166,7 +2168,7 @@ export const RunAnywhere = {
   async *generateImageStream(
     options: Partial<DiffusionGenerationOptions>,
     extra: CancellableCall = {},
-  ): AsyncIterable<DiffusionProgress> {
+  ): AsyncIterable<DiffusionStreamEvent | DiffusionProgress> {
     throwIfAborted(extra.signal, 'generateImageStream');
     await RunAnywhere.ensureServicesReady();
     throwIfAborted(extra.signal, 'generateImageStream');
@@ -2182,6 +2184,20 @@ export const RunAnywhere = {
 
   async cancelImageGeneration(): Promise<void> {
     await cancelImageGenerationCapability();
+  },
+
+  /** Kotlin-parity inpaint sugar over DIFFUSION_MODE_INPAINTING. */
+  async inpaint(
+    options: Parameters<typeof inpaintCapability>[0],
+    extra: CancellableCall = {},
+  ): Promise<DiffusionResult> {
+    throwIfAborted(extra.signal, 'inpaint');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'inpaint');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    return inpaintCapability(options).finally(detach);
   },
 
   // Explicit overloads (the capability function is overloaded; deriving the

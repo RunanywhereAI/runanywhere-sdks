@@ -223,6 +223,11 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
 
+  _rac_diffusion_generate_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
   _rac_diffusion_generate_proto?(
     handle: number,
     optionsBytes: number,

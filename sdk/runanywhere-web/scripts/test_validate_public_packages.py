@@ -31,10 +31,9 @@ PACKAGE_NAMES = {
     "web-llamacpp": "@runanywhere/web-llamacpp",
     "web-onnx": "@runanywhere/web-onnx",
 }
-# The diffusion workspace shell is intentionally absent: release artifacts
-# remain the established three publishable Web packages plus proto-ts until a
-# real diffusion WASM engine is available.
-UNPUBLISHED_WORKSPACE_PACKAGES = {"@runanywhere/web-diffusion"}
+# Diffusion is exposed through `@runanywhere/web` core — there is no separate
+# publishable diffusion workspace package.
+UNPUBLISHED_WORKSPACE_PACKAGES: set[str] = set()
 PROTO_FILES = {
     "package.json": json.dumps(
         {

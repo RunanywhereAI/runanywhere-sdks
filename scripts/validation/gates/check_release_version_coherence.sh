@@ -187,7 +187,6 @@ expect_literal "dependencies/versions.json" "\"@runanywhere/proto-ts\": \"^${VER
 for package_json in \
   sdk/runanywhere-web/package.json \
   sdk/runanywhere-web/packages/core/package.json \
-  sdk/runanywhere-web/packages/diffusion/package.json \
   sdk/runanywhere-web/packages/llamacpp/package.json \
   sdk/runanywhere-web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"version\": \"${VERSION}\""
@@ -195,7 +194,6 @@ done
 expect_literal "sdk/runanywhere-web/packages/core/src/Foundation/Version.ts" \
   "export const SDK_VERSION = '${VERSION}'"
 for package_json in \
-  sdk/runanywhere-web/packages/diffusion/package.json \
   sdk/runanywhere-web/packages/llamacpp/package.json \
   sdk/runanywhere-web/packages/onnx/package.json; do
   expect_literal "${package_json}" "\"@runanywhere/web\": \">=${VERSION} <1\""
@@ -203,7 +201,7 @@ done
 expect_count "sdk/runanywhere-web/package-lock.json" \
   "\"@runanywhere/proto-ts\": \"^${VERSION}\"" 2
 expect_count "sdk/runanywhere-web/package-lock.json" \
-  "\"@runanywhere/web\": \">=${VERSION} <1\"" 3
+  "\"@runanywhere/web\": \">=${VERSION} <1\"" 2
 
 for package_json in \
   sdk/runanywhere-react-native/package.json \

@@ -70,6 +70,11 @@ export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
   return activeHost?.diagnostics ?? { executionContext: 'main', queueDepth: 0 };
 }
 
+/** Active model-owning backend worker host, if a backend completed handshake. */
+export function getActiveBackendWorkerHost(): BackendWorkerHost | null {
+  return activeHost;
+}
+
 /**
  * Lazily creates a backend Worker and routes unary and stream RPC calls.
  * A worker crash rejects active calls and resets the host to main-thread
@@ -82,6 +87,7 @@ export class BackendWorkerHost {
   private initReject: ((reason: unknown) => void) | null = null;
   private requestCounter = 0;
   private readonly pending = new Map<string, PendingRequest>();
+  private readonly activeStreamIds = new Set<string>();
   private executionContext: 'main' | 'worker' = 'main';
 
   constructor(
@@ -183,6 +189,7 @@ export class BackendWorkerHost {
       if (state.finished) return;
       state.finished = true;
       this.pending.delete(requestId);
+      this.activeStreamIds.delete(requestId);
       while (state.waiters.length) {
         state.waiters.shift()!.resolve({ value: undefined, done: true });
       }
@@ -191,12 +198,14 @@ export class BackendWorkerHost {
       if (state.finished) return;
       state.finished = true;
       this.pending.delete(requestId);
+      this.activeStreamIds.delete(requestId);
       while (state.waiters.length) state.waiters.shift()!.reject(error);
     };
     const start = (): void => {
       if (started) return;
       started = true;
       this.pending.set(requestId, state);
+      this.activeStreamIds.add(requestId);
       void this.init()
         .then(() => this.post({ type: 'stream', requestId, kind, payload }, transfer))
         .catch(fail);
@@ -228,6 +237,13 @@ export class BackendWorkerHost {
       requestId: this.nextRequestId('cancel'),
       targetRequestId,
     });
+  }
+
+  /** Cancel every in-flight stream RPC (used by modality cancel APIs). */
+  cancelActiveStreams(): void {
+    for (const requestId of [...this.activeStreamIds]) {
+      this.cancel(requestId);
+    }
   }
 
   async health(): Promise<BackendWorkerHealthResponse> {
@@ -312,6 +328,7 @@ export class BackendWorkerHost {
     } else if (response.type === 'complete') {
       pending.finished = true;
       this.pending.delete(response.requestId);
+      this.activeStreamIds.delete(response.requestId);
       while (pending.waiters.length) pending.waiters.shift()!.resolve({ value: undefined, done: true });
     }
   }
@@ -320,6 +337,7 @@ export class BackendWorkerHost {
     const pending = this.pending.get(requestId);
     if (!pending) return;
     this.pending.delete(requestId);
+    this.activeStreamIds.delete(requestId);
     if (pending.kind === 'unary') {
       pending.reject(error);
       return;

@@ -110,6 +110,7 @@ let _streamingMode: StreamingMode = 'auto';
 let _switcher: RuntimeAccelerationSwitcher | null = null;
 let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
 let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
+let _degradedReason: string | null = null;
 
 /**
  * Public `RunAnywhere.runtime` capability object.
@@ -185,6 +186,14 @@ export const Runtime = {
   },
 
   /**
+   * When the preferred BackendWorker path could not be established, explains
+   * why inference remains on the main thread (missing Worker, COI, handshake).
+   */
+  get degradedReason(): string | null {
+    return _degradedReason;
+  },
+
+  /**
    * Advisory WASM32 memory limits for diagnostics and preflight UI. These
    * numbers do not allocate memory or override browser/device quota checks.
    */
@@ -199,6 +208,11 @@ export const Runtime = {
  */
 export function setAccelerationSwitcher(fn: RuntimeAccelerationSwitcher | null): void {
   _switcher = fn;
+}
+
+/** Backend hook: record why the preferred worker inference path is unavailable. */
+export function setRuntimeDegradedReason(reason: string | null): void {
+  _degradedReason = reason;
 }
 
 /**
