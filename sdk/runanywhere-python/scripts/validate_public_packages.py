@@ -9,8 +9,10 @@ inspects a built ``*.whl`` (a ZIP) and its companion ``*.tar.gz`` sdist and asse
 * the platform's vendored sidecar runtime libraries (onnxruntime / sherpa, placed by
   delvewheel beside ``_core`` on Windows, in ``runanywhere.libs`` on Linux, ``.dylibs`` on
   macOS) are all present — plus the CUDA libraries when ``--gpu`` is given;
-* no binary wheel member leaks an absolute host build path (``/Users/``, ``/home/``,
-  ``\\Users\\``);
+* no TEXT / metadata wheel member (our ``.py`` sources, ``METADATA``, ``RECORD``, ``WHEEL``)
+  leaks an absolute host build path (``/Users/``, ``/home/``, ``\\Users\\``). Compiled
+  binaries are NOT scanned: a native extension and its vendored deps unavoidably embed
+  build-env source paths, and CI runner workspaces live under ``/home/`` / ``/Users/``;
 * the sdist expands under a single ``runanywhere-<version>/`` prefix, ships
   ``pyproject.toml`` + ``native/`` + ``runanywhere/``, and contains NO compiled binary
   (``.pyd`` / ``.so`` / ``.dylib`` / ``.dll``).
@@ -187,13 +189,17 @@ def validate_wheel(wheel: Path, expected_version: str, *, gpu: bool = False) -> 
             for member_name in names:
                 if member_name.endswith("/"):
                     continue
-                if not member_name.casefold().endswith(BINARY_SUFFIXES):
+                # Skip compiled binaries: our _core and the vendored onnxruntime/sherpa libs
+                # unavoidably embed build-env source paths (llama/absl/ggml __FILE__ strings),
+                # and CI runner workspaces themselves live under /home/ or /Users/ — so scanning
+                # binaries yields only false positives. A host path in a TEXT / metadata member
+                # (our .py sources, METADATA, RECORD, WHEEL) IS an avoidable leak and is rejected.
+                if member_name.casefold().endswith(BINARY_SUFFIXES):
                     continue
                 payload = archive.read(member_name)
                 if any(marker in payload for marker in HOST_PATH_MARKERS):
                     raise PackageValidationError(
-                        f"{label}: binary member {member_name} exposes an absolute host "
-                        "build path"
+                        f"{label}: member {member_name} leaks an absolute host build path"
                     )
             _ = name_set
     except zipfile.BadZipFile as error:
