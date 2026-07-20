@@ -46,11 +46,16 @@ wheel.install-dir = "runanywhere/_native"
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 
-# The sdist uses scikit-build-core's default git-tracked file selection: every committed
-# source file (runanywhere/*.py, native/*, pyproject, docs) is included, while the locally
-# bundled compiled artifacts (_core.pyd, sidecar DLLs) and __pycache__ are gitignored and so
-# never enter the sdist — keeping it pure source. (A force `sdist.include` would drag those
-# binaries in, since include overrides exclude.)
+# Scope the sdist to the SDK's own sources. Without this, scikit-build-core would archive the
+# whole cmake.source-dir (the monorepo root, incl. build/ and .git) — hundreds of MB. In a
+# clean checkout runanywhere/_native/ holds only the loader + stub (the compiled _core and
+# sidecar libs are gitignored/absent), so the sdist is pure source; a local tree that has run
+# bundle_native.py will carry those binaries, which is a dev-only artifact, not a release one.
+[tool.scikit-build.sdist]
+include = [
+    "runanywhere",
+    "native",
+]
 
 [tool.cibuildwheel]
 build-frontend = "build"
