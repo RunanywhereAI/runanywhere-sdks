@@ -446,6 +446,7 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 return true;
             });
     } catch (const std::exception& e) {
+        RAC_LOG_ERROR("LLM.LlamaCpp.C-API", "generate_stream exception: %s", e.what());
         rac_error_set_details(e.what());
         if (!terminal_emitted) {
             callback("", RAC_TRUE, user_data);
