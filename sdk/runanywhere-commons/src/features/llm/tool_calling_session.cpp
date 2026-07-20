@@ -32,6 +32,7 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_grammar.h"
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
@@ -617,14 +618,19 @@ void run_generate_loop(ToolCallingSession& session) {
         session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
         !session.all_tool_calls.empty(), session.keep_tools_available);
     if (!tools_live_this_turn) {
-        step_generation.tool_names.clear();
+        step_generation.grammar_gbnf.clear();
+        step_generation.grammar_qhexrt.clear();
     } else if (session.has_tool_choice &&
                session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
                !session.forced_tool_name.empty()) {
-        // tool_choice=SPECIFIC: narrow the QHexRT grammar spec to the ONE forced tool so the
-        // grammar can only emit `[<forced>(...)]` (or free text), rather than letting the
-        // model pick a tool the SPECIFIC policy then rejects (see the run-loop path). RUN-80.
-        step_generation.tool_names = {session.forced_tool_name};
+        // tool_choice=SPECIFIC: rebuild grammars narrowed to the ONE forced tool
+        // so decoding can only emit that call (see the run-loop path).
+        auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
+            session.tool_options, session.has_tool_choice, session.tool_choice,
+            session.forced_tool_name);
+        step_generation.grammar_gbnf =
+            session.grammar_backend ? std::string() : std::move(grammar.gbnf);
+        step_generation.grammar_qhexrt = std::move(grammar.qhexrt);
     }
     // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
     // "only call when genuinely needed" hint to the system prompt (see the run-loop path).
@@ -862,13 +868,22 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
-        // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
-        session->generation.tool_names.push_back(tool.name());
     }
 
     std::string tool_choice_error;
     if (!apply_explicit_tool_choice(session.get(), &tool_choice_error)) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // TC-1: pre-build grammar dialects (same contract as the run-loop path).
+    if (session->format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON ||
+        session->grammar_backend) {
+        auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
+            session->tool_options, session->has_tool_choice, session->tool_choice,
+            session->forced_tool_name);
+        session->generation.grammar_gbnf =
+            session->grammar_backend ? std::string() : std::move(grammar.gbnf);
+        session->generation.grammar_qhexrt = std::move(grammar.qhexrt);
     }
 
     auto& reg = registry();

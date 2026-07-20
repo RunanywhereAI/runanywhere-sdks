@@ -57,11 +57,13 @@
 #include "pipeline.pb.h"
 #include "rag.pb.h"
 #include "stt_options.pb.h"
+#include "tool_calling.pb.h"
 #include "tts_options.pb.h"
 #include "vad_options.pb.h"
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_tool_calling.h"
 #if defined(RAC_HAVE_RAG)
 #include "rac/features/rag/rac_rag.h"
 #endif
@@ -259,6 +261,139 @@ class GenerateTextNode final : public OperatorNode {
     int max_tokens_;
     float temperature_;
     std::string system_prompt_;
+};
+
+// ---------------------------------------------------------------------------
+// agent_loop — text in (text.utf8) → text out (text.utf8) on port "token".
+//
+// AG-2: routes a tools-bearing AgentLoopConfig through the REAL tool-calling
+// run loop (rac_tool_calling_run_loop_proto) instead of the plain
+// generate_text path that silently ignored `tools`. Tool definitions arrive
+// from solution_converter as indexed spec params ("tool.<i>.name" /
+// ".description" / ".json_schema", count in "tool.count") because
+// OperatorSpec.params is the only converter→operator channel today.
+//
+// Solutions pipelines have no host tool-executor callback yet, so the loop
+// runs with auto_execute=false: the model sees the advertised tools, and a
+// requested call surfaces as an explicit structured error naming the tool —
+// replacing the old silent no-tools behavior with an honest contract.
+// ---------------------------------------------------------------------------
+class AgentLoopNode final : public OperatorNode {
+   public:
+    AgentLoopNode(std::string name, const runanywhere::v1::OperatorSpec& spec)
+        : PipelineNode(std::move(name), /*input*/ 8, /*output*/ 8, OverflowPolicy::BlockProducer),
+          max_iterations_(param_int_or(spec, "max_iterations", 0)) {
+        if (const std::string* p = find_param(spec, "system_prompt"); p) {
+            system_prompt_ = *p;
+        }
+        const int tool_count = param_int_or(spec, "tool.count", 0);
+        tools_.reserve(static_cast<size_t>(tool_count));
+        for (int i = 0; i < tool_count; ++i) {
+            const std::string prefix = "tool." + std::to_string(i) + ".";
+            ToolSpecParams tool;
+            if (const std::string* v = find_param(spec, prefix + "name"); v) {
+                tool.name = *v;
+            }
+            if (const std::string* v = find_param(spec, prefix + "description"); v) {
+                tool.description = *v;
+            }
+            if (const std::string* v = find_param(spec, prefix + "json_schema"); v) {
+                tool.json_schema = *v;
+            }
+            if (!tool.name.empty()) {
+                tools_.push_back(std::move(tool));
+            }
+        }
+    }
+
+   protected:
+    void process(Item item, OutputEdge& out) override {
+        if (!item.is_text()) {
+            set_error_detail(name(), "agent_loop expected text.utf8 input but received '" +
+                                         std::string(item.body_type_id()) + "'");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        runanywhere::v1::ToolCallingSessionCreateRequest request;
+        request.set_prompt(item.text());
+        if (!system_prompt_.empty()) {
+            request.set_system_prompt(system_prompt_);
+        }
+        if (max_iterations_ > 0) {
+            request.set_max_tool_calls(static_cast<uint32_t>(max_iterations_));
+        }
+        // No host executor exists in the Solutions DAG context; parse and
+        // validate the call, then hand it back instead of invoking anything.
+        request.set_auto_execute(false);
+        for (const ToolSpecParams& tool : tools_) {
+            auto* def = request.add_tools();
+            def->set_name(tool.name);
+            def->set_description(tool.description);
+            if (!tool.json_schema.empty()) {
+                def->set_json_schema(tool.json_schema);
+            }
+        }
+
+        std::vector<uint8_t> bytes(request.ByteSizeLong());
+        if (!bytes.empty() &&
+            !request.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+            set_error_detail(name(), "failed to serialize ToolCallingSessionCreateRequest");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        ProtoBufferGuard buffer;
+        const rac_result_t rc = rac_tool_calling_run_loop_proto(
+            bytes.empty() ? nullptr : bytes.data(), bytes.size(),
+            // Required non-null; unreachable because auto_execute=false.
+            [](const uint8_t*, size_t, rac_proto_buffer_t* exec_out, void*) -> rac_result_t {
+                return rac_proto_buffer_set_error(exec_out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                                  "Solutions pipelines have no host tool executor");
+            },
+            nullptr, [](uint64_t, void*) {}, nullptr, buffer.raw());
+        if (rc != RAC_SUCCESS) {
+            set_error_detail(name(), std::string("rac_tool_calling_run_loop_proto failed: ") +
+                                         rac_error_message(rc));
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        runanywhere::v1::ToolCallingResult result;
+        if (!result.ParseFromArray(buffer.data(), static_cast<int>(buffer.size()))) {
+            set_error_detail(name(), "failed to decode ToolCallingResult");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        if (result.tool_calls_size() > 0) {
+            set_error_detail(name(), "agent_loop: model requested tool '" +
+                                         result.tool_calls(0).name() +
+                                         "' but Solutions pipelines cannot execute host tools yet; "
+                                         "run tool-enabled generation through the SDK facade "
+                                         "(generateWithTools) instead");
+            cancel_graph(this->cancel_token());
+            return;
+        }
+        if (!result.error_message().empty() || result.error_code() != 0) {
+            set_error_detail(name(), "agent_loop generation failed: " + result.error_message());
+            cancel_graph(this->cancel_token());
+            return;
+        }
+
+        out.push(Item::text(result.text()), this->cancel_token());
+    }
+
+   private:
+    struct ToolSpecParams {
+        std::string name;
+        std::string description;
+        std::string json_schema;
+    };
+
+    int max_iterations_;
+    std::string system_prompt_;
+    std::vector<ToolSpecParams> tools_;
 };
 
 // ---------------------------------------------------------------------------
@@ -748,6 +883,17 @@ std::size_t register_engine_backed_operators(OperatorRegistry& registry) {
         "generate_text",
         [](const runanywhere::v1::OperatorSpec& spec) {
             return std::make_shared<GenerateTextNode>(spec.name(), spec);
+        },
+        schema({"in"}, {"token"}, kPayloadTextUtf8, kPayloadTextUtf8));
+    ++count;
+
+    // agent_loop — tool-enabled LLM loop. text.utf8 in → text.utf8 out on
+    // port "token" (same edge layout as generate_text, so
+    // solution_converter can swap the op type without new wiring).
+    registry.register_factory(
+        "agent_loop",
+        [](const runanywhere::v1::OperatorSpec& spec) {
+            return std::make_shared<AgentLoopNode>(spec.name(), spec);
         },
         schema({"in"}, {"token"}, kPayloadTextUtf8, kPayloadTextUtf8));
     ++count;
