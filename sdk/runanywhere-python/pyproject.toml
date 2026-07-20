@@ -1,0 +1,67 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "runanywhere"
+version = "0.20.11"
+description = "RunAnywhere SDK — on-device AI inference (LLM, ASR, TTS, embeddings) with a native runtime core."
+requires-python = ">=3.9"
+license = { text = "SEE LICENSE IN ../../LICENSE" }
+authors = [{ name = "RunAnywhere" }]
+keywords = ["ai", "llm", "asr", "tts", "embeddings", "on-device", "inference"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy>=1.21"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.scikit-build]
+cmake.source-dir = "../.."
+cmake.version = ">=3.24"
+cmake.args = [
+    "-DRAC_BUILD_PYTHON_MODULE=ON",
+    "-DRAC_BUILD_BACKENDS=ON",
+    "-DRAC_STATIC_PLUGINS=ON",
+    "-DRAC_BUILD_SHARED=OFF",
+    "-DRAC_BUILD_PLATFORM=OFF",
+]
+build.targets = ["runanywhere_core"]
+# Install ONLY our module's component (native/CMakeLists tags it `python_module`), so the
+# transitive commons/llama/zlib install rules (headers, static .libs, cmake, docs) stay out
+# of the wheel — the wheel carries just _core + the pure-Python package.
+install.components = ["python_module"]
+wheel.packages = ["runanywhere"]
+wheel.install-dir = "runanywhere/_native"
+
+[tool.scikit-build.cmake.define]
+CMAKE_BUILD_TYPE = "Release"
+
+[tool.scikit-build.sdist]
+include = [
+    "runanywhere",
+    "native",
+]
+
+[tool.cibuildwheel]
+build-frontend = "build"
+test-extras = ["test"]
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.windows]
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
