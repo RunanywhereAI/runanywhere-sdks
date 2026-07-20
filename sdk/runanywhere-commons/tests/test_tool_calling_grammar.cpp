@@ -145,6 +145,42 @@ void test_parallel_parse_returns_all_envelopes() {
     }
 }
 
+// Regression: a small model can stutter and repeat the SAME tool call
+// verbatim several times in one turn instead of moving on. Without a
+// dedup/stop guard, harvesting every envelope would treat the stutter as N
+// legitimate parallel calls, burning the max_tool_calls budget on
+// duplicates and starving the rest of the request.
+void test_parallel_parse_stops_at_repeated_call() {
+    const char* stuttered =
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Ankara\"}}</tool_call>"
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Ankara\"}}</tool_call>"
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Ankara\"}}</tool_call>"
+        "<tool_call>{\"tool\":\"get_current_time\",\"arguments\":{}}</tool_call>";
+
+    runanywhere::v1::ToolParseRequest request;
+    request.set_text(stuttered);
+    request.mutable_options()->set_parallel_tool_calls(true);
+    std::vector<uint8_t> bytes(request.ByteSizeLong());
+    request.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()));
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    runanywhere::v1::ToolParseResult result;
+    if (rac_tool_call_parse_proto(bytes.data(), bytes.size(), &out) == RAC_SUCCESS &&
+        out.data != nullptr) {
+        result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    rac_proto_buffer_free(&out);
+
+    CHECK(result.tool_calls_size() == 1,
+          "repeated identical call stops harvesting at the first repeat, "
+          "not the later distinct get_current_time call");
+    if (result.tool_calls_size() >= 1) {
+        CHECK(result.tool_calls(0).name() == "get_weather",
+              "the single harvested call is the first (legitimate) occurrence");
+    }
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -155,6 +191,7 @@ int main() {
     test_auto_leaves_gbnf_unconstrained_but_sets_qhexrt_opt();
     test_required_constrains_both_dialects_over_all_names();
     test_specific_constrains_to_single_forced_name();
+    test_parallel_parse_stops_at_repeated_call();
     test_parallel_parse_returns_all_envelopes();
 #else
     std::fprintf(stdout, "  skip: RAC_HAVE_PROTOBUF not defined\n");

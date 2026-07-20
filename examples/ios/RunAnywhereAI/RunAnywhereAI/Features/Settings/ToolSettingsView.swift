@@ -50,11 +50,21 @@ class ToolSettingsViewModel: ObservableObject {
                     try await WeatherService.fetchWeather(for: args["location"]?.string ?? "San Francisco")
                 }
             ),
-            // Time Tool - Real system time with timezone
+            // Time Tool - Real system time with timezone.
             (
                 definition: RAToolDefinition(
                     name: "get_current_time",
-                    description: "Gets the current date, time, and timezone information",
+                    // Directive, not just descriptive (same reasoning as the
+                    // search_web tool): small models tend to "helpfully"
+                    // re-convert an already-local timestamp against its own
+                    // timezone label (e.g. subtracting the GMT offset from a
+                    // value that is already local), producing a wrong time
+                    // that's off by exactly that offset. Stating the
+                    // no-location, already-local contract up front heads
+                    // that off at the source, not just in the result note.
+                    description: "Gets the device's current date, time, and timezone. Returns "
+                        + "only the device's own local time — it has no location parameter and "
+                        + "cannot look up another city's time.",
                     parameters: [],
                     category: "Utility"
                 ),
@@ -73,7 +83,16 @@ class ToolSettingsViewModel: ObservableObject {
                         "time": RAToolValue(timeFormatter.string(from: now)),
                         "timestamp": RAToolValue(ISO8601DateFormatter().string(from: now)),
                         "timezone": RAToolValue(timeZone.identifier),
-                        "utc_offset": RAToolValue(timeZone.abbreviation() ?? "UTC")
+                        "utc_offset": RAToolValue(timeZone.abbreviation() ?? "UTC"),
+                        // Explicit anti-reconversion guard: "time" above is
+                        // already local. Restating that next to the offset
+                        // (the field a model is most tempted to "apply")
+                        // stops the double-conversion at the point of use.
+                        "note": RAToolValue(
+                            "\"time\" is already this device's local wall-clock time in the "
+                                + "\"timezone\"/\"utc_offset\" below — do NOT apply utc_offset to "
+                                + "it again."
+                        )
                     ]
                 }
             ),
