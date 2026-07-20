@@ -444,9 +444,18 @@ async function startRuntime(
     await withTimeout(
       'registering the llama.cpp backend',
       120_000,
-      LlamaCPP.register({ acceleration: 'auto' }),
+      LlamaCPP.register({
+        acceleration: 'auto',
+        requireBackendWorker: true,
+        preferBackendWorker: true,
+      }),
     );
-    activeAcceleration = LlamaCPP.accelerationMode;
+    // Prefer SDK runtime.active (worker WebGPU when available) over the
+    // main-thread bridge mode, which may stay on CPU while the worker owns GPU.
+    activeAcceleration =
+      RunAnywhere.runtime.active === 'webgpu' || RunAnywhere.runtime.active === 'cpu'
+        ? RunAnywhere.runtime.active
+        : LlamaCPP.accelerationMode;
     appLogger.info('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
   } catch (err) {
     const message = formatError(err);
@@ -463,7 +472,10 @@ async function startRuntime(
     await withTimeout(
       'registering the ONNX/Sherpa backend',
       120_000,
-      ONNX.register(),
+      ONNX.register({
+        requireBackendWorker: true,
+        preferBackendWorker: true,
+      }),
     );
     appLogger.info('[RunAnywhere] onnx/sherpa backend registered');
     // Hybrid cloud STT is optional: the current artifact may omit the cloud
@@ -726,14 +738,16 @@ async function refreshSDKCatalogs(): Promise<void> {
 }
 
 /**
- * Display a small floating badge indicating the active hardware acceleration.
+ * Display a small floating badge indicating acceleration + worker execution.
  */
 function showAccelerationBadge(mode: string): void {
   document.getElementById('accel-badge')?.remove();
   const badge = document.createElement('div');
   badge.id = 'accel-badge';
   const isGPU = mode === 'webgpu';
-  badge.textContent = isGPU ? 'WebGPU' : 'CPU';
+  const exec = RunAnywhere.runtime.executionContext === 'worker' ? 'worker' : 'main';
+  badge.textContent = `${isGPU ? 'WebGPU' : 'CPU'} · ${exec}`;
+  badge.title = `acceleration=${mode}; executionContext=${exec}`;
   badge.className = `accel-badge ${isGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
   document.body.appendChild(badge);
 }

@@ -32,6 +32,7 @@
 
 import {
   BackendWorkerHost,
+  clearLlamaBackendWorkerDead,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setModelLoadPreparation,
@@ -40,6 +41,7 @@ import {
   setVisionLanguageProvider,
   getBackendWorkerFactory,
   setBackendWorkerFactory,
+  setLlamaBackendWorkerRequired,
   setStreamWorkerFactory,
   setStreamWorkerInit,
   SDKLogger,
@@ -62,6 +64,8 @@ const logger = new SDKLogger('LlamaCPP');
 let _installedBackendWorkerFactory = false;
 let _backendWorkerFactory: BackendWorkerFactory | null = null;
 let _backendWorkerHost: BackendWorkerHost | null = null;
+/** Acceleration used for LLM inference (worker when present, else bridge). */
+let _inferenceAcceleration: 'cpu' | 'webgpu' = 'cpu';
 let _installedStreamWorker = false;
 
 const MODULE_ID = 'llamacpp';
@@ -150,13 +154,15 @@ export interface LlamaCPPRegisterOptions {
   backendWorkerFactory?: BackendWorkerFactory;
   /**
    * Prefer the model-owning BackendWorker for LLM load/stream. Defaults to
-   * `true` when `Worker` + `URL` are available. Failure falls back to the
-   * main thread unless `requireBackendWorker` is set.
+   * `true` when `Worker` + `URL` are available. The worker prefers the
+   * no-pthread WebGPU WASM when possible; CPU pthread artifacts set
+   * `mainScriptUrlOrBlob` so nested `em-pthread` workers can boot.
    */
   preferBackendWorker?: boolean;
   /**
    * Fail registration when the BackendWorker handshake cannot complete.
-   * Defaults to `false` so unit tests and non-COI environments still work.
+   * Defaults to `true` in browser environments (Worker available); `false`
+   * in Node/unit tests without Worker.
    */
   requireBackendWorker?: boolean;
   /**
@@ -182,9 +188,13 @@ export const LlamaCPP = {
     return _registrationState;
   },
 
-  /** Active hardware acceleration mode (cpu | webgpu). Available after `register()`. */
+  /**
+   * Acceleration used for LLM inference (cpu | webgpu).
+   * When the BackendWorker owns the model, this is the worker's resolved mode
+   * (WebGPU-first), not the main-thread bridge which may stay on CPU.
+   */
   get accelerationMode(): 'cpu' | 'webgpu' {
-    return LlamaCppBridge.shared.accelerationMode;
+    return _inferenceAcceleration;
   },
 
   /**
@@ -247,7 +257,17 @@ export const LlamaCPP = {
           return true;
         });
 
-        await bridge.ensureLoaded(options.acceleration ?? 'auto');
+        // When the BackendWorker owns LLM inference, keep the main-thread
+        // bridge on CPU so we do not open a second WebGPU device (dual
+        // WebGPU modules have been correlated with worker generate Abort()).
+        // The worker still resolves auto → WebGPU when the adapter supports it.
+        const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+        const preferWorker = options.preferBackendWorker !== false && workerAvailable;
+        const requested = options.acceleration ?? 'auto';
+        const bridgeAcceleration = preferWorker && requested !== 'cpu'
+          ? 'cpu'
+          : requested;
+        await bridge.ensureLoaded(bridgeAcceleration);
         await installLlamaCppBackendWorker(options, bridge.accelerationMode);
         const enableStreamWorker = options.enableStreamWorker === true
           && typeof Worker !== 'undefined'
@@ -266,9 +286,22 @@ export const LlamaCPP = {
           }
         }
 
-        // Publish the active mode so `RunAnywhere.runtime.active` reflects
-        // what the bridge actually picked (auto → webgpu/cpu resolution).
-        setActiveAccelerationMode(bridge.accelerationMode);
+        // Prefer the worker's resolved acceleration for runtime.active so the
+        // UI badge matches where inference actually runs.
+        let publishedMode: 'cpu' | 'webgpu' = bridge.accelerationMode;
+        if (_backendWorkerHost) {
+          try {
+            const health = await _backendWorkerHost.health();
+            const details = health.details as { acceleration?: string } | undefined;
+            if (details?.acceleration === 'webgpu' || details?.acceleration === 'cpu') {
+              publishedMode = details.acceleration;
+            }
+          } catch {
+            /* keep bridge mode */
+          }
+        }
+        _inferenceAcceleration = publishedMode;
+        setActiveAccelerationMode(publishedMode);
 
         // VLM is wired alongside LLM by the unified
         // `rac_backend_llamacpp_register()` call, so once `ensureLoaded()`
@@ -285,7 +318,10 @@ export const LlamaCPP = {
         }
         _isRegistered = true;
         _registrationState = 'registered';
-        logger.info(`LlamaCpp backend registered (${bridge.accelerationMode})`);
+        logger.info(
+          `LlamaCpp backend registered (bridge=${bridge.accelerationMode}, inference=${publishedMode}`
+          + `${_backendWorkerHost ? ', executionContext=worker' : ''})`,
+        );
       } catch (error) {
         // Registration installs core hooks before deferred service startup.
         // A late failure must not leave those hooks pointing at a backend that
@@ -325,6 +361,7 @@ export const LlamaCPP = {
     clearLlamaCppBackendWorker();
     clearLlamaCppStreamWorker();
     LlamaCppBridge.shared.shutdown();
+    _inferenceAcceleration = 'cpu';
     _isRegistered = false;
     _registrationState = 'unregistered';
     logger.info('LlamaCpp backend unregistered');
@@ -364,14 +401,26 @@ async function installLlamaCppBackendWorker(
   _installedBackendWorkerFactory = true;
   _backendWorkerFactory = factory;
 
-  const host = new BackendWorkerHost(factory, { initTimeoutMs: 120_000 });
+  const requireWorker = options.requireBackendWorker
+    ?? (typeof Worker !== 'undefined' && typeof URL !== 'undefined');
+  setLlamaBackendWorkerRequired(requireWorker);
+  const host = new BackendWorkerHost(factory, {
+    initTimeoutMs: 120_000,
+    backendId: 'llamacpp',
+  });
   _backendWorkerHost = host;
   try {
+    // WebGPU-first inside the worker; CPU WASM only when WebGPU/shader-f16
+    // is unavailable (WorkerLlamaRuntime resolves auto → cpu). If a later
+    // generate Abort()s the worker, BackendWorkerHost retries next init on CPU.
     await host.init({
-      acceleration: accelerationMode === 'webgpu' ? 'webgpu' : 'auto',
+      acceleration: options.acceleration === 'cpu' ? 'cpu' : 'auto',
     });
+    clearLlamaBackendWorkerDead();
     setRuntimeDegradedReason(null);
-    logger.info(`BackendWorker ready (executionContext=worker, ${accelerationMode})`);
+    logger.info(
+      `BackendWorker ready (executionContext=worker; main bridge=${accelerationMode})`,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     host.dispose();
@@ -383,10 +432,12 @@ async function installLlamaCppBackendWorker(
     _backendWorkerFactory = null;
     const reason = `BackendWorker handshake failed: ${message}`;
     setRuntimeDegradedReason(reason);
-    logger.warning(`${reason}; keeping main-thread inference`);
-    if (options.requireBackendWorker) {
+    if (requireWorker) {
+      logger.error(`${reason}; main-thread LLM inference is disabled`);
       throw error instanceof Error ? error : new Error(reason);
     }
+    setLlamaBackendWorkerRequired(false);
+    logger.warning(`${reason}; continuing without BackendWorker (requireBackendWorker=false)`);
   }
 }
 

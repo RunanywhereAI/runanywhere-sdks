@@ -905,12 +905,23 @@ export class OPFSBridge {
     if (OPFSBridge.isSuppressed(path)) return 0;
 
     // Already present in MEMFS with real bytes — nothing to do.
+    // Empty OPFS-direct "size stubs" report a non-zero stat size via usedBytes
+    // while contents are empty; those must be rebuilt from OPFS.
     if (fs.analyzePath?.(path)?.exists) {
       try {
         const size = fs.stat(path).size;
-        if (size > 0) {
+        const node = (fs as {
+          lookupPath?(p: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
+        }).lookupPath?.(path)?.node;
+        const emptyStub = !!node
+          && (node.contents?.length ?? 0) === 0
+          && (node.usedBytes ?? 0) > 0;
+        if (size > 0 && !emptyStub) {
           logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
           return 0;
+        }
+        if (emptyStub) {
+          try { fs.unlink?.(path); } catch { /* rebuild below */ }
         }
       } catch {
         // stat failed — fall through and rebuild from OPFS.
@@ -1144,6 +1155,27 @@ export class OPFSBridge {
       return file.size;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * Read the first `maxBytes` of an OPFS file for magic-byte validation.
+   * Returns null when the path is missing or unreadable.
+   */
+  static async readPrefix(path: string, maxBytes: number): Promise<Uint8Array | null> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported() || maxBytes <= 0) return null;
+    if (OPFSBridge.isSuppressed(path)) return null;
+    try {
+      const dir = await resolveOPFSDirectory(segments.slice(0, -1), false);
+      if (!dir) return null;
+      const handle = await dir.getFileHandle(segments[segments.length - 1]);
+      const file = await handle.getFile();
+      if (file.size <= 0) return new Uint8Array(0);
+      const slice = file.slice(0, Math.min(maxBytes, file.size));
+      return new Uint8Array(await slice.arrayBuffer());
+    } catch {
+      return null;
     }
   }
 

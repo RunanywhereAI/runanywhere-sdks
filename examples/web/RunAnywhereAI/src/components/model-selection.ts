@@ -996,7 +996,18 @@ async function startDownload(modelId: string): Promise<void> {
     }
   }
 
-  const model = RunAnywhere.getModel(modelId);
+  let model = RunAnywhere.getModel(modelId);
+  if (!model && entry) {
+    // Catalog UI can outlive a partial registry wipe (backend re-register).
+    // Re-seed the declarative entry before failing the Download click.
+    try {
+      const { registerModelCatalog } = await import('../services/model-catalog');
+      registerModelCatalog();
+      model = RunAnywhere.getModel(modelId);
+    } catch {
+      /* fall through */
+    }
+  }
   if (!model) {
     showToast(`Model ${modelId} not found in registry`, 'warning');
     return;
@@ -1019,26 +1030,19 @@ async function startDownload(modelId: string): Promise<void> {
     return;
   }
 
+  // Large downloads use browser OPFS by default. Do not open the OS folder
+  // picker here — it steals the Download click and is easy to dismiss while
+  // the download continues anyway. Users who want a durable disk folder can
+  // set one explicitly under Storage → Choose Storage Folder.
   if (
     requiredBytes >= LARGE_DOWNLOAD_BYTES
     && !storage.persisted
     && !RunAnywhere.storage.isLocalStorageReady
-    && RunAnywhere.storage.isLocalStorageSupported
   ) {
-    showToast('Choose a folder on disk to store this large model reliably.', 'info', 4000);
-    const picked = await RunAnywhere.storage.chooseLocalStorageDirectory();
-    if (!picked) {
-      showToast(
-        'No folder selected — download will use browser OPFS and may stop if storage is cleared.',
-        'warning',
-        6000,
-      );
-    }
-  } else if (requiredBytes >= LARGE_DOWNLOAD_BYTES && !storage.persisted) {
     showToast(
-      'Durable browser storage was not granted. If the download stops, use Storage → Choose Storage Folder.',
-      'warning',
-      6000,
+      'Storing this model in browser OPFS. For a durable disk folder, open Storage → Choose Storage Folder.',
+      'info',
+      5000,
     );
   }
 

@@ -19,6 +19,7 @@
  */
 
 import {
+  BackendWorkerHost,
   SDKLogger,
   getBackendWorkerFactory,
   setBackendWorkerFactory,
@@ -33,15 +34,17 @@ const logger = new SDKLogger('ONNX');
 let _registrationState: BackendRegistrationState = 'unregistered';
 let _installedBackendWorkerFactory = false;
 let _backendWorkerFactory: BackendWorkerFactory | null = null;
+let _backendWorkerHost: BackendWorkerHost | null = null;
 
 export interface ONNXRegisterOptions {
   /** Override URL to the `racommons-onnx-sherpa.js` glue file. */
   wasmUrl?: string;
-  /**
-   * Optional Stage 3 worker bootstrap. Omit this until a bundler-specific
-   * ONNX worker entrypoint is available; inference remains on the main thread.
-   */
+  /** Optional worker factory. Defaults to this package's worker entrypoint. */
   backendWorkerFactory?: BackendWorkerFactory;
+  /** Prefer worker-owned ONNX/Sherpa model lifecycle and inference. */
+  preferBackendWorker?: boolean;
+  /** Require a worker when the Worker API is available. */
+  requireBackendWorker?: boolean;
 }
 
 export const ONNX = {
@@ -72,19 +75,19 @@ export const ONNX = {
    * then installs the module on every core proto-byte adapter so
    * STT/TTS/VAD calls in `@runanywhere/web` core route through it.
    */
-  async register(options?: ONNXRegisterOptions): Promise<void> {
+  async register(options: ONNXRegisterOptions = {}): Promise<void> {
     const bridge = SherpaONNXBridge.shared;
-    if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
+    if (options.wasmUrl) bridge.wasmUrl = options.wasmUrl;
     _registrationState = 'registering';
     try {
       await bridge.ensureLoaded(options);
-      if (options?.backendWorkerFactory) {
-        setBackendWorkerFactory(options.backendWorkerFactory);
-        _installedBackendWorkerFactory = true;
-        _backendWorkerFactory = options.backendWorkerFactory;
-      }
+      await installONNXBackendWorker(options);
       _registrationState = 'registered';
-      logger.info('ONNX/Sherpa backends registered (STT/TTS/VAD vtables installed)');
+      logger.info(
+        `ONNX/Sherpa backends registered (STT/TTS/VAD vtables installed${
+          _backendWorkerHost ? ', executionContext=worker' : ''
+        })`,
+      );
     } catch (error) {
       if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
         setBackendWorkerFactory(null);
@@ -98,15 +101,63 @@ export const ONNX = {
 
   /** Unregister the proto-byte plugins and release the WASM module. */
   unregister(): void {
-    if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
-      setBackendWorkerFactory(null);
-    }
-    _installedBackendWorkerFactory = false;
-    _backendWorkerFactory = null;
+    clearONNXBackendWorker();
     SherpaONNXBridge.shared.unregister();
     _registrationState = 'unregistered';
   },
 };
+
+async function installONNXBackendWorker(options: ONNXRegisterOptions): Promise<void> {
+  const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+  const prefer = options.preferBackendWorker !== false && workerAvailable;
+  if (!prefer) {
+    if (options.requireBackendWorker) {
+      throw new Error('Web Worker API unavailable or ONNX BackendWorker disabled.');
+    }
+    return;
+  }
+  const factory = options.backendWorkerFactory
+    ?? (() => new Worker(new URL('./backendWorker.ts', import.meta.url), {
+      type: 'module',
+      name: 'runanywhere-onnx-backend',
+    }));
+  setBackendWorkerFactory(factory);
+  _installedBackendWorkerFactory = true;
+  _backendWorkerFactory = factory;
+  const requireWorker = options.requireBackendWorker ?? workerAvailable;
+  const host = new BackendWorkerHost(factory, {
+    backendId: 'onnx',
+    initTimeoutMs: 120_000,
+  });
+  _backendWorkerHost = host;
+  try {
+    await host.init();
+  } catch (error) {
+    host.dispose();
+    _backendWorkerHost = null;
+    clearONNXBackendWorker();
+    if (requireWorker) throw error;
+    logger.warning(
+      `ONNX BackendWorker handshake failed; keeping main-thread inference: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function clearONNXBackendWorker(): void {
+  try {
+    _backendWorkerHost?.dispose();
+  } catch {
+    /* best effort */
+  }
+  _backendWorkerHost = null;
+  if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+    setBackendWorkerFactory(null);
+  }
+  _installedBackendWorkerFactory = false;
+  _backendWorkerFactory = null;
+}
 
 /** Best-effort registration helper for apps that import the package eagerly. */
 export function autoRegister(options?: ONNXRegisterOptions): Promise<void> {

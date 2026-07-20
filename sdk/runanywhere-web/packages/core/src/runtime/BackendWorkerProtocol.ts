@@ -10,12 +10,36 @@
  * the later wiring stages.
  */
 
-export type BackendWorkerModality = 'llm' | 'stt' | 'tts' | 'vlm';
+/** Logical backend that owns a DedicatedWorker + WASM heap. */
+export type BackendWorkerBackendId = 'llamacpp' | 'onnx';
+
+export type BackendWorkerModality =
+  | 'llm'
+  | 'stt'
+  | 'tts'
+  | 'vlm'
+  | 'vad'
+  | 'embeddings';
 export type BackendWorkerInferenceKind =
   | 'llm.generate'
+  | 'lora.apply'
+  | 'lora.remove'
+  | 'tool.sessionCreate'
+  | 'tool.sessionStep'
+  | 'tool.sessionDestroy'
+  | 'tool.sessionCancel'
+  | 'structured.parse'
+  | 'rag.sessionCreate'
+  | 'rag.ingest'
+  | 'rag.query'
+  | 'rag.clear'
+  | 'rag.stats'
+  | 'rag.sessionDestroy'
   | 'stt.transcribe'
   | 'tts.synthesize'
-  | 'vlm.generate';
+  | 'vlm.generate'
+  | 'vad.process'
+  | 'embeddings.embed';
 
 export interface BackendWorkerInitRequest {
   type: 'init';

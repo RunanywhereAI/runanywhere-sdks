@@ -56,6 +56,8 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
+import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -115,22 +117,53 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
 }
 
 /**
+ * When BackendWorkers own STT/TTS/VAD/LLM, the native single-heap voice-agent
+ * handle cannot see those models (fopen against empty main MEMFS → Silero
+ * "does not exist", processVoiceTurn → RAC_ERROR_NOT_INITIALIZED). Compose
+ * turns through the public STT/LLM/TTS facades that already RPC to workers.
+ */
+function prefersSplitBackendVoiceAgent(): boolean {
+  if (hasBackendWorkerOwnedModels('onnx') || hasBackendWorkerOwnedModels('llamacpp')) {
+    return true;
+  }
+  const onnx = getActiveBackendWorkerHost('onnx');
+  const llama = getActiveBackendWorkerHost('llamacpp');
+  return onnx?.diagnostics.executionContext === 'worker'
+    && llama?.diagnostics.executionContext === 'worker';
+}
+
+/**
  * Explicit backend-registration hook for the split-WASM voice pipeline.
  * Backend bridges invoke this after their capability registrations; facade
  * calls never manufacture a cross-WASM provider as a hidden default.
  */
 export function registerVoiceAgentProvider(provider?: VoiceAgentProvider): boolean {
-  // Prefer commons native handle orchestration (Swift/Kotlin parity). Only
-  // fall back to CrossWasm composition when the native create/init ABI is
-  // unavailable and the split STT/LLM/TTS backends can be composed.
+  // Explicit caller-provided providers always win.
   let resolved = provider ?? null;
-  if (!resolved && _provider?.providerKind === 'wasm-handle') {
+  const nativeAvailable = VoiceAgentProtoAdapter.tryDefault()?.supportsProtoVoiceAgent() ?? false;
+
+  // Production off-main-thread path: STT/TTS/LLM live in DedicatedWorkers.
+  // Prefer CrossWasm composition so each turn hits worker-owned facades.
+  if (!resolved && prefersSplitBackendVoiceAgent() && supportsCrossWasmVoiceAgent()) {
+    if (_provider?.providerKind !== 'cross-wasm') {
+      logger.info(
+        'Using CrossWasm voice-agent provider (modality models are BackendWorker-owned).',
+      );
+    }
+    resolved = _provider?.providerKind === 'cross-wasm'
+      ? _provider
+      : new CrossWasmVoiceAgentProvider();
+  }
+
+  if (!resolved && _provider?.providerKind === 'wasm-handle' && !prefersSplitBackendVoiceAgent()) {
     resolved = _provider;
   }
-  if (!resolved) {
+  if (!resolved && !prefersSplitBackendVoiceAgent()) {
     resolved = tryCreateNativeVoiceAgentProvider();
   }
-  if (!resolved && supportsCrossWasmVoiceAgent()) {
+  // Last resort when the native ABI is absent entirely.
+  if (!resolved && !nativeAvailable && supportsCrossWasmVoiceAgent()) {
+    logger.warning('Native voice-agent ABI is unavailable; using degraded CrossWasm provider.');
     resolved = new CrossWasmVoiceAgentProvider();
   }
   if (!resolved) return false;
@@ -1183,6 +1216,9 @@ export async function initializeVoiceAgentWithLoadedModels(
   if (ensureVAD) {
     await ensureDefaultVAD();
   }
+  // Re-bind after models are loaded: ONNX/Llama registration may have
+  // installed a native handle before BackendWorkers owned STT/LLM/TTS.
+  registerVoiceAgentProvider();
   await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels(ttsVoiceID);
 }
 

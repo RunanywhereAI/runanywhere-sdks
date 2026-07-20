@@ -5,6 +5,7 @@
  */
 
 import type {
+  BackendWorkerBackendId,
   BackendWorkerDiagnostics,
   BackendWorkerHealthResponse,
   BackendWorkerInferenceKind,
@@ -12,6 +13,20 @@ import type {
   BackendWorkerRequest,
   BackendWorkerResponse,
 } from './BackendWorkerProtocol.js';
+import {
+  clearModelOwnedByBackendWorker,
+  markLlamaBackendWorkerDead,
+} from './BackendWorkerModelOwnership.js';
+import { setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
+
+function isWasmAbortMessage(message: string): boolean {
+  return /Aborted\s*\(|RuntimeError:\s*Aborted/i.test(message);
+}
+import {
+  getBackendWorkerHost,
+  getRegisteredBackendWorkerDiagnostics,
+  setBackendWorkerHost,
+} from './BackendWorkerHostRegistry.js';
 
 export interface BackendWorkerLike {
   onmessage: ((event: MessageEvent<BackendWorkerResponse>) => void) | null;
@@ -24,6 +39,8 @@ export type BackendWorkerFactory = () => BackendWorkerLike;
 
 export interface BackendWorkerHostOptions {
   initTimeoutMs?: number;
+  /** Defaults to `llamacpp` for backward-compatible single-host callers. */
+  backendId?: BackendWorkerBackendId;
 }
 
 export class BackendWorkerError extends Error {
@@ -59,20 +76,20 @@ interface StreamPending {
 type PendingRequest = UnaryPending | StreamPending;
 
 const defaultInitTimeoutMs = 10_000;
-let activeHost: BackendWorkerHost | null = null;
-
-function setActiveBackendWorkerHost(host: BackendWorkerHost | null): void {
-  activeHost = host;
-}
 
 /** Current worker-runtime state for `RunAnywhere.runtime` diagnostics. */
 export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
-  return activeHost?.diagnostics ?? { executionContext: 'main', queueDepth: 0 };
+  return getRegisteredBackendWorkerDiagnostics();
 }
 
-/** Active model-owning backend worker host, if a backend completed handshake. */
-export function getActiveBackendWorkerHost(): BackendWorkerHost | null {
-  return activeHost;
+/**
+ * Active model-owning backend worker host.
+ * Defaults to the llamacpp host; pass `onnx` for speech/embeddings.
+ */
+export function getActiveBackendWorkerHost(
+  backendId: BackendWorkerBackendId = 'llamacpp',
+): BackendWorkerHost | null {
+  return getBackendWorkerHost(backendId);
 }
 
 /**
@@ -89,12 +106,17 @@ export class BackendWorkerHost {
   private readonly pending = new Map<string, PendingRequest>();
   private readonly activeStreamIds = new Set<string>();
   private executionContext: 'main' | 'worker' = 'main';
+  /** Last successful/requested init payload — reused after crash recovery. */
+  private lastInitPayload: unknown = undefined;
+
+  private readonly backendId: BackendWorkerBackendId;
 
   constructor(
     private readonly factory: BackendWorkerFactory,
     private readonly options: BackendWorkerHostOptions = {},
   ) {
-    setActiveBackendWorkerHost(this);
+    this.backendId = options.backendId ?? 'llamacpp';
+    setBackendWorkerHost(this.backendId, this);
   }
 
   get diagnostics(): BackendWorkerDiagnostics {
@@ -105,7 +127,9 @@ export class BackendWorkerHost {
   }
 
   async init(payload?: unknown, transfer?: Transferable[]): Promise<void> {
+    if (payload !== undefined) this.lastInitPayload = payload;
     if (this.ready) return this.ready;
+    const initPayload = payload ?? this.lastInitPayload;
     const requestId = this.nextRequestId('init');
     this.ready = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -144,7 +168,7 @@ export class BackendWorkerHost {
         worker.onerror = (event) => this.handleCrash(
           new BackendWorkerCrashedError(`Backend worker error: ${event.message || '<unknown>'}`),
         );
-        worker.postMessage({ type: 'init', requestId, payload }, transfer);
+        worker.postMessage({ type: 'init', requestId, payload: initPayload }, transfer);
       } catch (error) {
         this.initReject?.(error);
       }
@@ -268,7 +292,12 @@ export class BackendWorkerHost {
     this.worker = null;
     this.ready = null;
     this.executionContext = 'main';
-    if (activeHost === this) setActiveBackendWorkerHost(null);
+    if (this.backendId === 'llamacpp') {
+      clearModelOwnedByBackendWorker();
+    }
+    if (getBackendWorkerHost(this.backendId) === this) {
+      setBackendWorkerHost(this.backendId, null);
+    }
   }
 
   private async request(
@@ -347,10 +376,25 @@ export class BackendWorkerHost {
   }
 
   private handleCrash(error: unknown): void {
+    // Flip the diagnostic flag off "worker", but do not treat main-thread
+    // inference as a successful recovery — worker-owned models are gone.
+    const message = error instanceof Error ? error.message : String(error);
     this.executionContext = 'main';
     this.ready = null;
     this.worker?.terminate();
     this.worker = null;
+    // WebGPU worker generate has been observed to Abort() after a successful
+    // load. Prefer CPU on the next init so a model reload can recover chat.
+    if (this.backendId === 'llamacpp' && isWasmAbortMessage(message)) {
+      this.lastInitPayload = { acceleration: 'cpu' };
+    }
+    if (this.backendId === 'llamacpp') {
+      markLlamaBackendWorkerDead(message);
+    }
+    setRuntimeDegradedReason(
+      `BackendWorker (${this.backendId}) crashed; reload the model. `
+      + `Inference is not silently moved to the main thread. (${message})`,
+    );
     this.initReject?.(error);
     this.initReject = null;
     this.initResolve = null;

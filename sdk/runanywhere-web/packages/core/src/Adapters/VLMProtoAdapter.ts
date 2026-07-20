@@ -8,8 +8,15 @@ import {
   type VLMStreamEvent as ProtoVLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  hasBackendWorkerOwnedModels,
+  mustUseLlamaBackendWorker,
+} from '../runtime/BackendWorkerModelOwnership.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   ensureExports,
@@ -39,12 +46,33 @@ export class VLMProtoAdapter {
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
   ): Promise<ProtoVLMResult | null> {
-    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_generate_proto'])) {
-      return null;
-    }
     const requestBytes = VLMGenerationRequest.encode(
       VLMGenerationRequest.fromPartial({ images: [image], options }),
     ).finish();
+    const host = getActiveBackendWorkerHost('llamacpp');
+    const useWorker = mustUseLlamaBackendWorker()
+      || (
+        host != null
+        && host.diagnostics.executionContext === 'worker'
+        && hasBackendWorkerOwnedModels()
+      );
+    if (useWorker) {
+      if (!host || host.diagnostics.executionContext !== 'worker') {
+        throw SDKException.backendNotAvailable(
+          'vlm.process',
+          getLlamaBackendWorkerDeadReason()
+            ?? 'BackendWorker is required for VLM inference; main-thread fallback is disabled.',
+        );
+      }
+      const response = await host.infer('vlm.generate', { requestBytes }) as {
+        resultBytes?: Uint8Array;
+      };
+      if (!response?.resultBytes) return null;
+      return VLMResult.decode(response.resultBytes);
+    }
+    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_generate_proto'])) {
+      return null;
+    }
     const bridge = this.bridge();
     return bridge.withHeapBytesAsync(requestBytes, (requestPtr, requestSize) => (
       bridge.callResultProtoAsync(
@@ -79,7 +107,47 @@ export class VLMProtoAdapter {
         options: { ...options, streamingEnabled: true },
       }),
     ).finish();
-    // T6.1: prefer Worker path when available; otherwise main-thread MVP.
+    const host = getActiveBackendWorkerHost('llamacpp');
+    const useWorker = mustUseLlamaBackendWorker()
+      || (
+        host != null
+        && host.diagnostics.executionContext === 'worker'
+        && hasBackendWorkerOwnedModels()
+      );
+    if (useWorker) {
+      if (!host || host.diagnostics.executionContext !== 'worker') {
+        throw SDKException.backendNotAvailable(
+          'vlm.processImageStream',
+          getLlamaBackendWorkerDeadReason()
+            ?? 'BackendWorker is required for VLM streaming; main-thread fallback is disabled.',
+        );
+      }
+      const events = host.stream('vlm.generate', { requestBytes });
+      return {
+        [Symbol.asyncIterator]: (): AsyncIterator<ProtoVLMStreamEvent> => {
+          const iterator = events[Symbol.asyncIterator]();
+          return {
+            async next(): Promise<IteratorResult<ProtoVLMStreamEvent>> {
+              const item = await iterator.next();
+              if (item.done) return { value: undefined, done: true };
+              const payload = item.value;
+              const bytes = payload instanceof Uint8Array
+                ? payload
+                : (payload as { eventBytes?: Uint8Array })?.eventBytes;
+              if (!bytes) {
+                return { value: VLMStreamEvent.fromPartial({}), done: false };
+              }
+              return { value: VLMStreamEvent.decode(bytes), done: false };
+            },
+            async return(): Promise<IteratorResult<ProtoVLMStreamEvent>> {
+              await iterator.return?.();
+              return { value: undefined, done: true };
+            },
+          };
+        },
+      };
+    }
+    // Legacy offscreen StreamWorker path when BackendWorker is not active.
     const offscreen = OffscreenRuntimeBridge.tryGet();
     if (offscreen != null) {
       return offscreen.getStreamIterator(
@@ -117,6 +185,15 @@ export class VLMProtoAdapter {
   }
 
   cancel(): boolean {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (
+      host
+      && host.diagnostics.executionContext === 'worker'
+      && (mustUseLlamaBackendWorker() || hasBackendWorkerOwnedModels())
+    ) {
+      host.cancelActiveStreams();
+      return true;
+    }
     if (!ensureExports(this.module, 'vlm.cancel', ['_rac_vlm_cancel_lifecycle_proto'])) {
       return false;
     }

@@ -20,7 +20,6 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
-  ModelArtifactType,
   ModelCategory,
   AudioFormat,
   type InferenceFramework,
@@ -49,6 +48,7 @@ import { LocalFileStorage } from '../Infrastructure/LocalFileStorage.js';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
 import {
   frameworkOPFSDir,
+  isExtractedDirectoryArtifact,
   primaryFilenameFromModel,
 } from '../Infrastructure/FrameworkOPFSPaths.js';
 import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
@@ -620,10 +620,6 @@ function decodeTTSAudioToFloat32(output: {
 // Multi-file Download Helpers (Web / OPFS platform layer)
 // ---------------------------------------------------------------------------
 
-function isTarGzArchiveArtifact(model: ModelInfo): boolean {
-  return model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
-}
-
 function opfsModelDirectory(model: ModelInfo): string | null {
   const dir = frameworkOPFSDir(model.framework as InferenceFramework);
   if (!dir) return null;
@@ -633,7 +629,7 @@ function opfsModelDirectory(model: ModelInfo): string | null {
 /** Registry path after download/extract — archives hydrate as model dirs, not .tar.gz files. */
 function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): string {
   const modelDir = opfsModelDirectory(model);
-  if (modelDir && isTarGzArchiveArtifact(model)) {
+  if (modelDir && isExtractedDirectoryArtifact(model)) {
     return modelDir;
   }
   const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
@@ -666,33 +662,41 @@ async function resolveHydratedModelPath(
 ): Promise<{ exists: boolean; localPath: string }> {
   const modelDir = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`;
   const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
-  if (isMultiFile || isTarGzArchiveArtifact(model)) {
+  const isExtractedDir = isExtractedDirectoryArtifact(model);
+  if (isMultiFile || isExtractedDir) {
     const hasDir = await OPFSBridge.directoryHasArtifacts([
       'RunAnywhere',
       'Models',
       frameworkDir,
       model.id,
     ]);
-    if (hasDir) {
-      // Multi-file / archive: require the primary file (when known) to look
-      // complete so a partial extract after refresh does not show "Use".
-      const filename = primaryFilenameFromModel(model);
-      if (filename) {
-        const primaryPath = `${modelDir}/${filename}`;
-        const primaryExpected = Math.max(
-          0,
-          Number(
-            model.multiFile?.files?.find((file) => file.filename === filename)?.sizeBytes
-              ?? model.downloadSizeBytes
-              ?? 0,
-          ),
-        );
-        if (!(await isCompleteOpfsFile(primaryPath, primaryExpected))) {
-          return { exists: false, localPath: modelDir };
-        }
-      }
+    if (!hasDir) {
+      return { exists: false, localPath: modelDir };
+    }
+    // Archives unpack then delete the .tar.gz/.zip blob. Completeness is
+    // "extracted tree has files", not "archive file still present". Requiring
+    // primaryFilename (often `model.tar.gz`) falsely clears isDownloaded and
+    // breaks worker STT/TTS load after refresh.
+    if (isExtractedDir) {
       return { exists: true, localPath: modelDir };
     }
+    // Loose multi-file models: require the primary file to look complete.
+    const filename = primaryFilenameFromModel(model);
+    if (filename) {
+      const primaryPath = `${modelDir}/${filename}`;
+      const primaryExpected = Math.max(
+        0,
+        Number(
+          model.multiFile?.files?.find((file) => file.filename === filename)?.sizeBytes
+            ?? model.downloadSizeBytes
+            ?? 0,
+        ),
+      );
+      if (!(await isCompleteOpfsFile(primaryPath, primaryExpected))) {
+        return { exists: false, localPath: modelDir };
+      }
+    }
+    return { exists: true, localPath: modelDir };
   }
   const filename = primaryFilenameFromModel(model);
   if (!filename) {

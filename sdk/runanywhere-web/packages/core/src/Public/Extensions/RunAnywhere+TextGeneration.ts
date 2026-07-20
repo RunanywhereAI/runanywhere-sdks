@@ -38,6 +38,10 @@ import type { LLMStreamingResult } from '../../types/index.js';
 import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  mustUseLlamaBackendWorker,
+} from '../../runtime/BackendWorkerModelOwnership.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
@@ -542,6 +546,17 @@ export function extractStructuredOutput(
   text: string,
   schema: JSONSchemaDescriptor,
 ): StructuredOutputResult {
+  // This facade is synchronous, whereas BackendWorker RPC is intentionally
+  // asynchronous. Do not invoke the main-thread structured-output ABI when
+  // the LLM (and therefore its commons heap) belongs to the Llama worker.
+  // A future async facade can route `structured.parse` to that worker.
+  if (mustUseLlamaBackendWorker()) {
+    throw SDKException.backendNotAvailable(
+      'extractStructuredOutput',
+      getLlamaBackendWorkerDeadReason()
+        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or an async worker-aware structured-output API.',
+    );
+  }
   const adapter = StructuredOutputProtoAdapter.tryDefault();
   if (adapter?.supportsProtoParse()) {
     const result = adapter.parse({

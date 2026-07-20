@@ -28,6 +28,12 @@ import {
   rAGQueryOptionsDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { getBackendWorkerOwner } from '../../runtime/BackendWorkerModelOwnership.js';
+import {
+  getModuleForModel,
+  getWasmModuleRecord,
+  getWasmModuleRecordForCapability,
+} from '../../runtime/EmscriptenModule.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import {
@@ -139,6 +145,7 @@ export function registerRAGProvider(provider?: RAGProvider): boolean {
   // Kotlin parity). Fall back to the IndexedDB-backed CrossWasm provider only
   // when the native session ABI is unavailable in this WASM build.
   let resolved = provider ?? null;
+  const nativeAvailable = RAGProtoAdapter.tryDefault()?.supportsProtoRAG() ?? false;
   if (!resolved) {
     const nativeAdapter = RAGProtoAdapter.tryDefault();
     if (nativeAdapter?.supportsProtoRAG()) {
@@ -149,7 +156,11 @@ export function registerRAGProvider(provider?: RAGProvider): boolean {
       }
     }
   }
-  if (!resolved && supportsCrossWasmRAG()) {
+  // A build with the native session ABI must not silently replace commons
+  // retrieval with the browser-only CrossWasm composition. Apps that need it
+  // can explicitly call registerPersistentRAGProvider() as a degraded path.
+  if (!resolved && !nativeAvailable && supportsCrossWasmRAG()) {
+    logger.warning('Native RAG ABI is unavailable; using degraded CrossWasm RAG provider.');
     resolved = createPersistentRAGProvider();
   }
   if (!resolved) return false;
@@ -323,10 +334,10 @@ class NativeRAGSessionProvider implements RAGProvider {
     }
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
     if (this.session != null) {
-      this.adapter.destroySession(this.session);
+      await this.adapter.destroySession(this.session);
       this.session = null;
     }
-    const session = this.adapter.createSession(config);
+    const session = await this.adapter.createSession(config);
     if (session == null) {
       throw SDKException.backendNotAvailable(
         'RAG.createPipeline',
@@ -339,7 +350,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragDestroyPipeline(): Promise<void> {
     if (this.session != null) {
-      this.adapter.destroySession(this.session);
+      await this.adapter.destroySession(this.session);
       this.session = null;
     }
   }
@@ -352,7 +363,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
     const session = await this.ensureSession();
-    const stats = this.adapter.ingest(session, document);
+    const stats = await this.adapter.ingest(session, document);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.ingest',
@@ -382,7 +393,7 @@ class NativeRAGSessionProvider implements RAGProvider {
         'A session without an LLM model id can ingest but cannot generate answers.',
       );
     }
-    const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
+    const result = await this.adapter.query(session, makeRAGQuery(question, this.config, options));
     if (!result) {
       throw SDKException.backendNotAvailable(
         'RAG.query',
@@ -409,7 +420,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragClearDocuments(): Promise<void> {
     const session = await this.ensureSession();
-    const stats = this.adapter.clear(session);
+    const stats = await this.adapter.clear(session);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.clearDocuments',
@@ -454,7 +465,7 @@ class NativeRAGSessionProvider implements RAGProvider {
       }
       return emptyRAGStatistics(this.config);
     }
-    const stats = this.adapter.statistics(this.session);
+    const stats = await this.adapter.statistics(this.session);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.statistics',
@@ -969,6 +980,109 @@ function supportsCrossWasmRAG(): boolean {
     && TextGeneration.supportsProtoLLM();
 }
 
+/**
+ * Stable execution-site key for a loaded model. Native RAG can only resolve
+ * artifacts that live on the same site as the RAG ABI host (one Emscripten
+ * heap / BackendWorker). Keys are ownership-derived — never framework enums.
+ */
+function executionSiteForModel(modelId: string): string {
+  const workerOwner = getBackendWorkerOwner(modelId);
+  if (workerOwner) return `worker:${workerOwner}`;
+  const module = getModuleForModel(modelId);
+  if (module) {
+    const record = getWasmModuleRecord(module);
+    return `main:${record?.backend ?? 'unknown'}`;
+  }
+  return `unloaded:${modelId}`;
+}
+
+/**
+ * Where `rac_rag_session_create_proto` will run for this embedding model.
+ * Must stay aligned with `RAGProtoAdapter` worker routing.
+ */
+function executionSiteForNativeRagHost(embeddingModelId: string): string | null {
+  if (getBackendWorkerOwner(embeddingModelId) === 'onnx') {
+    return 'worker:onnx';
+  }
+  const ragRecord = getWasmModuleRecordForCapability('rag');
+  if (!ragRecord) return null;
+  return `main:${ragRecord.backend}`;
+}
+
+/**
+ * Native session iff every artifact the session will load is co-located with
+ * the RAG ABI host. Otherwise compose via public Embeddings + TextGeneration
+ * facades (still worker-backed; no framework hardcoding).
+ */
+function resolveRagExecutionPlan(config: RAGConfiguration): {
+  mode: 'native' | 'composed';
+  reason: string;
+} {
+  const embId = config.embeddingModelId?.trim() ?? '';
+  const llmId = config.llmModelId?.trim() ?? '';
+  if (!embId) {
+    return {
+      mode: 'composed',
+      reason: 'RAGConfiguration.embeddingModelId is required',
+    };
+  }
+
+  const ragHost = executionSiteForNativeRagHost(embId);
+  const embSite = executionSiteForModel(embId);
+  const llmSite = llmId ? executionSiteForModel(llmId) : embSite;
+
+  if (
+    ragHost
+    && embSite === ragHost
+    && llmSite === ragHost
+  ) {
+    return {
+      mode: 'native',
+      reason: `all RAG artifacts co-located with RAG ABI host (${ragHost})`,
+    };
+  }
+
+  return {
+    mode: 'composed',
+    reason: ragHost
+      ? `RAG ABI host is ${ragHost}, but artifacts are at emb=${embSite}`
+        + (llmId ? ` llm=${llmSite}` : '')
+        + '; native session is single-heap'
+      : 'No RAG ABI host is registered; composing via modality facades',
+  };
+}
+
+/**
+ * Install the provider that matches the ownership plan. Replaces a mismatched
+ * wasm-session provider when the pipeline spans heaps.
+ */
+async function ensureProviderForExecutionPlan(
+  config: RAGConfiguration,
+): Promise<void> {
+  const plan = resolveRagExecutionPlan(config);
+  if (plan.mode === 'native') return;
+
+  if (!supportsCrossWasmRAG()) {
+    throw SDKException.backendNotAvailable(
+      'RAG.createPipeline',
+      `${plan.reason}. Composed RAG also unavailable (embeddings + LLM facades `
+        + 'are not both registered).',
+    );
+  }
+
+  const current = _provider;
+  if (current?.providerKind === 'cross-wasm') return;
+  if (current) {
+    try {
+      await current.ragDestroyPipeline();
+    } catch {
+      /* ignore teardown races while swapping providers */
+    }
+  }
+  logger.info(`Using composed RAG provider — ${plan.reason}`);
+  setRAGProvider(createPersistentRAGProvider());
+}
+
 interface NormalizedCrossWasmDocument {
   id: string;
   name: string;
@@ -1297,6 +1411,7 @@ export async function ragCreatePipeline(
       baseConfiguration,
     )
     : configOrEmbeddingModelId;
+  await ensureProviderForExecutionPlan(config);
   const provider = activeProvider();
   if (provider) {
     await provider.ragCreatePipeline(config);
@@ -1590,6 +1705,7 @@ export const __testing__ = {
   createPersistentRAGProvider: (): RAGProvider => new PersistentRAGProvider(),
   clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
+  resolveRagExecutionPlan,
 };
 
 /**

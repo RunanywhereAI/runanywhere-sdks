@@ -14,6 +14,7 @@ import {
   type TTSVoiceInfo as ProtoTTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
@@ -56,18 +57,26 @@ export class TTSProtoAdapter {
     ]).length === 0;
   }
 
-  synthesizeLifecycle(
+  async synthesizeLifecycle(
     text: string,
     options: ProtoTTSOptions,
     ssml?: string,
-  ): ProtoTTSOutput | null {
+  ): Promise<ProtoTTSOutput | null> {
+    const request = lifecycleRequest(text, options, ssml);
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      const response = await host.infer('tts.synthesize', {
+        requestBytes: TTSSynthesisRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response.resultBytes ? TTSOutput.decode(response.resultBytes) : null;
+    }
     if (!ensureExports(this.module, 'tts.synthesizeLifecycle', [
       '_rac_tts_synthesize_lifecycle_proto',
     ])) {
       return null;
     }
     return this.bridge().withEncodedRequest(
-      lifecycleRequest(text, options, ssml),
+      request,
       TTSSynthesisRequest,
       TTSOutput,
       (requestPtr, requestSize, outResult) => (
@@ -92,12 +101,16 @@ export class TTSProtoAdapter {
     options: ProtoTTSOptions,
     ssml?: string,
   ): AsyncIterable<ProtoTTSStreamEvent> {
-    requireExports(this.module, 'tts.synthesizeLifecycleStream', [
-      '_rac_tts_synthesize_stream_lifecycle_proto',
-    ]);
     const requestBytes = TTSSynthesisRequest.encode(
       lifecycleRequest(text, options, ssml),
     ).finish();
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      return decodeWorkerStream(host.stream('tts.synthesize', { requestBytes }), TTSStreamEvent);
+    }
+    requireExports(this.module, 'tts.synthesizeLifecycleStream', [
+      '_rac_tts_synthesize_stream_lifecycle_proto',
+    ]);
     return streamCallback(
       this.module,
       TTSStreamEvent,
@@ -252,6 +265,18 @@ export class TTSProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
+  }
+}
+
+async function* decodeWorkerStream<T>(
+  stream: AsyncIterable<unknown>,
+  codec: { decode(input: Uint8Array): T },
+): AsyncIterable<T> {
+  for await (const payload of stream) {
+    const bytes = payload instanceof Uint8Array
+      ? payload
+      : (payload as { eventBytes?: Uint8Array })?.eventBytes;
+    if (bytes) yield codec.decode(bytes);
   }
 }
 

@@ -14,6 +14,7 @@ import {
 } from '@runanywhere/proto-ts/stt_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
@@ -47,16 +48,23 @@ export class STTProtoAdapter {
     ]).length === 0;
   }
 
-  transcribeLifecycle(
+  async transcribeLifecycle(
     audioData: Uint8Array,
     options: ProtoSTTOptions,
-  ): ProtoSTTOutput | null {
+  ): Promise<ProtoSTTOutput | null> {
+    const request = lifecycleRequest(audioData, options);
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      const response = await host.infer('stt.transcribe', {
+        requestBytes: STTTranscriptionRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response.resultBytes ? STTOutput.decode(response.resultBytes) : null;
+    }
     if (!ensureExports(this.module, 'stt.transcribeLifecycle', [
       '_rac_stt_transcribe_lifecycle_proto',
     ])) {
       return null;
     }
-    const request = lifecycleRequest(audioData, options);
     return this.bridge().withEncodedRequest(
       request,
       STTTranscriptionRequest,
@@ -76,15 +84,16 @@ export class STTProtoAdapter {
     audioData: Uint8Array,
     options: ProtoSTTOptions,
   ): AsyncIterable<ProtoSTTStreamEvent> {
-    // Do not route this call through OffscreenRuntimeBridge: lifecycle model
-    // ownership belongs to the registered main runtime, while a mirror worker
-    // has an independent commons registry and therefore no current STT model.
-    requireExports(this.module, 'stt.transcribeLifecycleStream', [
-      '_rac_stt_transcribe_stream_lifecycle_proto',
-    ]);
     const requestBytes = STTTranscriptionRequest.encode(
       lifecycleRequest(audioData, options),
     ).finish();
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      return decodeWorkerStream(host.stream('stt.transcribe', { requestBytes }), STTStreamEvent);
+    }
+    requireExports(this.module, 'stt.transcribeLifecycleStream', [
+      '_rac_stt_transcribe_stream_lifecycle_proto',
+    ]);
     return streamCallback(
       this.module,
       STTStreamEvent,
@@ -192,6 +201,18 @@ export class STTProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
+  }
+}
+
+async function* decodeWorkerStream<T>(
+  stream: AsyncIterable<unknown>,
+  codec: { decode(input: Uint8Array): T },
+): AsyncIterable<T> {
+  for await (const payload of stream) {
+    const bytes = payload instanceof Uint8Array
+      ? payload
+      : (payload as { eventBytes?: Uint8Array })?.eventBytes;
+    if (bytes) yield codec.decode(bytes);
   }
 }
 

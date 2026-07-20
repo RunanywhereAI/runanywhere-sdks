@@ -53,6 +53,15 @@ export {
   getBackendWorkerRuntimeDiagnostics,
 } from './runtime/BackendWorkerHost.js';
 export type { BackendWorkerFactory } from './runtime/BackendWorkerHost.js';
+export {
+  getBackendWorkerHost,
+  setBackendWorkerHost,
+} from './runtime/BackendWorkerHostRegistry.js';
+export type { BackendWorkerBackendId } from './runtime/BackendWorkerProtocol.js';
+export {
+  setLlamaBackendWorkerRequired,
+  clearLlamaBackendWorkerDead,
+} from './runtime/BackendWorkerModelOwnership.js';
 export { runBackendWorker } from './runtime/BackendWorker.js';
 export type {
   BackendWorkerHandlers,

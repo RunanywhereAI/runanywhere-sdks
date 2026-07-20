@@ -1530,6 +1530,9 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Drop the unreadable archive so the next retry re-downloads
+            // instead of re-opening a corrupt OPFS/MEMFS stub.
+            delete_file(file.destination_path.c_str());
             set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                               total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
                               total_expected, static_cast<int32_t>(i), file.storage_key, "",
@@ -2150,6 +2153,9 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Corrupt/incomplete OPFS archives must not stick around for the
+            // next Voice AI setup retry (web 416 path previously kept them).
+            delete_file(file.destination_path.c_str());
             set_task_progress(
                 task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                 drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,

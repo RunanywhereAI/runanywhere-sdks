@@ -75,6 +75,12 @@ import {
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
 import { callEmscriptenAsyncNumber } from '../../runtime/EmscriptenAsync.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  hasBackendWorkerOwnedModels,
+  mustUseLlamaBackendWorker,
+} from '../../runtime/BackendWorkerModelOwnership.js';
+import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('ToolCalling');
@@ -514,6 +520,126 @@ function encodeStepRequest(
   return ToolCallingSessionStepWithResultRequestMessage.encode(message).finish();
 }
 
+type WorkerToolSessionResponse = {
+  sessionHandle?: bigint;
+  eventBytes?: Uint8Array[];
+};
+
+function decodeWorkerSessionEvents(eventBytes: Uint8Array[] | undefined): ToolCallingSessionEvent[] {
+  return (eventBytes ?? []).map((bytes) => ToolCallingSessionEventMessage.decode(bytes));
+}
+
+async function generateWithToolsInBackendWorker(
+  prompt: string,
+  tools: ToolDefinition[],
+  effectiveOptions: ToolCallingOptions,
+  extra: GenerateWithToolsOptions,
+  executeTool: (toolCall: ToolCall) => Promise<ToolResult>,
+): Promise<ToolCallingResult> {
+  const host = getActiveBackendWorkerHost('llamacpp');
+  if (!host || host.diagnostics.executionContext !== 'worker') {
+    throw SDKException.backendNotAvailable(
+      'toolCalling.generateWithTools',
+      getLlamaBackendWorkerDeadReason()
+        ?? 'BackendWorker is required for tool-calling against a worker-owned LLM; main-thread fallback is disabled.',
+    );
+  }
+
+  let sessionHandle = 0n;
+  let cancelDispatched = false;
+  const dispatchCancel = (): void => {
+    if (sessionHandle === 0n || cancelDispatched) return;
+    cancelDispatched = true;
+    void host.infer('tool.sessionCancel', { sessionHandle }).catch((error) => {
+      logger.warning(
+        `worker tool session cancel failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  };
+  const onAbort = (): void => dispatchCancel();
+  extra.signal?.addEventListener('abort', onAbort);
+
+  try {
+    const created = await host.infer('tool.sessionCreate', {
+      requestBytes: buildSessionCreateRequest(prompt, tools, effectiveOptions, extra),
+    }) as WorkerToolSessionResponse;
+    if (created.sessionHandle === undefined || created.sessionHandle === 0n) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
+        'Worker tool-calling session creation failed',
+        'Worker returned success without a session handle',
+      );
+    }
+    sessionHandle = created.sessionHandle;
+    let events = decodeWorkerSessionEvents(created.eventBytes);
+
+    if (extra.signal?.aborted) {
+      dispatchCancel();
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+        'Tool-calling generation cancelled',
+        'AbortSignal fired while the initial worker generation was in flight',
+      );
+    }
+
+    while (true) {
+      let pendingToolCall: ToolCall | null = null;
+      let finalResult: ToolCallingResult | null = null;
+      let errorBytes: Uint8Array | null = null;
+      for (const event of events) {
+        if (event.finalResult) finalResult = event.finalResult;
+        else if (event.errorBytes?.length) errorBytes = event.errorBytes;
+        else if (event.toolCall) pendingToolCall = event.toolCall;
+      }
+      if (finalResult) return finalResult;
+      if (errorBytes) {
+        try {
+          const decoded = SDKErrorMessage.decode(errorBytes);
+          if (decoded.message) throw new SDKException(decoded);
+        } catch (error) {
+          if (error instanceof SDKException) throw error;
+        }
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
+          'Worker tool-calling session failed',
+          `commons error_bytes (${errorBytes.length}B)`,
+        );
+      }
+      if (!pendingToolCall) {
+        throw SDKException.fromCode(
+          -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
+          'Worker tool-calling session stalled',
+          'commons returned no event after create or step',
+        );
+      }
+
+      const toolResult = await executeTool(pendingToolCall);
+      const toolCallId = toolResult.toolCallId || toolCallIdentifier(pendingToolCall);
+      const stepped = await host.infer('tool.sessionStep', {
+        sessionHandle,
+        requestBytes: encodeStepRequest(
+          sessionHandle,
+          toolCallId,
+          toolResult.resultJson ?? '',
+          toolResult.success ? undefined : toolResult.error,
+        ),
+      }) as WorkerToolSessionResponse;
+      events = decodeWorkerSessionEvents(stepped.eventBytes);
+    }
+  } finally {
+    extra.signal?.removeEventListener('abort', onAbort);
+    if (sessionHandle !== 0n) {
+      try {
+        await host.infer('tool.sessionDestroy', { sessionHandle });
+      } catch (error) {
+        logger.warning(
+          `worker tool session destroy failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+  }
+}
+
 export const ToolCalling = {
   supportsProtoToolCalling(): boolean {
     const module = getModuleForCapability('tool-calling');
@@ -712,6 +838,22 @@ export const ToolCalling = {
       ? options.tools
       : this.getRegisteredTools();
     const effectiveOptions = buildPromptOptions(tools, options);
+    const workerHost = getActiveBackendWorkerHost('llamacpp');
+    const useWorker = mustUseLlamaBackendWorker()
+      || (
+        workerHost != null
+        && workerHost.diagnostics.executionContext === 'worker'
+        && hasBackendWorkerOwnedModels()
+      );
+    if (useWorker) {
+      return generateWithToolsInBackendWorker(
+        prompt,
+        tools,
+        effectiveOptions,
+        extra,
+        (toolCall) => this.executeTool(toolCall),
+      );
+    }
 
     const module = requireToolCallingModule('toolCalling.generateWithTools', [
       '_rac_tool_calling_session_create_proto',

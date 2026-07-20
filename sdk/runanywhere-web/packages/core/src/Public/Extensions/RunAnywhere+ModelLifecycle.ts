@@ -11,6 +11,7 @@ import type {
 import {
   InferenceFramework,
   ModelCategory as ModelCategoryEnum,
+  ModelInfo as ModelInfoCodec,
   ModelLoadRequest as ModelLoadRequestCodec,
   ModelLoadResult as ModelLoadResultCodec,
   ModelUnloadRequest as ModelUnloadRequestCodec,
@@ -27,6 +28,7 @@ import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge.js';
 import {
   frameworkOPFSDir,
+  isExtractedDirectoryArtifact,
   primaryFilenameFromModel,
 } from '../../Infrastructure/FrameworkOPFSPaths.js';
 import {
@@ -39,6 +41,7 @@ import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import {
   clearModelOwnedByBackendWorker,
   isModelOwnedByBackendWorker,
+  listBackendWorkerOwnedModels,
   markModelOwnedByBackendWorker,
 } from '../../runtime/BackendWorkerModelOwnership.js';
 
@@ -100,6 +103,25 @@ function isBackendWorkerEligibleLLM(
   );
 }
 
+function onnxWorkerModality(
+  model: ModelInfo | null,
+  request: ModelLoadRequest,
+): 'stt' | 'tts' | 'vad' | 'embeddings' | null {
+  const category = model?.category ?? request.category;
+  switch (category) {
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_RECOGNITION:
+      return 'stt';
+    case ModelCategoryEnum.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+      return 'tts';
+    case ModelCategoryEnum.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+      return 'vad';
+    case ModelCategoryEnum.MODEL_CATEGORY_EMBEDDING:
+      return 'embeddings';
+    default:
+      return null;
+  }
+}
+
 function hydratePathsForModel(model: ModelInfo | null): string[] {
   if (!model?.localPath) return [];
   const files = model.multiFile?.files ?? [];
@@ -111,20 +133,79 @@ function hydratePathsForModel(model: ModelInfo | null): string[] {
   return [model.localPath];
 }
 
+function currentModelFromBackendWorker(
+  request: CurrentModelRequest,
+): CurrentModelResult | null {
+  const owned = listBackendWorkerOwnedModels();
+  if (owned.length === 0) return null;
+
+  for (const entry of owned) {
+    const model = safeGetModelSnapshot(entry.modelId);
+    if (!model) continue;
+    if (
+      request.category !== undefined
+      && request.category !== null
+      && model.category !== undefined
+      && model.category !== request.category
+    ) {
+      continue;
+    }
+    if (
+      request.framework !== undefined
+      && request.framework !== null
+      && request.framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+      && model.framework !== undefined
+      && model.framework !== request.framework
+    ) {
+      continue;
+    }
+    return {
+      modelId: entry.modelId,
+      model: request.includeModelMetadata ? model : undefined,
+      loadedAtUnixMs: entry.loadedAtUnixMs,
+      found: true,
+      errorMessage: '',
+      category: model.category ?? ModelCategoryEnum.MODEL_CATEGORY_UNSPECIFIED,
+      framework: model.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+      resolvedPath: model.localPath ?? '',
+      resolvedArtifacts: model.multiFile?.files ?? [],
+    };
+  }
+  return null;
+}
+
 async function loadModelViaBackendWorker(
   request: ModelLoadRequest,
   model: ModelInfo | null,
   adapter: ModelLifecycleAdapter,
 ): Promise<ModelLoadResult | null> {
-  const host = getActiveBackendWorkerHost();
-  if (!host || !isBackendWorkerEligibleLLM(model, request)) return null;
+  const onnxModality = onnxWorkerModality(model, request);
+  const backendId = onnxModality ? 'onnx' : 'llamacpp';
+  const host = getActiveBackendWorkerHost(backendId);
+  // Prefer an explicit snapshot, else the live registry entry. The worker
+  // owns a separate WASM heap/registry and must receive ModelInfo bytes or
+  // lifecycle load fails with "model not found in registry".
+  const resolved = model ?? (
+    request.modelId ? ModelRegistry.getModel(request.modelId) : null
+  );
+  const modality = onnxWorkerModality(resolved, request);
+  if (!host || (!modality && !isBackendWorkerEligibleLLM(resolved, request))) return null;
+  if (!resolved) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND,
+      `model not found in registry: ${request.modelId}`,
+      'loadModel',
+    );
+  }
 
   const requestBytes = ModelLoadRequestCodec.encode(request).finish();
+  const modelInfoBytes = ModelInfoCodec.encode(resolved).finish();
   const response = await host.loadModel(
-    'llm',
+    modality ?? 'llm',
     {
       requestBytes,
-      hydratePaths: hydratePathsForModel(model),
+      modelInfoBytes,
+      hydratePaths: hydratePathsForModel(resolved),
     },
   ) as { resultBytes?: Uint8Array };
   if (!response?.resultBytes) {
@@ -136,7 +217,7 @@ async function loadModelViaBackendWorker(
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
   if (result.success) {
-    markModelOwnedByBackendWorker(request.modelId);
+    markModelOwnedByBackendWorker(request.modelId, backendId);
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
   }
   return result;
@@ -254,17 +335,27 @@ async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null
   const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
   if (!frameworkDir) return null;
 
+  const modelDir = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`;
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  // Whisper/Piper (and other Sherpa archives) land as extracted directories;
+  // the .tar.gz primary name from downloadUrl is deleted after unpack.
+  if (isExtractedDirectoryArtifact(model) || isMultiFile) {
+    const hasDir = await OPFSBridge.directoryHasArtifacts([
+      'RunAnywhere',
+      'Models',
+      frameworkDir,
+      model.id,
+    ]);
+    return hasDir ? modelDir : null;
+  }
+
   const filename = primaryFilenameFromModel(model);
   if (!filename) return null;
 
-  const opfsPath = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}/${filename}`;
+  const opfsPath = `${modelDir}/${filename}`;
   if (!(await OPFSBridge.exists(opfsPath))) return null;
   if (!(await isOpfsArtifactComplete(opfsPath, expectedDownloadBytes(model)))) return null;
-
-  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
-  return isMultiFile
-    ? `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`
-    : opfsPath;
+  return opfsPath;
 }
 
 /** Expected on-disk payload size for completeness checks after interrupted downloads. */
@@ -288,6 +379,12 @@ async function isOpfsArtifactComplete(path: string, expectedBytes: number): Prom
   return size * 5 >= expectedBytes * 4;
 }
 
+function opfsSegmentsFromPath(path: string): string[] | null {
+  if (!path.startsWith('/opfs/')) return null;
+  const segments = path.slice('/opfs/'.length).split('/').filter(Boolean);
+  return segments.length > 0 ? segments : null;
+}
+
 async function assertDownloadedArtifactReady(model: ModelInfo): Promise<void> {
   const localPath = model.localPath;
   if (!localPath) return;
@@ -308,6 +405,22 @@ async function assertDownloadedArtifactReady(model: ModelInfo): Promise<void> {
     }
     return;
   }
+
+  // Archive-extracted speech models (Whisper/Piper) set localPath to a
+  // directory. OPFS fileSize() on a directory is always 0, which previously
+  // failed Voice AI setup with "incomplete (0 of ~N bytes)" even after a
+  // successful extract.
+  const segments = opfsSegmentsFromPath(localPath);
+  if (segments && await OPFSBridge.isOPFSDirectory(segments)) {
+    if (!(await OPFSBridge.directoryHasArtifacts(segments))) {
+      throw new Error(
+        `Model download is incomplete (extracted folder is empty). `
+        + 'Tap Retry to finish downloading before using this model.',
+      );
+    }
+    return;
+  }
+
   if (!(await OPFSBridge.exists(localPath))
     || !(await isOpfsArtifactComplete(localPath, expected))) {
     const actual = await OPFSBridge.fileSize(localPath);
@@ -381,8 +494,10 @@ export const WebModelLifecycle = {
     // MEMFS. The worker hydrates its own MEMFS during loadModel RPC.
     const adapter = requireAdapter(modelSnapshot?.framework);
     const workerEligible = Boolean(
-      getActiveBackendWorkerHost()
-      && isBackendWorkerEligibleLLM(modelSnapshot, request),
+      (onnxWorkerModality(modelSnapshot, request)
+        ? getActiveBackendWorkerHost('onnx')
+        : getActiveBackendWorkerHost('llamacpp'))
+      && (onnxWorkerModality(modelSnapshot, request) || isBackendWorkerEligibleLLM(modelSnapshot, request)),
     );
     if (modelSnapshot?.localPath && !workerEligible) {
       const loadModule = lifecycleModuleAsEmscripten(adapter);
@@ -470,27 +585,36 @@ export const WebModelLifecycle = {
   },
 
   unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
-    if (request.modelId && isModelOwnedByBackendWorker(request.modelId)) {
-      clearModelOwnedByBackendWorker(request.modelId);
+    if (request.modelId && isModelOwnedByBackendWorker(request.modelId, 'llamacpp')) {
+      clearModelOwnedByBackendWorker(request.modelId, 'llamacpp');
+    } else if (request.modelId && isModelOwnedByBackendWorker(request.modelId, 'onnx')) {
+      clearModelOwnedByBackendWorker(request.modelId, 'onnx');
     } else if (request.unloadAll) {
       clearModelOwnedByBackendWorker();
+      clearModelOwnedByBackendWorker(undefined, 'onnx');
     }
     return unloadAcrossAdapters(request);
   },
 
   async unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
-    const host = getActiveBackendWorkerHost();
+    const backendId = request.modelId && isModelOwnedByBackendWorker(request.modelId, 'onnx')
+      ? 'onnx'
+      : 'llamacpp';
+    const host = getActiveBackendWorkerHost(backendId);
     if (
       host
       && (
-        (request.modelId && isModelOwnedByBackendWorker(request.modelId))
+        (request.modelId && isModelOwnedByBackendWorker(request.modelId, backendId))
         || request.unloadAll
       )
     ) {
       const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
-      await host.unloadModel('llm', { requestBytes });
-      if (request.unloadAll) clearModelOwnedByBackendWorker();
-      else clearModelOwnedByBackendWorker(request.modelId);
+      await host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes });
+      if (request.unloadAll) {
+        clearModelOwnedByBackendWorker(undefined, backendId);
+      } else {
+        clearModelOwnedByBackendWorker(request.modelId, backendId);
+      }
     }
     return unloadAcrossAdaptersAsync(request);
   },
@@ -502,6 +626,11 @@ export const WebModelLifecycle = {
   currentModel(
     request: CurrentModelRequest = { includeModelMetadata: false },
   ): CurrentModelResult | null {
+    // Models loaded in the BackendWorker are invisible to main-thread
+    // g_loaded maps — surface JS ownership first so Use/chat UI stays honest.
+    const workerOwned = currentModelFromBackendWorker(request);
+    if (workerOwned) return workerOwned;
+
     // Aggregate across all registered WASM modules: LlamaCPP holds LLM/VLM
     // state in its g_loaded map; ONNX holds STT/TTS/VAD/Embedding state in
     // its own map. The default adapter only sees one — return the first

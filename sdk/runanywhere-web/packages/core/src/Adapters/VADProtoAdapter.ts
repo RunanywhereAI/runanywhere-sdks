@@ -18,6 +18,7 @@ import {
   type VADStreamEvent as ProtoVADStreamEvent,
 } from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../Foundation/SDKException.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { readWasmUint64 } from '../runtime/WasmInt64.js';
 import {
@@ -91,16 +92,11 @@ export class VADProtoAdapter {
     );
   }
 
-  processLifecycle(
+  async processLifecycle(
     samples: Float32Array,
     options: ProtoVADOptions,
     sampleRate = 16_000,
-  ): ProtoVADResult | null {
-    if (!ensureExports(this.module, 'vad.processLifecycle', [
-      '_rac_vad_process_lifecycle_proto',
-    ])) {
-      return null;
-    }
+  ): Promise<ProtoVADResult | null> {
     const request = VADProcessRequest.create({
       requestId: lifecycleRequestId(),
       audio: {
@@ -113,6 +109,18 @@ export class VADProtoAdapter {
       options,
       metadata: {},
     });
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      const response = await host.infer('vad.process', {
+        requestBytes: VADProcessRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response.resultBytes ? VADResult.decode(response.resultBytes) : null;
+    }
+    if (!ensureExports(this.module, 'vad.processLifecycle', [
+      '_rac_vad_process_lifecycle_proto',
+    ])) {
+      return null;
+    }
     return this.bridge().withEncodedRequest(
       request,
       VADProcessRequest,

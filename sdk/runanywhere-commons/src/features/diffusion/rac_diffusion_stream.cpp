@@ -21,7 +21,7 @@
 
 #include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_memory.h"
+#include "rac/core/rac_types.h"
 #include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_types.h"
@@ -164,7 +164,11 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     const uint64_t session_id = next_session_id().fetch_add(1, std::memory_order_relaxed);
     {
         std::lock_guard<std::mutex> lock(g_mu());
-        g_sessions()[session_id] = StreamSession{.handle = handle, .request_id = parsed.request_id()};
+        // StreamSession contains an atomic — assign fields in-place (no copy/move).
+        StreamSession& session = g_sessions()[session_id];
+        session.handle = handle;
+        session.request_id = parsed.request_id();
+        session.is_cancelled.store(false, std::memory_order_release);
     }
     *out_session_id = session_id;
 
@@ -219,16 +223,16 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
         rac_diffusion_result_t raw = {};
         const rac_result_t rc = rac_diffusion_generate_with_progress(
             handle, &options,
-            [](const rac_diffusion_progress_t* progress, void* user_data) {
+            [](const rac_diffusion_progress_t* progress, void* user_data) -> rac_bool_t {
                 auto* ctx = static_cast<ProgressCtx*>(user_data);
                 if (!ctx || !progress)
-                    return;
+                    return RAC_TRUE;
                 {
                     std::lock_guard<std::mutex> lock(g_mu());
                     auto it = g_sessions().find(ctx->session_id);
                     if (it == g_sessions().end() ||
                         it->second.is_cancelled.load(std::memory_order_acquire)) {
-                        return;
+                        return RAC_FALSE;  // cancel
                     }
                 }
                 runanywhere::v1::DiffusionProgress proto_progress;
@@ -237,6 +241,7 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                         ctx->handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_PROGRESS,
                         &proto_progress, nullptr, nullptr, 0);
                 }
+                return RAC_TRUE;
             },
             &progress_ctx, &raw);
 

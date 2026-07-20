@@ -4,7 +4,14 @@ import {
   type StructuredOutputParseRequest as ProtoStructuredOutputParseRequest,
   type StructuredOutputResult as ProtoStructuredOutputResult,
 } from '@runanywhere/proto-ts/structured_output';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  hasBackendWorkerOwnedModels,
+  mustUseLlamaBackendWorker,
+} from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   ensureExports,
@@ -28,6 +35,21 @@ export class StructuredOutputProtoAdapter {
   parse(
     request: ProtoStructuredOutputParseRequest,
   ): ProtoStructuredOutputResult | null {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    const useWorker = mustUseLlamaBackendWorker()
+      || (
+        host != null
+        && host.diagnostics.executionContext === 'worker'
+        && hasBackendWorkerOwnedModels()
+      );
+    if (useWorker) {
+      // Sync facade cannot await worker RPC. Callers should use parseAsync.
+      throw SDKException.backendNotAvailable(
+        'structuredOutput.parse',
+        getLlamaBackendWorkerDeadReason()
+          ?? 'Structured-output parse against a BackendWorker-owned model requires parseAsync().',
+      );
+    }
     if (!ensureExports(this.module, 'structuredOutput.parse', [
       '_rac_structured_output_parse_proto',
     ])) {
@@ -42,6 +64,34 @@ export class StructuredOutputProtoAdapter {
       ),
       'rac_structured_output_parse_proto',
     );
+  }
+
+  async parseAsync(
+    request: ProtoStructuredOutputParseRequest,
+  ): Promise<ProtoStructuredOutputResult | null> {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    const useWorker = mustUseLlamaBackendWorker()
+      || (
+        host != null
+        && host.diagnostics.executionContext === 'worker'
+        && hasBackendWorkerOwnedModels()
+      );
+    if (useWorker) {
+      if (!host || host.diagnostics.executionContext !== 'worker') {
+        throw SDKException.backendNotAvailable(
+          'structuredOutput.parseAsync',
+          getLlamaBackendWorkerDeadReason()
+            ?? 'BackendWorker is required for structured-output parse; main-thread fallback is disabled.',
+        );
+      }
+      const requestBytes = StructuredOutputParseRequest.encode(request).finish();
+      const response = await host.infer('structured.parse', { requestBytes }) as {
+        resultBytes?: Uint8Array;
+      };
+      if (!response?.resultBytes) return null;
+      return StructuredOutputResult.decode(response.resultBytes);
+    }
+    return this.parse(request);
   }
 
   private bridge(): ProtoWasmBridge {

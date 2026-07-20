@@ -56,6 +56,11 @@ export interface WorkerLlamaModule {
   _rac_wasm_offsetof_config_log_level?(): number;
   _rac_backend_llamacpp_register(): number;
   _rac_get_model_registry?(): number;
+  _rac_model_registry_register_proto?(
+    registryHandle: number,
+    requestBytes: number,
+    requestSize: number,
+  ): number;
   _rac_model_lifecycle_load_proto?(
     registryHandle: number,
     requestBytes: number,
@@ -92,6 +97,9 @@ type CreateModuleFn = (options?: {
   print?: (text: string) => void;
   printErr?: (text: string) => void;
   locateFile?: (path: string) => string;
+  /** Required for pthread-backed modules hosted inside a DedicatedWorker. */
+  mainScriptUrlOrBlob?: string;
+  onAbort?: (what: unknown) => void;
 }) => Promise<WorkerLlamaModule>;
 
 interface WebGPUAdapterLike {
@@ -103,6 +111,8 @@ export class WorkerLlamaRuntime {
   private platformAdapter: PlatformAdapter | null = null;
   private accelerationMode: AccelerationMode = 'cpu';
   private loaded = false;
+  /** Recent WASM print/printErr/onAbort lines for diagnosing worker aborts. */
+  private readonly diagnosticsLog: string[] = [];
 
   get isLoaded(): boolean {
     return this.loaded && this.module !== null;
@@ -110,6 +120,23 @@ export class WorkerLlamaRuntime {
 
   get acceleration(): AccelerationMode {
     return this.accelerationMode;
+  }
+
+  get recentDiagnostics(): string[] {
+    return this.diagnosticsLog.slice(-40);
+  }
+
+  private pushDiag(level: string, text: string): void {
+    const line = `[${level}] ${text}`;
+    this.diagnosticsLog.push(line);
+    if (this.diagnosticsLog.length > 200) {
+      this.diagnosticsLog.splice(0, this.diagnosticsLog.length - 200);
+    }
+    if (level === 'err' || level === 'abort') {
+      logger.warning(line);
+    } else {
+      logger.info(line);
+    }
   }
 
   requireModule(): WorkerLlamaModule {
@@ -149,7 +176,21 @@ export class WorkerLlamaRuntime {
 
   private async doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     const webgpuAvailable = acceleration !== 'cpu' ? await detectWebGPU() : false;
-    const useWebGPU = acceleration !== 'cpu' && webgpuAvailable;
+    // CPU only when WebGPU capability is missing. If WebGPU exists, init/runtime
+    // failures must surface — do not silently downgrade to CPU.
+    const useWebGPU = acceleration === 'webgpu'
+      ? webgpuAvailable
+      : acceleration === 'auto'
+        ? webgpuAvailable
+        : false;
+    if ((acceleration === 'webgpu' || acceleration === 'auto') && !webgpuAvailable) {
+      if (acceleration === 'webgpu') {
+        throw new Error(
+          'WebGPU acceleration requested but navigator.gpu / shader-f16 is unavailable',
+        );
+      }
+      // auto + no GPU → CPU worker
+    }
     this.accelerationMode = useWebGPU ? 'webgpu' : 'cpu';
 
     const glueName = useWebGPU
@@ -160,10 +201,16 @@ export class WorkerLlamaRuntime {
     const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
     try {
+      // CPU artifacts are pthread-backed. When this module is hosted inside a
+      // DedicatedWorker, Emscripten must know the real glue URL so child
+      // `em-pthread` workers can reload the same script. WebGPU builds are
+      // Asyncify-only (no pthreads) and are preferred for BackendWorker.
       this.module = await glue.default({
-        print: (text) => logger.info(text),
-        printErr: (text) => logger.info(text),
+        print: (text) => this.pushDiag('out', text),
+        printErr: (text) => this.pushDiag('err', text),
+        onAbort: (what) => this.pushDiag('abort', String(what ?? '<empty>')),
         locateFile: (path) => baseUrl + path,
+        mainScriptUrlOrBlob: moduleUrl,
       });
 
       const ping = this.module._rac_wasm_ping?.();
@@ -183,14 +230,14 @@ export class WorkerLlamaRuntime {
       await this.registerBackend();
       logger.info(`Worker LlamaCpp WASM ready (${this.accelerationMode})`);
     } catch (error) {
-      if (this.accelerationMode === 'webgpu' && acceleration === 'auto') {
-        const reason = error instanceof Error ? error.message : String(error);
-        logger.warning(`Worker WebGPU WASM failed (${reason}); falling back to CPU`);
-        await this.teardown();
-        return this.doLoad('cpu');
-      }
+      const reason = error instanceof Error ? error.message : String(error);
+      const diag = this.recentDiagnostics.slice(-15).join('\n');
       await this.teardown();
-      throw error;
+      throw new Error(
+        diag
+          ? `Worker ${this.accelerationMode} WASM init failed: ${reason}\n--- wasm ---\n${diag}`
+          : `Worker ${this.accelerationMode} WASM init failed: ${reason}`,
+      );
     }
   }
 
