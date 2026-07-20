@@ -169,23 +169,27 @@ def test_gpu_flag_requires_cuda_sidecars(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------- wheel rejections
 
 
-def test_host_path_leak_in_binary_is_rejected(tmp_path: Path) -> None:
+def test_host_path_in_binary_is_tolerated(tmp_path: Path) -> None:
+    # A native extension (and its vendored deps) unavoidably embed build-env source paths,
+    # and CI runner workspaces live under /home/ or /Users/, so compiled binaries are NOT
+    # scanned for host paths — a build-path string inside _core / a sidecar must not fail.
     leaky = _win_sidecars()
     leaky["runanywhere/_native/_core.cp312-win_amd64.pyd"] = (
         CLEAN_BINARY + b"C:\\Users\\runner\\build\\_core.obj\x00"
     )
-    wheel = _build_wheel(include_core=False, sidecars=leaky)
-    dist = _write_dist(tmp_path, wheel=wheel)
-    with pytest.raises(V.PackageValidationError, match="host"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_home_path_leak_in_binary_is_rejected(tmp_path: Path) -> None:
-    leaky = _win_sidecars()
     leaky["runanywhere/_native/onnxruntime.dll"] = (
         CLEAN_BINARY + b"/home/runner/work/onnxruntime\x00"
     )
-    dist = _write_dist(tmp_path, wheel=_build_wheel(sidecars=leaky))
+    dist = _write_dist(tmp_path, wheel=_build_wheel(include_core=False, sidecars=leaky))
+    V.validate_public_packages(dist, VERSION)  # must not raise
+
+
+def test_host_path_leak_in_text_member_is_rejected(tmp_path: Path) -> None:
+    # A host path in a TEXT / metadata member (our own source) IS an avoidable leak.
+    wheel = _build_wheel(
+        extra_members={"runanywhere/_leak.py": b"CACHE = '/home/dev/secret/models'\n"}
+    )
+    dist = _write_dist(tmp_path, wheel=wheel)
     with pytest.raises(V.PackageValidationError, match="host"):
         V.validate_public_packages(dist, VERSION)
 
