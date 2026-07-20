@@ -350,11 +350,42 @@ function ggufShardSet(picked: string, files: string[]): string[] {
  * (`owner/repo` or `owner/repo:file.gguf`, GGUF + any mmproj auto-resolved,
  * split GGUFs downloaded whole), or a local file path.
  */
+// Recognize a HuggingFace *web* URL and map it to a repo (+ optional file) so it
+// resolves as a repo instead of being downloaded as a raw file. Returns null for
+// non-HF URLs and for `/resolve/` URLs (those are already direct file downloads).
+export function parseHfUrl(u: string): { repo: string; file?: string } | null {
+  if (!RE_URL.test(u)) return null;
+  let url: URL;
+  try {
+    url = new URL(u);
+  } catch {
+    return null;
+  }
+  if (!/(^|\.)huggingface\.co$/i.test(url.hostname)) return null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'models' || parts[0] === 'datasets') parts.shift(); // optional prefix
+  if (parts.length < 2) return null;
+  const repo = `${parts[0]}/${parts[1]}`;
+  const kind = parts[2]; // tree | blob | resolve | undefined (repo root)
+  if (kind === 'resolve') return null; // a /resolve/ URL is already a direct download
+  if (kind === 'blob' && parts.length >= 5) {
+    return { repo, file: decodeURIComponent(parts.slice(4).join('/')) };
+  }
+  return { repo };
+}
+
 export async function resolveModel(
   idOrPath: string,
   opts: { dir?: string; onProgress?: (p: DownloadProgress) => void } = {}
 ): Promise<ResolvedModel> {
   if (!isCatalogId(idOrPath)) {
+    // A HuggingFace page URL (…/owner/repo, …/tree/…, …/blob/…/file) resolves as a
+    // repo — NOT a raw download (fetching the repo's HTML index page was the bug
+    // when a user pasted the browser URL instead of `owner/repo`). A `/resolve/`
+    // URL or any non-HF URL still falls through to the direct-download branch.
+    const hf = parseHfUrl(idOrPath);
+    if (hf) idOrPath = hf.file ? `${hf.repo}:${hf.file}` : hf.repo;
+
     // Direct URL to a model file.
     if (RE_URL.test(idOrPath)) {
       let fname: string;
