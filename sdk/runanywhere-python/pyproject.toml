@@ -28,6 +28,11 @@ test = ["pytest>=7"]
 [tool.scikit-build]
 cmake.source-dir = "../.."
 cmake.version = ">=3.24"
+# Build in a project-relative dir instead of scikit-build's default temp under the user's
+# home. The vendored deps (llama/absl/ggml) embed their source __FILE__ paths in the .pyd;
+# building under the home-dir temp leaks a `\Users\` / `/home/` path that the release-boundary
+# validator rejects. A project-relative dir keeps those out (and makes rebuilds incremental).
+build-dir = "build/{wheel_tag}"
 cmake.args = [
     "-DRAC_BUILD_PYTHON_MODULE=ON",
     "-DRAC_BUILD_BACKENDS=ON",
@@ -46,11 +51,11 @@ wheel.install-dir = "runanywhere/_native"
 [tool.scikit-build.cmake.define]
 CMAKE_BUILD_TYPE = "Release"
 
-[tool.scikit-build.sdist]
-include = [
-    "runanywhere",
-    "native",
-]
+# The sdist uses scikit-build-core's default git-tracked file selection: every committed
+# source file (runanywhere/*.py, native/*, pyproject, docs) is included, while the locally
+# bundled compiled artifacts (_core.pyd, sidecar DLLs) and __pycache__ are gitignored and so
+# never enter the sdist — keeping it pure source. (A force `sdist.include` would drag those
+# binaries in, since include overrides exclude.)
 
 [tool.cibuildwheel]
 build-frontend = "build"
