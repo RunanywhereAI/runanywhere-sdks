@@ -62,9 +62,11 @@ class ToolSettingsViewModel: ObservableObject {
                     // that's off by exactly that offset. Stating the
                     // no-location, already-local contract up front heads
                     // that off at the source, not just in the result note.
-                    description: "Gets the device's current date, time, and timezone. Returns "
-                        + "only the device's own local time — it has no location parameter and "
-                        + "cannot look up another city's time.",
+                    description: """
+                        Gets the device's current date, time, and timezone. Returns \
+                        only the device's own local time — it has no location parameter and \
+                        cannot look up another city's time.
+                        """,
                     parameters: [],
                     category: "Utility"
                 ),
@@ -89,9 +91,11 @@ class ToolSettingsViewModel: ObservableObject {
                         // (the field a model is most tempted to "apply")
                         // stops the double-conversion at the point of use.
                         "note": RAToolValue(
-                            "\"time\" is already this device's local wall-clock time in the "
-                                + "\"timezone\"/\"utc_offset\" below — do NOT apply utc_offset to "
-                                + "it again."
+                            """
+                            "time" is already this device's local wall-clock time in the \
+                            "timezone"/"utc_offset" below — do NOT apply utc_offset to \
+                            it again.
+                            """
                         )
                     ]
                 }

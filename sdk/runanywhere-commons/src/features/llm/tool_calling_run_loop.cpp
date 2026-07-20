@@ -525,8 +525,12 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     // needs the qhexrt dialect whenever tools are advertised — its prompt path
     // uses bare-Pythonic regardless of the declared format enum.
     if (ctx.format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON || ctx.grammar_backend) {
+        // parallel only affects the llamacpp GBNF root (call vs call+). QHexRT's
+        // native toolcall/toolcall_opt kinds still admit at most one call per
+        // generation; GBNF is cleared on grammar_backend below.
         auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
-            ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name);
+            ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name,
+            ctx.parallel_tool_calls);
         // GBNF encodes the JSON <tool_call> envelope; skip it on grammar
         // backends that speak bare-Pythonic instead.
         ctx.generation.grammar_gbnf = ctx.grammar_backend ? std::string() : std::move(grammar.gbnf);
@@ -586,7 +590,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
             // tool so decoding can only emit that call (or free text on
             // toolcall_opt). Without this the spec still lists every tool.
             auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
-                ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name);
+                ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name,
+                ctx.parallel_tool_calls);
             step_generation.grammar_gbnf =
                 ctx.grammar_backend ? std::string() : std::move(grammar.gbnf);
             step_generation.grammar_qhexrt = std::move(grammar.qhexrt);

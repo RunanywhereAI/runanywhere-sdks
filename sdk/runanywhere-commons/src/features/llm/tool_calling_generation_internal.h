@@ -94,6 +94,11 @@ inline GenerationState generation_for_tool_step(const GenerationState& base, uin
                                                 runanywhere::v1::ToolChoiceMode tool_choice,
                                                 runanywhere::v1::ToolCallFormatName format) {
     GenerationState step = base;
+    // Grammar lifetime is owned by the run-loop / session via
+    // tool_grammar_constrained_this_turn (clear when tools are not live,
+    // including pure synthesis turns). Do NOT unconditionally clear here on
+    // iteration > 1 — that would drop grammar when keep_tools_available keeps
+    // tools live across multiple decision turns.
     const bool forced_decision = iteration == 1 && has_tool_choice &&
                                  tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
     if (!forced_decision) {

@@ -44,10 +44,16 @@ struct ToolCallGrammar {
 //
 // Returns an all-empty ToolCallGrammar when tool_options.tools() is empty
 // or tool_choice == NONE (matches today's unconstrained behavior).
+//
+// `parallel` mirrors ToolCallingOptions.parallel_tool_calls: when true, the
+// llama.cpp root rule accepts one-or-more back-to-back envelopes instead of
+// exactly one, so a REQUIRED/SPECIFIC turn can still emit a genuine
+// multi-call batch under grammar constraint (qhexrt's toolcall/toolcall_opt
+// kinds already read one full generation as a unit and need no change).
 ToolCallGrammar build_tool_call_grammar(const runanywhere::v1::ToolCallingOptions& tool_options,
                                         bool has_tool_choice,
                                         runanywhere::v1::ToolChoiceMode tool_choice,
-                                        const std::string& forced_tool_name);
+                                        const std::string& forced_tool_name, bool parallel);
 
 #endif  // RAC_HAVE_PROTOBUF
 

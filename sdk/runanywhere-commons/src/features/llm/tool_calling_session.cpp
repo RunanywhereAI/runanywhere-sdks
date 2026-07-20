@@ -627,7 +627,7 @@ void run_generate_loop(ToolCallingSession& session) {
         // so decoding can only emit that call (see the run-loop path).
         auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
             session.tool_options, session.has_tool_choice, session.tool_choice,
-            session.forced_tool_name);
+            session.forced_tool_name, /*parallel=*/false);
         step_generation.grammar_gbnf =
             session.grammar_backend ? std::string() : std::move(grammar.gbnf);
         step_generation.grammar_qhexrt = std::move(grammar.qhexrt);
@@ -880,7 +880,7 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
         session->grammar_backend) {
         auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
             session->tool_options, session->has_tool_choice, session->tool_choice,
-            session->forced_tool_name);
+            session->forced_tool_name, /*parallel=*/false);
         session->generation.grammar_gbnf =
             session->grammar_backend ? std::string() : std::move(grammar.gbnf);
         session->generation.grammar_qhexrt = std::move(grammar.qhexrt);

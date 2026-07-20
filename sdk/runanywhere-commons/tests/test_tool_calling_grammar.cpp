@@ -14,6 +14,7 @@
 
 #include <vector>
 
+#include "features/llm/tool_calling_generation_internal.h"
 #include "features/llm/tool_calling_grammar.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -52,13 +53,13 @@ void test_none_tools_yields_empty_grammar() {
     runanywhere::v1::ToolCallingOptions empty_options;
     auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
         empty_options, /*has_tool_choice=*/false, runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED,
-        /*forced_tool_name=*/"");
+        /*forced_tool_name=*/"", /*parallel=*/false);
     CHECK(grammar.gbnf.empty() && grammar.qhexrt.empty(), "empty tool set -> no grammar");
 
     auto options = two_tool_options();
     auto none_grammar = rac::llm::tool_calling::build_tool_call_grammar(
         options, /*has_tool_choice=*/true, runanywhere::v1::TOOL_CHOICE_MODE_NONE,
-        /*forced_tool_name=*/"");
+        /*forced_tool_name=*/"", /*parallel=*/false);
     CHECK(none_grammar.gbnf.empty() && none_grammar.qhexrt.empty(),
           "tool_choice=NONE -> no grammar");
 }
@@ -67,7 +68,7 @@ void test_auto_leaves_gbnf_unconstrained_but_sets_qhexrt_opt() {
     auto options = two_tool_options();
     auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
         options, /*has_tool_choice=*/false, runanywhere::v1::TOOL_CHOICE_MODE_AUTO,
-        /*forced_tool_name=*/"");
+        /*forced_tool_name=*/"", /*parallel=*/false);
     CHECK(grammar.gbnf.empty(), "AUTO -> llamacpp dialect left unconstrained");
     CHECK(grammar.qhexrt == "toolcall_opt:get_weather,get_current_time",
           "AUTO -> qhexrt dialect is toolcall_opt: with both names");
@@ -77,12 +78,13 @@ void test_required_constrains_both_dialects_over_all_names() {
     auto options = two_tool_options();
     auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
         options, /*has_tool_choice=*/true, runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED,
-        /*forced_tool_name=*/"");
+        /*forced_tool_name=*/"", /*parallel=*/false);
     CHECK(grammar.qhexrt == "toolcall:get_weather,get_current_time",
           "REQUIRED -> qhexrt dialect is toolcall: with both names");
 
     CHECK(!grammar.gbnf.empty(), "REQUIRED -> llamacpp GBNF is non-empty");
-    CHECK(grammar.gbnf.find("root ::=") != std::string::npos, "GBNF declares a root rule");
+    CHECK(grammar.gbnf.find("root ::= call\n") != std::string::npos,
+          "REQUIRED without parallel -> root accepts exactly one call");
     CHECK(grammar.gbnf.find("<tool_call>{\\\"tool\\\":") != std::string::npos,
           "GBNF root matches the <tool_call>{\"tool\": envelope prefix");
     CHECK(grammar.gbnf.find("}</tool_call>") != std::string::npos,
@@ -95,11 +97,24 @@ void test_required_constrains_both_dialects_over_all_names() {
           "GBNF appends the permissive JSON object production for arguments");
 }
 
+// Regression (CodeRabbit review on PR #574): when parallel_tool_calls is
+// requested alongside REQUIRED/SPECIFIC, the GBNF root must accept ONE OR
+// MORE back-to-back envelopes — otherwise the grammar itself caps the
+// model at a single call regardless of what the caller asked for.
+void test_parallel_required_gbnf_allows_repeated_calls() {
+    auto options = two_tool_options();
+    auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
+        options, /*has_tool_choice=*/true, runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED,
+        /*forced_tool_name=*/"", /*parallel=*/true);
+    CHECK(grammar.gbnf.find("root ::= call+\n") != std::string::npos,
+          "REQUIRED with parallel -> root accepts one-or-more calls");
+}
+
 void test_specific_constrains_to_single_forced_name() {
     auto options = two_tool_options();
     auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
         options, /*has_tool_choice=*/true, runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC,
-        /*forced_tool_name=*/"get_weather");
+        /*forced_tool_name=*/"get_weather", /*parallel=*/false);
     CHECK(grammar.qhexrt == "toolcall:get_weather",
           "SPECIFIC -> qhexrt dialect names only the forced tool");
     CHECK(grammar.gbnf.find(R"("\"get_weather\"")") != std::string::npos,
@@ -181,6 +196,37 @@ void test_parallel_parse_stops_at_repeated_call() {
     }
 }
 
+// Grammar lifetime is owned by tool_grammar_constrained_this_turn (RUN-80),
+// not by unconditionally clearing on iteration > 1. Synthesis turns (a call
+// was made and tools are not kept available) must drop the grammar so the
+// model can produce a final natural-language answer; keep_tools_available
+// must leave grammar live so a subsequent decision turn can still call.
+void test_grammar_scoped_by_tools_live_predicate() {
+    CHECK(rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+              /*none_veto=*/false, /*a_call_was_made=*/false, /*keep_tools_available=*/false),
+          "first decision turn keeps grammar live");
+    CHECK(!rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+              /*none_veto=*/false, /*a_call_was_made=*/true, /*keep_tools_available=*/false),
+          "synthesis turn (call made, tools not kept) clears grammar");
+    CHECK(rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+              /*none_veto=*/false, /*a_call_was_made=*/true, /*keep_tools_available=*/true),
+          "keep_tools_available keeps grammar live after a call");
+    CHECK(!rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+              /*none_veto=*/true, /*a_call_was_made=*/false, /*keep_tools_available=*/true),
+          "tool_choice=NONE veto clears grammar");
+
+    // generation_for_tool_step itself must NOT clear grammars — the loop owns
+    // that decision via the predicate above.
+    rac::llm::tool_calling::GenerationState base;
+    base.grammar_gbnf = "root ::= \"<tool_call>...\"";
+    base.grammar_qhexrt = "toolcall:get_weather";
+    const auto second = rac::llm::tool_calling::generation_for_tool_step(
+        base, /*iteration=*/2, /*has_tool_choice=*/true, runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED,
+        runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    CHECK(!second.grammar_gbnf.empty() && !second.grammar_qhexrt.empty(),
+          "generation_for_tool_step preserves grammars; loop clears via predicate");
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -190,7 +236,9 @@ int main() {
     test_none_tools_yields_empty_grammar();
     test_auto_leaves_gbnf_unconstrained_but_sets_qhexrt_opt();
     test_required_constrains_both_dialects_over_all_names();
+    test_parallel_required_gbnf_allows_repeated_calls();
     test_specific_constrains_to_single_forced_name();
+    test_grammar_scoped_by_tools_live_predicate();
     test_parallel_parse_stops_at_repeated_call();
     test_parallel_parse_returns_all_envelopes();
 #else

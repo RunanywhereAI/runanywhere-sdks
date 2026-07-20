@@ -46,7 +46,7 @@ constexpr const char* kJsonValueRules =
 ToolCallGrammar build_tool_call_grammar(const runanywhere::v1::ToolCallingOptions& tool_options,
                                         bool has_tool_choice,
                                         runanywhere::v1::ToolChoiceMode tool_choice,
-                                        const std::string& forced_tool_name) {
+                                        const std::string& forced_tool_name, bool parallel) {
     ToolCallGrammar result;
     if (tool_options.tools_size() == 0) {
         return result;
@@ -97,16 +97,24 @@ ToolCallGrammar build_tool_call_grammar(const runanywhere::v1::ToolCallingOption
     // ordinary chat responses; qhexrt's native toolcall_opt kind covers the
     // AUTO case on that engine instead.
     if (must_call) {
-        // Root: the fixed <tool_call>{"tool":...,"arguments":{...}}</tool_call>
+        // `call`: the fixed <tool_call>{"tool":...,"arguments":{...}}</tool_call>
         // envelope with exactly two free choices — which tool name, and what
         // the arguments object contains. Each quoted fragment below is a GBNF
         // string literal matched verbatim against the output text; `tool-name`
         // and `object` are rule references (defined below / in kJsonValueRules).
-        // Concatenated, root produces exactly:
+        // Concatenated, `call` produces exactly:
         //   <tool_call>{"tool":"<name>","arguments":<object>}</tool_call>
+        //
+        // `root` is `call` for a single required call, or `call+` when the
+        // caller opted into parallel_tool_calls — letting the model emit
+        // several back-to-back envelopes in one grammar-constrained
+        // generation instead of being capped at exactly one by the grammar
+        // itself (the parser's own duplicate-call guard still applies on
+        // top of whatever the grammar allows through).
         std::ostringstream gbnf;
+        gbnf << "root ::= " << (parallel ? "call+" : "call") << "\n";
         gbnf
-            << R"(root ::= "<tool_call>{\"tool\":" tool-name ",\"arguments\":" object "}</tool_call>")"
+            << R"(call ::= "<tool_call>{\"tool\":" tool-name ",\"arguments\":" object "}</tool_call>")"
             << "\n";
 
         // tool-name ::= "\"nameA\"" | "\"nameB\"" | ...

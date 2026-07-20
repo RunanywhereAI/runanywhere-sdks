@@ -216,6 +216,14 @@ export interface ToolCallingOptions {
     /** Typed tool-call format. Unset lets commons select the model default. */
     format?: ToolCallFormatName | undefined;
     /**
+     * When true, one model turn may emit multiple tool-call envelopes;
+     * commons parses and executes all of them before building a single
+     * follow-up prompt. Default false preserves the historical
+     * one-call-per-turn behavior. (Reclaims the field number that
+     * originally carried this flag before it was reserved.)
+     */
+    parallelToolCalls: boolean;
+    /**
      * Maximum tool calls in one conversation turn. Unset/0 = SDK default
      * (typically 5).
      */
@@ -370,6 +378,13 @@ export interface ToolCallingSessionCreateRequest {
      * cross-proto import cycle.
      */
     history: string[];
+    /**
+     * Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
+     * session envelope: when true, one model turn may emit multiple
+     * tool-call envelopes and commons executes all of them before one
+     * follow-up prompt. Default false = historical single-call behavior.
+     */
+    parallelToolCalls: boolean;
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;
