@@ -54,14 +54,10 @@ target_link_libraries(runanywhere_core PRIVATE
 if(MSVC)
     target_link_directories(runanywhere_core PRIVATE "${_ra_bundled_dir}")
     target_link_libraries(runanywhere_core PRIVATE Crypt32)
-    # zlibstatic / bz2_bundled are otherwise consumed by BARE NAME (commons cache-forces
-    # ZLIB_LIBRARIES="zlibstatic", and libarchive leaks bz2_bundled the same way), so
-    # neither `add_dependencies` nor a plain `target_link_libraries(... zlibstatic)`
-    # creates a build dependency — and both targets are EXCLUDE_FROM_ALL — so a lone
-    # `--target runanywhere_core` (what scikit-build's wheel build runs) leaves
-    # _bundled_libs empty and fails with LNK1181 zlibstatic.lib. Linking the target's
-    # $<TARGET_FILE:...> forces CMake to both build the target first and link its exact
-    # output (which already routes to _bundled_libs via the commons ARCHIVE_OUTPUT_DIR).
+    # Keep the builder's absolute PDB/build path out of the shipped .pyd (release hygiene —
+    # the public-package validator rejects embedded host paths like C:\Users\...). %_PDB%
+    # embeds only the PDB basename; /Brepro drops the non-deterministic build-path record.
+    target_link_options(runanywhere_core PRIVATE /PDBALTPATH:%_PDB% /Brepro)
     # zlibstatic / bz2_bundled are consumed by BARE NAME (commons cache-forces
     # ZLIB_LIBRARIES="zlibstatic"; libarchive leaks bz2_bundled likewise). They are
     # EXCLUDE_FROM_ALL FetchContent targets and are NOT visible as targets in this scope
