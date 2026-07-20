@@ -241,8 +241,8 @@ std::string endpoint_key(const EndpointRef& endpoint) {
 
 bool is_known_engine_backed_solution_type(const std::string& type) {
     const char* const kTypes[] = {
-        "anomaly_detect", "detect_voice", "embed",      "generate_text",
-        "retrieve",       "synthesize",   "transcribe",
+        "agent_loop",    "anomaly_detect", "detect_voice", "embed",
+        "generate_text", "retrieve",       "synthesize",   "transcribe",
     };
     for (const char* candidate : kTypes) {
         if (type == candidate)

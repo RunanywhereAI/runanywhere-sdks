@@ -5283,6 +5283,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     kTopPFieldNumber = 13,
     kReplaceSystemPromptFieldNumber = 17,
     kRequireJsonArgumentsFieldNumber = 18,
+    kParallelToolCallsFieldNumber = 20,
   };
   // repeated .runanywhere.v1.ToolDefinition tools = 2;
   [[nodiscard]] int tools_size()
@@ -5505,11 +5506,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
   void _internal_set_require_json_arguments(bool value);
 
   public:
+  // bool parallel_tool_calls = 20;
+  void clear_parallel_tool_calls() ;
+  [[nodiscard]] bool parallel_tool_calls() const;
+  void set_parallel_tool_calls(bool value);
+
+  private:
+  bool _internal_parallel_tool_calls() const;
+  void _internal_set_parallel_tool_calls(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolCallingSessionCreateRequest)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 17,
+      ::google::protobuf::internal::TcParseTable<5, 18,
                           1, 113,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -5555,6 +5566,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     float top_p_;
     bool replace_system_prompt_;
     bool require_json_arguments_;
+    bool parallel_tool_calls_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -5718,10 +5730,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     kAutoExecuteFieldNumber = 3,
     kReplaceSystemPromptFieldNumber = 7,
     kKeepToolsAvailableFieldNumber = 8,
-    kRequireJsonArgumentsFieldNumber = 16,
+    kParallelToolCallsFieldNumber = 15,
     kFormatFieldNumber = 10,
     kMaxToolCallsFieldNumber = 12,
     kToolChoiceFieldNumber = 13,
+    kRequireJsonArgumentsFieldNumber = 16,
     kDisableThinkingFieldNumber = 17,
   };
   // repeated .runanywhere.v1.ToolDefinition tools = 1;
@@ -5833,14 +5846,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
   void _internal_set_keep_tools_available(bool value);
 
   public:
-  // bool require_json_arguments = 16;
-  void clear_require_json_arguments() ;
-  [[nodiscard]] bool require_json_arguments() const;
-  void set_require_json_arguments(bool value);
+  // bool parallel_tool_calls = 15;
+  void clear_parallel_tool_calls() ;
+  [[nodiscard]] bool parallel_tool_calls() const;
+  void set_parallel_tool_calls(bool value);
 
   private:
-  bool _internal_require_json_arguments() const;
-  void _internal_set_require_json_arguments(bool value);
+  bool _internal_parallel_tool_calls() const;
+  void _internal_set_parallel_tool_calls(bool value);
 
   public:
   // optional .runanywhere.v1.ToolCallFormatName format = 10;
@@ -5877,6 +5890,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
   void _internal_set_tool_choice(::runanywhere::v1::ToolChoiceMode value);
 
   public:
+  // bool require_json_arguments = 16;
+  void clear_require_json_arguments() ;
+  [[nodiscard]] bool require_json_arguments() const;
+  void set_require_json_arguments(bool value);
+
+  private:
+  bool _internal_require_json_arguments() const;
+  void _internal_set_require_json_arguments(bool value);
+
+  public:
   // optional bool disable_thinking = 17;
   [[nodiscard]] bool has_disable_thinking()
       const;
@@ -5893,7 +5916,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 13,
+      ::google::protobuf::internal::TcParseTable<4, 14,
                           1, 79,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -5930,10 +5953,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     bool auto_execute_;
     bool replace_system_prompt_;
     bool keep_tools_available_;
-    bool require_json_arguments_;
+    bool parallel_tool_calls_;
     int format_;
     ::int32_t max_tool_calls_;
     int tool_choice_;
+    bool require_json_arguments_;
     bool disable_thinking_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -9228,6 +9252,30 @@ inline void ToolCallingOptions::_internal_set_format(::runanywhere::v1::ToolCall
   _impl_.format_ = value;
 }
 
+// bool parallel_tool_calls = 15;
+inline void ToolCallingOptions::clear_parallel_tool_calls() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.parallel_tool_calls_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+}
+inline bool ToolCallingOptions::parallel_tool_calls() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.parallel_tool_calls)
+  return _internal_parallel_tool_calls();
+}
+inline void ToolCallingOptions::set_parallel_tool_calls(bool value) {
+  _internal_set_parallel_tool_calls(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.parallel_tool_calls)
+}
+inline bool ToolCallingOptions::_internal_parallel_tool_calls() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.parallel_tool_calls_;
+}
+inline void ToolCallingOptions::_internal_set_parallel_tool_calls(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.parallel_tool_calls_ = value;
+}
+
 // optional int32 max_tool_calls = 12;
 inline bool ToolCallingOptions::has_max_tool_calls() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
@@ -9352,7 +9400,7 @@ inline void ToolCallingOptions::set_allocated_forced_tool_name(::std::string* PR
 inline void ToolCallingOptions::clear_require_json_arguments() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.require_json_arguments_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline bool ToolCallingOptions::require_json_arguments() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.require_json_arguments)
@@ -9360,7 +9408,7 @@ inline bool ToolCallingOptions::require_json_arguments() const {
 }
 inline void ToolCallingOptions::set_require_json_arguments(bool value) {
   _internal_set_require_json_arguments(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.require_json_arguments)
 }
 inline bool ToolCallingOptions::_internal_require_json_arguments() const {
@@ -9374,13 +9422,13 @@ inline void ToolCallingOptions::_internal_set_require_json_arguments(bool value)
 
 // optional bool disable_thinking = 17;
 inline bool ToolCallingOptions::has_disable_thinking() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00002000U);
   return value;
 }
 inline void ToolCallingOptions::clear_disable_thinking() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.disable_thinking_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
 }
 inline bool ToolCallingOptions::disable_thinking() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingOptions.disable_thinking)
@@ -9388,7 +9436,7 @@ inline bool ToolCallingOptions::disable_thinking() const {
 }
 inline void ToolCallingOptions::set_disable_thinking(bool value) {
   _internal_set_disable_thinking(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingOptions.disable_thinking)
 }
 inline bool ToolCallingOptions::_internal_disable_thinking() const {
@@ -12648,6 +12696,30 @@ inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
 ToolCallingSessionCreateRequest::_internal_mutable_history() {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return &_impl_.history_;
+}
+
+// bool parallel_tool_calls = 20;
+inline void ToolCallingSessionCreateRequest::clear_parallel_tool_calls() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.parallel_tool_calls_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
+}
+inline bool ToolCallingSessionCreateRequest::parallel_tool_calls() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.parallel_tool_calls)
+  return _internal_parallel_tool_calls();
+}
+inline void ToolCallingSessionCreateRequest::set_parallel_tool_calls(bool value) {
+  _internal_set_parallel_tool_calls(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.parallel_tool_calls)
+}
+inline bool ToolCallingSessionCreateRequest::_internal_parallel_tool_calls() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.parallel_tool_calls_;
+}
+inline void ToolCallingSessionCreateRequest::_internal_set_parallel_tool_calls(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.parallel_tool_calls_ = value;
 }
 
 // -------------------------------------------------------------------

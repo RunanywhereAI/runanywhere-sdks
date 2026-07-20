@@ -1921,18 +1921,50 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     const bool has_tool_call = parsed.has_tool_call == RAC_TRUE;
     result.set_has_tool_call(has_tool_call);
     result.set_remaining_text(parsed.clean_text ? parsed.clean_text : request.text());
-    if (has_tool_call) {
-        const int64_t call_number = parsed.call_id != 0 ? parsed.call_id : next_tool_call_id();
+
+    const auto append_parsed_call = [&result, &request](const rac_tool_call_t& call) {
+        const int64_t call_number = call.call_id != 0 ? call.call_id : next_tool_call_id();
         const int64_t created_at_ms = static_cast<int64_t>(std::time(nullptr)) * 1000;
         std::string call_id = "call_";
         call_id += std::to_string(call_number);
         auto* tool_call = result.add_tool_calls();
         tool_call->set_id(call_id);
-        tool_call->set_name(parsed.tool_name ? parsed.tool_name : "");
-        tool_call->set_arguments_json(parsed.arguments_json ? parsed.arguments_json : "{}");
+        tool_call->set_name(call.tool_name ? call.tool_name : "");
+        tool_call->set_arguments_json(call.arguments_json ? call.arguments_json : "{}");
         tool_call->set_type("function");
         tool_call->set_created_at_ms(created_at_ms);
         tool_call->set_raw_text(request.text());
+    };
+
+    if (has_tool_call) {
+        append_parsed_call(parsed);
+
+        // parallel_tool_calls: one model turn may emit several envelopes.
+        // The C parser extracts one envelope per invocation, so re-parse the
+        // clean text it hands back until no envelope remains. Only the caller
+        // that opted in pays this cost; the default path stays single-parse.
+        if (request.has_options() && request.options().parallel_tool_calls()) {
+            std::string remainder = parsed.clean_text ? parsed.clean_text : "";
+            while (!remainder.empty()) {
+                rac_tool_call_t next{};
+                const rac_result_t next_rc =
+                    use_explicit_format
+                        ? rac_tool_call_parse_with_format(
+                              remainder.c_str(),
+                              rac_tool_call_format_from_name(
+                                  tool_format_key_from_proto(request.options().format())),
+                              &next)
+                        : rac_tool_call_parse(remainder.c_str(), &next);
+                if (next_rc != RAC_SUCCESS || next.has_tool_call != RAC_TRUE) {
+                    rac_tool_call_free(&next);
+                    break;
+                }
+                append_parsed_call(next);
+                remainder = next.clean_text ? next.clean_text : "";
+                rac_tool_call_free(&next);
+            }
+            result.set_remaining_text(remainder);
+        }
     }
     result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     rac_tool_call_free(&parsed);
