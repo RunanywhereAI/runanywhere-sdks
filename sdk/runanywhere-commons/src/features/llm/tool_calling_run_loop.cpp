@@ -488,7 +488,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     // here covers every step of the loop below.
     if (ctx.format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON) {
         auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
-            ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name);
+            ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name,
+            ctx.parallel_tool_calls);
         ctx.generation.grammar_gbnf = std::move(grammar.gbnf);
         ctx.generation.grammar_qhexrt = std::move(grammar.qhexrt);
     }

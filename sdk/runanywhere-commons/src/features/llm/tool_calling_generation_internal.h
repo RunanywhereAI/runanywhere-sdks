@@ -99,6 +99,18 @@ inline GenerationState generation_for_tool_step(const GenerationState& base, uin
                                                 runanywhere::v1::ToolChoiceMode tool_choice,
                                                 runanywhere::v1::ToolCallFormatName format) {
     GenerationState step = base;
+    // TC-1: the tool-call grammar built in run_loop_impl constrains the
+    // model's FIRST decision — "you must emit a valid tool call now" for
+    // REQUIRED/SPECIFIC. It must not follow the loop into later turns: once
+    // that call has run and the model is synthesizing (or optionally
+    // deciding whether to call again), forcing the same tool-call-only
+    // grammar would make it impossible to ever produce the final natural-
+    // language answer. Base carries the grammar for iteration 1 only; every
+    // later step decodes unconstrained.
+    if (iteration > 1) {
+        step.grammar_gbnf.clear();
+        step.grammar_qhexrt.clear();
+    }
     const bool forced_decision = iteration == 1 && has_tool_choice &&
                                  tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
     if (!forced_decision) {
