@@ -179,7 +179,7 @@ if [ "${SHOW_FULL}" = true ]; then
     echo "  1. Start the dev server:"
     echo "     cd ${WEB_APP_DIR} && npm run dev"
     echo ""
-    echo "  2. Open http://localhost:5173 in a browser"
+    echo "  2. Open http://localhost:3000 in a browser"
     echo ""
     echo "  3. Follow the test steps in web-sdk-test-suite.md"
     echo "     Categories include:"
@@ -225,7 +225,7 @@ print_step "Waiting for server..."
 MAX_WAIT=30
 WAITED=0
 while [ "${WAITED}" -lt "${MAX_WAIT}" ]; do
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:5173" 2>/dev/null | grep -q "200"; then
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" 2>/dev/null | grep -q "200"; then
         break
     fi
     sleep 1
@@ -236,12 +236,12 @@ if [ "${WAITED}" -ge "${MAX_WAIT}" ]; then
     print_error "Dev server did not start within ${MAX_WAIT}s"
     exit 1
 fi
-print_ok "Dev server ready (http://localhost:5173)"
+print_ok "Dev server ready (http://localhost:3000)"
 
 # Smoke test 1: Page loads with 200
 echo ""
 echo -n "  App loads (HTTP 200)... "
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:5173" 2>/dev/null)
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000" 2>/dev/null)
 if [ "${STATUS}" = "200" ]; then
     echo -e "${GREEN}PASS${NC}"
     PASSED=$((PASSED + 1))
@@ -252,7 +252,7 @@ fi
 
 # Smoke test 2: HTML contains expected app shell
 echo -n "  App shell renders... "
-PAGE=$(curl -s "http://localhost:5173" 2>/dev/null)
+PAGE=$(curl -s "http://localhost:3000" 2>/dev/null)
 if echo "${PAGE}" | grep -q "RunAnywhere\|runanywhere\|<div id=" > /dev/null 2>&1; then
     echo -e "${GREEN}PASS${NC}"
     PASSED=$((PASSED + 1))

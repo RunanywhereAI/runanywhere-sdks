@@ -64,7 +64,7 @@ missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
 npm run lint
 npm run typecheck
 npm run build
-npm run dev -- --host 127.0.0.1
+npm run dev   # http://localhost:3000 (COOP/COEP enabled)
 ```
 
 Production Vercel releases use `npm run release:deploy`. No Vercel secrets,

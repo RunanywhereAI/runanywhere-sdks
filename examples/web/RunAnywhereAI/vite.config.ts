@@ -134,6 +134,9 @@ export default defineConfig(({ command }) => {
       alias: useInstalledSDK ? [] : localSDKSourceAliases,
     },
     server: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
       headers: isolationHeaders,
       cors: false,
       fs: {
@@ -143,6 +146,9 @@ export default defineConfig(({ command }) => {
       },
     },
     preview: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
       headers: isolationHeaders,
       cors: false,
     },
