@@ -39,9 +39,39 @@ test('module exports exactly the public surface', () => {
     'isRemoteSource',
     'modelStatus',
     'modelsRoot',
+    'parseHfUrl',
     'pathExists',
     'resolveModel',
   ]);
+});
+
+// --- parseHfUrl(): HuggingFace web URLs route to repo resolution --------------
+
+test('parseHfUrl maps a HuggingFace repo page URL to its repo', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF'), {
+    repo: 'bartowski/Qwen2.5-0.5B-Instruct-GGUF',
+  });
+});
+
+test('parseHfUrl handles /tree/ and trailing slashes + a models/ prefix', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/tree/main'), { repo: 'owner/repo' });
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/'), { repo: 'owner/repo' });
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/models/owner/repo'), { repo: 'owner/repo' });
+});
+
+test('parseHfUrl maps a /blob/ file URL to repo + explicit file', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/sub/model-Q4_K_M.gguf'), {
+    repo: 'owner/repo',
+    file: 'sub/model-Q4_K_M.gguf',
+  });
+});
+
+test('parseHfUrl returns null for a /resolve/ (direct-download) URL and non-HF URLs', () => {
+  // /resolve/ is already a raw file URL — keep it a direct download.
+  assert.equal(download.parseHfUrl('https://huggingface.co/owner/repo/resolve/main/model.gguf'), null);
+  assert.equal(download.parseHfUrl('https://example.com/models/model.gguf'), null);
+  assert.equal(download.parseHfUrl('owner/repo'), null); // not a URL
+  assert.equal(download.parseHfUrl('https://huggingface.co/owner'), null); // no repo segment
 });
 
 // --- isRemoteSource() (pure classifier; no network) --------------------------
