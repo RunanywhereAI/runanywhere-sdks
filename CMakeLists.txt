@@ -351,6 +351,35 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
     endif()
+    # Reranking primitive (RAC_PRIMITIVE_RERANK, ABI v8) contract test. Backend-
+    # neutral: it registers an in-test fake rerank engine, so it needs only
+    # rac_commons + the protobuf runtime (no llama.cpp / ONNX linkage).
+    if(RAC_PROTOBUF_RUNTIME_ENABLED AND TARGET rac_commons AND NOT TARGET test_rerank)
+        add_executable(test_rerank
+            sdk/runanywhere-commons/tests/test_rerank.cpp)
+        target_include_directories(test_rerank PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_rerank PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_link_libraries(test_rerank PRIVATE rac_commons)
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_rerank PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_rerank PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_rerank PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_rerank)
+        endif()
+        target_compile_features(test_rerank PRIVATE cxx_std_20)
+        add_test(NAME rerank_tests COMMAND test_rerank)
+        set_tests_properties(rerank_tests PROPERTIES LABELS "native;rerank")
+    endif()
     # The ONNX engine is configured after commons/tests. Keep this plugin-entry
     # contract gate alive in both RAG modes: segmentation is unconditional,
     # while embeddings are intentionally compiled only when RAG is enabled.

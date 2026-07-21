@@ -95,6 +95,8 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
             return RAC_PRIMITIVE_DIARIZE;
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
             return RAC_PRIMITIVE_SEGMENT;
+        case runanywhere::v1::SDK_COMPONENT_RERANK:
+            return RAC_PRIMITIVE_RERANK;
         default:
             return RAC_PRIMITIVE_UNSPECIFIED;
     }

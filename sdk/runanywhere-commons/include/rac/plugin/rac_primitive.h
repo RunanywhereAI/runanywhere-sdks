@@ -43,11 +43,14 @@ typedef enum rac_primitive {
     RAC_PRIMITIVE_DIFFUSION = 8, /**< Text-to-Image / Image-to-Image diffusion. */
     RAC_PRIMITIVE_DIARIZE = 9,   /**< Standalone speaker diarization. */
     RAC_PRIMITIVE_SEGMENT = 10,  /**< Semantic image segmentation. */
+    RAC_PRIMITIVE_RERANK = 11,   /**< Cross-encoder relevance reranking (query × candidates).
+                                  * NOTE: this is wire value 11, NOT the retired wire value 6
+                                  * (the original RERANK slot). Value 6 stays permanently
+                                  * retired to keep the values above wire-stable. */
 
     /* Reserved primitive slots — added to prevent struct re-layout when new
      * primitives land. Bump RAC_PLUGIN_API_VERSION when promoting any of
      * these. */
-    RAC_PRIMITIVE_RESERVED_11 = 11,
     RAC_PRIMITIVE_RESERVED_12 = 12,
     RAC_PRIMITIVE_RESERVED_13 = 13,
     RAC_PRIMITIVE_RESERVED_14 = 14,

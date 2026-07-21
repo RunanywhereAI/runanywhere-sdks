@@ -88,8 +88,14 @@ extern "C" {
  *                 and wire/slot 10 to semantic segmentation
  *                 (`RAC_PRIMITIVE_SEGMENT` / `segmentation_ops`). Engines
  *                 compiled against v6 are rejected until rebuilt.
+ *   8u — revived reranking as a first-class primitive: promoted reserved
+ *                 primitive wire value 11 to `RAC_PRIMITIVE_RERANK` and
+ *                 renamed vtable reserved_slot_2 → `rerank_ops` (same binary
+ *                 offset). This is wire value 11, NOT the original rerank
+ *                 wire value 6, which stays permanently retired. Engines
+ *                 compiled against v7 are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 7u
+#define RAC_PLUGIN_API_VERSION 8u
 
 /* ===========================================================================
  * Plugin entry-point signature

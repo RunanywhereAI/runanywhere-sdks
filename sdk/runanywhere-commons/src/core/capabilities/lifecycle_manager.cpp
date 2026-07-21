@@ -113,6 +113,8 @@ SDKComponent component_for_resource_type(rac_resource_type_t type) {
             return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
         case RAC_RESOURCE_TYPE_SEGMENTATION_MODEL:
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+        case RAC_RESOURCE_TYPE_RERANK_MODEL:
+            return runanywhere::v1::SDK_COMPONENT_RERANK;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -1034,6 +1036,8 @@ const char* rac_resource_type_name(rac_resource_type_t type) {
             return "embeddingsModel";
         case RAC_RESOURCE_TYPE_SEGMENTATION_MODEL:
             return "segmentationModel";
+        case RAC_RESOURCE_TYPE_RERANK_MODEL:
+            return "rerankModel";
         default:
             return "unknown";
     }

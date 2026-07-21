@@ -27,8 +27,10 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 
-// ABI v7 promotes two pointers from the existing reserve without changing the
-// 17-pointer primitive/reserve tail or the total vtable size.
+// ABI v7 promoted two pointers (diarization + segmentation) and v8 promoted a
+// third (rerank_ops, from reserved_slot_2) — all from the existing reserve,
+// without changing the 17-pointer primitive/reserve tail or the total vtable
+// size.
 static_assert((sizeof(rac_engine_vtable_t) - offsetof(rac_engine_vtable_t, llm_ops)) /
                   sizeof(void*) ==
               17);
@@ -36,8 +38,10 @@ static_assert(offsetof(rac_engine_vtable_t, diarization_ops) ==
               offsetof(rac_engine_vtable_t, diffusion_ops) + sizeof(void*));
 static_assert(offsetof(rac_engine_vtable_t, segmentation_ops) ==
               offsetof(rac_engine_vtable_t, diarization_ops) + sizeof(void*));
-static_assert(offsetof(rac_engine_vtable_t, reserved_slot_2) ==
+static_assert(offsetof(rac_engine_vtable_t, rerank_ops) ==
               offsetof(rac_engine_vtable_t, segmentation_ops) + sizeof(void*));
+static_assert(offsetof(rac_engine_vtable_t, reserved_slot_3) ==
+              offsetof(rac_engine_vtable_t, rerank_ops) + sizeof(void*));
 
 static_assert(RAC_MODEL_FORMAT_ID_UNSPECIFIED ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_UNSPECIFIED));

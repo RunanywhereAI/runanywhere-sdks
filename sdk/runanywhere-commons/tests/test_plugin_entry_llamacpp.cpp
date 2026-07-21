@@ -19,6 +19,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/rerank/rac_rerank_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry_llamacpp.h"
@@ -57,6 +58,14 @@ int main() {
         std::fprintf(stderr, "vlm_ops is NULL — VLM primitive not served\n");
         return 1;
     }
+    // Reranking (rank-pooling GGUFs) is served as a modality of llama.cpp
+    // (RAC_PRIMITIVE_RERANK, revived in plugin ABI v8).
+    if (vt->rerank_ops == nullptr || vt->rerank_ops->create == nullptr ||
+        vt->rerank_ops->initialize == nullptr || vt->rerank_ops->rerank == nullptr ||
+        vt->rerank_ops->cleanup == nullptr || vt->rerank_ops->destroy == nullptr) {
+        std::fprintf(stderr, "llama.cpp rerank ops are incomplete\n");
+        return 1;
+    }
 
     rac_result_t rc = rac_plugin_register(vt);
     if (rc != RAC_SUCCESS) {
@@ -67,15 +76,21 @@ int main() {
         std::fprintf(stderr, "rac_plugin_find did not return llama.cpp vtable\n");
         return 1;
     }
-    if (rac_plugin_find(RAC_PRIMITIVE_EMBED) != vt || rac_plugin_find(RAC_PRIMITIVE_VLM) != vt) {
-        std::fprintf(stderr, "llama.cpp embedding/VLM registry routing failed\n");
+    if (rac_plugin_find(RAC_PRIMITIVE_EMBED) != vt || rac_plugin_find(RAC_PRIMITIVE_VLM) != vt ||
+        rac_plugin_find(RAC_PRIMITIVE_RERANK) != vt) {
+        std::fprintf(stderr, "llama.cpp embedding/VLM/rerank registry routing failed\n");
+        return 1;
+    }
+    if (rac_engine_vtable_slot(vt, RAC_PRIMITIVE_RERANK) != vt->rerank_ops) {
+        std::fprintf(stderr, "rac_engine_vtable_slot did not resolve rerank_ops\n");
         return 1;
     }
     const rac_engine_manifest_t* manifest = rac_engine_manifest_find("llamacpp");
     if (manifest == nullptr || manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
-        manifest->primitives_count != 3 || manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT ||
+        manifest->primitives_count != 4 || manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT ||
         manifest->primitives[1] != RAC_PRIMITIVE_EMBED ||
-        manifest->primitives[2] != RAC_PRIMITIVE_VLM) {
+        manifest->primitives[2] != RAC_PRIMITIVE_VLM ||
+        manifest->primitives[3] != RAC_PRIMITIVE_RERANK) {
         std::fprintf(stderr, "llama.cpp manifest was not published correctly\n");
         return 1;
     }

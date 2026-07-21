@@ -74,6 +74,7 @@ export enum SDKComponent {
   SDK_COMPONENT_WAKEWORD = 10,
   SDK_COMPONENT_SPEAKER_DIARIZATION = 11,
   SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12,
+  SDK_COMPONENT_RERANK = 13,
   UNRECOGNIZED = -1,
 }
 
@@ -118,6 +119,9 @@ export function sDKComponentFromJSON(object: any): SDKComponent {
     case 12:
     case "SDK_COMPONENT_SEMANTIC_SEGMENTATION":
       return SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+    case 13:
+    case "SDK_COMPONENT_RERANK":
+      return SDKComponent.SDK_COMPONENT_RERANK;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -153,6 +157,8 @@ export function sDKComponentToJSON(object: SDKComponent): string {
       return "SDK_COMPONENT_SPEAKER_DIARIZATION";
     case SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION:
       return "SDK_COMPONENT_SEMANTIC_SEGMENTATION";
+    case SDKComponent.SDK_COMPONENT_RERANK:
+      return "SDK_COMPONENT_RERANK";
     case SDKComponent.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

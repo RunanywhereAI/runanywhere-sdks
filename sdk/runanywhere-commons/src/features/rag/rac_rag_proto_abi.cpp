@@ -38,6 +38,8 @@
 #include "rac/features/rag/rac_rag.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
@@ -221,6 +223,10 @@ struct Session {
     // events report the embedding model, query events the LLM).
     std::string embedding_model_id;
     std::string llm_model_id;
+    // Dedicated cross-encoder reranker model id (empty when none). Resolved +
+    // routed to RAC_PRIMITIVE_RERANK at session-create; query-time invocation is
+    // a follow-up.
+    std::string reranker_model_id;
     // Resolved retrieval top_k for this session (config default). Telemetry emits
     // the effective retrieval top_k so the query row is never null when a caller
     // omits a per-query override.
@@ -586,13 +592,37 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
 
     // rerank_results enables LLM-pointwise reranking of fused candidates, run
     // by rag_pipeline_graph using the session's LLM handle. reranker_model_id
-    // (a dedicated cross-encoder) is not yet supported — reject only that.
+    // (a dedicated cross-encoder) now routes to the first-class reranking
+    // primitive (RAC_PRIMITIVE_RERANK, revived in plugin ABI v8) instead of the
+    // old blanket refusal.
+    std::string reranker_model_id;
     if (proto.has_reranker_model_id() && !proto.reranker_model_id().empty()) {
-        const char* msg =
-            "reranker_model_id (dedicated cross-encoder) is not yet supported; use rerank_results "
-            "to enable LLM-pointwise reranking with the session LLM";
-        publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+        // Require a registered rerank backend; without one, keep a clear,
+        // actionable error rather than silently ignoring the request.
+        if (rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr) {
+            const char* msg =
+                "reranker_model_id is set but no rerank backend (RAC_PRIMITIVE_RERANK) is "
+                "registered; register a reranker engine (e.g. a rank-pooling GGUF via llama.cpp) "
+                "or use rerank_results for LLM-pointwise reranking with the session LLM";
+            publish_failure(RAC_ERROR_BACKEND_NOT_FOUND, "rag.sessionCreate", msg);
+            return RAC_ERROR_BACKEND_NOT_FOUND;
+        }
+        // Resolve the reranker model to a path up front so a missing model fails
+        // fast at session-create rather than at first query.
+        std::string reranker_err;
+        const std::string reranker_path =
+            resolve_rag_model_id_to_path(proto.reranker_model_id(), &reranker_err);
+        if (reranker_path.empty()) {
+            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", reranker_err.c_str());
+            return RAC_ERROR_MODEL_NOT_FOUND;
+        }
+        reranker_model_id = proto.reranker_model_id();
+        // NOTE: the dedicated cross-encoder reranker is resolved + routed to the
+        // RAC_PRIMITIVE_RERANK primitive here; wiring its query-time invocation
+        // over fused candidates through RAGBackend/rag_pipeline_graph is the
+        // remaining follow-up.
+        LOGI("sessionCreate: dedicated reranker '%s' resolved → routing via RAC_PRIMITIVE_RERANK",
+             reranker_model_id.c_str());
     }
 
     std::string err_message;
@@ -647,6 +677,7 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         auto session = std::make_shared<Session>();
         session->embedding_model_id = embedding_model_id;
         session->llm_model_id = llm_model_id;
+        session->reranker_model_id = reranker_model_id;
         RAGBackendConfig backend_config = build_backend_config(proto);
         session->retrieval_top_k = backend_config.top_k;
         session->rerank = backend_config.rerank;

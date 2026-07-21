@@ -73,8 +73,9 @@ State& state() {
 
 /** Which primitive slots (in declaration order) the vtable fills.
  *  Generated from RAC_PRIMITIVE_TABLE (rac_engine_vtable.h) — the single
- *  source of truth for the primitive↔slot mapping. RERANK is absent from the
- *  table, so it is never reported as served. */
+ *  source of truth for the primitive↔slot mapping. The retired wire value 6 is
+ *  absent from the table, so it is never reported as served; the revived
+ *  RERANK (wire value 11) is a live table row. */
 void each_served_primitive(const rac_engine_vtable_t* v,
                            const std::function<void(rac_primitive_t)>& fn) {
 #define X(ENUM, FIELD, NAME) \
@@ -223,9 +224,9 @@ rac_result_t rac_engine_manifest_validate_vtable(const rac_engine_manifest_t* ma
     /* A declared manifest primitive is valid iff it is a live routable
      * primitive (a RAC_PRIMITIVE_TABLE row) whose vtable slot is non-null.
      * `rac_engine_vtable_slot` returns NULL for everything absent from the
-     * table — RERANK, the reserved slots, UNSPECIFIED, and out-of-range
-     * values — so this single check also rejects them, with no magic range
-     * bound to keep in sync. */
+     * table — the reserved slots, UNSPECIFIED, the retired wire value 6, and
+     * out-of-range values — so this single check also rejects them, with no
+     * magic range bound to keep in sync. */
     for (size_t i = 0; i < manifest->primitives_count; ++i) {
         rac_primitive_t primitive = manifest->primitives[i];
         if (rac_engine_vtable_slot(vtable, primitive) == nullptr) {
@@ -234,8 +235,8 @@ rac_result_t rac_engine_manifest_validate_vtable(const rac_engine_manifest_t* ma
     }
 
     /* Every non-null routable slot the vtable fills must be declared in the
-     * manifest. Iterate the table directly so RERANK / reserved slots are
-     * excluded by construction. */
+     * manifest. Iterate the table directly so reserved slots are excluded by
+     * construction. */
 #define X(ENUM, FIELD, NAME)                               \
     if (rac_engine_vtable_slot(vtable, ENUM) != nullptr && \
         !manifest_declares_primitive(manifest, ENUM)) {    \
@@ -737,9 +738,9 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_
     if (vt == nullptr)
         return nullptr;
     /* Cases generated from RAC_PRIMITIVE_TABLE (rac_engine_vtable.h). The
-     * `default` covers everything absent from the table — RERANK (dormant),
-     * the reserved slots, and UNSPECIFIED — all of which are non-routable and
-     * return NULL. */
+     * `default` covers everything absent from the table — the retired wire
+     * value 6, the reserved slots, and UNSPECIFIED — all of which are
+     * non-routable and return NULL. */
     switch (primitive) {
 #define X(ENUM, FIELD, NAME) \
     case ENUM:               \

@@ -3,9 +3,10 @@
  * @brief Unified-ABI entry point for the llama.cpp engine.
  *
  * Exposes `rac_plugin_entry_llamacpp()` returning a `const
- * rac_engine_vtable_t*` with `llm_ops`, `embedding_ops`, and `vlm_ops` filled —
- * llama.cpp is one engine that supports text generation, text embeddings, and
- * vision-language inference as modalities of the same backend.
+ * rac_engine_vtable_t*` with `llm_ops`, `embedding_ops`, `vlm_ops`, and
+ * `rerank_ops` filled — llama.cpp is one engine that supports text generation,
+ * text embeddings, vision-language inference, and cross-encoder reranking
+ * (rank-pooling GGUFs) as modalities of the same backend.
  *
  * Per the v3 ABI principle ("each backend publishes a single
  * `rac_engine_vtable_t`"), this is the SOLE llama.cpp plugin entry. The
@@ -24,6 +25,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/rerank/rac_rerank_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -37,6 +39,8 @@ extern const rac_llm_service_ops_t g_llamacpp_ops;
 extern const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops;
 /* Defined in rac_llamacpp_vlm_ops.cpp. */
 extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
+/* Defined in rac_rerank_llamacpp.cpp. */
+extern const rac_rerank_service_ops_t g_llamacpp_rerank_ops;
 
 rac_result_t rac_llamacpp_cpu_runtime_register(void);
 void rac_llamacpp_cpu_runtime_unregister(void);
@@ -102,11 +106,13 @@ static const uint32_t k_llamacpp_formats[] = {
     RAC_MODEL_FORMAT_ID_BIN,
 };
 
-/* This single plugin serves text generation, embeddings, and VLM primitives. */
+/* This single plugin serves text generation, embeddings, VLM, and reranking
+ * (rank-pooling GGUFs) primitives. */
 static const rac_primitive_t k_llamacpp_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT,
     RAC_PRIMITIVE_EMBED,
     RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_RERANK,
 };
 
 static const rac_engine_manifest_t k_llamacpp_manifest = {
@@ -147,9 +153,9 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* diffusion_ops    */ nullptr,
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
+    /* rerank_ops       */ &g_llamacpp_rerank_ops,
 
-    /* reserved_slot_2..9 */
-    nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,

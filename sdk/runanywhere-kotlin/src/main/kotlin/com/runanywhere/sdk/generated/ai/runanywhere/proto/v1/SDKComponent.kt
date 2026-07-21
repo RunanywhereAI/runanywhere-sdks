@@ -56,6 +56,7 @@ public enum class SDKComponent(
   SDK_COMPONENT_WAKEWORD(10),
   SDK_COMPONENT_SPEAKER_DIARIZATION(11),
   SDK_COMPONENT_SEMANTIC_SEGMENTATION(12),
+  SDK_COMPONENT_RERANK(13),
   ;
 
   public companion object {
@@ -83,6 +84,7 @@ public enum class SDKComponent(
       10 -> SDK_COMPONENT_WAKEWORD
       11 -> SDK_COMPONENT_SPEAKER_DIARIZATION
       12 -> SDK_COMPONENT_SEMANTIC_SEGMENTATION
+      13 -> SDK_COMPONENT_RERANK
       else -> null
     }
   }
