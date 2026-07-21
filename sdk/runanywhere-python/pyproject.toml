@@ -35,6 +35,13 @@ cmake.args = [
     "-DRAC_BUILD_SHARED=OFF",
     "-DRAC_BUILD_PLATFORM=OFF",
 ]
+# Optional accelerator/engine backends are additive build-flag opt-ins (native/CMakeLists.txt
+# links + registers whatever rac_backend_<x> targets a build produces). Enable per build via
+# scikit-build config-settings, e.g.:
+#   GPU (NVIDIA):  pip install . --config-settings=cmake.define.RAC_GPU_CUDA=ON
+#   Hexagon NPU:   pip install . -C cmake.define.RAC_BACKEND_QHEXRT=ON -C cmake.define.QHEXRT_ROOT=<prebuilt tree>
+# (QHexRT requires its prebuilt archive for the target arch under QHEXRT_ROOT; on a supported
+#  NPU host it self-registers at priority 150 and load_llm/etc. auto-route to it.)
 build.targets = ["runanywhere_core"]
 # Install ONLY our module's component (native/CMakeLists tags it `python_module`), so the
 # transitive commons/llama/zlib install rules (headers, static .libs, cmake, docs) stay out
