@@ -97,6 +97,8 @@ std::vector<rac_primitive_t> primitives_for_component(runanywhere::v1::SDKCompon
             return {RAC_PRIMITIVE_DIFFUSION};
         case runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION:
             return {RAC_PRIMITIVE_DIARIZE};
+        case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
+            return {RAC_PRIMITIVE_SEGMENT};
         case runanywhere::v1::SDK_COMPONENT_VOICE_AGENT:
             return {RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE, RAC_PRIMITIVE_SYNTHESIZE,
                     RAC_PRIMITIVE_DETECT_VOICE};

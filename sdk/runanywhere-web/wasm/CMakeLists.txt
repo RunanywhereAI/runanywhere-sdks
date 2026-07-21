@@ -868,6 +868,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_embed_batch_lifecycle_proto"
     "_rac_embeddings_result_free"
 
+    # Lifecycle-owned semantic segmentation. The symbol is in commons; the
+    # ONNX bundle claims the capability and supplies the provider at runtime.
+    "_rac_segmentation_segment_lifecycle_proto"
+
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
     # library folds into rac_commons). When RAC_BACKEND_RAG=ON these exports
@@ -1033,6 +1037,11 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
 )
 
 set(RAC_EXPORTED_FUNCTIONS_ONNX
+    # Browser-only explicit license acknowledgement for restricted models.
+    # ONNX.register({ acceptNvidiaSegformerNoncommercialLicense: true })
+    # calls setenv before the first SegFormer load; the native provider still
+    # owns the fail-closed getenv check used by every platform.
+    "_setenv"
     # Lifecycle-owned STT. These handle-less exports resolve the model loaded
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
     "_rac_stt_transcribe_lifecycle_proto"

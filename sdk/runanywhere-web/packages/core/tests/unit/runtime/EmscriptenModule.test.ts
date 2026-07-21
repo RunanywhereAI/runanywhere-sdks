@@ -215,4 +215,17 @@ describe('Emscripten module capability wiring', () => {
     expect(getModuleForCapability('embedding')).toBeNull();
     expect(getModuleForFramework('onnx')).toBeNull();
   });
+
+  it('routes semantic segmentation to the ONNX capability owner', () => {
+    const onnx = fakeModule();
+    onnx._rac_segmentation_segment_lifecycle_proto = () => 0;
+
+    registerWasmModule(['segmentation'], onnx, ['onnx']);
+
+    expect(getModuleForCapability('segmentation')).toBe(onnx);
+    expect(getModuleForFramework('onnx')).toBe(onnx);
+
+    unregisterWasmModule(onnx);
+    expect(getModuleForCapability('segmentation')).toBeNull();
+  });
 });

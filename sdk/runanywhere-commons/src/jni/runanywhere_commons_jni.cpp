@@ -77,6 +77,7 @@
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/platform/rac_llm_platform.h"
 #include "rac/features/platform/rac_tts_platform.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_stream.h"
@@ -5716,6 +5717,20 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateLif
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_diffusion_generate_lifecycle_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSegmentationSegmentLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc =
+        rac_segmentation_segment_lifecycle_proto(request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racSegmentationSegmentLifecycleProto");
 }
 
 JNIEXPORT jbyteArray JNICALL

@@ -55,6 +55,7 @@ public enum class SDKComponent(
   SDK_COMPONENT_VOICE_AGENT(9),
   SDK_COMPONENT_WAKEWORD(10),
   SDK_COMPONENT_SPEAKER_DIARIZATION(11),
+  SDK_COMPONENT_SEMANTIC_SEGMENTATION(12),
   ;
 
   public companion object {
@@ -81,6 +82,7 @@ public enum class SDKComponent(
       9 -> SDK_COMPONENT_VOICE_AGENT
       10 -> SDK_COMPONENT_WAKEWORD
       11 -> SDK_COMPONENT_SPEAKER_DIARIZATION
+      12 -> SDK_COMPONENT_SEMANTIC_SEGMENTATION
       else -> null
     }
   }

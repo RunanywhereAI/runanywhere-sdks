@@ -94,6 +94,16 @@ export type {
   EmbeddingsRequest,
   EmbeddingsResult,
 } from './Public/Extensions/RunAnywhere+Embeddings.js';
+export {
+  SegmentationPixelFormat,
+} from './Public/Extensions/RunAnywhere+Segmentation.js';
+export type {
+  SegmentationClassSummary,
+  SegmentationImage,
+  SegmentationOptions,
+  SegmentationRequest,
+  SegmentationResult,
+} from './Public/Extensions/RunAnywhere+Segmentation.js';
 export type {
   RegisterModelFile,
   RegisterModelOptions,

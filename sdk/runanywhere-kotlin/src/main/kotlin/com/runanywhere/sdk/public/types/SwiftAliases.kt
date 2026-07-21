@@ -58,6 +58,14 @@ public typealias RADiffusionGenerationRequest = ai.runanywhere.proto.v1.Diffusio
 public typealias RADiffusionResult = ai.runanywhere.proto.v1.DiffusionResult
 public typealias RADiffusionMode = ai.runanywhere.proto.v1.DiffusionMode
 
+// Semantic Segmentation
+public typealias RASegmentationPixelFormat = ai.runanywhere.proto.v1.SegmentationPixelFormat
+public typealias RASegmentationImage = ai.runanywhere.proto.v1.SegmentationImage
+public typealias RASegmentationOptions = ai.runanywhere.proto.v1.SegmentationOptions
+public typealias RASegmentationRequest = ai.runanywhere.proto.v1.SegmentationRequest
+public typealias RASegmentationClassSummary = ai.runanywhere.proto.v1.SegmentationClassSummary
+public typealias RASegmentationResult = ai.runanywhere.proto.v1.SegmentationResult
+
 // ─── RAG ────────────────────────────────────────────────────────────────────
 
 public typealias RARAGConfiguration = ai.runanywhere.proto.v1.RAGConfiguration

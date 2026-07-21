@@ -2,9 +2,10 @@
 #define RAC_FEATURES_RAC_NONLLM_LIFECYCLE_BRIDGE_H
 
 #include "rac/core/rac_error.h"
-#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diarization/rac_diarization_service.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
@@ -59,6 +60,14 @@ struct LifecycleDiarizationRef {
     void* opaque = nullptr;
 };
 
+struct LifecycleSegmentationRef {
+    const rac_segmentation_service_ops_t* ops = nullptr;
+    void* impl = nullptr;
+    const char* model_id = nullptr;
+    const char* framework_name = nullptr;
+    void* opaque = nullptr;
+};
+
 rac_result_t acquire_lifecycle_stt(LifecycleSttRef* out_ref);
 void release_lifecycle_stt(LifecycleSttRef* ref);
 
@@ -76,6 +85,9 @@ void release_lifecycle_diffusion(LifecycleDiffusionRef* ref);
 
 rac_result_t acquire_lifecycle_diarization(LifecycleDiarizationRef* out_ref);
 void release_lifecycle_diarization(LifecycleDiarizationRef* ref);
+
+rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref);
+void release_lifecycle_segmentation(LifecycleSegmentationRef* ref);
 
 }  // namespace rac::lifecycle
 

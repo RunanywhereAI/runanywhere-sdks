@@ -79,6 +79,9 @@
 // Standalone Speaker Diarization
 #include "rac_diarization.h"
 
+// Semantic Image Segmentation
+#include "rac_segmentation.h"
+
 // VLM (Vision Language Model)
 #include "rac_vlm.h"
 #include "rac_vlm_component.h"

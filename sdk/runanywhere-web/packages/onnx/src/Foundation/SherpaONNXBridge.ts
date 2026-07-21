@@ -51,6 +51,8 @@ import type {
 } from '@runanywhere/web/backend';
 
 const logger = new SDKLogger('SherpaONNXBridge');
+const NVIDIA_SEGFORMER_LICENSE_ENV =
+  'RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE';
 
 /**
  * Subset of the Emscripten module surface touched directly by the ONNX bridge.
@@ -140,6 +142,34 @@ export class SherpaONNXBridge {
 
   get isBackendRegistered(): boolean {
     return this._onnxBackendRegistered && this._sherpaBackendRegistered;
+  }
+
+  /**
+   * Set the native provider's fail-closed license acknowledgement inside
+   * this Emscripten process. The caller-facing boolean lives on
+   * `ONNX.register(...)`; keeping the actual `setenv` here ensures it is
+   * applied to the same private WASM instance that owns SegFormer inference.
+   */
+  acceptNvidiaSegformerNoncommercialLicense(): void {
+    const module = this._module;
+    if (!module || typeof module.ccall !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'The ONNX WASM module cannot record the SegFormer license acknowledgement.',
+      );
+    }
+    const rc = module.ccall(
+      'setenv',
+      'number',
+      ['string', 'string', 'number'],
+      [NVIDIA_SEGFORMER_LICENSE_ENV, '1', 1],
+    );
+    if (rc !== 0) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `Failed to record the SegFormer license acknowledgement (setenv returned ${String(rc)}).`,
+      );
+    }
   }
 
   /** Acquire/load the commons module and register the ONNX backend vtable. */
@@ -266,7 +296,7 @@ export class SherpaONNXBridge {
       this._bridgeOwnedInit = true;
       completeNativePhase1ForModule(this._module);
 
-      // Claim speech + embedding + RAG. The dedicated racommons-onnx-sherpa
+      // Claim speech + embedding + semantic segmentation + RAG. The dedicated racommons-onnx-sherpa
       // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
       // export list — see `RAC_EXPORTED_FUNCTIONS_BASE` in
       // sdk/runanywhere-web/wasm/CMakeLists.txt) and the 6 `_rac_rag_*_proto`
@@ -282,6 +312,7 @@ export class SherpaONNXBridge {
         'vad',
         'voice-agent',
         'embedding',
+        'segmentation',
         'rag',
       ];
       registerWasmModule(capabilities, this._module, ['onnx', 'sherpa']);

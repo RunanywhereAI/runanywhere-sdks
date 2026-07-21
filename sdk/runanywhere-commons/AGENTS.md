@@ -93,7 +93,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Component Layer  (rac_*_component_*)                            │
 │  Owns lifecycle, emits analytics, exposes clean public API       │
-│  LLM | STT | TTS | VAD | VLM | Diffusion | Embeddings          │
+│  LLM | STT | TTS | VAD | VLM | Diffusion | Embed | Segment     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ rac_*_create() → rac_plugin_find() → vtable dispatch
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -113,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed) | coreml (Image/Diffusion, Apple)                  │
+│  onnx (Embed+Segment) | coreml (Image/Diffusion, Apple)          │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -128,7 +128,7 @@ Every AI capability follows the same two-layer design:
 
 **Feature-family classification** — not every capability fits one mold:
 
-- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
+- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
 - **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
@@ -146,7 +146,7 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
 | `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | backend-provided |
-| `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | backend-provided |
+| `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
 
 NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, was retired in ABI v4 and remains retired.)
 
@@ -278,7 +278,7 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **llamacpp** | LLM | GGUF | llama.cpp (FetchContent) | `rac_backend_llamacpp_register()` |
 | **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
-| **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
+| **onnx** | Segment; Embed when RAG is enabled | ONNX | `runtimes/onnxrt` Session | `rac_plugin_entry_onnx()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 

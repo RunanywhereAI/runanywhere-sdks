@@ -132,8 +132,8 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                                     │ rac_engine_vtable_t (v7)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  qhexrt     coreml/cloud    onnx
-     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed)
+      llamacpp      sherpa-onnx  qhexrt     coreml/cloud       onnx
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed,Segment)
 ```
 
 ### Key Architectural Patterns

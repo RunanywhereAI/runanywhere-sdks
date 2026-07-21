@@ -206,6 +206,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     outResult: number,
   ): number;
 
+  _rac_segmentation_segment_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
   _rac_diffusion_generate_proto?(
     handle: number,
     optionsBytes: number,
@@ -343,6 +349,7 @@ export interface ModalityCapabilitySlots {
   tts: ModalityProtoModule | null;
   vad: ModalityProtoModule | null;
   embedding: ModalityProtoModule | null;
+  segmentation: ModalityProtoModule | null;
   rag: ModalityProtoModule | null;
   diffusion: ModalityProtoModule | null;
   'structured-output': ModalityProtoModule | null;
@@ -374,6 +381,7 @@ export const adapterState = {
     tts: null,
     vad: null,
     embedding: null,
+    segmentation: null,
     rag: null,
     diffusion: null,
     'structured-output': null,

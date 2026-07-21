@@ -10,6 +10,7 @@
 #include "rac_runtime_onnxrt.h"
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
@@ -39,6 +40,7 @@ void* const volatile rac_onnxrt_runtime_anchor =
 #if defined(RAC_BACKEND_RAG)
 extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 #endif
+extern const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
     RAC_RUNTIME_ONNXRT,
@@ -52,6 +54,11 @@ static const uint32_t k_onnx_formats[] = {
 #if defined(RAC_BACKEND_RAG)
 static const rac_primitive_t k_onnx_primitives[] = {
     RAC_PRIMITIVE_EMBED,
+    RAC_PRIMITIVE_SEGMENT,
+};
+#else
+static const rac_primitive_t k_onnx_primitives[] = {
+    RAC_PRIMITIVE_SEGMENT,
 };
 #endif
 
@@ -67,13 +74,8 @@ static const rac_engine_manifest_t k_onnx_manifest = {
     .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
     .priority = 50,
     .capability_flags = 0,
-#if defined(RAC_BACKEND_RAG)
     .primitives = k_onnx_primitives,
     .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
-#else
-    .primitives = nullptr,
-    .primitives_count = 0,
-#endif
     .runtimes = k_onnx_runtimes,
     .runtimes_count = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
     .formats = k_onnx_formats,
@@ -99,7 +101,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
     /* diarization_ops  */ nullptr,
-    /* segmentation_ops */ nullptr,
+    /* segmentation_ops */ &g_onnx_segmentation_ops,
 
     /* reserved_slot_2..9 */
     nullptr,

@@ -449,6 +449,13 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDiffusionGenerateLifecycleProto(requestProto: ByteArray): ByteArray?
 
+    // SEMANTIC SEGMENTATION LIFECYCLE-PROTO ABI. The generated request carries
+    // tightly-packed RGB/RGBA/BGRA pixels and resolves the lifecycle-owned
+    // semantic-segmentation model without a Kotlin-owned component handle.
+
+    @JvmStatic
+    external fun racSegmentationSegmentLifecycleProto(requestProto: ByteArray): ByteArray?
+
     // Backend registration
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
     //

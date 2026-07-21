@@ -23,8 +23,8 @@ An **engine is an op-table adapter for modalities.** Concretely, an engine:
    (`sdk/runanywhere-commons/include/rac/plugin/rac_engine_vtable.h`) — a struct
    of per-modality op-table slots:
    `llm_ops` / `stt_ops` / `tts_ops` / `vad_ops` / `embedding_ops` / `vlm_ops` /
-   `diffusion_ops` (7 live primitive slots; the former `rerank_ops` was removed
-   in ABI v4 — see below). A **NULL slot means "I do
+   `diffusion_ops` / `diarization_ops` / `segmentation_ops` (9 live primitive
+   slots; the former `rerank_ops` was removed in ABI v4 — see below). A **NULL slot means "I do
    not serve that primitive."** Serving more than one modality just means filling
    more than one slot (llama.cpp fills `llm_ops` + `vlm_ops`; sherpa fills
    `stt_ops` + `tts_ops` + `vad_ops`).
@@ -75,7 +75,7 @@ engine exists in this tree.
 |---|---|---|---|---|---|
 | **llamacpp** | LLM (`llm_ops`) + VLM (`vlm_ops`) | llama.cpp / ggml (FetchContent), mtmd for VLM | **1** — bundles its own runtime | **ON** | priority 100. Declares `RAC_RUNTIME_CPU` always + Metal/CUDA/Vulkan gated on `GGML_USE_*`. Registers a CPU *provider* into `runtimes/cpu` (see Pattern 1). |
 | **sherpa** | STT + TTS + VAD (`stt_ops`/`tts_ops`/`vad_ops`) | Sherpa-ONNX C API (prebuilt, bundles its own ORT) | **3** (bundled-lib sub-case) | **ON** | priority 90. Declares `RAC_RUNTIME_CPU`. Offline recognizer; VAD is Silero-style. Routable only when `SHERPA_ONNX_AVAILABLE` + `RAC_SHERPA_SPEECH_OPS_AVAILABLE`. |
-| **onnx** | EMBED (`embedding_ops`) | ONNX Runtime via `runtimes/onnxrt` `Session` | **2** — uses a separate runtime as a library | **ON** | priority 50. Declares `RAC_RUNTIME_ONNXRT`. Embeddings slot gated on `RAC_BACKEND_RAG`; when RAG is off the engine registers with zero primitives. STT/TTS/VAD are sherpa's, not onnx's. |
+| **onnx** | SEGMENT (`segmentation_ops`) + optional EMBED (`embedding_ops`) | ONNX Runtime via `runtimes/onnxrt` `Session` | **2** — uses a separate runtime as a library | **ON** | priority 50. Declares `RAC_RUNTIME_ONNXRT`. Segmentation is always advertised; embeddings remain gated on `RAC_BACKEND_RAG`. STT/TTS/VAD are sherpa's, not onnx's. |
 | **cloud** | STT (`stt_ops`) | none — HTTP to a provider (Sarvam today) | **3** (no runtime — HTTP) | **ON** | priority 50, modality-agnostic name. `runtimes=NULL` → always eligible, never runtime-rejected. Provider via `config_json["provider"]`. Multi-modality-ready. |
 | **coreml** | DIFFUSION (`diffusion_ops`) | **our** Stable-Diffusion pipeline on Apple CoreML `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), modality-agnostic name. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(coreml)`. The engine `coreml` uses the runtime `coreml` (same framework name, separate registry/dir). CMake pins `RAC_COREML_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. Multi-modality-ready. |
 | **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android builds link the prebuilt under `QHEXRT_ROOT`. |
@@ -194,9 +194,9 @@ own section. (See `runtimes/` for the L1 device-runtime adapters.)
 2. **Engine uses a separate runtime as a library.** The engine has a real C++
    dependency on a `runtimes/` adapter and calls its API for compute.
    - *Example:* **`onnx`** → `runtimes/onnxrt`'s C++ `Session` class.
-     `onnx_embedding_provider.cpp` calls
+     `onnx_embedding_provider.cpp` and `onnx_segmentation_provider.cpp` call
      `runanywhere::runtime::onnxrt::Session::create(...)` / `->run(...)`
-     (`engines/onnx/onnx_embedding_provider.cpp:789, 823`), and the CMake links
+     for EMBED and SEGMENT, and the CMake links
      `rac_runtime_onnxrt` ("this engine uses only its thin session wrapper",
      `engines/onnx/CMakeLists.txt:145-146`). The ONNX Runtime `Env`/session are
      owned by the L1 onnxrt runtime, not the engine.

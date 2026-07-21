@@ -68,6 +68,8 @@ runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCateg
             return runanywhere::v1::SDK_COMPONENT_DIFFUSION;
         case runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION:
             return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
+        case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -91,6 +93,8 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
             return RAC_PRIMITIVE_DIFFUSION;
         case runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION:
             return RAC_PRIMITIVE_DIARIZE;
+        case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
+            return RAC_PRIMITIVE_SEGMENT;
         default:
             return RAC_PRIMITIVE_UNSPECIFIED;
     }
@@ -118,6 +122,8 @@ rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory catego
             return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
         case runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION:
             return RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
+        case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            return RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         case runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED:
         default:
             return RAC_MODEL_CATEGORY_UNKNOWN;

@@ -8,6 +8,7 @@
  *   - {@link VADProtoAdapter}
  *   - {@link VLMProtoAdapter}
  *   - {@link EmbeddingsProtoAdapter}
+ *   - {@link SegmentationProtoAdapter}
  *   - {@link DiffusionProtoAdapter}
  *   - {@link RAGProtoAdapter}
  *   - {@link LoRAProtoAdapter}
@@ -31,6 +32,7 @@ import {
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
 import { RAGProtoAdapter } from './RAGProtoAdapter.js';
+import { SegmentationProtoAdapter } from './SegmentationProtoAdapter.js';
 import { STTProtoAdapter } from './STTProtoAdapter.js';
 import { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter.js';
 import { TTSProtoAdapter } from './TTSProtoAdapter.js';
@@ -51,6 +53,7 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'tts',
   'vad',
   'embedding',
+  'segmentation',
   'rag',
   'diffusion',
   'structured-output',
@@ -64,6 +67,7 @@ export { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
 export { LLMProtoAdapter } from './LLMProtoAdapter.js';
 export { LoRAProtoAdapter } from './LoRAProtoAdapter.js';
 export { RAGProtoAdapter } from './RAGProtoAdapter.js';
+export { SegmentationProtoAdapter } from './SegmentationProtoAdapter.js';
 export { STTProtoAdapter } from './STTProtoAdapter.js';
 export { StructuredOutputProtoAdapter } from './StructuredOutputProtoAdapter.js';
 export { TTSProtoAdapter } from './TTSProtoAdapter.js';
@@ -104,6 +108,7 @@ export class ModalityProtoAdapter {
       ?? adapterState.modalitySlots.tts
       ?? adapterState.modalitySlots.vad
       ?? adapterState.modalitySlots.embedding
+      ?? adapterState.modalitySlots.segmentation
       ?? adapterState.modalitySlots.rag
       ?? adapterState.modalitySlots.diffusion
       ?? adapterState.modalitySlots['structured-output']
@@ -146,6 +151,7 @@ export class ModalityProtoAdapter {
         ?? adapterState.modalitySlots.stt
         ?? adapterState.modalitySlots.tts
         ?? adapterState.modalitySlots.vad
+        ?? adapterState.modalitySlots.segmentation
         ?? null;
     }
   }
@@ -198,6 +204,10 @@ export class ModalityProtoAdapter {
 
   embeddings(): EmbeddingsProtoAdapter {
     return new EmbeddingsProtoAdapter(this.module);
+  }
+
+  segmentation(): SegmentationProtoAdapter {
+    return new SegmentationProtoAdapter(this.module);
   }
 
   diffusion(): DiffusionProtoAdapter {

@@ -351,6 +351,105 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
         add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
     endif()
+    # The ONNX engine is configured after commons/tests. Keep this plugin-entry
+    # contract gate alive in both RAG modes: segmentation is unconditional,
+    # while embeddings are intentionally compiled only when RAG is enabled.
+    if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx AND
+       NOT TARGET test_plugin_entry_onnx)
+        add_executable(test_plugin_entry_onnx
+            sdk/runanywhere-commons/tests/test_plugin_entry_onnx.cpp)
+        target_include_directories(test_plugin_entry_onnx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_onnx PRIVATE
+            rac_commons
+            rac_backend_onnx
+        )
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_plugin_entry_onnx)
+        endif()
+        target_compile_features(test_plugin_entry_onnx PRIVATE cxx_std_20)
+        add_test(NAME plugin_entry_onnx_tests COMMAND test_plugin_entry_onnx)
+        set_tests_properties(plugin_entry_onnx_tests PROPERTIES
+            LABELS "native;onnx;segmentation")
+    endif()
+    # Native semantic-segmentation gates. The mandatory fixture target compiles
+    # the production provider against a separately hard-pinned, real tiny ONNX
+    # graph; the production backend remains pinned exclusively to the NVIDIA
+    # bundle. The exact-model parity target is opt-in via environment variables.
+    if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx AND
+       TARGET rac_runtime_onnxrt AND RAC_PROTOBUF_RUNTIME_ENABLED)
+        add_executable(test_segmentation_onnx
+            sdk/runanywhere-commons/tests/test_segmentation_onnx.cpp
+            engines/onnx/onnx_segmentation_provider.cpp
+            engines/onnx/rac_onnx_segmentation_register.cpp
+        )
+        target_include_directories(test_segmentation_onnx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/onnx
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_segmentation_onnx PRIVATE
+            RAC_HAVE_PROTOBUF=1
+            RAC_SEGMENTATION_TEST_FIXTURE_BUNDLE=1
+            "RAC_SEGMENTATION_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests/fixtures/segformer_tiny\""
+        )
+        target_link_libraries(test_segmentation_onnx PRIVATE
+            rac_commons
+            rac_runtime_onnxrt
+            nlohmann_json::nlohmann_json
+        )
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_segmentation_onnx PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_segmentation_onnx PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_segmentation_onnx PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_segmentation_onnx)
+        endif()
+        target_compile_features(test_segmentation_onnx PRIVATE cxx_std_20)
+        add_test(NAME segmentation_onnx_tests COMMAND test_segmentation_onnx)
+        set_tests_properties(segmentation_onnx_tests PROPERTIES
+            LABELS "native;onnx;segmentation;real-fixture")
+
+        add_executable(test_segmentation_onnx_exact
+            sdk/runanywhere-commons/tests/test_segmentation_onnx_exact.cpp)
+        target_include_directories(test_segmentation_onnx_exact PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_segmentation_onnx_exact PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_link_libraries(test_segmentation_onnx_exact PRIVATE
+            rac_commons
+            rac_backend_onnx
+        )
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_segmentation_onnx_exact PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_segmentation_onnx_exact PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_segmentation_onnx_exact PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_segmentation_onnx_exact)
+        endif()
+        target_compile_features(test_segmentation_onnx_exact PRIVATE cxx_std_20)
+        add_test(NAME segmentation_onnx_exact_model_tests
+                 COMMAND test_segmentation_onnx_exact)
+        set_tests_properties(segmentation_onnx_exact_model_tests PROPERTIES
+            LABELS "native;onnx;segmentation;exact-model;license-opt-in"
+            SKIP_RETURN_CODE 77)
+    endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
     # rac_backend_sherpa is built by engines/, which is configured after
     # sdk/runanywhere-commons/. This is also an intentional final-link gate:

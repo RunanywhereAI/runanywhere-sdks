@@ -78,6 +78,11 @@ import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywher
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD.js';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader.js';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
+import { segment as segmentImpl } from './Extensions/RunAnywhere+Segmentation.js';
+import type {
+  SegmentationRequest,
+  SegmentationResult,
+} from '@runanywhere/proto-ts/segmentation';
 import type {
   VLMGenerationOptions,
   VLMImage,
@@ -1433,6 +1438,16 @@ export const RunAnywhere = {
   // =========================================================================
 
   ...flatFacade,
+
+  /**
+   * Segment an image with the lifecycle-owned semantic-segmentation model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async segment(request: SegmentationRequest): Promise<SegmentationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return segmentImpl(request);
+  },
 
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
