@@ -19,6 +19,8 @@ require_command() {
 
 verify_output() {
   local output_root="${1:-dist}"
+  # Four canonical JS/WASM pairs = eight SDK runtime files. Diffusion is a
+  # workspace-only package and must not be added here until it ships WASM.
   local required_files=(
     index.html
     coi-serviceworker.js

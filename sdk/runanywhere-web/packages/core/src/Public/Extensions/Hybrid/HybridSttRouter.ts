@@ -26,10 +26,9 @@
  * does not launch concurrent transcribe calls. Native inference may still use
  * the module's pthread worker pool internally.
  *
- * NOTE: requires the hybrid-router proto-byte exports + cloud engine, which
- * the current Web WASM targets do NOT ship. See HybridWasmModule.ts BUILD
- * DELTA. Until that lands, construction succeeds but `setPair`/`transcribe`
- * raise a clear `backendNotAvailable` (never faked behaviour).
+ * NOTE: requires a freshly built hybrid-capable WASM artifact. Older or
+ * capability-incomplete artifacts are rejected during `create()` with a clear
+ * `backendNotAvailable` error; no routing behavior is faked.
  */
 
 import { SDKException } from '../../../Foundation/SDKException.js';
@@ -159,8 +158,8 @@ export class HybridSttRouter {
 
   private static resolveModule(): HybridWasmModule | null {
     // The router lives wherever the STT engines are linked (the ONNX-sherpa
-    // target owns both the offline sherpa side and — per the build delta — the
-    // cloud online side); fall back to commons for inspection.
+    // target owns both the offline sherpa side and cloud online side); fall
+    // back to commons for inspection.
     return (getModuleForCapability('stt') ??
       getModuleForCapability('commons')) as HybridWasmModule | null;
   }

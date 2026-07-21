@@ -52,6 +52,7 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle', () => ({
 import {
   __testing__,
   getVoiceAgentAvailability,
+  registerVoiceAgentProvider,
 } from '../../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -95,6 +96,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
       durationMs: 1_000,
       energy: 0.2,
     });
+    expect(registerVoiceAgentProvider()).toBe(true);
   });
 
   it('keeps energy and model-backed VAD thresholds in their native units', async () => {

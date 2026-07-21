@@ -94,7 +94,8 @@ const settings: AppSettings = {
   temperature: 0.7,
   maxTokens: 10000,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
-  thinkingModeEnabled: true,
+  // Opt-in: thinking-capable models answer directly unless the user enables this.
+  thinkingModeEnabled: false,
   apiKey: '',
   baseURL: '',
 };
@@ -202,8 +203,8 @@ export function initSettingsTab(el: HTMLElement): void {
           <div class="toggle ${settings.thinkingModeEnabled ? 'on' : ''}" id="settings-thinking-toggle"></div>
         </div>
         <p class="setting-hint">
-          When off, thinking-capable models (e.g. Qwen3) are asked to answer
-          directly without a reasoning phase.
+          Off by default. Turn on for thinking-capable models (e.g. Qwen3)
+          when you want a visible reasoning phase before the answer.
         </p>
       </div>
 

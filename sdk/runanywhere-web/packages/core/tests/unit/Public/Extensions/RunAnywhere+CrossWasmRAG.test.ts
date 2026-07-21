@@ -18,15 +18,48 @@ import {
   RAG,
   ragCreatePipeline,
   ragDestroyPipeline,
+  registerRAGProvider,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
 
 afterEach(() => {
+  __testing__.clearPersistentRAGStore();
+  __testing__.resetFacadeState();
   vi.restoreAllMocks();
 });
 
 describe('CrossWasmRAGProvider', () => {
+  it('restores an IndexedDB-compatible persistent index after provider reload', async () => {
+    const { loadModel } = installBackendSpies();
+    vi.spyOn(Embeddings, 'embedBatch').mockResolvedValue(
+      embeddingsResult([vector([1, 0], 'Persistent Zephyr note', 0)]),
+    );
+    const config = createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+      persistIndex: true,
+      indexPath: 'vitest-persistent-rag',
+    });
+
+    __testing__.clearPersistentRAGStore();
+    const first = __testing__.createPersistentRAGProvider();
+    await first.ragCreatePipeline(config);
+    await first.ragIngest('Persistent Zephyr note', JSON.stringify({
+      docId: 'persistent-zephyr',
+      docName: 'Persistent Zephyr',
+    }));
+    await first.ragDestroyPipeline();
+
+    const reloaded = __testing__.createPersistentRAGProvider();
+    await reloaded.ragCreatePipeline(config);
+
+    await expect(reloaded.ragGetDocumentCount()).resolves.toBe(1);
+    expect(reloaded.ragGetCapabilities?.()).toMatchObject({ persistent: true });
+    expect(loadModel).toHaveBeenCalled();
+    __testing__.clearPersistentRAGStore();
+  });
+
   it('routes embeddings and grounded generation across independent backends', async () => {
     const { loadModel } = installBackendSpies();
     const embedBatch = vi.spyOn(Embeddings, 'embedBatch').mockImplementation(
@@ -135,6 +168,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('increments the facade pipeline identity when a provider is replaced', async () => {
     installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     const configuration = createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
@@ -166,6 +200,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('invalidates provider identity during unconditional SDK cleanup', async () => {
     installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     await ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
@@ -183,6 +218,7 @@ describe('CrossWasmRAGProvider', () => {
 
   it('evicts a cached cross-WASM pipeline when a required backend disappears', async () => {
     const { supportsLLM } = installBackendSpies();
+    expect(registerRAGProvider()).toBe(true);
     await ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelId: 'all-minilm-l6-v2',
       llmModelId: 'lfm2-350m-q4_k_m',
@@ -199,6 +235,81 @@ describe('CrossWasmRAGProvider', () => {
       generation: created.generation + 1,
       configuration: null,
     });
+  });
+
+  it('composes RAG when embedding and LLM ownership span different BackendWorkers', async () => {
+    installBackendSpies();
+    const { markModelOwnedByBackendWorker, clearModelOwnedByBackendWorker } = await import(
+      '../../../../src/runtime/BackendWorkerModelOwnership'
+    );
+    markModelOwnedByBackendWorker('all-minilm-l6-v2', 'onnx');
+    markModelOwnedByBackendWorker('lfm2-350m-q4_k_m', 'llamacpp');
+
+    const plan = __testing__.resolveRagExecutionPlan(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
+    }));
+    expect(plan.mode).toBe('composed');
+
+    const nativeCreate = vi.fn(async () => {
+      throw new Error('rac_rag_session_create_proto failed with code -110');
+    });
+    RAG.setProvider({
+      providerKind: 'wasm-session',
+      async ragCreatePipeline() {
+        await nativeCreate();
+      },
+      async ragDestroyPipeline() {},
+      async ragIngest() {},
+      async ragQuery() {
+        return { answer: '', retrievedChunks: [] } as never;
+      },
+      async ragGetDocumentCount() {
+        return 0;
+      },
+    });
+
+    try {
+      await ragCreatePipeline(createDefaultRAGConfiguration({
+        embeddingModelId: 'all-minilm-l6-v2',
+        llmModelId: 'lfm2-350m-q4_k_m',
+      }));
+
+      expect(nativeCreate).not.toHaveBeenCalled();
+      expect(RAG.availability()).toMatchObject({
+        available: true,
+        source: 'cross-wasm',
+      });
+      await ragDestroyPipeline();
+    } finally {
+      clearModelOwnedByBackendWorker('all-minilm-l6-v2', 'onnx');
+      clearModelOwnedByBackendWorker('lfm2-350m-q4_k_m', 'llamacpp');
+    }
+  });
+
+  it('keeps native RAG when every artifact is co-located with the RAG ABI host', async () => {
+    installBackendSpies();
+    const { markModelOwnedByBackendWorker, clearModelOwnedByBackendWorker } = await import(
+      '../../../../src/runtime/BackendWorkerModelOwnership'
+    );
+    markModelOwnedByBackendWorker('all-minilm-l6-v2', 'onnx');
+    // Embed-only / same-host LLM: both on onnx worker → native is viable.
+    markModelOwnedByBackendWorker('onnx-local-llm', 'onnx');
+
+    try {
+      expect(__testing__.resolveRagExecutionPlan(createDefaultRAGConfiguration({
+        embeddingModelId: 'all-minilm-l6-v2',
+        llmModelId: 'onnx-local-llm',
+      })).mode).toBe('native');
+
+      expect(__testing__.resolveRagExecutionPlan(createDefaultRAGConfiguration({
+        embeddingModelId: 'all-minilm-l6-v2',
+        llmModelId: '',
+      })).mode).toBe('native');
+    } finally {
+      clearModelOwnedByBackendWorker('all-minilm-l6-v2', 'onnx');
+      clearModelOwnedByBackendWorker('onnx-local-llm', 'onnx');
+    }
   });
 });
 

@@ -120,7 +120,7 @@ export async function applyLoraAdapters(
 ): Promise<LoRAApplyResult> {
   return requireResult(
     'LoRA.apply',
-    requireAdapter('LoRA.apply').apply(request),
+    await requireAdapter('LoRA.apply').apply(request),
   );
 }
 
@@ -165,7 +165,7 @@ export async function removeLoraAdapters(
 ): Promise<LoRAState> {
   return requireResult(
     'LoRA.remove',
-    requireAdapter('LoRA.remove').remove(request),
+    await requireAdapter('LoRA.remove').remove(request),
   );
 }
 
