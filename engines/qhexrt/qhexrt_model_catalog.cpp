@@ -78,6 +78,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"qwen3_vl_2b_text", kV81, false},
     {"qwen3_vl", kV75V79, false},
     {"cosmos3_edge_text", kV81, false},   // Cosmos3-Edge reasoning/text AR path (sharded fp16 decode, split_generate); v81 device-validated greedy-exact
+    {"cosmos3_edge_vlm", kV81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v81 device-validated
     {"internvl3_5_1b", kAllSupportedArches, false},
     {"gemma4_e2b_vlm", kV79V81, false},
     {"gemma4_e4b_vlm", kV81, false},
