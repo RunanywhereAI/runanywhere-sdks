@@ -6,9 +6,9 @@ inspects a built ``*.whl`` (a ZIP) and its companion ``*.tar.gz`` sdist and asse
 
 * the wheel carries the ``runanywhere/`` package, the compiled ``runanywhere/_native/_core``
   extension, and a ``*.dist-info/METADATA`` whose ``Version`` matches the expected release;
-* the platform's vendored sidecar runtime libraries (onnxruntime / sherpa, placed by
-  delvewheel beside ``_core`` on Windows, in ``runanywhere.libs`` on Linux, ``.dylibs`` on
-  macOS) are all present — plus the CUDA libraries when ``--gpu`` is given;
+* the platform's vendored sidecar runtime libraries (onnxruntime / sherpa) are all present in
+  the wheel-repair tool's output dir (``runanywhere.libs`` for delvewheel/auditwheel,
+  ``runanywhere/.dylibs`` for delocate) — plus the CUDA libraries when ``--gpu`` is given;
 * no TEXT / metadata wheel member (our ``.py`` sources, ``METADATA``, ``RECORD``, ``WHEEL``)
   leaks an absolute host build path (``/Users/``, ``/home/``, ``\\Users\\``). Compiled
   binaries are NOT scanned: a native extension and its vendored deps unavoidably embed
@@ -54,8 +54,8 @@ class PlatformLibs:
     """The vendored sidecar runtime libraries for one wheel platform tag.
 
     ``libs_dir`` is where the wheel-repair tool places relocated sidecars relative to the
-    wheel root: beside ``_core`` on Windows, a top-level ``runanywhere.libs`` on Linux, and
-    ``runanywhere/_native/.dylibs`` on macOS. ``base`` are the always-present third-party
+    wheel root: a top-level ``runanywhere.libs`` for delvewheel (Windows) and auditwheel
+    (Linux), and ``runanywhere/.dylibs`` for delocate (macOS). ``base`` are the third-party
     runtime libraries; ``gpu`` are the extra CUDA libraries added by ``--gpu``. Matching is by
     filename stem prefix because the repair tools mangle names (e.g. a hash suffix on Linux).
     """
@@ -68,19 +68,22 @@ class PlatformLibs:
 # The runtime sidecars mirror the Electron native bundle (bundle-native.js): onnxruntime, its
 # providers stub, and the sherpa C-API. The GPU set mirrors the Electron CUDA prebuild.
 PLATFORMS: dict[str, PlatformLibs] = {
+    # delvewheel vendors into a top-level `runanywhere.libs/` (sibling of the package) and
+    # patches __init__ to load it — same convention auditwheel uses on Linux.
     "win": PlatformLibs(
-        libs_dir=CORE_DIR,
-        base=("onnxruntime", "onnxruntime_providers_shared", "sherpa-onnx-c-api"),
+        libs_dir="runanywhere.libs",
+        base=("onnxruntime", "sherpa-onnx-c-api"),
         gpu=("cudart64_12", "cublas64_12", "cublasLt64_12"),
     ),
     "linux": PlatformLibs(
         libs_dir="runanywhere.libs",
-        base=("libonnxruntime", "libonnxruntime_providers_shared", "libsherpa-onnx-c-api"),
+        base=("libonnxruntime", "libsherpa-onnx-c-api"),
         gpu=("libcudart", "libcublas", "libcublasLt"),
     ),
+    # delocate vendors into `<package>/.dylibs/`.
     "macos": PlatformLibs(
-        libs_dir=f"{CORE_DIR}/.dylibs",
-        base=("libonnxruntime", "libonnxruntime_providers_shared", "libsherpa-onnx-c-api"),
+        libs_dir="runanywhere/.dylibs",
+        base=("libonnxruntime", "libsherpa-onnx-c-api"),
         gpu=("libcudart", "libcublas", "libcublasLt"),
     ),
 }
@@ -179,7 +182,13 @@ def validate_wheel(wheel: Path, expected_version: str, *, gpu: bool = False) -> 
                 if posixpath.dirname(n) == platform.libs_dir
                 and n.casefold().endswith(BINARY_SUFFIXES)
             }
-            missing = sorted(lib for lib in expected_libs if lib not in present_stems)
+            # Repair tools mangle a hash into the name (onnxruntime -> onnxruntime-a1b2c3),
+            # so match a stem that equals the expected lib or begins with "<lib>-".
+            missing = sorted(
+                lib
+                for lib in expected_libs
+                if not any(s == lib or s.startswith(f"{lib}-") for s in present_stems)
+            )
             if missing:
                 raise PackageValidationError(
                     f"{label}: vendored sidecar libraries missing from "
