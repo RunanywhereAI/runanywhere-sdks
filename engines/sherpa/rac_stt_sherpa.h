@@ -34,10 +34,18 @@ rac_result_t rac_stt_sherpa_transcribe(rac_handle_t handle, const float* audio_s
                                        size_t num_samples, const rac_stt_options_t* options,
                                        rac_stt_result_t* out_result);
 rac_bool_t rac_stt_sherpa_supports_streaming(rac_handle_t handle);
+rac_bool_t rac_stt_sherpa_supports_persistent_streaming(rac_handle_t handle);
 rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle, rac_handle_t* out_stream);
+rac_result_t rac_stt_sherpa_create_stream_with_options(rac_handle_t handle,
+                                                       const rac_stt_options_t* options,
+                                                       rac_handle_t* out_stream);
 rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
                                        const float* audio_samples, size_t num_samples,
                                        int sample_rate);
+rac_result_t rac_stt_sherpa_feed_stream_audio_chunk(rac_handle_t handle, rac_handle_t stream,
+                                                    const int16_t* samples, size_t count,
+                                                    rac_stt_stream_callback_t callback,
+                                                    void* user_data);
 rac_bool_t rac_stt_sherpa_stream_is_ready(rac_handle_t handle, rac_handle_t stream);
 rac_result_t rac_stt_sherpa_decode_stream(rac_handle_t handle, rac_handle_t stream,
                                           char** out_text);

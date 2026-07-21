@@ -79,6 +79,7 @@ describe('NVIDIA Web catalog support', () => {
       ['sherpa-nemo-parakeet-tdt-0.6b-v2-int8', ['1ab9323565ddb038682214b292f588070a538ce2', 661_190_513]],
       ['sherpa-nemo-parakeet-tdt-0.6b-v3-int8', ['2bda32ec70b097a55adaa07d9a7173915b43cc78', 670_478_772]],
       ['sherpa-nemo-canary-180m-flash-int8', ['9077164e0d3dd1d5353743e89ceaa1d3a770838c', 207_170_046]],
+      ['sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8', ['ab43d895f5985b1bbab8b6eac8607fcdc05343f3', 682_215_356]],
     ] as const);
 
     for (const [id, [revision, sizeBytes]] of expected) {
@@ -93,5 +94,16 @@ describe('NVIDIA Web catalog support', () => {
       expect(model?.files?.every(({ url }) => url.includes(`/resolve/${revision}/`))).toBe(true);
       expect(model?.files?.some(({ filename }) => filename === 'tokens.txt')).toBe(true);
     }
+
+    const nemotron = getCatalog().find(
+      ({ id }) => id === 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
+    );
+    expect(nemotron?.files?.map(({ filename, sizeBytes }) => [filename, sizeBytes])).toEqual([
+      ['encoder.int8.onnx', 657_601_403],
+      ['decoder.int8.onnx', 14_978_075],
+      ['joiner.int8.onnx', 9_504_438],
+      ['tokens.txt', 131_440],
+    ]);
+    expect(nemotron && webModelCompatibility(nemotron)).toEqual({ supported: true });
   });
 });

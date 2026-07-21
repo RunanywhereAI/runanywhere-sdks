@@ -10,6 +10,8 @@
 
 #include "sherpa_backend.h"
 
+#include "sherpa_model_inspector.h"
+
 #include "core/internal/platform_compat.h"
 
 #ifdef __APPLE__
@@ -33,6 +35,7 @@
 #include <limits>
 #include <vector>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 
 // Direct logcat tag for confidence diagnostics. RAC_LOG_* routes through the
@@ -114,7 +117,7 @@ SherpaSTT::~SherpaSTT() {
 
 bool SherpaSTT::is_ready() const {
 #if SHERPA_ONNX_AVAILABLE
-    return model_loaded_ && sherpa_recognizer_ != nullptr;
+    return model_loaded_ && (sherpa_recognizer_ != nullptr || sherpa_online_recognizer_ != nullptr);
 #else
     return model_loaded_;
 #endif
@@ -125,9 +128,23 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     std::lock_guard<std::mutex> lock(mutex_);
 
 #if SHERPA_ONNX_AVAILABLE
+    for (auto& entry : sherpa_streams_) {
+        if (entry.second.offline) {
+            SherpaOnnxDestroyOfflineStream(entry.second.offline);
+        }
+        if (entry.second.online) {
+            SherpaOnnxDestroyOnlineStream(entry.second.online);
+        }
+    }
+    sherpa_streams_.clear();
+
     if (sherpa_recognizer_) {
         SherpaOnnxDestroyOfflineRecognizer(sherpa_recognizer_);
         sherpa_recognizer_ = nullptr;
+    }
+    if (sherpa_online_recognizer_) {
+        SherpaOnnxDestroyOnlineRecognizer(sherpa_online_recognizer_);
+        sherpa_online_recognizer_ = nullptr;
     }
 
     // The per-language LRU cache populated by transcribe()
@@ -146,6 +163,9 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     recognizer_lru_.clear();
 
     model_type_ = model_type;
+    recognizer_mode_ = SherpaRecognizerMode::Offline;
+    uses_language_prompt_ = false;
+    model_loaded_ = false;
     model_dir_ = model_path;
 
     RAC_LOG_INFO("Sherpa.STT", "Loading model from: %s", model_path.c_str());
@@ -383,11 +403,47 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     tokens_path_ = tokens_path;
     nemo_ctc_model_path_ = nemo_ctc_model_path;
 
-    if (!build_offline_recognizer_locked()) {
+    if (is_transducer) {
+        const auto encoder_contract =
+            rac::backends::sherpa::inspect_sherpa_onnx_encoder(encoder_path_);
+        if (encoder_contract.kind ==
+            rac::backends::sherpa::SherpaOnnxEncoderKind::OnlineTransducer) {
+            recognizer_mode_ = SherpaRecognizerMode::OnlineTransducer;
+            uses_language_prompt_ = encoder_contract.uses_language_prompt;
+            RAC_LOG_INFO("Sherpa.STT",
+                         "Detected online transducer encoder contract (language_prompt=%d)",
+                         uses_language_prompt_ ? 1 : 0);
+        } else if (encoder_contract.kind == rac::backends::sherpa::SherpaOnnxEncoderKind::Unknown) {
+            RAC_LOG_WARNING("Sherpa.STT",
+                            "Could not inspect encoder graph inputs; preserving offline "
+                            "transducer routing");
+        }
+    }
+
+    if (uses_language_prompt_) {
+        const char* runtime_version = SherpaOnnxGetVersionStr();
+        if (!runtime_version ||
+            !rac::backends::sherpa::sherpa_runtime_version_at_least(runtime_version, 1, 13, 4)) {
+            const std::string detail =
+                "Nemotron 3.5 prompted streaming ASR requires Sherpa-ONNX >= 1.13.4; "
+                "packaged runtime is " +
+                std::string(runtime_version ? runtime_version : "unknown");
+            RAC_LOG_ERROR("Sherpa.STT", "%s", detail.c_str());
+            rac_error_set_details(detail.c_str());
+            return false;
+        }
+    }
+
+    const bool recognizer_built = recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer
+                                      ? build_online_recognizer_locked()
+                                      : build_offline_recognizer_locked();
+    if (!recognizer_built) {
         return false;
     }
 
-    const char* loaded_type = is_nemo_ctc     ? "NeMo CTC"
+    const char* loaded_type = recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer
+                                  ? "online transducer"
+                              : is_nemo_ctc   ? "NeMo CTC"
                               : is_transducer ? "offline transducer"
                               : is_canary     ? "NeMo Canary"
                                               : "Whisper";
@@ -552,6 +608,75 @@ bool SherpaSTT::build_offline_recognizer_locked() {
 #endif
 }
 
+bool SherpaSTT::build_online_recognizer_locked() {
+#if SHERPA_ONNX_AVAILABLE
+    if (sherpa_online_recognizer_) {
+        SherpaOnnxDestroyOnlineRecognizer(sherpa_online_recognizer_);
+        sherpa_online_recognizer_ = nullptr;
+    }
+
+    SherpaOnnxOnlineRecognizerConfig recognizer_config;
+    memset(&recognizer_config, 0, sizeof(recognizer_config));
+
+    recognizer_config.feat_config.sample_rate = 16000;
+    recognizer_config.feat_config.feature_dim = 80;
+    recognizer_config.model_config.transducer.encoder = encoder_path_.c_str();
+    recognizer_config.model_config.transducer.decoder = decoder_path_.c_str();
+    recognizer_config.model_config.transducer.joiner = joiner_path_.c_str();
+    recognizer_config.model_config.tokens = tokens_path_.c_str();
+#if defined(__EMSCRIPTEN__)
+    recognizer_config.model_config.num_threads = 1;
+#else
+    recognizer_config.model_config.num_threads = 2;
+#endif
+    recognizer_config.model_config.provider = "cpu";
+    recognizer_config.model_config.debug = 0;
+    // Sherpa auto-detects NeMo transducers from the decoder graph contract.
+    // An explicit model_type would bypass that model-family detection.
+    recognizer_config.model_config.model_type = "";
+    recognizer_config.model_config.modeling_unit = "cjkchar";
+    recognizer_config.model_config.bpe_vocab = "";
+
+    recognizer_config.decoding_method = "greedy_search";
+    recognizer_config.max_active_paths = 4;
+    recognizer_config.enable_endpoint = 1;
+    recognizer_config.rule1_min_trailing_silence = 2.4f;
+    recognizer_config.rule2_min_trailing_silence = 1.2f;
+    recognizer_config.rule3_min_utterance_length = 20.0f;
+    recognizer_config.hotwords_file = "";
+    recognizer_config.hotwords_score = 1.5f;
+    recognizer_config.ctc_fst_decoder_config.graph = "";
+    recognizer_config.ctc_fst_decoder_config.max_active = 3000;
+    recognizer_config.rule_fsts = "";
+    recognizer_config.rule_fars = "";
+    recognizer_config.blank_penalty = 0.0f;
+    recognizer_config.hotwords_buf = nullptr;
+    recognizer_config.hotwords_buf_size = 0;
+    recognizer_config.hr.dict_dir = "";
+    recognizer_config.hr.lexicon = "";
+    recognizer_config.hr.rule_fsts = "";
+
+    RAC_LOG_INFO("Sherpa.STT", "Creating SherpaOnnxOnlineRecognizer...");
+    try {
+        sherpa_online_recognizer_ = SherpaOnnxCreateOnlineRecognizer(&recognizer_config);
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("Sherpa.STT", "SherpaOnnxCreateOnlineRecognizer threw: %s", e.what());
+        return false;
+    } catch (...) {
+        RAC_LOG_ERROR("Sherpa.STT", "SherpaOnnxCreateOnlineRecognizer threw");
+        return false;
+    }
+
+    if (!sherpa_online_recognizer_) {
+        RAC_LOG_ERROR("Sherpa.STT", "Failed to create SherpaOnnxOnlineRecognizer");
+        return false;
+    }
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool SherpaSTT::is_model_loaded() const {
     return model_loaded_;
 }
@@ -561,8 +686,11 @@ bool SherpaSTT::unload_model() {
 
 #if SHERPA_ONNX_AVAILABLE
     for (auto& pair : sherpa_streams_) {
-        if (pair.second) {
-            SherpaOnnxDestroyOfflineStream(pair.second);
+        if (pair.second.offline) {
+            SherpaOnnxDestroyOfflineStream(pair.second.offline);
+        }
+        if (pair.second.online) {
+            SherpaOnnxDestroyOnlineStream(pair.second.online);
         }
     }
     sherpa_streams_.clear();
@@ -570,6 +698,10 @@ bool SherpaSTT::unload_model() {
     if (sherpa_recognizer_) {
         SherpaOnnxDestroyOfflineRecognizer(sherpa_recognizer_);
         sherpa_recognizer_ = nullptr;
+    }
+    if (sherpa_online_recognizer_) {
+        SherpaOnnxDestroyOnlineRecognizer(sherpa_online_recognizer_);
+        sherpa_online_recognizer_ = nullptr;
     }
 
     // Also destroy any cached per-language recognizers parked
@@ -584,6 +716,8 @@ bool SherpaSTT::unload_model() {
 #endif
 
     model_loaded_ = false;
+    recognizer_mode_ = SherpaRecognizerMode::Offline;
+    uses_language_prompt_ = false;
     return true;
 }
 
@@ -608,9 +742,57 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
     // without racing other callers who might rebuild/destroy it.
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (!sherpa_recognizer_ || !model_loaded_) {
+    if ((!sherpa_recognizer_ && !sherpa_online_recognizer_) || !model_loaded_) {
         RAC_LOG_ERROR("Sherpa.STT", "STT not ready for transcription");
         set_status(SherpaSttStatus::ModelNotLoaded);
+        return result;
+    }
+
+    if (recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer) {
+        if (!sherpa_online_recognizer_) {
+            set_status(SherpaSttStatus::ModelNotLoaded);
+            return result;
+        }
+
+        const SherpaOnnxOnlineStream* stream =
+            SherpaOnnxCreateOnlineStream(sherpa_online_recognizer_);
+        if (!stream) {
+            RAC_LOG_ERROR("Sherpa.STT", "Failed to create online stream");
+            set_status(SherpaSttStatus::StreamCreationFailed);
+            return result;
+        }
+
+        std::string stream_language = language_;
+        if (request.detect_language) {
+            stream_language = "auto";
+        } else if (!request.language.empty()) {
+            stream_language = request.language;
+        }
+        if (stream_language.empty()) {
+            stream_language = "auto";
+        }
+        SherpaOnnxOnlineStreamSetOption(stream, "language", stream_language.c_str());
+        SherpaOnnxOnlineStreamAcceptWaveform(stream, request.sample_rate,
+                                             request.audio_samples.data(),
+                                             static_cast<int32_t>(request.audio_samples.size()));
+        SherpaOnnxOnlineStreamInputFinished(stream);
+        while (SherpaOnnxIsOnlineStreamReady(sherpa_online_recognizer_, stream)) {
+            SherpaOnnxDecodeOnlineStream(sherpa_online_recognizer_, stream);
+        }
+
+        const SherpaOnnxOnlineRecognizerResult* recognizer_result =
+            SherpaOnnxGetOnlineStreamResult(sherpa_online_recognizer_, stream);
+        if (recognizer_result && recognizer_result->text) {
+            result.text = recognizer_result->text;
+        }
+        if (recognizer_result) {
+            SherpaOnnxDestroyOnlineRecognizerResult(recognizer_result);
+        }
+        if (stream_language != "auto") {
+            result.detected_language = stream_language;
+        }
+        result.confidence = std::numeric_limits<float>::quiet_NaN();
+        SherpaOnnxDestroyOnlineStream(stream);
         return result;
     }
 
@@ -846,23 +1028,54 @@ bool SherpaSTT::supports_streaming() const {
 #endif
 }
 
+bool SherpaSTT::supports_persistent_streaming() const {
+#if SHERPA_ONNX_AVAILABLE
+    return model_loaded_ && recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer &&
+           sherpa_online_recognizer_ != nullptr;
+#else
+    return false;
+#endif
+}
+
 std::string SherpaSTT::create_stream(const nlohmann::json& config) {
 #if SHERPA_ONNX_AVAILABLE
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (!sherpa_recognizer_) {
+    if (!sherpa_recognizer_ && !sherpa_online_recognizer_) {
         RAC_LOG_ERROR("Sherpa.STT", "Cannot create stream: recognizer not initialized");
         return "";
     }
 
-    const SherpaOnnxOfflineStream* stream = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
-    if (!stream) {
-        RAC_LOG_ERROR("Sherpa.STT", "Failed to create offline stream");
-        return "";
+    const bool has_config = config.is_object();
+    StreamState state;
+    state.sample_rate = has_config ? config.value("sample_rate", 16000) : 16000;
+    if (state.sample_rate <= 0) {
+        state.sample_rate = 16000;
+    }
+    const bool detect_language = has_config && config.value("detect_language", false);
+    state.language =
+        detect_language ? "auto" : (has_config ? config.value("language", language_) : language_);
+    if (state.language.empty()) {
+        state.language = "auto";
+    }
+
+    if (recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer) {
+        state.online = SherpaOnnxCreateOnlineStream(sherpa_online_recognizer_);
+        if (!state.online) {
+            RAC_LOG_ERROR("Sherpa.STT", "Failed to create online stream");
+            return "";
+        }
+        SherpaOnnxOnlineStreamSetOption(state.online, "language", state.language.c_str());
+    } else {
+        state.offline = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
+        if (!state.offline) {
+            RAC_LOG_ERROR("Sherpa.STT", "Failed to create offline stream");
+            return "";
+        }
     }
 
     std::string stream_id = "stt_stream_" + std::to_string(++stream_counter_);
-    sherpa_streams_[stream_id] = stream;
+    sherpa_streams_.emplace(stream_id, std::move(state));
 
     RAC_LOG_DEBUG("Sherpa.STT", "Created stream: %s", stream_id.c_str());
     return stream_id;
@@ -877,16 +1090,92 @@ bool SherpaSTT::feed_audio(const std::string& stream_id, const std::vector<float
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = sherpa_streams_.find(stream_id);
-    if (it == sherpa_streams_.end() || !it->second) {
+    if (it == sherpa_streams_.end()) {
         RAC_LOG_ERROR("Sherpa.STT", "Stream not found: %s", stream_id.c_str());
         return false;
     }
 
-    SherpaOnnxAcceptWaveformOffline(it->second, sample_rate, samples.data(),
-                                    static_cast<int32_t>(samples.size()));
+    const int effective_rate = sample_rate > 0 ? sample_rate : it->second.sample_rate;
+    if (it->second.online) {
+        SherpaOnnxOnlineStreamAcceptWaveform(it->second.online, effective_rate, samples.data(),
+                                             static_cast<int32_t>(samples.size()));
+    } else if (it->second.offline) {
+        SherpaOnnxAcceptWaveformOffline(it->second.offline, effective_rate, samples.data(),
+                                        static_cast<int32_t>(samples.size()));
+    } else {
+        return false;
+    }
 
     return true;
 #else
+    return false;
+#endif
+}
+
+bool SherpaSTT::feed_audio_and_decode(const std::string& stream_id,
+                                      const std::vector<float>& samples,
+                                      std::vector<SherpaStreamUpdate>* updates) {
+#if SHERPA_ONNX_AVAILABLE
+    if (!updates) {
+        return false;
+    }
+    updates->clear();
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = sherpa_streams_.find(stream_id);
+    if (it == sherpa_streams_.end() || !it->second.online || !sherpa_online_recognizer_) {
+        return false;
+    }
+
+    const bool finishing = samples.empty();
+    if (finishing) {
+        // Commons defines a zero-sample persistent feed as the normal-stop
+        // flush signal. Finalize Sherpa input and drain every ready frame before
+        // returning the last hypothesis as a final callback.
+        SherpaOnnxOnlineStreamInputFinished(it->second.online);
+    } else {
+        SherpaOnnxOnlineStreamAcceptWaveform(it->second.online, it->second.sample_rate,
+                                             samples.data(), static_cast<int32_t>(samples.size()));
+    }
+    while (SherpaOnnxIsOnlineStreamReady(sherpa_online_recognizer_, it->second.online)) {
+        SherpaOnnxDecodeOnlineStream(sherpa_online_recognizer_, it->second.online);
+    }
+
+    std::string text;
+    const SherpaOnnxOnlineRecognizerResult* recognizer_result =
+        SherpaOnnxGetOnlineStreamResult(sherpa_online_recognizer_, it->second.online);
+    if (recognizer_result && recognizer_result->text) {
+        text = recognizer_result->text;
+    }
+    if (recognizer_result) {
+        SherpaOnnxDestroyOnlineRecognizerResult(recognizer_result);
+    }
+
+    if (finishing) {
+        if (!text.empty()) {
+            updates->push_back({.text = std::move(text), .is_final = true});
+        }
+        it->second.last_text.clear();
+        return true;
+    }
+
+    const bool endpoint =
+        SherpaOnnxOnlineStreamIsEndpoint(sherpa_online_recognizer_, it->second.online) != 0;
+    if (endpoint) {
+        if (!text.empty()) {
+            updates->push_back({.text = text, .is_final = true});
+        }
+        SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
+        SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+        it->second.last_text.clear();
+    } else if (!text.empty() && text != it->second.last_text) {
+        it->second.last_text = text;
+        updates->push_back({.text = std::move(text), .is_final = false});
+    }
+    return true;
+#else
+    (void)stream_id;
+    (void)samples;
+    (void)updates;
     return false;
 #endif
 }
@@ -895,7 +1184,13 @@ bool SherpaSTT::is_stream_ready(const std::string& stream_id) {
 #if SHERPA_ONNX_AVAILABLE
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = sherpa_streams_.find(stream_id);
-    return it != sherpa_streams_.end() && it->second != nullptr;
+    if (it == sherpa_streams_.end()) {
+        return false;
+    }
+    if (it->second.online && sherpa_online_recognizer_) {
+        return SherpaOnnxIsOnlineStreamReady(sherpa_online_recognizer_, it->second.online) != 0;
+    }
+    return it->second.offline != nullptr;
 #else
     return false;
 #endif
@@ -908,20 +1203,39 @@ STTResult SherpaSTT::decode(const std::string& stream_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = sherpa_streams_.find(stream_id);
-    if (it == sherpa_streams_.end() || !it->second) {
+    if (it == sherpa_streams_.end()) {
         RAC_LOG_ERROR("Sherpa.STT", "Stream not found for decode: %s", stream_id.c_str());
         return result;
     }
 
-    if (!sherpa_recognizer_) {
+    if (it->second.online && sherpa_online_recognizer_) {
+        while (SherpaOnnxIsOnlineStreamReady(sherpa_online_recognizer_, it->second.online)) {
+            SherpaOnnxDecodeOnlineStream(sherpa_online_recognizer_, it->second.online);
+        }
+        const SherpaOnnxOnlineRecognizerResult* recognizer_result =
+            SherpaOnnxGetOnlineStreamResult(sherpa_online_recognizer_, it->second.online);
+        if (recognizer_result && recognizer_result->text) {
+            result.text = recognizer_result->text;
+        }
+        if (recognizer_result) {
+            SherpaOnnxDestroyOnlineRecognizerResult(recognizer_result);
+        }
+        if (it->second.language != "auto") {
+            result.detected_language = it->second.language;
+        }
+        it->second.last_text = result.text;
+        return result;
+    }
+
+    if (!it->second.offline || !sherpa_recognizer_) {
         RAC_LOG_ERROR("Sherpa.STT", "Recognizer not available");
         return result;
     }
 
-    SherpaOnnxDecodeOfflineStream(sherpa_recognizer_, it->second);
+    SherpaOnnxDecodeOfflineStream(sherpa_recognizer_, it->second.offline);
 
     const SherpaOnnxOfflineRecognizerResult* recognizer_result =
-        SherpaOnnxGetOfflineStreamResult(it->second);
+        SherpaOnnxGetOfflineStreamResult(it->second.offline);
 
     if (recognizer_result && recognizer_result->text) {
         result.text = recognizer_result->text;
@@ -939,22 +1253,45 @@ STTResult SherpaSTT::decode(const std::string& stream_id) {
 }
 
 bool SherpaSTT::is_endpoint(const std::string& stream_id) {
+#if SHERPA_ONNX_AVAILABLE
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = sherpa_streams_.find(stream_id);
+    return it != sherpa_streams_.end() && it->second.online && sherpa_online_recognizer_ &&
+           SherpaOnnxOnlineStreamIsEndpoint(sherpa_online_recognizer_, it->second.online) != 0;
+#else
     return false;
+#endif
 }
 
-void SherpaSTT::input_finished(const std::string& stream_id) {}
+void SherpaSTT::input_finished(const std::string& stream_id) {
+#if SHERPA_ONNX_AVAILABLE
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = sherpa_streams_.find(stream_id);
+    if (it != sherpa_streams_.end() && it->second.online) {
+        SherpaOnnxOnlineStreamInputFinished(it->second.online);
+    }
+#else
+    (void)stream_id;
+#endif
+}
 
 void SherpaSTT::reset_stream(const std::string& stream_id) {
 #if SHERPA_ONNX_AVAILABLE
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto it = sherpa_streams_.find(stream_id);
-    if (it != sherpa_streams_.end() && it->second) {
-        SherpaOnnxDestroyOfflineStream(it->second);
-
-        if (sherpa_recognizer_) {
-            it->second = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
-        } else {
+    if (it == sherpa_streams_.end()) {
+        return;
+    }
+    if (it->second.online && sherpa_online_recognizer_) {
+        SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
+        SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+        it->second.last_text.clear();
+    } else if (it->second.offline) {
+        SherpaOnnxDestroyOfflineStream(it->second.offline);
+        it->second.offline =
+            sherpa_recognizer_ ? SherpaOnnxCreateOfflineStream(sherpa_recognizer_) : nullptr;
+        if (!it->second.offline) {
             sherpa_streams_.erase(it);
         }
     }
@@ -967,8 +1304,11 @@ void SherpaSTT::destroy_stream(const std::string& stream_id) {
 
     auto it = sherpa_streams_.find(stream_id);
     if (it != sherpa_streams_.end()) {
-        if (it->second) {
-            SherpaOnnxDestroyOfflineStream(it->second);
+        if (it->second.offline) {
+            SherpaOnnxDestroyOfflineStream(it->second.offline);
+        }
+        if (it->second.online) {
+            SherpaOnnxDestroyOnlineStream(it->second.online);
         }
         sherpa_streams_.erase(it);
         RAC_LOG_DEBUG("Sherpa.STT", "Destroyed stream: %s", stream_id.c_str());
@@ -977,6 +1317,16 @@ void SherpaSTT::destroy_stream(const std::string& stream_id) {
 }
 
 std::vector<std::string> SherpaSTT::get_supported_languages() const {
+    if (recognizer_mode_ == SherpaRecognizerMode::OnlineTransducer) {
+        if (!uses_language_prompt_) {
+            return {"en"};
+        }
+        // Nemotron 3.5's transcription-ready and broad-coverage language
+        // aliases. Sherpa derives these base aliases from the locale-keyed
+        // prompt_dictionary embedded in the encoder metadata.
+        return {"en", "es", "fr", "it", "pt", "nl", "de", "tr", "ru", "ar", "hi", "ja", "ko", "vi",
+                "uk", "pl", "sv", "cs", "nb", "da", "bg", "fi", "hr", "sk", "zh", "hu", "ro", "et"};
+    }
     return {"en", "zh", "de",  "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl",
             "ar", "sv", "it",  "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro",
             "da", "hu", "ta",  "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy",

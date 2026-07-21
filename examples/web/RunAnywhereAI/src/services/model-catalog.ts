@@ -433,6 +433,24 @@ const CATALOG: readonly CatalogEntry[] = [
       { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 53_555 },
     ],
   },
+  {
+    id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
+    name: 'NVIDIA Nemotron 3.5 ASR Streaming 0.6B INT8 (Sherpa-ONNX)',
+    description: 'Exact multilingual 560 ms streaming transducer bundle with per-stream language prompting.',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx',
+    downloadSizeBytes: 682_215_356,
+    memoryRequiredBytes: 900_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 657_601_403 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 14_978_075 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 9_504_438 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 131_440 },
+    ],
+  },
 
   // ---------- Speech Synthesis (TTS) ----------
   {
