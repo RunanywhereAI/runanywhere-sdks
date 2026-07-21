@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -482,6 +483,37 @@ class DartBridgeDevice {
         deviceId: _cachedDeviceId,
       );
     }
+    _pushLiveDeviceState();
+  }
+
+  /// Push the freshly collected device state into the commons telemetry cache.
+  /// Telemetry stamping runs on inference threads where Dart FFI callbacks
+  /// must not be invoked; commons reads this pushed cache instead.
+  static void _pushLiveDeviceState() {
+    final snapshot = _cachedRegistrationInfo;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final push = lib.lookupFunction<
+        Void Function(Double, Pointer<Utf8>, Int32, Int64, Int64),
+        void Function(double, Pointer<Utf8>, int, int, int)
+      >('rac_telemetry_push_live_device_state');
+      final statePtr = snapshot.batteryState.isNotEmpty
+          ? snapshot.batteryState.toNativeUtf8()
+          : nullptr.cast<Utf8>();
+      try {
+        push(
+          snapshot.batteryLevel,
+          statePtr,
+          snapshot.isLowPowerMode ? 1 : 0,
+          snapshot.totalMemory,
+          snapshot.availableMemory,
+        );
+      } finally {
+        if (statePtr != nullptr) calloc.free(statePtr);
+      }
+    } catch (_) {
+      _logger.debug('Live device state push unavailable');
+    }
   }
 
   // ============================================================================
@@ -929,6 +961,7 @@ class _DeviceRegistrationInfoSnapshot {
 Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
   final deviceId = DartBridgeDevice._cachedDeviceId ?? '';
   final plugin = DeviceInfoPlugin();
+  final battery = await _collectBatterySnapshot();
 
   if (Platform.isAndroid) {
     final info = await plugin.androidInfo;
@@ -950,12 +983,12 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
       chipName: chipName,
       totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
       availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
-      hasNeuralEngine: false,
+      hasNeuralEngine: _androidHasNeuralEngine(chipName, info.manufacturer),
       neuralEngineCores: 0,
       gpuFamily: _inferAndroidGpuFamily(chipName, info.manufacturer),
-      batteryLevel: -1,
-      batteryState: '',
-      isLowPowerMode: false,
+      batteryLevel: battery.level,
+      batteryState: battery.state,
+      isLowPowerMode: battery.isLowPowerMode,
       coreCount: coreCount,
       performanceCores: coreSplit.$1,
       efficiencyCores: coreSplit.$2,
@@ -967,8 +1000,9 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
     final info = await plugin.iosInfo;
     final model = _nonEmpty(info.modelName) ?? info.model;
     final coreCount = Platform.numberOfProcessors;
-    final coreSplit = _coreDistribution(coreCount, model);
     final machine = _nonEmpty(info.utsname.machine) ?? 'unknown';
+    final chipName = _appleChipName(machine);
+    final coreSplit = _coreDistribution(coreCount, model, chip: chipName);
     final hasNeuralEngine =
         info.isPhysicalDevice &&
         (machine.startsWith('iPhone') || machine.startsWith('iPad'));
@@ -981,15 +1015,17 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
           _nonEmpty(info.systemVersion) ?? Platform.operatingSystemVersion,
       formFactor: model.toLowerCase().contains('ipad') ? 'tablet' : 'phone',
       architecture: _currentAbiArchitecture(),
-      chipName: machine,
+      chipName: chipName,
       totalMemory: _memoryMegabytesToBytes(info.physicalRamSize),
       availableMemory: _memoryMegabytesToBytes(info.availableRamSize),
       hasNeuralEngine: hasNeuralEngine,
-      neuralEngineCores: hasNeuralEngine ? 16 : 0,
+      neuralEngineCores: hasNeuralEngine
+          ? _appleNeuralEngineCores(chipName)
+          : 0,
       gpuFamily: 'apple',
-      batteryLevel: -1,
-      batteryState: '',
-      isLowPowerMode: false,
+      batteryLevel: battery.level,
+      batteryState: battery.state,
+      isLowPowerMode: battery.isLowPowerMode,
       coreCount: coreCount,
       performanceCores: coreSplit.$1,
       efficiencyCores: coreSplit.$2,
@@ -1000,8 +1036,11 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
   if (Platform.isMacOS) {
     final info = await plugin.macOsInfo;
     final model = _nonEmpty(info.modelName) ?? info.model;
-    final coreSplit = _coreDistribution(info.activeCPUs, model);
     final hasNeuralEngine = info.arch == 'arm64';
+    final chipName = hasNeuralEngine
+        ? _appleChipName(_nonEmpty(info.model) ?? 'unknown')
+        : _nonEmpty(info.model) ?? 'unknown';
+    final coreSplit = _coreDistribution(info.activeCPUs, model, chip: chipName);
     return _DeviceRegistrationInfoSnapshot(
       deviceId: deviceId,
       deviceModel: model,
@@ -1011,15 +1050,17 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
           '${info.majorVersion}.${info.minorVersion}.${info.patchVersion}',
       formFactor: 'desktop',
       architecture: _nonEmpty(info.arch) ?? 'unknown',
-      chipName: _nonEmpty(info.model) ?? 'unknown',
+      chipName: chipName,
       totalMemory: _memoryBytes(info.memorySize),
+      // device_info_plus exposes only total memory on macOS; 0 = unknown.
       availableMemory: 0,
       hasNeuralEngine: hasNeuralEngine,
+      // Every Apple Silicon Mac (M1 through M4) ships a 16-core ANE.
       neuralEngineCores: hasNeuralEngine ? 16 : 0,
       gpuFamily: 'apple',
-      batteryLevel: -1,
-      batteryState: '',
-      isLowPowerMode: false,
+      batteryLevel: battery.level,
+      batteryState: battery.state,
+      isLowPowerMode: battery.isLowPowerMode,
       coreCount: info.activeCPUs,
       performanceCores: coreSplit.$1,
       efficiencyCores: coreSplit.$2,
@@ -1028,6 +1069,38 @@ Future<_DeviceRegistrationInfoSnapshot> _collectDeviceInfoSnapshot() async {
   }
 
   return _DeviceRegistrationInfoSnapshot.defaults(deviceId: deviceId);
+}
+
+typedef _BatterySnapshot = ({double level, String state, bool isLowPowerMode});
+
+Future<_BatterySnapshot> _collectBatterySnapshot() async {
+  var level = -1.0;
+  var state = '';
+  var isLowPowerMode = false;
+  final battery = Battery();
+  try {
+    final percent = await battery.batteryLevel;
+    if (percent >= 0 && percent <= 100) {
+      level = percent / 100.0;
+    }
+  } catch (_) {
+    DartBridgeDevice._logger.debug('Battery level unavailable');
+  }
+  try {
+    state = switch (await battery.batteryState) {
+      BatteryState.charging || BatteryState.connectedNotCharging => 'charging',
+      BatteryState.full => 'full',
+      BatteryState.discharging || BatteryState.unknown => 'unplugged',
+    };
+  } catch (_) {
+    DartBridgeDevice._logger.debug('Battery state unavailable');
+  }
+  try {
+    isLowPowerMode = await battery.isInBatterySaveMode;
+  } catch (_) {
+    DartBridgeDevice._logger.debug('Battery save mode unavailable');
+  }
+  return (level: level, state: state, isLowPowerMode: isLowPowerMode);
 }
 
 String? _nonEmpty(String? value) {
@@ -1079,19 +1152,120 @@ int _memoryBytes(int bytes) {
   return bytes > 0 ? bytes : 0;
 }
 
-(int, int) _coreDistribution(int coreCount, String model) {
+(int, int) _coreDistribution(int coreCount, String model, {String chip = ''}) {
   if (coreCount <= 0) return (0, 0);
-  final lowerModel = model.toLowerCase();
   int performance;
-  if (lowerModel.startsWith('iphone')) {
-    performance = 2;
-  } else if (lowerModel.startsWith('ipad') || lowerModel.startsWith('mac')) {
-    performance = (coreCount * 2 ~/ 5).clamp(2, coreCount).toInt();
+  if (RegExp(r'^A\d').hasMatch(chip)) {
+    // A-series (A11-A19): 2 performance cores; A12X/A12Z: 4.
+    performance = chip.startsWith('A12X') || chip.startsWith('A12Z') ? 4 : 2;
+  } else if (RegExp(r'^M\d').hasMatch(chip)) {
+    // M-series: 4 efficiency cores on base/Pro/Max variants.
+    performance = coreCount - 4;
+    if (performance < 2) performance = coreCount ~/ 2;
   } else {
-    performance = (coreCount ~/ 3).clamp(1, coreCount).toInt();
+    final lowerModel = model.toLowerCase();
+    if (lowerModel.startsWith('iphone')) {
+      performance = 2;
+    } else if (lowerModel.startsWith('ipad') || lowerModel.startsWith('mac')) {
+      performance = (coreCount * 2 ~/ 5).clamp(2, coreCount).toInt();
+    } else {
+      performance = (coreCount ~/ 3).clamp(1, coreCount).toInt();
+    }
   }
   performance = performance.clamp(0, coreCount).toInt();
   return (performance, coreCount - performance);
+}
+
+const Map<String, String> _appleExactChipById = {
+  'iPhone17,1': 'A18 Pro',
+  'iPhone17,2': 'A18 Pro',
+  'iPhone18,1': 'A19 Pro',
+  'iPhone18,2': 'A19 Pro',
+  'iPhone18,4': 'A19 Pro',
+  'iPad13,1': 'A14',
+  'iPad13,2': 'A14',
+  'iPad13,18': 'A14',
+  'iPad13,19': 'A14',
+  'iPad14,1': 'A15',
+  'iPad14,2': 'A15',
+  'iPad15,7': 'A16',
+  'iPad15,8': 'A16',
+  'iPad16,1': 'A17 Pro',
+  'iPad16,2': 'A17 Pro',
+};
+
+const Map<String, String> _appleChipByPrefix = {
+  'iPhone10,': 'A11',
+  'iPhone11,': 'A12',
+  'iPhone12,': 'A13',
+  'iPhone13,': 'A14',
+  'iPhone14,': 'A15',
+  'iPhone15,': 'A16',
+  'iPhone16,': 'A17 Pro',
+  'iPhone17,': 'A18',
+  'iPhone18,': 'A19',
+  'iPad7,': 'A10X',
+  'iPad8,': 'A12X',
+  'iPad11,': 'A12',
+  'iPad12,': 'A13',
+  'iPad13,': 'M1',
+  'iPad14,': 'M2',
+  'iPad15,': 'M3',
+  'iPad16,': 'M4',
+  'MacBookAir10,': 'M1',
+  'MacBookPro17,': 'M1',
+  'MacBookPro18,': 'M1',
+  'Macmini9,': 'M1',
+  'iMac21,': 'M1',
+  'Mac13,': 'M1',
+  'Mac14,': 'M2',
+  'Mac15,': 'M3',
+  'Mac16,': 'M4',
+};
+
+/// Map an Apple hardware identifier (e.g. "iPhone15,2", "Mac14,9") to a chip
+/// family name. Falls back to the raw identifier when unmapped.
+String _appleChipName(String machine) {
+  final exact = _appleExactChipById[machine];
+  if (exact != null) return exact;
+  for (final entry in _appleChipByPrefix.entries) {
+    if (machine.startsWith(entry.key)) return entry.value;
+  }
+  return machine;
+}
+
+/// ANE core counts per chip family: A11=2, A12/A13=8, A14+ and M-series=16.
+/// Unmapped chips report 0 (unknown).
+int _appleNeuralEngineCores(String chip) {
+  if (chip == 'A11') return 2;
+  if (chip == 'A12' || chip == 'A12X' || chip == 'A13') return 8;
+  if (RegExp(r'^M\d').hasMatch(chip)) return 16;
+  final generation = RegExp(r'^A1(\d)').firstMatch(chip);
+  if (generation != null && int.parse(generation.group(1)!) >= 4) return 16;
+  return 0;
+}
+
+/// NPU heuristic from the SoC/hardware string: Snapdragon SM8/SM7/QCM,
+/// Google Tensor, Exynos 2xxx (s5e9xxx), MediaTek Dimensity.
+bool _androidHasNeuralEngine(String chipName, String manufacturer) {
+  final chip = chipName.toLowerCase();
+  if (RegExp(r'sm[78]\d{3}').hasMatch(chip) || chip.contains('qcm')) {
+    return true;
+  }
+  if (chip.contains('tensor') ||
+      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
+      chip.contains('zuma') ||
+      manufacturer.toLowerCase().contains('google')) {
+    return true;
+  }
+  if (RegExp(r'exynos\s?2\d{3}').hasMatch(chip) ||
+      RegExp(r's5e9[89]\d{2}').hasMatch(chip)) {
+    return true;
+  }
+  if (chip.contains('dimensity') || RegExp(r'mt6[89]\d{2}').hasMatch(chip)) {
+    return true;
+  }
+  return false;
 }
 
 String _defaultFormFactor() {
@@ -1120,24 +1294,30 @@ String _inferAndroidGpuFamily(String chipName, String manufacturer) {
   final maker = manufacturer.toLowerCase();
   if (chip.contains('snapdragon') ||
       chip.contains('qualcomm') ||
+      chip.contains('qcom') ||
+      chip.contains('qcm') ||
       chip.contains('sdm') ||
-      chip.contains('sm8') ||
-      chip.contains('sm7') ||
-      chip.contains('sm6') ||
+      RegExp(r'sm[4-8]\d{3}').hasMatch(chip) ||
       chip.contains('msm') ||
       maker.contains('qualcomm')) {
     return 'adreno';
   }
-  if (chip.contains('exynos') ||
-      chip.contains('tensor') ||
-      chip.contains('mediatek') ||
-      chip.contains('dimensity') ||
-      chip.contains('helio') ||
-      chip.contains('kirin') ||
-      maker.contains('google') ||
-      maker.contains('samsung')) {
+  // Exynos 2200+ (s5e992x/s5e994x) use AMD Xclipse; earlier Exynos use Mali.
+  if (RegExp(r's5e9(9[24]|4\d)\d').hasMatch(chip)) return 'xclipse';
+  if (chip.contains('exynos') || chip.contains('s5e')) return 'mali';
+  if (chip.contains('tensor') ||
+      RegExp(r'\bgs\d{3}').hasMatch(chip) ||
+      chip.contains('zuma') ||
+      maker.contains('google')) {
     return 'mali';
   }
+  if (chip.contains('mediatek') ||
+      chip.contains('dimensity') ||
+      chip.contains('helio') ||
+      RegExp(r'\bmt\d{4}').hasMatch(chip)) {
+    return 'mali';
+  }
+  if (chip.contains('kirin') || maker.contains('samsung')) return 'mali';
   if (chip.contains('intel')) return 'intel';
   if (chip.contains('nvidia') || chip.contains('tegra')) return 'nvidia';
   return 'unknown';

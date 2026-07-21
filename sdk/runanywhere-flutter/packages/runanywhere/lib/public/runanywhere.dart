@@ -486,11 +486,26 @@ abstract final class RunAnywhere {
   }) async {
     final SDKInitParams params;
 
-    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      // Development mode ignores any caller-supplied baseURL and always uses
-      // the dev placeholder / Supabase-derived URL. Mirrors Swift
-      // RunAnywhere.swift:125-127 (`SDKInitParams(forDevelopmentWithAPIKey:)`).
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+        (baseURL == null || baseURL.isEmpty)) {
+      // Development without an explicit baseURL falls back to the dev
+      // placeholder / Supabase-derived URL. A caller-supplied baseURL is
+      // honored so dev builds can target a real backend (the placeholder
+      // DNS alias is unreachable on most machines).
       params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
+    } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      final parsed = Uri.tryParse(baseURL!);
+      if (parsed == null) {
+        throw SDKException.validationFailed(
+          'Invalid base URL: $baseURL',
+          fieldPath: 'SDKInitParams.baseURL',
+        );
+      }
+      params = SDKInitParams(
+        apiKey: apiKey ?? '',
+        baseURL: parsed,
+        environment: environment,
+      );
     } else {
       // Keyless staging is valid: commons overrides the base URL with the
       // baked staging backend and requests go out unauthenticated

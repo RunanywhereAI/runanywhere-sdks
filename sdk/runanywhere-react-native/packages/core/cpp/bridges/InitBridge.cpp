@@ -13,6 +13,7 @@
 #include "HTTPBridge.hpp"
 #include "PlatformDownloadBridge.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/device/rac_device_identity.h" // rac_device_get_or_create_persistent_id
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -62,6 +63,11 @@ extern jmethodID g_secureGetMethod;
 extern jmethodID g_secureDeleteMethod;
 extern jmethodID g_getModelBaseDirectoryMethod;
 extern jmethodID g_getDeviceModelMethod;
+extern jmethodID g_getDeviceNameMethod;
+extern jmethodID g_getBatteryLevelMethod;
+extern jmethodID g_getBatteryStateMethod;
+extern jmethodID g_isLowPowerModeMethod;
+extern jmethodID g_hasNPUMethod;
 extern jmethodID g_getOSVersionMethod;
 extern jmethodID g_getChipNameMethod;
 extern jmethodID g_getTotalMemoryMethod;
@@ -445,6 +451,68 @@ namespace AndroidBridge {
         return result == JNI_TRUE;
     }
 
+    std::string getDeviceName() {
+        return callStaticString(g_getDeviceNameMethod, "getDeviceName");
+    }
+
+    float getBatteryLevel() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return -1.0f;
+
+        if (!g_platformAdapterBridgeClass || !g_getBatteryLevelMethod) {
+            LOGE("PlatformAdapterBridge class or getBatteryLevel method not cached");
+            return -1.0f;
+        }
+
+        jfloat result = env->CallStaticFloatMethod(g_platformAdapterBridgeClass, g_getBatteryLevelMethod);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in PlatformAdapterBridge.getBatteryLevel");
+            return -1.0f;
+        }
+        return static_cast<float>(result);
+    }
+
+    std::string getBatteryState() {
+        return callStaticString(g_getBatteryStateMethod, "getBatteryState");
+    }
+
+    bool isLowPowerMode() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+
+        if (!g_platformAdapterBridgeClass || !g_isLowPowerModeMethod) {
+            LOGE("PlatformAdapterBridge class or isLowPowerMode method not cached");
+            return false;
+        }
+
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_isLowPowerModeMethod);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in PlatformAdapterBridge.isLowPowerMode");
+            return false;
+        }
+        return result == JNI_TRUE;
+    }
+
+    bool hasNPU() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+
+        if (!g_platformAdapterBridgeClass || !g_hasNPUMethod) {
+            LOGE("PlatformAdapterBridge class or hasNPU method not cached");
+            return false;
+        }
+
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_hasNPUMethod);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in PlatformAdapterBridge.hasNPU");
+            return false;
+        }
+        return result == JNI_TRUE;
+    }
+
     std::string getAppIdentifier() {
         return callStaticString(g_getAppIdentifierMethod, "getAppIdentifier");
     }
@@ -652,6 +720,12 @@ extern "C" {
     int PlatformAdapter_getCoreCount(void);
     bool PlatformAdapter_getArchitecture(char** outValue);
     bool PlatformAdapter_getGPUFamily(char** outValue);
+    bool PlatformAdapter_getDeviceName(char** outValue);
+    float PlatformAdapter_getBatteryLevel(void);
+    bool PlatformAdapter_getBatteryState(char** outValue);
+    bool PlatformAdapter_isLowPowerMode(void);
+    int PlatformAdapter_getPerformanceCores(void);
+    int PlatformAdapter_getEfficiencyCores(void);
 
     // App/client metadata (Bundle.main)
     bool PlatformAdapter_getAppIdentifier(char** outValue);
@@ -712,6 +786,35 @@ template <typename Container> void wipeAndClear(Container &value) {
   }
   value.clear();
 }
+
+#if defined(__APPLE__)
+// Apple Neural Engine core counts by chip generation: A11 = 2, A12/A13 = 8,
+// A14+ and all M-series = 16. Unknown chips report 0 rather than a guess.
+int neuralEngineCoresForChip(const std::string& chipName) {
+  if (chipName.size() < 2) {
+    return 0;
+  }
+  const char family = chipName[0];
+  const char second = chipName[1];
+  if ((family != 'A' && family != 'M') || second < '0' || second > '9') {
+    return 0;
+  }
+  const int generation = std::atoi(chipName.c_str() + 1);
+  if (family == 'M') {
+    return 16;
+  }
+  if (generation >= 14) {
+    return 16;
+  }
+  if (generation == 12 || generation == 13) {
+    return 8;
+  }
+  if (generation == 11) {
+    return 2;
+  }
+  return 0;
+}
+#endif
 
 } // anonymous namespace
 
@@ -898,7 +1001,7 @@ static std::string getClientTimezone() {
 }
 
 static void configureClientInfo() {
-    const std::string sdkBinding = "react_native";
+    const std::string sdkBinding = "react-native";
     const std::string appIdentifier = getClientAppIdentifier();
     const std::string appName = getClientAppName();
     const std::string appVersion = getClientAppVersion();
@@ -1867,7 +1970,10 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
 #endif
         info.sdkVersion = InitBridge::shared().getSdkVersion();
         info.deviceModel = InitBridge::shared().getDeviceModel();
-        info.deviceName = info.deviceModel;
+        info.deviceName = InitBridge::shared().getDeviceName();
+        if (info.deviceName.empty()) {
+            info.deviceName = info.deviceModel;
+        }
         info.osVersion = InitBridge::shared().getOSVersion();
         info.chipName = InitBridge::shared().getChipName();
         info.architecture = InitBridge::shared().getArchitecture();
@@ -1876,34 +1982,48 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
         info.coreCount = InitBridge::shared().getCoreCount();
         info.gpuFamily = InitBridge::shared().getGPUFamily();
         info.formFactor = InitBridge::shared().isTablet() ? "tablet" : "phone";
-        info.batteryLevel = -1.0f;
-        info.batteryState = "";
-        info.isLowPowerMode = false;
-        // Mirrors Swift DeviceInfo.swift: Neural Engine is derived from the
-        // architecture (arm64 Apple silicon), never hardcoded — x86 simulators
-        // report none. Cores follow Swift's `hasNeuralEngine ? 16 : 0`.
+        info.batteryLevel = InitBridge::shared().getBatteryLevel();
+        info.batteryState = InitBridge::shared().getBatteryState();
+        info.isLowPowerMode = InitBridge::shared().isLowPowerMode();
+        // Apple: Neural Engine derived from the architecture (arm64 Apple
+        // silicon) with per-generation core counts; x86 simulators report
+        // none. Android: NPU presence detected from the SoC family; core
+        // counts are not exposed, so they stay 0 rather than a guess.
+        info.hasNeuralEngine = InitBridge::shared().hasNeuralEngine();
 #if defined(__APPLE__)
-        info.hasNeuralEngine = info.architecture == "arm64";
+        info.neuralEngineCores =
+            info.hasNeuralEngine ? neuralEngineCoresForChip(info.chipName) : 0;
 #else
-        info.hasNeuralEngine = false;
+        info.neuralEngineCores = 0;
 #endif
-        info.neuralEngineCores = info.hasNeuralEngine ? 16 : 0;
-        // Core split mirrors Swift getCoreDistribution(totalCores:modelId:):
-        // iPhone → 2P + rest E; iPad/Mac → ~40% performance (min 2);
-        // default → totalCores/3 performance (min 1).
-        const std::string& model = info.deviceModel;
         const int totalCores = info.coreCount;
-        int perfCores;
-        if (model.rfind("iPhone", 0) == 0) {
-            perfCores = 2;
-        } else if (model.rfind("iPad", 0) == 0 || model.rfind("Mac", 0) == 0) {
-            perfCores = std::max(2, totalCores * 2 / 5);
+        int perfCores = 0;
+        int effCores = 0;
+        if (InitBridge::shared().getCoreSplit(totalCores, perfCores, effCores)) {
+            info.performanceCores = perfCores;
+            info.efficiencyCores = effCores;
         } else {
-            perfCores = std::max(1, totalCores / 3);
+            // Heuristic fallback mirrors Swift
+            // getCoreDistribution(totalCores:modelId:): iPhone → 2P + rest E;
+            // iPad/Mac → ~40% performance (min 2); default → totalCores/3 (min 1).
+            const std::string& model = info.deviceModel;
+            if (model.rfind("iPhone", 0) == 0) {
+                perfCores = 2;
+            } else if (model.rfind("iPad", 0) == 0 || model.rfind("Mac", 0) == 0) {
+                perfCores = std::max(2, totalCores * 2 / 5);
+            } else {
+                perfCores = std::max(1, totalCores / 3);
+            }
+            perfCores = std::min(perfCores, totalCores);
+            info.performanceCores = perfCores;
+            info.efficiencyCores = totalCores - perfCores;
         }
-        perfCores = std::min(perfCores, totalCores);
-        info.performanceCores = perfCores;
-        info.efficiencyCores = totalCores - perfCores;
+        // Stable hardware fingerprint: SHA-256 of the invariant hardware
+        // tuple, distinct from the per-install persistent device UUID.
+        info.deviceFingerprint = ::runanywhere::sha256_hex(
+            info.deviceModel + "|" + info.chipName + "|" +
+            std::to_string(info.totalMemory) + "|" +
+            std::to_string(info.coreCount));
         return info;
     };
 
@@ -2285,6 +2405,128 @@ bool InitBridge::isTablet() {
 #elif defined(ANDROID) || defined(__ANDROID__)
     return AndroidBridge::isTablet();
 #else
+    return false;
+#endif
+}
+
+std::string InitBridge::getDeviceName() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getDeviceName(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    if (value) {
+        free(value);
+    }
+    return "";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getDeviceName();
+#else
+    return "";
+#endif
+}
+
+float InitBridge::getBatteryLevel() {
+#if defined(__APPLE__)
+    return PlatformAdapter_getBatteryLevel();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getBatteryLevel();
+#else
+    return -1.0f;
+#endif
+}
+
+std::string InitBridge::getBatteryState() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getBatteryState(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    if (value) {
+        free(value);
+    }
+    return "";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getBatteryState();
+#else
+    return "";
+#endif
+}
+
+bool InitBridge::isLowPowerMode() {
+#if defined(__APPLE__)
+    return PlatformAdapter_isLowPowerMode();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::isLowPowerMode();
+#else
+    return false;
+#endif
+}
+
+bool InitBridge::hasNeuralEngine() {
+#if defined(__APPLE__)
+    return getArchitecture() == "arm64";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::hasNPU();
+#else
+    return false;
+#endif
+}
+
+bool InitBridge::getCoreSplit(int totalCores, int& perfCores, int& effCores) {
+    if (totalCores <= 0) {
+        return false;
+    }
+#if defined(__APPLE__)
+    const int perf = PlatformAdapter_getPerformanceCores();
+    if (perf <= 0 || perf > totalCores) {
+        return false;
+    }
+    int eff = PlatformAdapter_getEfficiencyCores();
+    if (eff < 0 || perf + eff > totalCores) {
+        eff = totalCores - perf;
+    }
+    perfCores = perf;
+    effCores = eff;
+    return true;
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Group cores by cpuinfo_max_freq: cores at the highest max frequency are
+    // performance cores, the rest efficiency. Homogeneous CPUs report all
+    // cores as performance.
+    long maxFreq = 0;
+    std::vector<long> freqs;
+    freqs.reserve(static_cast<size_t>(totalCores));
+    for (int cpu = 0; cpu < totalCores; ++cpu) {
+        char path[96];
+        std::snprintf(path, sizeof(path),
+                      "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", cpu);
+        std::ifstream file(path);
+        long freq = 0;
+        if (!file || !(file >> freq) || freq <= 0) {
+            return false;
+        }
+        freqs.push_back(freq);
+        maxFreq = std::max(maxFreq, freq);
+    }
+    int perf = 0;
+    for (long freq : freqs) {
+        if (freq == maxFreq) {
+            ++perf;
+        }
+    }
+    if (perf <= 0 || perf > totalCores) {
+        return false;
+    }
+    perfCores = perf;
+    effCores = totalCores - perf;
+    return true;
+#else
+    (void)perfCores;
+    (void)effCores;
     return false;
 #endif
 }
