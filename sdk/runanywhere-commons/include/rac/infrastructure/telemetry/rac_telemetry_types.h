@@ -94,10 +94,10 @@ typedef struct rac_telemetry_payload {
     int32_t segment_index;
     // Hybrid STT router attribution (populated only on the hybrid transcribe
     // path; null on plain single-backend STT).
-    const char* routed_backend;    // backend/model that actually served the request
-    rac_bool_t was_fallback;       // secondary served after the primary failed
-    rac_bool_t has_was_fallback;   // whether was_fallback is meaningful
-    int32_t attempt_count;         // 1 = primary only, 2 = primary then fallback
+    const char* routed_backend;   // backend/model that actually served the request
+    rac_bool_t was_fallback;      // secondary served after the primary failed
+    rac_bool_t has_was_fallback;  // whether was_fallback is meaningful
+    int32_t attempt_count;        // 1 = primary only, 2 = primary then fallback
 
     // TTS-specific fields
     int32_t character_count;
@@ -132,9 +132,9 @@ typedef struct rac_telemetry_payload {
     // RAG-specific extras (via properties carrier; retrieved_docs_count above)
     int32_t top_k;
     double retrieval_time_ms;
-    int32_t query_token_count;    // estimated tokens in the query (via properties carrier)
-    int32_t context_tokens;       // estimated tokens in the retrieved context (via carrier)
-    const char* embedding_model;  // RAG embedding model (string → dup'd/freed)
+    int32_t query_token_count;     // estimated tokens in the query (via properties carrier)
+    int32_t context_tokens;        // estimated tokens in the retrieved context (via carrier)
+    const char* embedding_model;   // RAG embedding model (string → dup'd/freed)
     rac_bool_t reranker_used;      // LLM-pointwise rerank enabled for the query
     rac_bool_t has_reranker_used;  // whether reranker_used is set
 
@@ -171,9 +171,9 @@ typedef struct rac_telemetry_payload {
     // Voice-agent per-turn fields (via properties carrier; voice_* timing above)
     int32_t transcript_chars;
     int32_t response_chars;
-    int32_t turn_index;              // 0-based turn number within the agent session
-    rac_bool_t has_turn_index;       // whether turn_index is set (0 is valid)
-    rac_bool_t voice_interrupted;    // turn ended via caller cancel / barge-out
+    int32_t turn_index;            // 0-based turn number within the agent session
+    rac_bool_t has_turn_index;     // whether turn_index is set (0 is valid)
+    rac_bool_t voice_interrupted;  // turn ended via caller cancel / barge-out
     rac_bool_t has_voice_interrupted;
 
     // SDK lifecycle fields
@@ -185,6 +185,18 @@ typedef struct rac_telemetry_payload {
     // Network fields
     rac_bool_t is_online;
     rac_bool_t has_is_online;
+
+    // Live device state + SDK origin (stamped by the telemetry manager at
+    // track time — callers never set these; see telemetry_manager.cpp)
+    const char* sdk_binding;       // "swift", "kotlin", "flutter", "react-native", "web", "cli"
+    double battery_level;          // 0.0-1.0 sampled at event time, negative if unavailable
+    const char* battery_state;     // "charging", "full", "unplugged", NULL if unavailable
+    rac_bool_t is_low_power_mode;  // Low power mode at event time
+    rac_bool_t has_is_low_power_mode;
+    int64_t total_memory;       // Total RAM in bytes, 0 if unknown
+    int64_t available_memory;   // Available RAM in bytes at event time, 0 if unknown
+    double cpu_usage_percent;   // 0-100 since previous event, negative if unavailable
+    int32_t online_core_count;  // CPU cores online at event time, 0 if unknown
 } rac_telemetry_payload_t;
 
 /**

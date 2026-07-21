@@ -18,9 +18,11 @@
  * bypassed and completion events flush synchronously into the capture callback.
  */
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <thread>
 
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
@@ -33,13 +35,13 @@ namespace v1 = runanywhere::v1;
 static int g_checks = 0;
 static int g_failures = 0;
 
-#define CHECK(cond, msg)                                     \
-    do {                                                     \
-        ++g_checks;                                          \
-        if (!(cond)) {                                       \
-            ++g_failures;                                    \
-            std::fprintf(stderr, "  FAIL: %s\n", (msg));     \
-        }                                                    \
+#define CHECK(cond, msg)                                 \
+    do {                                                 \
+        ++g_checks;                                      \
+        if (!(cond)) {                                   \
+            ++g_failures;                                \
+            std::fprintf(stderr, "  FAIL: %s\n", (msg)); \
+        }                                                \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -160,7 +162,8 @@ int main() {
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/embeddings", "embeddings: routed correctly");
         CHECK(has(cap.body, "\"total_tokens\":21"), "embeddings: total_tokens = 21");
         CHECK(has(cap.body, "\"batch_size\":1"), "embeddings: batch_size = 1");
-        CHECK(has(cap.body, "\"embedding_dimension\":384"), "embeddings: embedding_dimension = 384");
+        CHECK(has(cap.body, "\"embedding_dimension\":384"),
+              "embeddings: embedding_dimension = 384");
     }
 
     // --- LoRA failure: base_model_id + adapter_id + adapter_size_bytes ------
@@ -216,13 +219,65 @@ int main() {
         cap_ev->set_kind(v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED);
         cap_ev->set_component(v1::SDK_COMPONENT_VLM);
         cap_ev->set_model_id("smolvlm2-256m");
-        cap_ev->set_input_count(1);    // image count
+        cap_ev->set_input_count(1);  // image count
         cap_ev->set_output_count(128);
         track(mgr, &cap, ev);
         CHECK(cap.called, "vlm: event delivered to sink");
         CHECK(cap.endpoint == "/api/v2/sdk/telemetry/vlm", "vlm: routed to vlm endpoint");
         CHECK(has(cap.body, "\"image_count\":1"), "vlm: image_count = 1");
         CHECK(has(cap.body, "\"prompt_eval_time_ms\":826"), "vlm: prompt_eval_time_ms = 826");
+    }
+
+    // --- SDK origin + live device state stamped on every event --------------
+    {
+        rac_client_info_t ci = {};
+        ci.sdk_binding = "test-binding";
+        rac_sdk_set_client_info(&ci);
+
+        v1::SDKEvent ev;
+        envelope(&ev, v1::SDK_COMPONENT_LLM);
+        auto* g = ev.mutable_generation();
+        g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
+        g->set_model_id("qwen3-0.6b");
+        track(mgr, &cap, ev);
+        CHECK(cap.called, "device-state: event delivered to sink");
+        CHECK(has(cap.body, "\"sdk_binding\":\"test-binding\""),
+              "device-state: sdk_binding stamped");
+        // No device-manager callbacks registered here, so battery/memory stay
+        // omitted; CPU core count is read in-process and must be present.
+        CHECK(has(cap.body, "\"online_core_count\":"), "device-state: online_core_count present");
+
+        rac_client_info_t reset = {};
+        rac_sdk_set_client_info(&reset);
+    }
+
+    // --- HTTP retry: a failed batch re-sends after backoff ------------------
+    {
+        v1::SDKEvent ev;
+        envelope(&ev, v1::SDK_COMPONENT_LLM);
+        auto* g = ev.mutable_generation();
+        g->set_kind(v1::GENERATION_EVENT_KIND_COMPLETED);
+        g->set_model_id("retry-model");
+
+        cap.called = false;
+        const std::string bytes = ev.SerializeAsString();
+        rac_telemetry_manager_track_proto(mgr, reinterpret_cast<const uint8_t*>(bytes.data()),
+                                          bytes.size());
+        CHECK(cap.called, "retry: initial send delivered");
+        rac_telemetry_manager_http_complete(mgr, RAC_FALSE, nullptr, "simulated network failure");
+
+        // Before the backoff elapses a flush must NOT re-send the batch.
+        cap.called = false;
+        rac_telemetry_manager_flush(mgr);
+        CHECK(!cap.called, "retry: no re-send before backoff");
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(5200));
+        cap.called = false;
+        rac_telemetry_manager_flush(mgr);
+        CHECK(cap.called, "retry: re-sent after backoff");
+        CHECK(cap.endpoint == "/api/v2/sdk/telemetry/llm", "retry: same endpoint");
+        CHECK(has(cap.body, "retry-model"), "retry: same batch body");
+        rac_telemetry_manager_http_complete(mgr, RAC_TRUE, nullptr, nullptr);
     }
 
     rac_telemetry_manager_destroy(mgr);

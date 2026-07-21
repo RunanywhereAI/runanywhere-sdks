@@ -17,6 +17,7 @@
  *     UUID through secure storage instead.
  */
 
+#include "../infrastructure/device/rac_device_live_state_internal.h"
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -454,6 +455,9 @@ extern "C" {
 
 rac_result_t rac_desktop_adapter_init(const rac_desktop_adapter_config_t* config,
                                       rac_platform_adapter_t* out_adapter) {
+    // Desktop callbacks are plain C — live telemetry sampling is thread-safe.
+    rac_telemetry_enable_live_platform_sampling();
+
     if (!out_adapter) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
