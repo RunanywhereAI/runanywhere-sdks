@@ -297,6 +297,64 @@ jobs:
           Copy-Item tests -Destination $tmp -Recurse -Force
           python -m pytest $tmp\tests -q
 
+  python-linux:
+    # Linux sibling of python-windows: builds the runanywhere-python wheel via
+    # scikit-build-core, repairs it with auditwheel (vendors the onnxruntime/sherpa sidecar
+    # .so into runanywhere.libs/ and retags linux_x86_64 -> manylinux), installs it into a
+    # clean interpreter, and runs the hermetic suite. ubuntu-22.04 keeps the manylinux tag low
+    # (glibc 2.35) for a broadly-installable wheel.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: linux
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build tools (patchelf is required by auditwheel)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q patchelf ninja-build
+          python -m pip install --upgrade pip build auditwheel pytest
+      - name: Sherpa-ONNX prebuilts
+        run: |
+          ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+          # The prebuilt ships libonnxruntime.so, but _core/sherpa record a versioned
+          # DT_NEEDED (libonnxruntime.so.1); give auditwheel a matching filename to vendor.
+          lib="sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib"
+          ln -sf libonnxruntime.so "$lib/libonnxruntime.so.1"
+      - name: Build wheel
+        working-directory: sdk/runanywhere-python
+        run: python -m build --wheel -o dist
+      - name: Repair wheel (vendor sidecar .so)
+        working-directory: sdk/runanywhere-python
+        run: |
+          # The sherpa prebuilt lib dir holds the version-matched libonnxruntime.so +
+          # libsherpa-onnx-c-api.so; on LD_LIBRARY_PATH auditwheel finds + vendors them.
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib:$LD_LIBRARY_PATH"
+          wheel="$(ls dist/*.whl | head -1)"
+          auditwheel repair -w wheelhouse "$wheel"
+      - name: Validate release boundary (no host paths, no binaries in sdist)
+        working-directory: sdk/runanywhere-python
+        run: |
+          python -m build --sdist -o wheelhouse
+          ver="$(tr -d '[:space:]' < ../runanywhere-commons/VERSION)"
+          python scripts/validate_public_packages.py --dist wheelhouse --expected-version "$ver"
+      - name: Install + hermetic tests
+        working-directory: sdk/runanywhere-python
+        run: |
+          wheel="$(ls wheelhouse/*.whl | head -1)"
+          python -m pip install "$wheel"
+          # Run the hermetic suite from a temp dir so `runanywhere` resolves to the installed
+          # wheel, not the source tree; the gated smoke tests self-skip (no models).
+          tmp="$RUNNER_TEMP/ratests"; mkdir -p "$tmp"
+          cp -r tests "$tmp/tests"
+          cd "$tmp" && python -m pytest tests -q
+
   wasm:
     runs-on: ubuntu-22.04
     steps:
