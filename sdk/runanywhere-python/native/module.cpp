@@ -68,6 +68,27 @@ rac_result_t create_service(const char* model_id, const char* config_json, rac_h
 extern "C" void rac_python_fill_posix_adapter(rac_platform_adapter_t* out, const char* secure_dir);
 #endif
 
+// Optional engine backends. `native/CMakeLists.txt` links any present `rac_backend_<x>`
+// target and defines the matching `RAC_HAVE_BACKEND_<X>`; `rac_backend_<x>_register()` is the
+// single entry every RunAnywhere SDK invokes. Declared here (guarded) so the wrapper compiles
+// with any subset of backends and a new one (QHexRT on Windows-on-Snapdragon, MLX, ...) drops
+// in via a build flag with no wrapper-logic changes. llamacpp/onnx/sherpa keep their existing
+// commons headers above; these have no public commons header, so declare them directly.
+extern "C" {
+#ifdef RAC_HAVE_BACKEND_QHEXRT
+rac_result_t rac_backend_qhexrt_register(void);  // Qualcomm Hexagon NPU (Snapdragon)
+#endif
+#ifdef RAC_HAVE_BACKEND_MLX
+rac_result_t rac_backend_mlx_register(void);  // Apple MLX
+#endif
+#ifdef RAC_HAVE_BACKEND_COREML
+rac_result_t rac_backend_coreml_register(void);  // Apple Core ML
+#endif
+#ifdef RAC_HAVE_BACKEND_CLOUD
+rac_result_t rac_backend_cloud_register(void);  // Cloud STT provider
+#endif
+}
+
 namespace {
 
 // The adapter struct is caller-owned and must outlive rac_shutdown().
@@ -197,16 +218,38 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
     // initialize() must stay safe to call again after shutdown().
     static bool backends_registered = false;
     if (!backends_registered) {
+        // Register whichever engine backends this build linked (each gated by the
+        // RAC_HAVE_BACKEND_<X> define native/CMakeLists.txt emits for a present
+        // rac_backend_<x> target). Selection among registered engines is by the C plugin
+        // registry's priority (qhexrt=150 > mlx=110 > llamacpp=100 > sherpa=90 >
+        // onnx/cloud=50), so a loaded model auto-routes to the best available engine and
+        // adding a backend needs NO facade changes — just link it + one guarded call here.
+#ifdef RAC_HAVE_BACKEND_LLAMACPP
+        // LLM/VLM engine — treated as required when linked: a failure here is fatal.
         rc = rac_backend_llamacpp_register();
         if (rc != RAC_SUCCESS) {
             rac_shutdown();
             raise_rac_error(rc, "rac_backend_llamacpp_register");
         }
-        // Embeddings engine (optional): register the ONNX backend. A failure here
-        // just means embeddings are unavailable, not a fatal init error.
-        rac_backend_onnx_register();
-        // Speech engine (optional): register sherpa for STT / TTS.
-        rac_backend_sherpa_register();
+#endif
+#ifdef RAC_HAVE_BACKEND_ONNX
+        rac_backend_onnx_register();  // embeddings (optional; failure just = unavailable)
+#endif
+#ifdef RAC_HAVE_BACKEND_SHERPA
+        rac_backend_sherpa_register();  // STT / TTS (optional)
+#endif
+#ifdef RAC_HAVE_BACKEND_QHEXRT
+        rac_backend_qhexrt_register();  // Hexagon NPU (Snapdragon; incl. Windows-on-Snapdragon)
+#endif
+#ifdef RAC_HAVE_BACKEND_MLX
+        rac_backend_mlx_register();  // Apple MLX (Apple Silicon)
+#endif
+#ifdef RAC_HAVE_BACKEND_COREML
+        rac_backend_coreml_register();  // Apple Core ML
+#endif
+#ifdef RAC_HAVE_BACKEND_CLOUD
+        rac_backend_cloud_register();  // cloud STT provider fallback
+#endif
         backends_registered = true;
     }
     g_initialized.store(true);
