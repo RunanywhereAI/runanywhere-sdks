@@ -54,6 +54,7 @@ import type {
 const logger = new SDKLogger('SherpaONNXBridge');
 const NVIDIA_SEGFORMER_LICENSE_ENV =
   'RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE';
+const NVIDIA_SORTFORMER_LICENSE_ENV = 'RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE';
 
 function logTimedStep(step: string, startedAt: number): void {
   logger.info(`${step} completed in ${Date.now() - startedAt}ms`);
@@ -174,6 +175,36 @@ export class SherpaONNXBridge {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
         `Failed to record the SegFormer license acknowledgement (setenv returned ${String(rc)}).`,
+      );
+    }
+  }
+
+  /**
+   * Set the native provider's fail-closed license acknowledgement for the
+   * NVIDIA streaming Sortformer diarization model inside this Emscripten
+   * process (env `RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE`). The caller-facing
+   * boolean lives on `ONNX.register(...)`; keeping the actual `setenv` here
+   * applies it to the same private WASM instance that owns diarization.
+   * Model bytes must still be supplied separately.
+   */
+  acceptNvidiaSortformerLicense(): void {
+    const module = this._module;
+    if (!module || typeof module.ccall !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'The ONNX WASM module cannot record the Sortformer license acknowledgement.',
+      );
+    }
+    const rc = module.ccall(
+      'setenv',
+      'number',
+      ['string', 'string', 'number'],
+      [NVIDIA_SORTFORMER_LICENSE_ENV, '1', 1],
+    );
+    if (rc !== 0) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `Failed to record the Sortformer license acknowledgement (setenv returned ${String(rc)}).`,
       );
     }
   }

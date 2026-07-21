@@ -51,6 +51,13 @@ export interface ONNXRegisterOptions {
    * Model bytes must still be supplied separately.
    */
   acceptNvidiaSegformerNoncommercialLicense?: boolean;
+  /**
+   * Explicitly acknowledge the NVIDIA streaming Sortformer diarization
+   * license for this browser-WASM session. Does not download or catalog the
+   * model. Set it only after the application owner has reviewed and accepted
+   * the pinned upstream terms; model bytes must still be supplied separately.
+   */
+  acceptNvidiaSortformerLicense?: boolean;
   /** Optional worker factory. Defaults to this package's worker entrypoint. */
   backendWorkerFactory?: BackendWorkerFactory;
   /** Prefer worker-owned ONNX/Sherpa model lifecycle and inference. */
@@ -95,6 +102,9 @@ export const ONNX = {
       await bridge.ensureLoaded(options);
       if (options?.acceptNvidiaSegformerNoncommercialLicense === true) {
         bridge.acceptNvidiaSegformerNoncommercialLicense();
+      }
+      if (options?.acceptNvidiaSortformerLicense === true) {
+        bridge.acceptNvidiaSortformerLicense();
       }
       await installONNXBackendWorker(options);
       _registrationState = 'registered';

@@ -229,12 +229,13 @@ async function onLicenseToggle(input: HTMLInputElement): Promise<void> {
   setLicenseStatus('Registering the ONNX diarization backend…');
   renderView();
   try {
-    // The app-facing way to bring up the ONNX diarization backend: register it.
-    // `register` is idempotent, so this is safe if ONNX is already registered
-    // (e.g. for STT). Loading the Sortformer weights enforces the NVIDIA Open
-    // Model License in the SDK / C++ commons; failures surface as a load error.
+    // Bring up the ONNX diarization backend AND record the NVIDIA Sortformer
+    // license acknowledgement for this browser session. `register` is
+    // idempotent, so this is safe if ONNX is already registered (e.g. for STT).
+    // The SDK sets RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE inside the WASM;
+    // loading the (user-supplied) weights enforces it in C++ commons.
     const { ONNX } = await import('@runanywhere/web-onnx');
-    await ONNX.register({ preferBackendWorker: true });
+    await ONNX.register({ acceptNvidiaSortformerLicense: true });
     licenseAccepted = true;
     setStatus('License accepted. Load a diarization model to continue.');
   } catch (err) {
