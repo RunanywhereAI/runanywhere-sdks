@@ -236,12 +236,15 @@ const App: React.FC = () => {
             '[App] SDK initialized with backend configuration (staging)'
           );
         } else {
+          // Staging test build: keyless staging — no API key, no URL; the SDK
+          // resolves the baked staging backend URL and sends unauthenticated
+          // telemetry (PUBLIC-org ingestion). Restore DEVELOPMENT to go back.
           await RunAnywhere.initialize({
             apiKey: '',
-            baseURL: 'https://api.runanywhere.ai',
-            environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+            baseURL: '',
+            environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
           });
-          console.log('[App] SDK initialized in DEVELOPMENT mode');
+          console.log('[App] SDK initialized in STAGING mode (keyless)');
         }
 
         await registerAll(backendState);

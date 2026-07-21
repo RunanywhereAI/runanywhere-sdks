@@ -82,8 +82,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (staging)');
       } else {
-        await RunAnywhere.initialize();
-        debugPrint('✅ SDK initialized in DEVELOPMENT mode');
+        // Staging test build: keyless staging — no API key, no URL; the SDK
+        // resolves the baked staging backend URL and sends unauthenticated
+        // telemetry (PUBLIC-org ingestion). Restore `RunAnywhere.initialize()`
+        // to go back to development behavior.
+        await RunAnywhere.initialize(
+          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+        );
+        debugPrint('✅ SDK initialized in STAGING mode (keyless)');
       }
 
       // Re-apply the persisted HuggingFace token (Settings screen) so private
