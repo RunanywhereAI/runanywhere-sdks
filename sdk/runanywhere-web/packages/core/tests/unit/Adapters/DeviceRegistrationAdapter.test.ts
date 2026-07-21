@@ -353,7 +353,7 @@ describe('DeviceRegistrationAdapter', () => {
     adapter.cleanup();
   });
 
-  it('distinguishes HTTP rejection, development upsert, and missing configuration', async () => {
+  it('distinguishes HTTP rejection, development registration, and missing configuration', async () => {
     const prod = createFakeModule();
     const prodAdapter = DeviceRegistrationAdapter.install(prod.module, {
       baseURL: 'https://relay.test',
@@ -374,8 +374,10 @@ describe('DeviceRegistrationAdapter', () => {
 
     fetchStub.mockClear();
     fetchStub.mockResolvedValueOnce({ ok: true, status: 204 } as Response);
-    // Dev/keyless upsert now flows through the effective base URL + API key
-    // supplied by commons state (no baked Supabase dev-config credentials).
+    // Every environment (including development/keyless) registers through the
+    // backend endpoint using the effective base URL + API key from commons
+    // state. The device-registration URL is used as-is, with no query rewrite
+    // and no extra request-preference header.
     const dev = createFakeModule();
     const devAdapter = DeviceRegistrationAdapter.install(dev.module, {
       baseURL: 'https://development.invalid',
@@ -383,16 +385,17 @@ describe('DeviceRegistrationAdapter', () => {
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
       sdkVersion: '0.19.13',
     });
-    const devEndpoint = dev.allocateString('/rest/v1/sdk_devices');
+    const devEndpoint = dev.allocateString('/api/v1/devices/register');
     const devBody = dev.allocateString('{}');
     const devResponse = dev.allocateString(' '.repeat(RESPONSE.size));
-    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(-100);
+    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 1, devResponse, 0)).toBe(-100);
     await DeviceRegistrationAdapter.waitForPendingRegistration(dev.module);
-    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(0);
-    expect(fetchStub.mock.calls[0][0]).toContain('?on_conflict=device_id');
+    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 1, devResponse, 0)).toBe(0);
+    expect(fetchStub.mock.calls[0][0]).toBe('https://development.invalid/api/v1/devices/register');
     const devHeaders = new Headers((fetchStub.mock.calls[0][1] as RequestInit).headers);
-    expect(devHeaders.get('authorization')).toBe('Bearer test-development-key');
-    expect(devHeaders.get('prefer')).toContain('merge-duplicates');
+    expect(devHeaders.get('apikey')).toBe('test-development-key');
+    expect(devHeaders.get('authorization')).toBe('Bearer test-access-token');
+    expect(devHeaders.get('prefer')).toBeNull();
     devAdapter.cleanup();
 
     fetchStub.mockClear();
@@ -401,7 +404,7 @@ describe('DeviceRegistrationAdapter', () => {
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
       sdkVersion: '0.19.13',
     });
-    const noConfigEndpoint = noConfig.allocateString('/rest/v1/sdk_devices');
+    const noConfigEndpoint = noConfig.allocateString('/api/v1/devices/register');
     const noConfigBody = noConfig.allocateString('{}');
     const noConfigResponse = noConfig.allocateString(' '.repeat(RESPONSE.size));
     expect(callback(noConfig, CALLBACK.httpPost)(
@@ -428,7 +431,7 @@ describe('DeviceRegistrationAdapter', () => {
         environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         sdkVersion: '0.19.13',
       });
-      const endpoint = handle.allocateString('/rest/v1/sdk_devices');
+      const endpoint = handle.allocateString('/api/v1/devices/register');
       const body = handle.allocateString('{}');
       const response = handle.allocateString(' '.repeat(RESPONSE.size));
 
