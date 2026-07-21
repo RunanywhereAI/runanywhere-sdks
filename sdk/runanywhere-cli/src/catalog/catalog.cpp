@@ -119,6 +119,34 @@ constexpr CatalogFile kMlxNemotronNano8BFiles[] = {
      "tokenizer_config.json", true},
 };
 
+constexpr CatalogFile kMlxNemotronMini4BFiles[] = {
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
 constexpr CatalogFile kMlxLlama32_1BFiles[] = {
     {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
      "main/"
@@ -711,6 +739,11 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronNano8BFiles, 8,
      4534806075LL, 131072, false},
+    {"mlx-nemotron-mini-4b-instruct-4bit", "mlx-nemotron-mini",
+     "NVIDIA Nemotron Mini 4B Instruct 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronMini4BFiles, 6,
+     2392679103LL, 4096, false},
     // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
     // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
     {"mlx-bonsai-1.7b-1bit", "mlx-bonsai-1.7b", "MLX Bonsai-1.7B 1-bit",

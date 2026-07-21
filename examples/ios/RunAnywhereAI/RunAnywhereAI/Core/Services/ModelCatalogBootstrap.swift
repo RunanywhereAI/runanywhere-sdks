@@ -304,6 +304,52 @@ enum ModelCatalogBootstrap {
             modality: .language,
             memoryRequirement: 4_534_806_075
         )
+        // This is the original Nemotron decoder (model_type=nemotron), not a
+        // Llama-family conversion. MLXRuntime registers RunAnywhere's exact
+        // ReLU-squared, LayerNorm1P, and partial-RoPE implementation before
+        // loading. Keep the complete bundle pinned to the reviewed revision.
+        let nemotronMini4BMLXBaseURL =
+            "https://huggingface.co/mlx-community/Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/b5784198153d2d71afcc97d4cc38c049abced8cd"
+        await registerMultiFile(
+            id: "mlx-nemotron-mini-4b-instruct-4bit",
+            name: "NVIDIA Nemotron Mini 4B Instruct 4-bit (MLX)",
+            files: [
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/chat_template.jinja",
+                    filename: "chat_template.jinja",
+                    sizeBytes: 876
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 849
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 2_357_816_399
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json",
+                    sizeBytes: 50_559
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/tokenizer.json",
+                    filename: "tokenizer.json",
+                    sizeBytes: 34_810_091
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/tokenizer_config.json",
+                    filename: "tokenizer_config.json",
+                    sizeBytes: 329
+                ),
+            ],
+            framework: .mlx,
+            modality: .language,
+            memoryRequirement: 2_392_679_103,
+            contextLength: 4_096
+        )
         // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
         // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
         await registerLLM(
@@ -1209,7 +1255,9 @@ enum ModelCatalogBootstrap {
         files: [(url: String, filename: String)],
         framework: InferenceFramework,
         modality: ModelCategory,
-        memoryRequirement: Int64
+        memoryRequirement: Int64,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false
     ) async {
         await registerMultiFile(
             id: id,
@@ -1217,7 +1265,9 @@ enum ModelCatalogBootstrap {
             files: files.map { CatalogModelFile(url: $0.url, filename: $0.filename) },
             framework: framework,
             modality: modality,
-            memoryRequirement: memoryRequirement
+            memoryRequirement: memoryRequirement,
+            contextLength: contextLength,
+            supportsThinking: supportsThinking
         )
     }
 
@@ -1227,7 +1277,9 @@ enum ModelCatalogBootstrap {
         files: [CatalogModelFile],
         framework: InferenceFramework,
         modality: ModelCategory,
-        memoryRequirement: Int64
+        memoryRequirement: Int64,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
@@ -1250,7 +1302,9 @@ enum ModelCatalogBootstrap {
                 name: name,
                 framework: framework,
                 modality: modality,
-                memoryRequirement: memoryRequirement
+                memoryRequirement: memoryRequirement,
+                contextLength: contextLength,
+                supportsThinking: supportsThinking
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

@@ -626,6 +626,7 @@ private final class MLXSession: @unchecked Sendable {
         let tokenizerLoader: any TokenizerLoader = TransformersTokenizerLoader()
         switch kind {
         case .llm:
+            await registerRunAnywhereNemotronModelType()
             let container = try await LLMModelFactory.shared.loadContainer(
                 from: directory,
                 using: tokenizerLoader

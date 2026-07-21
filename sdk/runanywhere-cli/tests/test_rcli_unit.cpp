@@ -334,6 +334,27 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
+  const rcli::catalog::CatalogEntry *nemotron_mini =
+      rcli::catalog::find("mlx-nemotron-mini");
+  if (!nemotron_mini ||
+      nemotron_mini->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      nemotron_mini->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      nemotron_mini->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      nemotron_mini->files == nullptr || nemotron_mini->file_count != 6 ||
+      nemotron_mini->download_size_bytes != 2392679103LL ||
+      nemotron_mini->context_length != 4096) {
+    result.details = "mlx-nemotron-mini should be a complete pinned MLX bundle";
+    return result;
+  }
+  for (size_t i = 0; i < nemotron_mini->file_count; ++i) {
+    if (std::string(nemotron_mini->files[i].url)
+            .find("/resolve/b5784198153d2d71afcc97d4cc38c049abced8cd/") ==
+        std::string::npos) {
+      result.details = "mlx-nemotron-mini files must use the pinned revision";
+      return result;
+    }
+  }
+
   struct NvidiaSpeechCase {
     const char *alias;
     int64_t download_size_bytes;
@@ -464,6 +485,7 @@ TestResult test_mlx_catalog_registration() {
       "mlx-qwen3-asr-0.6b-8bit",
       "mlx-glm-asr-nano-2512-4bit",
       "mlx-llama-3.1-nemotron-nano-8b-v1-4bit",
+      "mlx-nemotron-mini-4b-instruct-4bit",
       "mlx-parakeet-ctc-1.1b",
       "mlx-parakeet-tdt-0.6b-v2",
       "mlx-parakeet-tdt-0.6b-v3",
@@ -571,6 +593,7 @@ TestResult test_mlx_catalog_registration() {
   };
   const RegisteredNvidiaCase registered_nvidia_cases[] = {
       {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", 8, 4534806075LL},
+      {"mlx-nemotron-mini-4b-instruct-4bit", 6, 2392679103LL},
       {"mlx-parakeet-ctc-1.1b", 2, 4250718357LL},
       {"mlx-parakeet-tdt-0.6b-v2", 2, 2471596080LL},
       {"mlx-parakeet-tdt-0.6b-v3", 2, 2508532829LL},

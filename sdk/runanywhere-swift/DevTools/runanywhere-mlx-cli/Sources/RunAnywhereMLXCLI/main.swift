@@ -109,6 +109,48 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    private static let nemotronMini4BBaseURL =
+        "https://huggingface.co/mlx-community/Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/b5784198153d2d71afcc97d4cc38c049abced8cd"
+
+    static let nemotronMini4BLLM = CatalogEntry(
+        id: "mlx-nemotron-mini-4b-instruct-4bit",
+        alias: "mlx-nemotron-mini",
+        name: "NVIDIA Nemotron Mini 4B Instruct 4-bit (MLX)",
+        category: .language,
+        framework: .mlx,
+        files: [
+            .init(
+                "\(nemotronMini4BBaseURL)/chat_template.jinja",
+                "chat_template.jinja",
+                sizeBytes: 876
+            ),
+            .init("\(nemotronMini4BBaseURL)/config.json", "config.json", sizeBytes: 849),
+            .init(
+                "\(nemotronMini4BBaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 2_357_816_399
+            ),
+            .init(
+                "\(nemotronMini4BBaseURL)/model.safetensors.index.json",
+                "model.safetensors.index.json",
+                sizeBytes: 50_559
+            ),
+            .init(
+                "\(nemotronMini4BBaseURL)/tokenizer.json",
+                "tokenizer.json",
+                sizeBytes: 34_810_091
+            ),
+            .init(
+                "\(nemotronMini4BBaseURL)/tokenizer_config.json",
+                "tokenizer_config.json",
+                sizeBytes: 329
+            ),
+        ],
+        memoryRequirement: 2_392_679_103,
+        contextLength: 4_096,
+        supportsThinking: false
+    )
+
     static let llamaLLM = CatalogEntry(
         id: "mlx-llama-3.2-1b-instruct-4bit",
         alias: "mlx-llama3.2",
@@ -493,6 +535,7 @@ private enum MLXCatalog {
     static let entries = [
         qwen3LLM,
         nemotronNano8BLLM,
+        nemotronMini4BLLM,
         llamaLLM,
         fastVLM,
         qwen2VLM,
