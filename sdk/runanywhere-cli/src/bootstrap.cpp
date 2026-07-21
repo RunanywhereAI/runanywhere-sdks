@@ -339,7 +339,11 @@ void initialize_telemetry_auth() {
   const std::string environment_name =
       first_env_value("RUNANYWHERE_ENVIRONMENT", nullptr, nullptr);
 
-  if (api_key.empty() || base_url.empty()) {
+  // Keyless staging is valid: the baked staging URL resolves in commons and
+  // telemetry flushes unauthenticated (PUBLIC-org ingestion).
+  const bool staging_keyless =
+      environment_from_name(environment_name) == RAC_ENV_STAGING;
+  if ((api_key.empty() || base_url.empty()) && !staging_keyless) {
     return; // Local dev mode — telemetry not sent (staging/prod only).
   }
 
