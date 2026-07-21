@@ -37,6 +37,17 @@ struct ConsumerAdvancedHubView: View {
                         subtitle: "Speech/silence diagnostics"
                     )
                 }
+
+                #if canImport(UIKit)
+                NavigationLink(destination: DiarizationView()) {
+                    AdvancedFeatureRow(
+                        icon: "person.2.wave.2",
+                        color: AppColors.primaryAccent,
+                        title: "Diarization",
+                        subtitle: "Who spoke when (NVIDIA Sortformer)"
+                    )
+                }
+                #endif
             }
 
             #if canImport(UIKit)

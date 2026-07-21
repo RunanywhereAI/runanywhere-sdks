@@ -41,6 +41,9 @@ data class Vision(val openLiveCamera: Boolean = false)
 data object Segmentation
 
 @Serializable
+data object Diarization
+
+@Serializable
 data object Documents
 
 @Serializable
