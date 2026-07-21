@@ -1,0 +1,5 @@
+# The on-device engine (the wheel built from sdk/runanywhere-python; or `pip install runanywhere`).
+runanywhere>=0.20.11
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9   # multipart file upload for /v1/audio/transcriptions
