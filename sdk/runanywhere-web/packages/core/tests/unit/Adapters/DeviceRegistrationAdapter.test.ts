@@ -75,7 +75,7 @@ interface FakeModuleHandle {
   setNativeRegistered(value: boolean): void;
 }
 
-function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeModuleHandle {
+function createFakeModule(): FakeModuleHandle {
   const memory = new ArrayBuffer(1 << 20);
   const heap = new Uint8Array(memory);
   const view = new DataView(memory);
@@ -108,8 +108,6 @@ function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeM
   };
   const deviceIdPtr = writeString('web-device-id');
   const accessTokenPtr = writeString('test-access-token');
-  const devURLPtr = writeString('https://development.invalid');
-  const devKeyPtr = writeString('test-development-key');
 
   const moduleShape: Partial<DeviceRegistrationModule> = {
     HEAPU8: heap,
@@ -157,9 +155,6 @@ function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeM
     _rac_state_is_device_registered: () => nativeRegistered ? 1 : 0,
     _rac_state_set_device_registered(value: number): void { nativeRegistered = value !== 0; },
     _rac_auth_get_access_token: () => accessTokenPtr,
-    _rac_wasm_dev_config_is_available: () => options.devConfigAvailable ? 1 : 0,
-    _rac_wasm_dev_config_get_supabase_url: () => devURLPtr,
-    _rac_wasm_dev_config_get_supabase_key: () => devKeyPtr,
 
     _rac_wasm_sizeof_device_callbacks: () => CALLBACK.size,
     _rac_wasm_offsetof_device_callbacks_get_device_info: () => CALLBACK.getInfo,
@@ -379,8 +374,12 @@ describe('DeviceRegistrationAdapter', () => {
 
     fetchStub.mockClear();
     fetchStub.mockResolvedValueOnce({ ok: true, status: 204 } as Response);
-    const dev = createFakeModule({ devConfigAvailable: true });
+    // Dev/keyless upsert now flows through the effective base URL + API key
+    // supplied by commons state (no baked Supabase dev-config credentials).
+    const dev = createFakeModule();
     const devAdapter = DeviceRegistrationAdapter.install(dev.module, {
+      baseURL: 'https://development.invalid',
+      apiKey: 'test-development-key',
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
       sdkVersion: '0.19.13',
     });
@@ -423,7 +422,7 @@ describe('DeviceRegistrationAdapter', () => {
       { baseURL: 'https://attacker.invalid' },
       { apiKey: 'configured-key-without-origin' },
     ]) {
-      const handle = createFakeModule({ devConfigAvailable: true });
+      const handle = createFakeModule();
       const adapter = DeviceRegistrationAdapter.install(handle.module, {
         ...configuration,
         environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,

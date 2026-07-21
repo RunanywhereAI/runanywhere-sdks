@@ -59,9 +59,6 @@ export interface DeviceRegistrationModule extends EmscriptenRunanywhereModule {
   _rac_state_is_device_registered?(): number;
   _rac_state_set_device_registered?(registered: number): void;
   _rac_auth_get_access_token?(): number;
-  _rac_wasm_dev_config_get_supabase_url?(): number;
-  _rac_wasm_dev_config_get_supabase_key?(): number;
-  _rac_wasm_dev_config_is_available?(): number;
 
   _rac_wasm_sizeof_device_callbacks?(): number;
   _rac_wasm_offsetof_device_callbacks_get_device_info?(): number;
@@ -658,21 +655,19 @@ export class DeviceRegistrationAdapter {
     return this.readNativeString(this.module._rac_auth_get_access_token);
   }
 
-  /** Resolve URL + credential atomically so embedded secrets never cross origins. */
+  /**
+   * Resolve URL + credential atomically so embedded secrets never cross origins.
+   *
+   * No released SDK bakes or reads Supabase credentials or a build token: the
+   * backend is reached only through the effective base URL supplied by commons
+   * state (keyless staging attributes to a PUBLIC org). The dev/keyless path
+   * therefore falls through to the same effective-base-URL configuration as any
+   * other environment — there is no separate dev-config credential branch.
+   */
   private currentControlPlaneConfiguration(): ResolvedControlPlaneConfiguration | null {
-    if (this.configuredBaseURL || this.configuredApiKey) {
-      return this.configuredBaseURL && this.configuredApiKey
-        ? { baseURL: this.configuredBaseURL, apiKey: this.configuredApiKey }
-        : null;
-    }
-    try {
-      if (this.module._rac_wasm_dev_config_is_available?.() !== 1) return null;
-      const baseURL = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_url);
-      const apiKey = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_key);
-      return baseURL && apiKey ? { baseURL, apiKey } : null;
-    } catch {
-      return null;
-    }
+    return this.configuredBaseURL && this.configuredApiKey
+      ? { baseURL: this.configuredBaseURL, apiKey: this.configuredApiKey }
+      : null;
   }
 
   private async prepareHTTPRequest(options: {

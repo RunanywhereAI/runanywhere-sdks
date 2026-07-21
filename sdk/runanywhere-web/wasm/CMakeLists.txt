@@ -970,12 +970,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_sizeof_embeddings_options"
     "_rac_wasm_sizeof_embeddings_result"
 
-    # Dev config WASM wrappers
-    "_rac_wasm_dev_config_is_available"
-    "_rac_wasm_dev_config_get_supabase_url"
-    "_rac_wasm_dev_config_get_supabase_key"
-    "_rac_wasm_dev_config_get_build_token"
-
     # Emscripten runtime helpers
     "_malloc"
     "_free"
