@@ -77,7 +77,10 @@ option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Mode
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
+option(RAC_BUILD_ELECTRON_HARNESS "Build the runanywhere-electron M0 Win32 inference harness" OFF)
+option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addon" OFF)
 option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux/Windows) platform adapter + libcurl HTTP transport" OFF)
+option(RAC_GPU_CUDA           "Build llama.cpp with the CUDA GPU backend (NVIDIA; requires the CUDA toolkit + MSVC)" OFF)
 
 # Protobuf is a private implementation detail of the serialized-byte C ABI.
 # Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime
@@ -263,6 +266,13 @@ endif()
 # rac_backend_* targets that only exist once the engine subdirs configured.
 if(RAC_BUILD_CLI)
     add_subdirectory(sdk/runanywhere-cli)
+endif()
+
+# runanywhere-electron M0 inference harness. Added after engines/ because it
+# links rac_backend_llamacpp, which only exists once the engine subdir configured.
+if((RAC_BUILD_ELECTRON_HARNESS OR RAC_BUILD_ELECTRON_ADDON)
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-electron/native/CMakeLists.txt")
+    add_subdirectory(sdk/runanywhere-electron/native)
 endif()
 
 # Tests — wired through commons/tests for now. RAC_BUILD_TESTS is forwarded

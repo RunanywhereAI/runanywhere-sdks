@@ -331,7 +331,19 @@ std::string resolve_manifest(const char* path, const char* arch) {
     std::error_code ec;
     fs::path p(path);
     if (fs::is_regular_file(p, ec)) {
-        return p.generic_string();  // a manifest file was passed directly
+        // A real manifest .json was passed directly — use it.
+        std::string name = p.filename().generic_string();
+        if (ends_with_ci(name, ".json") && !is_aux_json(name) && looks_like_manifest(p)) {
+            return p.generic_string();
+        }
+        // Otherwise commons handed us a non-manifest bundle file. This happens for
+        // a directory-based framework whose model carries multi_file descriptors:
+        // rac_model_paths_resolve_artifact scans the folder and returns the first
+        // QNN_CONTEXT `.bin` (e.g. the fp16 embedding blob) as the primary path,
+        // which synthesize_artifact_resolution_from_descriptors then cannot
+        // override. Recover by resolving the manifest from the file's own bundle
+        // directory (the layout below handles the arch-subdir and flat cases).
+        p = p.parent_path();
     }
     if (!fs::is_directory(p, ec)) {
         return {};
