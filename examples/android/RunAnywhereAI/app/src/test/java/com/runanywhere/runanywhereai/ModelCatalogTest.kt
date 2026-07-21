@@ -64,12 +64,67 @@ class ModelCatalogTest {
             assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, model.framework)
             assertEquals(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, model.category)
             assertEquals(pinAndSize.second, model.memoryBytes)
+            assertEquals(pinAndSize.second, model.downloadBytes)
             assertTrue(model.files.isNotEmpty())
             assertTrue(model.files.all { it.url.contains("/resolve/${pinAndSize.first}/") })
             assertTrue(model.files.all { (it.sizeBytes ?: 0) > 0 })
             assertEquals(pinAndSize.second, model.files.sumOf { it.sizeBytes ?: 0 })
             assertTrue(model.files.any { it.filename == "tokens.txt" })
         }
+    }
+
+    @Test
+    fun parakeetCtcUsesExactTransformBackedBundleAndRuntimeMemory() {
+        val model =
+            ModelCatalog.models.single { it.id == "sherpa-nemo-parakeet-ctc-1.1b-int8" }
+                as MultiFileModel
+
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, model.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, model.category)
+        assertEquals(2L * 1_024L * 1_024L * 1_024L, model.memoryBytes)
+        assertEquals(1_110_024_519L, model.downloadBytes)
+
+        val descriptors = model.descriptors()
+        assertEquals(2, descriptors.size)
+        assertEquals(model.downloadBytes, descriptors.sumOf { it.size_bytes ?: 0 })
+
+        val primary = descriptors.single { it.filename == "model.int8.onnx" }
+        assertEquals(
+            "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx",
+            primary.url,
+        )
+        assertEquals(1_110_014_145L, primary.size_bytes)
+        assertEquals(
+            "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+            primary.checksum_sha256,
+        )
+
+        val transform = requireNotNull(primary.post_download_transform)
+        assertEquals(1_110_014_069L, transform.source_size_bytes)
+        assertEquals(
+            "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d",
+            transform.source_checksum_sha256,
+        )
+        assertEquals(primary.size_bytes, transform.final_size_bytes)
+        assertEquals(primary.checksum_sha256, transform.final_checksum_sha256)
+        val payload = requireNotNull(transform.operations.single().append_bytes).payload
+        assertEquals(76, payload.size)
+        assertEquals(
+            "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c696e675f666163746f72120138721d0a0e6e6f726d616c697a655f74797065120b7065725f66656174757265",
+            payload.hex(),
+        )
+
+        val tokens = descriptors.single { it.filename == "tokens.txt" }
+        assertEquals(
+            "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt",
+            tokens.url,
+        )
+        assertEquals(10_374L, tokens.size_bytes)
+        assertEquals(
+            "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921",
+            tokens.checksum_sha256,
+        )
+        assertEquals(null, tokens.post_download_transform)
     }
 
     @Test

@@ -168,6 +168,7 @@ suspend fun RunAnywhere.registerModel(
     contextLength: Int? = null,
     supportsThinking: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    downloadSize: Long? = memoryRequirement,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -181,11 +182,11 @@ suspend fun RunAnywhere.registerModel(
             framework = framework,
             category = modality,
             memory_required_bytes = memoryRequirement,
-            // Swift parity: curated catalogs use this value as the exact
-            // aggregate download size. Commons can then keep the storage gate
-            // deterministic even if a legacy per-file descriptor lacks a size
-            // and the remote HEAD response omits Content-Length.
-            download_size_bytes = memoryRequirement,
+            // Runtime compatibility and storage planning are independent.
+            // Legacy callers retain the old behavior because downloadSize
+            // defaults to memoryRequirement, while exact catalogs can provide
+            // the aggregate final artifact size separately.
+            download_size_bytes = downloadSize,
             context_length = contextLength,
             supports_thinking = if (supportsThinking) true else null,
             source = source,

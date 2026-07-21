@@ -5,10 +5,31 @@ import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.PostDownloadAppendBytes
+import ai.runanywhere.proto.v1.PostDownloadTransform
+import ai.runanywhere.proto.v1.PostDownloadTransformOperation
+import okio.ByteString.Companion.decodeHex
 
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
 internal object ModelCatalog {
+
+    private const val PARAKEET_CTC_METADATA_HEX =
+        "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c696e675f666163746f72120138721d0a0e6e6f726d616c697a655f74797065120b7065725f66656174757265"
+
+    private val parakeetCtcTransform =
+        PostDownloadTransform(
+            source_size_bytes = 1_110_014_069,
+            source_checksum_sha256 = "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d",
+            final_size_bytes = 1_110_014_145,
+            final_checksum_sha256 = "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+            operations =
+                listOf(
+                    PostDownloadTransformOperation(
+                        append_bytes = PostDownloadAppendBytes(payload = PARAKEET_CTC_METADATA_HEX.decodeHex()),
+                    ),
+                ),
+        )
 
     private val LLAMA = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
     private val SHERPA = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
@@ -445,6 +466,35 @@ internal object ModelCatalog {
                 ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx", "joiner.int8.onnx", 6_355_277),
                 ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt", "tokens.txt", 93_939),
             ),
+        ),
+        // This upstream ONNX is otherwise loadable but lacks three metadata
+        // entries required by Sherpa. Commons verifies the source bytes, then
+        // appends the exact reviewed 76-byte payload before publishing the
+        // final artifact. Runtime RAM is based on the observed Android PSS
+        // (~1,760,875 KB), not the smaller aggregate download size.
+        MultiFileModel(
+            "sherpa-nemo-parakeet-ctc-1.1b-int8",
+            "NVIDIA Parakeet CTC 1.1B INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            memoryBytes = 2L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 1_110_024_519,
+            files =
+                listOf(
+                    ModelFile(
+                        "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx",
+                        "model.int8.onnx",
+                        1_110_014_145,
+                        "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+                        parakeetCtcTransform,
+                    ),
+                    ModelFile(
+                        "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt",
+                        "tokens.txt",
+                        10_374,
+                        "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921",
+                    ),
+                ),
         ),
         MultiFileModel(
             "sherpa-nemo-canary-180m-flash-int8",

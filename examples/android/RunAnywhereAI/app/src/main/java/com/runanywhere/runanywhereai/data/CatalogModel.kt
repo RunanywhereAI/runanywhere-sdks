@@ -8,6 +8,7 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelSource
+import ai.runanywhere.proto.v1.PostDownloadTransform
 import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
@@ -24,6 +25,8 @@ internal data class ModelFile(
     val url: String,
     val filename: String,
     val sizeBytes: Long? = null,
+    val checksumSha256: String? = null,
+    val postDownloadTransform: PostDownloadTransform? = null,
 )
 
 internal data class SingleFileModel(
@@ -106,6 +109,7 @@ internal data class MultiFileModel(
     val framework: InferenceFramework,
     val category: ModelCategory,
     val memoryBytes: Long,
+    val downloadBytes: Long = memoryBytes,
     val files: List<ModelFile>,
 ) : CatalogModel {
     override suspend fun register(): ModelInfo =
@@ -116,18 +120,21 @@ internal data class MultiFileModel(
             framework = framework,
             modality = category,
             memoryRequirement = memoryBytes,
+            downloadSize = downloadBytes,
             contextLength = null,
             supportsThinking = false,
             source = ModelSource.MODEL_SOURCE_REMOTE,
         )
 
-    private fun descriptors(): List<ModelFileDescriptor> =
+    internal fun descriptors(): List<ModelFileDescriptor> =
         files.mapIndexed { idx, file ->
             ModelFileDescriptor(
                 url = file.url,
                 filename = file.filename,
                 is_required = true,
                 size_bytes = file.sizeBytes,
+                checksum_sha256 = file.checksumSha256,
+                post_download_transform = file.postDownloadTransform,
                 role = if (idx == 0) {
                     ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
                 } else {
