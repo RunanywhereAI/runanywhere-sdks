@@ -541,6 +541,13 @@ object RunAnywhereBridge {
     external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
 
     /**
+     * Evaluate a registered model against caller-supplied available RAM and
+     * storage using the canonical commons compatibility policy.
+     */
+    @JvmStatic
+    external fun racModelCompatibilityCheckProto(requestProto: ByteArray): ByteArray?
+
+    /**
      * Canonical "register a model from a URL" entry point. Forwards to
      * `rac_register_model_from_url_proto`, which translates a serialized
      * runanywhere.v1.RegisterModelFromUrlRequest into a ModelInfoMakeRequest and

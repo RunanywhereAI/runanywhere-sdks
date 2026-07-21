@@ -23,6 +23,17 @@ class ModelCatalogTest {
         assertEquals(ModelCategory.MODEL_CATEGORY_LANGUAGE, mini.category)
         assertTrue(mini.url.contains("/resolve/fb49cde090c86092d89905bea2ffc41c23c2615e/"))
 
+        val nano = byId.getValue("llama-3.1-nemotron-nano-8b-v1-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, nano.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_LANGUAGE, nano.category)
+        assertEquals(4_920_736_864L, nano.downloadBytes)
+        assertEquals(6L * 1_024L * 1_024L * 1_024L, nano.memoryBytes)
+        assertEquals(4_096, nano.contextLength)
+        assertEquals(
+            "https://huggingface.co/bartowski/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/6f3d46cfbc39ce7a1bec89654305515d904e8102/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
+            nano.url,
+        )
+
         val embedding = byId.getValue("nemotron-3-embed-1b-q4_k_m") as SingleFileModel
         assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, embedding.framework)
         assertEquals(ModelCategory.MODEL_CATEGORY_EMBEDDING, embedding.category)

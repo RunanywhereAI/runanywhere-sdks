@@ -199,6 +199,21 @@ internal object ModelCatalog {
             2_697_387_072,
             contextLength = 4_096
         ),
+        // Exact P0 NVIDIA Nano checkpoint. The file itself is 4.92 GB, while
+        // llama.cpp also needs KV/cache/compute headroom. Keep those two facts
+        // separate so the download planner validates the exact transport size
+        // and the mandatory SDK compatibility preflight requires 6 GiB of
+        // currently available RAM before either download or lifecycle load.
+        SingleFileModel(
+            "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
+            "NVIDIA Llama 3.1 Nemotron Nano 8B v1 Q4_K_M",
+            "https://huggingface.co/bartowski/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/6f3d46cfbc39ce7a1bec89654305515d904e8102/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            memoryBytes = 6L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 4_920_736_864L,
+            contextLength = 4_096,
+        ),
         // Bonsai family at TRUE 1-bit (Q1_0, ~1.125 bit/wt) on CPU via llama.cpp — the same GGUF
         // that runs on the NPU (bonsai_{4b,8b,27b}_1bit, QHEXRT). Requires a llama.cpp build with
         // qwen3_5 GatedDeltaNet + Q1_0 support (the app's LlamaCPP engine must be the patched fork).

@@ -33,6 +33,7 @@ internal data class SingleFileModel(
     val framework: InferenceFramework,
     val category: ModelCategory,
     val memoryBytes: Long,
+    val downloadBytes: Long = memoryBytes,
     val contextLength: Int? = null,
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
@@ -67,6 +68,7 @@ internal data class SingleFileModel(
             modality = category,
             artifactType = null,
             memoryRequirement = memoryBytes,
+            downloadSize = downloadBytes,
             supportsThinking = supportsThinking,
             supportsLora = supportsLora,
         )

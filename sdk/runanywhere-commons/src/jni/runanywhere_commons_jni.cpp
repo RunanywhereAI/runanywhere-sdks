@@ -95,6 +95,7 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
+#include "rac/infrastructure/model_management/rac_model_compatibility.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -2284,6 +2285,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     return callModelRegistryProtoBuffer(env, requestProto, rac_model_registry_refresh_proto,
                                         "racModelRegistryRefreshProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelCompatibilityCheckProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_model_compatibility_check_proto,
+                             "racModelCompatibilityCheckProto");
 }
 
 JNIEXPORT jbyteArray JNICALL

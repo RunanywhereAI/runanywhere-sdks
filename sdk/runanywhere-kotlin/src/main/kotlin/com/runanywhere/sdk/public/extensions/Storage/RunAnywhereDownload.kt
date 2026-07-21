@@ -49,9 +49,20 @@ suspend fun RunAnywhere.downloadModel(
     if (!RunAnywhere.isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    ensureServicesReady()
+    return withModelCompatibilityPreflight(
+        operation = ModelCompatibilityOperation.DOWNLOAD,
+        resultProvider = { checkModelCompatibility(model.id) },
+    ) {
+        ensureServicesReady()
+        val resolvedModel = resolveModelForDownload(model)
+        downloadCompatibleModel(resolvedModel, onProgress)
+    }
+}
 
-    val resolvedModel = resolveModelForDownload(model)
+private suspend fun RunAnywhere.downloadCompatibleModel(
+    resolvedModel: RAModelInfo,
+    onProgress: (suspend (DownloadProgress) -> Unit)?,
+): DownloadProgress {
     downloadLogger.info("Planning download for ${resolvedModel.id}")
 
     val planRequest =
