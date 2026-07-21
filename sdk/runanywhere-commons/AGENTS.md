@@ -104,7 +104,7 @@ scripts/build-windows.bat
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Plugin Registry  (src/plugin/)                                 │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 7u)    │
+│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 8u)    │
 │  Priority order: highest-priority plugin per primitive wins, no  │
 │  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
 │  dynamic (rac_registry_load_plugin / dlopen).                    │
@@ -128,13 +128,13 @@ Every AI capability follows the same two-layer design:
 
 **Feature-family classification** — not every capability fits one mold:
 
-- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
+- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`, `vocoder`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
 - **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Unified Plugin ABI (v7)
+### Unified Plugin ABI (v8)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 9 active primitive slots plus 8 reserved slots (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10 active primitive slots plus 7 reserved slots (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
@@ -147,6 +147,7 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
 | `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | backend-provided |
 | `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
+| `RAC_PRIMITIVE_VOCODE` | `vocoder_ops` | onnx (BigVGAN) |
 
 NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, was retired in ABI v4 and remains retired.)
 

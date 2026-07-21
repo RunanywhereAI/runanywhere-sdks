@@ -88,8 +88,11 @@ extern "C" {
  *                 and wire/slot 10 to semantic segmentation
  *                 (`RAC_PRIMITIVE_SEGMENT` / `segmentation_ops`). Engines
  *                 compiled against v6 are rejected until rebuilt.
+ *   8u — promoted reserved primitive wire/slot 11 to mel-spectrogram vocoding
+ *                 (`RAC_PRIMITIVE_VOCODE` / `vocoder_ops`). Engines compiled
+ *                 against v7 are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 7u
+#define RAC_PLUGIN_API_VERSION 8u
 
 /* ===========================================================================
  * Plugin entry-point signature

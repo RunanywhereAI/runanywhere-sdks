@@ -27,7 +27,7 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 
-// ABI v7 promotes two pointers from the existing reserve without changing the
+// ABI v8 promotes the vocoder pointer from the existing reserve without changing the
 // 17-pointer primitive/reserve tail or the total vtable size.
 static_assert((sizeof(rac_engine_vtable_t) - offsetof(rac_engine_vtable_t, llm_ops)) /
                   sizeof(void*) ==
@@ -36,8 +36,10 @@ static_assert(offsetof(rac_engine_vtable_t, diarization_ops) ==
               offsetof(rac_engine_vtable_t, diffusion_ops) + sizeof(void*));
 static_assert(offsetof(rac_engine_vtable_t, segmentation_ops) ==
               offsetof(rac_engine_vtable_t, diarization_ops) + sizeof(void*));
-static_assert(offsetof(rac_engine_vtable_t, reserved_slot_2) ==
+static_assert(offsetof(rac_engine_vtable_t, vocoder_ops) ==
               offsetof(rac_engine_vtable_t, segmentation_ops) + sizeof(void*));
+static_assert(offsetof(rac_engine_vtable_t, reserved_slot_3) ==
+              offsetof(rac_engine_vtable_t, vocoder_ops) + sizeof(void*));
 
 static_assert(RAC_MODEL_FORMAT_ID_UNSPECIFIED ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_UNSPECIFIED));
@@ -170,8 +172,8 @@ const rac_engine_vtable_t k_manifest_vtable = {
     /* diffusion_ops    */ nullptr,
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
-    /* reserved_slot_2..9 */
-    nullptr,
+    /* vocoder_ops      */ nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,
@@ -228,9 +230,9 @@ int main() {
 
     // (2) ABI mismatch
     {
-        auto vt = make_vt("abi-v6", 50, 6u);
+        auto vt = make_vt("abi-v7", 50, 7u);
         rac_result_t rc = rac_plugin_register(&vt);
-        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v6 plugin rejected by v7 host");
+        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v7 plugin rejected by v8 host");
         CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == nullptr, "abi: not inserted");
     }
 
@@ -258,19 +260,25 @@ int main() {
     {
         const int diarization_sentinel = 9;
         const int segmentation_sentinel = 10;
+        const int vocoder_sentinel = 11;
         rac_engine_vtable_t vt{};
-        vt.diarization_ops = reinterpret_cast<const struct rac_diarization_service_ops*>(
-            &diarization_sentinel);
-        vt.segmentation_ops = reinterpret_cast<const struct rac_segmentation_service_ops*>(
-            &segmentation_sentinel);
+        vt.diarization_ops =
+            reinterpret_cast<const struct rac_diarization_service_ops*>(&diarization_sentinel);
+        vt.segmentation_ops =
+            reinterpret_cast<const struct rac_segmentation_service_ops*>(&segmentation_sentinel);
+        vt.vocoder_ops = reinterpret_cast<const struct rac_vocoder_service_ops*>(&vocoder_sentinel);
         CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_DIARIZE) == &diarization_sentinel,
-              "v7: DIARIZE resolves diarization_ops");
+              "v8: DIARIZE resolves diarization_ops");
         CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_SEGMENT) == &segmentation_sentinel,
-              "v7: SEGMENT resolves segmentation_ops");
+              "v8: SEGMENT resolves segmentation_ops");
+        CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_VOCODE) == &vocoder_sentinel,
+              "v8: VOCODE resolves vocoder_ops");
         CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_DIARIZE), "diarize") == 0,
-              "v7: DIARIZE name is stable");
+              "v8: DIARIZE name is stable");
         CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_SEGMENT), "segment") == 0,
-              "v7: SEGMENT name is stable");
+              "v8: SEGMENT name is stable");
+        CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_VOCODE), "vocode") == 0,
+              "v8: VOCODE name is stable");
     }
 
     // (6) unregister nonexistent

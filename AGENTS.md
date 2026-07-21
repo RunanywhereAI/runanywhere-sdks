@@ -129,7 +129,7 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                     │  Service Layer (dispatch)      │
                     │  Plugin Registry               │
                     └───────────────┬───────────────┘
-                                    │ rac_engine_vtable_t (v7)
+                                    │ rac_engine_vtable_t (v8)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
       llamacpp      sherpa-onnx  qhexrt     coreml/cloud       onnx
@@ -142,7 +142,7 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
 
 **Two-Phase SDK Initialization**: All SDKs follow the same pattern: Phase 1 (synchronous — register platform adapter, load native libs, configure logging) then Phase 2 (async — authenticate, register device, fetch model assignments, discover downloaded models).
 
-**Plugin ABI v7**: Every backend publishes a `rac_engine_vtable_t` with 9 active primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`) plus 8 reserved slots. NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 7u` — version mismatch causes immediate rejection. (Wire value 6, formerly `rerank_ops`/`RAC_PRIMITIVE_RERANK`, remains retired.)
+**Plugin ABI v8**: Every backend publishes a `rac_engine_vtable_t` with 10 active primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`, `vocoder_ops`) plus 7 reserved slots. NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 8u` — version mismatch causes immediate rejection. (Wire value 6, formerly `rerank_ops`/`RAC_PRIMITIVE_RERANK`, remains retired.)
 
 **Static vs Dynamic Plugins**: iOS and WASM force `RAC_STATIC_PLUGINS=ON` (no `dlopen`). Android/Linux/macOS default to dynamic loading via `rac_registry_load_plugin()`. Static registration uses `RAC_STATIC_PLUGIN_REGISTER(name)` macro with `-force_load` / `--whole-archive` linker flags.
 

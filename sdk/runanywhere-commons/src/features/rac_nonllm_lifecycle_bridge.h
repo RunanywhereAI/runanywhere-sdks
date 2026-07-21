@@ -9,6 +9,7 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/features/vocoder/rac_vocoder_service.h"
 
 namespace rac::lifecycle {
 
@@ -68,6 +69,14 @@ struct LifecycleSegmentationRef {
     void* opaque = nullptr;
 };
 
+struct LifecycleVocoderRef {
+    const rac_vocoder_service_ops_t* ops = nullptr;
+    void* impl = nullptr;
+    const char* model_id = nullptr;
+    const char* framework_name = nullptr;
+    void* opaque = nullptr;
+};
+
 rac_result_t acquire_lifecycle_stt(LifecycleSttRef* out_ref);
 void release_lifecycle_stt(LifecycleSttRef* ref);
 
@@ -88,6 +97,9 @@ void release_lifecycle_diarization(LifecycleDiarizationRef* ref);
 
 rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref);
 void release_lifecycle_segmentation(LifecycleSegmentationRef* ref);
+
+rac_result_t acquire_lifecycle_vocoder(LifecycleVocoderRef* out_ref);
+void release_lifecycle_vocoder(LifecycleVocoderRef* ref);
 
 }  // namespace rac::lifecycle
 

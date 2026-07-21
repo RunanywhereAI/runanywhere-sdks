@@ -117,8 +117,8 @@ const rac_engine_vtable_t k_probe_engine = {
     /* diffusion_ops    */ nullptr,
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
-    /* reserved_slot_2..9 */
-    nullptr,
+    /* vocoder_ops      */ nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,

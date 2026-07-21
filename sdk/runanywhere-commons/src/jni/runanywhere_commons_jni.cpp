@@ -87,6 +87,7 @@
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/features/vocoder/rac_vocoder_service.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -519,8 +520,11 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
              buffer->error_message ? buffer->error_message : "");
         const rac_result_t status = buffer->status;
         const char* message = buffer->error_message;
-        rac_proto_buffer_free(buffer);
+        // ThrowNew copies the formatted message. Keep the proto buffer alive
+        // until after formatting so error_message cannot become a dangling
+        // pointer on expected failures (not-loaded, invalid request, etc.).
         throwNativeProtoFailure(env, operation, status, message);
+        rac_proto_buffer_free(buffer);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {
@@ -5731,6 +5735,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSegmentationSegmentL
     rac_result_t rc =
         rac_segmentation_segment_lifecycle_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racSegmentationSegmentLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVocoderVocodeLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vocoder_vocode_lifecycle_proto(request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVocoderVocodeLifecycleProto");
 }
 
 JNIEXPORT jbyteArray JNICALL

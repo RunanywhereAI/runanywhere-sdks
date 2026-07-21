@@ -49,7 +49,8 @@ typedef enum rac_resource_type {
     RAC_RESOURCE_TYPE_VLM_MODEL = 5,         /**< Vision Language Model */
     RAC_RESOURCE_TYPE_DIFFUSION_MODEL = 6,   /**< Diffusion/Image Generation Model */
     RAC_RESOURCE_TYPE_EMBEDDINGS_MODEL = 7,  /**< Text embedding model */
-    RAC_RESOURCE_TYPE_SEGMENTATION_MODEL = 8 /**< Semantic segmentation model */
+    RAC_RESOURCE_TYPE_SEGMENTATION_MODEL = 8, /**< Semantic segmentation model */
+    RAC_RESOURCE_TYPE_VOCODER_MODEL = 9       /**< Mel-spectrogram vocoder model */
 } rac_resource_type_t;
 
 /**

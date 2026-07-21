@@ -49,6 +49,7 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/features/vocoder/rac_vocoder_service.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "download_service.pb.h"
@@ -99,6 +100,7 @@ struct LoadedModel {
     const rac_diffusion_service_ops_t* diffusion_ops{nullptr};
     const rac_diarization_service_ops_t* diarization_ops{nullptr};
     const rac_segmentation_service_ops_t* segmentation_ops{nullptr};
+    const rac_vocoder_service_ops_t* vocoder_ops{nullptr};
     void* impl{nullptr};
     int active_refs{0};
     std::atomic<bool> cancel_requested{false};

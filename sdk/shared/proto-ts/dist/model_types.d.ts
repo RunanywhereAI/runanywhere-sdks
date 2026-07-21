@@ -136,6 +136,7 @@ export declare enum ModelCategory {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
     MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
+    MODEL_CATEGORY_VOCODER = 12,
     UNRECOGNIZED = -1
 }
 export declare function modelCategoryFromJSON(object: any): ModelCategory;

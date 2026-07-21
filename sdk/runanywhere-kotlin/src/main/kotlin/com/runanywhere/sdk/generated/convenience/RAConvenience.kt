@@ -84,6 +84,7 @@ public val ModelCategory.wireString: String
         ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> "voice-activity-detection"
         ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION -> "speaker-diarization"
         ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION -> "semantic-segmentation"
+        ModelCategory.MODEL_CATEGORY_VOCODER -> "vocoder"
         else -> ""
     }
 
@@ -102,6 +103,7 @@ public fun ModelCategory.Companion.fromWireString(value: String): ModelCategory?
         "voice-activity-detection" -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         "speaker-diarization" -> ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION
         "semantic-segmentation" -> ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION
+        "vocoder" -> ModelCategory.MODEL_CATEGORY_VOCODER
         else -> null
     }
 

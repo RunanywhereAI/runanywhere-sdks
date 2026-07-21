@@ -10,7 +10,7 @@
 #   - engines/                 — engine plugins (llamacpp, onnx, sherpa,
 #                                qhexrt, coreml). Each publishes
 #                                a `rac_engine_vtable_t` at
-#                                `RAC_PLUGIN_API_VERSION=7u` via
+#                                `RAC_PLUGIN_API_VERSION=8u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
 #                                `rac_plugin_entry` symbol.
 #   - tools/plugin-loader-smoke/ — CLI smoke test for the plugin loader
@@ -448,6 +448,79 @@ if(RAC_BUILD_TESTS)
                  COMMAND test_segmentation_onnx_exact)
         set_tests_properties(segmentation_onnx_exact_model_tests PROPERTIES
             LABELS "native;onnx;segmentation;exact-model;license-opt-in"
+            SKIP_RETURN_CODE 77)
+
+        # Native BigVGAN vocoder gates. As with segmentation, the mandatory
+        # test compiles the production provider against a separately pinned
+        # tiny real ONNX graph. Production code remains pinned to the full
+        # NVIDIA export bundle; exact parity is opt-in through the environment.
+        add_executable(test_vocoder_onnx
+            sdk/runanywhere-commons/tests/test_vocoder_onnx.cpp
+            engines/onnx/onnx_vocoder_provider.cpp
+            engines/onnx/rac_onnx_vocoder_register.cpp
+        )
+        target_include_directories(test_vocoder_onnx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/onnx
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_vocoder_onnx PRIVATE
+            RAC_HAVE_PROTOBUF=1
+            RAC_VOCODER_TEST_FIXTURE_BUNDLE=1
+            "RAC_VOCODER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests/fixtures/bigvgan_tiny\""
+        )
+        target_link_libraries(test_vocoder_onnx PRIVATE
+            rac_commons
+            rac_runtime_onnxrt
+            nlohmann_json::nlohmann_json
+        )
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_vocoder_onnx PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_vocoder_onnx PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_vocoder_onnx PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_vocoder_onnx)
+        endif()
+        target_compile_features(test_vocoder_onnx PRIVATE cxx_std_20)
+        add_test(NAME vocoder_onnx_tests COMMAND test_vocoder_onnx)
+        set_tests_properties(vocoder_onnx_tests PROPERTIES
+            LABELS "native;onnx;vocoder;real-fixture")
+
+        add_executable(test_vocoder_onnx_exact
+            sdk/runanywhere-commons/tests/test_vocoder_onnx_exact.cpp)
+        target_include_directories(test_vocoder_onnx_exact PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        target_compile_definitions(test_vocoder_onnx_exact PRIVATE RAC_HAVE_PROTOBUF=1)
+        target_link_libraries(test_vocoder_onnx_exact PRIVATE
+            rac_commons
+            rac_backend_onnx
+        )
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(test_vocoder_onnx_exact PRIVATE protobuf::libprotobuf)
+        elseif(Protobuf_LIBRARIES)
+            target_link_libraries(test_vocoder_onnx_exact PRIVATE ${Protobuf_LIBRARIES})
+        endif()
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(test_vocoder_onnx_exact PRIVATE ${RAC_ABSL_LIBS})
+        endif()
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_vocoder_onnx_exact)
+        endif()
+        target_compile_features(test_vocoder_onnx_exact PRIVATE cxx_std_20)
+        add_test(NAME vocoder_onnx_exact_model_tests COMMAND test_vocoder_onnx_exact)
+        set_tests_properties(vocoder_onnx_exact_model_tests PROPERTIES
+            LABELS "native;onnx;vocoder;exact-model"
             SKIP_RETURN_CODE 77)
     endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because

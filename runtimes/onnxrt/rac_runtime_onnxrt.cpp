@@ -374,10 +374,12 @@ const uint32_t k_supported_formats[] = {
 /* ONNXRT is capability-only: it advertises the primitives it can describe for
  * the router, but hosts no session through the C vtable. The onnx engine
  * reaches ONNX Runtime exclusively through the C++ `Session` class below (see
- * engines/onnx/onnx_embedding_provider.cpp). EMBED is the primitive the live
- * `Session` path serves. */
+ * engines/onnx/). EMBED, SEGMENT, and VOCODE are the primitives whose live
+ * providers execute through that `Session` path. */
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_EMBED,
+    RAC_PRIMITIVE_SEGMENT,
+    RAC_PRIMITIVE_VOCODE,
 };
 
 }  // namespace

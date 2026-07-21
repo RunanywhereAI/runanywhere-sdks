@@ -71,6 +71,7 @@ extension RAModelCategory {
         case .voiceActivityDetection: return "voice-activity-detection"
         case .speakerDiarization: return "speaker-diarization"
         case .semanticSegmentation: return "semantic-segmentation"
+        case .vocoder: return "vocoder"
         default: return ""
         }
     }
@@ -93,6 +94,7 @@ extension RAModelCategory {
         case "voice-activity-detection": return .voiceActivityDetection
         case "speaker-diarization": return .speakerDiarization
         case "semantic-segmentation": return .semanticSegmentation
+        case "vocoder": return .vocoder
         default: return nil
         }
     }

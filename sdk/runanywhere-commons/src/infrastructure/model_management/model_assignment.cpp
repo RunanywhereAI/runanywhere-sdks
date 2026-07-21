@@ -205,6 +205,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->category = RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
         else if (category == "semantic-segmentation" || category == "segmentation")
             model->category = RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+        else if (category == "vocoder" || category == "vocode")
+            model->category = RAC_MODEL_CATEGORY_VOCODER;
         else if (category == "multimodal")
             model->category = RAC_MODEL_CATEGORY_MULTIMODAL;
         else
@@ -942,6 +944,8 @@ static ModelCategory category_from_assignment_token(const std::string& token) {
                 return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
             case 11:
                 return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+            case 12:
+                return runanywhere::v1::MODEL_CATEGORY_VOCODER;
             default:
                 return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
         }
@@ -980,6 +984,9 @@ static ModelCategory category_from_assignment_token(const std::string& token) {
     if (lower == "segmentation" || lower == "semantic_segmentation" ||
         lower == "semantic-segmentation") {
         return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+    }
+    if (lower == "vocoder" || lower == "vocode") {
+        return runanywhere::v1::MODEL_CATEGORY_VOCODER;
     }
     return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
 }

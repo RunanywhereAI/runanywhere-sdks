@@ -105,6 +105,10 @@ export type {
   SegmentationResult,
 } from './Public/Extensions/RunAnywhere+Segmentation.js';
 export type {
+  VocoderRequest,
+  VocoderResult,
+} from './Public/Extensions/RunAnywhere+Vocoder.js';
+export type {
   RegisterModelFile,
   RegisterModelOptions,
   RegisterMultiFileOptions,

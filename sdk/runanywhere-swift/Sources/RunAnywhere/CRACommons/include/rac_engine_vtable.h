@@ -54,7 +54,8 @@ struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_ser
 struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 struct rac_diarization_service_ops; /* rac/features/diarization/rac_diarization_service.h */
-struct rac_segmentation_service_ops; /* reserved for semantic segmentation service */
+struct rac_segmentation_service_ops; /* rac/features/segmentation/rac_segmentation_service.h */
+struct rac_vocoder_service_ops;      /* rac/features/vocoder/rac_vocoder_service.h */
 
 /**
  * @brief Plugin metadata carried in every vtable.
@@ -145,7 +146,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (9 active) ─────────── */
+    /* ─────────── Primitive slot groups (10 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -174,7 +175,10 @@ typedef struct rac_engine_vtable {
     /** Semantic image segmentation (`RAC_PRIMITIVE_SEGMENT`). */
     const struct rac_segmentation_service_ops* segmentation_ops;
 
-    /* ─────────── Reserved slot pool (8 slots) ─────────── */
+    /** Mel-spectrogram to waveform vocoding (`RAC_PRIMITIVE_VOCODE`). */
+    const struct rac_vocoder_service_ops* vocoder_ops;
+
+    /* ─────────── Reserved slot pool (7 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -185,7 +189,6 @@ typedef struct rac_engine_vtable {
      *   3. Bumping RAC_PLUGIN_API_VERSION.
      * Old binaries will fail ABI version check and be rejected safely.
      */
-    const void* reserved_slot_2;
     const void* reserved_slot_3;
     const void* reserved_slot_4;
     const void* reserved_slot_5;
@@ -229,7 +232,8 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_VLM, vlm_ops, "vlm")                     \
     X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")   \
     X(RAC_PRIMITIVE_DIARIZE, diarization_ops, "diarize")     \
-    X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")
+    X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")    \
+    X(RAC_PRIMITIVE_VOCODE, vocoder_ops, "vocode")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by

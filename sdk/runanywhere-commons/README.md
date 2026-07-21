@@ -300,7 +300,7 @@ rac_version_t rac_get_version(void);
 // Engines are the single registration unit. Each fills a rac_engine_vtable_t
 // (one op-struct per served primitive) plus a rac_engine_manifest_t, and
 // registers it via rac_plugin_register; metadata.abi_version must equal
-// RAC_PLUGIN_API_VERSION (7u). Static builds wire this through
+// RAC_PLUGIN_API_VERSION (8u). Static builds wire this through
 // RAC_STATIC_PLUGIN_REGISTER(<name>) at file scope in the engine's
 // rac_plugin_entry_<name>.cpp; shared builds expose the same entry symbol
 // for dlopen via rac_registry_load_plugin.
@@ -322,8 +322,8 @@ const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
 > (`rac_service_register_provider` / `rac_service_create`) and a module
 > registry (`rac_module_register` / `rac_module_list`). Both surfaces were
 > removed in the v3 ABI cut-over and replaced by the unified engine-plugin
-> vtable above. See `include/rac/plugin/rac_engine_vtable.h` for the 9 active
-> + 8 reserved primitive slots.
+> vtable above. See `include/rac/plugin/rac_engine_vtable.h` for the 10 active
+> + 7 reserved primitive slots.
 
 ### LLM Service
 

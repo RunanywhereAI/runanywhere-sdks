@@ -228,4 +228,17 @@ describe('Emscripten module capability wiring', () => {
     unregisterWasmModule(onnx);
     expect(getModuleForCapability('segmentation')).toBeNull();
   });
+
+  it('routes vocoding to the ONNX capability owner', () => {
+    const onnx = fakeModule();
+    onnx._rac_vocoder_vocode_lifecycle_proto = () => 0;
+
+    registerWasmModule(['vocoder'], onnx, ['onnx']);
+
+    expect(getModuleForCapability('vocoder')).toBe(onnx);
+    expect(getModuleForFramework('onnx')).toBe(onnx);
+
+    unregisterWasmModule(onnx);
+    expect(getModuleForCapability('vocoder')).toBeNull();
+  });
 });

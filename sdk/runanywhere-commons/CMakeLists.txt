@@ -911,6 +911,9 @@ set(RAC_FEATURES_SOURCES
     # Semantic image segmentation (source-dimension uint16 class masks)
     src/features/segmentation/segmentation_module.cpp
     src/features/segmentation/rac_segmentation_service.cpp
+    # Mel-spectrogram vocoding (generic [B,M,T] float32 ABI)
+    src/features/vocoder/vocoder_module.cpp
+    src/features/vocoder/rac_vocoder_service.cpp
     # TTS
     # W4: unified module — merges tts_component.cpp + TTS slice of
     # rac_nonllm_lifecycle_proto_abi.cpp.
@@ -1384,6 +1387,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/diarization.pb.cc
     ${_RAC_PROTO_GEN_DIR}/segmentation.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/vocoder.pb.cc
     ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc

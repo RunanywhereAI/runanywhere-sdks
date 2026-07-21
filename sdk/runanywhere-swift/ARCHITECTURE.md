@@ -2203,17 +2203,17 @@ Swift manages this in `NativeProtoABI`:
 
 NULL fields cause C++ to fall back or return `RAC_ERROR_NOT_SUPPORTED`. See §6.5.19 for the Swift implementation of each slot.
 
-### §13.4 Plugin ABI v7 — `rac_engine_vtable_t`
+### §13.4 Plugin ABI v8 — `rac_engine_vtable_t`
 
 Every backend publishes a single `rac_engine_vtable_t`:
 
 - `rac_engine_metadata_t metadata` — `abi_version` (must equal `RAC_PLUGIN_API_VERSION`), `name`, `display_name`, `engine_version`, `priority`, `capability_flags`, optional `runtimes[]` + `formats[]`.
 - `rac_result_t (*capability_check)(void)` — called once after ABI version validation.
 - `void (*on_unload)(void)` — called on unload.
-- 9 active primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`. NULL means the engine does not serve that primitive. (The former `rerank_ops` was removed in ABI v4 and remains retired.)
-- 8 `const void* reserved_slot_N` fields.
+- 10 active primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`, `vocoder_ops`. NULL means the engine does not serve that primitive. (The former `rerank_ops` was removed in ABI v4 and remains retired.)
+- 7 `const void* reserved_slot_N` fields.
 
-`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `7u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
+`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `8u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
 
 ### §13.5 Streaming fan-out — `HandleStreamAdapter`
 
@@ -2617,7 +2617,7 @@ All files in `Generated/` are produced by `idl/codegen/generate_all.sh` and must
 - **`NativeProtoABI`** — Internal Swift `enum` (`CppBridge+NativeProtoABI.swift`) holding `load`, `require`, `withSerializedBytes`, `decode`, `free`, `invoke` helpers for the proto-byte ABI. All other slices call through this enum.
 - **`RA*` typealias prefix** — Proto-generated Swift types keep their `RA` prefix. Public extensions then declare typealiases stripping it for the caller's convenience.
 - **`RAC_STATIC_PLUGINS`** — CMake flag forcing static plugin registration on iOS/WASM. Combined with `-force_load` linker flags via `RAC_STATIC_PLUGIN_REGISTER(name)` macro.
-- **`RAC_PLUGIN_API_VERSION`** — C macro currently `7u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
+- **`RAC_PLUGIN_API_VERSION`** — C macro currently `8u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
 - **Proto-byte buffer** — A `rac_proto_buffer_t` filled by C++ with serialized proto bytes. Swift wraps in `Data`, deserializes to the response type, then frees via `rac_proto_buffer_free` (via `NativeProtoABI.free`).
 - **Two-phase init** — Swift SDK contract: synchronous Phase 1 (`rac_sdk_init_phase1_proto`) registers platform services and validates inputs; async Phase 2 (`rac_sdk_init_phase2_proto`) performs HTTP/auth/device registration. Phase 2 failures are non-fatal.
 - **Platform adapter IoC** — `rac_platform_adapter_t` flat C struct of function pointers. Swift populates this struct; C++ calls into it for all platform services (file I/O, Keychain, logging, clock, memory, HTTP download).

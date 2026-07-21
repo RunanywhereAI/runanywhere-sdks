@@ -157,6 +157,7 @@ export {
   TTSProtoAdapter,
   VADProtoAdapter,
   VLMProtoAdapter,
+  VocoderProtoAdapter,
   VoiceAgentProtoAdapter,
 } from './Adapters/ModalityProtoAdapter.js';
 export type {
