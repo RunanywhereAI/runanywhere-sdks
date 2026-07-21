@@ -166,8 +166,7 @@ test.describe('Web SDK smoke test', () => {
       !err.includes('model assignment base URL is not configured') &&
       !err.includes('Device registration requires a matching base URL and API key') &&
       !err.includes('Device registration failed') &&
-      !err.includes('Device registration remained deferred') &&
-      !err.includes('/sdk_devices'),
+      !err.includes('Device registration remained deferred'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
   });
