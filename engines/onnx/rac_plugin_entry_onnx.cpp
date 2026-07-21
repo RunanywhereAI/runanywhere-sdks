@@ -9,6 +9,7 @@
 
 #include "rac_runtime_onnxrt.h"
 
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
@@ -41,6 +42,7 @@ void* const volatile rac_onnxrt_runtime_anchor =
 extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 #endif
 extern const rac_segmentation_service_ops_t g_onnx_segmentation_ops;
+extern const rac_diarization_service_ops_t g_onnx_diarization_ops;
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
     RAC_RUNTIME_ONNXRT,
@@ -55,10 +57,12 @@ static const uint32_t k_onnx_formats[] = {
 static const rac_primitive_t k_onnx_primitives[] = {
     RAC_PRIMITIVE_EMBED,
     RAC_PRIMITIVE_SEGMENT,
+    RAC_PRIMITIVE_DIARIZE,
 };
 #else
 static const rac_primitive_t k_onnx_primitives[] = {
     RAC_PRIMITIVE_SEGMENT,
+    RAC_PRIMITIVE_DIARIZE,
 };
 #endif
 
@@ -100,7 +104,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 #endif
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    /* diarization_ops  */ nullptr,
+    /* diarization_ops  */ &g_onnx_diarization_ops,
     /* segmentation_ops */ &g_onnx_segmentation_ops,
 
     /* reserved_slot_2..9 */
