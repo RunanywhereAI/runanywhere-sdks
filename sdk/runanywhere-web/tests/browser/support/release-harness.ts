@@ -133,7 +133,7 @@ export const test = base.extend<ReleaseTestFixtures, ReleaseWorkerFixtures>({
     const configuredBaseURL = workerInfo.project.use.baseURL;
     const baseURL = typeof configuredBaseURL === 'string'
       ? configuredBaseURL
-      : 'http://localhost:5173';
+      : 'http://localhost:3000';
     const context = await browser.newContext({
       baseURL,
       viewport: { width: 1440, height: 1000 },

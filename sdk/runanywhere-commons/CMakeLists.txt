@@ -542,6 +542,15 @@ endif()
 # archive to a known directory and add it to the linker search path so the
 # `-l` lookup succeeds.
 if(MSVC)
+    # zlib's own CMake gives the static target OUTPUT_NAME `zs` on Windows, but
+    # commons + libarchive reference it by the bare string `zlibstatic`
+    # (ZLIB_LIBRARIES=zlibstatic), so the link line looks for `zlibstatic.lib` —
+    # which never exists, producing LNK1181 the first time an executable links the
+    # chain. We build static-only (no shared zlib.lib to disambiguate from), so
+    # force the output name back to match the reference.
+    if(TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES OUTPUT_NAME zlibstatic)
+    endif()
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
         string(TOUPPER "${_cfg}" _CFG)
         if(TARGET zlibstatic)
@@ -1067,6 +1076,16 @@ endif()
 # this define, so accidental SDK-side inclusion still triggers the warning.
 target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
 
+# Windows/MSVC: <winnt.h> defines ERROR_SEVERITY_SUCCESS/INFORMATIONAL/WARNING/ERROR
+# and <wingdi.h> defines ERROR as macros that collide with generated protobuf enum
+# values (e.g. runanywhere::ErrorSeverity::ERROR_SEVERITY_WARNING in errors.pb.h).
+# Force-include a compat header that pulls <windows.h> once, then #undefs them; the
+# windows.h include guard keeps them gone for the rest of each TU. No proto drift.
+if(MSVC)
+    target_compile_options(rac_commons PRIVATE
+        "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/win_msvc_compat.h")
+endif()
+
 # Canonical SDK version string (from the VERSION file) injected as a compile
 # define so rac_get_version()/rac_sdk_get_version() return the real release
 # version. Single source of truth: sdk/runanywhere-commons/VERSION -> RAC_VERSION
@@ -1423,6 +1442,11 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
         set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
         set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
+        # protobuf defaults protobuf_MSVC_STATIC_RUNTIME=ON (static CRT /MT), but
+        # the rest of the build (rac_commons, llama.cpp, libarchive, desktop exes,
+        # and the Node .node addon) uses the dynamic CRT /MD. Mixing /MT and /MD in
+        # one link fails with LNK2038; Node/Electron require /MD. Force /MD here.
+        set(protobuf_MSVC_STATIC_RUNTIME   OFF CACHE BOOL "" FORCE)
         set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
         # Skip building upb (Universal Protocol Buffers) entirely. Upstream
         # protobuf v34 builds protoc-gen-upb / protoc-gen-upbdefs /

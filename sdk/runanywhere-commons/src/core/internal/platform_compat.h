@@ -66,6 +66,16 @@
  * pulls errors.pb.h). NOGDI drops wingdi entirely; this shim + the codebase
  * never use Win32 GDI. The explicit undefs are belt-and-suspenders for macros
  * provided by windows.h/winnt.h even when GDI is excluded. */
+/* Self-protect: engine-plugin targets (engines/*) do NOT inherit commons' global
+ * NOMINMAX / WIN32_LEAN_AND_MEAN compile definitions, so define them here before
+ * <windows.h> — otherwise its min()/max() macros clobber std::min / std::max /
+ * std::numeric_limits<>::max() in any engine TU that includes this shim. */
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #ifndef NOGDI
 #define NOGDI
 #endif
@@ -90,7 +100,16 @@
 #define NAME_MAX 260
 #endif
 
+/* dirent d_type values (subset). Windows has no d_type; readdir() below fills it
+ * from the Win32 file attributes so callers can use DT_DIR / DT_REG. */
+#ifndef DT_UNKNOWN
+#define DT_UNKNOWN 0
+#define DT_DIR 4
+#define DT_REG 8
+#endif
+
 struct dirent {
+    unsigned char d_type;
     char d_name[NAME_MAX + 1];
 };
 
@@ -152,6 +171,8 @@ static inline struct dirent* readdir(DIR* dir) {
     }
     strncpy(dir->entry.d_name, dir->fdata.cFileName, NAME_MAX);
     dir->entry.d_name[NAME_MAX] = '\0';
+    dir->entry.d_type =
+        (dir->fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? DT_DIR : DT_REG;
     return &dir->entry;
 }
 

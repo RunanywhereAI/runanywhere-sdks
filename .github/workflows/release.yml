@@ -715,6 +715,15 @@ jobs:
         # The script packs @runanywhere/proto-ts alongside the SDK packages (it
         # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
         run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
+      - name: Install example app dependencies
+        working-directory: examples/web/RunAnywhereAI
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright Chromium
+        working-directory: sdk/runanywhere-web
+        run: npx playwright install --with-deps chromium
+      - name: Packaged-browser smoke (readiness)
+        working-directory: sdk/runanywhere-web
+        run: npm run test:browser:smoke
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -1580,7 +1580,7 @@
 .model-action-btn--progress { background: var(--bg-tertiary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .model-action-btn--retry { background: var(--badge-red); color: var(--color-red); }
 .model-action-btn--unavailable {
-  max-width: 132px;
+  max-width: 168px;
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
   cursor: not-allowed;
@@ -1979,7 +1979,6 @@
   flex-direction: column;
   gap: var(--space-xs);
   border-top: 1px solid var(--border-light);
-  animation: fade-in var(--duration-fast) ease-out;
 }
 
 .variant-row {

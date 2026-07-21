@@ -13,10 +13,12 @@
  * one site.
  */
 import {
+  ModelArtifactType,
   ModelFileRole,
   type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
+import { artifactTypeRequiresExtraction } from '../types/ModelTypes+Artifacts.js';
 import { tryRunanywhereModule } from '../runtime/EmscriptenModule.js';
 
 /**
@@ -68,4 +70,20 @@ export function primaryFilenameFromModel(model: ModelInfo): string | null {
   const url = model.downloadUrl ?? '';
   const trailing = url.split('?')[0].split('/').pop() ?? '';
   return trailing.length > 0 ? trailing : null;
+}
+
+/**
+ * True when a model lands in OPFS as an extracted directory (archive unpack
+ * or directory artifact), not as a single retained blob. After extract,
+ * commons deletes the `.tar.gz` / `.zip`, so hydration must not require the
+ * archive filename from `downloadUrl` to still exist.
+ */
+export function isExtractedDirectoryArtifact(model: ModelInfo): boolean {
+  const type = model.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED;
+  if (artifactTypeRequiresExtraction(type)) return true;
+  if (type === ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY) return true;
+  const url = (model.downloadUrl ?? '').split('?')[0]?.toLowerCase() ?? '';
+  return url.endsWith('.tar.gz') || url.endsWith('.tgz')
+    || url.endsWith('.tar.bz2') || url.endsWith('.tar.xz')
+    || url.endsWith('.zip');
 }

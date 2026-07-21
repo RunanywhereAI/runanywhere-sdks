@@ -368,7 +368,7 @@ export async function synthesize(
         'Loaded WASM module does not export rac_tts_synthesize_lifecycle_proto.',
       );
     }
-    const output = adapter.synthesizeLifecycle(text, resolvedOptions);
+    const output = await adapter.synthesizeLifecycle(text, resolvedOptions);
     if (!output) {
       throw SDKException.notInitialized(
         'TTS lifecycle synthesis failed. Reload the TTS model through RunAnywhere.loadModel(...) and retry.',

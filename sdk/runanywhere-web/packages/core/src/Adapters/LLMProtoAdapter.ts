@@ -14,11 +14,19 @@ import {
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  hasBackendWorkerOwnedModels,
+  mustUseLlamaBackendWorker,
+} from '../runtime/BackendWorkerModelOwnership.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -26,6 +34,33 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+import type { BackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+
+/**
+ * Worker path is required. After a crash the host can recreate the
+ * DedicatedWorker, but model weights are gone — ask for an explicit reload
+ * instead of a vague "Backend not available" / sticky dead state.
+ */
+export function requireLlamaWorkerHost(
+  host: BackendWorkerHost | null,
+  operation: string,
+): BackendWorkerHost {
+  if (!host || host.diagnostics.executionContext !== 'worker') {
+    throw SDKException.backendNotAvailable(
+      operation,
+      getLlamaBackendWorkerDeadReason()
+        ?? 'BackendWorker is required for LLM inference; main-thread fallback is disabled.',
+    );
+  }
+  const dead = getLlamaBackendWorkerDeadReason();
+  if (dead && !hasBackendWorkerOwnedModels('llamacpp')) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      `${dead} Reload the language model to continue.`,
+    );
+  }
+  return host;
+}
 
 export class LLMProtoAdapter {
   static tryDefault(): LLMProtoAdapter | null {
@@ -44,6 +79,13 @@ export class LLMProtoAdapter {
   }
 
   async generate(request: ProtoLLMGenerateRequest): Promise<ProtoLLMGenerationResult | null> {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (mustUseLlamaBackendWorker()) {
+      const workerHost = requireLlamaWorkerHost(host, 'llm.generate');
+      const encoded = LLMGenerateRequest.encode(request).finish();
+      const response = await workerHost.infer('llm.generate', { requestBytes: encoded });
+      return decodeWorkerInferResult(response, LLMGenerationResult);
+    }
     if (!this.ensureExports('llm.generate', ['_rac_llm_generate_proto'])) return null;
     return this.bridge().withEncodedRequestAsync(
       request,
@@ -72,6 +114,17 @@ export class LLMProtoAdapter {
         streamingEnabled: true,
       }),
     }).finish();
+
+    // Prefer the model-owning BackendWorker when it holds the loaded LLM.
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (mustUseLlamaBackendWorker()) {
+      const workerHost = requireLlamaWorkerHost(host, 'llm.generateStream');
+      return decodeWorkerStream(
+        workerHost.stream('llm.generate', { requestBytes: encoded }),
+        LLMStreamEvent,
+      );
+    }
+
     // T6.1: prefer the Worker path when a streamWorkerFactory is
     // registered (and `streamingMode !== 'main'`); transparently fall
     // back to the existing main-thread `streamCallback` MVP otherwise.
@@ -121,6 +174,15 @@ export class LLMProtoAdapter {
   }
 
   cancel(): ProtoSDKEvent | null {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (
+      host
+      && host.diagnostics.executionContext === 'worker'
+      && mustUseLlamaBackendWorker()
+    ) {
+      host.cancelActiveStreams();
+      return SDKEvent.fromPartial({});
+    }
     if (!this.ensureExports('llm.cancel', ['_rac_llm_cancel_proto'])) return null;
     return this.bridge().callResultProto(
       SDKEvent,

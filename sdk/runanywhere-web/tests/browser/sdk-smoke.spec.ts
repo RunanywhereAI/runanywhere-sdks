@@ -15,6 +15,19 @@ interface AppReadinessSnapshot {
   ready: boolean;
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
   sdk: 'initializing' | 'ready' | 'unavailable';
+  backend: 'pending' | 'registered' | 'unavailable';
+  identity: 'not-required' | 'pending' | 'ready' | 'unavailable';
+  step:
+    | 'booting'
+    | 'initializing-sdk'
+    | 'registering-llamacpp'
+    | 'registering-onnx'
+    | 'phase2-services'
+    | 'catalog'
+    | 'identity'
+    | 'building-shell'
+    | 'interactive'
+    | 'error';
   shellReady: boolean;
   modelUiReady: boolean;
   modelUiTarget: 'get-started' | 'toolbar' | null;
@@ -46,7 +59,7 @@ declare global {
 }
 
 test.describe('Web SDK smoke test', () => {
-  test('example app initializes and exposes RunAnywhere public surface', async ({ page }) => {
+  test('example app initializes and exposes RunAnywhere public surface', async ({ page }, testInfo) => {
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') {
@@ -64,18 +77,33 @@ test.describe('Web SDK smoke test', () => {
     // Wait for the app to finish its boot sequence. SDK readiness may be
     // `ready` (WASM loaded) or `unavailable` (WASM missing in dev cold-start),
     // but the app shell must reach `interactive` either way.
-    await page.waitForFunction(
-      () => {
-        const snap = window.__RUNANYWHERE_AI_READY__;
-        return snap && (snap.state === 'interactive' || snap.state === 'error');
-      },
-      null,
-      { timeout: 60_000 },
-    );
+    try {
+      await page.waitForFunction(
+        () => {
+          const snap = window.__RUNANYWHERE_AI_READY__;
+          // Production identity intentionally completes in the background;
+          // local interactive readiness must not wait for it.
+          return snap && (snap.ready || snap.state === 'error');
+        },
+        null,
+        { timeout: 60_000 },
+      );
+    } catch {
+      const snapshot = await page.evaluate(() => window.__RUNANYWHERE_AI_READY__);
+      await testInfo.attach('readiness-at-timeout', {
+        body: JSON.stringify(snapshot ?? { state: 'not-published' }, null, 2),
+        contentType: 'application/json',
+      });
+      throw new Error(
+        `readiness stayed pending after 60s at step=${snapshot?.step ?? 'not-published'}: `
+        + `${snapshot?.reason ?? 'no readiness snapshot'}`,
+      );
+    }
 
     const readiness = await page.evaluate(() => window.__RUNANYWHERE_AI_READY__);
     expect(readiness, 'readiness snapshot should be published').toBeTruthy();
     expect(readiness?.state, `app reached error state: ${readiness?.error ?? ''}`).not.toBe('error');
+    expect(readiness?.ready, `app was interactive but not ready at step=${readiness?.step}`).toBe(true);
     expect(readiness?.shellReady).toBe(true);
 
     // The example app publishes the imported singleton on window so the
@@ -131,14 +159,15 @@ test.describe('Web SDK smoke test', () => {
       !err.includes('sherpa-onnx') &&
       !err.includes('racommons-llamacpp') &&
       !err.includes('racommons-onnx-sherpa') &&
-      // Credential-less dev init: commons logs the model-assignment fetch
-      // at ERROR ("base URL is not configured"); the SDK's Phase 2 already
-      // downgrades it to a deferred-fetch warning, so it is expected noise
-      // in development — same on iOS, where commons emits the same line.
+      // Credential-less / non-blocking cloud init: commons may log model-
+      // assignment and device-registration failures while the local shell
+      // still reaches interactive. These are expected development noise and
+      // must not fail the readiness smoke gate.
       !err.includes('model assignment base URL is not configured') &&
-      // Device registration follows the same credential-less development
-      // path and deliberately reports that its configuration is incomplete.
-      !err.includes('Device registration requires a matching base URL and API key'),
+      !err.includes('Device registration requires a matching base URL and API key') &&
+      !err.includes('Device registration failed') &&
+      !err.includes('Device registration remained deferred') &&
+      !err.includes('/sdk_devices'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
   });

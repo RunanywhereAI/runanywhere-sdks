@@ -14,6 +14,7 @@ import {
   environmentDescription,
   environmentShouldSendTelemetry,
   RunAnywhere,
+  Cloud,
   modelInfoIsAvailableForUse,
   modelInfoIsDownloadedOnDisk,
 } from '@runanywhere/web';
@@ -35,6 +36,18 @@ import { appLogger } from './services/app-logger';
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
 type BackendReadinessState = 'pending' | 'registered' | 'unavailable';
+type IdentityReadinessState = 'not-required' | 'pending' | 'ready' | 'unavailable';
+type AppReadinessStep =
+  | 'booting'
+  | 'initializing-sdk'
+  | 'registering-llamacpp'
+  | 'registering-onnx'
+  | 'phase2-services'
+  | 'catalog'
+  | 'identity'
+  | 'building-shell'
+  | 'interactive'
+  | 'error';
 
 interface AppShellProbe {
   shellReady: boolean;
@@ -49,6 +62,9 @@ interface AppReadinessSnapshot extends AppShellProbe {
   state: AppReadinessState;
   sdk: SDKReadinessState;
   backend: BackendReadinessState;
+  identity: IdentityReadinessState;
+  identityError?: string;
+  step: AppReadinessStep;
   backendError?: string;
   updatedAt: number;
   error?: string;
@@ -72,6 +88,10 @@ let sdkReadinessState: SDKReadinessState = 'initializing';
 let sdkInitializationError: string | undefined;
 let backendReadinessState: BackendReadinessState = 'pending';
 let backendRegistrationError: string | undefined;
+let identityReadinessState: IdentityReadinessState = 'not-required';
+let identityInitializationError: string | undefined;
+let appReadinessState: AppReadinessState = 'booting';
+let readinessStep: AppReadinessStep = 'booting';
 
 interface RuntimeConfiguration {
   environment: SDKEnvironment;
@@ -86,6 +106,7 @@ let unsubscribeAccelerationBadge: (() => void) | null = null;
 setAPIConfigurationApplyHandler(applyAPIConfiguration);
 
 function publishReadiness(state: AppReadinessState, error?: string): AppReadinessSnapshot {
+  appReadinessState = state;
   const probe = probeAppShell();
   // Inference readiness is independent of app-shell readiness: when the
   // backend WASM is missing or fails to register, the model selector is
@@ -104,6 +125,9 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
     sdk: sdkReadinessState,
     backend: backendReadinessState,
     backendError: backendRegistrationError,
+    identity: identityReadinessState,
+    identityError: identityInitializationError,
+    step: readinessStep,
     updatedAt: Date.now(),
     error: error ?? sdkInitializationError,
   };
@@ -115,6 +139,8 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
   root.dataset.runanywhereAiState = state;
   root.dataset.runanywhereAiSdk = sdkReadinessState;
   root.dataset.runanywhereAiBackend = backendReadinessState;
+  root.dataset.runanywhereAiIdentity = identityReadinessState;
+  root.dataset.runanywhereAiStep = readinessStep;
   root.dataset.runanywhereAiShellReady = probe.shellReady ? 'true' : 'false';
   root.dataset.runanywhereAiModelUiReady = probe.modelUiReady ? 'true' : 'false';
   root.dataset.runanywhereAiModelUiTarget = probe.modelUiTarget ?? '';
@@ -130,6 +156,11 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
   } else {
     delete root.dataset.runanywhereAiBackendError;
   }
+  if (identityInitializationError) {
+    root.dataset.runanywhereAiIdentityError = identityInitializationError;
+  } else {
+    delete root.dataset.runanywhereAiIdentityError;
+  }
 
   const app = document.getElementById('app');
   if (app) {
@@ -139,6 +170,31 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
 
   window.dispatchEvent(new CustomEvent('runanywhere-ai-readinesschange', { detail: snapshot }));
   return snapshot;
+}
+
+function publishReadinessStep(step: AppReadinessStep): void {
+  readinessStep = step;
+  updateLoadingStatus(step);
+  publishReadiness(appReadinessState);
+}
+
+function updateLoadingStatus(step: AppReadinessStep): void {
+  const status = document.getElementById('loading-status');
+  if (status) status.textContent = `Step: ${step.replaceAll('-', ' ')}...`;
+}
+
+async function withTimeout<T>(step: string, timeoutMs: number, operation: Promise<T>): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(`Timed out after ${Math.round(timeoutMs / 1000)}s while ${step}. Check network, WASM assets, and browser diagnostics.`));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
 }
 
 function probeAppShell(): AppShellProbe {
@@ -220,6 +276,7 @@ function isElementActionable(element: HTMLElement): boolean {
 
 async function waitForInteractiveShell(): Promise<AppReadinessSnapshot> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  readinessStep = 'interactive';
   const snapshot = publishReadiness('interactive');
   if (!snapshot.ready) {
     // The shell never reached interactive readiness AND the backend isn't
@@ -287,13 +344,15 @@ async function ensureCrossOriginIsolation(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  readinessStep = 'booting';
   publishReadiness('booting');
 
   // Step 0: Ensure cross-origin isolation for SharedArrayBuffer (Safari/iOS)
-  await ensureCrossOriginIsolation();
+  await withTimeout('setting up cross-origin isolation', 60_000, ensureCrossOriginIsolation());
 
   // Show loading screen while SDK initializes
   showLoadingScreen();
+  publishReadinessStep('initializing-sdk');
   publishReadiness('initializing-sdk');
 
   try {
@@ -302,12 +361,14 @@ async function main(): Promise<void> {
 
     // Step 2: Hide loading screen and show the app
     hideLoadingScreen();
+    publishReadinessStep('building-shell');
     publishReadiness('building-shell');
     buildAppShell();
     await waitForInteractiveShell();
   } catch (error) {
     // Show error view with retry
     const message = formatError(error);
+    readinessStep = 'error';
     showErrorView(message);
     publishReadiness('error', message);
   }
@@ -362,9 +423,14 @@ async function startRuntime(
   configuration: RuntimeConfiguration,
   requireAllBackends: boolean,
 ): Promise<void> {
-  await RunAnywhere.initialize(configuration);
+  publishReadinessStep('initializing-sdk');
+  await withTimeout('initializing the SDK', 60_000, RunAnywhere.initialize(configuration));
 
-  const localRestored = await RunAnywhere.storage.restoreLocalStorage();
+  const localRestored = await withTimeout(
+    'restoring local storage',
+    60_000,
+    RunAnywhere.storage.restoreLocalStorage(),
+  );
   if (localRestored) {
     appLogger.info('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
   }
@@ -373,9 +439,23 @@ async function startRuntime(
   const backendErrors: string[] = [];
 
   try {
+    publishReadinessStep('registering-llamacpp');
     const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
-    await LlamaCPP.register({ acceleration: 'auto' });
-    activeAcceleration = LlamaCPP.accelerationMode;
+    await withTimeout(
+      'registering the llama.cpp backend',
+      120_000,
+      LlamaCPP.register({
+        acceleration: 'auto',
+        requireBackendWorker: true,
+        preferBackendWorker: true,
+      }),
+    );
+    // Prefer SDK runtime.active (worker WebGPU when available) over the
+    // main-thread bridge mode, which may stay on CPU while the worker owns GPU.
+    activeAcceleration =
+      RunAnywhere.runtime.active === 'webgpu' || RunAnywhere.runtime.active === 'cpu'
+        ? RunAnywhere.runtime.active
+        : LlamaCPP.accelerationMode;
     appLogger.info('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
   } catch (err) {
     const message = formatError(err);
@@ -387,9 +467,29 @@ async function startRuntime(
   }
 
   try {
+    publishReadinessStep('registering-onnx');
     const { ONNX } = await import('@runanywhere/web-onnx');
-    await ONNX.register();
+    await withTimeout(
+      'registering the ONNX/Sherpa backend',
+      120_000,
+      ONNX.register({
+        requireBackendWorker: true,
+        preferBackendWorker: true,
+      }),
+    );
     appLogger.info('[RunAnywhere] onnx/sherpa backend registered');
+    // Hybrid cloud STT is optional: the current artifact may omit the cloud
+    // engine, and credentials are supplied separately through Cloud.register().
+    // Never let this capability probe make local ONNX/Sherpa unavailable.
+    try {
+      const cloudRegistered = Cloud.registerBackend();
+      appLogger.info('[RunAnywhere] cloud STT backend registration:', cloudRegistered);
+    } catch (err) {
+      appLogger.warning(
+        '[RunAnywhere] cloud STT backend is unavailable; hybrid cloud routing is disabled:',
+        err,
+      );
+    }
   } catch (err) {
     const message = formatError(err);
     backendErrors.push(`onnx/sherpa: ${message}`);
@@ -405,28 +505,44 @@ async function startRuntime(
     throw new Error(`Backend registration failed (${backendErrors.join('; ')})`);
   }
 
-  // Backend registration installs the active WASM transport. Complete Phase
-  // 2 against that transport explicitly; production Settings must not report
-  // success while auth/device registration are merely deferred.
-  await RunAnywhere.completeServicesInitialization();
-  if (
-    requireAllBackends
-    && configuration.environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-  ) {
-    await requireProductionIdentity();
-  }
+  // Backend registration installs the active WASM transport. Phase 2 is
+  // explicit and bounded so a cloud-service failure cannot make a successful
+  // local backend registration appear pending forever.
+  publishReadinessStep('phase2-services');
+  await withTimeout(
+    'initializing Phase 2 services',
+    60_000,
+    RunAnywhere.completeServicesInitialization(),
+  );
 
-  const registeredCount = await registerModelCatalogAll();
-  notifyCatalogRegistered(registeredCount);
+  publishReadinessStep('catalog');
+  const registeredCount = await withTimeout(
+    'registering the model catalog',
+    60_000,
+    registerModelCatalogAll(),
+  );
   if (requireAllBackends && registeredCount === 0) {
     throw new Error('Model catalog registration failed: no models were registered.');
   }
 
-  // Explicitly await hydration on every runtime lifetime. The SDK also
-  // schedules best-effort hydration after each model registration; awaiting
-  // here makes Settings reconfiguration completion truthful and deterministic.
-  await RunAnywhere.hydrateModelRegistry();
-  await refreshSDKCatalogs();
+  // Hydrate OPFS → registry *before* notifying the picker. Otherwise the UI
+  // seeds every row as "Download" and can miss the later models.hydrated
+  // refresh (collapsed families / sheet opened from stale rowStates).
+  await withTimeout('hydrating the model registry', 60_000, RunAnywhere.hydrateModelRegistry());
+  await withTimeout('refreshing SDK catalogs', 60_000, refreshSDKCatalogs());
+  notifyCatalogRegistered(registeredCount);
+
+  // Production identity is cloud-dependent and must not delay an otherwise
+  // usable local shell. Its status remains observable through readiness data.
+  if (configuration.environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION) {
+    identityReadinessState = 'pending';
+    identityInitializationError = undefined;
+    publishReadinessStep('identity');
+    void completeProductionIdentityInBackground();
+  } else {
+    identityReadinessState = 'not-required';
+    identityInitializationError = undefined;
+  }
 
   appLogger.info(
     '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
@@ -438,6 +554,20 @@ async function startRuntime(
   unsubscribeAccelerationBadge = RunAnywhere.events.on('sdk.accelerationMode', ({ mode }) => {
     showAccelerationBadge(mode);
   });
+}
+
+async function completeProductionIdentityInBackground(): Promise<void> {
+  try {
+    await withTimeout('completing production identity', 60_000, requireProductionIdentity());
+    identityReadinessState = 'ready';
+    identityInitializationError = undefined;
+    appLogger.info('[RunAnywhere] Production identity is ready');
+  } catch (err) {
+    identityReadinessState = 'unavailable';
+    identityInitializationError = formatError(err);
+    appLogger.warning('[RunAnywhere] Production identity is unavailable; local inference remains ready:', err);
+  }
+  publishReadiness(appReadinessState);
 }
 
 async function requireProductionIdentity(): Promise<void> {
@@ -493,6 +623,8 @@ function applyAPIConfiguration(
     sdkReadinessState = 'initializing';
     backendReadinessState = 'pending';
     backendRegistrationError = undefined;
+    identityReadinessState = 'not-required';
+    identityInitializationError = undefined;
 
     try {
       await teardownRuntime();
@@ -606,14 +738,16 @@ async function refreshSDKCatalogs(): Promise<void> {
 }
 
 /**
- * Display a small floating badge indicating the active hardware acceleration.
+ * Display a small floating badge indicating acceleration + worker execution.
  */
 function showAccelerationBadge(mode: string): void {
   document.getElementById('accel-badge')?.remove();
   const badge = document.createElement('div');
   badge.id = 'accel-badge';
   const isGPU = mode === 'webgpu';
-  badge.textContent = isGPU ? 'WebGPU' : 'CPU';
+  const exec = RunAnywhere.runtime.executionContext === 'worker' ? 'worker' : 'main';
+  badge.textContent = `${isGPU ? 'WebGPU' : 'CPU'} · ${exec}`;
+  badge.title = `acceleration=${mode}; executionContext=${exec}`;
   badge.className = `accel-badge ${isGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
   document.body.appendChild(badge);
 }
@@ -649,7 +783,7 @@ function showLoadingScreen(): void {
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
-    <p class="text-sm text-tertiary">Initializing SDK...</p>
+    <p class="text-sm text-tertiary" id="loading-status">Step: initializing SDK...</p>
   `;
   document.body.appendChild(screen);
 }

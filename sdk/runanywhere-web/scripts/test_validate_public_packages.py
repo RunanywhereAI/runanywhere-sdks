@@ -31,6 +31,9 @@ PACKAGE_NAMES = {
     "web-llamacpp": "@runanywhere/web-llamacpp",
     "web-onnx": "@runanywhere/web-onnx",
 }
+# Diffusion is exposed through `@runanywhere/web` core — there is no separate
+# publishable diffusion workspace package.
+UNPUBLISHED_WORKSPACE_PACKAGES: set[str] = set()
 PROTO_FILES = {
     "package.json": json.dumps(
         {
@@ -109,6 +112,9 @@ def _write_valid_set(dist: Path) -> None:
 
 
 class WebPackageValidationTest(unittest.TestCase):
+    def test_diffusion_shell_is_not_a_release_artifact_until_its_wasm_exists(self) -> None:
+        self.assertTrue(UNPUBLISHED_WORKSPACE_PACKAGES.isdisjoint(PACKAGE_NAMES.values()))
+
     def test_accepts_exact_self_contained_package_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             dist = Path(temporary)

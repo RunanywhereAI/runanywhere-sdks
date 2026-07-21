@@ -1,0 +1,12 @@
+{
+  "name": "@runanywhere/electron-native",
+  "version": "0.1.0",
+  "description": "RunAnywhere Electron SDK — native N-API addon over the rac_* C ABI (on-device LLM/VLM/STT/TTS, Windows-first, Hexagon-ready).",
+  "private": true,
+  "license": "SEE LICENSE IN ../../../LICENSE",
+  "type": "commonjs",
+  "dependencies": {
+    "node-addon-api": "^8.9.0",
+    "node-api-headers": "^1.9.0"
+  }
+}
