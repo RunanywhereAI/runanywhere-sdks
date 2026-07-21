@@ -265,8 +265,6 @@ public actor HTTPClientAdapter {
         headers["X-Platform"] = SDKConstants.platform
         if let apiKey {
             headers["apikey"] = apiKey
-            // Supabase PostgREST: include the inserted/updated row in body.
-            headers["Prefer"] = "return=representation"
         }
         if let authToken {
             headers["Authorization"] = "Bearer \(authToken)"
