@@ -416,6 +416,105 @@ TestResult test_catalog_lookup() {
   return result;
 }
 
+TestResult test_nvidia_sherpa_catalog() {
+  TestResult result;
+  result.test_name = "nvidia_sherpa_catalog";
+
+  struct ExpectedFile {
+    const char *filename;
+    int64_t size_bytes;
+  };
+  constexpr ExpectedFile parakeet_v2_files[] = {
+      {"encoder.int8.onnx", 652184296LL},
+      {"decoder.int8.onnx", 7257753LL},
+      {"joiner.int8.onnx", 1739080LL},
+      {"tokens.txt", 9384LL},
+  };
+  constexpr ExpectedFile parakeet_v3_files[] = {
+      {"encoder.int8.onnx", 652184281LL},
+      {"decoder.int8.onnx", 11845275LL},
+      {"joiner.int8.onnx", 6355277LL},
+      {"tokens.txt", 93939LL},
+  };
+  constexpr ExpectedFile canary_files[] = {
+      {"encoder.int8.onnx", 132678643LL},
+      {"decoder.int8.onnx", 74437848LL},
+      {"tokens.txt", 53555LL},
+  };
+
+  struct Case {
+    const char *id;
+    const char *alias;
+    const char *repo;
+    const char *revision;
+    const ExpectedFile *files;
+    size_t file_count;
+    int64_t total_size_bytes;
+  };
+  const Case cases[] = {
+      {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", "parakeet-tdt-v2",
+       "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+       "1ab9323565ddb038682214b292f588070a538ce2", parakeet_v2_files, 4,
+       661190513LL},
+      {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", "parakeet-tdt-v3",
+       "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+       "2bda32ec70b097a55adaa07d9a7173915b43cc78", parakeet_v3_files, 4,
+       670478772LL},
+      {"sherpa-nemo-canary-180m-flash-int8", "canary-180m",
+       "csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8",
+       "9077164e0d3dd1d5353743e89ceaa1d3a770838c", canary_files, 3,
+       207170046LL},
+  };
+
+  for (const Case &test_case : cases) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.id);
+    if (!entry || entry != rcli::catalog::find(test_case.alias)) {
+      result.details =
+          std::string(test_case.id) + " should resolve by exact id and alias";
+      return result;
+    }
+    if (entry->category != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_ONNX ||
+        entry->url != nullptr || entry->files == nullptr ||
+        entry->file_count != test_case.file_count ||
+        entry->download_size_bytes != test_case.total_size_bytes) {
+      result.details = std::string(test_case.id) +
+                       " should be an exact Sherpa-ONNX STT bundle";
+      return result;
+    }
+
+    const std::string base_url = std::string("https://huggingface.co/") +
+                                 test_case.repo + "/resolve/" +
+                                 test_case.revision + "/";
+    int64_t manifest_total = 0;
+    for (size_t i = 0; i < test_case.file_count; ++i) {
+      const rcli::catalog::CatalogFile &actual = entry->files[i];
+      const ExpectedFile &expected = test_case.files[i];
+      const std::string expected_url = base_url + expected.filename;
+      if (actual.url == nullptr || actual.filename == nullptr ||
+          std::string(actual.url) != expected_url ||
+          std::string(actual.filename) != expected.filename ||
+          !actual.required || actual.size_bytes != expected.size_bytes) {
+        result.details = std::string(test_case.id) +
+                         " has a mismatched pinned file manifest at index " +
+                         std::to_string(i);
+        return result;
+      }
+      manifest_total += actual.size_bytes;
+    }
+    if (manifest_total != test_case.total_size_bytes) {
+      result.details = std::string(test_case.id) +
+                       " per-file sizes should sum to the exact bundle total";
+      return result;
+    }
+  }
+
+  result.passed = true;
+  return result;
+}
+
 TestResult test_engine_hint_parsing() {
   TestResult result;
   result.test_name = "engine_hint_parsing";
@@ -522,6 +621,9 @@ TestResult test_mlx_catalog_registration() {
       "mlx-nemotron-3.5-asr-streaming-0.6b-8bit",
       "mlx-qwen3-tts-12hz-0.6b-base-8bit",
       "mlx-soprano-1.1-80m-5bit",
+      "sherpa-nemo-parakeet-tdt-0.6b-v2-int8",
+      "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+      "sherpa-nemo-canary-180m-flash-int8",
   });
 
   runanywhere::v1::ModelInfo qwen;
@@ -644,6 +746,49 @@ TestResult test_mlx_catalog_registration() {
     }
   }
 
+  struct RegisteredSherpaCase {
+    const char *id;
+    int expected_files;
+    int64_t expected_size;
+  };
+  const RegisteredSherpaCase registered_sherpa_cases[] = {
+      {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", 4, 661190513LL},
+      {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", 4, 670478772LL},
+      {"sherpa-nemo-canary-180m-flash-int8", 3, 207170046LL},
+  };
+  for (const RegisteredSherpaCase &test_case : registered_sherpa_cases) {
+    runanywhere::v1::ModelInfo model;
+    if (!get_registered_model(test_case.id, &model, &error) ||
+        model.category() !=
+            runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        model.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA ||
+        model.format() != runanywhere::v1::MODEL_FORMAT_ONNX ||
+        !model.has_multi_file() ||
+        model.multi_file().files_size() != test_case.expected_files ||
+        model.download_size_bytes() != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA Sherpa metadata is incomplete: ") +
+          test_case.id;
+      return result;
+    }
+    int64_t registered_file_total = 0;
+    for (const auto &file : model.multi_file().files()) {
+      if (!file.has_size_bytes() || file.size_bytes() <= 0) {
+        result.details =
+            std::string("registered NVIDIA Sherpa file size is missing: ") +
+            test_case.id;
+        return result;
+      }
+      registered_file_total += file.size_bytes();
+    }
+    if (registered_file_total != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA Sherpa file sizes do not sum: ") +
+          test_case.id;
+      return result;
+    }
+  }
+
   runanywhere::v1::ModelInfo qwen_tts;
   if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts,
                             &error) ||
@@ -734,6 +879,7 @@ int main(int argc, char **argv) {
   suite.add("resolve_home_precedence", test_resolve_home_precedence);
   suite.add("state_dir", test_state_dir);
   suite.add("catalog_lookup", test_catalog_lookup);
+  suite.add("nvidia_sherpa_catalog", test_nvidia_sherpa_catalog);
   suite.add("engine_hint_parsing", test_engine_hint_parsing);
   suite.add("mlx_catalog_registration", test_mlx_catalog_registration);
   suite.add("hf_ref_registration", test_hf_ref_registration);

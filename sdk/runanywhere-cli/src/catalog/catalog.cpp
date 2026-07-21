@@ -53,6 +53,59 @@ constexpr CatalogFile kMiniLmFiles[] = {
      "vocab.txt", true},
 };
 
+constexpr CatalogFile kSherpaParakeetTdtV2Files[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 652184296LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 7257753LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx",
+     "joiner.int8.onnx", true, 1739080LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/tokens.txt",
+     "tokens.txt", true, 9384LL},
+};
+
+constexpr CatalogFile kSherpaParakeetTdtV3Files[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 652184281LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 11845275LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx",
+     "joiner.int8.onnx", true, 6355277LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt",
+     "tokens.txt", true, 93939LL},
+};
+
+constexpr CatalogFile kSherpaCanary180MFiles[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 132678643LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 74437848LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt",
+     "tokens.txt", true, 53555LL},
+};
+
 constexpr CatalogFile kMlxQwen3_06BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
      "added_tokens.json",
@@ -691,6 +744,21 @@ constexpr CatalogEntry kCatalog[] = {
      "runanywhere-models-v1/"
      "sherpa-onnx-whisper-tiny.en.tar.gz",
      nullptr, 0, 75 * MB, 0, false},
+    {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", "parakeet-tdt-v2",
+     "NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaParakeetTdtV2Files, 4, 661190513LL,
+     0, false},
+    {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", "parakeet-tdt-v3",
+     "NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaParakeetTdtV3Files, 4, 670478772LL,
+     0, false},
+    {"sherpa-nemo-canary-180m-flash-int8", "canary-180m",
+     "NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaCanary180MFiles, 3, 207170046LL, 0,
+     false},
     {"vits-piper-en_US-lessac-medium", "piper",
      "Piper TTS US English (Lessac Medium)",
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_SHERPA,
@@ -905,6 +973,9 @@ rac_result_t register_entry(const CatalogEntry &entry) {
       file->set_url(entry.files[i].url);
       file->set_filename(entry.files[i].filename);
       file->set_is_required(entry.files[i].required);
+      if (entry.files[i].size_bytes > 0) {
+        file->set_size_bytes(entry.files[i].size_bytes);
+      }
     }
     const std::string bytes = proto::serialize(request);
     rc = rac_register_multi_file_model_proto(
