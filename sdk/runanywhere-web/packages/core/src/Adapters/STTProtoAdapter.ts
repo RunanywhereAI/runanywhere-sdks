@@ -18,6 +18,8 @@ import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -57,8 +59,8 @@ export class STTProtoAdapter {
     if (host?.diagnostics.executionContext === 'worker') {
       const response = await host.infer('stt.transcribe', {
         requestBytes: STTTranscriptionRequest.encode(request).finish(),
-      }) as { resultBytes?: Uint8Array };
-      return response.resultBytes ? STTOutput.decode(response.resultBytes) : null;
+      });
+      return decodeWorkerInferResult(response, STTOutput);
     }
     if (!ensureExports(this.module, 'stt.transcribeLifecycle', [
       '_rac_stt_transcribe_lifecycle_proto',
@@ -201,18 +203,6 @@ export class STTProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
-  }
-}
-
-async function* decodeWorkerStream<T>(
-  stream: AsyncIterable<unknown>,
-  codec: { decode(input: Uint8Array): T },
-): AsyncIterable<T> {
-  for await (const payload of stream) {
-    const bytes = payload instanceof Uint8Array
-      ? payload
-      : (payload as { eventBytes?: Uint8Array })?.eventBytes;
-    if (bytes) yield codec.decode(bytes);
   }
 }
 

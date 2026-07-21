@@ -25,6 +25,7 @@ import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -39,11 +40,11 @@ import type { BackendWorkerHost } from '../runtime/BackendWorkerHost.js';
  * DedicatedWorker, but model weights are gone — ask for an explicit reload
  * instead of a vague "Backend not available" / sticky dead state.
  */
-function requireLlamaWorkerHost(
+export function requireLlamaWorkerHost(
   host: BackendWorkerHost | null,
   operation: string,
 ): BackendWorkerHost {
-  if (!host) {
+  if (!host || host.diagnostics.executionContext !== 'worker') {
     throw SDKException.backendNotAvailable(
       operation,
       getLlamaBackendWorkerDeadReason()
@@ -78,20 +79,11 @@ export class LLMProtoAdapter {
 
   async generate(request: ProtoLLMGenerateRequest): Promise<ProtoLLMGenerationResult | null> {
     const host = getActiveBackendWorkerHost('llamacpp');
-    const useWorker = mustUseLlamaBackendWorker()
-      || (
-        host != null
-        && host.diagnostics.executionContext === 'worker'
-        && hasBackendWorkerOwnedModels('llamacpp')
-      );
-    if (useWorker) {
+    if (mustUseLlamaBackendWorker()) {
       const workerHost = requireLlamaWorkerHost(host, 'llm.generate');
       const encoded = LLMGenerateRequest.encode(request).finish();
-      const response = await workerHost.infer('llm.generate', { requestBytes: encoded }) as {
-        resultBytes?: Uint8Array;
-      };
-      if (!response?.resultBytes) return null;
-      return LLMGenerationResult.decode(response.resultBytes);
+      const response = await workerHost.infer('llm.generate', { requestBytes: encoded });
+      return decodeWorkerInferResult(response, LLMGenerationResult);
     }
     if (!this.ensureExports('llm.generate', ['_rac_llm_generate_proto'])) return null;
     return this.bridge().withEncodedRequestAsync(
@@ -124,13 +116,7 @@ export class LLMProtoAdapter {
 
     // Prefer the model-owning BackendWorker when it holds the loaded LLM.
     const host = getActiveBackendWorkerHost('llamacpp');
-    const useWorker = mustUseLlamaBackendWorker()
-      || (
-        host != null
-        && host.diagnostics.executionContext === 'worker'
-        && hasBackendWorkerOwnedModels('llamacpp')
-      );
-    if (useWorker) {
+    if (mustUseLlamaBackendWorker()) {
       const workerHost = requireLlamaWorkerHost(host, 'llm.generateStream');
       const events = workerHost.stream('llm.generate', { requestBytes: encoded });
       return {

@@ -431,9 +431,11 @@ async function callUnload(
         ),
       )
     ));
-    const dataOffset = module._rac_wasm_offsetof_proto_buffer_data?.() ?? 0;
-    const sizeOffset = module._rac_wasm_offsetof_proto_buffer_size?.() ?? 0;
-    if (!dataOffset || !sizeOffset) return undefined;
+    // `data` is the first field of rac_proto_buffer_t, so offsetof(data) is 0.
+    // Treat missing exports as undefined — do not treat a valid 0 offset as absent.
+    const dataOffset = module._rac_wasm_offsetof_proto_buffer_data?.();
+    const sizeOffset = module._rac_wasm_offsetof_proto_buffer_size?.();
+    if (dataOffset === undefined || sizeOffset === undefined) return undefined;
     const dataPtr = module.getValue(outPtr + dataOffset, '*');
     const dataSize = module.getValue(outPtr + sizeOffset, 'i32');
     if (!dataPtr || dataSize <= 0) return undefined;

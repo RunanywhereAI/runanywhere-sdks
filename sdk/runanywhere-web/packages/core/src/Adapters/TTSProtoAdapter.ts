@@ -19,6 +19,8 @@ import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   collectCallback,
+  decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -67,8 +69,8 @@ export class TTSProtoAdapter {
     if (host?.diagnostics.executionContext === 'worker') {
       const response = await host.infer('tts.synthesize', {
         requestBytes: TTSSynthesisRequest.encode(request).finish(),
-      }) as { resultBytes?: Uint8Array };
-      return response.resultBytes ? TTSOutput.decode(response.resultBytes) : null;
+      });
+      return decodeWorkerInferResult(response, TTSOutput);
     }
     if (!ensureExports(this.module, 'tts.synthesizeLifecycle', [
       '_rac_tts_synthesize_lifecycle_proto',
@@ -265,18 +267,6 @@ export class TTSProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
-  }
-}
-
-async function* decodeWorkerStream<T>(
-  stream: AsyncIterable<unknown>,
-  codec: { decode(input: Uint8Array): T },
-): AsyncIterable<T> {
-  for await (const payload of stream) {
-    const bytes = payload instanceof Uint8Array
-      ? payload
-      : (payload as { eventBytes?: Uint8Array })?.eventBytes;
-    if (bytes) yield codec.decode(bytes);
   }
 }
 

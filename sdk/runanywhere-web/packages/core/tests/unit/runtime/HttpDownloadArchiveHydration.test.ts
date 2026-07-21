@@ -23,7 +23,7 @@ describe('archive download hydration helpers', () => {
     const fetches: Array<{ range?: string }> = [];
     let deleted = false;
 
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
       const range = headers.get('Range') ?? undefined;
       fetches.push({ range });

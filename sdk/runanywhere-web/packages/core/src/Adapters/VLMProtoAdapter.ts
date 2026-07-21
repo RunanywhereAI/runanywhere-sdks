@@ -10,21 +10,21 @@ import {
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import {
-  getLlamaBackendWorkerDeadReason,
   hasBackendWorkerOwnedModels,
   mustUseLlamaBackendWorker,
 } from '../runtime/BackendWorkerModelOwnership.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
-import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
   ensureExports,
   missingExports,
   modalityLogger as logger,
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+import { requireLlamaWorkerHost } from './LLMProtoAdapter.js';
 
 export class VLMProtoAdapter {
   static tryDefault(): VLMProtoAdapter | null {
@@ -49,26 +49,13 @@ export class VLMProtoAdapter {
     const requestBytes = VLMGenerationRequest.encode(
       VLMGenerationRequest.fromPartial({ images: [image], options }),
     ).finish();
-    const host = getActiveBackendWorkerHost('llamacpp');
-    const useWorker = mustUseLlamaBackendWorker()
-      || (
-        host != null
-        && host.diagnostics.executionContext === 'worker'
-        && hasBackendWorkerOwnedModels()
+    if (mustUseLlamaBackendWorker()) {
+      const host = requireLlamaWorkerHost(
+        getActiveBackendWorkerHost('llamacpp'),
+        'vlm.process',
       );
-    if (useWorker) {
-      if (!host || host.diagnostics.executionContext !== 'worker') {
-        throw SDKException.backendNotAvailable(
-          'vlm.process',
-          getLlamaBackendWorkerDeadReason()
-            ?? 'BackendWorker is required for VLM inference; main-thread fallback is disabled.',
-        );
-      }
-      const response = await host.infer('vlm.generate', { requestBytes }) as {
-        resultBytes?: Uint8Array;
-      };
-      if (!response?.resultBytes) return null;
-      return VLMResult.decode(response.resultBytes);
+      const response = await host.infer('vlm.generate', { requestBytes });
+      return decodeWorkerInferResult(response, VLMResult);
     }
     if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_generate_proto'])) {
       return null;
@@ -107,21 +94,11 @@ export class VLMProtoAdapter {
         options: { ...options, streamingEnabled: true },
       }),
     ).finish();
-    const host = getActiveBackendWorkerHost('llamacpp');
-    const useWorker = mustUseLlamaBackendWorker()
-      || (
-        host != null
-        && host.diagnostics.executionContext === 'worker'
-        && hasBackendWorkerOwnedModels()
+    if (mustUseLlamaBackendWorker()) {
+      const host = requireLlamaWorkerHost(
+        getActiveBackendWorkerHost('llamacpp'),
+        'vlm.processImageStream',
       );
-    if (useWorker) {
-      if (!host || host.diagnostics.executionContext !== 'worker') {
-        throw SDKException.backendNotAvailable(
-          'vlm.processImageStream',
-          getLlamaBackendWorkerDeadReason()
-            ?? 'BackendWorker is required for VLM streaming; main-thread fallback is disabled.',
-        );
-      }
       const events = host.stream('vlm.generate', { requestBytes });
       return {
         [Symbol.asyncIterator]: (): AsyncIterator<ProtoVLMStreamEvent> => {

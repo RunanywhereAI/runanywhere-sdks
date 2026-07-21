@@ -781,6 +781,11 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
             return fail();
         }
     }
+    if (out->mode == RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE) {
+        if (!out->input_image_data || out->input_image_size == 0) {
+            return fail();
+        }
+    }
     out->input_image_width = in.input_image_width();
     out->input_image_height = in.input_image_height();
     if (in.denoise_strength() > 0.0f)

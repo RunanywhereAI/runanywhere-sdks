@@ -23,6 +23,7 @@ import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { readWasmUint64 } from '../runtime/WasmInt64.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -113,8 +114,8 @@ export class VADProtoAdapter {
     if (host?.diagnostics.executionContext === 'worker') {
       const response = await host.infer('vad.process', {
         requestBytes: VADProcessRequest.encode(request).finish(),
-      }) as { resultBytes?: Uint8Array };
-      return response.resultBytes ? VADResult.decode(response.resultBytes) : null;
+      });
+      return decodeWorkerInferResult(response, VADResult);
     }
     if (!ensureExports(this.module, 'vad.processLifecycle', [
       '_rac_vad_process_lifecycle_proto',

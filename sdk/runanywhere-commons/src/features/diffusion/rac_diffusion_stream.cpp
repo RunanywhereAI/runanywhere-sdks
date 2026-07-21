@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -67,9 +68,24 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
+/** At most one active stream session per diffusion handle. */
+std::unordered_map<rac_handle_t, uint64_t>& g_active_by_handle() {
+    static std::unordered_map<rac_handle_t, uint64_t> m;
+    return m;
+}
+
 std::atomic<uint64_t>& next_session_id() {
     static std::atomic<uint64_t> id{1};
     return id;
+}
+
+/** Clear session bookkeeping. Caller must hold g_mu(). */
+void erase_session_locked(uint64_t session_id, rac_handle_t handle) {
+    g_sessions().erase(session_id);
+    auto it = g_active_by_handle().find(handle);
+    if (it != g_active_by_handle().end() && it->second == session_id) {
+        g_active_by_handle().erase(it);
+    }
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -164,11 +180,15 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     const uint64_t session_id = next_session_id().fetch_add(1, std::memory_order_relaxed);
     {
         std::lock_guard<std::mutex> lock(g_mu());
+        if (g_active_by_handle().find(handle) != g_active_by_handle().end()) {
+            return RAC_ERROR_SERVICE_BUSY;
+        }
         // StreamSession contains an atomic — assign fields in-place (no copy/move).
         StreamSession& session = g_sessions()[session_id];
         session.handle = handle;
         session.request_id = parsed.request_id();
         session.is_cancelled.store(false, std::memory_order_release);
+        g_active_by_handle()[handle] = session_id;
     }
     *out_session_id = session_id;
 
@@ -177,114 +197,131 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     std::vector<uint8_t> request_copy(request_proto_bytes,
                                       request_proto_bytes + request_proto_size);
 
-    std::thread([handle, session_id, request_copy = std::move(request_copy)]() mutable {
-        runanywhere::v1::DiffusionGenerationRequest request;
-        if (!request.ParseFromArray(request_copy.data(), static_cast<int>(request_copy.size())) ||
-            !request.has_options()) {
-            rac::diffusion::dispatch_diffusion_stream_event(
-                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
-                "failed to parse DiffusionGenerationRequest",
-                static_cast<int>(RAC_ERROR_DECODING_ERROR));
-            std::lock_guard<std::mutex> lock(g_mu());
-            g_sessions().erase(session_id);
-            return;
-        }
+    // Cover the whole worker lifetime so rac_diffusion_proto_quiesce() waits
+    // for generation to finish, not just individual event dispatches.
+    diffusion_in_flight().fetch_add(1, std::memory_order_relaxed);
+    try {
+        std::thread([handle, session_id, request_copy = std::move(request_copy)]() mutable {
+            auto in_flight_done = std::shared_ptr<void>(nullptr, [](void*) {
+                diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
+            });
 
-        rac::diffusion::dispatch_diffusion_stream_event(
-            handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_STARTED, nullptr, nullptr, nullptr,
-            0);
-
-        {
-            std::lock_guard<std::mutex> lock(g_mu());
-            auto it = g_sessions().find(session_id);
-            if (it == g_sessions().end() ||
-                it->second.is_cancelled.load(std::memory_order_acquire)) {
-                g_sessions().erase(session_id);
+            runanywhere::v1::DiffusionGenerationRequest request;
+            if (!request.ParseFromArray(request_copy.data(),
+                                        static_cast<int>(request_copy.size())) ||
+                !request.has_options()) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to parse DiffusionGenerationRequest",
+                    static_cast<int>(RAC_ERROR_DECODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
                 return;
             }
-        }
 
-        rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
-        if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
             rac::diffusion::dispatch_diffusion_stream_event(
-                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
-                "failed to convert DiffusionGenerationOptions",
-                static_cast<int>(RAC_ERROR_DECODING_ERROR));
-            std::lock_guard<std::mutex> lock(g_mu());
-            g_sessions().erase(session_id);
-            return;
-        }
+                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_STARTED, nullptr, nullptr,
+                nullptr, 0);
 
-        struct ProgressCtx {
-            rac_handle_t handle;
-            uint64_t session_id;
-        } progress_ctx{handle, session_id};
+            {
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it == g_sessions().end() ||
+                    it->second.is_cancelled.load(std::memory_order_acquire)) {
+                    erase_session_locked(session_id, handle);
+                    return;
+                }
+            }
 
-        rac_diffusion_result_t raw = {};
-        const rac_result_t rc = rac_diffusion_generate_with_progress(
-            handle, &options,
-            [](const rac_diffusion_progress_t* progress, void* user_data) -> rac_bool_t {
-                auto* ctx = static_cast<ProgressCtx*>(user_data);
-                if (!ctx || !progress)
-                    return RAC_TRUE;
-                {
-                    std::lock_guard<std::mutex> lock(g_mu());
-                    auto it = g_sessions().find(ctx->session_id);
-                    if (it == g_sessions().end() ||
-                        it->second.is_cancelled.load(std::memory_order_acquire)) {
-                        return RAC_FALSE;  // cancel
+            rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
+            if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to convert DiffusionGenerationOptions",
+                    static_cast<int>(RAC_ERROR_DECODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
+
+            struct ProgressCtx {
+                rac_handle_t handle;
+                uint64_t session_id;
+            } progress_ctx{handle, session_id};
+
+            rac_diffusion_result_t raw = {};
+            const rac_result_t rc = rac_diffusion_generate_with_progress(
+                handle, &options,
+                [](const rac_diffusion_progress_t* progress, void* user_data) -> rac_bool_t {
+                    auto* ctx = static_cast<ProgressCtx*>(user_data);
+                    if (!ctx || !progress)
+                        return RAC_TRUE;
+                    {
+                        std::lock_guard<std::mutex> lock(g_mu());
+                        auto it = g_sessions().find(ctx->session_id);
+                        if (it == g_sessions().end() ||
+                            it->second.is_cancelled.load(std::memory_order_acquire)) {
+                            return RAC_FALSE;  // cancel
+                        }
                     }
-                }
-                runanywhere::v1::DiffusionProgress proto_progress;
-                if (rac::foundation::rac_diffusion_progress_to_proto(progress, &proto_progress)) {
-                    rac::diffusion::dispatch_diffusion_stream_event(
-                        ctx->handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_PROGRESS,
-                        &proto_progress, nullptr, nullptr, 0);
-                }
-                return RAC_TRUE;
-            },
-            &progress_ctx, &raw);
+                    runanywhere::v1::DiffusionProgress proto_progress;
+                    if (rac::foundation::rac_diffusion_progress_to_proto(progress, &proto_progress)) {
+                        rac::diffusion::dispatch_diffusion_stream_event(
+                            ctx->handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_PROGRESS,
+                            &proto_progress, nullptr, nullptr, 0);
+                    }
+                    return RAC_TRUE;
+                },
+                &progress_ctx, &raw);
 
-        free_diffusion_options(&options);
+            free_diffusion_options(&options);
 
-        {
-            std::lock_guard<std::mutex> lock(g_mu());
-            auto it = g_sessions().find(session_id);
-            if (it == g_sessions().end() ||
-                it->second.is_cancelled.load(std::memory_order_acquire)) {
-                if (rc == RAC_SUCCESS)
-                    rac_diffusion_result_free(&raw);
-                g_sessions().erase(session_id);
+            {
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it == g_sessions().end() ||
+                    it->second.is_cancelled.load(std::memory_order_acquire)) {
+                    if (rc == RAC_SUCCESS)
+                        rac_diffusion_result_free(&raw);
+                    erase_session_locked(session_id, handle);
+                    return;
+                }
+            }
+
+            if (rc != RAC_SUCCESS) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    rac_error_message(rc), static_cast<int>(rc));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
                 return;
             }
-        }
 
-        if (rc != RAC_SUCCESS) {
-            rac::diffusion::dispatch_diffusion_stream_event(
-                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
-                rac_error_message(rc), static_cast<int>(rc));
-            std::lock_guard<std::mutex> lock(g_mu());
-            g_sessions().erase(session_id);
-            return;
-        }
-
-        runanywhere::v1::DiffusionResult result;
-        if (!rac::foundation::rac_diffusion_result_to_proto(&raw, &result)) {
+            runanywhere::v1::DiffusionResult result;
+            if (!rac::foundation::rac_diffusion_result_to_proto(&raw, &result)) {
+                rac_diffusion_result_free(&raw);
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to encode DiffusionResult",
+                    static_cast<int>(RAC_ERROR_ENCODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
             rac_diffusion_result_free(&raw);
             rac::diffusion::dispatch_diffusion_stream_event(
-                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
-                "failed to encode DiffusionResult", static_cast<int>(RAC_ERROR_ENCODING_ERROR));
+                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_COMPLETED, nullptr, &result,
+                nullptr, 0);
             std::lock_guard<std::mutex> lock(g_mu());
-            g_sessions().erase(session_id);
-            return;
-        }
-        rac_diffusion_result_free(&raw);
-        rac::diffusion::dispatch_diffusion_stream_event(
-            handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_COMPLETED, nullptr, &result,
-            nullptr, 0);
+            erase_session_locked(session_id, handle);
+        }).detach();
+    } catch (...) {
+        diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
         std::lock_guard<std::mutex> lock(g_mu());
-        g_sessions().erase(session_id);
-    }).detach();
+        erase_session_locked(session_id, handle);
+        *out_session_id = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     return RAC_SUCCESS;
 #endif

@@ -71,7 +71,11 @@ export function markModelOwnedByBackendWorker(
   backendId: 'llamacpp' | 'onnx' = 'llamacpp',
 ): void {
   if (!modelId) return;
-  llamaWorkerDeadReason = null;
+  // Only a successful Llama reload clears the sticky crash flag. Loading an
+  // unrelated ONNX speech model must not re-enable main-thread Llama fallback.
+  if (backendId === 'llamacpp') {
+    llamaWorkerDeadReason = null;
+  }
   workerOwnedModels.set(modelId, {
     modelId,
     loadedAtUnixMs: Date.now(),

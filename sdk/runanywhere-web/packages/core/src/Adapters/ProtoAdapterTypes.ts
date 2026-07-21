@@ -778,3 +778,31 @@ export function requireExports(
     );
   }
 }
+
+/** Decode a BackendWorker `infer` response after validating `resultBytes`. */
+export function decodeWorkerInferResult<T>(
+  response: unknown,
+  codec: { decode(input: Uint8Array): T },
+): T | null {
+  const bytes = (response as { resultBytes?: unknown } | undefined)?.resultBytes;
+  return bytes instanceof Uint8Array ? codec.decode(bytes) : null;
+}
+
+/** Yield decoded stream events from raw `Uint8Array` or `{ eventBytes }` payloads. */
+export async function* decodeWorkerStream<T>(
+  stream: AsyncIterable<unknown>,
+  codec: { decode(input: Uint8Array): T },
+): AsyncIterable<T> {
+  for await (const payload of stream) {
+    if (payload instanceof Uint8Array) {
+      yield codec.decode(payload);
+      continue;
+    }
+    const eventBytes = (payload as { eventBytes?: unknown } | undefined)?.eventBytes;
+    if (eventBytes instanceof Uint8Array) {
+      yield codec.decode(eventBytes);
+      continue;
+    }
+    modalityLogger.warning('BackendWorker stream payload had unrecognized shape; skipping');
+  }
+}

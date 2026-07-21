@@ -76,11 +76,10 @@ import {
 } from '../../runtime/EmscriptenModule.js';
 import { callEmscriptenAsyncNumber } from '../../runtime/EmscriptenAsync.js';
 import {
-  getLlamaBackendWorkerDeadReason,
-  hasBackendWorkerOwnedModels,
   mustUseLlamaBackendWorker,
 } from '../../runtime/BackendWorkerModelOwnership.js';
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import { requireLlamaWorkerHost } from '../../Adapters/LLMProtoAdapter.js';
 import { TextGeneration } from './RunAnywhere+TextGeneration.js';
 
 const logger = new SDKLogger('ToolCalling');
@@ -536,14 +535,10 @@ async function generateWithToolsInBackendWorker(
   extra: GenerateWithToolsOptions,
   executeTool: (toolCall: ToolCall) => Promise<ToolResult>,
 ): Promise<ToolCallingResult> {
-  const host = getActiveBackendWorkerHost('llamacpp');
-  if (!host || host.diagnostics.executionContext !== 'worker') {
-    throw SDKException.backendNotAvailable(
-      'toolCalling.generateWithTools',
-      getLlamaBackendWorkerDeadReason()
-        ?? 'BackendWorker is required for tool-calling against a worker-owned LLM; main-thread fallback is disabled.',
-    );
-  }
+  const host = requireLlamaWorkerHost(
+    getActiveBackendWorkerHost('llamacpp'),
+    'toolCalling.generateWithTools',
+  );
 
   let sessionHandle = 0n;
   let cancelDispatched = false;
@@ -838,14 +833,7 @@ export const ToolCalling = {
       ? options.tools
       : this.getRegisteredTools();
     const effectiveOptions = buildPromptOptions(tools, options);
-    const workerHost = getActiveBackendWorkerHost('llamacpp');
-    const useWorker = mustUseLlamaBackendWorker()
-      || (
-        workerHost != null
-        && workerHost.diagnostics.executionContext === 'worker'
-        && hasBackendWorkerOwnedModels()
-      );
-    if (useWorker) {
+    if (mustUseLlamaBackendWorker()) {
       return generateWithToolsInBackendWorker(
         prompt,
         tools,

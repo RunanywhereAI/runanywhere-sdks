@@ -10,12 +10,13 @@ import {
   getActiveBackendWorkerHost,
   type BackendWorkerHost,
 } from '../../../src/runtime/BackendWorkerHost';
+import type * as BackendWorkerHostModule from '../../../src/runtime/BackendWorkerHost.js';
 import { LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
 import { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 import { VLMResult } from '@runanywhere/proto-ts/vlm_options';
 
 vi.mock('../../../src/runtime/BackendWorkerHost.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../src/runtime/BackendWorkerHost.js')>(
+  const actual = await vi.importActual<typeof BackendWorkerHostModule>(
     '../../../src/runtime/BackendWorkerHost.js',
   );
   return {
