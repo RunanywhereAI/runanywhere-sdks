@@ -12,7 +12,7 @@
 //     so the blocking libcurl call never stalls the UI thread.
 //   * The adapter carries the SDK-level request config (baseURL,
 //     apiKey, env, access token, default headers) so call sites don't
-//     have to reconstruct `Authorization` / `apikey` / `Prefer` headers
+//     have to reconstruct `Authorization` / `apikey` headers
 //     themselves.
 
 import 'dart:async';
@@ -269,7 +269,7 @@ class HTTPClientAdapter {
 
     var response = await rawRequest(
       method: method,
-      url: _maybeAppendSupabaseUpsert(url, path, snapshot.environment),
+      url: url,
       headers: resolvedHeaders,
       body: encodedBody,
       timeoutMs: timeoutMs ?? snapshot.timeoutMs,
@@ -294,7 +294,7 @@ class HTTPClientAdapter {
           retryHeaders['Authorization'] = 'Bearer $newToken';
           response = await rawRequest(
             method: method,
-            url: _maybeAppendSupabaseUpsert(url, path, snapshot.environment),
+            url: url,
             headers: retryHeaders,
             body: encodedBody,
             timeoutMs: timeoutMs ?? snapshot.timeoutMs,
@@ -395,25 +395,6 @@ class HTTPClientAdapter {
         : configuredBaseURL;
     final endpoint = path.startsWith('/') ? path : '/$path';
     return '$base$endpoint';
-  }
-
-  /// Supabase device-registration endpoints need `on_conflict=device_id`
-  /// to do an UPSERT instead of rejecting duplicates.
-  String _maybeAppendSupabaseUpsert(
-    String url,
-    String path,
-    SDKEnvironment environment,
-  ) {
-    if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return url;
-    if (!_isDeviceRegistrationPath(path)) return url;
-    final separator = url.contains('?') ? '&' : '?';
-    return '$url${separator}on_conflict=device_id';
-  }
-
-  bool _isDeviceRegistrationPath(String path) {
-    return path.contains('sdk_devices') ||
-        path.contains('devices/register') ||
-        path.contains('rest/v1/sdk_devices');
   }
 
   bool _redirectsAllowedForHeaders(

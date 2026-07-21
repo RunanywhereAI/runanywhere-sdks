@@ -55,10 +55,6 @@ class DartBridgeDevice {
   /// SharedPreferences instance (lazily initialized)
   static SharedPreferences? _prefs;
 
-  /// SDK environment for HTTP calls
-  static SDKEnvironment _environment =
-      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-
   /// Base URL for HTTP calls
   static String? _baseURL;
 
@@ -165,7 +161,6 @@ class DartBridgeDevice {
     String? baseURL,
     String? accessToken,
   }) async {
-    _environment = environment;
     _baseURL = baseURL;
     _accessToken = accessToken;
 
@@ -271,7 +266,6 @@ class DartBridgeDevice {
     _cachedDeviceId = null;
     _cachedRegistrationInfo = _DeviceRegistrationInfoSnapshot.defaults();
     _prefs = null;
-    _environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     _baseURL = null;
     _accessToken = null;
     _pendingEndpoint = null;
@@ -306,25 +300,15 @@ class DartBridgeDevice {
         ? baseURL.substring(0, baseURL.length - 1)
         : baseURL;
 
-    // For dev mode (Supabase), add ?on_conflict=device_id for UPSERT
-    // Matches Swift/Kotlin behavior
-    final isDev = _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    final finalEndpoint = isDev
-        ? (endpoint.contains('?')
-              ? '$endpoint&on_conflict=device_id'
-              : '$endpoint?on_conflict=device_id')
-        : endpoint;
-    final fullUrl = '$trimmedBase$finalEndpoint';
+    // Every environment registers through the backend endpoint (the C++
+    // callback supplies the resolved path). No datastore-specific rewrite.
+    final fullUrl = '$trimmedBase$endpoint';
 
     // Build headers matching Kotlin/Swift
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-
-    if (isDev) {
-      headers['Prefer'] = 'resolution=merge-duplicates';
-    }
 
     final accessToken =
         _accessToken ?? DartBridgeAuth.instance.getAccessToken();
