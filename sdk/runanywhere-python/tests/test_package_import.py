@@ -16,7 +16,13 @@ import sys
 
 import pytest
 
-_PKG_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Directory that must be on sys.path for a fresh interpreter to import ``runanywhere``: the
+# parent of the package itself, located via find_spec (no import side effects). This works
+# for a source checkout AND an installed wheel — and, unlike ``dirname(dirname(__file__))``,
+# it stays correct when the CI hermetic step runs this file from a relocated ``tests/`` dir.
+_spec = importlib.util.find_spec("runanywhere")
+assert _spec is not None and _spec.origin is not None, "runanywhere must be importable"
+_PKG_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(_spec.origin)))
 
 
 def _fresh_interpreter(code: str) -> subprocess.CompletedProcess:
@@ -26,7 +32,10 @@ def _fresh_interpreter(code: str) -> subprocess.CompletedProcess:
     process — an in-process check is polluted once any earlier test (e.g. the gated
     smoke suite) has legitimately loaded the compiled ``_core`` into ``sys.modules``.
     """
-    env = {**os.environ, "PYTHONPATH": _PKG_PARENT}
+    # Prepend the package parent while preserving any inherited PYTHONPATH.
+    _existing = os.environ.get("PYTHONPATH", "")
+    _pythonpath = os.pathsep.join(p for p in (_PKG_PARENT, _existing) if p)
+    env = {**os.environ, "PYTHONPATH": _pythonpath}
     return subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, env=env
     )
