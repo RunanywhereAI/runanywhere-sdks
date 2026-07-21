@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for ``validate_public_packages`` using synthetic in-memory wheels/sdists.
 
-Each case assembles a minimal but structurally faithful wheel (a ZIP with ``runanywhere/``,
-a compiled ``_core`` stub, ``*.dist-info/METADATA``, and platform sidecars) and sdist (a
-``.tar.gz`` under a single ``runanywhere-<version>/`` prefix). The good bundle must pass; the
-host-path-leak / missing-sidecar / binary-in-sdist bundles must each be rejected.
+Uses stdlib ``unittest`` (no pytest) so it runs standalone via ``python3 <file>`` in the CI
+``validation`` job, exactly like the sibling SDK validator self-tests. Each case assembles a
+minimal but structurally faithful wheel (a ZIP with ``runanywhere/``, a compiled ``_core``
+stub, ``*.dist-info/METADATA``, and the wheel-repair tool's vendored ``runanywhere.libs/``
+sidecars with hash-mangled names) and sdist (a ``.tar.gz`` under a single
+``runanywhere-<version>/`` prefix). The good bundle must pass; the host-path-leak /
+missing-sidecar / binary-in-sdist bundles must each be rejected.
 """
 
 from __future__ import annotations
@@ -13,10 +16,10 @@ import importlib.util
 import io
 import sys
 import tarfile
+import tempfile
+import unittest
 import zipfile
 from pathlib import Path
-
-import pytest
 
 
 def _load_validator():
@@ -54,11 +57,14 @@ def _metadata(version: str = VERSION) -> bytes:
 
 
 def _win_sidecars() -> dict[str, bytes]:
-    """The Windows base sidecar set delvewheel places beside _core (no GPU)."""
+    """The Windows base sidecars delvewheel vendors into ``runanywhere.libs/``.
+
+    Names carry a hash suffix (delvewheel's mangling) so the tests exercise the validator's
+    ``<lib>`` / ``<lib>-<hash>`` prefix matching, not just exact names.
+    """
     return {
-        "runanywhere/_native/onnxruntime.dll": CLEAN_BINARY,
-        "runanywhere/_native/onnxruntime_providers_shared.dll": CLEAN_BINARY,
-        "runanywhere/_native/sherpa-onnx-c-api.dll": CLEAN_BINARY,
+        "runanywhere.libs/onnxruntime-a1b2c3d4.dll": CLEAN_BINARY,
+        "runanywhere.libs/sherpa-onnx-c-api-e5f6a7b8.dll": CLEAN_BINARY,
     }
 
 
@@ -134,160 +140,140 @@ def _write_dist(
     return dist
 
 
-# --------------------------------------------------------------------------------------- good
+class ValidatePublicPackagesTest(unittest.TestCase):
+    def _tmp(self) -> Path:
+        # A per-test temp dir cleaned up automatically at tearDown (3.9-compatible).
+        ctx = tempfile.TemporaryDirectory()
+        self.addCleanup(ctx.cleanup)
+        return Path(ctx.name)
 
+    # ------------------------------------------------------------------- good
+    def test_good_bundle_passes(self) -> None:
+        V.validate_public_packages(_write_dist(self._tmp()), VERSION)
 
-def test_good_bundle_passes(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path)
-    V.validate_public_packages(dist, VERSION)
+    def test_good_bundle_main_returns_zero(self) -> None:
+        dist = _write_dist(self._tmp())
+        self.assertEqual(V.main(["--dist", str(dist), "--expected-version", VERSION]), 0)
 
+    def test_gpu_flag_requires_cuda_sidecars(self) -> None:
+        # Base-only wheel must FAIL under --gpu (CUDA sidecars absent) ...
+        dist = _write_dist(self._tmp())
+        with self.assertRaises(V.PackageValidationError):
+            V.validate_public_packages(dist, VERSION, gpu=True)
+        # ... but PASS once the CUDA DLLs are vendored (mangled) into runanywhere.libs.
+        gpu_sidecars = _win_sidecars()
+        gpu_sidecars.update(
+            {
+                "runanywhere.libs/cudart64_12-11aa.dll": CLEAN_BINARY,
+                "runanywhere.libs/cublas64_12-22bb.dll": CLEAN_BINARY,
+                "runanywhere.libs/cublasLt64_12-33cc.dll": CLEAN_BINARY,
+            }
+        )
+        dist2 = _write_dist(self._tmp(), wheel=_build_wheel(sidecars=gpu_sidecars))
+        V.validate_public_packages(dist2, VERSION, gpu=True)
 
-def test_good_bundle_main_returns_zero(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path)
-    assert V.main(["--dist", str(dist), "--expected-version", VERSION]) == 0
+    # --------------------------------------------------------- wheel rejections
+    def test_host_path_in_binary_is_tolerated(self) -> None:
+        # A native extension (and its vendored deps) unavoidably embed build-env source paths,
+        # and CI runner workspaces live under /home/ or /Users/, so compiled binaries are NOT
+        # scanned for host paths — a build-path string inside _core / a sidecar must not fail.
+        leaky = _win_sidecars()
+        leaky["runanywhere/_native/_core.cp312-win_amd64.pyd"] = (
+            CLEAN_BINARY + b"C:\\Users\\runner\\build\\_core.obj\x00"
+        )
+        leaky["runanywhere.libs/onnxruntime-a1b2c3d4.dll"] = (
+            CLEAN_BINARY + b"/home/runner/work/onnxruntime\x00"
+        )
+        dist = _write_dist(self._tmp(), wheel=_build_wheel(include_core=False, sidecars=leaky))
+        V.validate_public_packages(dist, VERSION)  # must not raise
 
+    def test_host_path_leak_in_text_member_is_rejected(self) -> None:
+        # A host path in a TEXT / metadata member (our own source) IS an avoidable leak.
+        wheel = _build_wheel(
+            extra_members={"runanywhere/_leak.py": b"CACHE = '/home/dev/secret/models'\n"}
+        )
+        with self.assertRaisesRegex(V.PackageValidationError, "host"):
+            V.validate_public_packages(_write_dist(self._tmp(), wheel=wheel), VERSION)
 
-def test_gpu_flag_requires_cuda_sidecars(tmp_path: Path) -> None:
-    # Base-only wheel must FAIL under --gpu (CUDA sidecars absent) ...
-    dist = _write_dist(tmp_path)
-    with pytest.raises(V.PackageValidationError):
-        V.validate_public_packages(dist, VERSION, gpu=True)
+    def test_missing_sidecar_lib_is_rejected(self) -> None:
+        partial = _win_sidecars()
+        del partial["runanywhere.libs/sherpa-onnx-c-api-e5f6a7b8.dll"]
+        with self.assertRaisesRegex(V.PackageValidationError, "sidecar"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), wheel=_build_wheel(sidecars=partial)), VERSION
+            )
 
-    # ... but PASS once the CUDA DLLs are vendored beside _core.
-    gpu_sidecars = _win_sidecars()
-    gpu_sidecars.update(
-        {
-            "runanywhere/_native/cudart64_12.dll": CLEAN_BINARY,
-            "runanywhere/_native/cublas64_12.dll": CLEAN_BINARY,
-            "runanywhere/_native/cublasLt64_12.dll": CLEAN_BINARY,
-        }
-    )
-    dist2 = _write_dist(tmp_path / "gpu", wheel=_build_wheel(sidecars=gpu_sidecars))
-    V.validate_public_packages(dist2, VERSION, gpu=True)
+    def test_missing_core_extension_is_rejected(self) -> None:
+        with self.assertRaisesRegex(V.PackageValidationError, "_core"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), wheel=_build_wheel(include_core=False)), VERSION
+            )
 
+    def test_version_mismatch_is_rejected(self) -> None:
+        with self.assertRaisesRegex(V.PackageValidationError, "version"):
+            V.validate_public_packages(_write_dist(self._tmp()), "9.9.9")
 
-# ---------------------------------------------------------------------------- wheel rejections
+    def test_missing_package_dir_is_rejected(self) -> None:
+        members = _win_sidecars()
+        members["runanywhere/_native/_core.cp312-win_amd64.pyd"] = CLEAN_BINARY
+        members[f"runanywhere-{VERSION}.dist-info/METADATA"] = _metadata()
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for name, payload in members.items():
+                archive.writestr(name, payload)
+        with self.assertRaisesRegex(V.PackageValidationError, "runanywhere"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), wheel=buffer.getvalue()), VERSION
+            )
 
+    # --------------------------------------------------------- sdist rejections
+    def test_binary_in_sdist_is_rejected(self) -> None:
+        sdist = _build_sdist(
+            extra_members={
+                f"runanywhere-{VERSION}/runanywhere/_native/_core.cp312-win_amd64.pyd": CLEAN_BINARY
+            }
+        )
+        with self.assertRaisesRegex(V.PackageValidationError, "binaries"):
+            V.validate_public_packages(_write_dist(self._tmp(), sdist=sdist), VERSION)
 
-def test_host_path_in_binary_is_tolerated(tmp_path: Path) -> None:
-    # A native extension (and its vendored deps) unavoidably embed build-env source paths,
-    # and CI runner workspaces live under /home/ or /Users/, so compiled binaries are NOT
-    # scanned for host paths — a build-path string inside _core / a sidecar must not fail.
-    leaky = _win_sidecars()
-    leaky["runanywhere/_native/_core.cp312-win_amd64.pyd"] = (
-        CLEAN_BINARY + b"C:\\Users\\runner\\build\\_core.obj\x00"
-    )
-    leaky["runanywhere/_native/onnxruntime.dll"] = (
-        CLEAN_BINARY + b"/home/runner/work/onnxruntime\x00"
-    )
-    dist = _write_dist(tmp_path, wheel=_build_wheel(include_core=False, sidecars=leaky))
-    V.validate_public_packages(dist, VERSION)  # must not raise
+    def test_sdist_multiple_prefixes_is_rejected(self) -> None:
+        sdist = _build_sdist(extra_members={"stray-0.1/setup.py": b"# stray\n"})
+        with self.assertRaisesRegex(V.PackageValidationError, "prefix"):
+            V.validate_public_packages(_write_dist(self._tmp(), sdist=sdist), VERSION)
 
+    def test_sdist_missing_pyproject_is_rejected(self) -> None:
+        with self.assertRaisesRegex(V.PackageValidationError, "pyproject"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), sdist=_build_sdist(include_pyproject=False)), VERSION
+            )
 
-def test_host_path_leak_in_text_member_is_rejected(tmp_path: Path) -> None:
-    # A host path in a TEXT / metadata member (our own source) IS an avoidable leak.
-    wheel = _build_wheel(
-        extra_members={"runanywhere/_leak.py": b"CACHE = '/home/dev/secret/models'\n"}
-    )
-    dist = _write_dist(tmp_path, wheel=wheel)
-    with pytest.raises(V.PackageValidationError, match="host"):
-        V.validate_public_packages(dist, VERSION)
+    def test_sdist_missing_native_is_rejected(self) -> None:
+        with self.assertRaisesRegex(V.PackageValidationError, "native"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), sdist=_build_sdist(include_native=False)), VERSION
+            )
 
+    def test_sdist_wrong_version_prefix_is_rejected(self) -> None:
+        with self.assertRaisesRegex(V.PackageValidationError, "prefix"):
+            V.validate_public_packages(
+                _write_dist(self._tmp(), sdist=_build_sdist(prefix="runanywhere-0.0.1")), VERSION
+            )
 
-def test_missing_sidecar_lib_is_rejected(tmp_path: Path) -> None:
-    partial = _win_sidecars()
-    del partial["runanywhere/_native/sherpa-onnx-c-api.dll"]
-    dist = _write_dist(tmp_path, wheel=_build_wheel(sidecars=partial))
-    with pytest.raises(V.PackageValidationError, match="sidecar"):
-        V.validate_public_packages(dist, VERSION)
+    # ---------------------------------------------------------- dist-set errors
+    def test_missing_sdist_is_rejected(self) -> None:
+        dist = self._tmp() / "dist"
+        dist.mkdir()
+        (dist / WHEEL_NAME).write_bytes(_build_wheel())
+        with self.assertRaisesRegex(V.PackageValidationError, "sdist"):
+            V.validate_public_packages(dist, VERSION)
 
-
-def test_missing_core_extension_is_rejected(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path, wheel=_build_wheel(include_core=False))
-    with pytest.raises(V.PackageValidationError, match="_core"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_version_mismatch_is_rejected(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path, wheel=_build_wheel(version=VERSION))
-    with pytest.raises(V.PackageValidationError, match="version"):
-        V.validate_public_packages(dist, "9.9.9")
-
-
-def test_missing_package_dir_is_rejected(tmp_path: Path) -> None:
-    # A wheel with the dist-info + sidecars but no runanywhere/__init__.py.
-    members = _win_sidecars()
-    members["runanywhere/_native/_core.cp312-win_amd64.pyd"] = CLEAN_BINARY
-    members[f"runanywhere-{VERSION}.dist-info/METADATA"] = _metadata()
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        for name, payload in members.items():
-            archive.writestr(name, payload)
-    dist = _write_dist(tmp_path, wheel=buffer.getvalue())
-    with pytest.raises(V.PackageValidationError, match="runanywhere"):
-        V.validate_public_packages(dist, VERSION)
-
-
-# ---------------------------------------------------------------------------- sdist rejections
-
-
-def test_binary_in_sdist_is_rejected(tmp_path: Path) -> None:
-    sdist = _build_sdist(
-        extra_members={
-            f"runanywhere-{VERSION}/runanywhere/_native/_core.cp312-win_amd64.pyd": CLEAN_BINARY
-        }
-    )
-    dist = _write_dist(tmp_path, sdist=sdist)
-    with pytest.raises(V.PackageValidationError, match="binaries"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_sdist_multiple_prefixes_is_rejected(tmp_path: Path) -> None:
-    # Add a stray second top-level prefix beside the versioned one.
-    sdist = _build_sdist(extra_members={"stray-0.1/setup.py": b"# stray\n"})
-    dist = _write_dist(tmp_path, sdist=sdist)
-    with pytest.raises(V.PackageValidationError, match="prefix"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_sdist_missing_pyproject_is_rejected(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path, sdist=_build_sdist(include_pyproject=False))
-    with pytest.raises(V.PackageValidationError, match="pyproject"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_sdist_missing_native_is_rejected(tmp_path: Path) -> None:
-    dist = _write_dist(tmp_path, sdist=_build_sdist(include_native=False))
-    with pytest.raises(V.PackageValidationError, match="native"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_sdist_wrong_version_prefix_is_rejected(tmp_path: Path) -> None:
-    # Prefix names a different version than expected.
-    sdist = _build_sdist(prefix="runanywhere-0.0.1")
-    dist = _write_dist(tmp_path, sdist=sdist)
-    with pytest.raises(V.PackageValidationError, match="prefix"):
-        V.validate_public_packages(dist, VERSION)
-
-
-# ----------------------------------------------------------------------------- dist-set errors
-
-
-def test_missing_sdist_is_rejected(tmp_path: Path) -> None:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / WHEEL_NAME).write_bytes(_build_wheel())
-    with pytest.raises(V.PackageValidationError, match="sdist"):
-        V.validate_public_packages(dist, VERSION)
-
-
-def test_missing_wheel_is_rejected(tmp_path: Path) -> None:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / SDIST_NAME).write_bytes(_build_sdist())
-    with pytest.raises(V.PackageValidationError, match="wheel"):
-        V.validate_public_packages(dist, VERSION)
+    def test_missing_wheel_is_rejected(self) -> None:
+        dist = self._tmp() / "dist"
+        dist.mkdir()
+        (dist / SDIST_NAME).write_bytes(_build_sdist())
+        with self.assertRaisesRegex(V.PackageValidationError, "wheel"):
+            V.validate_public_packages(dist, VERSION)
 
 
 if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__, "-v"]))
+    unittest.main()
