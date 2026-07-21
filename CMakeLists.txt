@@ -449,6 +449,35 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(segmentation_onnx_exact_model_tests PROPERTIES
             LABELS "native;onnx;segmentation;exact-model;license-opt-in"
             SKIP_RETURN_CODE 77)
+
+        # Streaming-Sortformer diarization: op-table wiring, the self-contained
+        # DSP math (FFT / mel filterbank / median / binarization) vs independent
+        # scalar oracles, and null/missing-model graceful failure. Needs no ORT
+        # weights and no Sortformer bundle. The test TU #includes the provider
+        # .cpp to reach its file-local math helpers; the service-vtable adapter
+        # is compiled alongside to expose g_onnx_diarization_ops. Neither links
+        # rac_backend_onnx, so the provider symbols are defined exactly once.
+        add_executable(test_diarization_onnx
+            sdk/runanywhere-commons/tests/test_diarization_onnx.cpp
+            engines/onnx/rac_onnx_diarization_register.cpp
+        )
+        target_include_directories(test_diarization_onnx PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/onnx
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src
+        )
+        target_link_libraries(test_diarization_onnx PRIVATE
+            rac_commons
+            rac_runtime_onnxrt
+        )
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_diarization_onnx)
+        endif()
+        target_compile_features(test_diarization_onnx PRIVATE cxx_std_20)
+        add_test(NAME diarization_onnx_tests COMMAND test_diarization_onnx)
+        set_tests_properties(diarization_onnx_tests PROPERTIES
+            LABELS "native;onnx;diarization")
     endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
     # rac_backend_sherpa is built by engines/, which is configured after
