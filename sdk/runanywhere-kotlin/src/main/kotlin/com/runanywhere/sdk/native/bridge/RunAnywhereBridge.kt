@@ -1387,10 +1387,6 @@ object RunAnywhereBridge {
     // `HTTPClientAdapter` to converge on the same canonical SDK header
     // list and structured API-error parsing Swift consumes, instead of
     // inlining the policy on the Kotlin side.
-    //
-    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
-    // commons does not expose an upsert-mode HTTP variant through the
-    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical

@@ -217,8 +217,7 @@ object CppBridgeDevConfig {
 object CppBridgeEndpoints {
     /** Fallback constants used when the native binding is unreachable.
      *  Mirror the canonical values in `rac_endpoints.h`. */
-    private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/sdk_devices"
-    private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices/register"
+    private const val FALLBACK_DEVICE_REGISTRATION: String = "/api/v1/devices/register"
     private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/model-assignments/for-sdk"
 
     /** SDK authenticate endpoint. Mirrors Swift's `Endpoints.authenticate`. */
@@ -236,20 +235,13 @@ object CppBridgeEndpoints {
     /**
      * Device registration endpoint for [env]. Mirrors Swift's
      * `Endpoints.deviceRegistration(for:)` — delegates to
-     * `rac_endpoint_device_registration` via JNI.
+     * `rac_endpoint_device_registration` via JNI. Every environment now
+     * registers through the backend (`/api/v1/devices/register`).
      */
-    fun deviceRegistration(env: SDKEnvironment): String {
-        val fallback =
-            when (env) {
-                SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-                -> FALLBACK_PROD_DEVICE_REGISTRATION
-                else -> FALLBACK_DEV_DEVICE_REGISTRATION
-            }
-        return jniOrFallback(fallback) {
+    fun deviceRegistration(env: SDKEnvironment): String =
+        jniOrFallback(FALLBACK_DEVICE_REGISTRATION) {
             RunAnywhereBridge.racEndpointDeviceRegistration(CppBridgeEnvironment.toC(env))
         }
-    }
 
     /** Model assignments endpoint. Mirrors Swift's `Endpoints.modelAssignments()`. */
     fun modelAssignments(): String =
