@@ -734,13 +734,6 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& jsonBody,
     const std::string& apiKey
 ) {
-    // Supabase device-registration upserts route through
-    // rac_http_request_set_upsert_mode below (commons appends
-    // ?on_conflict=<field> and the merge-duplicates Prefer header) instead of
-    // duplicating the Supabase wire protocol at this layer.
-    const bool isDeviceUpsert =
-        url.find("/rest/v1/sdk_devices") != std::string::npos;
-
     std::vector<rac_http_header_kv_t> headers = {
         {"Content-Type", "application/json"},
         {"Accept", "application/json"},
@@ -770,9 +763,6 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     // target. Callers may retry against an explicitly validated endpoint.
     req.follow_redirects = RAC_FALSE;
     req.expected_checksum_hex = nullptr;
-    if (isDeviceUpsert) {
-        rac_http_request_set_upsert_mode(&req, "device_id");
-    }
 
     rac_http_response_t resp{};
     rac_result_t sendResult = rac_http_request_send(client, &req, &resp);
