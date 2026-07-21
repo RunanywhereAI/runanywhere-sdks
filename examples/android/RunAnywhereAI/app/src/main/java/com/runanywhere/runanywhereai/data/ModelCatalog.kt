@@ -68,8 +68,11 @@ internal object ModelCatalog {
         SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 6_211_227_068L, supportsThinking = true),
         SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 8_210_665_301L, supportsThinking = true),
         SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 8_609_694_487L),
-        // Cosmos3-Edge reasoning/text AR path (W8 monolithic decode, ~19 tok/s); v81 Plane B ACCEPTANCE PASS.
-        SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_text_HNPU/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = true),
+        // Cosmos3-Edge text AR path (W8 monolithic decode, ~19 tok/s); v81 Plane B ACCEPTANCE PASS.
+        // supportsThinking=false: the v81 bundle answers directly (its manifest bakes a closed empty-think
+        // block for concise, self-terminating replies), so the app shows the answer rather than routing it
+        // into an always-empty reasoning section.
+        SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_text_HNPU/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = false),
         SingleFileModel("cosmos3_edge_vlm", "Cosmos3-Edge Vision (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_vlm_HNPU/v81/cosmos3-edge-vlm.json", QHEXRT, MULTIMODAL, 3505000000L, contextLength = 2_048),
         SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Diffusion (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_diffusion_HNPU/v81/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
         SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
