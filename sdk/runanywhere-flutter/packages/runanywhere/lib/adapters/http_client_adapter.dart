@@ -25,7 +25,6 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -95,7 +94,6 @@ class _HttpAdapterSnapshot {
     required this.environment,
     required this.accessToken,
     required this.timeoutMs,
-    required this.supabaseKey,
     required this.tokenResolver,
     required this.refreshTokenCallback,
   });
@@ -106,7 +104,6 @@ class _HttpAdapterSnapshot {
   final SDKEnvironment environment;
   final String? accessToken;
   final int timeoutMs;
-  final String supabaseKey;
   final Future<String?> Function({required bool requiresAuth})? tokenResolver;
   final Future<String?> Function()? refreshTokenCallback;
 }
@@ -140,9 +137,6 @@ class HTTPClientAdapter {
   String? _accessToken;
   int _timeoutMs = defaultTimeoutMs;
 
-  // Development (Supabase) overrides.
-  String _supabaseURL = '';
-  String _supabaseKey = '';
   int _configurationGeneration = 0;
 
   // Per-request token resolver (injected by auth bridge to avoid a
@@ -168,48 +162,19 @@ class HTTPClientAdapter {
     _logger.info('Configured for ${environment.name} environment');
   }
 
-  void configureDev({
-    required String supabaseURL,
-    required String supabaseKey,
-  }) {
-    _configurationGeneration++;
-    if (!DartBridgeDevConfig.isUsableHttpUrl(supabaseURL) ||
-        !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
-      _supabaseURL = '';
-      _supabaseKey = '';
-      _logger.warning('Dev Supabase config ignored: missing or placeholder');
-      return;
-    }
-
-    _supabaseURL = supabaseURL;
-    _supabaseKey = supabaseKey;
-    _logger.info('Dev mode configured with Supabase');
-  }
-
   void setToken(String? token) {
     _accessToken = token;
   }
 
   String? get accessToken => _accessToken;
 
-  String get baseURL =>
-      _supabaseURL.isNotEmpty &&
-          _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-      ? _supabaseURL
-      : _baseURL;
+  String get baseURL => _baseURL;
 
   SDKEnvironment get environment => _environment;
 
   String get apiKey => _apiKey;
 
-  String get supabaseKey => _supabaseKey;
-
-  bool get isConfigured {
-    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      return _supabaseURL.isNotEmpty;
-    }
-    return _baseURL.isNotEmpty;
-  }
+  bool get isConfigured => _baseURL.isNotEmpty;
 
   /// Wire in a token resolver so `requiresAuth: true` requests can
   /// trigger token refresh without this adapter importing the auth
@@ -413,8 +378,6 @@ class HTTPClientAdapter {
     _environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     _accessToken = null;
     _timeoutMs = defaultTimeoutMs;
-    _supabaseURL = '';
-    _supabaseKey = '';
     _tokenResolver = null;
     _refreshTokenCallback = null;
   }
@@ -484,38 +447,30 @@ class HTTPClientAdapter {
     final headers = _commonsDefaultHeaders();
     headers['X-Platform'] = SDKConstants.platform;
 
-    if (snapshot.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      if (snapshot.supabaseKey.isNotEmpty) {
-        headers['apikey'] = snapshot.supabaseKey;
-        headers['Authorization'] = 'Bearer ${snapshot.supabaseKey}';
-        headers['Prefer'] = _isDeviceRegistrationPath(path)
-            ? 'resolution=merge-duplicates'
-            : 'return=representation';
+    // Every environment reaches the backend through the effective base URL and
+    // C++-owned auth — there is no dev-only direct-to-datastore credential path.
+    if (requiresAuth && snapshot.tokenResolver != null) {
+      try {
+        final token = await snapshot.tokenResolver!.call(requiresAuth: true);
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        } else if (snapshot.apiKey.isNotEmpty) {
+          headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
+        }
+      } catch (_) {
+        _logger.debug('Token resolver failed');
+        if (snapshot.apiKey.isNotEmpty) {
+          headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
+        }
       }
     } else {
-      if (requiresAuth && snapshot.tokenResolver != null) {
-        try {
-          final token = await snapshot.tokenResolver!.call(requiresAuth: true);
-          if (token != null && token.isNotEmpty) {
-            headers['Authorization'] = 'Bearer $token';
-          } else if (snapshot.apiKey.isNotEmpty) {
-            headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
-          }
-        } catch (_) {
-          _logger.debug('Token resolver failed');
-          if (snapshot.apiKey.isNotEmpty) {
-            headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
-          }
-        }
-      } else {
-        final token = snapshot.accessToken ?? snapshot.apiKey;
-        if (token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-        }
+      final token = snapshot.accessToken ?? snapshot.apiKey;
+      if (token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
       }
-      if (snapshot.apiKey.isNotEmpty) {
-        headers['apikey'] = snapshot.apiKey;
-      }
+    }
+    if (snapshot.apiKey.isNotEmpty) {
+      headers['apikey'] = snapshot.apiKey;
     }
 
     if (extra != null) headers.addAll(extra);
@@ -529,7 +484,6 @@ class HTTPClientAdapter {
     environment: _environment,
     accessToken: _accessToken,
     timeoutMs: _timeoutMs,
-    supabaseKey: _supabaseKey,
     tokenResolver: _tokenResolver,
     refreshTokenCallback: _refreshTokenCallback,
   );

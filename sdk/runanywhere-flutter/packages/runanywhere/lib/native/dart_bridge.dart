@@ -11,7 +11,6 @@ import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
@@ -322,7 +321,7 @@ class DartBridge {
     try {
       final result = DartBridgeSdkInit.phase2(
         SdkInitPhase2Request(
-          buildToken: buildToken ?? DartBridgeDevConfig.buildToken ?? '',
+          buildToken: buildToken ?? '',
           forceRefreshAssignments: forceRefreshAssignments,
           flushTelemetry: flushTelemetry,
           discoverDownloadedModels: discoverDownloadedModels,
