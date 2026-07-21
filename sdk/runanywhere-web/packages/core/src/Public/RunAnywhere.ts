@@ -88,6 +88,11 @@ import type {
   DiarizationRequest,
   DiarizationResult,
 } from '@runanywhere/proto-ts/diarization';
+import { rerank as rerankImpl } from './Extensions/RunAnywhere+Rerank.js';
+import type {
+  RerankRequest,
+  RerankResult,
+} from '@runanywhere/proto-ts/rerank';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
 import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
@@ -1633,6 +1638,17 @@ export const RunAnywhere = {
   async diarize(request: DiarizationRequest): Promise<DiarizationResult> {
     await RunAnywhere.ensureServicesReady();
     return diarizeImpl(request);
+  },
+
+  /**
+   * Rerank candidates against a query with the lifecycle-owned cross-encoder
+   * rerank model. The caller must register and load the rerank model through
+   * the generic model lifecycle first; this verb never downloads or silently
+   * swaps models.
+   */
+  async rerank(request: RerankRequest): Promise<RerankResult> {
+    await RunAnywhere.ensureServicesReady();
+    return rerankImpl(request);
   },
 
   async loadModel(

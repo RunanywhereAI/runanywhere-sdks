@@ -75,6 +75,13 @@ public typealias RADiarizationResult = ai.runanywhere.proto.v1.DiarizationResult
 public typealias RADiarizationStreamEvent = ai.runanywhere.proto.v1.DiarizationStreamEvent
 public typealias RADiarizationStreamEventKind = ai.runanywhere.proto.v1.DiarizationStreamEventKind
 
+// Cross-encoder Reranking
+public typealias RARerankCandidate = ai.runanywhere.proto.v1.RerankCandidate
+public typealias RARerankOptions = ai.runanywhere.proto.v1.RerankOptions
+public typealias RARerankRequest = ai.runanywhere.proto.v1.RerankRequest
+public typealias RARerankScoredItem = ai.runanywhere.proto.v1.RerankScoredItem
+public typealias RARerankResult = ai.runanywhere.proto.v1.RerankResult
+
 // ─── RAG ────────────────────────────────────────────────────────────────────
 
 public typealias RARAGConfiguration = ai.runanywhere.proto.v1.RAGConfiguration

@@ -102,5 +102,18 @@ public class ComponentVTable internal constructor(
                 cleanupFn = { handle -> RunAnywhereBridge.racDiarizationComponentUnload(handle) },
                 loadModel = { handle, path, id, name -> RunAnywhereBridge.racDiarizationComponentLoadModel(handle, path, id, name) },
             )
+
+        // Standalone cross-encoder reranking component vtable. Mirrors Swift's
+        // `ComponentVTable.rerank`, whose `cleanup` maps to
+        // `rac_rerank_component_unload` (no separate `_cleanup` C ABI).
+        public val rerank: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_RERANK,
+                createFn = { RunAnywhereBridge.racRerankComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racRerankComponentIsLoaded(handle) },
+                destroyFn = { handle -> RunAnywhereBridge.racRerankComponentDestroy(handle) },
+                cleanupFn = { handle -> RunAnywhereBridge.racRerankComponentUnload(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racRerankComponentLoadModel(handle, path, id, name) },
+            )
     }
 }

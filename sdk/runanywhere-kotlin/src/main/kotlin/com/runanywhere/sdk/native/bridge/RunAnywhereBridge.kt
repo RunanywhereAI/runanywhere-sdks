@@ -331,6 +331,33 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDiarizationStreamCancelProto(sessionId: Long): Int
 
+    // CROSS-ENCODER RERANK (rac_rerank_component.h). Component handle family plus
+    // the single handle-scoped proto verb. Unlike diarization/segmentation the
+    // revived rerank primitive ships no handle-free `*_lifecycle_proto` verb, so
+    // the offline path loads the lifecycle-resolved model into this component's
+    // handle (owner-scoped acquire) before scoring.
+
+    @JvmStatic
+    external fun racRerankComponentCreate(): Long
+
+    @JvmStatic
+    external fun racRerankComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racRerankComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racRerankComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racRerankComponentDestroy(handle: Long)
+
+    // Takes a serialized RerankRequest (query + candidates + options) and scores
+    // it against the model loaded into `handle`. Returns a serialized
+    // RerankResult, or null on failure.
+    @JvmStatic
+    external fun racRerankComponentRerankProto(handle: Long, requestProto: ByteArray): ByteArray?
+
     // TTS COMPONENT (rac_tts_component.h)
 
     @JvmStatic

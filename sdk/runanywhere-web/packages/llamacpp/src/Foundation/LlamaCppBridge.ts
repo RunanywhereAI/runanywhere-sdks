@@ -339,6 +339,7 @@ export class LlamaCppBridge {
         'llm',
         'vlm',
         'embedding',
+        'rerank',
         'structured-output',
         'tool-calling',
         'lora',

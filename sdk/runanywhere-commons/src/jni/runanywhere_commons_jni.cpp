@@ -76,6 +76,7 @@
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/diarization/rac_diarization.h"
+#include "rac/features/rerank/rac_rerank.h"
 #include "rac/features/platform/rac_llm_platform.h"
 #include "rac/features/platform/rac_tts_platform.h"
 #include "rac/features/segmentation/rac_segmentation_service.h"
@@ -5171,6 +5172,84 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationStreamCan
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     return static_cast<jint>(rac_diarization_stream_cancel_proto(static_cast<uint64_t>(sessionId)));
+}
+
+// =============================================================================
+// CROSS-ENCODER RERANK — component handle family + one handle-scoped proto verb.
+// Mirrors the diarization component thunks above (Swift parity:
+// CppBridge+Rerank.swift). Unlike diarization there is no handle-free
+// `*_lifecycle_proto` verb: rac_rerank_component_rerank_proto's acquire is
+// owner-scoped, so the Kotlin bridge loads the model into this handle first.
+// =============================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentCreate(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_handle_t handle = RAC_INVALID_HANDLE;
+    rac_result_t result = rac_rerank_component_create(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("Failed to create rerank component: %d", result);
+        return 0;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentIsLoaded(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return rac_rerank_component_is_loaded(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                               : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentLoadModel(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId,
+    jstring modelName) {
+    (void)clazz;
+    std::string path = getCString(env, modelPath);
+    std::string id = getCString(env, modelId);
+    std::string name = getCString(env, modelName);
+    return static_cast<jint>(rac_rerank_component_load_model(
+        handleFromJLong(handle), path.c_str(), id.c_str(), name.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentUnload(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_rerank_component_unload(handleFromJLong(handle)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0) {
+        rac_rerank_component_destroy(reinterpret_cast<rac_handle_t>(handle));
+    }
+}
+
+// Handle-scoped: score a serialized RerankRequest against the model loaded into
+// `handle` via rac_rerank_component_rerank_proto, returning a serialized
+// RerankResult.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentRerankProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_rerank_component_rerank_proto(handleFromJLong(handle), request.u8(),
+                                                        request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRerankComponentRerankProto");
 }
 
 // Swift-aligned: mirror iOS Swift which uses rac_tts_synthesize_lifecycle_proto

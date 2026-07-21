@@ -218,6 +218,25 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     outResult: number,
   ): number;
 
+  // Cross-encoder rerank ships only the handle-scoped component verb (no
+  // handle-free `*_lifecycle_proto`); the facade owns a component handle and
+  // loads the lifecycle-resolved model into it before scoring.
+  _rac_rerank_component_create?(outHandle: number): number;
+  _rac_rerank_component_load_model?(
+    handle: number,
+    modelPath: number,
+    modelId: number,
+    modelName: number,
+  ): number;
+  _rac_rerank_component_unload?(handle: number): number;
+  _rac_rerank_component_destroy?(handle: number): void;
+  _rac_rerank_component_rerank_proto?(
+    handle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
   _rac_diffusion_generate_lifecycle_proto?(
     requestBytes: number,
     requestSize: number,
@@ -362,6 +381,7 @@ export interface ModalityCapabilitySlots {
   embedding: ModalityProtoModule | null;
   segmentation: ModalityProtoModule | null;
   diarization: ModalityProtoModule | null;
+  rerank: ModalityProtoModule | null;
   rag: ModalityProtoModule | null;
   diffusion: ModalityProtoModule | null;
   'structured-output': ModalityProtoModule | null;
@@ -395,6 +415,7 @@ export const adapterState = {
     embedding: null,
     segmentation: null,
     diarization: null,
+    rerank: null,
     rag: null,
     diffusion: null,
     'structured-output': null,

@@ -23,6 +23,7 @@
  */
 
 import { DiarizationProtoAdapter } from './DiarizationProtoAdapter.js';
+import { RerankProtoAdapter } from './RerankProtoAdapter.js';
 import { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
 import { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
 import { LLMProtoAdapter } from './LLMProtoAdapter.js';
@@ -56,6 +57,7 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'embedding',
   'segmentation',
   'diarization',
+  'rerank',
   'rag',
   'diffusion',
   'structured-output',
@@ -65,6 +67,7 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
 ]);
 
 export { DiarizationProtoAdapter } from './DiarizationProtoAdapter.js';
+export { RerankProtoAdapter } from './RerankProtoAdapter.js';
 export { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
 export { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
 export { LLMProtoAdapter } from './LLMProtoAdapter.js';
@@ -215,6 +218,10 @@ export class ModalityProtoAdapter {
 
   diarization(): DiarizationProtoAdapter {
     return new DiarizationProtoAdapter(this.module);
+  }
+
+  rerank(): RerankProtoAdapter {
+    return new RerankProtoAdapter(this.module);
   }
 
   diffusion(): DiffusionProtoAdapter {
