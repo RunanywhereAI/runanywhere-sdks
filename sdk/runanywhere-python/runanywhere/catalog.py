@@ -104,6 +104,38 @@ def _piper(voice: str, label: str, size_mb: int) -> CatalogEntry:
     )
 
 
+def _hnpu(repo: str, files: list[str], primary: str, type_: str, label: str,
+          params: str, size_mb: int) -> CatalogEntry:
+    """A Qualcomm Hexagon NPU (QHexRT) bundle from a ``*_HNPU`` HF repo.
+
+    QHexRT ships a directory bundle (compiled context binaries + manifest + tokenizer), not a
+    single GGUF. ``files`` are the repo-relative paths to fetch (flattened to their basenames);
+    ``primary`` is the file the engine loads (typically the manifest). These entries auto-route
+    to the ``qhexrt`` engine when it is registered (a QHexRT-enabled build on a supported NPU
+    host); on a non-NPU build they simply have no engine and won't load. See
+    ``https://huggingface.co/runanywhere/models`` for the published bundles.
+    """
+    return CatalogEntry(
+        type=type_,
+        files=[CatalogFile(url=f"{_HF}/{repo}/resolve/main/{f}", name=f.rsplit("/", 1)[-1])
+               for f in files],
+        primary=primary,
+        label=label,
+        params=params,
+        size_mb=size_mb,
+    )
+
+
+# QHexRT (Hexagon NPU) bundle catalog — populated when the QHexRT engine + its Windows model
+# contract land. Kept as a separate dict so it can be extended independently; it is merged into
+# CATALOG below. Adding a model is then one `_hnpu(...)` line here. Example shape (commented —
+# fill the real per-arch file list from the HF repo when wiring):
+#   "qwen3-0.6b-npu": _hnpu(
+#       "runanywhere/qwen3_0_6b_HNPU", files=["v79/manifest.json", "v79/model.bin", ...],
+#       primary="manifest.json", type_="llm", label="Qwen3-0.6B (NPU)", params="0.6B", size_mb=900),
+QHEXRT_BUNDLES: dict[str, CatalogEntry] = {}
+
+
 CATALOG: dict[str, CatalogEntry] = {
     # ---- LLMs (GGUF, llama.cpp) ----
     "smollm2-135m": _llm(
@@ -250,6 +282,9 @@ CATALOG: dict[str, CatalogEntry] = {
     "piper-amy": _piper("amy", "Piper · Amy", 64),
     "piper-ryan": _piper("ryan", "Piper · Ryan", 64),
 }
+
+# Fold in the QHexRT NPU bundles (empty until the engine + Windows model contract land).
+CATALOG.update(QHEXRT_BUNDLES)
 
 
 def is_catalog_id(id_or_path: str) -> bool:
