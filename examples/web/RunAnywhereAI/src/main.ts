@@ -521,16 +521,16 @@ async function startRuntime(
     60_000,
     registerModelCatalogAll(),
   );
-  notifyCatalogRegistered(registeredCount);
   if (requireAllBackends && registeredCount === 0) {
     throw new Error('Model catalog registration failed: no models were registered.');
   }
 
-  // Explicitly await hydration on every runtime lifetime. The SDK also
-  // schedules best-effort hydration after each model registration; awaiting
-  // here makes Settings reconfiguration completion truthful and deterministic.
+  // Hydrate OPFS → registry *before* notifying the picker. Otherwise the UI
+  // seeds every row as "Download" and can miss the later models.hydrated
+  // refresh (collapsed families / sheet opened from stale rowStates).
   await withTimeout('hydrating the model registry', 60_000, RunAnywhere.hydrateModelRegistry());
   await withTimeout('refreshing SDK catalogs', 60_000, refreshSDKCatalogs());
+  notifyCatalogRegistered(registeredCount);
 
   // Production identity is cloud-dependent and must not delay an otherwise
   // usable local shell. Its status remains observable through readiness data.

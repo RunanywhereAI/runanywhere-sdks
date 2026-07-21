@@ -429,11 +429,15 @@ function renderSheet(): void {
   // the async capability probe resolves.
   void ensureCapabilities().then(() => {
     if (modalEl) {
+      if (catalogRegistered) hydrateRowStatesFromRegistry();
       renderBanner();
       renderRows();
     }
   });
 
+  // Always re-read the registry when opening the sheet so OPFS-hydrated
+  // downloads (or loads from other tabs) are not stuck on "Download".
+  if (catalogRegistered) hydrateRowStatesFromRegistry();
   renderBanner();
   renderRows();
 }

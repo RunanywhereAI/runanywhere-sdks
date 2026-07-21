@@ -77,6 +77,7 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_config_log_level?(): number;
   _rac_init?(configPtr: number): number;
   _rac_shutdown?(): void;
+  _rac_model_paths_set_base_dir?(basePtr: number): number;
   _rac_backend_onnx_register?(): number;
   _rac_backend_onnx_unregister?(): number;
   _rac_backend_sherpa_register?(): number;
@@ -501,10 +502,37 @@ export class SherpaONNXBridge {
           `rac_init returned ${rc}.`,
         );
       }
+      // Match LlamaCppBridge / CommonsModule: C++ registry reconcile and the
+      // download orchestrator require a non-empty model-paths base dir.
+      this._setModelPathsBaseDir(module, '/opfs');
     } finally {
       module._free(configPtr);
     }
     logger.info('RACommons initialized (rac_init returned 0)');
+  }
+
+  private _setModelPathsBaseDir(module: CommonsModule, base: string): void {
+    const setFn = module._rac_model_paths_set_base_dir;
+    if (typeof setFn !== 'function' || typeof module._malloc !== 'function') {
+      logger.warning(
+        'WASM module missing _rac_model_paths_set_base_dir; C++ model-path reconcile may skip downloads.',
+      );
+      return;
+    }
+    const len = module.lengthBytesUTF8(base) + 1;
+    const ptr = module._malloc(len);
+    if (!ptr) return;
+    try {
+      module.stringToUTF8(base, ptr, len);
+      const rc = setFn(ptr);
+      if (rc !== 0) {
+        logger.warning(`rac_model_paths_set_base_dir('${base}') returned ${rc}`);
+      } else {
+        logger.info(`Model paths base dir set to synthetic prefix '${base}'`);
+      }
+    } finally {
+      module._free?.(ptr);
+    }
   }
 
   private _isRegistrationSuccess(rc: number): boolean {

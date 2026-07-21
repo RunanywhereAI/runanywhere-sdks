@@ -1982,16 +1982,13 @@ export const RunAnywhere = {
         if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;
       } catch { /* ignore */ }
     }
-    if (patched > 0) {
-      // Notify UI subscribers (Storage tab, model
-      // sheet) so they re-query the registry and render Downloaded/Load
-      // instead of Download after a fresh page load.
-      EventBus.shared.publish(
-        'models.hydrated',
-        EventCategory.EVENT_CATEGORY_STORAGE,
-        { count: patched },
-      );
-    }
+    // Always notify — even when patched === 0 (already reconciled). Late UI
+    // subscribers and sheet opens must re-query after cold-start OPFS scan.
+    EventBus.shared.publish(
+      'models.hydrated',
+      EventCategory.EVENT_CATEGORY_STORAGE,
+      { count: patched },
+    );
     return patched;
   },
 
