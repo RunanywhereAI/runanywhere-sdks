@@ -64,7 +64,7 @@ missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
 npm run lint
 npm run typecheck
 npm run build
-npm run dev -- --host 127.0.0.1
+npm run dev   # http://localhost:3000 (COOP/COEP enabled)
 ```
 
 Production Vercel releases use `npm run release:deploy`. No Vercel secrets,
@@ -118,6 +118,22 @@ example, `racommons.js`). The WebGPU/Asyncify release artifact is intentionally
 non-threaded, but its canonical glue is still required. Production output must
 therefore contain and serve all four canonical JS/WASM pairs with JavaScript
 and `application/wasm` MIME types.
+
+## Boot and availability rules
+
+- Boot in this order: `RunAnywhere.initialize()` → llama.cpp/ONNX backend
+  registration → `completeServicesInitialization()` (Phase 2) → model catalog
+  registration/hydration. Production identity continues asynchronously and must
+  not block local interactive readiness; its state remains in the readiness
+  snapshot.
+- `BackendWorkerHost` is currently a Worker-runtime scaffold. Until a backend
+  supplies a worker factory and completes its handshake, inference uses the
+  supported main-thread fallback.
+- Diffusion is a core `@runanywhere/web` facade. Do not show it as available until a browser engine registers the `diffusion` capability
+  or add it to packaging until it has a production WASM artifact.
+- Register hybrid Cloud STT with `Cloud.registerBackend()` after
+  `ONNX.register()`. Cloud failure is optional and must leave local
+  ONNX/Sherpa speech capability truthful and independently available.
 
 ## Validation Standard
 

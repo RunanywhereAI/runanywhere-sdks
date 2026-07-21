@@ -453,6 +453,87 @@ jobs:
         working-directory: sdk/runanywhere-web
         run: npm test
 
+  # Lightweight browser readiness/stream gate. Stages release-prebuilt WASM
+  # (gitignored) from the latest RACommons-web GitHub Release asset, then uses
+  # the example Vite alias path — no real-model downloads. Full real-model
+  # matrix remains opt-in via RA_RUN_FULL_E2E / workflow_dispatch.
+  web-browser-smoke:
+    runs-on: ubuntu-22.04
+    needs: [web-typecheck]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: node
+      - name: Install Web SDK workspace
+        working-directory: sdk/runanywhere-web
+        run: npm ci --no-audit --no-fund
+      - name: Install proto-ts dependencies
+        working-directory: sdk/shared/proto-ts
+        run: npm ci --no-audit --no-fund --workspaces=false
+      - name: Install example app dependencies
+        working-directory: examples/web/RunAnywhereAI
+        run: npm ci --no-audit --no-fund
+      - name: Stage release-prebuilt WASM
+        working-directory: sdk/runanywhere-web
+        env:
+          # checkout uses persist-credentials: false; gh still needs a token.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Newest non-draft release that ships RACommons-web-v*.tar.gz
+          RESOLVED="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=30" --jq '
+            [.[]
+              | select(.draft == false and .prerelease == false)
+              | . as $r
+              | .assets[]
+              | select(.name | test("^RACommons-web-v.+\\.tar\\.gz$"))
+              | {tag: $r.tag_name, name: .name}
+            ] | .[0] | "\(.tag)\t\(.name)"
+          ')"
+          TAG="$(printf '%s' "${RESOLVED}" | cut -f1)"
+          ASSET="$(printf '%s' "${RESOLVED}" | cut -f2)"
+          if [ -z "${TAG}" ] || [ -z "${ASSET}" ] || [ "${TAG}" = "null" ]; then
+            echo "::error::No published RACommons-web-v*.tar.gz release asset found"
+            exit 1
+          fi
+          echo "Downloading ${ASSET} from ${TAG}"
+          TMP="$(mktemp -d)"
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "${ASSET}" --dir "${TMP}"
+          mkdir -p packages
+          tar xzf "${TMP}/${ASSET}" -C packages/
+          for f in \
+            packages/core/wasm/racommons.js \
+            packages/core/wasm/racommons.wasm \
+            packages/llamacpp/wasm/racommons-llamacpp.js \
+            packages/llamacpp/wasm/racommons-llamacpp.wasm \
+            packages/onnx/wasm/racommons-onnx-sherpa.js \
+            packages/onnx/wasm/racommons-onnx-sherpa.wasm
+          do
+            if [ ! -s "${f}" ]; then
+              echo "::error::Missing or empty WASM artifact after extract: ${f}"
+              exit 1
+            fi
+          done
+          echo "Staged release-prebuilt WASM from ${TAG}"
+      - name: Install Playwright Chromium
+        working-directory: sdk/runanywhere-web
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke (readiness + hybrid STT surface)
+        working-directory: sdk/runanywhere-web
+        run: npm run test:browser:smoke
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-smoke-artifacts
+          path: |
+            sdk/runanywhere-web/playwright-report
+            sdk/runanywhere-web/test-results
+          if-no-files-found: ignore
+
   # Dedicated validation lane — runs the source-of-truth validation scripts
   # so deprecated-surface drift and RAC_API export drift cannot land silently.
   validation:

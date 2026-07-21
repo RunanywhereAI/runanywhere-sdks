@@ -193,6 +193,14 @@ const FAMILY_MATCHERS: ReadonlyArray<{
   tagline: string;
   test: RegExp;
 }> = [
+  // PrismML before Qwen*: Bonsai ids/names often mention qwen3_5 ancestry and
+  // must not land under the generic Qwen3 family card.
+  {
+    key: 'prismml',
+    name: 'PrismML',
+    tagline: 'Sub-byte Bonsai reasoning models (1-bit GGUF).',
+    test: /bonsai|prismml|prism-?ml/,
+  },
   { key: 'qwen3', name: 'Qwen3', tagline: 'Latest Qwen chat models with a thinking mode.', test: /qwen3/ },
   { key: 'qwen2.5', name: 'Qwen2.5', tagline: 'Compact, capable all-round chat models.', test: /qwen2\.?5/ },
   { key: 'qwen2-vl', name: 'Qwen2-VL', tagline: 'Qwen models that can also see images.', test: /qwen2-?vl/ },

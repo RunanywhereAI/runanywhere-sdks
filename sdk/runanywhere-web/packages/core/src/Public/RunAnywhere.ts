@@ -20,7 +20,6 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
-  ModelArtifactType,
   ModelCategory,
   AudioFormat,
   type InferenceFramework,
@@ -44,11 +43,12 @@ import {
 import type { SDKInitOptions } from '../types/models.js';
 import { EventBus } from '../Foundation/EventBus.js';
 import { SDKLogger } from '../Foundation/SDKLogger.js';
-import { requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
+import { ensureDownloadStorageReady, requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage.js';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
 import {
   frameworkOPFSDir,
+  isExtractedDirectoryArtifact,
   primaryFilenameFromModel,
 } from '../Infrastructure/FrameworkOPFSPaths.js';
 import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
@@ -83,13 +83,28 @@ import type {
   SegmentationRequest,
   SegmentationResult,
 } from '@runanywhere/proto-ts/segmentation';
+import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
+import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
   VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
+import type {
+  DiffusionGenerationOptions,
+  DiffusionProgress,
+  DiffusionResult,
+  DiffusionStreamEvent,
+} from '@runanywhere/proto-ts/diffusion_options';
 import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid.js';
+import {
+  Diffusion as DiffusionCapability,
+  cancelImageGeneration as cancelImageGenerationCapability,
+  generateImage as generateImageCapability,
+  generateImageStream as generateImageStreamCapability,
+  inpaint as inpaintCapability,
+} from './Extensions/RunAnywhere+Diffusion.js';
 import {
   createStorageNamespace,
   setRegisterModelHydrateHook,
@@ -110,6 +125,7 @@ import { CommonsModule } from '../runtime/CommonsModule.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
+import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -609,10 +625,6 @@ function decodeTTSAudioToFloat32(output: {
 // Multi-file Download Helpers (Web / OPFS platform layer)
 // ---------------------------------------------------------------------------
 
-function isTarGzArchiveArtifact(model: ModelInfo): boolean {
-  return model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
-}
-
 function opfsModelDirectory(model: ModelInfo): string | null {
   const dir = frameworkOPFSDir(model.framework as InferenceFramework);
   if (!dir) return null;
@@ -622,7 +634,7 @@ function opfsModelDirectory(model: ModelInfo): string | null {
 /** Registry path after download/extract — archives hydrate as model dirs, not .tar.gz files. */
 function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): string {
   const modelDir = opfsModelDirectory(model);
-  if (modelDir && isTarGzArchiveArtifact(model)) {
+  if (modelDir && isExtractedDirectoryArtifact(model)) {
     return modelDir;
   }
   const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
@@ -632,29 +644,72 @@ function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): s
   return reportedPath;
 }
 
+/** Expected payload size used to reject mid-refresh partial OPFS files. */
+function expectedHydrationBytes(model: ModelInfo): number {
+  const fromFiles = (model.multiFile?.files ?? []).reduce(
+    (total, file) => total + Math.max(0, Number(file.sizeBytes ?? 0)),
+    0,
+  );
+  return Math.max(0, Number(model.downloadSizeBytes ?? 0), fromFiles);
+}
+
+async function isCompleteOpfsFile(path: string, expectedBytes: number): Promise<boolean> {
+  const size = await OPFSBridge.fileSize(path);
+  if (size <= 0) return false;
+  if (expectedBytes <= 0) return true;
+  // Match commons validate_downloaded_sizes (80% threshold).
+  return size * 5 >= expectedBytes * 4;
+}
+
 async function resolveHydratedModelPath(
   model: ModelInfo,
   frameworkDir: string,
 ): Promise<{ exists: boolean; localPath: string }> {
   const modelDir = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`;
   const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
-  if (isMultiFile || isTarGzArchiveArtifact(model)) {
+  const isExtractedDir = isExtractedDirectoryArtifact(model);
+  if (isMultiFile || isExtractedDir) {
     const hasDir = await OPFSBridge.directoryHasArtifacts([
       'RunAnywhere',
       'Models',
       frameworkDir,
       model.id,
     ]);
-    if (hasDir) {
+    if (!hasDir) {
+      return { exists: false, localPath: modelDir };
+    }
+    // Archives unpack then delete the .tar.gz/.zip blob. Completeness is
+    // "extracted tree has files", not "archive file still present". Requiring
+    // primaryFilename (often `model.tar.gz`) falsely clears isDownloaded and
+    // breaks worker STT/TTS load after refresh.
+    if (isExtractedDir) {
       return { exists: true, localPath: modelDir };
     }
+    // Loose multi-file models: require the primary file to look complete.
+    const filename = primaryFilenameFromModel(model);
+    if (filename) {
+      const primaryPath = `${modelDir}/${filename}`;
+      const primaryExpected = Math.max(
+        0,
+        Number(
+          model.multiFile?.files?.find((file) => file.filename === filename)?.sizeBytes
+            ?? model.downloadSizeBytes
+            ?? 0,
+        ),
+      );
+      if (!(await isCompleteOpfsFile(primaryPath, primaryExpected))) {
+        return { exists: false, localPath: modelDir };
+      }
+    }
+    return { exists: true, localPath: modelDir };
   }
   const filename = primaryFilenameFromModel(model);
   if (!filename) {
     return { exists: false, localPath: modelDir };
   }
   const opfsPath = `${modelDir}/${filename}`;
-  const exists = await OPFSBridge.exists(opfsPath);
+  const exists = await OPFSBridge.exists(opfsPath)
+    && await isCompleteOpfsFile(opfsPath, expectedHydrationBytes(model));
   return { exists, localPath: exists ? opfsPath : modelDir };
 }
 
@@ -813,6 +868,100 @@ async function planDownloadWithSelfHeal(
   return DownloadsCapability.plan(request);
 }
 
+/**
+ * Browser OPFS / origin free space from `navigator.storage.estimate()`.
+ * Returns 0 when the API is unavailable so callers can fall back to other
+ * gates. Never returns MEMFS/WASM-heap leftovers — those falsely refuse
+ * multi-GB downloads (see download_orchestrator filesystem_available_bytes).
+ */
+async function resolveBrowserAvailableStorageBytes(): Promise<number> {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') {
+    return 0;
+  }
+  try {
+    const estimate = await navigator.storage.estimate();
+    const quota = Number(estimate.quota ?? 0);
+    const usage = Number(estimate.usage ?? 0);
+    if (!Number.isFinite(quota) || quota <= 0) return 0;
+    return Math.max(0, quota - (Number.isFinite(usage) ? Math.min(quota, usage) : 0));
+  } catch {
+    return 0;
+  }
+}
+
+async function assertBrowserStorageQuota(
+  modelId: string,
+  plan: DownloadPlanResult,
+  requiredFreeBytesAfterDownload: number,
+  availableStorageBytes?: number,
+): Promise<void> {
+  const remaining = availableStorageBytes !== undefined && availableStorageBytes > 0
+    ? availableStorageBytes
+    : await resolveBrowserAvailableStorageBytes();
+  if (remaining <= 0) return;
+  const planWithSizes = plan as unknown as {
+    totalBytes?: number;
+    requiredBytes?: number;
+    files?: Array<{ totalBytes?: number; expectedBytes?: number; sizeBytes?: number; remainingBytes?: number }>;
+  };
+  const plannedBytes = planWithSizes.requiredBytes
+    ?? planWithSizes.totalBytes
+    ?? planWithSizes.files?.reduce(
+      (total, file) => total + (file.remainingBytes ?? file.expectedBytes ?? file.totalBytes ?? file.sizeBytes ?? 0),
+      0,
+    )
+    ?? 0;
+  const needed = plannedBytes + requiredFreeBytesAfterDownload;
+  // A plan without size metadata cannot be preflighted safely; commons still
+  // performs its native storage check before it starts the transfer.
+  if (needed > 0 && needed > remaining) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Insufficient browser storage for '${modelId}': need ${needed} bytes, only ${remaining} bytes remain.`,
+      'downloadModel',
+    );
+  }
+}
+
+/** Map a failed download plan/start/terminal state to a storage or download error. */
+function throwDownloadFailure(feature: string, message: string, reason?: DownloadFailureReason): never {
+  const storageFailure = reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE
+    || /not enough storage|insufficient (browser )?storage|free space/i.test(message);
+  throw SDKException.fromCode(
+    storageFailure
+      ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
+      : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    message,
+    feature,
+  );
+}
+
+async function pollDownloadWithRetry(
+  modelId: string,
+  taskId: string,
+  maxRetries = 3,
+): Promise<DownloadProgress | null> {
+  let failure: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return DownloadsCapability.poll({ modelId, taskId });
+    } catch (error) {
+      failure = error;
+      if (attempt === maxRetries) break;
+      const backoffMs = 100 * (2 ** attempt);
+      logger.warning(`Download poll failed; resuming '${modelId}' in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await delay(backoffMs);
+      // Native download tasks retain their resume token and partial bytes.
+      // Polling again is therefore resumable without restarting the transfer.
+    }
+  }
+  throw SDKException.fromCode(
+    -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    `Download polling failed after ${maxRetries + 1} attempts: ${failure instanceof Error ? failure.message : String(failure)}`,
+    'downloadModel',
+  );
+}
+
 // The previous in-TS multi-file
 // orchestrator that walked `model.multiFile.files`, fetched each URL,
 // wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
@@ -959,6 +1108,12 @@ export const RunAnywhere = {
     return Runtime;
   },
 
+  /** Browser-only CPU, memory, GPU and user-agent profile. */
+  hardware: HardwareCapability,
+
+  /** Configure the Hugging Face download token (or clear it with `null`). */
+  setHfToken,
+
   /** Convenience setter for the preferred acceleration. */
   async setRuntime(mode: 'cpu' | 'webgpu' | 'auto'): Promise<void> {
     if (mode === 'auto') {
@@ -1042,6 +1197,19 @@ export const RunAnywhere = {
           sdkVersion: SDK_VERSION,
         });
         throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+
+        // Re-apply any previously stored HF token so a rebuilt WASM artifact
+        // that exports `_rac_http_hf_token_set` receives it after commons load.
+        try {
+          const storedHfToken = getStoredHfToken();
+          if (storedHfToken) setHfToken(storedHfToken);
+        } catch (error) {
+          logger.debug(
+            `Hugging Face token hydration skipped: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
 
         _isInitialized = true;
 
@@ -1416,6 +1584,9 @@ export const RunAnywhere = {
   /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
   visionLanguage: VisionLanguageCapability,
 
+  /** Diffusion availability; image-generation methods remain flat for Swift parity. */
+  diffusion: DiffusionCapability,
+
   /** Model-registry proto bridge — `RunAnywhere.modelRegistry.registerModel(model)`
    * etc. (documented public namespace; the flat Swift-named verbs
    * `registerModel`/`listModels`/`refreshModelRegistry` delegate to it). */
@@ -1521,6 +1692,9 @@ export const RunAnywhere = {
     // recursively flushes the directory contents to OPFS + mirrors them
     // into every module's MEMFS. No Web-specific orchestrator below.
 
+    const requiredBytes = Math.max(0, Number(model.downloadSizeBytes ?? 0));
+    const storageReady = await ensureDownloadStorageReady({ requiredBytes });
+
     await prepareModelLoad({
       request: {
         modelId: request.modelId,
@@ -1531,6 +1705,25 @@ export const RunAnywhere = {
     });
     ModelRegistryCapability.registerModel(model);
 
+    // Prefer the browser OPFS/origin quota over MEMFS leftovers. Shipping a
+    // real `availableStorageBytes` into the commons planner avoids the false
+    // "only 2 GB is free" refusal on multi-GB models (Qwen3 4B, etc.).
+    let browserAvailableBytes = request.availableStorageBytes !== undefined
+      && request.availableStorageBytes > 0
+      ? request.availableStorageBytes
+      : storageReady.availableBytes > 0
+        ? storageReady.availableBytes
+        : await resolveBrowserAvailableStorageBytes();
+    // When estimate() is unavailable, still avoid the MEMFS ~2 GB figure that
+    // commons would otherwise read via fs::space. OPFS quota is enforced by the
+    // browser during the write; assertBrowserStorageQuota remains best-effort.
+    if (browserAvailableBytes <= 0 && OPFSBridge.isSupported) {
+      browserAvailableBytes = Number.MAX_SAFE_INTEGER;
+      logger.debug(
+        'navigator.storage.estimate() unavailable — skipping MEMFS free-space gate for OPFS download',
+      );
+    }
+
     // Plan defaults mirror Swift RunAnywhere+Storage.swift:187-189:
     // resumeExisting=true, validateExistingBytes=true,
     // verifyChecksums=!checksum.isEmpty.
@@ -1538,7 +1731,7 @@ export const RunAnywhere = {
       modelId: request.modelId,
       model,
       resumeExisting: request.resumeExisting ?? true,
-      availableStorageBytes: request.availableStorageBytes ?? 0,
+      availableStorageBytes: browserAvailableBytes,
       allowMeteredNetwork: request.allowMeteredNetwork ?? true,
       storageNamespace: request.storageNamespace ?? '',
       validateExistingBytes: request.validateExistingBytes ?? true,
@@ -1548,11 +1741,18 @@ export const RunAnywhere = {
     };
     const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         plan?.errorMessage || `Download plan for '${request.modelId}' could not start.`,
+        plan?.failureReason,
       );
     }
+    await assertBrowserStorageQuota(
+      request.modelId,
+      plan,
+      request.requiredFreeBytesAfterDownload ?? 0,
+      browserAvailableBytes,
+    );
 
     // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
     // update the registry on completion; the explicit import below
@@ -1567,7 +1767,7 @@ export const RunAnywhere = {
       updateRegistryOnCompletion: false,
     });
     if (!start?.accepted) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         start?.errorMessage || `Download start for '${request.modelId}' was rejected.`,
       );
@@ -1604,10 +1804,7 @@ export const RunAnywhere = {
       while (!lastProgress || !terminal.has(lastProgress.state)) {
         throwIfAborted(extra.signal, 'downloadModel');
         await delay(request.pollIntervalMs ?? 250);
-        const progress = DownloadsCapability.poll({
-          modelId: request.modelId,
-          taskId: start.taskId,
-        });
+        const progress = await pollDownloadWithRetry(request.modelId, start.taskId);
         if (!progress) continue;
         lastProgress = progress;
         // Defer COMPLETED to onProgress until OPFS flush finishes.
@@ -1622,7 +1819,7 @@ export const RunAnywhere = {
     }
 
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
-      throw SDKException.backendNotAvailable(
+      throwDownloadFailure(
         'downloadModel',
         lastProgress.errorMessage || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
       );
@@ -1781,10 +1978,10 @@ export const RunAnywhere = {
 
       const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
 
-      // clearSiteStorage (or manual OPFS purge)
-      // wipes bytes but the registry can still report isDownloaded=true from
-      // a prior session. Reconcile: if the canonical OPFS path is gone, clear
-      // the flag so the next downloadModel() re-fetches instead of no-oping.
+      // clearSiteStorage (or manual OPFS purge) — and mid-download refresh —
+      // can leave a partial OPFS file while the registry still says
+      // isDownloaded=true. Reconcile: missing OR incomplete bytes clear the
+      // flag so the UI shows Retry instead of a broken Use.
       if (!exists) {
         if (existing.localPath || existing.isDownloaded) {
           try {
@@ -1800,16 +1997,13 @@ export const RunAnywhere = {
         if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;
       } catch { /* ignore */ }
     }
-    if (patched > 0) {
-      // Notify UI subscribers (Storage tab, model
-      // sheet) so they re-query the registry and render Downloaded/Load
-      // instead of Download after a fresh page load.
-      EventBus.shared.publish(
-        'models.hydrated',
-        EventCategory.EVENT_CATEGORY_STORAGE,
-        { count: patched },
-      );
-    }
+    // Always notify — even when patched === 0 (already reconciled). Late UI
+    // subscribers and sheet opens must re-query after cold-start OPFS scan.
+    EventBus.shared.publish(
+      'models.hydrated',
+      EventCategory.EVENT_CATEGORY_STORAGE,
+      { count: patched },
+    );
     return patched;
   },
 
@@ -1972,6 +2166,54 @@ export const RunAnywhere = {
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
     );
     return VisionLanguageCapability.processImage(image, options).finally(detach);
+  },
+
+  async generateImage(
+    options: Partial<DiffusionGenerationOptions>,
+    extra: CancellableCall = {},
+  ): Promise<DiffusionResult> {
+    throwIfAborted(extra.signal, 'generateImage');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateImage');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    return generateImageCapability(options).finally(detach);
+  },
+
+  async *generateImageStream(
+    options: Partial<DiffusionGenerationOptions>,
+    extra: CancellableCall = {},
+  ): AsyncIterable<DiffusionStreamEvent | DiffusionProgress> {
+    throwIfAborted(extra.signal, 'generateImageStream');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'generateImageStream');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    try {
+      yield* generateImageStreamCapability(options);
+    } finally {
+      detach();
+    }
+  },
+
+  async cancelImageGeneration(): Promise<void> {
+    await cancelImageGenerationCapability();
+  },
+
+  /** Kotlin-parity inpaint sugar over DIFFUSION_MODE_INPAINTING. */
+  async inpaint(
+    options: Parameters<typeof inpaintCapability>[0],
+    extra: CancellableCall = {},
+  ): Promise<DiffusionResult> {
+    throwIfAborted(extra.signal, 'inpaint');
+    await RunAnywhere.ensureServicesReady();
+    throwIfAborted(extra.signal, 'inpaint');
+    const detach = attachSignalToCancel(extra.signal, () => {
+      void cancelImageGenerationCapability();
+    });
+    return inpaintCapability(options).finally(detach);
   },
 
   // Explicit overloads (the capability function is overloaded; deriving the
@@ -2140,6 +2382,7 @@ export const RunAnywhere = {
       }
       cleanup('Stream worker factory cleanup', () => setStreamWorkerFactory(null));
       cleanup('Stream worker state cleanup', () => setStreamWorkerInit(null));
+      cleanup('Backend worker factory cleanup', () => setBackendWorkerFactory(null));
 
       cleanup('Event bus cleanup', () => EventBus.reset());
 
@@ -2193,3 +2436,11 @@ setRegisterModelHydrateHook(() => {
     );
   });
 });
+
+/** Focused test hooks for browser-only download safeguards. */
+export const __testing__ = {
+  assertBrowserStorageQuota,
+  pollDownloadWithRetry,
+  resolveBrowserAvailableStorageBytes,
+  throwDownloadFailure,
+};

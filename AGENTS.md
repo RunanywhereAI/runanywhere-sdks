@@ -306,18 +306,21 @@ Three npm packages: `@runanywhere/web` (core TS), `@runanywhere/web-llamacpp` (W
 cd sdk/runanywhere-web/
 
 # Build WASM (requires Emscripten SDK)
-./wasm/scripts/build.sh --llamacpp --vlm       # CPU variant
-./wasm/scripts/build.sh --llamacpp --webgpu     # WebGPU variant
-./wasm/scripts/build-sherpa-onnx.sh             # Sherpa-ONNX WASM
+npm run build:wasm -- --core
+npm run build:wasm -- --llamacpp                 # CPU variant
+npm run build:wasm -- --webgpu                   # WebGPU variant
+npm run build:wasm -- --onnx                     # ONNX + Sherpa artifact
 
 # Build TypeScript
-npm run build:ts
+npm run build
 
 # Type-check
 npm run typecheck
 ```
 
-WASM outputs: `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`, `packages/onnx/wasm/sherpa/sherpa-onnx.wasm`
+The current artifact and deployment contract is maintained in
+`sdk/runanywhere-web/AGENTS.md`; it supersedes historical standalone
+`wasm/sherpa/` paths. Do not use or recreate those removed paths.
 
 ### IDL Codegen
 
@@ -417,7 +420,7 @@ yarn typecheck      # Primary verification gate
 cd examples/web/RunAnywhereAI/
 
 npm install
-npm run dev          # Vite dev server at port 5173
+npm run dev          # Vite dev server at port 3000
 npm run build        # Production build
 ```
 
@@ -583,7 +586,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 |-----------|-------|------|------|-------|
 | Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
-| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
+| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:3000` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |
 | Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |

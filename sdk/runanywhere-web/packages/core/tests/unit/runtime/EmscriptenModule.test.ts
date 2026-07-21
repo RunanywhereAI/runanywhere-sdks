@@ -7,7 +7,7 @@ import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
   clearRunanywhereModule,
   getModuleForCapability,
-  getModuleForFramework,
+  getWasmModuleRecordForCapability,
   registerWasmModule,
   type EmscriptenRunanywhereModule,
   unregisterWasmModule,
@@ -112,6 +112,7 @@ describe('Emscripten module capability wiring', () => {
     const commonsCalls: SolutionCallCounters = { creates: 0, starts: 0, destroys: 0 };
     const ragCalls: SolutionCallCounters = { creates: 0, starts: 0, destroys: 0 };
     const commonsModule = fakeModule(commonsCalls);
+    const llamaModule = fakeModule();
     const ragModule = fakeModule(ragCalls);
     ragModule._rac_rag_session_create_proto = () => 0;
     ragModule._rac_rag_query_proto = () => 0;
@@ -120,7 +121,12 @@ describe('Emscripten module capability wiring', () => {
     // Registry replay is unrelated to this routing contract and the minimal
     // fake modules intentionally omit model-registry proto exports.
     ModelRegistryAdapter.clearDefaultModule();
-    registerWasmModule(['rag'], ragModule, ['onnx']);
+    registerWasmModule(['llm'], llamaModule, ['llamacpp']);
+    registerWasmModule(
+      ['rag', 'embedding', 'stt', 'tts', 'vad', 'voice-agent'],
+      ragModule,
+      ['onnx'],
+    );
 
     const ragHandle = SolutionAdapter.run({ yaml: 'rag:\n  embed_model_id: minilm' });
     ragHandle.start();
@@ -144,20 +150,20 @@ describe('Emscripten module capability wiring', () => {
     voiceHandle.start();
     voiceHandle.destroy();
 
-    expect(commonsCalls).toEqual({ creates: 1, starts: 1, destroys: 1 });
-    expect(ragCalls).toEqual({ creates: 3, starts: 3, destroys: 3 });
+    expect(commonsCalls).toEqual({ creates: 0, starts: 0, destroys: 0 });
+    expect(ragCalls).toEqual({ creates: 4, starts: 4, destroys: 4 });
   });
 
   it('fails every RAG input form honestly when no module has RAG exports', () => {
     registerWasmModule(['commons'], fakeModule());
     expect(() => SolutionAdapter.run({ yaml: 'rag:\n  embed_model_id: minilm' }))
-      .toThrow(/Backend not available for: RAG solution YAML/);
+      .toThrow(/Backend not available for: Solutions\.rag/);
     const ragConfig = SolutionConfig.fromPartial({ rag: { embedModelId: 'minilm' } });
     expect(() => SolutionAdapter.run({ config: ragConfig }))
-      .toThrow(/Backend not available for: RAG solution config/);
+      .toThrow(/Backend not available for: Solutions\.rag/);
     expect(() => SolutionAdapter.run({
       configBytes: SolutionConfig.encode(ragConfig).finish(),
-    })).toThrow(/Backend not available for: RAG solution config/);
+    })).toThrow(/Backend not available for: Solutions\.rag/);
   });
 
   it('clears ModelRegistryAdapter default module', () => {
@@ -198,34 +204,54 @@ describe('Emscripten module capability wiring', () => {
     expect(resetB).not.toHaveBeenCalled();
   });
 
-  it('restores the surviving owner of a shared capability after teardown', () => {
-    const onnx = fakeModule();
+  it.each([
+    ['llamacpp then onnx', ['llamacpp', 'onnx'] as const],
+    ['onnx then llamacpp', ['onnx', 'llamacpp'] as const],
+  ])('routes sibling capabilities regardless of registration order: %s', (_name, order) => {
     const llama = fakeModule();
-
-    registerWasmModule(['embedding'], onnx, ['onnx']);
-    registerWasmModule(['embedding'], llama, ['llamacpp']);
-    expect(getModuleForCapability('embedding')).toBe(llama);
-
-    unregisterWasmModule(llama);
+    const onnx = fakeModule();
+    for (const backend of order) {
+      if (backend === 'llamacpp') {
+        registerWasmModule(['llm', 'vlm'], llama, ['llamacpp'], {
+          backend: 'llamacpp',
+          acceleration: 'cpu',
+        });
+      } else {
+        registerWasmModule(['stt', 'tts', 'embedding'], onnx, ['onnx', 'sherpa'], {
+          backend: 'onnx-sherpa',
+          acceleration: 'cpu',
+        });
+      }
+    }
+    expect(getModuleForCapability('llm')).toBe(llama);
     expect(getModuleForCapability('embedding')).toBe(onnx);
-    expect(getModuleForFramework('onnx')).toBe(onnx);
-    expect(getModuleForFramework('llamacpp')).toBeNull();
-
-    unregisterWasmModule(onnx);
-    expect(getModuleForCapability('embedding')).toBeNull();
-    expect(getModuleForFramework('onnx')).toBeNull();
+    expect(getWasmModuleRecordForCapability('llm')).toMatchObject({
+      backend: 'llamacpp',
+      acceleration: 'cpu',
+      readiness: 'ready',
+    });
   });
 
-  it('routes semantic segmentation to the ONNX capability owner', () => {
+  it('does not let an acceleration reload steal sibling capabilities', () => {
     const onnx = fakeModule();
-    onnx._rac_segmentation_segment_lifecycle_proto = () => 0;
+    const llamaCpu = fakeModule();
+    const llamaWebGpu = fakeModule();
+    registerWasmModule(['stt', 'tts', 'embedding'], onnx, ['onnx'], {
+      backend: 'onnx-sherpa',
+      acceleration: 'cpu',
+    });
+    registerWasmModule(['llm', 'vlm'], llamaCpu, ['llamacpp'], {
+      backend: 'llamacpp',
+      acceleration: 'cpu',
+    });
+    unregisterWasmModule(llamaCpu);
+    registerWasmModule(['llm', 'vlm'], llamaWebGpu, ['llamacpp'], {
+      backend: 'llamacpp',
+      acceleration: 'webgpu',
+    });
 
-    registerWasmModule(['segmentation'], onnx, ['onnx']);
-
-    expect(getModuleForCapability('segmentation')).toBe(onnx);
-    expect(getModuleForFramework('onnx')).toBe(onnx);
-
-    unregisterWasmModule(onnx);
-    expect(getModuleForCapability('segmentation')).toBeNull();
+    expect(getModuleForCapability('llm')).toBe(llamaWebGpu);
+    expect(getModuleForCapability('embedding')).toBe(onnx);
+    expect(getWasmModuleRecordForCapability('embedding')?.generation).toBeGreaterThan(0);
   });
 });

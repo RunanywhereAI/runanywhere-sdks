@@ -5,9 +5,9 @@
   "description": "RunAnywhere Web SDK Demo App",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1 --port 3000 --strictPort",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host 127.0.0.1 --port 3000 --strictPort",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "typecheck:installed": "tsc --noEmit -p tsconfig.installed-sdk.json",

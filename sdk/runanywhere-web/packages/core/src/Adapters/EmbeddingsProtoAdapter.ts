@@ -7,6 +7,7 @@ import {
 import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { getModuleForFramework } from '../runtime/EmscriptenModule.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
@@ -81,6 +82,13 @@ export class EmbeddingsProtoAdapter {
   async embedBatchLifecycle(
     request: ProtoEmbeddingsRequest,
   ): Promise<ProtoEmbeddingsResult | null> {
+    const host = getActiveBackendWorkerHost('onnx');
+    if (host?.diagnostics.executionContext === 'worker') {
+      const response = await host.infer('embeddings.embed', {
+        requestBytes: EmbeddingsRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response?.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
+    }
     if (!ensureExports(this.module, 'embeddings.embedBatchLifecycle', [
       '_rac_embeddings_embed_batch_lifecycle_proto',
     ])) {
