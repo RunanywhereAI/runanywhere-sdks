@@ -2,32 +2,20 @@
 
 from __future__ import annotations
 
-import importlib.util
-import os
-import sys
-
 import pytest
 
-# Import the errors module directly by path so this test does not depend on the
-# package __init__ (authored in parallel and may pull in unfinished siblings).
-_ERRORS_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "runanywhere",
-    "errors.py",
+# Import via the package (its __init__ is lazy — it does not load the native core), so this
+# test works whether ``runanywhere`` is the source tree or an installed wheel run from a
+# relocated ``tests/`` dir (the CI hermetic step copies tests out of the source tree).
+from runanywhere.errors import (
+    ErrorCategory,
+    ErrorCode,
+    SDKException,
+    as_sdk_exception,
+    category_for_code,
+    is_sdk_exception,
+    raise_for_rac,
 )
-_spec = importlib.util.spec_from_file_location("_ra_errors", _ERRORS_PATH)
-assert _spec is not None and _spec.loader is not None
-errors = importlib.util.module_from_spec(_spec)
-sys.modules["_ra_errors"] = errors
-_spec.loader.exec_module(errors)
-
-ErrorCode = errors.ErrorCode
-ErrorCategory = errors.ErrorCategory
-SDKException = errors.SDKException
-category_for_code = errors.category_for_code
-raise_for_rac = errors.raise_for_rac
-is_sdk_exception = errors.is_sdk_exception
-as_sdk_exception = errors.as_sdk_exception
 
 
 # --------------------------------------------------------------------------- #
