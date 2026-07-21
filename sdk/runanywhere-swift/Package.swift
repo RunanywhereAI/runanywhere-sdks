@@ -20,14 +20,16 @@ import Foundation
 // =============================================================================
 
 // mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
-// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
-// first-class in the Apple MLX runtime while upstream release tags catch up.
+// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS and
+// speaker-diarization provider plumbing are available to the Apple MLX runtime
+// while upstream release tags catch up.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioVAD", package: "mlx-audio-swift"),
 ]
 
 // PrismML's Bonsai 1-bit weights require kernels that are not yet available
@@ -90,7 +92,7 @@ let package = Package(
             revision: prismMLXSwiftRevision
         ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
-        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
+        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS/VAD/diarization.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
     ] + mlxAudioPackageDependencies,
     targets: [
@@ -319,6 +321,12 @@ let package = Package(
             ],
             path: "Tests/RunAnywhereTests",
             exclude: ["Fixtures"]
+        ),
+
+        .testTarget(
+            name: "MLXRuntimeTests",
+            dependencies: ["MLXRuntime"],
+            path: "Tests/MLXRuntimeTests"
         ),
 
         // -------------------------------------------------------------------
