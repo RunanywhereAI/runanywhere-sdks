@@ -250,6 +250,7 @@ _FIXTURE_VALIDATABLE_FIELDS: frozenset[str] = frozenset({
     "threshold_float",
     "precision_double",
     "enable_feature_bool",
+    "mono_channel_count",
 })
 
 # Regex captures the field-name suffix of every `'RacTestConfig.<name>'`
@@ -366,6 +367,48 @@ def assert_cross_language_parity(
     return violations
 
 
+# The fixture's optional threshold_float mirrors DiarizationOptions.threshold.
+# A plain `< min || > max` guard accepts NaN in every target language, so keep
+# explicit structural cases for all three invalid classes at the generator
+# boundary. These tokens live in the same emitted condition in each golden.
+_FLOAT_RANGE_CASE_SIGNATURES: dict[str, dict[str, str]] = {
+    "swift": {
+        "negative": "effectiveThresholdFloat < 0.0",
+        "above_max": "effectiveThresholdFloat > 1.0",
+        "nan_or_non_finite": "!effectiveThresholdFloat.isFinite",
+    },
+    "kotlin": {
+        "negative": "threshold_float < 0.0",
+        "above_max": "threshold_float > 1.0",
+        "nan_or_non_finite": "!threshold_float.isFinite()",
+    },
+    "dart": {
+        "negative": "effectiveThresholdFloat < 0.0",
+        "above_max": "effectiveThresholdFloat > 1.0",
+        "nan_or_non_finite": "!effectiveThresholdFloat.isFinite",
+    },
+    "ts": {
+        "negative": "m.thresholdFloat < 0.0",
+        "above_max": "m.thresholdFloat > 1.0",
+        "nan_or_non_finite": "!Number.isFinite(m.thresholdFloat)",
+    },
+}
+
+
+def assert_float_range_cases(outputs: dict[str, str]) -> list[str]:
+    """Require negative, above-max, and NaN/non-finite threshold guards."""
+    violations: list[str] = []
+    for language, signatures in _FLOAT_RANGE_CASE_SIGNATURES.items():
+        generated = outputs.get(language, "")
+        for case_name, signature in signatures.items():
+            if signature not in generated:
+                violations.append(
+                    f"[float-range] {language} is missing the {case_name} "
+                    f"threshold guard: {signature}"
+                )
+    return violations
+
+
 # ---------------------------------------------------------------------------
 # Main.
 # ---------------------------------------------------------------------------
@@ -449,6 +492,13 @@ def main() -> int:
             else:
                 print("   parity ok (validated-field set + error-shape "
                       "aligned across swift/kotlin/dart/ts)")
+
+            print("-- asserting float-range invalid-value cases ...")
+            float_range_violations = assert_float_range_cases(generated_outputs)
+            if float_range_violations:
+                failures.extend(float_range_violations)
+            else:
+                print("   float-range ok (negative, above-max, and NaN/non-finite)")
 
         if args.keep_sandbox:
             # Re-root the sandbox so the TemporaryDirectory cleanup does

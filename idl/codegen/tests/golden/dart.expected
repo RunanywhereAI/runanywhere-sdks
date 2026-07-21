@@ -89,6 +89,8 @@ extension RacTestConfigConvenience on RacTestConfig {
     r.precisionDouble = 0.7;
     r.enableFeatureBool = true;
     r.modeEnum = RacTestMode.RAC_TEST_MODE_BALANCED;
+    r.monoChannelCount = 1;
+    r.plainModeEnum = RacTestPlainMode.RAC_TEST_PLAIN_MODE_ENABLED;
     return r;
   }
 }
@@ -113,16 +115,24 @@ extension RacTestConfigValidate on RacTestConfig {
         fieldPath: 'RacTestConfig.limit_int64',
       );
     }
-    if (thresholdFloat < 0.0 || thresholdFloat > 1.0) {
+    final effectiveThresholdFloat = hasThresholdFloat() ? thresholdFloat : 0.5;
+    if (!effectiveThresholdFloat.isFinite || effectiveThresholdFloat < 0.0 || effectiveThresholdFloat > 1.0) {
       throw SDKException.validationFailed(
-        'threshold_float must be in 0.0...1.0 (got $thresholdFloat)',
+        'threshold_float must be in 0.0...1.0 (got $effectiveThresholdFloat)',
         fieldPath: 'RacTestConfig.threshold_float',
       );
     }
-    if (precisionDouble < 0.0 || precisionDouble > 1.0) {
+    if (!precisionDouble.isFinite || precisionDouble < 0.0 || precisionDouble > 1.0) {
       throw SDKException.validationFailed(
         'precision_double must be in 0.0...1.0 (got $precisionDouble)',
         fieldPath: 'RacTestConfig.precision_double',
+      );
+    }
+    final effectiveMonoChannelCount = hasMonoChannelCount() ? monoChannelCount : 1;
+    if (effectiveMonoChannelCount < 1 || effectiveMonoChannelCount > 1) {
+      throw SDKException.validationFailed(
+        'mono_channel_count must be in 1...1 (got $effectiveMonoChannelCount)',
+        fieldPath: 'RacTestConfig.mono_channel_count',
       );
     }
   }

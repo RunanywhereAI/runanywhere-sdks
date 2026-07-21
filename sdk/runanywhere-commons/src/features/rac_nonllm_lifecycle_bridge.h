@@ -3,6 +3,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -50,6 +51,14 @@ struct LifecycleDiffusionRef {
     void* opaque = nullptr;
 };
 
+struct LifecycleDiarizationRef {
+    const rac_diarization_service_ops_t* ops = nullptr;
+    void* impl = nullptr;
+    const char* model_id = nullptr;
+    const char* framework_name = nullptr;
+    void* opaque = nullptr;
+};
+
 rac_result_t acquire_lifecycle_stt(LifecycleSttRef* out_ref);
 void release_lifecycle_stt(LifecycleSttRef* ref);
 
@@ -64,6 +73,9 @@ void release_lifecycle_embeddings(LifecycleEmbeddingsRef* ref);
 
 rac_result_t acquire_lifecycle_diffusion(LifecycleDiffusionRef* out_ref);
 void release_lifecycle_diffusion(LifecycleDiffusionRef* ref);
+
+rac_result_t acquire_lifecycle_diarization(LifecycleDiarizationRef* out_ref);
+void release_lifecycle_diarization(LifecycleDiarizationRef* ref);
 
 }  // namespace rac::lifecycle
 

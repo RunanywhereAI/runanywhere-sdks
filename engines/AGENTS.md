@@ -105,7 +105,7 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
      there is no local model file, e.g. cloud).
    - `availability` (PUBLIC / PRIVATE), `priority`, package owner/name.
 2. **A `rac_engine_vtable_t`**: the served-primitive slots non-NULL, **every
-   other slot explicit NULL** (7 primitive slots + 10 reserved slots). Lives in
+   other slot explicit NULL** (9 primitive slots + 8 reserved slots). Lives in
    `.rodata` (no runtime allocation). A future reserved-slot promotion turns the
    aggregate initializer into a compile error — the intended tripwire.
 3. **The uniform MODEL LIFECYCLE** on each served op-table (verified in
@@ -121,7 +121,7 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
         → destroy(impl)                    // free the impl
    ```
 
-   `create` is the v4 (`RAC_PLUGIN_API_VERSION = 4u`) slot that replaced the
+   `create` originated in v4 (the current `RAC_PLUGIN_API_VERSION` is `7u`) and replaced the
    deleted `rac_service_provider_t` factory; commons' `rac_<primitive>_create()`
    calls it after `rac_plugin_find` picks the engine. `config_json` is
    advisory: engines that don't understand it **must** ignore it and succeed with

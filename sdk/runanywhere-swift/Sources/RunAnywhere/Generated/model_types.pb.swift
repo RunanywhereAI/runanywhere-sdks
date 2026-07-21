@@ -373,6 +373,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
 
   /// present in Swift only pre-IDL
   case voiceActivityDetection // = 9
+  case speakerDiarization // = 10
+  case semanticSegmentation // = 11
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -391,6 +393,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case 7: self = .audio
     case 8: self = .embedding
     case 9: self = .voiceActivityDetection
+    case 10: self = .speakerDiarization
+    case 11: self = .semanticSegmentation
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -407,6 +411,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case .audio: return 7
     case .embedding: return 8
     case .voiceActivityDetection: return 9
+    case .speakerDiarization: return 10
+    case .semanticSegmentation: return 11
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -423,6 +429,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     .audio,
     .embedding,
     .voiceActivityDetection,
+    .speakerDiarization,
+    .semanticSegmentation,
   ]
 
 }
@@ -2995,7 +3003,7 @@ nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0\u{1}MODEL_CATEGORY_SPEAKER_DIARIZATION\0\u{1}MODEL_CATEGORY_SEMANTIC_SEGMENTATION\0")
 }
 
 nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {

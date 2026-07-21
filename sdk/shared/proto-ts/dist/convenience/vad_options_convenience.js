@@ -39,7 +39,7 @@ const validateVADConfiguration = (m) => {
             message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
         });
     }
-    if (m.threshold < 0.0 || m.threshold > 1.0) {
+    if (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0) {
         throw new _errors_1.ValidationError({
             fieldPath: 'VADConfiguration.threshold',
             message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,

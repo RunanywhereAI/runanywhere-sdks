@@ -18,6 +18,7 @@ package com.runanywhere.sdk.generated.convenience
 
 import ai.runanywhere.proto.v1.RacTestConfig
 import ai.runanywhere.proto.v1.RacTestMode
+import ai.runanywhere.proto.v1.RacTestPlainMode
 import com.runanywhere.sdk.foundation.errors.SDKException
 
 /** Generated from `(runanywhere.v1.rac_display_name)` annotations in idl/. */
@@ -70,6 +71,8 @@ public fun RacTestConfig.Companion.defaults(): RacTestConfig =
         precision_double = 0.7,
         enable_feature_bool = true,
         mode_enum = RacTestMode.RAC_TEST_MODE_BALANCED,
+        mono_channel_count = 1,
+        plain_mode_enum = RacTestPlainMode.RAC_TEST_PLAIN_MODE_ENABLED,
     )
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
@@ -92,16 +95,22 @@ public fun RacTestConfig.validate() {
             message = "limit_int64 must be in 1...65536 (got ${limit_int64})",
         )
     }
-    if (threshold_float < 0.0 || threshold_float > 1.0) {
+    if (threshold_float != null && (!threshold_float.isFinite() || threshold_float < 0.0 || threshold_float > 1.0)) {
         throw SDKException.validationFailed(
             fieldPath = "RacTestConfig.threshold_float",
             message = "threshold_float must be in 0.0...1.0 (got ${threshold_float})",
         )
     }
-    if (precision_double < 0.0 || precision_double > 1.0) {
+    if (!precision_double.isFinite() || precision_double < 0.0 || precision_double > 1.0) {
         throw SDKException.validationFailed(
             fieldPath = "RacTestConfig.precision_double",
             message = "precision_double must be in 0.0...1.0 (got ${precision_double})",
+        )
+    }
+    if (mono_channel_count != null && (mono_channel_count < 1 || mono_channel_count > 1)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RacTestConfig.mono_channel_count",
+            message = "mono_channel_count must be in 1...1 (got ${mono_channel_count})",
         )
     }
 }

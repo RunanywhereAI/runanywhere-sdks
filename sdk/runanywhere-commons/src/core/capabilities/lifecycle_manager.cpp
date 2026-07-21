@@ -110,6 +110,7 @@ SDKComponent component_for_resource_type(rac_resource_type_t type) {
         case RAC_RESOURCE_TYPE_EMBEDDINGS_MODEL:
             return runanywhere::v1::SDK_COMPONENT_EMBEDDINGS;
         case RAC_RESOURCE_TYPE_DIARIZATION_MODEL:
+            return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -133,6 +134,8 @@ ModelCategory category_for_component(SDKComponent component) {
             return runanywhere::v1::MODEL_CATEGORY_MULTIMODAL;
         case runanywhere::v1::SDK_COMPONENT_DIFFUSION:
             return runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION;
+        case runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION:
+            return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
         default:
             return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     }
@@ -185,6 +188,12 @@ void decompose_service(SDKComponent component, rac_handle_t service, detail::Loa
         case runanywhere::v1::SDK_COMPONENT_DIFFUSION: {
             auto* s = static_cast<rac_diffusion_service_t*>(service);
             entry->diffusion_ops = s->ops;
+            entry->impl = s->impl;
+            break;
+        }
+        case runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION: {
+            auto* s = static_cast<rac_diarization_service_t*>(service);
+            entry->diarization_ops = s->ops;
             entry->impl = s->impl;
             break;
         }
@@ -252,8 +261,8 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
     std::lock_guard<std::mutex> mgr_lock(mgr->mutex);
 
     if (mgr->component == runanywhere::v1::SDK_COMPONENT_UNSPECIFIED) {
-        // No SDKComponent maps to this resource type (e.g. diarization); the
-        // facade has nowhere to store the model.
+        // No SDKComponent maps to this resource type; the facade has nowhere
+        // to store the model.
         RAC_LOG_ERROR(mgr->logger_category.c_str(),
                       "Lifecycle load unsupported for resource type %d",
                       static_cast<int>(mgr->resource_type));

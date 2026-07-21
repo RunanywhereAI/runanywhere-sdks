@@ -83,8 +83,13 @@ extern "C" {
  *   6u — rac_embeddings_options_t gained explicit long-input policy and batch
  *                 size fields. Engines compiled against v5 expect the shorter
  *                 layout and are rejected at register time until rebuilt.
+ *   7u — promoted reserved primitive wire/slot 9 to standalone speaker
+ *                 diarization (`RAC_PRIMITIVE_DIARIZE` / `diarization_ops`)
+ *                 and wire/slot 10 to semantic segmentation
+ *                 (`RAC_PRIMITIVE_SEGMENT` / `segmentation_ops`). Engines
+ *                 compiled against v6 are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 6u
+#define RAC_PLUGIN_API_VERSION 7u
 
 /* ===========================================================================
  * Plugin entry-point signature

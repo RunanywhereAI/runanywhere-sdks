@@ -426,6 +426,8 @@ export enum ModelCategory {
   MODEL_CATEGORY_EMBEDDING = 8,
   /** MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION - present in Swift only pre-IDL */
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
+  MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
+  MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
   UNRECOGNIZED = -1,
 }
 
@@ -461,6 +463,12 @@ export function modelCategoryFromJSON(object: any): ModelCategory {
     case 9:
     case "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION":
       return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    case 10:
+    case "MODEL_CATEGORY_SPEAKER_DIARIZATION":
+      return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
+    case 11:
+    case "MODEL_CATEGORY_SEMANTIC_SEGMENTATION":
+      return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -490,6 +498,10 @@ export function modelCategoryToJSON(object: ModelCategory): string {
       return "MODEL_CATEGORY_EMBEDDING";
     case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
       return "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION";
+    case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      return "MODEL_CATEGORY_SPEAKER_DIARIZATION";
+    case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+      return "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
     case ModelCategory.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

@@ -904,6 +904,10 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/rac_stt_stream.cpp
     # Canonical STTConfiguration defaults helper
     src/features/stt/rac_stt_config_defaults.cpp
+    # Standalone speaker diarization (offline + persistent stream sessions)
+    src/features/diarization/diarization_module.cpp
+    src/features/diarization/rac_diarization_service.cpp
+    src/features/diarization/rac_diarization_stream.cpp
     # TTS
     # W4: unified module — merges tts_component.cpp + TTS slice of
     # rac_nonllm_lifecycle_proto_abi.cpp.
@@ -1375,6 +1379,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/tool_calling.pb.cc
     ${_RAC_PROTO_GEN_DIR}/structured_output.pb.cc
     ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/diarization.pb.cc
     ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc

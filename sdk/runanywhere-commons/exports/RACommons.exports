@@ -1126,3 +1126,37 @@ _rac_register_multi_file_model_proto
 _rac_tool_calling_run_loop_cancel_proto
 _rac_tool_calling_run_loop_proto
 _rac_uuid_v4
+
+# ============================================================================
+# AUTO-SYNC (2026-07-21): symbols appended by sync_rac_api_exports.sh.
+# Net-new RAC_API-decorated decls discovered in the commons headers and
+# not already covered by an earlier curated section. Routing rules live
+# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
+# Added 26 symbols to RACommons.exports, sorted alphabetically.
+# ============================================================================
+_rac_diarization_cleanup
+_rac_diarization_component_create
+_rac_diarization_component_destroy
+_rac_diarization_component_diarize_proto
+_rac_diarization_component_get_metrics
+_rac_diarization_component_get_model_id
+_rac_diarization_component_get_state
+_rac_diarization_component_is_loaded
+_rac_diarization_component_load_model
+_rac_diarization_component_unload
+_rac_diarization_create
+_rac_diarization_destroy
+_rac_diarization_diarize
+_rac_diarization_diarize_lifecycle_proto
+_rac_diarization_initialize
+_rac_diarization_proto_quiesce
+_rac_diarization_result_free
+_rac_diarization_set_stream_proto_callback
+_rac_diarization_stream_cancel_proto
+_rac_diarization_stream_create
+_rac_diarization_stream_destroy
+_rac_diarization_stream_feed_audio_chunk
+_rac_diarization_stream_feed_audio_proto
+_rac_diarization_stream_start_proto
+_rac_diarization_stream_stop_proto
+_rac_diarization_unset_stream_proto_callback

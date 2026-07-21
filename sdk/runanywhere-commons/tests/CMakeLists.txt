@@ -886,6 +886,18 @@ target_compile_features(test_nonllm_lifecycle_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_nonllm_lifecycle_proto_abi)
 add_test(NAME nonllm_lifecycle_proto_abi_tests COMMAND test_nonllm_lifecycle_proto_abi)
 
+# --- Standalone speaker-diarization proto/lifecycle/stream ABI tests --------
+add_executable(test_diarization_proto_abi test_diarization_proto_abi.cpp)
+target_include_directories(test_diarization_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_diarization_proto_abi PRIVATE rac_commons Threads::Threads)
+rac_link_archive_deps(test_diarization_proto_abi)
+target_compile_features(test_diarization_proto_abi PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_diarization_proto_abi)
+add_test(NAME diarization_proto_abi_tests COMMAND test_diarization_proto_abi)
+
 # --- Advanced modality proto-byte ABI tests ---------------------------------
 # Exercises VLM, embeddings, RAG, LoRA, and diffusion service boundaries over
 # serialized generated protos. RAG symbols are folded into rac_commons only when
@@ -1108,7 +1120,7 @@ add_test(NAME static_registration_tests COMMAND test_static_registration)
 # mode. iOS / WASM / RAC_STATIC_PLUGINS=ON skip these targets entirely.
 if(NOT RAC_STATIC_PLUGINS)
     # Two fixture libraries from one source — the BAD_ABI variant flips a
-    # compile-time toggle so its metadata.abi_version equals host + 99.
+    # compile-time toggle so its metadata.abi_version equals the preceding v6.
     # Fixtures are minimal .so's that do NOT link rac_commons (they exercise
     # the dlopen / ABI-version paths in isolation), so the include path has
     # to be spelled out explicitly — ${CMAKE_SOURCE_DIR} refers to the repo

@@ -145,10 +145,10 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* embedding_ops    */ &g_llamacpp_embeddings_ops,
     /* vlm_ops          */ &g_llamacpp_vlm_ops,
     /* diffusion_ops    */ nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_0..9 */
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

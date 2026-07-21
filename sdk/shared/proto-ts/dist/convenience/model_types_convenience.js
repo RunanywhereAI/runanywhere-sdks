@@ -92,6 +92,10 @@ const modelCategoryWireString = (e) => {
             return 'embedding';
         case model_types_1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             return 'voice-activity-detection';
+        case model_types_1.ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+            return 'speaker-diarization';
+        case model_types_1.ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            return 'semantic-segmentation';
         default:
             return '';
     }
@@ -119,6 +123,10 @@ const modelCategoryFromWireString = (s) => {
             return model_types_1.ModelCategory.MODEL_CATEGORY_EMBEDDING;
         case 'voice-activity-detection':
             return model_types_1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+        case 'speaker-diarization':
+            return model_types_1.ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
+        case 'semantic-segmentation':
+            return model_types_1.ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         default:
             return undefined;
     }

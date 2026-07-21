@@ -5,8 +5,8 @@
 //   protoc               v7.35.1
 // source: model_types.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ArtifactInferFromUrlResult = exports.ArtifactInferFromUrlRequest = exports.ModelFormatFromUrlResult = exports.ModelFormatFromUrlRequest = exports.ModelCompatibilityResult = exports.ModelCompatibilityRequest = exports.ModelDeleteResult = exports.ModelDeleteRequest = exports.CurrentModelResult = exports.CurrentModelRequest = exports.ModelUnloadResult = exports.ModelUnloadRequest = exports.ModelLoadResult = exports.ModelLoadRequest = exports.ModelDiscoveryResult = exports.DiscoveredModel = exports.ModelDiscoveryRequest = exports.ModelImportResult = exports.ModelImportRequest = exports.ModelGetResult = exports.ModelGetRequest = exports.ModelListResult = exports.ModelListRequest = exports.ModelRegistryRefreshResult = exports.ModelRegistryRefreshRequest = exports.ModelQuery = exports.ExpectedModelFiles = exports.MultiFileArtifact = exports.ModelFileDescriptor = exports.ArchiveArtifact = exports.SingleFileArtifact = exports.ModelInfoList = exports.ModelInfo = exports.ModelRuntimeCompatibility = exports.ModelInfoMetadata = exports.RoutingPolicy = exports.ModelFileRole = exports.ModelQuerySortOrder = exports.ModelQuerySortField = exports.ModelRegistryStatus = exports.ModelArtifactType = exports.ArchiveStructure = exports.ArchiveType = exports.ModelSource = exports.SDKEnvironment = exports.ModelCategory = exports.InferenceFramework = exports.ModelFormat = exports.AudioFormat = exports.protobufPackage = void 0;
-exports.RegisterMultiFileModelRequest = exports.RegisterModelFromUrlRequest = exports.ModelInfoMakeRequest = exports.ModelRegistryFetchAssignmentsResult = exports.ModelRegistryFetchAssignmentsRequest = void 0;
+exports.ModelFormatFromUrlRequest = exports.ModelCompatibilityResult = exports.ModelCompatibilityRequest = exports.ModelDeleteResult = exports.ModelDeleteRequest = exports.CurrentModelResult = exports.CurrentModelRequest = exports.ModelUnloadResult = exports.ModelUnloadRequest = exports.ModelLoadResult = exports.ModelLoadRequest = exports.ModelDiscoveryResult = exports.DiscoveredModel = exports.ModelDiscoveryRequest = exports.ModelImportResult = exports.ModelImportRequest = exports.ModelGetResult = exports.ModelGetRequest = exports.ModelListResult = exports.ModelListRequest = exports.ModelRegistryRefreshResult = exports.ModelRegistryRefreshRequest = exports.ModelQuery = exports.ExpectedModelFiles = exports.MultiFileArtifact = exports.ModelFileDescriptor = exports.PostDownloadTransform = exports.PostDownloadTransformOperation = exports.PostDownloadAppendBytes = exports.ArchiveArtifact = exports.SingleFileArtifact = exports.ModelInfoList = exports.ModelInfo = exports.ModelRuntimeCompatibility = exports.ModelInfoMetadata = exports.RoutingPolicy = exports.ModelFileRole = exports.ModelQuerySortOrder = exports.ModelQuerySortField = exports.ModelRegistryStatus = exports.ModelArtifactType = exports.ArchiveStructure = exports.ArchiveType = exports.ModelSource = exports.SDKEnvironment = exports.ModelCategory = exports.InferenceFramework = exports.ModelFormat = exports.AudioFormat = exports.protobufPackage = void 0;
+exports.RegisterMultiFileModelRequest = exports.RegisterModelFromUrlRequest = exports.ModelInfoMakeRequest = exports.ModelRegistryFetchAssignmentsResult = exports.ModelRegistryFetchAssignmentsRequest = exports.ArtifactInferFromUrlResult = exports.ArtifactInferFromUrlRequest = exports.ModelFormatFromUrlResult = void 0;
 exports.audioFormatFromJSON = audioFormatFromJSON;
 exports.audioFormatToJSON = audioFormatToJSON;
 exports.modelFormatFromJSON = modelFormatFromJSON;
@@ -445,6 +445,8 @@ var ModelCategory;
     ModelCategory[ModelCategory["MODEL_CATEGORY_EMBEDDING"] = 8] = "MODEL_CATEGORY_EMBEDDING";
     /** MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION - present in Swift only pre-IDL */
     ModelCategory[ModelCategory["MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION"] = 9] = "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION";
+    ModelCategory[ModelCategory["MODEL_CATEGORY_SPEAKER_DIARIZATION"] = 10] = "MODEL_CATEGORY_SPEAKER_DIARIZATION";
+    ModelCategory[ModelCategory["MODEL_CATEGORY_SEMANTIC_SEGMENTATION"] = 11] = "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
     ModelCategory[ModelCategory["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelCategory || (exports.ModelCategory = ModelCategory = {}));
 function modelCategoryFromJSON(object) {
@@ -479,6 +481,12 @@ function modelCategoryFromJSON(object) {
         case 9:
         case "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION":
             return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+        case 10:
+        case "MODEL_CATEGORY_SPEAKER_DIARIZATION":
+            return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
+        case 11:
+        case "MODEL_CATEGORY_SEMANTIC_SEGMENTATION":
+            return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -507,6 +515,10 @@ function modelCategoryToJSON(object) {
             return "MODEL_CATEGORY_EMBEDDING";
         case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             return "MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION";
+        case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+            return "MODEL_CATEGORY_SPEAKER_DIARIZATION";
+        case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            return "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
         case ModelCategory.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -2357,6 +2369,247 @@ exports.ArchiveArtifact = {
         return message;
     },
 };
+function createBasePostDownloadAppendBytes() {
+    return { payload: new Uint8Array(0) };
+}
+exports.PostDownloadAppendBytes = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.payload.length !== 0) {
+            writer.uint32(10).bytes(message.payload);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePostDownloadAppendBytes();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.payload = reader.bytes();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { payload: isSet(object.payload) ? bytesFromBase64(object.payload) : new Uint8Array(0) };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.payload.length !== 0) {
+            obj.payload = base64FromBytes(message.payload);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.PostDownloadAppendBytes.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePostDownloadAppendBytes();
+        message.payload = object.payload ?? new Uint8Array(0);
+        return message;
+    },
+};
+function createBasePostDownloadTransformOperation() {
+    return { appendBytes: undefined };
+}
+exports.PostDownloadTransformOperation = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.appendBytes !== undefined) {
+            exports.PostDownloadAppendBytes.encode(message.appendBytes, writer.uint32(10).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePostDownloadTransformOperation();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.appendBytes = exports.PostDownloadAppendBytes.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            appendBytes: isSet(object.appendBytes)
+                ? exports.PostDownloadAppendBytes.fromJSON(object.appendBytes)
+                : isSet(object.append_bytes)
+                    ? exports.PostDownloadAppendBytes.fromJSON(object.append_bytes)
+                    : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.appendBytes !== undefined) {
+            obj.appendBytes = exports.PostDownloadAppendBytes.toJSON(message.appendBytes);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.PostDownloadTransformOperation.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePostDownloadTransformOperation();
+        message.appendBytes = (object.appendBytes !== undefined && object.appendBytes !== null)
+            ? exports.PostDownloadAppendBytes.fromPartial(object.appendBytes)
+            : undefined;
+        return message;
+    },
+};
+function createBasePostDownloadTransform() {
+    return { sourceSizeBytes: 0, sourceChecksumSha256: "", finalSizeBytes: 0, finalChecksumSha256: "", operations: [] };
+}
+exports.PostDownloadTransform = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.sourceSizeBytes !== 0) {
+            writer.uint32(8).int64(message.sourceSizeBytes);
+        }
+        if (message.sourceChecksumSha256 !== "") {
+            writer.uint32(18).string(message.sourceChecksumSha256);
+        }
+        if (message.finalSizeBytes !== 0) {
+            writer.uint32(24).int64(message.finalSizeBytes);
+        }
+        if (message.finalChecksumSha256 !== "") {
+            writer.uint32(34).string(message.finalChecksumSha256);
+        }
+        for (const v of message.operations) {
+            exports.PostDownloadTransformOperation.encode(v, writer.uint32(42).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePostDownloadTransform();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.sourceSizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sourceChecksumSha256 = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.finalSizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.finalChecksumSha256 = reader.string();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.operations.push(exports.PostDownloadTransformOperation.decode(reader, reader.uint32()));
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            sourceSizeBytes: isSet(object.sourceSizeBytes)
+                ? globalThis.Number(object.sourceSizeBytes)
+                : isSet(object.source_size_bytes)
+                    ? globalThis.Number(object.source_size_bytes)
+                    : 0,
+            sourceChecksumSha256: isSet(object.sourceChecksumSha256)
+                ? globalThis.String(object.sourceChecksumSha256)
+                : isSet(object.source_checksum_sha256)
+                    ? globalThis.String(object.source_checksum_sha256)
+                    : "",
+            finalSizeBytes: isSet(object.finalSizeBytes)
+                ? globalThis.Number(object.finalSizeBytes)
+                : isSet(object.final_size_bytes)
+                    ? globalThis.Number(object.final_size_bytes)
+                    : 0,
+            finalChecksumSha256: isSet(object.finalChecksumSha256)
+                ? globalThis.String(object.finalChecksumSha256)
+                : isSet(object.final_checksum_sha256)
+                    ? globalThis.String(object.final_checksum_sha256)
+                    : "",
+            operations: globalThis.Array.isArray(object?.operations)
+                ? object.operations.map((e) => exports.PostDownloadTransformOperation.fromJSON(e))
+                : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.sourceSizeBytes !== 0) {
+            obj.sourceSizeBytes = Math.round(message.sourceSizeBytes);
+        }
+        if (message.sourceChecksumSha256 !== "") {
+            obj.sourceChecksumSha256 = message.sourceChecksumSha256;
+        }
+        if (message.finalSizeBytes !== 0) {
+            obj.finalSizeBytes = Math.round(message.finalSizeBytes);
+        }
+        if (message.finalChecksumSha256 !== "") {
+            obj.finalChecksumSha256 = message.finalChecksumSha256;
+        }
+        if (message.operations?.length) {
+            obj.operations = message.operations.map((e) => exports.PostDownloadTransformOperation.toJSON(e));
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.PostDownloadTransform.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePostDownloadTransform();
+        message.sourceSizeBytes = object.sourceSizeBytes ?? 0;
+        message.sourceChecksumSha256 = object.sourceChecksumSha256 ?? "";
+        message.finalSizeBytes = object.finalSizeBytes ?? 0;
+        message.finalChecksumSha256 = object.finalChecksumSha256 ?? "";
+        message.operations = object.operations?.map((e) => exports.PostDownloadTransformOperation.fromPartial(e)) || [];
+        return message;
+    },
+};
 function createBaseModelFileDescriptor() {
     return {
         url: "",
@@ -2368,6 +2621,7 @@ function createBaseModelFileDescriptor() {
         role: undefined,
         localPath: undefined,
         checksumSha256: undefined,
+        postDownloadTransform: undefined,
     };
 }
 exports.ModelFileDescriptor = {
@@ -2398,6 +2652,9 @@ exports.ModelFileDescriptor = {
         }
         if (message.checksumSha256 !== undefined) {
             writer.uint32(82).string(message.checksumSha256);
+        }
+        if (message.postDownloadTransform !== undefined) {
+            exports.PostDownloadTransform.encode(message.postDownloadTransform, writer.uint32(90).fork()).join();
         }
         return writer;
     },
@@ -2471,6 +2728,13 @@ exports.ModelFileDescriptor = {
                     message.checksumSha256 = reader.string();
                     continue;
                 }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.postDownloadTransform = exports.PostDownloadTransform.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2514,6 +2778,11 @@ exports.ModelFileDescriptor = {
                 : isSet(object.checksum_sha256)
                     ? globalThis.String(object.checksum_sha256)
                     : undefined,
+            postDownloadTransform: isSet(object.postDownloadTransform)
+                ? exports.PostDownloadTransform.fromJSON(object.postDownloadTransform)
+                : isSet(object.post_download_transform)
+                    ? exports.PostDownloadTransform.fromJSON(object.post_download_transform)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -2545,6 +2814,9 @@ exports.ModelFileDescriptor = {
         if (message.checksumSha256 !== undefined) {
             obj.checksumSha256 = message.checksumSha256;
         }
+        if (message.postDownloadTransform !== undefined) {
+            obj.postDownloadTransform = exports.PostDownloadTransform.toJSON(message.postDownloadTransform);
+        }
         return obj;
     },
     create(base) {
@@ -2561,6 +2833,10 @@ exports.ModelFileDescriptor = {
         message.role = object.role ?? undefined;
         message.localPath = object.localPath ?? undefined;
         message.checksumSha256 = object.checksumSha256 ?? undefined;
+        message.postDownloadTransform =
+            (object.postDownloadTransform !== undefined && object.postDownloadTransform !== null)
+                ? exports.PostDownloadTransform.fromPartial(object.postDownloadTransform)
+                : undefined;
         return message;
     },
 };
@@ -7514,6 +7790,21 @@ exports.RegisterMultiFileModelRequest = {
         return message;
     },
 };
+function bytesFromBase64(b64) {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+        arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+}
+function base64FromBytes(arr) {
+    const bin = [];
+    arr.forEach((byte) => {
+        bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+}
 function longToNumber(int64) {
     const num = globalThis.Number(int64.toString());
     if (num > globalThis.Number.MAX_SAFE_INTEGER) {

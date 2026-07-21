@@ -17,11 +17,6 @@ struct MLXSortformerCatalogFile: Equatable, Sendable {
 }
 
 /// Immutable metadata for the reviewed four-speaker Sortformer MLX bundle.
-///
-/// This is intentionally provider-local until Commons exposes an executable
-/// speaker-diarization component. Registering it as `ModelCategory.audio`
-/// today would route it through the ordinary VAD lifecycle and discard the
-/// speaker identity carried by Sortformer.
 enum MLXSortformerCatalog {
     static let modelID = "mlx-sortformer-4spk-v2.1-fp16"
     static let repository = "mlx-community/diar_streaming_sortformer_4spk-v2.1-fp16"
@@ -89,10 +84,7 @@ struct MLXSortformerOptions: Equatable, Sendable {
     var speakerCacheFrames = 188
     var fifoFrames = 188
 
-    func validate(sampleCount: Int) throws {
-        guard sampleCount > 0 else {
-            throw MLXSortformerProviderError.emptyAudio
-        }
+    func validateConfiguration() throws {
         guard sampleRate == MLXSortformerCatalog.supportedSampleRate else {
             throw MLXSortformerProviderError.unsupportedSampleRate(sampleRate)
         }
@@ -111,6 +103,13 @@ struct MLXSortformerOptions: Equatable, Sendable {
         guard speakerCacheFrames > 0, fifoFrames > 0 else {
             throw MLXSortformerProviderError.invalidStreamingCacheSize
         }
+    }
+
+    func validate(sampleCount: Int) throws {
+        guard sampleCount > 0 else {
+            throw MLXSortformerProviderError.emptyAudio
+        }
+        try validateConfiguration()
     }
 }
 
@@ -131,12 +130,26 @@ struct MLXSortformerSegment: Equatable, Sendable {
 struct MLXSortformerResult: Equatable, Sendable {
     let segments: [MLXSortformerSegment]
     let activeSpeakerCount: Int
+    let audioDurationMilliseconds: Int64
     let processingTimeMilliseconds: Int64
 
-    init(_ output: DiarizationOutput) {
+    init(_ output: DiarizationOutput, sampleCount: Int, sampleRate: Int) {
         segments = output.segments.map(MLXSortformerSegment.init)
         activeSpeakerCount = output.numSpeakers
+        audioDurationMilliseconds = Int64(sampleCount * 1_000 / sampleRate)
         processingTimeMilliseconds = Int64((output.totalTime * 1_000).rounded())
+    }
+
+    init(
+        segments: [MLXSortformerSegment],
+        sampleCount: Int,
+        sampleRate: Int,
+        processingTimeMilliseconds: Int64
+    ) {
+        self.segments = segments
+        activeSpeakerCount = Set(segments.map(\.speakerIndex)).count
+        audioDurationMilliseconds = Int64(sampleCount * 1_000 / sampleRate)
+        self.processingTimeMilliseconds = processingTimeMilliseconds
     }
 }
 
@@ -150,6 +163,7 @@ enum MLXSortformerProviderError: Error, Equatable, LocalizedError {
     case invalidStreamingCacheSize
     case missingBundleFiles([String])
     case providerBusy
+    case streamClosed
 
     var errorDescription: String? {
         switch self {
@@ -171,15 +185,132 @@ enum MLXSortformerProviderError: Error, Equatable, LocalizedError {
             return "Sortformer bundle is missing required files: \(filenames.joined(separator: ", "))."
         case .providerBusy:
             return "Sortformer is already processing an audio stream."
+        case .streamClosed:
+            return "Sortformer stream is closed."
         }
     }
 }
 
-/// Real MLX Sortformer execution plumbing shared by a future Commons bridge.
+/// One persistent Sortformer stream backed by upstream `StreamingState`.
 ///
-/// The operation gate prevents overlapping calls from mutating the upstream
-/// model concurrently. The provider returns plain, Sendable speaker segments
-/// rather than leaking MLX arrays across the bridge.
+/// Each feed supplies only the newly-arrived samples to `SortformerModel.feed`.
+/// The accumulated result is returned as a complete session snapshot, matching
+/// the Commons diarization stream contract. The state lock rejects overlapping
+/// feeds and makes close-vs-feed safe without holding a lock across `await`.
+final class MLXSortformerPersistentStream: @unchecked Sendable {
+    private struct State: @unchecked Sendable {
+        var upstream: StreamingState
+        var segments: [MLXSortformerSegment] = []
+        var totalSampleCount = 0
+        var processingTimeMilliseconds: Int64 = 0
+        var feedInFlight = false
+        var closed = false
+        var providerLeaseReleased = false
+    }
+
+    private let model: SortformerModel
+    private let options: MLXSortformerOptions
+    private let onClose: @Sendable () -> Void
+    private let state: OSAllocatedUnfairLock<State>
+
+    init(
+        model: SortformerModel,
+        options: MLXSortformerOptions,
+        upstream: StreamingState,
+        onClose: @escaping @Sendable () -> Void
+    ) {
+        self.model = model
+        self.options = options
+        self.onClose = onClose
+        state = OSAllocatedUnfairLock(initialState: State(upstream: upstream))
+    }
+
+    deinit {
+        close()
+    }
+
+    func feed(samples: [Float]) async throws -> MLXSortformerResult {
+        guard !samples.isEmpty else { return try flush() }
+        let upstream = try state.withLock { current -> StreamingState in
+            guard !current.closed else { throw MLXSortformerProviderError.streamClosed }
+            guard !current.feedInFlight else { throw MLXSortformerProviderError.providerBusy }
+            current.feedInFlight = true
+            return current.upstream
+        }
+
+        let started = Date()
+        do {
+            let (output, nextState) = try await model.feed(
+                chunk: MLXArray(samples),
+                state: upstream,
+                sampleRate: options.sampleRate,
+                threshold: options.threshold,
+                minDuration: options.minimumDuration,
+                mergeGap: options.mergeGap,
+                spkcacheMax: options.speakerCacheFrames,
+                fifoMax: options.fifoFrames
+            )
+            try Task.checkCancellation()
+            let elapsed = max(0, Int64(Date().timeIntervalSince(started) * 1_000))
+            let result = try state.withLock { current -> MLXSortformerResult in
+                defer { current.feedInFlight = false }
+                guard !current.closed else { throw MLXSortformerProviderError.streamClosed }
+                current.upstream = nextState
+                current.segments.append(contentsOf: output.segments.map(MLXSortformerSegment.init))
+                current.totalSampleCount += samples.count
+                current.processingTimeMilliseconds += elapsed
+                return Self.snapshot(current, sampleRate: options.sampleRate)
+            }
+            releaseProviderLeaseIfNeeded()
+            return result
+        } catch {
+            state.withLock { $0.feedInFlight = false }
+            releaseProviderLeaseIfNeeded()
+            throw error
+        }
+    }
+
+    func flush() throws -> MLXSortformerResult {
+        try state.withLock { current in
+            guard !current.closed else { throw MLXSortformerProviderError.streamClosed }
+            guard !current.feedInFlight else { throw MLXSortformerProviderError.providerBusy }
+            return Self.snapshot(current, sampleRate: options.sampleRate)
+        }
+    }
+
+    func close() {
+        state.withLock { $0.closed = true }
+        releaseProviderLeaseIfNeeded()
+    }
+
+    private func releaseProviderLeaseIfNeeded() {
+        let shouldRelease = state.withLock { current -> Bool in
+            guard current.closed, !current.feedInFlight, !current.providerLeaseReleased else {
+                return false
+            }
+            current.providerLeaseReleased = true
+            return true
+        }
+        if shouldRelease {
+            onClose()
+        }
+    }
+
+    private static func snapshot(_ state: State, sampleRate: Int) -> MLXSortformerResult {
+        MLXSortformerResult(
+            segments: state.segments,
+            sampleCount: state.totalSampleCount,
+            sampleRate: sampleRate,
+            processingTimeMilliseconds: state.processingTimeMilliseconds
+        )
+    }
+}
+
+/// Real MLX Sortformer execution plumbing shared by the Commons callback bridge.
+///
+/// One exclusive operation is admitted at a time. A persistent stream retains
+/// its lease until `close()`, so offline inference cannot mutate the same MLX
+/// model between feeds.
 final class MLXSortformerProvider: @unchecked Sendable {
     private let model: SortformerModel
     private let operationState = OSAllocatedUnfairLock(initialState: false)
@@ -203,33 +334,46 @@ final class MLXSortformerProvider: @unchecked Sendable {
             minDuration: options.minimumDuration,
             mergeGap: options.mergeGap
         )
-        return MLXSortformerResult(output)
+        return MLXSortformerResult(
+            output,
+            sampleCount: samples.count,
+            sampleRate: options.sampleRate
+        )
     }
 
+    func makePersistentStream(
+        options: MLXSortformerOptions = MLXSortformerOptions()
+    ) throws -> MLXSortformerPersistentStream {
+        try options.validateConfiguration()
+        try beginOperation()
+        return MLXSortformerPersistentStream(
+            model: model,
+            options: options,
+            upstream: model.initStreamingState(),
+            onClose: { [weak self] in self?.finishOperation() }
+        )
+    }
+
+    /// Convenience whole-buffer adapter implemented in terms of the real
+    /// persistent `initStreamingState` + `feed(chunk:state:)` path.
     func diarizeStream(
         samples: [Float],
         options: MLXSortformerOptions = MLXSortformerOptions()
     ) throws -> AsyncThrowingStream<MLXSortformerResult, Error> {
         try options.validate(sampleCount: samples.count)
-        try beginOperation()
-        let upstream = model.generateStream(
-            audio: MLXArray(samples),
-            sampleRate: options.sampleRate,
-            chunkDuration: options.chunkDuration,
-            threshold: options.threshold,
-            minDuration: options.minimumDuration,
-            mergeGap: options.mergeGap,
-            spkcacheMax: options.speakerCacheFrames,
-            fifoMax: options.fifoFrames
-        )
+        let stream = try makePersistentStream(options: options)
 
         return AsyncThrowingStream { continuation in
             let producer = Task {
-                defer { self.finishOperation() }
+                defer { stream.close() }
                 do {
-                    for try await output in upstream {
+                    let chunkSize = max(1, Int(options.chunkDuration * Float(options.sampleRate)))
+                    var offset = 0
+                    while offset < samples.count {
                         try Task.checkCancellation()
-                        continuation.yield(MLXSortformerResult(output))
+                        let end = min(samples.count, offset + chunkSize)
+                        continuation.yield(try await stream.feed(samples: Array(samples[offset..<end])))
+                        offset = end
                     }
                     try Task.checkCancellation()
                     continuation.finish()

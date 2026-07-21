@@ -104,7 +104,7 @@ scripts/build-windows.bat
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Plugin Registry  (src/plugin/)                                 │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 4u)    │
+│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 7u)    │
 │  Priority order: highest-priority plugin per primitive wins, no  │
 │  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
 │  dynamic (rac_registry_load_plugin / dlopen).                    │
@@ -132,9 +132,9 @@ Every AI capability follows the same two-layer design:
 - **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Unified Plugin ABI (v4)
+### Unified Plugin ABI (v7)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with slots for 7 primitives (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 9 active primitive slots plus 8 reserved slots (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
@@ -145,8 +145,10 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
+| `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | backend-provided |
+| `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | backend-provided |
 
-NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, is retired — no backend implemented it — which is why the ABI is now v4.)
+NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, was retired in ABI v4 and remains retired.)
 
 ### Platform Adapter Inversion-of-Control
 
