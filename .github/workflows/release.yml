@@ -45,6 +45,9 @@ env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
   SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
   BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+  # Staging backend base URL baked the same way — lets environment=staging run
+  # keyless with no explicit URL (see rac_dev_config_get_staging_base_url).
+  STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
 
 jobs:
 
