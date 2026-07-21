@@ -14,7 +14,6 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.system.Os
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,14 +34,12 @@ import java.nio.ByteBuffer
 
 /**
  * Drives semantic image segmentation (SegFormer) through the canonical
- * `RunAnywhere.segment` facade. Pure platform plumbing: pixel packing, EULA
- * signalling, SDK model lifecycle, and the segment call. All inference and
- * model routing live in the SDK / C++ commons.
+ * `RunAnywhere.segment` facade. Pure platform plumbing: pixel packing, SDK
+ * model lifecycle, and the segment call. All inference and model routing live
+ * in the SDK / C++ commons.
  */
 class SegmentationViewModel(application: Application) : AndroidViewModel(application) {
 
-    var licenseAccepted by mutableStateOf(false)
-        private set
     var isModelLoaded by mutableStateOf(false)
         private set
     var loadedModelId by mutableStateOf<String?>(null)
@@ -82,30 +79,10 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
     }
 
     /**
-     * Accept the SegFormer noncommercial license for this process. The native
-     * ONNX provider reads [LICENSE_ENV] via getenv when the model is loaded, so
-     * acceptance must precede [importAndLoadModel].
-     */
-    fun acceptLicense() {
-        runCatching { Os.setenv(LICENSE_ENV, "1", true) }
-            .onFailure {
-                error = "Could not accept the license: ${it.message}"
-                return
-            }
-        licenseAccepted = true
-        error = null
-        status = "License accepted. Load a SegFormer model to continue."
-    }
-
-    /**
      * Stage the user-picked SegFormer bundle files into app storage, then import
      * and load them under the semantic-segmentation category.
      */
     fun importAndLoadModel(uris: List<Uri>) {
-        if (!licenseAccepted) {
-            error = "Accept the SegFormer license first."
-            return
-        }
         if (uris.isEmpty()) return
         viewModelScope.launch {
             isImportingModel = true
@@ -166,7 +143,6 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun runSegmentation() {
-        if (!licenseAccepted) { error = "Accept the SegFormer license first."; return }
         if (!isModelLoaded) { error = "Load a segmentation model first."; return }
         val pixels = sourcePixels
         if (pixels == null) { error = "Pick an image first."; return }
@@ -261,7 +237,6 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
 
     private companion object {
         const val TAG = "SegmentationVM"
-        const val LICENSE_ENV = "RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE"
         const val MAX_DIMENSION = 1024
     }
 }

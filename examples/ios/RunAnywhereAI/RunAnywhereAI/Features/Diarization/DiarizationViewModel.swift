@@ -4,10 +4,10 @@
 //
 //  Standalone speaker diarization over the canonical `RunAnywhere.diarize` facade.
 //
-//  This view model is pure platform plumbing: it accepts the NVIDIA Open Model
-//  License gate, downloads + loads the cataloged Sortformer model through the SDK
-//  lifecycle, captures microphone audio, and calls `RunAnywhere.diarize`. All
-//  inference and model routing live in the SDK / C++ commons.
+//  This view model is pure platform plumbing: it downloads + loads the cataloged
+//  Sortformer model through the SDK lifecycle, captures microphone audio, and
+//  calls `RunAnywhere.diarize`. All inference and model routing live in the SDK
+//  / C++ commons.
 //
 
 import Combine
@@ -19,9 +19,6 @@ import os.log
 @MainActor
 @Observable
 final class DiarizationViewModel {
-    // License gate
-    private(set) var licenseAccepted = false
-
     // Model lifecycle
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
@@ -48,10 +45,6 @@ final class DiarizationViewModel {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Diarization")
 
-    /// The env var the native ONNX Sortformer provider reads (getenv) to gate
-    /// loading the NVIDIA Open Model License weights. Setting it is harmless for
-    /// the MLX path and mirrors the segmentation license contract.
-    private static let licenseEnvVar = "RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE"
     /// Cataloged NVIDIA Streaming Sortformer 4-speaker v2.1 FP16 (MLX).
     private static let catalogModelID = "mlx-sortformer-4spk-v2.1-fp16"
 
@@ -63,25 +56,11 @@ final class DiarizationViewModel {
         isModelLoaded = RunAnywhere.currentModel(request).found
     }
 
-    // MARK: - License
-
-    /// Accept the NVIDIA Sortformer Open Model License for this process.
-    func acceptLicense() {
-        setenv(Self.licenseEnvVar, "1", 1)
-        licenseAccepted = true
-        error = nil
-        statusMessage = "License accepted. Download the Sortformer model to continue."
-    }
-
     // MARK: - Model supply (cataloged, downloaded on demand)
 
     /// Download (if needed) and load the cataloged Sortformer model under the
     /// `.speakerDiarization` category through the canonical SDK lifecycle.
     func prepareModel() async {
-        guard licenseAccepted else {
-            error = "Accept the Sortformer license first."
-            return
-        }
         isPreparingModel = true
         error = nil
         defer { isPreparingModel = false }

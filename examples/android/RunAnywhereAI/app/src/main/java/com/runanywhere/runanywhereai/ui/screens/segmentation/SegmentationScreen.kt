@@ -20,7 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,10 +36,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 
 /**
- * Semantic image segmentation (SegFormer) UI. Pure SwiftUI-style Compose: EULA
- * gate, user-supplied model import, image picker, and mask rendering. No
- * inference or model logic lives here — everything routes through
- * [SegmentationViewModel] into the SDK facade.
+ * Semantic image segmentation (SegFormer) UI. Pure SwiftUI-style Compose:
+ * user-supplied model import, image picker, and mask rendering. No inference or
+ * model logic lives here — everything routes through [SegmentationViewModel]
+ * into the SDK facade.
  */
 @Composable
 fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
@@ -83,7 +82,6 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             fontWeight = FontWeight.SemiBold,
         )
 
-        licenseCard(viewModel)
         modelCard(viewModel) { modelPicker.launch(arrayOf("*/*")) }
         imageCard(viewModel) { imagePicker.launch("image/*") }
 
@@ -103,37 +101,6 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
                 text = viewModel.status,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun licenseCard(viewModel: SegmentationViewModel) {
-    Card {
-        val dimens = LocalDimens.current
-        Text("Model license", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "SegFormer segmentation weights are released for noncommercial research / evaluation only. " +
-                "The SDK will not load them until you accept the pinned upstream terms. Acceptance applies " +
-                "to this app session and does not download any model.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "I accept the NVIDIA SegFormer noncommercial license.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Switch(
-                checked = viewModel.licenseAccepted,
-                onCheckedChange = { if (it) viewModel.acceptLicense() },
-                enabled = !viewModel.licenseAccepted,
             )
         }
     }
@@ -163,7 +130,7 @@ private fun modelCard(viewModel: SegmentationViewModel, onPickModel: () -> Unit)
         )
         Button(
             onClick = onPickModel,
-            enabled = viewModel.licenseAccepted && !viewModel.isImportingModel,
+            enabled = !viewModel.isImportingModel,
         ) {
             if (viewModel.isImportingModel) {
                 CircularProgressIndicator(modifier = Modifier.height(18.dp))
@@ -224,13 +191,12 @@ private fun imageCard(viewModel: SegmentationViewModel, onPickImage: () -> Unit)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-            OutlinedButton(onClick = onPickImage, enabled = viewModel.licenseAccepted) {
+            OutlinedButton(onClick = onPickImage) {
                 Text(if (viewModel.sourceBitmap == null) "Pick image…" else "Change image…")
             }
             Button(
                 onClick = { viewModel.runSegmentation() },
-                enabled = viewModel.licenseAccepted &&
-                    viewModel.isModelLoaded &&
+                enabled = viewModel.isModelLoaded &&
                     viewModel.sourceBitmap != null &&
                     !viewModel.isSegmenting,
             ) {

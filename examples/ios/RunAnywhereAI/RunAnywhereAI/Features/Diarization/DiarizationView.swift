@@ -3,8 +3,8 @@
 //  RunAnywhereAI
 //
 //  UI for standalone speaker diarization (NVIDIA Sortformer) over
-//  `RunAnywhere.diarize`. Pure SwiftUI: license gate, cataloged-model download +
-//  load, microphone capture, and a speaker-segment list — no inference or model
+//  `RunAnywhere.diarize`. Pure SwiftUI: cataloged-model download + load,
+//  microphone capture, and a speaker-segment list — no inference or model
 //  logic lives here.
 //
 
@@ -17,7 +17,6 @@ struct DiarizationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                licenseCard
                 modelCard
                 audioCard
                 if !viewModel.segments.isEmpty {
@@ -40,30 +39,6 @@ struct DiarizationView: View {
         #endif
         .task { viewModel.refreshModelStatus() }
         .onDisappear { viewModel.cleanup() }
-    }
-
-    // MARK: - License
-
-    private var licenseCard: some View {
-        card {
-            Text("Model license")
-                .font(AppTypography.subheadlineMedium)
-                .foregroundColor(AppColors.textPrimary)
-            Text("NVIDIA Streaming Sortformer diarization weights are released under the NVIDIA Open Model License. The SDK will not load them until you accept the pinned upstream terms. Acceptance applies to this app session and does not download any model.")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.textSecondary)
-            Link("Sortformer model card",
-                 destination: URL(string: "https://huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2.1")!)
-                .font(AppTypography.caption)
-            Toggle(isOn: Binding(
-                get: { viewModel.licenseAccepted },
-                set: { if $0 { viewModel.acceptLicense() } }
-            )) {
-                Text("I have read and accept the NVIDIA Sortformer Open Model License.")
-                    .font(AppTypography.caption)
-            }
-            .disabled(viewModel.licenseAccepted)
-        }
     }
 
     // MARK: - Model
@@ -91,7 +66,7 @@ struct DiarizationView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.licenseAccepted || viewModel.isPreparingModel)
+            .disabled(viewModel.isPreparingModel)
         }
     }
 

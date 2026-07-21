@@ -11,7 +11,6 @@ import ai.runanywhere.proto.v1.ModelLoadRequest
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.system.Os
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,14 +32,12 @@ import java.io.File
 
 /**
  * Drives standalone speaker diarization (NVIDIA Sortformer) through the canonical
- * `RunAnywhere.diarize` facade. Pure platform plumbing: EULA signalling, SDK model
- * lifecycle, microphone capture, and the diarize call. All inference and model
- * routing live in the SDK / C++ commons.
+ * `RunAnywhere.diarize` facade. Pure platform plumbing: SDK model lifecycle,
+ * microphone capture, and the diarize call. All inference and model routing live
+ * in the SDK / C++ commons.
  */
 class DiarizationViewModel(application: Application) : AndroidViewModel(application) {
 
-    var licenseAccepted by mutableStateOf(false)
-        private set
     var isModelLoaded by mutableStateOf(false)
         private set
     var loadedModelId by mutableStateOf<String?>(null)
@@ -83,30 +80,10 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     /**
-     * Accept the NVIDIA Sortformer license for this process. The native ONNX
-     * provider reads [LICENSE_ENV] via getenv when the model is loaded, so
-     * acceptance must precede [importAndLoadModel].
-     */
-    fun acceptLicense() {
-        runCatching { Os.setenv(LICENSE_ENV, "1", true) }
-            .onFailure {
-                error = "Could not accept the license: ${it.message}"
-                return
-            }
-        licenseAccepted = true
-        error = null
-        status = "License accepted. Load a Sortformer model to continue."
-    }
-
-    /**
      * Stage the user-picked Sortformer bundle files into app storage, then import
      * and load them under the speaker-diarization category.
      */
     fun importAndLoadModel(uris: List<Uri>) {
-        if (!licenseAccepted) {
-            error = "Accept the Sortformer license first."
-            return
-        }
         if (uris.isEmpty()) return
         viewModelScope.launch {
             isImportingModel = true
@@ -274,7 +251,6 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
 
     private companion object {
         const val TAG = "DiarizationVM"
-        const val LICENSE_ENV = "RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE"
         const val MIN_BYTES = 16000
     }
 }

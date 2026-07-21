@@ -59,9 +59,6 @@ using runanywhere::runtime::onnxrt::TensorInput;
 using runanywhere::runtime::onnxrt::TensorOutput;
 
 constexpr const char* kLogCategory = "Diarization.ONNX";
-// Mirrors the segmentation provider's NVIDIA-license acceptance gate. Sortformer
-// ships under the NVIDIA Open Model License.
-constexpr const char* kLicenseAcceptanceEnv = "RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE";
 constexpr const char* kModelId = "diar_streaming_sortformer_4spk-v2.1-onnx";
 constexpr const char* kModelFileName = "diar_streaming_sortformer_4spk-v2.1.onnx";
 
@@ -103,13 +100,6 @@ constexpr size_t kMaxIndex = 99999;
 // Median smoothing window applied to per-frame probabilities before
 // binarization (parakeet-rs default). Must be odd.
 constexpr size_t kMedianWindow = 11;
-
-bool accepted_license() {
-    const char* value = std::getenv(kLicenseAcceptanceEnv);
-    return value && (std::strcmp(value, "1") == 0 || std::strcmp(value, "true") == 0 ||
-                     std::strcmp(value, "TRUE") == 0 || std::strcmp(value, "yes") == 0 ||
-                     std::strcmp(value, "YES") == 0);
-}
 
 char* duplicate_string(const std::string& value) {
     char* copy = static_cast<char*>(std::malloc(value.size() + 1));
@@ -464,13 +454,6 @@ class ONNXDiarizationProvider::Impl {
 // ---------------------------------------------------------------------------
 rac_result_t ONNXDiarizationProvider::Impl::initialize(const std::string& model_path) {
     try {
-        if (!accepted_license()) {
-            RAC_LOG_WARNING(kLogCategory,
-                            "Sortformer load requires %s=1 after reviewing the NVIDIA Open Model "
-                            "License",
-                            kLicenseAcceptanceEnv);
-            return RAC_ERROR_PERMISSION_DENIED;
-        }
         std::filesystem::path supplied(model_path);
         std::filesystem::path onnx_path;
         std::error_code ec;

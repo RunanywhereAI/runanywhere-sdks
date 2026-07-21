@@ -49,21 +49,7 @@ int g_failures = 0;
         }                                                                            \
     } while (0)
 
-constexpr const char* kLicenseEnv = "RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE";
-
 const rac_segmentation_service_ops_t* fixture_segmentation_ops();
-
-void set_license_acceptance(bool accepted) {
-#if defined(_WIN32)
-    _putenv_s(kLicenseEnv, accepted ? "1" : "");
-#else
-    if (accepted) {
-        setenv(kLicenseEnv, "1", 1);
-    } else {
-        unsetenv(kLicenseEnv);
-    }
-#endif
-}
 
 rac_engine_vtable_t make_fixture_vtable() {
     static const uint32_t kFormats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_ONNX)};
@@ -289,16 +275,10 @@ int main() {
     rac_handle_t component = nullptr;
     CHECK(rac_segmentation_component_create(&component) == RAC_SUCCESS && component != nullptr,
           "segmentation component creates");
-    set_license_acceptance(false);
-    CHECK(rac_segmentation_component_load_model(component, RAC_SEGMENTATION_FIXTURE_DIR,
-                                                "fixture-segformer",
-                                                "Fixture SegFormer") == RAC_ERROR_PERMISSION_DENIED,
-          "NVIDIA noncommercial license acceptance is explicit");
-    set_license_acceptance(true);
     CHECK(rac_segmentation_component_load_model(component, RAC_SEGMENTATION_FIXTURE_DIR,
                                                 "fixture-segformer",
                                                 "Fixture SegFormer") == RAC_SUCCESS,
-          "real tiny ONNX fixture loads through Commons lifecycle");
+          "real tiny ONNX fixture loads through Commons lifecycle without a license gate");
     CHECK(rac_segmentation_component_is_loaded(component) == RAC_TRUE,
           "component reports loaded state");
 
@@ -481,7 +461,6 @@ int main() {
 
     CHECK(rac_plugin_unregister("onnx-segmentation-fixture") == RAC_SUCCESS,
           "fixture plugin unregisters");
-    set_license_acceptance(false);
     std::fprintf(stdout, "\n%d checks, %d failed\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 }

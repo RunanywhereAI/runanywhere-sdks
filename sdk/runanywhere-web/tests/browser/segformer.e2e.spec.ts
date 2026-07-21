@@ -8,8 +8,8 @@
  *   npx playwright test tests/browser/segformer.e2e.spec.ts
  *
  * The bundle is never checked in, downloaded, or cataloged by this test. The
- * application-level ONNX registration flag is the browser equivalent of the
- * native RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE environment gate.
+ * SegFormer weights are user-supplied and gated at the source (HuggingFace
+ * gated repo + the existing HF token flow); there is no in-app license gate.
  */
 import { expect, test } from '@playwright/test';
 import { existsSync } from 'node:fs';
@@ -59,7 +59,7 @@ test.describe('SegFormer browser WASM', () => {
   test('matches the pinned native mask oracle through the public API', async ({ page }) => {
     test.skip(
       process.env.RA_RUN_SEGFORMER_E2E !== '1',
-      'Set RA_RUN_SEGFORMER_E2E=1 only after accepting the pinned NVIDIA license.',
+      'Set RA_RUN_SEGFORMER_E2E=1 with a user-supplied SegFormer bundle to run this.',
     );
 
     for (const filename of FILES) {
@@ -97,7 +97,7 @@ test.describe('SegFormer browser WASM', () => {
           import(/* @vite-ignore */ modelTypesPath),
           import(/* @vite-ignore */ segmentationPath),
         ]);
-        await ONNX.register({ acceptNvidiaSegformerNoncommercialLicense: true });
+        await ONNX.register();
 
         const module = internal.getModuleForCapability('segmentation') as {
           FS?: {

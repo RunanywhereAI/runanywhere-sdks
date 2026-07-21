@@ -20,16 +20,8 @@
 
 namespace {
 
-constexpr const char* kLicenseEnv = "RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE";
 constexpr const char* kExpectedMaskSha256 =
     "fd68d059416df80f316c61292dd32e3ea5d7e90b17e568c8eb40f0cf0db317e7";
-
-bool accepted_license() {
-    const char* value = std::getenv(kLicenseEnv);
-    return value && (std::strcmp(value, "1") == 0 || std::strcmp(value, "true") == 0 ||
-                     std::strcmp(value, "TRUE") == 0 || std::strcmp(value, "yes") == 0 ||
-                     std::strcmp(value, "YES") == 0);
-}
 
 std::vector<uint8_t> make_oracle_rgb() {
     constexpr uint32_t kWidth = 37;
@@ -55,12 +47,6 @@ int main() {
                      "SKIP: set RAC_SEGFORMER_MODEL_DIR to the pinned Optimum ONNX bundle\n");
         return 77;
     }
-    if (!accepted_license()) {
-        std::fprintf(stdout, "SKIP: exact NVIDIA model requires explicit %s=1 license acceptance\n",
-                     kLicenseEnv);
-        return 77;
-    }
-
     const rac_engine_vtable_t* vtable = rac_plugin_entry_onnx();
     if (!vtable || rac_plugin_register(vtable) != RAC_SUCCESS) {
         std::fprintf(stderr, "FAIL: production ONNX plugin registration\n");

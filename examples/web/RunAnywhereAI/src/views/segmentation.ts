@@ -2,25 +2,21 @@
  * Segmentation Tab — semantic image segmentation over the canonical
  * `RunAnywhere.segment` facade (SegFormer / ADE20K-class models).
  *
- * The segmentation model is usage-license-gated (an EULA, not HF auth): the
- * ONNX Web backend refuses to load segmentation weights unless the app has
- * explicitly accepted the NVIDIA SegFormer noncommercial research license for
- * this browser session. This view therefore:
+ * The SegFormer weights are user-supplied and gated at the source (HuggingFace
+ * gated repo + the existing HF token flow); there is no in-app license
+ * acceptance step. This view therefore:
  *
- *   1. Renders the license text + an acceptance toggle. Accepting calls the
- *      documented SDK facade `ONNX.register({ acceptNvidiaSegformerNoncommercialLicense: true })`
- *      — no app-side bridging into the backend package internals.
- *   2. Reports the SDK-owned lifecycle state for a loaded
+ *   1. Reports the SDK-owned lifecycle state for a loaded
  *      `.semanticSegmentation` model. The SegFormer weights are user-supplied
  *      and uncataloged, so model supply/load is delegated to the SDK's model
  *      management (the shared model sheet) rather than reimplemented here.
- *   3. Accepts a user-picked image, decodes it to tightly-packed RGBA8 pixels,
+ *   2. Accepts a user-picked image, decodes it to tightly-packed RGBA8 pixels,
  *      and runs `RunAnywhere.segment(request)`.
- *   4. Renders the returned diagnostic mask overlaid on the source image and a
+ *   3. Renders the returned diagnostic mask overlaid on the source image and a
  *      per-class pixel summary.
  *
- * All inference, model routing, and license enforcement live in the SDK / C++
- * commons. This view is DOM state + thin facade calls only.
+ * All inference and model routing live in the SDK / C++ commons. This view is
+ * DOM state + thin facade calls only.
  */
 
 import type { TabLifecycle } from '../app';
@@ -43,9 +39,6 @@ const SEG_PICKER_FILTER: readonly ModelCategory[] = [
 // 4096-px boundary or stall the browser while decoding to raw pixels.
 const MAX_SOURCE_DIMENSION = 1024;
 
-const LICENSE_URL =
-  'https://github.com/NVlabs/SegFormer/blob/65fa8cfa9b52b6ee7e8897a98705abf8570f9e32/LICENSE';
-
 interface LoadedImage {
   /** Tightly-packed RGBA8 pixels (width * height * 4). */
   rgba: Uint8Array;
@@ -55,8 +48,6 @@ interface LoadedImage {
 }
 
 let container: HTMLElement;
-let licenseAccepted = false;
-let licenseBusy = false;
 let image: LoadedImage | null = null;
 let lastResult: SegmentationResult | null = null;
 let status = '';
@@ -94,39 +85,21 @@ export function initSegmentationTab(el: HTMLElement): TabLifecycle {
 
 function renderView(): void {
   const modelLoaded = isSegmentationModelLoaded();
-  const canRun = licenseAccepted && modelLoaded && image !== null && !isBusy;
+  const canRun = modelLoaded && image !== null && !isBusy;
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Segmentation</div>
       <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="seg-model-btn" ${licenseAccepted ? '' : 'disabled'}>
+        <button class="btn btn-secondary" id="seg-model-btn">
           ${modelLoaded ? 'Change Model' : 'Load Segmentation Model'}
         </button>
       </div>
     </div>
     <div class="scroll-area">
       <div class="docs-section">
-        <h3>Model license</h3>
-        <p class="text-secondary">
-          Semantic-segmentation weights (NVIDIA SegFormer) are released for
-          <strong>noncommercial research / evaluation only</strong>. The SDK will not
-          load segmentation weights until you accept the pinned upstream terms:
-          <a href="${LICENSE_URL}" target="_blank" rel="noopener noreferrer">SegFormer LICENSE</a>.
-          Acceptance is per browser session and does not download any model.
-        </p>
-        <label class="form-check">
-          <input type="checkbox" id="seg-license-toggle"
-            ${licenseAccepted ? 'checked' : ''} ${licenseBusy ? 'disabled' : ''} />
-          <span>I have read and accept the NVIDIA SegFormer noncommercial license.</span>
-        </label>
-        <div id="seg-license-status" class="docs-status">${escapeHtml(licenseStatusLabel())}</div>
-      </div>
-
-      <div class="docs-section">
         <h3>Status</h3>
         <ul class="feature-unavailable__list">
-          <li><code>license accepted</code>: <strong>${licenseAccepted ? 'yes' : 'no'}</strong></li>
           <li><code>segmentation model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
         </ul>
         <p class="text-secondary">
@@ -140,7 +113,7 @@ function renderView(): void {
         <h3>Image</h3>
         <p class="text-secondary">Pick a photo to segment. It is decoded to tightly-packed RGBA8 pixels for the SDK.</p>
         <div class="toolbar-actions">
-          <button class="btn btn-secondary" id="seg-load-image-btn" ${licenseAccepted && !isBusy ? '' : 'disabled'}>
+          <button class="btn btn-secondary" id="seg-load-image-btn" ${!isBusy ? '' : 'disabled'}>
             Load image…
           </button>
           <input type="file" id="seg-image-input" accept="image/*" hidden />
@@ -177,11 +150,6 @@ function renderView(): void {
         filterCategories: SEG_PICKER_FILTER,
       }),
     );
-  container
-    .querySelector('#seg-license-toggle')!
-    .addEventListener('change', (event) =>
-      void onLicenseToggle(event.target as HTMLInputElement),
-    );
   const imageInput = container.querySelector<HTMLInputElement>('#seg-image-input')!;
   container
     .querySelector('#seg-load-image-btn')!
@@ -190,12 +158,6 @@ function renderView(): void {
   container
     .querySelector('#seg-run-btn')!
     .addEventListener('click', () => void onRun());
-}
-
-function licenseStatusLabel(): string {
-  if (licenseBusy) return 'Registering the ONNX backend with license acceptance…';
-  if (licenseAccepted) return 'License accepted for this session.';
-  return 'License not yet accepted — segmentation is disabled.';
 }
 
 function frameMetaLabel(): string {
@@ -223,40 +185,6 @@ function reattachResult(): void {
   if (!lastResult || !image) return;
   host.appendChild(buildOverlay(lastResult, image));
   host.appendChild(buildClassSummary(lastResult));
-}
-
-// ---------------------------------------------------------------------------
-// License
-// ---------------------------------------------------------------------------
-
-async function onLicenseToggle(input: HTMLInputElement): Promise<void> {
-  if (!input.checked) {
-    // Acceptance cannot be revoked mid-session at the backend; reflect that
-    // truthfully rather than pretend the toggle disables an already-loaded backend.
-    input.checked = licenseAccepted;
-    return;
-  }
-  licenseBusy = true;
-  setLicenseStatus('Registering the ONNX backend with license acceptance…');
-  renderView();
-  try {
-    // The ONLY app-facing way to signal license acceptance: re-register the
-    // ONNX backend with the flag. `ensureLoaded` is idempotent, so this flips
-    // the backend's license gate without re-downloading the WASM.
-    const { ONNX } = await import('@runanywhere/web-onnx');
-    await ONNX.register({
-      acceptNvidiaSegformerNoncommercialLicense: true,
-      preferBackendWorker: true,
-    });
-    licenseAccepted = true;
-    setStatus('License accepted. Load a segmentation model to continue.');
-  } catch (err) {
-    licenseAccepted = false;
-    setStatus(`Could not accept the license: ${formatError(err)}`);
-  } finally {
-    licenseBusy = false;
-    renderView();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -326,11 +254,6 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
 // ---------------------------------------------------------------------------
 
 async function onRun(): Promise<void> {
-  if (!licenseAccepted) {
-    setStatus('Accept the SegFormer license first.');
-    renderView();
-    return;
-  }
   if (!isSegmentationModelLoaded()) {
     setStatus('No segmentation model is loaded. Load one from the model picker, then re-run.');
     renderView();
@@ -455,10 +378,5 @@ function isSegmentationModelLoaded(): boolean {
 function setStatus(text: string): void {
   status = text;
   const banner = container.querySelector<HTMLDivElement>('#seg-status');
-  if (banner) banner.textContent = text;
-}
-
-function setLicenseStatus(text: string): void {
-  const banner = container.querySelector<HTMLDivElement>('#seg-license-status');
   if (banner) banner.textContent = text;
 }

@@ -3,22 +3,20 @@
  * `RunAnywhere.diarize` facade (NVIDIA Streaming Sortformer). Offline only:
  * the Web SDK exposes no `diarizeStream` verb yet.
  *
- * The Sortformer weights are released under the NVIDIA Open Model License. Like
- * the segmentation view, this view:
+ * The Sortformer weights are user-supplied and gated at the source (HuggingFace
+ * gated repo + the existing HF token flow); there is no in-app license
+ * acceptance step. This view:
  *
- *   1. Renders the license text + an acceptance toggle. Accepting registers the
- *      ONNX Web backend for this browser session through the documented facade
- *      `ONNX.register(...)` — no app-side bridging into backend internals.
- *   2. Reports the SDK-owned lifecycle state for a loaded
+ *   1. Reports the SDK-owned lifecycle state for a loaded
  *      `.speakerDiarization` model. The Sortformer weights are user-supplied and
  *      uncataloged, so model supply/load is delegated to the SDK's model
  *      management (the shared model sheet) rather than reimplemented here.
- *   3. Accepts a user-picked or recorded audio clip, decodes it to 16 kHz mono
+ *   2. Accepts a user-picked or recorded audio clip, decodes it to 16 kHz mono
  *      PCM float samples, and runs `RunAnywhere.diarize(request)`.
- *   4. Renders the returned speaker segments (start / end / speaker) as a list.
+ *   3. Renders the returned speaker segments (start / end / speaker) as a list.
  *
- * All inference, model routing, and license enforcement live in the SDK / C++
- * commons. This view is DOM state + thin facade calls only.
+ * All inference and model routing live in the SDK / C++ commons. This view is
+ * DOM state + thin facade calls only.
  */
 
 import type { TabLifecycle } from '../app';
@@ -39,9 +37,6 @@ const DIAR_PICKER_FILTER: readonly ModelCategory[] = [
 
 const SAMPLE_RATE = 16000;
 
-const LICENSE_URL =
-  'https://huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2.1';
-
 interface LoadedAudio {
   /** 16 kHz mono PCM float samples. */
   samples: Float32Array;
@@ -49,8 +44,6 @@ interface LoadedAudio {
 }
 
 let container: HTMLElement;
-let licenseAccepted = false;
-let licenseBusy = false;
 let audio: LoadedAudio | null = null;
 let lastResult: DiarizationResult | null = null;
 let status = '';
@@ -93,39 +86,21 @@ export function initDiarizationTab(el: HTMLElement): TabLifecycle {
 
 function renderView(): void {
   const modelLoaded = isDiarizationModelLoaded();
-  const canRun = licenseAccepted && modelLoaded && audio !== null && !isBusy;
+  const canRun = modelLoaded && audio !== null && !isBusy;
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Diarization</div>
       <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="diar-model-btn" ${licenseAccepted ? '' : 'disabled'}>
+        <button class="btn btn-secondary" id="diar-model-btn">
           ${modelLoaded ? 'Change Model' : 'Load Diarization Model'}
         </button>
       </div>
     </div>
     <div class="scroll-area">
       <div class="docs-section">
-        <h3>Model license</h3>
-        <p class="text-secondary">
-          Speaker-diarization weights (NVIDIA Streaming Sortformer) are released under the
-          <strong>NVIDIA Open Model License</strong>:
-          <a href="${LICENSE_URL}" target="_blank" rel="noopener noreferrer">Sortformer model card</a>.
-          Accepting registers the ONNX diarization backend for this browser session and
-          does not download any model.
-        </p>
-        <label class="form-check">
-          <input type="checkbox" id="diar-license-toggle"
-            ${licenseAccepted ? 'checked' : ''} ${licenseBusy ? 'disabled' : ''} />
-          <span>I have read and accept the NVIDIA Sortformer Open Model License.</span>
-        </label>
-        <div id="diar-license-status" class="docs-status">${escapeHtml(licenseStatusLabel())}</div>
-      </div>
-
-      <div class="docs-section">
         <h3>Status</h3>
         <ul class="feature-unavailable__list">
-          <li><code>license accepted</code>: <strong>${licenseAccepted ? 'yes' : 'no'}</strong></li>
           <li><code>diarization model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
         </ul>
         <p class="text-secondary">
@@ -142,11 +117,11 @@ function renderView(): void {
           16 kHz mono PCM float samples for the SDK.
         </p>
         <div class="toolbar-actions">
-          <button class="btn btn-secondary" id="diar-mic-btn" ${licenseAccepted && !isBusy ? '' : 'disabled'}>
+          <button class="btn btn-secondary" id="diar-mic-btn" ${!isBusy ? '' : 'disabled'}>
             ${isCapturing ? 'Stop recording' : 'Record'}
           </button>
           <input type="file" id="diar-file-input" accept="audio/*"
-            ${licenseAccepted && !isBusy && !isCapturing ? '' : 'disabled'} />
+            ${!isBusy && !isCapturing ? '' : 'disabled'} />
         </div>
         <div id="diar-audio-meta" class="docs-status">${escapeHtml(audioMetaLabel())}</div>
       </div>
@@ -179,11 +154,6 @@ function renderView(): void {
       }),
     );
   container
-    .querySelector('#diar-license-toggle')!
-    .addEventListener('change', (event) =>
-      void onLicenseToggle(event.target as HTMLInputElement),
-    );
-  container
     .querySelector('#diar-mic-btn')!
     .addEventListener('click', () => void toggleMic());
   const fileInput = container.querySelector<HTMLInputElement>('#diar-file-input')!;
@@ -191,12 +161,6 @@ function renderView(): void {
   container
     .querySelector('#diar-run-btn')!
     .addEventListener('click', () => void onRun());
-}
-
-function licenseStatusLabel(): string {
-  if (licenseBusy) return 'Registering the ONNX diarization backend…';
-  if (licenseAccepted) return 'License accepted for this session.';
-  return 'License not yet accepted — diarization is disabled.';
 }
 
 function audioMetaLabel(): string {
@@ -212,39 +176,6 @@ function reattachResult(): void {
   host.innerHTML = '';
   if (!lastResult) return;
   host.appendChild(buildSegmentSummary(lastResult));
-}
-
-// ---------------------------------------------------------------------------
-// License
-// ---------------------------------------------------------------------------
-
-async function onLicenseToggle(input: HTMLInputElement): Promise<void> {
-  if (!input.checked) {
-    // Acceptance cannot be revoked mid-session at the backend; reflect that
-    // truthfully rather than pretend the toggle disables an already-loaded backend.
-    input.checked = licenseAccepted;
-    return;
-  }
-  licenseBusy = true;
-  setLicenseStatus('Registering the ONNX diarization backend…');
-  renderView();
-  try {
-    // Bring up the ONNX diarization backend AND record the NVIDIA Sortformer
-    // license acknowledgement for this browser session. `register` is
-    // idempotent, so this is safe if ONNX is already registered (e.g. for STT).
-    // The SDK sets RAC_ACCEPT_NVIDIA_SORTFORMER_LICENSE inside the WASM;
-    // loading the (user-supplied) weights enforces it in C++ commons.
-    const { ONNX } = await import('@runanywhere/web-onnx');
-    await ONNX.register({ acceptNvidiaSortformerLicense: true });
-    licenseAccepted = true;
-    setStatus('License accepted. Load a diarization model to continue.');
-  } catch (err) {
-    licenseAccepted = false;
-    setStatus(`Could not register the diarization backend: ${formatError(err)}`);
-  } finally {
-    licenseBusy = false;
-    renderView();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -317,11 +248,6 @@ async function onAudioFileSelected(input: HTMLInputElement): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function onRun(): Promise<void> {
-  if (!licenseAccepted) {
-    setStatus('Accept the Sortformer license first.');
-    renderView();
-    return;
-  }
   if (!isDiarizationModelLoaded()) {
     setStatus('No diarization model is loaded. Load one from the model picker, then re-run.');
     renderView();
@@ -433,10 +359,5 @@ function formatMs(ms: number): string {
 function setStatus(text: string): void {
   status = text;
   const banner = container.querySelector<HTMLDivElement>('#diar-status');
-  if (banner) banner.textContent = text;
-}
-
-function setLicenseStatus(text: string): void {
-  const banner = container.querySelector<HTMLDivElement>('#diar-license-status');
   if (banner) banner.textContent = text;
 }

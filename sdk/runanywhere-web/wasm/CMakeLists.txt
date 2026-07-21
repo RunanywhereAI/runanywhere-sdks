@@ -1047,10 +1047,7 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
 )
 
 set(RAC_EXPORTED_FUNCTIONS_ONNX
-    # Browser-only explicit license acknowledgement for restricted models.
-    # ONNX.register({ acceptNvidiaSegformerNoncommercialLicense: true })
-    # calls setenv before the first SegFormer load; the native provider still
-    # owns the fail-closed getenv check used by every platform.
+    # Browser env-var support (setenv/getenv) for provider configuration.
     "_setenv"
     # Lifecycle-owned STT. These handle-less exports resolve the model loaded
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.

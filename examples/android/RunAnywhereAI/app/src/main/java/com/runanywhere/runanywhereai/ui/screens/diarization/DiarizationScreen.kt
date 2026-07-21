@@ -21,7 +21,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,7 +48,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 /**
- * Standalone speaker-diarization (NVIDIA Sortformer) UI. Pure Compose: EULA gate,
+ * Standalone speaker-diarization (NVIDIA Sortformer) UI. Pure Compose:
  * user-supplied model import, microphone capture, and a speaker-segment timeline.
  * No inference or model logic lives here — everything routes through
  * [DiarizationViewModel] into the SDK facade.
@@ -106,7 +105,6 @@ fun DiarizationScreen(viewModel: DiarizationViewModel = viewModel()) {
             fontWeight = FontWeight.SemiBold,
         )
 
-        licenseCard(viewModel)
         modelCard(viewModel) { modelPicker.launch(arrayOf("*/*")) }
         audioCard(viewModel, onRecord = ::onRecord)
 
@@ -138,37 +136,6 @@ fun DiarizationScreen(viewModel: DiarizationViewModel = viewModel()) {
 }
 
 @Composable
-private fun licenseCard(viewModel: DiarizationViewModel) {
-    Card {
-        val dimens = LocalDimens.current
-        Text("Model license", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "NVIDIA Streaming Sortformer diarization weights are released under the NVIDIA Open Model " +
-                "License. The SDK will not load them until you accept the pinned upstream terms. " +
-                "Acceptance applies to this app session and does not download any model.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "I accept the NVIDIA Sortformer Open Model License.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            Switch(
-                checked = viewModel.licenseAccepted,
-                onCheckedChange = { if (it) viewModel.acceptLicense() },
-                enabled = !viewModel.licenseAccepted,
-            )
-        }
-    }
-}
-
-@Composable
 private fun modelCard(viewModel: DiarizationViewModel, onPickModel: () -> Unit) {
     Card {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -192,7 +159,7 @@ private fun modelCard(viewModel: DiarizationViewModel, onPickModel: () -> Unit) 
         )
         Button(
             onClick = onPickModel,
-            enabled = viewModel.licenseAccepted && !viewModel.isImportingModel,
+            enabled = !viewModel.isImportingModel,
         ) {
             if (viewModel.isImportingModel) {
                 CircularProgressIndicator(modifier = Modifier.height(18.dp))

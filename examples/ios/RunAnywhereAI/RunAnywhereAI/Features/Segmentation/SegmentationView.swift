@@ -3,8 +3,8 @@
 //  RunAnywhereAI
 //
 //  UI for semantic image segmentation (SegFormer) over `RunAnywhere.segment`.
-//  Pure SwiftUI: EULA gate, model supply, image picker, and mask rendering —
-//  no inference or model logic lives here.
+//  Pure SwiftUI: model supply, image picker, and mask rendering — no inference
+//  or model logic lives here.
 //
 
 #if canImport(UIKit)
@@ -21,7 +21,6 @@ struct SegmentationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                licenseCard
                 modelCard
                 imageCard
                 if !viewModel.classSummaries.isEmpty {
@@ -68,30 +67,6 @@ struct SegmentationView: View {
         }
     }
 
-    // MARK: - License
-
-    private var licenseCard: some View {
-        card {
-            Text("Model license")
-                .font(AppTypography.subheadlineMedium)
-                .foregroundColor(AppColors.textPrimary)
-            Text("SegFormer segmentation weights are released for noncommercial research / evaluation only. The SDK will not load them until you accept the pinned upstream terms. Acceptance applies to this app session and does not download any model.")
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.textSecondary)
-            Link("SegFormer LICENSE",
-                 destination: URL(string: "https://github.com/NVlabs/SegFormer/blob/65fa8cfa9b52b6ee7e8897a98705abf8570f9e32/LICENSE")!)
-                .font(AppTypography.caption)
-            Toggle(isOn: Binding(
-                get: { viewModel.licenseAccepted },
-                set: { if $0 { viewModel.acceptLicense() } }
-            )) {
-                Text("I have read and accept the NVIDIA SegFormer noncommercial license.")
-                    .font(AppTypography.caption)
-            }
-            .disabled(viewModel.licenseAccepted)
-        }
-    }
-
     // MARK: - Model
 
     private var modelCard: some View {
@@ -117,7 +92,7 @@ struct SegmentationView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.licenseAccepted || viewModel.isImportingModel)
+            .disabled(viewModel.isImportingModel)
         }
     }
 
@@ -133,7 +108,6 @@ struct SegmentationView: View {
                 Text(viewModel.sourceImage == nil ? "Pick image…" : "Change image…")
             }
             .buttonStyle(.bordered)
-            .disabled(!viewModel.licenseAccepted)
 
             Button {
                 Task { await viewModel.runSegmentation() }
@@ -145,8 +119,7 @@ struct SegmentationView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!viewModel.licenseAccepted
-                      || !viewModel.isModelLoaded
+            .disabled(!viewModel.isModelLoaded
                       || viewModel.sourceImage == nil
                       || viewModel.isSegmenting)
         }

@@ -5,9 +5,9 @@
 //  Semantic image segmentation over the canonical `RunAnywhere.segment` facade.
 //
 //  This view model is pure platform plumbing: it converts a picked image to
-//  packed RGBA8 pixels, signals the EULA gate, drives the SDK model lifecycle,
-//  and calls `RunAnywhere.segment`. All inference, model routing, and license
-//  enforcement live in the SDK / C++ commons.
+//  packed RGBA8 pixels, drives the SDK model lifecycle, and calls
+//  `RunAnywhere.segment`. All inference and model routing live in the SDK /
+//  C++ commons.
 //
 
 #if canImport(UIKit)
@@ -20,9 +20,6 @@ import os.log
 @MainActor
 @Observable
 final class SegmentationViewModel {
-    // License gate
-    private(set) var licenseAccepted = false
-
     // Model lifecycle
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
@@ -44,11 +41,6 @@ final class SegmentationViewModel {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Segmentation")
 
-    /// The env var the native ONNX segmentation provider reads (getenv) to gate
-    /// loading the noncommercial-licensed SegFormer weights. This is the
-    /// documented acceptance contract — there is no dedicated Swift SDK facade
-    /// for it yet (Web exposes `ONNX.register({ acceptNvidiaSegformer… })`).
-    private static let licenseEnvVar = "RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE"
     private static let maxDimension = 1024
 
     // MARK: - Model status
@@ -59,27 +51,11 @@ final class SegmentationViewModel {
         isModelLoaded = RunAnywhere.currentModel(request).found
     }
 
-    // MARK: - License
-
-    /// Accept the SegFormer noncommercial license for this process. The native
-    /// provider re-reads the env var when the segmentation model is loaded, so
-    /// acceptance must precede `importAndLoadModel`.
-    func acceptLicense() {
-        setenv(Self.licenseEnvVar, "1", 1)
-        licenseAccepted = true
-        error = nil
-        statusMessage = "License accepted. Load a SegFormer model to continue."
-    }
-
     // MARK: - Model supply (user-supplied, uncataloged)
 
     /// Import a user-supplied SegFormer model directory and load it under the
     /// `.semanticSegmentation` category through the canonical SDK lifecycle.
     func importAndLoadModel(from url: URL) async {
-        guard licenseAccepted else {
-            error = "Accept the SegFormer license first."
-            return
-        }
         isImportingModel = true
         error = nil
         statusMessage = "Importing model…"
@@ -142,7 +118,6 @@ final class SegmentationViewModel {
     // MARK: - Segmentation
 
     func runSegmentation() async {
-        guard licenseAccepted else { error = "Accept the SegFormer license first."; return }
         guard isModelLoaded else { error = "Load a segmentation model first."; return }
         guard let pixels = sourcePixels else { error = "Pick an image first."; return }
 

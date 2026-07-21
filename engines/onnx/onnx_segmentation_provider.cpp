@@ -35,7 +35,6 @@ using runanywhere::runtime::onnxrt::TensorInput;
 using runanywhere::runtime::onnxrt::TensorOutput;
 
 constexpr const char* kLogCategory = "Segmentation.ONNX";
-constexpr const char* kLicenseAcceptanceEnv = "RAC_ACCEPT_NVIDIA_SEGFORMER_NONCOMMERCIAL_LICENSE";
 constexpr const char* kBundleManifestName = "runanywhere-segmentation.json";
 constexpr const char* kModelFileName = "model.onnx";
 constexpr const char* kConfigFileName = "config.json";
@@ -92,13 +91,6 @@ bool checked_mul(size_t a, size_t b, size_t* out) {
     }
     *out = a * b;
     return true;
-}
-
-bool accepted_license() {
-    const char* value = std::getenv(kLicenseAcceptanceEnv);
-    return value && (std::strcmp(value, "1") == 0 || std::strcmp(value, "true") == 0 ||
-                     std::strcmp(value, "TRUE") == 0 || std::strcmp(value, "yes") == 0 ||
-                     std::strcmp(value, "YES") == 0);
 }
 
 bool read_file(const std::filesystem::path& path, std::string* out) {
@@ -462,13 +454,6 @@ ONNXSegmentationProvider::~ONNXSegmentationProvider() = default;
 
 rac_result_t ONNXSegmentationProvider::initialize(const std::string& model_path) {
     try {
-        if (!accepted_license()) {
-            RAC_LOG_WARNING(kLogCategory,
-                            "SegFormer load requires %s=1 after reviewing the NVIDIA noncommercial "
-                            "research/evaluation license",
-                            kLicenseAcceptanceEnv);
-            return RAC_ERROR_PERMISSION_DENIED;
-        }
         std::filesystem::path supplied(model_path);
         std::filesystem::path directory =
             std::filesystem::is_directory(supplied) ? supplied : supplied.parent_path();
