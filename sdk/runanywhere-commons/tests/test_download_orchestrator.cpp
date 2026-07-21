@@ -811,6 +811,79 @@ static TestResult test_proto_plan_single_file() {
     return r;
 }
 
+static TestResult test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown() {
+    TestResult r;
+    r.test_name = "proto_plan_multifile_uses_declared_aggregate_when_head_unknown";
+
+    // The fake HEAD transport deliberately returns no Content-Length. A
+    // curated multi-file model with an exact aggregate must remain startable
+    // even when legacy descriptors do not carry their per-file sizes.
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_multifile_aggregate");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    constexpr int64_t kCanaryBundleBytes = 207170046;
+    rav1::DownloadPlanRequest request;
+    request.set_model_id("canary-aggregate-fallback");
+    request.set_available_storage_bytes(1LL << 30);  // 1 GiB
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(request.model_id());
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_SHERPA);
+    model->set_format(rav1::MODEL_FORMAT_ONNX);
+
+    for (const char* filename : {"encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"}) {
+        rav1::ModelFileDescriptor* file = model->mutable_multi_file()->add_files();
+        file->set_url(std::string("http://fake/no-content-length/") + filename);
+        file->set_filename(filename);
+        file->set_is_required(true);
+    }
+
+    std::string unknown_bytes = serialize_msg(request);
+    rac_proto_buffer_t unknown_buffer;
+    rac_proto_buffer_init(&unknown_buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(unknown_bytes.data()),
+                                        unknown_bytes.size(), &unknown_buffer) == RAC_SUCCESS,
+                "Unknown-size plan call should return a result proto");
+    rav1::DownloadPlanResult unknown_plan;
+    ASSERT_TRUE(parse_plan(unknown_buffer, &unknown_plan), "Unknown-size plan should parse");
+    rac_proto_buffer_free(&unknown_buffer);
+    ASSERT_TRUE(!unknown_plan.can_start(), "Missing per-file and aggregate sizes must fail closed");
+    ASSERT_TRUE(unknown_plan.total_bytes() == 0, "Unknown-size plan must not invent a total");
+
+    model->set_download_size_bytes(kCanaryBundleBytes);
+    std::string bytes = serialize_msg(request);
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), &buffer) == RAC_SUCCESS,
+                "Plan call should return a result proto");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+    rac_proto_buffer_free(&buffer);
+
+    ASSERT_TRUE(plan.can_start(), "Declared aggregate should keep the multi-file plan startable");
+    ASSERT_TRUE(plan.total_bytes() == kCanaryBundleBytes,
+                "Plan should use the model's declared aggregate size");
+    ASSERT_TRUE(plan.files_size() == 3, "Plan should preserve every file");
+    for (const auto& file : plan.files()) {
+        ASSERT_TRUE(file.expected_bytes() == 0,
+                    "Aggregate fallback must not invent a per-file expected size");
+    }
+    bool aggregate_warning = false;
+    for (const auto& warning : plan.warnings()) {
+        aggregate_warning = aggregate_warning ||
+                            warning.find("using model download_size_bytes") != std::string::npos;
+    }
+    ASSERT_TRUE(aggregate_warning, "Plan should disclose the aggregate-size fallback");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_plan_invalid_url() {
     TestResult r;
     r.test_name = "proto_plan_invalid_url";
@@ -1582,6 +1655,8 @@ int main(int argc, char** argv) {
 #ifdef RAC_HAVE_PROTOBUF
         // proto-byte workflow ABI
         suite.add("proto_plan_single_file", test_proto_plan_single_file);
+        suite.add("proto_plan_multifile_uses_declared_aggregate_when_head_unknown",
+                  test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown);
         suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
         suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
         suite.add("proto_plan_self_heals_oversized_existing_bytes",

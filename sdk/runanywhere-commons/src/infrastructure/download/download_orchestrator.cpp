@@ -3014,8 +3014,25 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     }
 
     if (!all_sizes_known) {
-        total_bytes = 0;
-        result.add_warnings("one or more file sizes are unknown");
+        // A curated multi-file registration can carry an exact aggregate
+        // download_size_bytes even when an older persisted descriptor has no
+        // per-file size. Treat that aggregate as the storage-planning bound
+        // when every known descriptor fits inside it and leaves a positive
+        // byte budget for the unknown files. This keeps planning
+        // deterministic when a transient HEAD request omits Content-Length,
+        // while preserving per-file expected_bytes == 0 (and therefore never
+        // applying a made-up per-file size/checksum guard).
+        const int64_t declared_total_bytes = model.download_size_bytes();
+        if (declared_total_bytes > total_bytes) {
+            total_bytes = declared_total_bytes;
+            unsized_nonarchive_file = false;
+            result.add_warnings(
+                "one or more per-file sizes are unknown; using model download_size_bytes for "
+                "storage planning");
+        } else {
+            total_bytes = 0;
+            result.add_warnings("one or more file sizes are unknown");
+        }
     }
 
     int64_t resume_from = 0;

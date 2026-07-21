@@ -55,6 +55,8 @@ class ModelCatalogTest {
             assertEquals(pinAndSize.second, model.memoryBytes)
             assertTrue(model.files.isNotEmpty())
             assertTrue(model.files.all { it.url.contains("/resolve/${pinAndSize.first}/") })
+            assertTrue(model.files.all { (it.sizeBytes ?: 0) > 0 })
+            assertEquals(pinAndSize.second, model.files.sumOf { it.sizeBytes ?: 0 })
             assertTrue(model.files.any { it.filename == "tokens.txt" })
         }
     }

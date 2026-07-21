@@ -20,7 +20,11 @@ internal sealed interface CatalogModel {
     suspend fun register(): ModelInfo?
 }
 
-internal data class ModelFile(val url: String, val filename: String)
+internal data class ModelFile(
+    val url: String,
+    val filename: String,
+    val sizeBytes: Long? = null,
+)
 
 internal data class SingleFileModel(
     override val id: String,
@@ -121,6 +125,7 @@ internal data class MultiFileModel(
                 url = file.url,
                 filename = file.filename,
                 is_required = true,
+                size_bytes = file.sizeBytes,
                 role = if (idx == 0) {
                     ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
                 } else {

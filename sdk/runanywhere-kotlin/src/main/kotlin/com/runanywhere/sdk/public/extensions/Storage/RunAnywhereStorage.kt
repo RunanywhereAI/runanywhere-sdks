@@ -180,6 +180,11 @@ suspend fun RunAnywhere.registerModel(
             framework = framework,
             category = modality,
             memory_required_bytes = memoryRequirement,
+            // Swift parity: curated catalogs use this value as the exact
+            // aggregate download size. Commons can then keep the storage gate
+            // deterministic even if a legacy per-file descriptor lacks a size
+            // and the remote HEAD response omits Content-Length.
+            download_size_bytes = memoryRequirement,
             context_length = contextLength,
             supports_thinking = if (supportsThinking) true else null,
             source = source,
