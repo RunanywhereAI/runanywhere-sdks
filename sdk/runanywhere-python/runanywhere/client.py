@@ -89,6 +89,15 @@ class RunAnywhere:
         """The bundled commons/runtime version (requires initialize())."""
         return self._require_core().version()
 
+    def available_backends(self) -> list[str]:
+        """The engine backends compiled into this build, e.g. ``['llamacpp', 'onnx', 'sherpa']``.
+
+        Does not require :meth:`initialize` — it reflects the wheel's build config. The plugin
+        registry auto-selects the highest-priority registered backend for each modality, so an
+        NPU-enabled build reports ``'qhexrt'`` here and ``load_llm`` routes to it automatically.
+        """
+        return list(_native.get_core().backends())
+
     @property
     def is_initialized(self) -> bool:
         """True once this client has completed :meth:`initialize` (and not shut down)."""
