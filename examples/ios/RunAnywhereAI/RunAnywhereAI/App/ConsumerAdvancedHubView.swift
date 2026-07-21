@@ -39,6 +39,19 @@ struct ConsumerAdvancedHubView: View {
                 }
             }
 
+            #if canImport(UIKit)
+            Section("Vision Utilities") {
+                NavigationLink(destination: SegmentationView()) {
+                    AdvancedFeatureRow(
+                        icon: "square.stack.3d.up",
+                        color: AppColors.primaryAccent,
+                        title: "Segmentation",
+                        subtitle: "Semantic image segmentation (SegFormer)"
+                    )
+                }
+            }
+            #endif
+
             Section {
                 NavigationLink(destination: BenchmarkDashboardView()) {
                     AdvancedFeatureRow(
