@@ -242,8 +242,10 @@ export const RunAnywhere = {
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
           : '';
+        // Keyless staging is valid: commons overrides the base URL with the
+        // baked staging backend and requests go out unauthenticated
+        // (PUBLIC-org ingestion). Only production demands credentials.
         const requiresCredentials =
-          environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
           environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
         if (
           !isUsableHTTPURL(effectiveBaseURL, {

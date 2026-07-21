@@ -393,9 +393,13 @@ object CppBridge {
                     if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                         CppBridgeDevConfig.configureHTTP()
                     } else {
-                        val baseUrl = CppBridgeTelemetry.getBaseUrl()
+                        // Read the effective config from commons state: staging
+                        // overrides whatever the app passed (baked URL, keyless).
+                        val baseUrl = RunAnywhereBridge.racStateGetBaseUrl()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?: CppBridgeTelemetry.getBaseUrl()
                         val apiKey = CppBridgeTelemetry.getApiKey()
-                        if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
+                        if (!baseUrl.isNullOrEmpty()) {
                             HTTPClientAdapter.configure(baseUrl, apiKey)
                             true
                         } else {

@@ -95,7 +95,9 @@ public object HTTPClientAdapter {
 
     private data class Configuration(
         val baseURL: String,
-        val apiKey: String,
+        // Null in keyless staging: requests go out unauthenticated and the
+        // backend attributes them to the PUBLIC org.
+        val apiKey: String?,
     )
 
     @Volatile private var configuration: Configuration? = null
@@ -108,16 +110,20 @@ public object HTTPClientAdapter {
      * by Swift's `CppBridge.DevConfig`. On invalid input the adapter is
      * left unconfigured rather than throwing.
      */
-    public suspend fun configure(baseURL: String, apiKey: String) {
-        val trimmedKey = apiKey.trim()
+    public suspend fun configure(baseURL: String, apiKey: String?) {
+        val trimmedKey = apiKey?.trim()
         synchronized(stateLock) {
-            if (!isUsableHTTPURL(baseURL) || !isUsableCredential(trimmedKey)) {
+            if (!isUsableHTTPURL(baseURL)) {
                 configuration = null
                 logger.info("HTTP adapter not configured: no usable external config")
                 return
             }
-            configuration = Configuration(baseURL = baseURL.trimEnd('/'), apiKey = trimmedKey)
-            logger.info("HTTP adapter configured with base URL: ${urlForLog(baseURL)}")
+            val usableKey = trimmedKey?.takeIf { isUsableCredential(it) }
+            configuration = Configuration(baseURL = baseURL.trimEnd('/'), apiKey = usableKey)
+            logger.info(
+                "HTTP adapter configured with base URL: ${urlForLog(baseURL)}" +
+                    if (usableKey == null) " (keyless)" else "",
+            )
         }
     }
 
@@ -139,7 +145,8 @@ public object HTTPClientAdapter {
     public val hasUsableConfiguration: Boolean
         get() {
             val snapshot = configuration ?: return false
-            return isUsableHTTPURL(snapshot.baseURL) && isUsableCredential(snapshot.apiKey)
+            // A usable URL is enough — keyless staging sends unauthenticated.
+            return isUsableHTTPURL(snapshot.baseURL)
         }
 
     // Public request surface
@@ -263,12 +270,13 @@ public object HTTPClientAdapter {
      *  - When auth is required and a valid token is available → use it.
      *  - Otherwise fall back to the API key, throwing if none is set.
      */
-    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String): String {
-        if (!requiresAuth) return apiKey
+    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String?): String {
+        if (!requiresAuth) return apiKey ?: ""
         val token = platformResolveAuthToken()
         if (!token.isNullOrEmpty()) return token
-        if (apiKey.isNotEmpty()) return apiKey
-        throw SDKException.authenticationFailed(reason = "No valid authentication token")
+        // Keyless staging: no token and no key means the request goes out
+        // unauthenticated (the backend attributes it to the PUBLIC org)
+        return apiKey ?: ""
     }
 
     /**

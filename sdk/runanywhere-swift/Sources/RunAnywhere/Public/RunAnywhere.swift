@@ -418,11 +418,16 @@ public enum RunAnywhere {
                 } else {
                     logger.debug("HTTP adapter disabled: no usable development config")
                 }
-            } else if CppBridge.DevConfig.isUsableCredential(params.apiKey),
-                      CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString) {
-                await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
             } else {
-                logger.debug("HTTP adapter disabled: no usable external config")
+                // Effective config from commons state: staging overrides
+                // whatever the app passed (baked URL, keyless).
+                let effectiveURLString = CppBridge.State.baseURL ?? params.baseURL.absoluteString
+                if CppBridge.DevConfig.isUsableHTTPURL(effectiveURLString),
+                   let effectiveURL = URL(string: effectiveURLString) {
+                    await CppBridge.HTTP.shared.configure(baseURL: effectiveURL, apiKey: params.apiKey)
+                } else {
+                    logger.debug("HTTP adapter disabled: no usable external config")
+                }
             }
         }
 

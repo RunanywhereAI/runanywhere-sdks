@@ -103,6 +103,7 @@ import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_hf_auth.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
+import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
     show ProtoInferenceFrameworkCppBridge;
@@ -491,27 +492,38 @@ abstract final class RunAnywhere {
       // RunAnywhere.swift:125-127 (`SDKInitParams(forDevelopmentWithAPIKey:)`).
       params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
     } else {
-      if (apiKey == null || apiKey.isEmpty) {
+      // Keyless staging is valid: commons overrides the base URL with the
+      // baked staging backend and requests go out unauthenticated
+      // (PUBLIC-org ingestion). Production stays strict.
+      final isStaging = environment == SDKEnvironment.SDK_ENVIRONMENT_STAGING;
+      if (!isStaging && (apiKey == null || apiKey.isEmpty)) {
         throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
           fieldPath: 'SDKInitParams.apiKey',
         );
       }
-      if (baseURL == null || baseURL.isEmpty) {
+      if (!isStaging && (baseURL == null || baseURL.isEmpty)) {
         throw SDKException.validationFailed(
           'Base URL is required for ${environment.description} mode',
           fieldPath: 'SDKInitParams.baseURL',
         );
       }
-      final uri = Uri.tryParse(baseURL);
-      if (uri == null) {
-        throw SDKException.validationFailed(
-          'Invalid base URL: $baseURL',
-          fieldPath: 'SDKInitParams.baseURL',
-        );
+      final Uri uri;
+      if (baseURL == null || baseURL.isEmpty) {
+        // Staging placeholder — replaced by the baked staging URL in commons.
+        uri = Uri.parse('https://staging.runanywhere.local');
+      } else {
+        final parsed = Uri.tryParse(baseURL);
+        if (parsed == null) {
+          throw SDKException.validationFailed(
+            'Invalid base URL: $baseURL',
+            fieldPath: 'SDKInitParams.baseURL',
+          );
+        }
+        uri = parsed;
       }
       params = SDKInitParams(
-        apiKey: apiKey,
+        apiKey: apiKey ?? '',
         baseURL: uri,
         environment: environment,
       );
@@ -643,8 +655,12 @@ abstract final class RunAnywhere {
   static Future<void> _runPhase2(SDKInitParams params, SDKLogger logger) async {
     // Step 1: Configure the shared HTTP client. Mirrors Swift's inlined
     // HTTP setup inside `RunAnywhere.performCoreInit()` (no DI container).
+    // Read the effective base URL from commons state: staging overrides
+    // whatever the app passed (baked URL, keyless).
+    final effectiveBaseURL =
+        DartBridgeState.instance.baseURL ?? params.baseURL.toString();
     HTTPClientAdapter.shared.configure(
-      baseURL: params.baseURL.toString(),
+      baseURL: effectiveBaseURL,
       apiKey: params.apiKey,
       environment: params.environment,
     );

@@ -29,7 +29,9 @@ public actor HTTPClientAdapter {
 
     private struct Configuration: Sendable {
         let baseURL: URL
-        let apiKey: String
+        // Nil in keyless staging: requests go out unauthenticated and the
+        // backend attributes them to the PUBLIC org.
+        let apiKey: String?
         let generation: UInt64
     }
 
@@ -53,19 +55,20 @@ public actor HTTPClientAdapter {
 
     public func configure(baseURL: URL, apiKey: String) {
         let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString),
-              CppBridge.DevConfig.isUsableCredential(trimmedAPIKey) else {
+        guard CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) else {
             clearConfiguration()
             logger.info("HTTP adapter not configured: no usable external config")
             return
         }
+        // Keyless (staging) is valid: requests go out unauthenticated.
+        let usableKey = CppBridge.DevConfig.isUsableCredential(trimmedAPIKey) ? trimmedAPIKey : nil
         nextConfigurationGeneration &+= 1
         configuration = Configuration(
             baseURL: baseURL,
-            apiKey: trimmedAPIKey,
+            apiKey: usableKey,
             generation: nextConfigurationGeneration
         )
-        logger.info("HTTP adapter configured with base URL: \(baseURL.host ?? "unknown")")
+        logger.info("HTTP adapter configured with base URL: \(baseURL.host ?? "unknown")\(usableKey == nil ? " (keyless)" : "")")
     }
 
     public func configure(baseURL: String, apiKey: String) {
@@ -80,8 +83,8 @@ public actor HTTPClientAdapter {
     public var isConfigured: Bool { configuration != nil }
     public var hasUsableConfiguration: Bool {
         guard let configuration else { return false }
-        return CppBridge.DevConfig.isUsableHTTPURL(configuration.baseURL.absoluteString) &&
-            CppBridge.DevConfig.isUsableCredential(configuration.apiKey)
+        // A usable URL is enough — keyless staging sends unauthenticated.
+        return CppBridge.DevConfig.isUsableHTTPURL(configuration.baseURL.absoluteString)
     }
 
     /// Clear lifetime-scoped credentials so a later SDK initialization must
@@ -169,8 +172,8 @@ public actor HTTPClientAdapter {
         )
     }
 
-    private func resolveToken(requiresAuth: Bool, fallbackAPIKey: String) async throws -> String {
-        if !requiresAuth { return fallbackAPIKey }
+    private func resolveToken(requiresAuth: Bool, fallbackAPIKey: String?) async throws -> String {
+        if !requiresAuth { return fallbackAPIKey ?? "" }
         // `rac_auth_get_valid_token` encodes the "valid → return / expired
         // → signal refresh" handshake in one call.
         var tokenPtr: UnsafePointer<CChar>?
@@ -181,8 +184,9 @@ public actor HTTPClientAdapter {
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
         if status == 0, let ptr = tokenPtr { return String(cString: ptr) }
-        if !fallbackAPIKey.isEmpty { return fallbackAPIKey }
-        throw SDKException(code: .authenticationFailed, message: "No valid authentication token", category: .auth)
+        // Keyless staging: no token and no key means the request goes out
+        // unauthenticated (the backend attributes it to the PUBLIC org)
+        return fallbackAPIKey ?? ""
     }
 
     private func clearConfiguration() {
