@@ -117,8 +117,11 @@ bool http_setup_applicable_for_state() {
 
     const char* api_key = rac_state_get_api_key();
     const char* base_url = rac_state_get_base_url();
-    return rac_dev_config_is_usable_http_url(base_url) &&
-           rac_dev_config_is_usable_credential(api_key);
+    if (!rac_dev_config_is_usable_http_url(base_url)) {
+        return false;
+    }
+    // Keyless staging is a valid HTTP setup (unauthenticated public ingestion)
+    return rac_dev_config_is_usable_credential(api_key) || !rac_env_auth_expected(env, api_key);
 }
 
 std::string warning_from_code(const char* prefix, rac_result_t code) {
@@ -311,7 +314,19 @@ rac_result_t perform_authentication(SdkInitResult* result) {
 
     const char* api_key = rac_state_get_api_key();
     const char* base_url = rac_state_get_base_url();
-    if (!has_nonempty_string(api_key) || !has_nonempty_string(base_url)) {
+    if (!has_nonempty_string(base_url)) {
+        result->set_http_configured(false);
+        result->set_has_completed_http_setup(false);
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+    if (!rac_env_auth_expected(env, api_key)) {
+        // Keyless staging: requests go out unauthenticated (public ingestion),
+        // there is no token to fetch
+        result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
+        result->set_has_completed_http_setup(true);
+        return RAC_SUCCESS;
+    }
+    if (!has_nonempty_string(api_key)) {
         result->set_http_configured(false);
         result->set_has_completed_http_setup(false);
         return RAC_ERROR_INVALID_CONFIGURATION;
@@ -520,9 +535,20 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     }
 
     const rac_environment_t env = to_rac_environment(request.environment());
-    const std::string api_key = request.api_key();
-    const std::string base_url = request.base_url();
+    std::string api_key = request.api_key();
+    std::string base_url = request.base_url();
     const std::string device_id = request.device_id();
+
+    // Staging is absolute: whatever the caller passed, requests go keyless to
+    // the baked staging backend (git-ignored dev config / CI secret). Builds
+    // without the baked URL keep the caller's URL as-is.
+    if (env == RAC_ENV_STAGING) {
+        api_key.clear();
+        const char* baked = rac_dev_config_get_staging_base_url();
+        if (rac_dev_config_is_usable_http_url(baked)) {
+            base_url = baked;
+        }
+    }
     const std::string platform = request.platform();
     const std::string sdk_version =
         request.sdk_version().empty() ? std::string(rac_sdk_get_version()) : request.sdk_version();

@@ -9,6 +9,7 @@
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 
 // =============================================================================
@@ -61,6 +62,18 @@ struct SdkConfigSnapshotStorage {
 
 bool rac_env_requires_auth(rac_environment_t env) {
     return env != RAC_ENV_DEVELOPMENT;
+}
+
+bool rac_env_auth_expected(rac_environment_t env, const char* api_key) {
+    if (!rac_env_requires_auth(env)) {
+        return false;
+    }
+    // Staging accepts keyless clients — requests go out unauthenticated and
+    // the backend attributes them to the PUBLIC org. Production stays strict.
+    if (env == RAC_ENV_STAGING && (!api_key || api_key[0] == '\0')) {
+        return false;
+    }
+    return true;
 }
 
 bool rac_env_requires_backend_url(rac_environment_t env) {
@@ -196,12 +209,13 @@ static bool is_localhost_host(const char* host) {
 // =============================================================================
 
 rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environment_t env) {
-    // Development mode doesn't require API key
-    if (!rac_env_requires_auth(env)) {
+    // Development never needs a key; staging accepts an empty one (keyless
+    // clients send unauthenticated requests, attributed to the PUBLIC org)
+    if (!rac_env_auth_expected(env, api_key)) {
         return RAC_VALIDATION_OK;
     }
 
-    // Staging/Production require API key
+    // Production requires API key
     if (!api_key || api_key[0] == '\0') {
         return RAC_VALIDATION_API_KEY_REQUIRED;
     }
@@ -220,8 +234,13 @@ rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t
         return RAC_VALIDATION_OK;
     }
 
-    // Staging/Production require URL
+    // Staging/Production require URL — except staging builds carrying the
+    // baked backend URL, where an empty URL resolves to it at init
     if (!url || url[0] == '\0') {
+        if (env == RAC_ENV_STAGING &&
+            rac_dev_config_is_usable_http_url(rac_dev_config_get_staging_base_url())) {
+            return RAC_VALIDATION_OK;
+        }
         return RAC_VALIDATION_URL_REQUIRED;
     }
 
@@ -396,6 +415,19 @@ rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
     if (!config) {
         return RAC_VALIDATION_API_KEY_REQUIRED;
     }
+
+    // Staging is absolute: whatever the caller passed, requests go keyless to
+    // the baked staging backend (git-ignored dev config / CI secret). Builds
+    // without the baked URL keep the caller's URL as-is.
+    rac_sdk_config_t effective = *config;
+    if (effective.environment == RAC_ENV_STAGING) {
+        effective.api_key = "";
+        const char* baked = rac_dev_config_get_staging_base_url();
+        if (rac_dev_config_is_usable_http_url(baked)) {
+            effective.base_url = baked;
+        }
+    }
+    config = &effective;
 
     // Validate configuration
     rac_validation_result_t result = rac_validate_config(config);

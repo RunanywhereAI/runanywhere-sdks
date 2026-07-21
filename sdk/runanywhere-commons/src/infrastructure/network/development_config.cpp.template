@@ -38,6 +38,10 @@ constexpr const char* SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 // Get this from your team's credential storage, or use a debug token for local dev
 constexpr const char* BUILD_TOKEN = "YOUR_BUILD_TOKEN";
 
+// Staging backend base URL — baked into team builds so environment=staging
+// needs no explicit URL. Leave the placeholder to require an explicit URL.
+constexpr const char* STAGING_BASE_URL = "YOUR_STAGING_BASE_URL";
+
 std::string trim(const char* value) {
     if (!value) {
         return {};
@@ -120,6 +124,10 @@ const char* rac_dev_config_get_supabase_key(void) {
 
 const char* rac_dev_config_get_build_token(void) {
     return BUILD_TOKEN;
+}
+
+const char* rac_dev_config_get_staging_base_url(void) {
+    return STAGING_BASE_URL;
 }
 
 bool rac_dev_config_has_supabase(void) {

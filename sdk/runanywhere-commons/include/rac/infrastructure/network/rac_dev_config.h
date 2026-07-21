@@ -58,6 +58,17 @@ RAC_API const char* rac_dev_config_get_supabase_key(void);
  */
 RAC_API const char* rac_dev_config_get_build_token(void);
 
+/**
+ * @brief Get the baked staging backend base URL
+ *
+ * Team builds bake the staging URL via the git-ignored development_config.cpp
+ * so callers can init with environment=staging and nothing else. Open-source
+ * builds keep the placeholder and must pass a base URL explicitly.
+ *
+ * @return URL string or placeholder (static, do not free)
+ */
+RAC_API const char* rac_dev_config_get_staging_base_url(void);
+
 // =============================================================================
 // Convenience Functions
 // =============================================================================

@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_sdk_state.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 
 // =============================================================================
 // Internal C++ State Class
@@ -49,6 +50,16 @@ class SDKState {
         environment_ = env;
         api_key_ = api_key ? api_key : "";
         base_url_ = base_url ? base_url : "";
+        // Staging is absolute: whatever the caller passed, requests go keyless
+        // to the baked staging backend (git-ignored dev config / CI secret).
+        // Builds without the baked URL keep the caller's URL as-is.
+        if (env == RAC_ENV_STAGING) {
+            api_key_.clear();
+            const char* baked = rac_dev_config_get_staging_base_url();
+            if (rac_dev_config_is_usable_http_url(baked)) {
+                base_url_ = baked;
+            }
+        }
         device_id_ = device_id ? device_id : "";
         is_initialized_ = true;
         return RAC_SUCCESS;

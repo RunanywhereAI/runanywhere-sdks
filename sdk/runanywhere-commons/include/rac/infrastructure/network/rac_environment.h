@@ -84,6 +84,19 @@ typedef struct {
 RAC_API bool rac_env_requires_auth(rac_environment_t env);
 
 /**
+ * @brief Check whether authenticated requests are expected for this config
+ *
+ * Staging accepts keyless clients: with no API key configured, requests go
+ * out unauthenticated and the backend attributes them to the PUBLIC org.
+ * Production always expects auth; development never does.
+ *
+ * @param env The environment to check
+ * @param api_key The configured API key (may be NULL or empty)
+ * @return true when the SDK must authenticate before talking to the backend
+ */
+RAC_API bool rac_env_auth_expected(rac_environment_t env, const char* api_key);
+
+/**
  * @brief Check if environment requires a backend URL
  * @param env The environment to check
  * @return true for staging/production, false for development

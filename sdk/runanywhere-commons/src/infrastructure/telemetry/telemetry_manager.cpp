@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_sdk_state.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -927,7 +928,6 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
                                                  ? static_cast<double>(g.time_to_first_token_ms())
                                                  : static_cast<double>(g.first_token_latency_ms());
-            payload.prompt_eval_time_ms = static_cast<double>(g.prompt_eval_time_ms());
             payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
             payload.has_is_streaming = RAC_TRUE;
             framework_str = framework_proto_to_string(g.framework());
@@ -1174,10 +1174,6 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (ttft_it != ev.properties().end()) {
                         payload.time_to_first_token_ms = std::atof(ttft_it->second.c_str());
                     }
-                    auto pe_it = ev.properties().find("prompt_eval_time_ms");
-                    if (pe_it != ev.properties().end()) {
-                        payload.prompt_eval_time_ms = std::atof(pe_it->second.c_str());
-                    }
                     auto temp_it = ev.properties().find("temperature");
                     if (temp_it != ev.properties().end()) {
                         payload.temperature = std::atof(temp_it->second.c_str());
@@ -1228,16 +1224,6 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                         payload.reranker_used = rr_it->second == "1" ? RAC_TRUE : RAC_FALSE;
                         payload.has_reranker_used = RAC_TRUE;
                     }
-                    auto qt_it = ev.properties().find("query_token_count");
-                    if (qt_it != ev.properties().end()) {
-                        payload.query_token_count =
-                            static_cast<int32_t>(std::atoi(qt_it->second.c_str()));
-                    }
-                    auto ct_it = ev.properties().find("context_tokens");
-                    if (ct_it != ev.properties().end()) {
-                        payload.context_tokens =
-                            static_cast<int32_t>(std::atoi(ct_it->second.c_str()));
-                    }
                     break;
                 }
                 case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS: {
@@ -1245,22 +1231,11 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     // embedding_model is read from model_id (set above) in the JSON.
                     payload.input_count = static_cast<int32_t>(c.input_count());
                     payload.vectors_produced = static_cast<int32_t>(c.output_count());
-                    // embedding_dimension / total_tokens / batch_size ride the
-                    // properties carrier (no CapabilityOperationEvent fields).
+                    // embedding_dimension rides the properties carrier (no proto field).
                     auto dim_it = ev.properties().find("embedding_dimension");
                     if (dim_it != ev.properties().end()) {
                         payload.embedding_dimension =
                             static_cast<int32_t>(std::atoi(dim_it->second.c_str()));
-                    }
-                    auto tok_it = ev.properties().find("total_tokens");
-                    if (tok_it != ev.properties().end()) {
-                        payload.total_tokens =
-                            static_cast<int32_t>(std::atoi(tok_it->second.c_str()));
-                    }
-                    auto bs_it = ev.properties().find("batch_size");
-                    if (bs_it != ev.properties().end()) {
-                        payload.batch_size =
-                            static_cast<int32_t>(std::atoi(bs_it->second.c_str()));
                     }
                     break;
                 }
@@ -1463,8 +1438,11 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     // The V2 telemetry endpoints only accept a JWT; flushing before
     // authentication would 401 and silently drop the batch (the HTTP callback
     // is fire-and-forget). Keep events queued — rac_auth_handle_*_response
-    // kicks a flush the moment a token lands.
-    if (rac_env_requires_auth(manager->environment) && !rac_auth_is_authenticated()) {
+    // kicks a flush the moment a token lands. Keyless staging never expects a
+    // token: events flush unauthenticated and the backend attributes them to
+    // the PUBLIC org.
+    if (rac_env_auth_expected(manager->environment, rac_state_get_api_key()) &&
+        !rac_auth_is_authenticated()) {
         size_t queued = 0;
         {
             std::lock_guard<std::mutex> lock(manager->queue_mutex);
