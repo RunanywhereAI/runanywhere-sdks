@@ -15,7 +15,9 @@ import {
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   decodeWorkerInferResult,
@@ -27,6 +29,19 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+
+function requireLiveOnnxWorkerOrMain(operation: string) {
+  const host = getActiveBackendWorkerHost('onnx');
+  if (host?.diagnostics.executionContext === 'worker') return host;
+  if (hasBackendWorkerOwnedModels('onnx')) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      'ONNX BackendWorker owns loaded speech models; reload after recovering the worker. '
+        + 'Main-thread fallback is disabled for worker-owned models.',
+    );
+  }
+  return null;
+}
 
 export class STTProtoAdapter {
   static tryDefault(): STTProtoAdapter | null {
@@ -55,8 +70,8 @@ export class STTProtoAdapter {
     options: ProtoSTTOptions,
   ): Promise<ProtoSTTOutput | null> {
     const request = lifecycleRequest(audioData, options);
-    const host = getActiveBackendWorkerHost('onnx');
-    if (host?.diagnostics.executionContext === 'worker') {
+    const host = requireLiveOnnxWorkerOrMain('stt.transcribeLifecycle');
+    if (host) {
       const response = await host.infer('stt.transcribe', {
         requestBytes: STTTranscriptionRequest.encode(request).finish(),
       });
@@ -89,8 +104,8 @@ export class STTProtoAdapter {
     const requestBytes = STTTranscriptionRequest.encode(
       lifecycleRequest(audioData, options),
     ).finish();
-    const host = getActiveBackendWorkerHost('onnx');
-    if (host?.diagnostics.executionContext === 'worker') {
+    const host = requireLiveOnnxWorkerOrMain('stt.transcribeLifecycleStream');
+    if (host) {
       return decodeWorkerStream(host.stream('stt.transcribe', { requestBytes }), STTStreamEvent);
     }
     requireExports(this.module, 'stt.transcribeLifecycleStream', [

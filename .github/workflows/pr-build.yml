@@ -478,6 +478,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Stage release-prebuilt WASM
         working-directory: sdk/runanywhere-web
+        env:
+          # checkout uses persist-credentials: false; gh still needs a token.
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           # Newest non-draft release that ships RACommons-web-v*.tar.gz

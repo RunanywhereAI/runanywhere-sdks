@@ -26,6 +26,7 @@ import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -118,30 +119,10 @@ export class LLMProtoAdapter {
     const host = getActiveBackendWorkerHost('llamacpp');
     if (mustUseLlamaBackendWorker()) {
       const workerHost = requireLlamaWorkerHost(host, 'llm.generateStream');
-      const events = workerHost.stream('llm.generate', { requestBytes: encoded });
-      return {
-        [Symbol.asyncIterator]: (): AsyncIterator<ProtoLLMStreamEvent> => {
-          const iterator = events[Symbol.asyncIterator]();
-          return {
-            async next(): Promise<IteratorResult<ProtoLLMStreamEvent>> {
-              const item = await iterator.next();
-              if (item.done) return { value: undefined, done: true };
-              const payload = item.value;
-              const bytes = payload instanceof Uint8Array
-                ? payload
-                : (payload as { eventBytes?: Uint8Array })?.eventBytes;
-              if (!bytes) {
-                return { value: LLMStreamEvent.fromPartial({ isFinal: false }), done: false };
-              }
-              return { value: LLMStreamEvent.decode(bytes), done: false };
-            },
-            async return(): Promise<IteratorResult<ProtoLLMStreamEvent>> {
-              await iterator.return?.();
-              return { value: undefined, done: true };
-            },
-          };
-        },
-      };
+      return decodeWorkerStream(
+        workerHost.stream('llm.generate', { requestBytes: encoded }),
+        LLMStreamEvent,
+      );
     }
 
     // T6.1: prefer the Worker path when a streamWorkerFactory is
@@ -197,7 +178,7 @@ export class LLMProtoAdapter {
     if (
       host
       && host.diagnostics.executionContext === 'worker'
-      && hasBackendWorkerOwnedModels('llamacpp')
+      && mustUseLlamaBackendWorker()
     ) {
       host.cancelActiveStreams();
       return SDKEvent.fromPartial({});

@@ -71,7 +71,7 @@ export class EmbeddingsProtoAdapter {
       const response = await host.infer('embeddings.embed', {
         requestBytes: EmbeddingsRequest.encode(request).finish(),
       }) as { resultBytes?: Uint8Array };
-      return response.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
+      return response?.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
     }
     if (!ensureExports(this.module, 'embeddings.embedBatchLifecycle', [
       '_rac_embeddings_embed_batch_lifecycle_proto',

@@ -36,8 +36,14 @@ internal object QHexRTSkelInstaller {
             val skelNames =
                 context.assets
                     .list(assetDir)
-                    ?.filter { (it.startsWith("libQnnHtpV") && it.endsWith("Skel.so")) || it == "libQnnBonsaiBitnet.so" }
-                    .orEmpty()
+                    ?.filter {
+                        (it.startsWith("libQnnHtpV") && it.endsWith("Skel.so")) ||
+                            it == "libQnnBonsaiBitnet.so" ||
+                            // Bonsai fully-on-NPU 1-bit decoder FastRPC skel: the cDSP
+                            // resolves it by name via ADSP_LIBRARY_PATH, so it must be
+                            // installed into the skel dir alongside the QNN skels.
+                            it == "librun_main_on_hexagon_skel.so"
+                    }.orEmpty()
                     .sorted()
             if (skelNames.isEmpty()) {
                 logger.warning("QHexRT DSP skel assets missing at $assetDir")

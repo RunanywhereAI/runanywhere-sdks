@@ -578,6 +578,12 @@ function looksLikeArchivePath(dest: string): boolean {
     || lower.endsWith('.gz');
 }
 
+/** Gzip-backed archives (includes `.tgz`, which does not contain the `.gz` substring). */
+function looksLikeGzipArchivePath(dest: string): boolean {
+  const lower = dest.toLowerCase();
+  return lower.endsWith('.tgz') || lower.endsWith('.gz');
+}
+
 function hasGzipMagic(bytes: Uint8Array | null | undefined): boolean {
   return !!bytes && bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
 }
@@ -625,7 +631,7 @@ async function materializeMemfsForComplete(
     );
   }
 
-  if (looksLikeArchivePath(dest) && dest.toLowerCase().includes('.gz')) {
+  if (looksLikeGzipArchivePath(dest)) {
     const prefix = typeof fs.readFile === 'function'
       ? fs.readFile(dest).subarray(0, 2)
       : await OPFSBridge.readPrefix(dest, 2);
@@ -805,7 +811,7 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
       const localSize = Math.max(memfsExisting, opfsExisting);
       const remoteSize = await probeRemoteContentLength(url, controller.signal);
       let magicOk = true;
-      if (looksLikeArchivePath(dest) && dest.toLowerCase().includes('.gz')) {
+      if (looksLikeGzipArchivePath(dest)) {
         const prefix = memfsExisting > 0 && typeof fs.readFile === 'function'
           ? fs.readFile(dest).subarray(0, 2)
           : await OPFSBridge.readPrefix(dest, 2);

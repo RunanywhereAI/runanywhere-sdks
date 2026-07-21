@@ -511,10 +511,14 @@ async function readPersistentRAGSnapshot(key: string): Promise<PersistentRAGSnap
     request.onupgradeneeded = () => request.result.createObjectStore('indexes');
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      const transaction = request.result.transaction('indexes', 'readonly');
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readonly');
       const get = transaction.objectStore('indexes').get(key);
       get.onsuccess = () => resolve((get.result as PersistentRAGSnapshot | undefined) ?? null);
       get.onerror = () => reject(get.error);
+      transaction.oncomplete = () => db.close();
+      transaction.onerror = () => db.close();
+      transaction.onabort = () => db.close();
     };
   });
 }
@@ -529,10 +533,18 @@ async function writePersistentRAGSnapshot(key: string, snapshot: PersistentRAGSn
     request.onupgradeneeded = () => request.result.createObjectStore('indexes');
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      const transaction = request.result.transaction('indexes', 'readwrite');
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readwrite');
       transaction.objectStore('indexes').put(snapshot, key);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        reject(transaction.error);
+      };
+      transaction.onabort = () => db.close();
     };
   });
 }
@@ -547,10 +559,18 @@ async function deletePersistentRAGSnapshot(key: string): Promise<void> {
     request.onupgradeneeded = () => request.result.createObjectStore('indexes');
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
-      const transaction = request.result.transaction('indexes', 'readwrite');
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readwrite');
       transaction.objectStore('indexes').delete(key);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        reject(transaction.error);
+      };
+      transaction.onabort = () => db.close();
     };
   });
 }

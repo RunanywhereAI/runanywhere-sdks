@@ -84,11 +84,12 @@ export class RAGProtoAdapter {
   }
 
   async destroySession(session: number): Promise<void> {
-    const host = this.workerHostForSession(session);
-    if (host) {
+    if (workerOwnedSessions.has(session)) {
       try {
+        const host = this.requireOnnxWorkerHost('rag.destroySession');
         await host.infer('rag.sessionDestroy', { session });
       } finally {
+        // Always drop ownership so a dead worker cannot strand the session id.
         workerOwnedSessions.delete(session);
       }
       return;

@@ -1019,15 +1019,21 @@ async function startDownload(modelId: string): Promise<void> {
 
   const requiredBytes = entry
     ? modelDisplaySizeBytes(entry)
-    : Math.max(0, Number(model.downloadSizeBytes ?? 0));
+    : (() => {
+      const parsed = Number(model.downloadSizeBytes ?? 0);
+      return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    })();
 
   // First async step after the Download click — request persist() while the
   // user gesture is still active, then verify origin quota.
   const storage = await ensureDownloadStorageReady({ requiredBytes });
   if (requiredBytes > 0 && !storage.sufficient) {
+    const fallbackMessage = RunAnywhere.storage.isLocalStorageSupported
+      ? 'Free space or open Storage → Choose Storage Folder.'
+      : 'Please free up space in your browser.';
     showToast(
       `Not enough browser storage for this model (need ${formatBytes(requiredBytes)}, `
-        + `${formatBytes(storage.availableBytes)} free). Free space or open Storage → Choose Storage Folder.`,
+        + `${formatBytes(storage.availableBytes)} free). ${fallbackMessage}`,
       'warning',
       6000,
     );
@@ -1036,12 +1042,13 @@ async function startDownload(modelId: string): Promise<void> {
 
   // Large downloads use browser OPFS by default. Do not open the OS folder
   // picker here — it steals the Download click and is easy to dismiss while
-  // the download continues anyway. Users who want a durable disk folder can
-  // set one explicitly under Storage → Choose Storage Folder.
+  // the download continues anyway. Only mention Choose Storage Folder when
+  // the browser supports that path and no durable folder is already active.
   if (
     requiredBytes >= LARGE_DOWNLOAD_BYTES
     && !storage.persisted
     && !RunAnywhere.storage.isLocalStorageReady
+    && RunAnywhere.storage.isLocalStorageSupported
   ) {
     showToast(
       'Storing this model in browser OPFS. For a durable disk folder, open Storage → Choose Storage Folder.',

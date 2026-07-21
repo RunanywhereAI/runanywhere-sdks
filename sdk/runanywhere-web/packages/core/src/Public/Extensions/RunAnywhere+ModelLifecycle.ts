@@ -179,16 +179,15 @@ async function loadModelViaBackendWorker(
   model: ModelInfo | null,
   adapter: ModelLifecycleAdapter,
 ): Promise<ModelLoadResult | null> {
-  const onnxModality = onnxWorkerModality(model, request);
-  const backendId = onnxModality ? 'onnx' : 'llamacpp';
-  const host = getActiveBackendWorkerHost(backendId);
-  // Prefer an explicit snapshot, else the live registry entry. The worker
-  // owns a separate WASM heap/registry and must receive ModelInfo bytes or
-  // lifecycle load fails with "model not found in registry".
+  // Prefer an explicit snapshot, else the live registry entry. Derive backend
+  // from the resolved model so a null snapshot cannot force ONNX STT onto the
+  // llamacpp worker.
   const resolved = model ?? (
     request.modelId ? ModelRegistry.getModel(request.modelId) : null
   );
   const modality = onnxWorkerModality(resolved, request);
+  const backendId = modality ? 'onnx' : 'llamacpp';
+  const host = getActiveBackendWorkerHost(backendId);
   if (!host || (!modality && !isBackendWorkerEligibleLLM(resolved, request))) return null;
   if (!resolved) {
     throw SDKException.fromCode(

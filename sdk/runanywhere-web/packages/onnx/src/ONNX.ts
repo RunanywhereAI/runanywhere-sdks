@@ -124,7 +124,11 @@ async function installONNXBackendWorker(options: ONNXRegisterOptions): Promise<v
   setBackendWorkerFactory(factory);
   _installedBackendWorkerFactory = true;
   _backendWorkerFactory = factory;
-  const requireWorker = options.requireBackendWorker ?? workerAvailable;
+  // Soft-default: registration can complete on the main thread when the
+  // handshake fails. Callers that need a hard worker requirement pass
+  // `requireBackendWorker: true` explicitly (browser apps that load speech
+  // models into the worker should do so).
+  const requireWorker = options.requireBackendWorker ?? false;
   const host = new BackendWorkerHost(factory, {
     backendId: 'onnx',
     initTimeoutMs: 120_000,

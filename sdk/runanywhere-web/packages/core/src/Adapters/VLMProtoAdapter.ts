@@ -10,7 +10,6 @@ import {
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
 import {
-  hasBackendWorkerOwnedModels,
   mustUseLlamaBackendWorker,
 } from '../runtime/BackendWorkerModelOwnership.js';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
@@ -18,6 +17,7 @@ import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
   decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -99,30 +99,10 @@ export class VLMProtoAdapter {
         getActiveBackendWorkerHost('llamacpp'),
         'vlm.processImageStream',
       );
-      const events = host.stream('vlm.generate', { requestBytes });
-      return {
-        [Symbol.asyncIterator]: (): AsyncIterator<ProtoVLMStreamEvent> => {
-          const iterator = events[Symbol.asyncIterator]();
-          return {
-            async next(): Promise<IteratorResult<ProtoVLMStreamEvent>> {
-              const item = await iterator.next();
-              if (item.done) return { value: undefined, done: true };
-              const payload = item.value;
-              const bytes = payload instanceof Uint8Array
-                ? payload
-                : (payload as { eventBytes?: Uint8Array })?.eventBytes;
-              if (!bytes) {
-                return { value: VLMStreamEvent.fromPartial({}), done: false };
-              }
-              return { value: VLMStreamEvent.decode(bytes), done: false };
-            },
-            async return(): Promise<IteratorResult<ProtoVLMStreamEvent>> {
-              await iterator.return?.();
-              return { value: undefined, done: true };
-            },
-          };
-        },
-      };
+      return decodeWorkerStream(
+        host.stream('vlm.generate', { requestBytes }),
+        VLMStreamEvent,
+      );
     }
     // Legacy offscreen StreamWorker path when BackendWorker is not active.
     const offscreen = OffscreenRuntimeBridge.tryGet();
@@ -166,7 +146,7 @@ export class VLMProtoAdapter {
     if (
       host
       && host.diagnostics.executionContext === 'worker'
-      && (mustUseLlamaBackendWorker() || hasBackendWorkerOwnedModels())
+      && mustUseLlamaBackendWorker()
     ) {
       host.cancelActiveStreams();
       return true;
