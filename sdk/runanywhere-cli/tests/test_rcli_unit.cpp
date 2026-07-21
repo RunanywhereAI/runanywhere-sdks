@@ -322,6 +322,35 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
+  struct PortableNvidiaEmbeddingCase {
+    const char *id;
+    const char *alias;
+    const char *revision;
+    int64_t download_size_bytes;
+  };
+  const PortableNvidiaEmbeddingCase portable_nvidia_embeddings[] = {
+      {"nemotron-3-embed-1b-q4_k_m", "nemotron-3-embed",
+       "06df1fde6f7009c91f6cc3cd520081921929a678", 749352096LL},
+      {"llama-nemotron-embed-1b-v2-q4_k_m", "llama-nemotron-embed",
+       "bf7c9832b1d76f86777379e58b7b74805ee58006", 807690624LL},
+  };
+  for (const PortableNvidiaEmbeddingCase &test_case :
+       portable_nvidia_embeddings) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.id);
+    if (!entry || entry != rcli::catalog::find(test_case.alias) ||
+        entry->category != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_GGUF ||
+        entry->files != nullptr || entry->url == nullptr ||
+        entry->download_size_bytes != test_case.download_size_bytes ||
+        std::string(entry->url).find(test_case.revision) == std::string::npos) {
+      result.details = std::string(test_case.id) +
+                       " should be an exact pinned llama.cpp embedding";
+      return result;
+    }
+  }
+
   const rcli::catalog::CatalogEntry *nemotron_nano =
       rcli::catalog::find("mlx-nemotron-nano");
   if (!nemotron_nano ||

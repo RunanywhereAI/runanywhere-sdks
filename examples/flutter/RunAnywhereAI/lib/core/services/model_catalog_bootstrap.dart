@@ -6,6 +6,24 @@ import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 
+@visibleForTesting
+const portableNvidiaEmbeddingCatalog = [
+  (
+    id: 'nemotron-3-embed-1b-q4_k_m',
+    name: 'NVIDIA Nemotron 3 Embed 1B Q4_K_M',
+    url:
+        'https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/nemotron-3-embed-1b-q4_k_m.gguf',
+    memoryRequirement: 749352096,
+  ),
+  (
+    id: 'llama-nemotron-embed-1b-v2-q4_k_m',
+    name: 'NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M',
+    url:
+        'https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/llama-nemotron-embed-1B-v2-Q4_K_M.gguf',
+    memoryRequirement: 807690624,
+  ),
+];
+
 /// ModelCatalogBootstrap
 ///
 /// Mirrors iOS `Core/Services/ModelCatalogBootstrap.swift` (the canonical
@@ -159,6 +177,16 @@ abstract final class ModelCatalogBootstrap {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 2000000000,
     );
+    for (final model in portableNvidiaEmbeddingCatalog) {
+      await _registerLLM(
+        id: model.id,
+        name: model.name,
+        url: model.url,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        modality: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        memoryRequirement: model.memoryRequirement,
+      );
+    }
     debugPrint('LLM models registered');
 
     if (mlxRegistered) {

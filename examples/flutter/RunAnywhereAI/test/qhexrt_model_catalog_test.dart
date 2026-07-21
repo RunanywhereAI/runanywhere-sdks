@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_ai/core/services/model_catalog_bootstrap.dart';
 import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart'
     show ExampleModelInfoView, ModelSelectionContext;
@@ -9,11 +10,11 @@ import 'package:runanywhere_ai/features/models/model_types.dart'
 void main() {
   tearDown(QHexRTModelCatalog.resetForTesting);
 
-  test('Flutter QHexRT catalog exactly matches the 51 Android rows', () {
+  test('Flutter QHexRT catalog exactly matches the 52 Android rows', () {
     final kotlinRows = _parseKotlinCatalog();
     const flutterRows = QHexRTModelCatalog.models;
 
-    expect(flutterRows, hasLength(51));
+    expect(flutterRows, hasLength(52));
     expect(
       flutterRows.map((model) => model.id).toList(),
       kotlinRows.map((model) => model.id).toList(),
@@ -98,9 +99,9 @@ void main() {
 
       expect(result.registered, 1);
       expect(result.failed, 0);
-      expect(result.skippedNative, 50);
+      expect(result.skippedNative, 51);
       expect(result.registeredModelIds, {'qwen3_5_0_8b_v81'});
-      expect(seenIds, hasLength(51));
+      expect(seenIds, hasLength(52));
       expect(seenIds, contains('kokoro_en'));
 
       final cpu = ModelInfo(
@@ -148,12 +149,17 @@ void main() {
 
     expect(registrarCalled, isFalse);
     expect(result.registeredModelIds, isEmpty);
-    expect(result.skippedNative, 51);
+    expect(result.skippedNative, 52);
     expect(QHexRTModelCatalog.registeredModelIds, isEmpty);
     expect(QHexRTModelCatalog.snapshots.value.revision, 2);
   });
 
   test('RAG accepts QHexRT generators and embedders but not rerankers', () {
+    final portableLlamaEmbedding = ModelInfo(
+      id: 'nemotron-3-embed-1b-q4_k_m',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    );
     final qhexrtEmbedding = ModelInfo(
       id: 'embeddinggemma_300m_v81',
       category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
@@ -171,6 +177,10 @@ void main() {
     );
 
     expect(
+      ModelSelectionContext.ragEmbedding.includes(portableLlamaEmbedding),
+      isTrue,
+    );
+    expect(
       ModelSelectionContext.ragEmbedding.includes(qhexrtEmbedding),
       isTrue,
     );
@@ -179,6 +189,25 @@ void main() {
       isFalse,
     );
     expect(ModelSelectionContext.ragLLM.includes(qhexrtLlm), isTrue);
+  });
+
+  test('portable NVIDIA embedding rows stay pinned to validated GGUFs', () {
+    expect(
+      portableNvidiaEmbeddingCatalog
+          .map((model) => model.id)
+          .toList(growable: false),
+      ['nemotron-3-embed-1b-q4_k_m', 'llama-nemotron-embed-1b-v2-q4_k_m'],
+    );
+    expect(
+      portableNvidiaEmbeddingCatalog
+          .map((model) => model.memoryRequirement)
+          .toList(growable: false),
+      [749352096, 807690624],
+    );
+    expect(
+      portableNvidiaEmbeddingCatalog.map((model) => model.url),
+      everyElement(matches(RegExp(r'/resolve/[0-9a-f]{40}/.*\.gguf$'))),
+    );
   });
 
   test('non-QHexRT IDs do not inherit native QHexRT auth policy', () {

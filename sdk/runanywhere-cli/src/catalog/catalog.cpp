@@ -712,6 +712,21 @@ constexpr CatalogEntry kCatalog[] = {
      nullptr, 0, 2327524, 0, false},
 
     // --- Embeddings ---
+    {"nemotron-3-embed-1b-q4_k_m", "nemotron-3-embed",
+     "NVIDIA Nemotron 3 Embed 1B Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/zenmagnets/"
+     "Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/"
+     "06df1fde6f7009c91f6cc3cd520081921929a678/"
+     "nemotron-3-embed-1b-q4_k_m.gguf",
+     nullptr, 0, 749352096LL, 0, false},
+    {"llama-nemotron-embed-1b-v2-q4_k_m", "llama-nemotron-embed",
+     "NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/"
+     "resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/"
+     "llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
+     nullptr, 0, 807690624LL, 0, false},
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
