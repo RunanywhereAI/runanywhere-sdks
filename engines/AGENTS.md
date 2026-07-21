@@ -23,8 +23,8 @@ An **engine is an op-table adapter for modalities.** Concretely, an engine:
    (`sdk/runanywhere-commons/include/rac/plugin/rac_engine_vtable.h`) — a struct
    of per-modality op-table slots:
    `llm_ops` / `stt_ops` / `tts_ops` / `vad_ops` / `embedding_ops` / `vlm_ops` /
-   `diffusion_ops` / `diarization_ops` / `segmentation_ops` (9 live primitive
-   slots; the former `rerank_ops` was removed in ABI v4 — see below). A **NULL slot means "I do
+   `diffusion_ops` / `diarization_ops` / `segmentation_ops` / `rerank_ops` (10 live
+   primitive slots; `rerank_ops` was revived as a first-class primitive in ABI v8 — see below). A **NULL slot means "I do
    not serve that primitive."** Serving more than one modality just means filling
    more than one slot (llama.cpp fills `llm_ops` + `vlm_ops`; sherpa fills
    `stt_ops` + `tts_ops` + `vad_ops`).
@@ -80,11 +80,13 @@ engine exists in this tree.
 | **coreml** | DIFFUSION (`diffusion_ops`) | **our** Stable-Diffusion pipeline on Apple CoreML `MLModel` | **3** — our inference code on a device-runtime | **ON (Apple)** | priority 100, Apple-only (`AVAILABILITY_PRIVATE`), modality-agnostic name. Self-registers via `RAC_STATIC_PLUGIN_REGISTER(coreml)`. The engine `coreml` uses the runtime `coreml` (same framework name, separate registry/dir). CMake pins `RAC_COREML_GENERATE_AVAILABLE=1`, so it is routable by default on Apple. Multi-modality-ready. |
 | **qhexrt** | LLM, VLM, STT, TTS (`llm_ops`/`vlm_ops`/`stt_ops`/`tts_ops`) when linked | private RunAnywhere QHexRT prebuilt archive | **1** — QNN-context bundles on Snapdragon HNPU | **OFF** | priority 150 when routable. Public builds compile a not-routable shell when the private archive is absent; authorized Android builds link the prebuilt under `QHEXRT_ROOT`. |
 
-`RAC_PRIMITIVE_RERANK` (wire value 6) and its former `rerank_ops` slot were
-**removed in ABI v4**: there is no `rerank_ops` field on `rac_engine_vtable_t`,
-the value is absent from `RAC_PRIMITIVE_TABLE`, and the registry rejects
-manifests that declare wire value 6. Re-introducing it requires bumping
-`RAC_PLUGIN_API_VERSION`.
+`RAC_PRIMITIVE_RERANK` was **revived as a first-class cross-encoder reranking
+primitive in ABI v8** at **wire value 11**, with its `rerank_ops` slot promoted
+from `reserved_slot_2` on `rac_engine_vtable_t` (same binary offset, so the
+struct layout stayed stable). It is present in `RAC_PRIMITIVE_TABLE` and routable.
+The *original* rerank slot (wire value 6, retired in ABI v4) stays permanently
+retired — the revived primitive is a new wire value, not a reuse of 6, and the
+registry still rejects manifests that declare wire value 6.
 
 ---
 
@@ -105,7 +107,7 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
      there is no local model file, e.g. cloud).
    - `availability` (PUBLIC / PRIVATE), `priority`, package owner/name.
 2. **A `rac_engine_vtable_t`**: the served-primitive slots non-NULL, **every
-   other slot explicit NULL** (9 primitive slots + 8 reserved slots). Lives in
+   other slot explicit NULL** (10 primitive slots + 7 reserved slots). Lives in
    `.rodata` (no runtime allocation). A future reserved-slot promotion turns the
    aggregate initializer into a compile error — the intended tripwire.
 3. **The uniform MODEL LIFECYCLE** on each served op-table (verified in
@@ -121,7 +123,7 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
         → destroy(impl)                    // free the impl
    ```
 
-   `create` originated in v4 (the current `RAC_PLUGIN_API_VERSION` is `7u`) and replaced the
+   `create` originated in v4 (the current `RAC_PLUGIN_API_VERSION` is `8u`) and replaced the
    deleted `rac_service_provider_t` factory; commons' `rac_<primitive>_create()`
    calls it after `rac_plugin_find` picks the engine. `config_json` is
    advisory: engines that don't understand it **must** ignore it and succeed with
