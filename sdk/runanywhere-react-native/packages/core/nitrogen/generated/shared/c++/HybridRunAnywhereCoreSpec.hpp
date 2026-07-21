@@ -73,6 +73,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> getOrganizationId() = 0;
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> connectGetPlatformPolicyProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> connectClientCreateHelloProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> connectClientValidateHostProto(const std::shared_ptr<ArrayBuffer>& responseBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
       virtual std::string frameworkDisplayName(double frameworkProto) = 0;
       virtual double modelCategoryDefaultFramework(double categoryProto) = 0;

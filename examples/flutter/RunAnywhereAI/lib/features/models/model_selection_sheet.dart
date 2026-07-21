@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:runanywhere/public/connect/connect_session.dart';
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/services/connect_service.dart';
 import 'package:runanywhere_ai/core/services/device_info_service.dart';
 import 'package:runanywhere_ai/core/services/hf_token_store.dart';
 import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
@@ -37,6 +39,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   ModelInfo? _selectedModel;
   bool _isLoadingModel = false;
   String _loadingProgress = '';
+  final ConnectService _connect = ConnectService.shared;
 
   /// Get all models relevant to this context, sorted by availability.
   /// Filtering (category + framework allow-list + supporting-file
@@ -75,7 +78,23 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   @override
   void initState() {
     super.initState();
+    _connect.addListener(_connectChanged);
     unawaited(_loadInitialData());
+  }
+
+  @override
+  void dispose() {
+    _connect.removeListener(_connectChanged);
+    super.dispose();
+  }
+
+  void _connectChanged() {
+    if (mounted) setState(() {});
+    if (_connect.state.isConnected && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -109,6 +128,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
                     return ListView(
                       children: [
+                        if (widget.context == ModelSelectionContext.llm)
+                          _buildConnectSection(context),
                         _buildDeviceStatusSection(context),
                         _buildModelsListSection(context),
                       ],
@@ -121,6 +142,101 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           if (_isLoadingModel) _buildLoadingOverlay(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildConnectSection(BuildContext context) {
+    final state = _connect.state;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Connect'),
+        if (state.isConnected)
+          ListTile(
+            leading: const Icon(Icons.check_circle_outline),
+            title: Text(
+              state.activeHost?.displayName ?? 'Connected Host',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              state.activeModel?.displayName ?? 'Hosted language model',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: FilledButton.tonal(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Use'),
+            ),
+          )
+        else if (state.availableHosts.isEmpty)
+          ListTile(
+            leading: const Icon(Icons.desktop_windows_outlined),
+            title: Text(
+              state.status == ConnectStatus.discovering
+                  ? 'Looking for Hosts'
+                  : state.status == ConnectStatus.disconnected
+                  ? 'Find a Host again'
+                  : 'Connect to a Host',
+            ),
+            subtitle: Text(
+              state.status == ConnectStatus.discovering
+                  ? 'Searching your local network'
+                  : 'Use a language model available on your local network',
+            ),
+            trailing: state.status == ConnectStatus.discovering
+                ? const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : FilledButton.tonalIcon(
+                    onPressed: () => unawaited(_connect.findHosts()),
+                    icon: const Icon(Icons.link),
+                    label: Text(
+                      state.status == ConnectStatus.disconnected ||
+                              state.status == ConnectStatus.failed
+                          ? 'Retry'
+                          : 'Find Host',
+                    ),
+                  ),
+          )
+        else
+          ...state.availableHosts.map(
+            (host) => ListTile(
+              leading: const Icon(Icons.desktop_windows_outlined),
+              title: Text(
+                host.displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: const Text('Hosted language model available'),
+              trailing: FilledButton.tonal(
+                onPressed: state.status == ConnectStatus.connecting
+                    ? null
+                    : () => unawaited(_connect.connect(host)),
+                child: state.status == ConnectStatus.connecting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Connect'),
+              ),
+            ),
+          ),
+        if (state.status == ConnectStatus.failed && state.message != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
+            child: Text(
+              state.message!,
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: Theme.of(context).colorScheme.error),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        const Divider(),
+      ],
     );
   }
 
@@ -418,6 +534,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       // The callback knows the correct context and how to load the model
       debugPrint('Model selected: ${model.id}, calling callback to load');
       await widget.onModelSelected(model);
+      if (widget.context == ModelSelectionContext.llm) {
+        await _connect.disconnect();
+      }
 
       if (mounted) {
         // Defer Navigator.pop until after the current frame completes

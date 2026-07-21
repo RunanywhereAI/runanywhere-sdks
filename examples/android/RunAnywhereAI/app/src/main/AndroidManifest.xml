@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Requested only when the user chooses Connect in the model picker. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Model downloads run in a foreground service so multi-GB NPU bundles keep

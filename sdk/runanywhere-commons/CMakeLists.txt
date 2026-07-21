@@ -725,6 +725,11 @@ set(RAC_CORE_SOURCES
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
     src/foundation/rac_sha256.cpp
+    # Connect owns platform-role policy and transport-independent session
+    # coordination in commons. Platform SDKs register concrete discovery and
+    # channel adapters through the transport vtable.
+    src/connect/rac_connect.cpp
+    src/connect/rac_connect_transport.cpp
     # Canonical two-phase SDK init ABI. Wraps existing rac_state /
     # rac_auth / rac_device_manager / rac_model_assignment internals behind
     # one rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto surface so
@@ -1402,6 +1407,8 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/device_info.pb.cc
     # Plugin loader descriptors (PluginInfo / PluginInfoList).
     ${_RAC_PROTO_GEN_DIR}/plugin_loader.pb.cc
+    # Cross-platform Connect policy, handshake, and invocation envelopes.
+    ${_RAC_PROTO_GEN_DIR}/connect.pb.cc
     # rac_options.proto — custom FieldOptions / EnumValueOptions extensions
     # imported by codegen post-processors and several option protos. Required
     # at link time by every .pb.cc that imports rac_options.proto.

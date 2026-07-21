@@ -43,6 +43,8 @@ export 'public/capabilities/runanywhere_vad.dart' show RunAnywhereVAD;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
 export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
 export 'public/configuration/sdk_environment.dart';
+export 'public/connect/connect_session.dart'
+    show ConnectHost, ConnectModel, ConnectSession, ConnectState, ConnectStatus;
 export 'public/events/event_bus.dart'
     show
         EventBus,

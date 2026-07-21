@@ -36,6 +36,10 @@ extension LLMViewModel {
     // MARK: - Model Status Checking
 
     func checkModelStatus() async {
+        #if os(iOS)
+        guard !isUsingConnect else { return }
+        #endif
+
         let modelListViewModel = ModelListViewModel.shared
 
         await MainActor.run {

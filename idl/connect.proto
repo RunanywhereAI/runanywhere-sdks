@@ -1,0 +1,208 @@
+// RunAnywhere IDL — LAN host/client session contract.
+//
+// This schema defines the transport-independent control plane for a local
+// runtime host. Discovery and sockets remain platform adapters; commons owns
+// the role constraints, protocol compatibility checks, session state, and
+// validation of typed remote generation requests.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "llm_service.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "ConnectProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Platform identity is explicit so commons can evaluate role availability
+// from one policy table. Platform SDKs must not hardcode the host/client
+// matrix in UI or transport code.
+enum ConnectPlatform {
+    CONNECT_PLATFORM_UNSPECIFIED = 0;
+    CONNECT_PLATFORM_MACOS       = 1;
+    CONNECT_PLATFORM_IOS         = 2;
+    CONNECT_PLATFORM_IPADOS      = 3;
+
+    // Reserved for the follow-on SDK integrations. Keeping the values in the
+    // canonical IDL avoids a later wire-format migration.
+    CONNECT_PLATFORM_ANDROID      = 4;
+    CONNECT_PLATFORM_REACT_NATIVE = 5;
+    CONNECT_PLATFORM_FLUTTER      = 6;
+    CONNECT_PLATFORM_WEB          = 7;
+
+    // Reserved now so adding the planned Windows host adapter does not require
+    // a platform-identity wire migration. Its host role remains PLANNED until
+    // the native transport, discovery, and protected-storage adapter ships.
+    CONNECT_PLATFORM_WINDOWS      = 8;
+}
+
+// Role availability is richer than a boolean so the wire contract can reserve
+// planned platforms without accidentally advertising them as usable.
+enum ConnectRoleAvailability {
+    CONNECT_ROLE_AVAILABILITY_UNSPECIFIED = 0;
+    CONNECT_ROLE_AVAILABILITY_DISABLED    = 1;
+    CONNECT_ROLE_AVAILABILITY_PLANNED     = 2;
+    CONNECT_ROLE_AVAILABILITY_ENABLED     = 3;
+}
+
+message ConnectPlatformPolicyRequest {
+    ConnectPlatform platform = 1;
+}
+
+// Commons is the authority for this policy. SDKs may query it to shape UI,
+// but every host/client entrypoint also enforces it inside C++.
+message ConnectPlatformPolicy {
+    ConnectPlatform         platform    = 1;
+    ConnectRoleAvailability host_role   = 2;
+    ConnectRoleAvailability client_role = 3;
+}
+
+enum ConnectHandshakeStatus {
+    CONNECT_HANDSHAKE_STATUS_UNSPECIFIED = 0;
+    CONNECT_HANDSHAKE_STATUS_ACCEPTED    = 1;
+    CONNECT_HANDSHAKE_STATUS_REJECTED    = 2;
+}
+
+enum ConnectSessionState {
+    CONNECT_SESSION_STATE_UNSPECIFIED  = 0;
+    CONNECT_SESSION_STATE_CONNECTING   = 1;
+    CONNECT_SESSION_STATE_CONNECTED    = 2;
+    CONNECT_SESSION_STATE_DISCONNECTED = 3;
+    CONNECT_SESSION_STATE_FAILED       = 4;
+}
+
+// Non-secret metadata published through LAN service discovery and echoed by
+// the handshake. `instance_id` is generated anew whenever the host starts;
+// it is not a persistent device identifier or a credential.
+message ConnectDiscoveryMetadata {
+    string          instance_id      = 1;
+    string          display_name     = 2;
+    ConnectPlatform platform         = 3;
+    uint32          protocol_version = 4;
+}
+
+// The single language model currently shared by a host. A host must select a
+// loaded model before it starts publishing; this lets clients enter chat
+// immediately without downloading or selecting a local model.
+message ConnectModelDescriptor {
+    string model_id = 1;
+    string display_name = 2;
+    string framework = 3;
+    uint32 context_window = 4;
+    bool supports_streaming = 5;
+}
+
+message ConnectHostStartRequest {
+    string          display_name     = 1;
+    ConnectPlatform platform         = 2;
+    uint32          protocol_version = 3;
+    ConnectModelDescriptor model     = 4;
+}
+
+message ConnectHostStopRequest {}
+
+message ConnectHostState {
+    bool                     is_hosting          = 1;
+    ConnectDiscoveryMetadata discovery_metadata  = 2;
+    uint32                   active_client_count = 3;
+    string                   error_message       = 4;
+    ConnectModelDescriptor   model               = 5;
+}
+
+message ConnectClientStartRequest {
+    string          display_name     = 1;
+    ConnectPlatform platform         = 2;
+    uint32          protocol_version = 3;
+}
+
+// Sent by a client immediately after the platform transport is connected.
+message ConnectClientHello {
+    string          instance_id      = 1;
+    string          display_name     = 2;
+    ConnectPlatform platform         = 3;
+    uint32          protocol_version = 4;
+}
+
+// Sent by the host after commons has accepted or rejected a client hello.
+message ConnectHandshakeResponse {
+    ConnectHandshakeStatus  status           = 1;
+    string                  session_id       = 2;
+    ConnectDiscoveryMetadata host            = 3;
+    string                  rejection_reason = 4;
+    ConnectModelDescriptor  model            = 5;
+}
+
+// The client validates the host response through commons and receives the
+// public session state it can expose to its platform UI.
+message ConnectClientSessionState {
+    ConnectSessionState      state         = 1;
+    string                   session_id    = 2;
+    ConnectDiscoveryMetadata host          = 3;
+    string                   error_message = 4;
+    ConnectModelDescriptor   model         = 5;
+}
+
+message ConnectSessionCloseRequest {
+    string session_id = 1;
+}
+
+// A client sends the existing typed LLM request to the selected host model.
+// `session_id` binds the request to the prior handshake; `generation.model_id`
+// must match the model the host published for that session.
+message ConnectInvocationRequest {
+    string              session_id = 1;
+    string              request_id = 2;
+    LLMGenerateRequest  generation = 3;
+}
+
+// Commons validates that an invocation belongs to an active session and uses
+// the host's published model before any platform runtime receives the prompt.
+message ConnectInvocationValidation {
+    bool accepted = 1;
+    string rejection_reason = 2;
+}
+
+// Hosts forward the SDK's canonical stream events without translating them to
+// a platform-specific token shape. This is the portable streaming surface for
+// future Kotlin, React Native, Flutter, and Web clients.
+message ConnectInvocationEvent {
+    string request_id = 1;
+    LLMStreamEvent event = 2;
+}
+
+// The connection stays open between generations, so the client needs a
+// control-plane exchange that can detect a host stopped while chat is idle.
+// These frames deliberately remain separate from LLM invocation payloads:
+// a health check must never reach a model or appear as an assistant message.
+message ConnectHeartbeatRequest {
+    string session_id = 1;
+    uint64 sequence = 2;
+}
+
+message ConnectHeartbeatResponse {
+    string session_id = 1;
+    uint64 sequence = 2;
+}
+
+// Every frame after the initial ClientHello handshake is carried in one of
+// these explicit envelopes. This leaves typed inference traffic untouched
+// while allowing clients to verify an otherwise-idle host connection.
+message ConnectClientFrame {
+    oneof payload {
+        ConnectInvocationRequest invocation = 1;
+        ConnectHeartbeatRequest heartbeat = 2;
+    }
+}
+
+message ConnectHostFrame {
+    oneof payload {
+        ConnectInvocationEvent invocation_event = 1;
+        ConnectHeartbeatResponse heartbeat = 2;
+    }
+}

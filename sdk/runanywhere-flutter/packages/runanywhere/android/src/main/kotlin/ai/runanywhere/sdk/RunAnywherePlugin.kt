@@ -1,6 +1,8 @@
 package ai.runanywhere.sdk
 
 import android.os.Build
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.util.Log
 import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -17,6 +19,8 @@ import io.flutter.plugin.common.MethodChannel.Result
  */
 class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private var multicastLock: WifiManager.MulticastLock? = null
+    private var applicationContext: Context? = null
 
     companion object {
         private const val TAG = "RunAnywherePlugin"
@@ -58,6 +62,7 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        applicationContext = flutterPluginBinding.applicationContext
         try {
             FlutterSecureStorageBridge.initialize(flutterPluginBinding.applicationContext)
         } catch (_: Throwable) {
@@ -83,6 +88,13 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
             "getSocModel" -> {
                 result.success(getSocModel())
             }
+            "connectAcquireMulticastLock" -> {
+                result.success(acquireMulticastLock())
+            }
+            "connectReleaseMulticastLock" -> {
+                releaseMulticastLock()
+                result.success(null)
+            }
             else -> {
                 result.notImplemented()
             }
@@ -90,7 +102,36 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        releaseMulticastLock()
+        applicationContext = null
         channel.setMethodCallHandler(null)
+    }
+
+    /** Allow the SDK's Dart mDNS client to receive multicast packets on Android Wi-Fi. */
+    private fun acquireMulticastLock(): Boolean {
+        if (multicastLock?.isHeld == true) return true
+        val context = applicationContext ?: return false
+        val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return false
+        return try {
+            multicastLock =
+                wifiManager.createMulticastLock("runanywhere-connect-discovery").apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            true
+        } catch (error: Throwable) {
+            Log.w(TAG, "Unable to acquire Connect multicast lock", error)
+            multicastLock = null
+            false
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        val lock = multicastLock
+        multicastLock = null
+        if (lock?.isHeld == true) {
+            runCatching { lock.release() }
+        }
     }
 
     /**

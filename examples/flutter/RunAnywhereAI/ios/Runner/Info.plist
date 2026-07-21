@@ -30,6 +30,12 @@
 	<string>RunAnywhere AI needs access to your camera for vision language model features to analyze images.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice assistant features.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RunAnywhere searches for a language-model host only when you choose Find Host.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_runanywhere-connect._tcp</string>
+	</array>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>This app needs speech recognition for voice assistant features.</string>
 	<key>UIApplicationSceneManifest</key>

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/runanywhere.dart'
     show ToolCallingOptions, ToolCallFormatName;
+import 'package:runanywhere_ai/core/services/connect_service.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
@@ -80,7 +81,9 @@ class ChatMessage {
 /// pure [ListenableBuilder] consumer.
 class ChatViewModel extends ChangeNotifier {
   ChatViewModel({ConversationStore? store})
-    : _store = store ?? ConversationStore.shared;
+    : _store = store ?? ConversationStore.shared {
+    ConnectService.shared.addListener(_connectChanged);
+  }
 
   final ConversationStore _store;
 
@@ -106,10 +109,14 @@ class ChatViewModel extends ChangeNotifier {
   bool _loadedModelSupportsThinking = false;
   bool _loadedModelSupportsLora = false;
 
-  String? get loadedModelName => _loadedModelName;
+  String? get loadedModelName =>
+      ConnectService.shared.state.activeModel?.displayName ?? _loadedModelName;
   sdk.InferenceFramework? get loadedFramework => _loadedFramework;
   bool get loadedModelSupportsLora => _loadedModelSupportsLora;
-  bool get isModelLoaded => sdk.RunAnywhere.llm.isLoaded;
+  bool get isModelLoaded =>
+      ConnectService.shared.state.isConnected || sdk.RunAnywhere.llm.isLoaded;
+  bool get isUsingHostedModel => ConnectService.shared.state.isConnected;
+  sdk.ConnectState get connectState => ConnectService.shared.state;
 
   // --- LoRA adapter state ---------------------------------------------------
 
@@ -169,6 +176,7 @@ class ChatViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    ConnectService.shared.removeListener(_connectChanged);
     unawaited(_lifecycleSubscription?.cancel());
     if (_isGenerating) {
       sdk.RunAnywhere.llm.cancelGeneration();
@@ -199,7 +207,14 @@ class ChatViewModel extends ChangeNotifier {
   // --- Sending --------------------------------------------------------------
 
   bool canSend(String text) =>
-      text.isNotEmpty && !_isGenerating && sdk.RunAnywhere.llm.isLoaded;
+      text.isNotEmpty && !_isGenerating && isModelLoaded;
+
+  void _connectChanged() {
+    if (!ConnectService.shared.state.isConnected) {
+      unawaited(syncModelState());
+    }
+    notifyListeners();
+  }
 
   void clearError() {
     _errorMessage = null;
@@ -246,6 +261,7 @@ class ChatViewModel extends ChangeNotifier {
 
       final toolSettings = ToolSettingsViewModel.shared;
       final useToolCalling =
+          !isUsingHostedModel &&
           toolSettings.toolCallingEnabled &&
           toolSettings.registeredTools.isNotEmpty;
 
@@ -265,7 +281,9 @@ class ChatViewModel extends ChangeNotifier {
           disableThinking: disableThinking,
         );
 
-        if (_useStreaming) {
+        if (isUsingHostedModel) {
+          await _generateHostedStreaming(userMessage, options);
+        } else if (_useStreaming) {
           await _generateStreaming(userMessage, options);
         } else {
           await _generateNonStreaming(userMessage, options);
@@ -280,7 +298,11 @@ class ChatViewModel extends ChangeNotifier {
 
   /// Stop the in-flight generation (mirrors iOS `stopGeneration`).
   void stopGeneration() {
-    sdk.RunAnywhere.llm.cancelGeneration();
+    if (isUsingHostedModel) {
+      unawaited(ConnectService.shared.disconnect());
+    } else {
+      sdk.RunAnywhere.llm.cancelGeneration();
+    }
     _isGenerating = false;
     notifyListeners();
   }
@@ -462,6 +484,64 @@ class ChatViewModel extends ChangeNotifier {
     } catch (e) {
       _messages.removeLast();
       _errorMessage = 'Streaming failed: $e';
+      _isGenerating = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _generateHostedStreaming(
+    String prompt,
+    sdk.LLMGenerationOptions options,
+  ) async {
+    final modelName = loadedModelName;
+    final assistantMessage = _appendEmptyAssistantMessage();
+    final messageIndex = _messages.length - 1;
+
+    try {
+      final result = await sdk.RunAnywhere.aggregateStream(
+        prompt: prompt,
+        events: ConnectService.shared.session.generateStream(
+          sdk.LLMGenerateRequest(prompt: prompt, options: options),
+        ),
+        onToken: (aggregated) async {
+          if (_timeToFirstToken == null && _generationStartTime != null) {
+            _timeToFirstToken =
+                DateTime.now()
+                    .difference(_generationStartTime!)
+                    .inMilliseconds /
+                1000.0;
+          }
+          _messages[messageIndex] = _messages[messageIndex].copyWith(
+            content: aggregated,
+          );
+          notifyListeners();
+        },
+      );
+      if (result.errorMessage.isNotEmpty) {
+        throw Exception(result.errorMessage);
+      }
+      final finalMessage = _messages[messageIndex].copyWith(
+        content: result.text,
+        thinkingContent: result.thinkingContent.isEmpty
+            ? null
+            : result.thinkingContent,
+        analytics: MessageAnalytics(
+          messageId: assistantMessage.id,
+          modelName: modelName,
+          timeToFirstToken: _timeToFirstToken,
+          totalGenerationTime: _elapsedGenerationSeconds(),
+          outputTokens: result.tokensGenerated,
+          tokensPerSecond: result.tokensPerSecond,
+          wasThinkingMode: result.thinkingContent.isNotEmpty,
+        ),
+      );
+      _messages[messageIndex] = finalMessage;
+      _isGenerating = false;
+      _persistMessage(finalMessage);
+      notifyListeners();
+    } catch (error) {
+      _messages.removeLast();
+      _errorMessage = 'Hosted generation failed: $error';
       _isGenerating = false;
       notifyListeners();
     }

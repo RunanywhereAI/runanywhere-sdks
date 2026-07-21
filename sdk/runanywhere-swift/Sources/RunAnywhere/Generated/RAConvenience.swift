@@ -177,6 +177,41 @@ extension RAArchiveStructure {
     }
 }
 
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVADConfiguration {
+        var r = RAVADConfiguration()
+        r.sampleRate = 16000
+        r.frameLengthMs = 100
+        r.threshold = 0.015
+        return r
+    }
+}
+
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if sampleRate < 1 || sampleRate > 48000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.sample_rate",
+                message: "sample_rate must be in 1...48000 (got \(sampleRate))"
+            )
+        }
+        if frameLengthMs < 1 || frameLengthMs > 1000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.frame_length_ms",
+                message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
+            )
+        }
+        if threshold < 0.0 || threshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.threshold",
+                message: "threshold must be in 0.0...1.0 (got \(threshold))"
+            )
+        }
+    }
+}
+
 extension RAEmbeddingsConfiguration {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RAEmbeddingsConfiguration {
@@ -218,41 +253,6 @@ extension RAEmbeddingsOptions {
         var r = RAEmbeddingsOptions()
         r.normalize = true
         return r
-    }
-}
-
-extension RAVADConfiguration {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVADConfiguration {
-        var r = RAVADConfiguration()
-        r.sampleRate = 16000
-        r.frameLengthMs = 100
-        r.threshold = 0.015
-        return r
-    }
-}
-
-extension RAVADConfiguration {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if sampleRate < 1 || sampleRate > 48000 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.sample_rate",
-                message: "sample_rate must be in 1...48000 (got \(sampleRate))"
-            )
-        }
-        if frameLengthMs < 1 || frameLengthMs > 1000 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.frame_length_ms",
-                message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
-            )
-        }
-        if threshold < 0.0 || threshold > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.threshold",
-                message: "threshold must be in 0.0...1.0 (got \(threshold))"
-            )
-        }
     }
 }
 

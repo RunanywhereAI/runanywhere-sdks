@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- This is an Android library module, no specific permissions or activities needed here -->
+    <!-- Connect uses Android NSD and a framed TCP channel only after the app
+         explicitly starts discovery. ACCESS_LOCAL_NETWORK is runtime-gated on
+         newer Android releases; apps remain responsible for requesting it at
+         the feature entry point. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 </manifest>

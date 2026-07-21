@@ -44,6 +44,10 @@ import com.runanywhere.runanywhereai.ui.screens.vision.VisionAnswerMode
 import com.runanywhere.runanywhereai.ui.screens.vision.VisionGenerationPolicy
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.connect.ConnectModel
+import com.runanywhere.sdk.public.connect.ConnectSession
+import com.runanywhere.sdk.public.connect.ConnectState
+import com.runanywhere.sdk.public.connect.ConnectStatus
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
@@ -122,10 +126,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     val toolsEnabled: Boolean
-        get() = toolsRequested && ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
+        get() = !isUsingConnect && toolsRequested &&
+            ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
 
     val toolsUnavailableMessage: String?
         get() {
+            if (isUsingConnect && toolsRequested) {
+                return "Web & tools are unavailable while using a hosted model."
+            }
             val availability = ToolCallingModelPolicy.evaluate(GlobalState.model.loaded)
             return availability.message.takeIf {
                 !availability.isAvailable && (toolsRequested || showToolGateNotice)
@@ -133,13 +141,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     val canSend: Boolean
-        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && GlobalState.model.isLoaded
+        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() &&
+            (GlobalState.model.isLoaded || isUsingConnect)
+
+    val isUsingConnect: Boolean
+        get() = connectState.status == ConnectStatus.CONNECTED && connectState.activeModel != null
 
     private var job: Job? = null
     private var cancellationJob: Job? = null
     private var conversationTransitionJob: Job? = null
     private var persistJob: Job? = null
     private var smartTitleJob: Job? = null
+    private var connectStateJob: Job? = null
+    private var connectSession: ConnectSession? = null
+    private var connectState by mutableStateOf(ConnectState())
     private val smartTitleLifecycle = SmartTitleLifecycle()
     private val generationOwnership = ChatGenerationOwnership()
     private var activeReplyIndex: Int? = null
@@ -205,7 +220,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         job?.cancel()
         persistJob?.cancel()
         smartTitleJob?.cancel()
+        connectStateJob?.cancel()
         super.onCleared()
+    }
+
+    fun bindConnectSession(session: ConnectSession) {
+        if (connectSession === session) return
+        connectStateJob?.cancel()
+        connectSession = session
+        connectState = session.state.value
+        connectStateJob = viewModelScope.launch {
+            session.state.collect { connectState = it }
+        }
     }
 
     fun onInputChange(value: String) {
@@ -271,67 +297,87 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 awaitSmartTitleStopped(titleToStop)
                 ensureOwns(request)
-                val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
-                bindActiveModel(request, activeModel)
-                // Trim old turns to the model's context window so small-context models (e.g.
-                // Llama-3.2-1B = 512 on v79) don't rc=-130 once a long conversation overruns MAXCTX.
-                val effectiveTurn = ChatRequestPolicy.windowHistory(
-                    turn = turn,
-                    contextTokens = activeModel.model.context_length,
-                    outputTokens = ChatGenerationBudgetPolicy.resolve(
-                        requestedMaxTokens = SettingsRepository.settings.maxTokens,
-                        modelContextTokens = activeModel.model.context_length,
-                    ).effectiveMaxTokens,
-                    systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
-                )
-                val registeredTools = if (toolsRequested) {
-                    RunAnywhere.getRegisteredTools()
+                val hostedModel = connectState.activeModel
+                val hostedSession = connectSession
+                if (isUsingConnect && hostedModel != null && hostedSession != null) {
+                    val streaming = SettingsRepository.settings.streaming && hostedModel.supportsStreaming
+                    val effectiveTurn = ChatRequestPolicy.windowHistory(
+                        turn = turn,
+                        contextTokens = hostedModel.contextWindow,
+                        outputTokens = ChatGenerationBudgetPolicy.resolve(
+                            requestedMaxTokens = SettingsRepository.settings.maxTokens,
+                            modelContextTokens = hostedModel.contextWindow,
+                        ).effectiveMaxTokens,
+                        systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+                    )
+                    val llmRequest = ChatRequestPolicy.buildRequest(
+                        turn = effectiveTurn,
+                        options = generationOptions(
+                            contextTokens = hostedModel.contextWindow,
+                            modelName = hostedModel.displayName,
+                        ),
+                        conversationId = ensureConversationId(),
+                        streaming = streaming,
+                    )
+                    generateHostedReply(
+                        request = request,
+                        llmRequest = llmRequest,
+                        index = replyIndex,
+                        model = hostedModel,
+                        session = hostedSession,
+                        streamUpdates = streaming,
+                    )
                 } else {
-                    emptyList()
-                }
-                val toolPreflight = ToolCallingModelPolicy.preflight(
-                    toolsRequested = toolsRequested,
-                    registeredToolCount = registeredTools.size,
-                    model = activeModel.model,
-                )
-                when (toolPreflight.route) {
-                    ToolCallingRoute.TOOL_GENERATION ->
-                        generateWithTools(
-                            request,
-                            prompt,
-                            replyIndex,
-                            activeModel,
-                            registeredTools,
-                            // Normalized flat alternating [user0, asst0, ...] of PRIOR turns
-                            // from the SAME snapshot the standard path uses (turn.history is
-                            // captured before the current prompt is appended, so it already
-                            // excludes the current turn). toToolCallingHistory mirrors the
-                            // standard path's commons normalizer (coalesce same-role, drop
-                            // leading-assistant/trailing-user) so a dropped blank assistant
-                            // turn can't hand commons a mislabeled non-alternating list.
-                            history = ChatRequestPolicy.toToolCallingHistory(effectiveTurn.history),
-                        )
-                    ToolCallingRoute.BLOCKED -> {
-                        showToolGateNotice = true
-                        updateReply(request, replyIndex) { reply ->
-                            reply.copy(
-                                text = toolPreflight.availability.message
-                                    ?: "Web & tools are unavailable for the current model.",
+                    val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
+                    bindActiveModel(request, activeModel)
+                    // Trim old turns to the model's context window so small-context models do not overflow.
+                    val effectiveTurn = ChatRequestPolicy.windowHistory(
+                        turn = turn,
+                        contextTokens = activeModel.model.context_length,
+                        outputTokens = ChatGenerationBudgetPolicy.resolve(
+                            requestedMaxTokens = SettingsRepository.settings.maxTokens,
+                            modelContextTokens = activeModel.model.context_length,
+                        ).effectiveMaxTokens,
+                        systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+                    )
+                    val registeredTools = if (toolsRequested) RunAnywhere.getRegisteredTools() else emptyList()
+                    val toolPreflight = ToolCallingModelPolicy.preflight(
+                        toolsRequested = toolsRequested,
+                        registeredToolCount = registeredTools.size,
+                        model = activeModel.model,
+                    )
+                    when (toolPreflight.route) {
+                        ToolCallingRoute.TOOL_GENERATION ->
+                            generateWithTools(
+                                request,
+                                prompt,
+                                replyIndex,
+                                activeModel,
+                                registeredTools,
+                                history = ChatRequestPolicy.toToolCallingHistory(effectiveTurn.history),
                             )
+                        ToolCallingRoute.BLOCKED -> {
+                            showToolGateNotice = true
+                            updateReply(request, replyIndex) { reply ->
+                                reply.copy(
+                                    text = toolPreflight.availability.message
+                                        ?: "Web & tools are unavailable for the current model.",
+                                )
+                            }
                         }
-                    }
-                    ToolCallingRoute.STANDARD_GENERATION -> {
-                        val streaming = SettingsRepository.settings.streaming
-                        val llmRequest = ChatRequestPolicy.buildRequest(
-                            turn = effectiveTurn,
-                            options = generationOptions(activeModel),
-                            conversationId = ensureConversationId(),
-                            streaming = streaming,
-                        )
-                        if (streaming) {
-                            streamReply(request, llmRequest, replyIndex, activeModel)
-                        } else {
-                            generateReply(request, llmRequest, replyIndex, activeModel)
+                        ToolCallingRoute.STANDARD_GENERATION -> {
+                            val streaming = SettingsRepository.settings.streaming
+                            val llmRequest = ChatRequestPolicy.buildRequest(
+                                turn = effectiveTurn,
+                                options = generationOptions(activeModel),
+                                conversationId = ensureConversationId(),
+                                streaming = streaming,
+                            )
+                            if (streaming) {
+                                streamReply(request, llmRequest, replyIndex, activeModel)
+                            } else {
+                                generateReply(request, llmRequest, replyIndex, activeModel)
+                            }
                         }
                     }
                 }
@@ -575,29 +621,78 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun generationOptions(activeModel: RuntimeModelSnapshot): RALLMGenerationOptions {
+        val options = generationOptions(activeModel.model.context_length, activeModel.model.name)
+        val s = SettingsRepository.settings
+        return options.copy(
+            thinking_pattern = activeModel.model.thinking_pattern.takeIf {
+                activeModel.model.supports_thinking && !s.disableThinking
+            },
+            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
+        )
+    }
+
+    private fun generationOptions(contextTokens: Int, modelName: String): RALLMGenerationOptions {
         val s = SettingsRepository.settings
         val budget = ChatGenerationBudgetPolicy.resolve(
             requestedMaxTokens = s.maxTokens,
-            modelContextTokens = activeModel.model.context_length,
+            modelContextTokens = contextTokens,
         )
         if (budget.isCapped) {
             RACLog.i(
                 "chat output budget capped from ${budget.requestedMaxTokens} to " +
-                    "${budget.effectiveMaxTokens} for ${activeModel.model.id}",
+                    "${budget.effectiveMaxTokens} for $modelName",
             )
         }
         return RALLMGenerationOptions(
             max_tokens = budget.effectiveMaxTokens,
             temperature = s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
-            thinking_pattern = activeModel.model.thinking_pattern.takeIf {
-                activeModel.model.supports_thinking && !s.disableThinking
-            },
-            // Only apply the "disable thinking" preference to models that actually think — on a
-            // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
-            // and corrupts the prompt (e.g. Llama). Bug 5 follow-up.
-            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
+            thinking_pattern = null,
+            disable_thinking = s.disableThinking,
         )
+    }
+
+    private suspend fun generateHostedReply(
+        request: ChatGenerationRequest,
+        llmRequest: RALLMGenerateRequest,
+        index: Int,
+        model: ConnectModel,
+        session: ConnectSession,
+        streamUpdates: Boolean,
+    ) {
+        val events = session.generateStream(llmRequest)
+        val result = RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
+            if (streamUpdates) updateReply(request, index) { it.copy(text = accumulated) }
+        }
+
+        ensureOwns(request)
+        if (!result.error_message.isNullOrBlank()) {
+            updateReply(request, index) {
+                it.copy(text = "Error: ${result.error_message}", thinking = null)
+            }
+            return
+        }
+        val totalMs = result.generation_time_ms.toLong()
+        val tokens = result.tokens_generated
+        val tps = result.tokens_per_second.takeIf { it > 0 }
+            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
+        updateReply(request, index) { reply ->
+            reply.copy(
+                text = result.text,
+                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+                stats = GenerationStats(
+                    tokens = tokens,
+                    tokensPerSecond = tps,
+                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 },
+                    totalTimeMs = totalMs,
+                    inputTokens = result.input_tokens,
+                    modelName = model.displayName,
+                    framework = model.framework,
+                    mode = if (streamUpdates) GenerationMode.STREAMING else GenerationMode.NON_STREAMING,
+                ),
+            )
+        }
+        conversationModelName = model.displayName
     }
 
     private suspend fun generateReply(

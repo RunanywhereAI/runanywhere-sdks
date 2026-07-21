@@ -107,6 +107,17 @@ public:
   std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
   std::shared_ptr<Promise<std::string>> getDeviceId() override;
 
+  // Connect client policy and handshake
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  connectGetPlatformPolicyProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  connectClientCreateHelloProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  connectClientValidateHostProto(
+      const std::shared_ptr<ArrayBuffer> &responseBytes) override;
+
   // ============================================================================
   // Model Registry - Delegates to ModelRegistryBridge
   // ============================================================================

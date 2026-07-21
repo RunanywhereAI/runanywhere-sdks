@@ -161,6 +161,25 @@ export interface RunAnywhereCore extends HybridObject<{
   getDeviceId(): Promise<string>;
 
   // ============================================================================
+  // Connect client policy and handshake
+  // ============================================================================
+
+  /** Return the C++-owned platform role policy. */
+  connectGetPlatformPolicyProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /** Create a canonical client hello after C++ policy validation. */
+  connectClientCreateHelloProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /** Validate a host handshake and return the typed client session state. */
+  connectClientValidateHostProto(
+    responseBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  // ============================================================================
   // Model Registry
   // Matches Swift: CppBridge+ModelRegistry.swift
   // ============================================================================

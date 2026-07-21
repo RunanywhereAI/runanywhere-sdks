@@ -214,6 +214,33 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       framework ?? LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 
   Widget _buildModelStatusBanner() {
+    if (_viewModel.isUsingHostedModel) {
+      final state = _viewModel.connectState;
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: ListTile(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusCard),
+          ),
+          tileColor: AppColors.backgroundGray6(context),
+          leading: const Icon(Icons.desktop_windows_outlined),
+          title: Text(
+            state.activeModel?.displayName ?? 'Hosted model',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            'Host · ${state.activeHost?.displayName ?? 'Connected'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: TextButton(
+            onPressed: _showModelSelectionSheet,
+            child: const Text('Change'),
+          ),
+        ),
+      );
+    }
     LLMFramework? framework;
     if (_viewModel.isModelLoaded && _viewModel.loadedFramework != null) {
       framework = _mapInferenceFramework(_viewModel.loadedFramework);

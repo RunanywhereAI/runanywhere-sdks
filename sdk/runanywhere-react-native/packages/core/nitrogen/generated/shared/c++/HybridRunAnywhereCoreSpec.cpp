@@ -36,6 +36,9 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("getOrganizationId", &HybridRunAnywhereCoreSpec::getOrganizationId);
       prototype.registerHybridMethod("isDeviceRegistered", &HybridRunAnywhereCoreSpec::isDeviceRegistered);
       prototype.registerHybridMethod("getDeviceId", &HybridRunAnywhereCoreSpec::getDeviceId);
+      prototype.registerHybridMethod("connectGetPlatformPolicyProto", &HybridRunAnywhereCoreSpec::connectGetPlatformPolicyProto);
+      prototype.registerHybridMethod("connectClientCreateHelloProto", &HybridRunAnywhereCoreSpec::connectClientCreateHelloProto);
+      prototype.registerHybridMethod("connectClientValidateHostProto", &HybridRunAnywhereCoreSpec::connectClientValidateHostProto);
       prototype.registerHybridMethod("getAvailableModelsProto", &HybridRunAnywhereCoreSpec::getAvailableModelsProto);
       prototype.registerHybridMethod("frameworkDisplayName", &HybridRunAnywhereCoreSpec::frameworkDisplayName);
       prototype.registerHybridMethod("modelCategoryDefaultFramework", &HybridRunAnywhereCoreSpec::modelCategoryDefaultFramework);

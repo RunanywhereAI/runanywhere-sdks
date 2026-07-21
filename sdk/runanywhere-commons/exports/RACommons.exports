@@ -83,6 +83,22 @@ _rac_platform_services_register_availability_callback
 _rac_http_download
 _rac_http_download_cancel
 
+# Connect — protocol/session policy plus the platform transport adapter ABI.
+_rac_connect_client_create_hello_proto
+_rac_connect_client_validate_host_proto
+_rac_connect_get_platform_policy_proto
+_rac_connect_host_accept_client_proto
+_rac_connect_host_close_session_proto
+_rac_connect_host_start_proto
+_rac_connect_host_stop_proto
+_rac_connect_host_validate_invocation_proto
+_rac_connect_transport_close
+_rac_connect_transport_is_registered
+_rac_connect_transport_open
+_rac_connect_transport_receive
+_rac_connect_transport_register
+_rac_connect_transport_send
+
 # Events — internal lower-level publisher used by lifecycle manager,
 # storage analyzer, device manager, and engine plugins for telemetry
 # breadcrumbs. Public SDK event stream is rac_sdk_event_* below.

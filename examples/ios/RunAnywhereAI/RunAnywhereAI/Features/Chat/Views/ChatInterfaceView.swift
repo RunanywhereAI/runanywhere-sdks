@@ -66,6 +66,9 @@ struct ChatInterfaceView: View {
     @State private var loraScale: Float = 1.0
     @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
     @ObservedObject private var settingsViewModel = SettingsViewModel.shared
+    #if os(iOS)
+    @ObservedObject private var connectController = ConnectClientController.shared
+    #endif
     @FocusState private var isTextFieldFocused: Bool
 
     private let logger = Logger(
@@ -176,7 +179,15 @@ struct ChatInterfaceView: View {
             await viewModel.initialize()
             await refreshVisionModelStatus()
             await hydrateDefaultDocumentModels()
+            #if os(iOS)
+            await synchronizeConnectState()
+            #endif
         }
+        #if os(iOS)
+        .onChange(of: connectController.session.status) { _, _ in
+            Task { await synchronizeConnectState() }
+        }
+        #endif
         .onChange(of: viewModel.isModelLoaded) { wasLoaded, isLoaded in
             if isLoaded && !wasLoaded {
                 showModelLoadedToast = true
@@ -265,11 +276,20 @@ extension ChatInterfaceView {
         VStack(spacing: 0) {
             consumerTopBar
 
-            ZStack {
+            // The banner belongs to the chat surface, not the entire screen.
+            // It therefore overlays content below the top bar without ever
+            // obscuring the navigation, selected model, or settings controls.
+            ZStack(alignment: .top) {
                 VStack(spacing: 0) {
                     contentArea
                 }
                 modelRequiredOverlayIfNeeded
+
+                #if os(iOS)
+                ConnectStatusBanner()
+                    .padding(.top, AppSpacing.small)
+                    .zIndex(1)
+                #endif
             }
         }
     }
@@ -394,9 +414,13 @@ extension ChatInterfaceView {
                             .lineLimit(1)
 
                         HStack(spacing: 3) {
-                            Image(systemName: viewModel.selectedFramework?.consumerBackendIcon ?? "cube")
+                            Image(systemName: viewModel.isUsingConnect
+                                  ? "desktopcomputer"
+                                  : viewModel.selectedFramework?.consumerBackendIcon ?? "cube")
                                 .font(.system(size: 7))
-                            Text(viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready")
+                            Text(viewModel.isUsingConnect
+                                 ? "Mac"
+                                 : viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready")
                                 .font(.system(size: 8, weight: .medium))
                         }
                         .foregroundColor(viewModel.selectedFramework?.consumerBackendColor ?? AppColors.primaryAccent)
@@ -417,6 +441,20 @@ extension ChatInterfaceView {
 // MARK: - Helper Methods
 
 extension ChatInterfaceView {
+    #if os(iOS)
+    private func synchronizeConnectState() async {
+        if case .connected = connectController.session.status,
+           let model = connectController.session.activeModel {
+            viewModel.activateConnectModel(
+                model,
+                hostName: connectController.session.activeHost?.displayName ?? "Mac"
+            )
+        } else if viewModel.isUsingConnect {
+            await viewModel.deactivateConnectModel()
+        }
+    }
+    #endif
+
     private var canSendCurrentTurn: Bool {
         let hasText = !viewModel.currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         if pendingImageAttachment != nil {

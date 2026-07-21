@@ -25,7 +25,7 @@ extension LLMViewModel {
         // to do alongside a hardcoded `framework = "llamacpp"` literal.
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
         let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let eventStream = try await RunAnywhere.generateStream(request)
+        let eventStream = try await generationStream(for: request)
         let result = await RunAnywhere.aggregateStream(
             prompt: prompt,
             events: eventStream,
@@ -73,7 +73,21 @@ extension LLMViewModel {
     ) async throws {
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
         let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let result = try await RunAnywhere.generate(request)
+        let result: RALLMGenerationResult
+        #if os(iOS)
+        if isUsingConnect {
+            // Connect uses one typed streaming transport for both chat modes;
+            // aggregate it here when the user has disabled live token updates.
+            result = await RunAnywhere.aggregateStream(
+                prompt: prompt,
+                events: try await generationStream(for: request)
+            )
+        } else {
+            result = try await RunAnywhere.generate(request)
+        }
+        #else
+        result = try await RunAnywhere.generate(request)
+        #endif
         guard isCurrentGeneration(generationID) else { return }
         await updateMessageWithResult(
             at: messageIndex,
@@ -142,6 +156,15 @@ extension LLMViewModel {
         return history
     }
 
+    private func generationStream(for request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
+        #if os(iOS)
+        if isUsingConnect {
+            return try await ConnectClientController.shared.session.generateStream(request)
+        }
+        #endif
+        return try await RunAnywhere.generateStream(request)
+    }
+
     // MARK: - Message Updates
 
     func updateMessageContent(at index: Int, content: String) {
@@ -203,7 +226,7 @@ extension LLMViewModel {
         )
 
         let modelInfo: MessageModelInfo?
-        if let currentModel = ModelListViewModel.shared.currentModel {
+        if !isUsingConnect, let currentModel = ModelListViewModel.shared.currentModel {
             modelInfo = MessageModelInfo(from: currentModel)
         } else {
             modelInfo = nil

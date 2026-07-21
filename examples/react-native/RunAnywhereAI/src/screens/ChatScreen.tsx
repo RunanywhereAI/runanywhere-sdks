@@ -21,7 +21,13 @@
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useSyncExternalStore,
+} from 'react';
 import {
   View,
   Text,
@@ -63,6 +69,7 @@ import { getPrimaryFramework } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
+import { ConnectService } from '../services/ConnectService';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
   ToolCallFormatName,
@@ -139,6 +146,12 @@ export const ChatScreen: React.FC = () => {
   // LoRA adapter management (mirrors iOS LLMViewModel.loraAdapters).
   const [showLoRASheet, setShowLoRASheet] = useState(false);
   const [loraAdapterCount, setLoraAdapterCount] = useState(0);
+  const connectState = useSyncExternalStore(
+    ConnectService.subscribe,
+    ConnectService.getSnapshot,
+    ConnectService.getSnapshot
+  );
+  const [showConnectBanner, setShowConnectBanner] = useState(false);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
@@ -146,6 +159,20 @@ export const ChatScreen: React.FC = () => {
 
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (
+      connectState.status !== 'connected' &&
+      connectState.status !== 'disconnected' &&
+      connectState.status !== 'failed'
+    ) {
+      return;
+    }
+    setShowConnectBanner(true);
+    if (connectState.status !== 'connected') return;
+    const timer = setTimeout(() => setShowConnectBanner(false), 6000);
+    return () => clearTimeout(timer);
+  }, [connectState.status, connectState.activeHost?.id, connectState.message]);
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -357,10 +384,10 @@ export const ChatScreen: React.FC = () => {
   const handleToggleTools = useCallback(() => {
     setToolsEnabled((prev) => {
       const next = !prev;
-      void AsyncStorage.setItem(
+      AsyncStorage.setItem(
         APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
         next ? 'true' : 'false'
-      );
+      ).catch(() => undefined);
       return next;
     });
   }, []);
@@ -378,7 +405,14 @@ export const ChatScreen: React.FC = () => {
       const text = (
         typeof promptOverride === 'string' ? promptOverride : inputText
       ).trim();
-      if (isLoading || !text || !currentConversation) return;
+      const hostedModel = connectState.activeModel;
+      if (
+        isLoading ||
+        !text ||
+        !currentConversation ||
+        (!currentModel && !hostedModel)
+      )
+        return;
 
       const userMessage: Message = {
         id: generateId(),
@@ -413,7 +447,8 @@ export const ChatScreen: React.FC = () => {
         );
 
         const registeredTools = await RunAnywhere.getRegisteredTools();
-        const shouldUseTools = toolsEnabled && registeredTools.length > 0;
+        const shouldUseTools =
+          !hostedModel && toolsEnabled && registeredTools.length > 0;
         const supportsThinking = currentModel?.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
         const disableThinking =
@@ -442,9 +477,14 @@ export const ChatScreen: React.FC = () => {
           disableThinking,
         });
 
-        const frameworkName = RunAnywhere.formatFramework(
-          currentModel?.preferredFramework ?? currentModel?.framework
-        );
+        const activeModelId = hostedModel?.id || currentModel?.id || 'unknown';
+        const activeModelName =
+          hostedModel?.displayName || currentModel?.name || 'Unknown Model';
+        const frameworkName = hostedModel?.framework
+          ? hostedModel.framework
+          : RunAnywhere.formatFramework(
+              currentModel?.preferredFramework ?? currentModel?.framework
+            );
 
         // Insert the initial empty assistant message once (matches iOS two-phase pattern).
         const initialAssistantMessage: Message = {
@@ -454,8 +494,8 @@ export const ChatScreen: React.FC = () => {
           timestamp: new Date(),
           isStreaming: true,
           modelInfo: {
-            modelId: currentModel?.id || 'unknown',
-            modelName: currentModel?.name || 'Unknown Model',
+            modelId: activeModelId,
+            modelName: activeModelName,
             framework: frameworkName,
             frameworkDisplayName: frameworkName,
           },
@@ -531,7 +571,18 @@ export const ChatScreen: React.FC = () => {
           // Stream tokens as they arrive — canonical cross-SDK path. We drive
           // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
           // like iOS LLMViewModel+Generation.swift.
-          const eventStream = RunAnywhere.generateStream(prompt, genOptions);
+          const eventStream = hostedModel
+            ? ConnectService.session.generateStream({
+                prompt,
+                emitThoughts: options.thinkingModeEnabled,
+                requestId: assistantMessageId,
+                modelId: hostedModel.id,
+                conversationId: currentConversation.id,
+                metadata: {},
+                options: genOptions,
+                history: [],
+              })
+            : RunAnywhere.generateStream(prompt, genOptions);
           const result = await RunAnywhere.aggregateStream(
             prompt,
             eventStream,
@@ -545,8 +596,8 @@ export const ChatScreen: React.FC = () => {
                   timestamp: new Date(),
                   isStreaming: true,
                   modelInfo: {
-                    modelId: currentModel?.id || 'unknown',
-                    modelName: currentModel?.name || 'Unknown Model',
+                    modelId: activeModelId,
+                    modelName: activeModelName,
                     framework: frameworkName,
                     frameworkDisplayName: frameworkName,
                   },
@@ -570,8 +621,8 @@ export const ChatScreen: React.FC = () => {
             thinkingContent: result.thinkingContent,
             timestamp: new Date(),
             modelInfo: {
-              modelId: currentModel?.id || 'unknown',
-              modelName: currentModel?.name || 'Unknown Model',
+              modelId: activeModelId,
+              modelName: activeModelName,
               framework: frameworkName,
               frameworkDisplayName: frameworkName,
             },
@@ -648,6 +699,7 @@ export const ChatScreen: React.FC = () => {
       inputText,
       currentConversation,
       currentModel,
+      connectState.activeModel,
       toolsEnabled,
       addMessage,
       updateMessage,
@@ -657,7 +709,7 @@ export const ChatScreen: React.FC = () => {
 
   const handleStopGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
-    void RunAnywhere.cancelGeneration();
+    RunAnywhere.cancelGeneration().catch(() => undefined);
     setIsLoading(false);
   }, []);
 
@@ -726,8 +778,8 @@ export const ChatScreen: React.FC = () => {
    */
   const renderHeader = () => (
     <ChatHeader
-      modelName={currentModel?.name}
-      ready={!!currentModel}
+      modelName={connectState.activeModel?.displayName || currentModel?.name}
+      ready={!!currentModel || connectState.status === 'connected'}
       generating={isLoading}
       hasMessages={messages.length > 0}
       onModelPress={handleSelectModel}
@@ -737,11 +789,55 @@ export const ChatScreen: React.FC = () => {
     />
   );
 
-  const showOverlay = !currentModel && !isModelLoading;
+  const hasUsableModel = !!currentModel || connectState.status === 'connected';
+  const showOverlay = !hasUsableModel && !isModelLoading;
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {renderHeader()}
+
+      {showConnectBanner && (
+        <View style={[styles.connectBanner, { top: insets.top + 64 }]}>
+          <View style={styles.connectBannerIcon}>
+            <Icon
+              name={
+                connectState.status === 'connected'
+                  ? 'checkmark-circle'
+                  : 'alert-circle-outline'
+              }
+              size={24}
+              color={
+                connectState.status === 'connected'
+                  ? Colors.statusGreen
+                  : Colors.primaryRed
+              }
+            />
+          </View>
+          <View style={styles.connectBannerText}>
+            <Text style={styles.connectBannerTitle} numberOfLines={1}>
+              {connectState.status === 'connected'
+                ? `Connected to ${connectState.activeHost?.displayName || 'Host'}`
+                : 'Host connection ended'}
+            </Text>
+            <Text style={styles.connectBannerSubtitle} numberOfLines={1}>
+              {connectState.status === 'connected'
+                ? connectState.activeModel?.displayName
+                : connectState.message || 'Choose a local model or reconnect'}
+            </Text>
+          </View>
+          {connectState.status === 'connected' && (
+            <TouchableOpacity
+              style={styles.connectBannerAction}
+              onPress={() => ConnectService.disconnect()}
+            >
+              <Text style={styles.connectBannerActionText}>Disconnect</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => setShowConnectBanner(false)}>
+            <Icon name="close" size={22} color={Colors.textTertiary} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {showOverlay ? (
         <ModelRequiredOverlay
@@ -766,12 +862,14 @@ export const ChatScreen: React.FC = () => {
           />
 
           {/* Tool Calling Badge (shows when tools are enabled) */}
-          {currentModel && registeredToolCount > 0 && (
-            <ToolCallingBadge toolCount={registeredToolCount} />
-          )}
+          {currentModel &&
+            connectState.status !== 'connected' &&
+            registeredToolCount > 0 && (
+              <ToolCallingBadge toolCount={registeredToolCount} />
+            )}
 
           {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
-          {currentModel && (
+          {currentModel && connectState.status !== 'connected' && (
             <View style={styles.loraRow}>
               <TouchableOpacity
                 style={[
@@ -804,11 +902,15 @@ export const ChatScreen: React.FC = () => {
           )}
 
           {/* Example prompts (mode follows tool/LoRA state), shown on an empty chat */}
-          {currentModel && messages.length === 0 && (
+          {hasUsableModel && messages.length === 0 && (
             <PromptSuggestions
-              toolsEnabled={toolsEnabled}
+              toolsEnabled={
+                connectState.status === 'connected' ? false : toolsEnabled
+              }
               loraActive={loraAdapterCount > 0}
-              onSelect={(p) => void handleSend(p)}
+              onSelect={(p) => {
+                handleSend(p).catch(() => undefined);
+              }}
             />
           )}
 
@@ -818,12 +920,18 @@ export const ChatScreen: React.FC = () => {
             onChangeText={setInputText}
             onSend={handleSend}
             onStop={handleStopGeneration}
-            disabled={!currentModel || !currentConversation}
+            disabled={!hasUsableModel || !currentConversation}
             isLoading={isLoading}
-            toolsEnabled={toolsEnabled}
-            onToggleTools={currentModel ? handleToggleTools : undefined}
+            toolsEnabled={
+              connectState.status === 'connected' ? false : toolsEnabled
+            }
+            onToggleTools={
+              currentModel && connectState.status !== 'connected'
+                ? handleToggleTools
+                : undefined
+            }
             placeholder={
-              currentModel
+              hasUsableModel
                 ? 'Type a message...'
                 : 'Select a model to start chatting'
             }
@@ -875,6 +983,58 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.backgroundPrimary,
+  },
+  connectBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 50,
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    shadowColor: '#000000',
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  connectBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.badgeGreen,
+  },
+  connectBannerText: {
+    flex: 1,
+  },
+  connectBannerTitle: {
+    ...Typography.headline,
+    color: Colors.textPrimary,
+  },
+  connectBannerSubtitle: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  connectBannerAction: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  connectBannerActionText: {
+    ...Typography.caption,
+    color: Colors.primaryRed,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

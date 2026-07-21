@@ -33,6 +33,12 @@
 	<string>Vision AI needs camera access to describe what you see</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RunAnywhere needs access to your microphone for speech-to-text transcription.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RunAnywhere searches for a language-model host only when you choose Find Host.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_runanywhere-connect._tcp</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Vision AI needs photo library access to describe images</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -942,6 +942,20 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDevConfigIsUsableHttpUrl(value: String): Boolean
 
+    // CONNECT CLIENT API (rac_connect.h)
+
+    /** Return the commons-owned role policy for a serialized Connect platform request. */
+    @JvmStatic
+    external fun racConnectGetPlatformPolicyProto(requestProto: ByteArray): ByteArray?
+
+    /** Validate client eligibility and create the typed Connect handshake hello. */
+    @JvmStatic
+    external fun racConnectClientCreateHelloProto(requestProto: ByteArray): ByteArray?
+
+    /** Validate the host response and return the model-bound client session state. */
+    @JvmStatic
+    external fun racConnectClientValidateHostProto(responseProto: ByteArray): ByteArray?
+
     // SDK configuration initialization
 
     /**

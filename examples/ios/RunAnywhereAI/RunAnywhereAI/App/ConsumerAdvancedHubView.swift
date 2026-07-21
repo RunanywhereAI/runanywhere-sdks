@@ -10,6 +10,19 @@ import SwiftUI
 struct ConsumerAdvancedHubView: View {
     var body: some View {
         List {
+            #if os(macOS)
+            Section("Connect") {
+                NavigationLink(destination: ConnectHostManagementView()) {
+                    AdvancedFeatureRow(
+                        icon: "macbook.and.iphone",
+                        color: AppColors.primaryAccent,
+                        title: "Host this Mac",
+                        subtitle: "Share a selected language model with your devices"
+                    )
+                }
+            }
+            #endif
+
             Section("Voice Utilities") {
                 NavigationLink(destination: SpeechToTextView()) {
                     AdvancedFeatureRow(
@@ -71,6 +84,7 @@ private struct AdvancedFeatureRow: View {
         HStack(spacing: AppSpacing.mediumLarge) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundColor(color)
                 .frame(width: 36, height: 36)
                 .background(color.opacity(0.12))

@@ -162,6 +162,36 @@ public fun ArchiveStructure.Companion.fromWireString(value: String): ArchiveStru
     }
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun VADConfiguration.Companion.defaults(): VADConfiguration =
+    VADConfiguration(
+        sample_rate = 16000,
+        frame_length_ms = 100,
+        threshold = 0.015f,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun VADConfiguration.validate() {
+    if (sample_rate < 1 || sample_rate > 48000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.sample_rate",
+            message = "sample_rate must be in 1...48000 (got ${sample_rate})",
+        )
+    }
+    if (frame_length_ms < 1 || frame_length_ms > 1000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.frame_length_ms",
+            message = "frame_length_ms must be in 1...1000 (got ${frame_length_ms})",
+        )
+    }
+    if (threshold < 0.0 || threshold > 1.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.threshold",
+            message = "threshold must be in 0.0...1.0 (got ${threshold})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun EmbeddingsConfiguration.Companion.defaults(): EmbeddingsConfiguration =
     EmbeddingsConfiguration(
         embedding_dimension = 384,
@@ -196,36 +226,6 @@ public fun EmbeddingsOptions.Companion.defaults(): EmbeddingsOptions =
     EmbeddingsOptions(
         normalize = true,
     )
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VADConfiguration.Companion.defaults(): VADConfiguration =
-    VADConfiguration(
-        sample_rate = 16000,
-        frame_length_ms = 100,
-        threshold = 0.015f,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VADConfiguration.validate() {
-    if (sample_rate < 1 || sample_rate > 48000) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.sample_rate",
-            message = "sample_rate must be in 1...48000 (got ${sample_rate})",
-        )
-    }
-    if (frame_length_ms < 1 || frame_length_ms > 1000) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.frame_length_ms",
-            message = "frame_length_ms must be in 1...1000 (got ${frame_length_ms})",
-        )
-    }
-    if (threshold < 0.0 || threshold > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.threshold",
-            message = "threshold must be in 0.0...1.0 (got ${threshold})",
-        )
-    }
-}
 
 /** Generated from `(runanywhere.v1.rac_display_name)` annotations in idl/. */
 public val LogLevel.displayName: String
