@@ -57,6 +57,19 @@ static const char* FORMAT_NAMES[] = {
     "Pythonic (bare)",  // RAC_TOOL_FORMAT_PYTHONIC
 };
 
+// Shared synthesis-turn grounding rule, appended wherever tool results are
+// handed back to the model for a final answer. Small models "helpfully"
+// fabricate a plausible number when the field they need is absent from the
+// result (observed live: a sleep query whose result carried only {"date":...}
+// was answered with an invented "7 hours"). Stating the rule at the exact
+// point of use — next to the result payload — is the strongest prompt-level
+// counter available, and living in commons it protects every SDK and every
+// model family, not just one example app.
+static const char* kToolResultGroundingRule =
+    "State only values literally present in the tool result. If the result lacks the value the "
+    "user asked for (or it is empty), say that data is unavailable - never estimate, invent, or "
+    "recall a plausible number.";
+
 static int64_t next_tool_call_id() {
     static std::atomic<int64_t> next{1};
     return next.fetch_add(1, std::memory_order_relaxed);
@@ -2321,10 +2334,11 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             }
             followup += "\nUsing all results above, answer the original question. ";
             if (keep_tools == RAC_TRUE) {
-                followup += "You may use another tool if needed.";
+                followup += "You may use another tool if needed. ";
             } else {
-                followup += "Do not emit tool calls or tool tags.";
+                followup += "Do not emit tool calls or tool tags. ";
             }
+            followup += kToolResultGroundingRule;
             prompt = dup_owned_string(followup);
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
@@ -2940,6 +2954,29 @@ extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
     return finalize_tool_validation(out_validation, errors, &args, &matched_tool_json);
 }
 
+// Today's date in UTC, formatted YYYY-MM-DD. Embedded into every tool prompt
+// (and the final web-search synthesis turn) because on-device models have no
+// notion of "now": with a 2023-era training cutoff they confidently invent
+// dates like "2024-01-01" when a tool argument or an answer needs one.
+// Grounding the prompt itself is the only fix that works across every model
+// family and every SDK — it cannot be forgotten by an app author.
+static std::string current_utc_date() {
+    const std::time_t now = std::time(nullptr);
+    std::tm utc{};
+#if defined(_WIN32)
+    if (gmtime_s(&utc, &now) != 0) {
+        return "unknown";
+    }
+#else
+    if (gmtime_r(&now, &utc) == nullptr) {
+        return "unknown";
+    }
+#endif
+    char value[11]{};
+    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
+                                                                       : std::string("unknown");
+}
+
 /**
  * @brief Generate format-specific tool calling instructions
  *
@@ -3135,7 +3172,12 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
-    prompt += "# TOOLS\n";
+    // Date grounding must precede everything else: models fill date-shaped
+    // tool arguments from training-data memory unless the true current date
+    // is right in front of them (see current_utc_date's rationale).
+    prompt += "Current date (UTC): ";
+    prompt += current_utc_date();
+    prompt += "\n\n# TOOLS\n";
     prompt += tools_json;
     prompt += "\n\n";
 
@@ -3143,8 +3185,14 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += get_format_example_json(actual_format);
 
     prompt += "\n\n## RULES\n";
+    // Soft AUTO framing (RUN-80): do not hard-code per-tool "ALWAYS call"
+    // rules here — that reintroduces small-model over-calling. Date grounding
+    // is additive and tool-agnostic.
     prompt += "- Call a tool only when it is needed to answer; otherwise reply normally.\n";
     prompt += "- Use only the tools listed above, with their exact names and parameters.\n";
+    prompt +=
+        "- Any date argument MUST be derived from the Current date above or from a date the "
+        "user explicitly stated. NEVER guess or recall dates from memory.\n";
 
     // Format-specific tag instructions (the parser keys on these exact tags, so a
     // tool call must always be wrapped in them — but this does NOT mean a tool must
@@ -3333,23 +3381,6 @@ static std::string compact_web_evidence_json(const char* tool_result_json) {
     return compact.empty() ? std::string(tool_result_json) : compact.dump();
 }
 
-static std::string current_utc_date() {
-    const std::time_t now = std::time(nullptr);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &now) != 0) {
-        return "unknown";
-    }
-#else
-    if (gmtime_r(&now, &utc) == nullptr) {
-        return "unknown";
-    }
-#endif
-    char value[11]{};
-    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
-                                                                       : std::string("unknown");
-}
-
 extern "C" rac_result_t
 rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char* tools_prompt,
                                     const char* tool_name, const char* tool_result_json,
@@ -3407,11 +3438,13 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
 
     if (keep_tools_available != 0) {
         prompt += "Using this information, respond to the user's original question. ";
-        prompt += "You may use additional tools if needed.";
+        prompt += "You may use additional tools if needed. ";
+        prompt += kToolResultGroundingRule;
     } else if (!is_final_web_search) {
         prompt +=
             "Using this information, provide a natural response to the user's original question. ";
-        prompt += "Do not use any tool tags in your response - just respond naturally.";
+        prompt += "Do not use any tool tags in your response - just respond naturally. ";
+        prompt += kToolResultGroundingRule;
     }
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
