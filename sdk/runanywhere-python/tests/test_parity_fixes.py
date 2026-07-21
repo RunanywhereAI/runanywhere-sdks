@@ -109,6 +109,9 @@ class _FakeCore:
     def unload_vad(self, handle):
         self.unloaded_vad.append(handle)
 
+    def backends(self):
+        return ["llamacpp", "onnx", "sherpa"]
+
 
 @pytest.fixture()
 def client_env(monkeypatch):
@@ -156,3 +159,9 @@ def test_vad_is_closed_on_client_shutdown(client_env):
     assert vad is not None
     ra.shutdown()
     assert fake.unloaded_vad == [7]  # registered -> close() -> core.unload_vad(handle)
+
+
+def test_available_backends_reports_core_list(client_env):
+    C, _ = client_env
+    # No initialize() required — it reflects the build's compiled-in backends.
+    assert C.RunAnywhere().available_backends() == ["llamacpp", "onnx", "sherpa"]
