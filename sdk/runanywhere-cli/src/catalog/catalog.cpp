@@ -83,6 +83,42 @@ constexpr CatalogFile kMlxQwen3_06BFiles[] = {
      "vocab.json", true},
 };
 
+constexpr CatalogFile kMlxNemotronNano8BFiles[] = {
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/config.json",
+     "config.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
 constexpr CatalogFile kMlxLlama32_1BFiles[] = {
     {"https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/"
      "main/"
@@ -309,6 +345,53 @@ constexpr CatalogFile kMlxGlmAsrNano2512Files[] = {
      "tokenizer_config.json", true},
 };
 
+constexpr CatalogFile kMlxParakeetCtc11BFiles[] = {
+    {"https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/"
+     "295d0c0557aef0c445db79b3d09c9a94a69ffeaf/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/"
+     "295d0c0557aef0c445db79b3d09c9a94a69ffeaf/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetTdtV2Files[] = {
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/"
+     "8ae155301e23d820d82aa60d24817c900e69e487/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/"
+     "8ae155301e23d820d82aa60d24817c900e69e487/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetTdtV3Files[] = {
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/"
+     "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/"
+     "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetRnnt11BFiles[] = {
+    {"https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/"
+     "7f399a0d3442123deae9194e71f5c984b2879efa/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/"
+     "7f399a0d3442123deae9194e71f5c984b2879efa/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxNemotronStreamingAsrFiles[] = {
+    {"https://huggingface.co/mlx-community/"
+     "nemotron-3.5-asr-streaming-0.6b-8bit/resolve/"
+     "7279359e4481b5e9e185a318bd618e429c6d86cd/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "nemotron-3.5-asr-streaming-0.6b-8bit/resolve/"
+     "7279359e4481b5e9e185a318bd618e429c6d86cd/model.safetensors",
+     "model.safetensors", true},
+};
+
 constexpr CatalogFile kMlxQwen3Tts06BBaseFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
      "resolve/main/"
@@ -417,25 +500,27 @@ constexpr CatalogFile kMlxBonsai27B1BitFiles[] = {
 // PrismML Bonsai 1-bit MLX at 1.7B/4B/8B — same 8-file set as the 27B above
 // (mlx-swift-lm needs weights + tokenizer + config; vision preprocessor stubs
 // on some repos are not required for text-only LLM use).
-#define BONSAI_MLX_FILES(repo)                                               \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/chat_template.jinja", \
-   "chat_template.jinja", true},                                             \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",      \
-   "config.json", true},                                                    \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/merges.txt",       \
-   "merges.txt", true},                                                     \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/model.safetensors", \
-   "model.safetensors", true},                                              \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/model.safetensors.index.json",                            \
-   "model.safetensors.index.json", true},                                   \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json",   \
-   "tokenizer.json", true},                                                 \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/tokenizer_config.json",                                   \
-   "tokenizer_config.json", true},                                          \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/vocab.json",       \
-   "vocab.json", true},
+#define BONSAI_MLX_FILES(repo)                                                 \
+  {"https://huggingface.co/prism-ml/" repo                                     \
+   "/resolve/main/chat_template.jinja",                                        \
+   "chat_template.jinja", true},                                               \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",    \
+       "config.json", true},                                                   \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/merges.txt",     \
+       "merges.txt", true},                                                    \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors",                                      \
+       "model.safetensors", true},                                             \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors.index.json",                           \
+       "model.safetensors.index.json", true},                                  \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json", \
+       "tokenizer.json", true},                                                \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/tokenizer_config.json",                                  \
+       "tokenizer_config.json", true},                                         \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/vocab.json",     \
+       "vocab.json", true},
 
 constexpr CatalogFile kMlxBonsai1_7B1BitFiles[] = {
     BONSAI_MLX_FILES("Bonsai-1.7B-mlx-1bit")};
@@ -448,21 +533,23 @@ constexpr CatalogFile kMlxBonsai8B1BitFiles[] = {
 // merges.txt/vocab.json (tokenizer.json is the self-contained fast-tokenizer
 // format here), unlike the plain-Bonsai repos above. Verified via HF API file
 // listing this session — do not add those two filenames or the download 404s.
-#define TERNARY_BONSAI_MLX_FILES_SMALL(repo)                                 \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/chat_template.jinja", \
-   "chat_template.jinja", true},                                             \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",      \
-   "config.json", true},                                                    \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/model.safetensors", \
-   "model.safetensors", true},                                              \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/model.safetensors.index.json",                            \
-   "model.safetensors.index.json", true},                                   \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json",   \
-   "tokenizer.json", true},                                                 \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/tokenizer_config.json",                                   \
-   "tokenizer_config.json", true},
+#define TERNARY_BONSAI_MLX_FILES_SMALL(repo)                                   \
+  {"https://huggingface.co/prism-ml/" repo                                     \
+   "/resolve/main/chat_template.jinja",                                        \
+   "chat_template.jinja", true},                                               \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",    \
+       "config.json", true},                                                   \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors",                                      \
+       "model.safetensors", true},                                             \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors.index.json",                           \
+       "model.safetensors.index.json", true},                                  \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json", \
+       "tokenizer.json", true},                                                \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/tokenizer_config.json",                                  \
+       "tokenizer_config.json", true},
 
 constexpr CatalogFile kMlxTernaryBonsai1_7B2BitFiles[] = {
     TERNARY_BONSAI_MLX_FILES_SMALL("Ternary-Bonsai-1.7B-mlx-2bit")};
@@ -619,6 +706,11 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
      4096, true},
+    {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", "mlx-nemotron-nano",
+     "NVIDIA Llama 3.1 Nemotron Nano 8B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronNano8BFiles, 8,
+     4534806075LL, 131072, false},
     // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
     // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
     {"mlx-bonsai-1.7b-1bit", "mlx-bonsai-1.7b", "MLX Bonsai-1.7B 1-bit",
@@ -670,8 +762,8 @@ constexpr CatalogEntry kCatalog[] = {
      kMlxQwen2Vl2BFiles, 11, 1261853827, 2048, false},
     {"mlx-fastvlm-0.5b-bf16", "mlx-fastvlm", "FastVLM 0.5B bf16 (MLX)",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
-     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14,
-     1256926974, 2048, false},
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14, 1256926974,
+     2048, false},
     {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
      "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -684,6 +776,27 @@ constexpr CatalogEntry kCatalog[] = {
      "GLM-ASR Nano 2512 4-bit (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
      kMlxGlmAsrNano2512Files, 9, 1288437789, 0, false},
+    {"mlx-parakeet-ctc-1.1b", "mlx-parakeet-ctc",
+     "NVIDIA Parakeet CTC 1.1B (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetCtc11BFiles, 2, 4250718357LL, 0, false},
+    {"mlx-parakeet-tdt-0.6b-v2", "mlx-parakeet-tdt-v2",
+     "NVIDIA Parakeet TDT 0.6B v2 (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetTdtV2Files, 2, 2471596080LL, 0, false},
+    {"mlx-parakeet-tdt-0.6b-v3", "mlx-parakeet-tdt-v3",
+     "NVIDIA Parakeet TDT 0.6B v3 (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetTdtV3Files, 2, 2508532829LL, 0, false},
+    {"mlx-parakeet-rnnt-1.1b", "mlx-parakeet-rnnt",
+     "NVIDIA Parakeet RNNT 1.1B (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetRnnt11BFiles, 2, 4282283914LL, 0, false},
+    {"mlx-nemotron-3.5-asr-streaming-0.6b-8bit", "mlx-nemotron-asr",
+     "NVIDIA Nemotron 3.5 Streaming ASR 0.6B 8-bit (MLX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronStreamingAsrFiles, 2,
+     755758528LL, 0, false},
     {"mlx-qwen3-tts-12hz-0.6b-base-8bit", "mlx-qwen3-tts",
      "Qwen3-TTS 12Hz 0.6B Base 8-bit (MLX)",
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_MLX,

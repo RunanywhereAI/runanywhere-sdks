@@ -253,10 +253,9 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
-  const rcli::catalog::CatalogEntry *mlx_llm =
-      rcli::catalog::find("mlx-qwen3");
-  if (!mlx_llm || mlx_llm->framework !=
-                      runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+  const rcli::catalog::CatalogEntry *mlx_llm = rcli::catalog::find("mlx-qwen3");
+  if (!mlx_llm ||
+      mlx_llm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_llm->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
       mlx_llm->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
       mlx_llm->files == nullptr || mlx_llm->file_count != 9 ||
@@ -267,8 +266,8 @@ TestResult test_catalog_lookup() {
 
   const rcli::catalog::CatalogEntry *mlx_vlm =
       rcli::catalog::find("mlx-qwen2-vl");
-  if (!mlx_vlm || mlx_vlm->category !=
-                      runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+  if (!mlx_vlm ||
+      mlx_vlm->category != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       mlx_vlm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_vlm->files == nullptr || mlx_vlm->file_count != 11) {
     result.details = "mlx-qwen2-vl should be a complete MLX VLM bundle";
@@ -281,7 +280,8 @@ TestResult test_catalog_lookup() {
         std::string(mlx_vlm->files[i].filename) == "preprocessor_config.json";
   }
   if (!has_preprocessor) {
-    result.details = "MLX VLM catalog entry must include preprocessor_config.json";
+    result.details =
+        "MLX VLM catalog entry must include preprocessor_config.json";
     return result;
   }
 
@@ -306,19 +306,60 @@ TestResult test_catalog_lookup() {
          (filename == "processing_fastvlm.py" || filename == "llava_qwen.py"));
   }
   if (!has_processor_config || !has_fastvlm_companion) {
-    result.details =
-        "MLX FastVLM catalog entry must include processor config and companions";
+    result.details = "MLX FastVLM catalog entry must include processor config "
+                     "and companions";
     return result;
   }
 
   const rcli::catalog::CatalogEntry *mlx_embed =
       rcli::catalog::find("mlx-qwen3-embed");
-  if (!mlx_embed || mlx_embed->category !=
-                       runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+  if (!mlx_embed ||
+      mlx_embed->category != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
       mlx_embed->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_embed->files == nullptr || mlx_embed->file_count != 11) {
-    result.details = "mlx-qwen3-embed should be a complete MLX embedding bundle";
+    result.details =
+        "mlx-qwen3-embed should be a complete MLX embedding bundle";
     return result;
+  }
+
+  const rcli::catalog::CatalogEntry *nemotron_nano =
+      rcli::catalog::find("mlx-nemotron-nano");
+  if (!nemotron_nano ||
+      nemotron_nano->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      nemotron_nano->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      nemotron_nano->files == nullptr || nemotron_nano->file_count != 8 ||
+      nemotron_nano->download_size_bytes != 4534806075LL ||
+      nemotron_nano->context_length != 131072) {
+    result.details = "mlx-nemotron-nano should be a complete pinned MLX bundle";
+    return result;
+  }
+
+  struct NvidiaSpeechCase {
+    const char *alias;
+    int64_t download_size_bytes;
+  };
+  const NvidiaSpeechCase nvidia_speech_cases[] = {
+      {"mlx-parakeet-ctc", 4250718357LL},
+      {"mlx-parakeet-tdt-v2", 2471596080LL},
+      {"mlx-parakeet-tdt-v3", 2508532829LL},
+      {"mlx-parakeet-rnnt", 4282283914LL},
+      {"mlx-nemotron-asr", 755758528LL},
+  };
+  for (const NvidiaSpeechCase &test_case : nvidia_speech_cases) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.alias);
+    if (!entry ||
+        entry->category != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+        entry->files == nullptr || entry->file_count != 2 ||
+        entry->download_size_bytes != test_case.download_size_bytes ||
+        std::string(entry->files[0].url).find("/resolve/") ==
+            std::string::npos) {
+      result.details = std::string(test_case.alias) +
+                       " should be a complete pinned MLX speech bundle";
+      return result;
+    }
   }
 
   result.passed = true;
@@ -392,8 +433,8 @@ private:
   std::vector<std::string> ids_;
 };
 
-bool get_registered_model(const std::string &id, runanywhere::v1::ModelInfo *out,
-                          std::string *error) {
+bool get_registered_model(const std::string &id,
+                          runanywhere::v1::ModelInfo *out, std::string *error) {
   rac_proto_buffer_t found;
   rac_proto_buffer_init(&found);
   const rac_result_t rc = rac_model_registry_get_proto_buffer(
@@ -422,6 +463,12 @@ TestResult test_mlx_catalog_registration() {
       "mlx-qwen3-embedding-0.6b-4bit-dwq",
       "mlx-qwen3-asr-0.6b-8bit",
       "mlx-glm-asr-nano-2512-4bit",
+      "mlx-llama-3.1-nemotron-nano-8b-v1-4bit",
+      "mlx-parakeet-ctc-1.1b",
+      "mlx-parakeet-tdt-0.6b-v2",
+      "mlx-parakeet-tdt-0.6b-v3",
+      "mlx-parakeet-rnnt-1.1b",
+      "mlx-nemotron-3.5-asr-streaming-0.6b-8bit",
       "mlx-qwen3-tts-12hz-0.6b-base-8bit",
       "mlx-soprano-1.1-80m-5bit",
   });
@@ -448,8 +495,8 @@ TestResult test_mlx_catalog_registration() {
   }
   bool preprocessor_registered = false;
   for (const auto &file : vlm.multi_file().files()) {
-    preprocessor_registered =
-        preprocessor_registered || file.filename() == "preprocessor_config.json";
+    preprocessor_registered = preprocessor_registered ||
+                              file.filename() == "preprocessor_config.json";
   }
   if (vlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       vlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
@@ -471,9 +518,8 @@ TestResult test_mlx_catalog_registration() {
         processor_registered || file.filename() == "processor_config.json";
     companion_registered =
         companion_registered ||
-        (!file.is_required() &&
-         (file.filename() == "processing_fastvlm.py" ||
-          file.filename() == "llava_qwen.py"));
+        (!file.is_required() && (file.filename() == "processing_fastvlm.py" ||
+                                 file.filename() == "llava_qwen.py"));
   }
   if (fastvlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       fastvlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
@@ -492,14 +538,16 @@ TestResult test_mlx_catalog_registration() {
   if (embedding.category() != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
       embedding.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       embedding.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
-      !embedding.has_multi_file() || embedding.multi_file().files_size() != 11) {
+      !embedding.has_multi_file() ||
+      embedding.multi_file().files_size() != 11) {
     result.details = "registered MLX embedding metadata is incomplete";
     return result;
   }
 
   runanywhere::v1::ModelInfo qwen_asr;
   if (!get_registered_model("mlx-qwen3-asr-0.6b-8bit", &qwen_asr, &error) ||
-      qwen_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      qwen_asr.category() !=
+          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
       qwen_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !qwen_asr.has_multi_file() || qwen_asr.multi_file().files_size() != 9) {
     result.details = "registered MLX Qwen3-ASR metadata is incomplete";
@@ -508,15 +556,45 @@ TestResult test_mlx_catalog_registration() {
 
   runanywhere::v1::ModelInfo glm_asr;
   if (!get_registered_model("mlx-glm-asr-nano-2512-4bit", &glm_asr, &error) ||
-      glm_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      glm_asr.category() !=
+          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
       glm_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !glm_asr.has_multi_file() || glm_asr.multi_file().files_size() != 9) {
     result.details = "registered MLX GLM-ASR metadata is incomplete";
     return result;
   }
 
+  struct RegisteredNvidiaCase {
+    const char *id;
+    int expected_files;
+    int64_t expected_size;
+  };
+  const RegisteredNvidiaCase registered_nvidia_cases[] = {
+      {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", 8, 4534806075LL},
+      {"mlx-parakeet-ctc-1.1b", 2, 4250718357LL},
+      {"mlx-parakeet-tdt-0.6b-v2", 2, 2471596080LL},
+      {"mlx-parakeet-tdt-0.6b-v3", 2, 2508532829LL},
+      {"mlx-parakeet-rnnt-1.1b", 2, 4282283914LL},
+      {"mlx-nemotron-3.5-asr-streaming-0.6b-8bit", 2, 755758528LL},
+  };
+  for (const RegisteredNvidiaCase &test_case : registered_nvidia_cases) {
+    runanywhere::v1::ModelInfo model;
+    if (!get_registered_model(test_case.id, &model, &error) ||
+        model.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+        model.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+        !model.has_multi_file() ||
+        model.multi_file().files_size() != test_case.expected_files ||
+        model.download_size_bytes() != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA MLX metadata is incomplete: ") +
+          test_case.id;
+      return result;
+    }
+  }
+
   runanywhere::v1::ModelInfo qwen_tts;
-  if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts, &error) ||
+  if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts,
+                            &error) ||
       qwen_tts.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS ||
       qwen_tts.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !qwen_tts.has_multi_file() || qwen_tts.multi_file().files_size() != 12) {
