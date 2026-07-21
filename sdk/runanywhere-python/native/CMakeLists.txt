@@ -48,8 +48,25 @@ target_include_directories(runanywhere_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include)
 target_compile_features(runanywhere_core PRIVATE cxx_std_20)
-target_link_libraries(runanywhere_core PRIVATE
-    rac_commons rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa)
+target_link_libraries(runanywhere_core PRIVATE rac_commons)
+
+# Link whichever engine backends this build enabled, and tell module.cpp which are present
+# via RAC_HAVE_BACKEND_<X>. The wrapper registers only the linked backends and the C plugin
+# registry routes by priority — so adding a backend (QHexRT on Windows-on-Snapdragon, MLX,
+# CoreML, cloud, ...) is: enable its upstream RAC_BACKEND_* flag so its rac_backend_<x> target
+# builds, and it self-links + self-registers here with no wrapper source changes. The default
+# CPU build (RAC_BUILD_BACKENDS=ON) provides llamacpp + onnx + sherpa.
+set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
+set(_ra_linked_backends "")
+foreach(_ra_b IN LISTS _ra_backends)
+    if(TARGET rac_backend_${_ra_b})
+        target_link_libraries(runanywhere_core PRIVATE rac_backend_${_ra_b})
+        string(TOUPPER "${_ra_b}" _ra_bU)
+        target_compile_definitions(runanywhere_core PRIVATE RAC_HAVE_BACKEND_${_ra_bU})
+        list(APPEND _ra_linked_backends ${_ra_b})
+    endif()
+endforeach()
+message(STATUS "runanywhere-python: engine backends -> ${_ra_linked_backends}")
 
 if(MSVC)
     target_link_directories(runanywhere_core PRIVATE "${_ra_bundled_dir}")
