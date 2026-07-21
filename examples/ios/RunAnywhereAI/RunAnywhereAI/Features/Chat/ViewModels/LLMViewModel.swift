@@ -684,7 +684,31 @@ final class LLMViewModel {
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
-        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+        var effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+
+        #if os(iOS)
+        // The get_health_data tool surfaces real vitals (heart rate, SpO2,
+        // resting heart rate, ...). Without guidance, a small on-device model
+        // asked to comment on those numbers will readily improvise a medical
+        // opinion. This instruction is appended (not swapped in) so it holds
+        // even when the user has set their own custom system prompt.
+        if ToolSettingsViewModel.shared.toolCallingEnabled, ToolSettingsViewModel.shared.healthToolEnabled {
+            let healthSafetyInstructions = """
+                You have access to the user's real Apple Health data via get_health_data. \
+                Never provide a medical diagnosis, treatment recommendation, or interpret \
+                vitals as indicating a health condition. If the user describes concerning \
+                symptoms (e.g. chest pain, severe dizziness, fainting, difficulty breathing), \
+                tell them to seek medical attention immediately instead of analyzing their \
+                Health data for it. Present Health data factually and encourage consulting a \
+                qualified healthcare professional for any medical concerns. Only state \
+                numbers that literally appear in a get_health_data tool result — if a field \
+                is missing, say the data isn't available rather than estimating a number.
+                """
+            effectiveSystemPrompt = [effectiveSystemPrompt, healthSafetyInstructions]
+                .compactMap { $0 }
+                .joined(separator: "\n\n")
+        }
+        #endif
 
         let systemPromptInfo: String = {
             guard let prompt = effectiveSystemPrompt else { return "nil" }

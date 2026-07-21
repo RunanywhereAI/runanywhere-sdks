@@ -29,6 +29,49 @@ class ToolSettingsViewModel: ObservableObject {
         }
     }
 
+    #if os(iOS)
+    // Apple Health is opt-in separately from the other built-in tools since
+    // it requires its own OS permission prompt (HealthKit) rather than just
+    // being added to the in-memory tool registry. HealthKit only exists on
+    // iOS — this app also ships as a native macOS target, so this whole
+    // feature is compiled out there.
+    @Published var healthToolEnabled: Bool = false {
+        didSet {
+            guard healthToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(healthToolEnabled, forKey: "healthToolEnabled")
+            Task {
+                if healthToolEnabled {
+                    await enableHealthTool()
+                } else {
+                    await RunAnywhere.unregisterTool(HealthKitTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var healthAuthorizationError: String?
+    #endif
+
+    // Calendar is opt-in separately for the same reason as Apple Health — it
+    // needs its own OS permission prompt (EventKit). Unlike HealthKit,
+    // EventKit is available on both iOS and macOS, so this one is not
+    // platform-gated.
+    @Published var calendarToolEnabled: Bool = false {
+        didSet {
+            guard calendarToolEnabled != oldValue else { return }
+            UserDefaults.standard.set(calendarToolEnabled, forKey: "calendarToolEnabled")
+            Task {
+                if calendarToolEnabled {
+                    await enableCalendarTool()
+                } else {
+                    await RunAnywhere.unregisterTool(CalendarTool.definition.name)
+                    await refreshRegisteredTools()
+                }
+            }
+        }
+    }
+    @Published var calendarAuthorizationError: String?
+
     // App-local tools with real implementations.
     private var builtInTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
@@ -165,6 +208,10 @@ class ToolSettingsViewModel: ObservableObject {
 
     init() {
         toolCallingEnabled = UserDefaults.standard.bool(forKey: "toolCallingEnabled")
+        #if os(iOS)
+        healthToolEnabled = UserDefaults.standard.bool(forKey: "healthToolEnabled")
+        #endif
+        calendarToolEnabled = UserDefaults.standard.bool(forKey: "calendarToolEnabled")
         Task {
             await refreshRegisteredTools()
         }
@@ -182,12 +229,53 @@ class ToolSettingsViewModel: ObservableObject {
             await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
         }
+        #if os(iOS)
+        if healthToolEnabled {
+            await enableHealthTool()
+        }
+        #endif
+        if calendarToolEnabled {
+            await enableCalendarTool()
+        }
         await refreshRegisteredTools()
     }
 
     func clearAllTools() async {
         await RunAnywhere.clearTools()
         await refreshRegisteredTools()
+    }
+
+    #if os(iOS)
+    func enableHealthTool() async {
+        guard HealthKitManager.isAvailable else {
+            healthAuthorizationError = "Health data is not available on this device."
+            healthToolEnabled = false
+            return
+        }
+        do {
+            try await HealthKitManager.shared.requestAuthorization()
+            healthAuthorizationError = nil
+            await RunAnywhere.registerTool(HealthKitTool.definition, executor: HealthKitTool.executor)
+            logger.info("Registered tool \(HealthKitTool.definition.name)")
+            await refreshRegisteredTools()
+        } catch {
+            healthAuthorizationError = error.localizedDescription
+            healthToolEnabled = false
+        }
+    }
+    #endif
+
+    func enableCalendarTool() async {
+        do {
+            try await CalendarManager.shared.requestAuthorization()
+            calendarAuthorizationError = nil
+            await RunAnywhere.registerTool(CalendarTool.definition, executor: CalendarTool.executor)
+            logger.info("Registered tool \(CalendarTool.definition.name)")
+            await refreshRegisteredTools()
+        } catch {
+            calendarAuthorizationError = error.localizedDescription
+            calendarToolEnabled = false
+        }
     }
 }
 
@@ -201,6 +289,26 @@ struct ToolSettingsSection: View {
             Toggle("Enable Tool Calling", isOn: $viewModel.toolCallingEnabled)
 
             if viewModel.toolCallingEnabled {
+                #if os(iOS)
+                Toggle(isOn: $viewModel.healthToolEnabled) {
+                    Label("Apple Health", systemImage: "heart.fill")
+                }
+                if let error = viewModel.healthAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+                #endif
+
+                Toggle(isOn: $viewModel.calendarToolEnabled) {
+                    Label("Calendar", systemImage: "calendar")
+                }
+                if let error = viewModel.calendarAuthorizationError {
+                    Text(error)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryRed)
+                }
+
                 HStack {
                     Text("Registered Tools")
                     Spacer()
@@ -238,7 +346,9 @@ struct ToolSettingsSection: View {
         } footer: {
             Text(
                 "Allow the LLM to use registered tools to perform actions like "
-                + "web lookup, weather, time, or calculations."
+                + "web lookup, weather, time, calculations, your Apple Health data, or your "
+                + "Calendar. iOS does not reveal which Health categories were granted, so if "
+                + "answers seem empty, check Settings > Privacy & Security > Health."
             )
             .font(AppTypography.caption)
         }
@@ -269,6 +379,18 @@ struct ToolSettingsCard: View {
 
                 if viewModel.toolCallingEnabled {
                     Divider()
+
+                    HStack {
+                        Text("Calendar")
+                            .frame(width: 150, alignment: .leading)
+                        Toggle("", isOn: $viewModel.calendarToolEnabled)
+                        Spacer()
+                        if let error = viewModel.calendarAuthorizationError {
+                            Text(error)
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.primaryRed)
+                        }
+                    }
 
                     HStack {
                         Text("Registered Tools")
