@@ -109,6 +109,31 @@ void SherpaBackend::create_capabilities() {
 // SherpaSTT Implementation
 // =============================================================================
 
+#if SHERPA_ONNX_AVAILABLE
+namespace {
+
+// Nemotron's prompt-aware streaming encoder needs the same context padding as
+// Sherpa-ONNX's canonical online client. Without the tail, InputFinished can
+// leave the last token undecoded (for example, dropping "gold" from the pinned
+// English fixture). Keep this scoped to prompt-aware online models so existing
+// transducer timing and endpoint behavior are unchanged.
+constexpr float kPromptedOnlineLeftPaddingSeconds = 0.3f;
+constexpr float kPromptedOnlineTailPaddingSeconds = 0.8f;
+
+void accept_online_silence(const SherpaOnnxOnlineStream* stream, int sample_rate,
+                           float duration_seconds) {
+    if (!stream || sample_rate <= 0 || duration_seconds <= 0.0f) {
+        return;
+    }
+    const int32_t sample_count =
+        static_cast<int32_t>(duration_seconds * static_cast<float>(sample_rate));
+    std::vector<float> silence(static_cast<size_t>(sample_count), 0.0f);
+    SherpaOnnxOnlineStreamAcceptWaveform(stream, sample_rate, silence.data(), sample_count);
+}
+
+}  // namespace
+#endif
+
 SherpaSTT::SherpaSTT(SherpaBackend* backend) : backend_(backend) {}
 
 SherpaSTT::~SherpaSTT() {
@@ -772,9 +797,17 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             stream_language = "auto";
         }
         SherpaOnnxOnlineStreamSetOption(stream, "language", stream_language.c_str());
+        if (uses_language_prompt_) {
+            accept_online_silence(stream, request.sample_rate,
+                                  kPromptedOnlineLeftPaddingSeconds);
+        }
         SherpaOnnxOnlineStreamAcceptWaveform(stream, request.sample_rate,
                                              request.audio_samples.data(),
                                              static_cast<int32_t>(request.audio_samples.size()));
+        if (uses_language_prompt_) {
+            accept_online_silence(stream, request.sample_rate,
+                                  kPromptedOnlineTailPaddingSeconds);
+        }
         SherpaOnnxOnlineStreamInputFinished(stream);
         while (SherpaOnnxIsOnlineStreamReady(sherpa_online_recognizer_, stream)) {
             SherpaOnnxDecodeOnlineStream(sherpa_online_recognizer_, stream);
@@ -1066,6 +1099,10 @@ std::string SherpaSTT::create_stream(const nlohmann::json& config) {
             return "";
         }
         SherpaOnnxOnlineStreamSetOption(state.online, "language", state.language.c_str());
+        if (uses_language_prompt_) {
+            accept_online_silence(state.online, state.sample_rate,
+                                  kPromptedOnlineLeftPaddingSeconds);
+        }
     } else {
         state.offline = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
         if (!state.offline) {
@@ -1129,8 +1166,12 @@ bool SherpaSTT::feed_audio_and_decode(const std::string& stream_id,
     const bool finishing = samples.empty();
     if (finishing) {
         // Commons defines a zero-sample persistent feed as the normal-stop
-        // flush signal. Finalize Sherpa input and drain every ready frame before
-        // returning the last hypothesis as a final callback.
+        // flush signal. Prompt-aware models need Sherpa's canonical tail
+        // padding before finalization so the last token remains decodable.
+        if (uses_language_prompt_) {
+            accept_online_silence(it->second.online, it->second.sample_rate,
+                                  kPromptedOnlineTailPaddingSeconds);
+        }
         SherpaOnnxOnlineStreamInputFinished(it->second.online);
     } else {
         SherpaOnnxOnlineStreamAcceptWaveform(it->second.online, it->second.sample_rate,
@@ -1166,6 +1207,10 @@ bool SherpaSTT::feed_audio_and_decode(const std::string& stream_id,
         }
         SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
         SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+        if (uses_language_prompt_) {
+            accept_online_silence(it->second.online, it->second.sample_rate,
+                                  kPromptedOnlineLeftPaddingSeconds);
+        }
         it->second.last_text.clear();
     } else if (!text.empty() && text != it->second.last_text) {
         it->second.last_text = text;
@@ -1268,6 +1313,10 @@ void SherpaSTT::input_finished(const std::string& stream_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = sherpa_streams_.find(stream_id);
     if (it != sherpa_streams_.end() && it->second.online) {
+        if (uses_language_prompt_) {
+            accept_online_silence(it->second.online, it->second.sample_rate,
+                                  kPromptedOnlineTailPaddingSeconds);
+        }
         SherpaOnnxOnlineStreamInputFinished(it->second.online);
     }
 #else
@@ -1286,6 +1335,10 @@ void SherpaSTT::reset_stream(const std::string& stream_id) {
     if (it->second.online && sherpa_online_recognizer_) {
         SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
         SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+        if (uses_language_prompt_) {
+            accept_online_silence(it->second.online, it->second.sample_rate,
+                                  kPromptedOnlineLeftPaddingSeconds);
+        }
         it->second.last_text.clear();
     } else if (it->second.offline) {
         SherpaOnnxDestroyOfflineStream(it->second.offline);
