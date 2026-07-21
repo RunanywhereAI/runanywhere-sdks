@@ -273,12 +273,12 @@ public:
      *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string
-     * @param supabaseKey Supabase API key (for dev mode, empty for prod)
+     * @param apiKey Authorization token for the request (empty for keyless)
      * @return tuple<success, statusCode, responseBody, errorMessage>
      */
     std::tuple<bool, int, std::string, std::string>
     httpPostSync(const std::string &url, const std::string &jsonBody,
-                 const std::string &supabaseKey);
+                 const std::string &apiKey);
 
   private:
     InitBridge() = default;

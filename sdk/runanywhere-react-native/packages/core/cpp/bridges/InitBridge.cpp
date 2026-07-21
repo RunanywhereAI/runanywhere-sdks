@@ -1826,13 +1826,10 @@ InitBridge::initialize(rac_environment_t environment, const std::string &apiKey,
     LOGI("SDK Phase 1 proto initialized");
   }
 
+  // The effective build token is whatever the app passed (or empty). There is
+  // no baked dev build token anymore — the backend is reached solely through
+  // the effective base URL.
   std::string effectiveBuildToken = buildToken;
-  if (effectiveBuildToken.empty() && environment == RAC_ENV_DEVELOPMENT) {
-    const char *devBuildToken = rac_dev_config_get_build_token();
-    if (devBuildToken && config::isUsableSecret(devBuildToken)) {
-      effectiveBuildToken = devBuildToken;
-    }
-  }
   phase2RequestBytes_ = makePhase2RequestBytes(
       effectiveBuildToken, forceRefreshAssignments, flushTelemetry,
       discoverDownloadedModels, rescanLocalModels);
@@ -1938,30 +1935,18 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     ) -> std::tuple<bool, int, std::string, std::string> {
         (void)requiresAuth;
 
-        rac_environment_t env = InitBridge::shared().getEnvironment();
-        std::string baseURL;
-        std::string token;
-
-        if (env == RAC_ENV_DEVELOPMENT) {
-            auto supabaseConfig = config::makeEndpointConfig(
-                rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
-                rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
-            if (!supabaseConfig.usable) {
-                LOGI("Skipping development device registration: no usable config");
-                return {true, 204, "{}", ""};
-            }
-            baseURL = supabaseConfig.baseURL;
-            token = supabaseConfig.token;
-        } else {
-            baseURL = config::trim(InitBridge::shared().getBaseURL());
-            std::string accessToken = AuthBridge::shared().getAccessToken();
-            token = config::isUsableSecret(accessToken)
-                ? accessToken
-                : config::trim(InitBridge::shared().getApiKey());
-            if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(token)) {
-                LOGI("Skipping device registration: no usable external config");
-                return {true, 204, "{}", ""};
-            }
+        // Effective config from commons state, for every environment: staging
+        // resolves the baked keyless base URL, dev/prod use whatever the app
+        // passed. There is no direct-to-datastore path — the backend is always
+        // reached through this base URL.
+        std::string baseURL = config::trim(InitBridge::shared().getBaseURL());
+        std::string accessToken = AuthBridge::shared().getAccessToken();
+        std::string token = config::isUsableSecret(accessToken)
+            ? accessToken
+            : config::trim(InitBridge::shared().getApiKey());
+        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(token)) {
+            LOGI("Skipping device registration: no usable external config");
+            return {true, 204, "{}", ""};
         }
 
         std::string fullURL = config::appendEndpointPath(baseURL, endpoint);
@@ -2297,10 +2282,10 @@ bool InitBridge::isTablet() {
 std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
     const std::string& url,
     const std::string& jsonBody,
-    const std::string& supabaseKey
+    const std::string& apiKey
 ) {
   LOGI("httpPostSync via rac_http_client_* starting");
-  auto result = postJsonViaRacHttpClient(url, jsonBody, supabaseKey);
+  auto result = postJsonViaRacHttpClient(url, jsonBody, apiKey);
   LOGI("httpPostSync result: success=%d statusCode=%d", std::get<0>(result),
        std::get<1>(result));
   return result;
