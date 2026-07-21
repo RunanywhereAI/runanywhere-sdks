@@ -35,8 +35,8 @@
 // `Java_...` thunk, not a C ABI export, so Flutter FFI cannot call it. Instead
 // this bridge replicates its body in pure FFI (route → vtable slot →
 // stt_ops->create → build rac_stt_service_t) over faithful Dart mirrors of the
-// commons structs. The struct mirrors track plugin ABI v8
-// (RAC_PLUGIN_API_VERSION = 8); a layout bump there requires updating them.
+// commons structs. The struct mirrors track plugin ABI v7
+// (RAC_PLUGIN_API_VERSION = 7); a layout bump there requires updating them.
 
 import 'dart:ffi';
 import 'dart:typed_data';
@@ -55,7 +55,7 @@ import 'package:runanywhere/native/types/basic_types.dart';
 const int _kPrimitiveTranscribe = 2;
 
 // ============================================================================
-// FFI structs mirroring the commons C ABI (plugin ABI v8).
+// FFI structs mirroring the commons C ABI (plugin ABI v7).
 //
 // Only the prefix needed to reach `stt_ops` (in the engine vtable) and the
 // `create` / `destroy` slots (in the STT ops vtable) is consumed; the full

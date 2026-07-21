@@ -96,8 +96,6 @@ export const modelCategoryWireString = (e: ModelCategory): string => {
       return 'speaker-diarization';
     case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       return 'semantic-segmentation';
-    case ModelCategory.MODEL_CATEGORY_VOCODER:
-      return 'vocoder';
     default:
       return '';
   }
@@ -129,8 +127,6 @@ export const modelCategoryFromWireString = (s: string): ModelCategory | undefine
       return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
     case 'semantic-segmentation':
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-    case 'vocoder':
-      return ModelCategory.MODEL_CATEGORY_VOCODER;
     default:
       return undefined;
   }

@@ -43,11 +43,11 @@ typedef enum rac_primitive {
     RAC_PRIMITIVE_DIFFUSION = 8, /**< Text-to-Image / Image-to-Image diffusion. */
     RAC_PRIMITIVE_DIARIZE = 9,   /**< Standalone speaker diarization. */
     RAC_PRIMITIVE_SEGMENT = 10,  /**< Semantic image segmentation. */
-    RAC_PRIMITIVE_VOCODE = 11,   /**< Mel-spectrogram to waveform vocoding. */
 
     /* Reserved primitive slots — added to prevent struct re-layout when new
      * primitives land. Bump RAC_PLUGIN_API_VERSION when promoting any of
      * these. */
+    RAC_PRIMITIVE_RESERVED_11 = 11,
     RAC_PRIMITIVE_RESERVED_12 = 12,
     RAC_PRIMITIVE_RESERVED_13 = 13,
     RAC_PRIMITIVE_RESERVED_14 = 14,

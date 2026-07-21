@@ -82,9 +82,6 @@
 // Semantic Image Segmentation
 #include "rac_segmentation.h"
 
-// Mel Vocoder
-#include "rac_vocoder.h"
-
 // VLM (Vision Language Model)
 #include "rac_vlm.h"
 #include "rac_vlm_component.h"

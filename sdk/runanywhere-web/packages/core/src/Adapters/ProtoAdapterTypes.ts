@@ -212,12 +212,6 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     outResult: number,
   ): number;
 
-  _rac_vocoder_vocode_lifecycle_proto?(
-    requestBytes: number,
-    requestSize: number,
-    outResult: number,
-  ): number;
-
   _rac_diffusion_generate_proto?(
     handle: number,
     optionsBytes: number,
@@ -356,7 +350,6 @@ export interface ModalityCapabilitySlots {
   vad: ModalityProtoModule | null;
   embedding: ModalityProtoModule | null;
   segmentation: ModalityProtoModule | null;
-  vocoder: ModalityProtoModule | null;
   rag: ModalityProtoModule | null;
   diffusion: ModalityProtoModule | null;
   'structured-output': ModalityProtoModule | null;
@@ -389,7 +382,6 @@ export const adapterState = {
     vad: null,
     embedding: null,
     segmentation: null,
-    vocoder: null,
     rag: null,
     diffusion: null,
     'structured-output': null,

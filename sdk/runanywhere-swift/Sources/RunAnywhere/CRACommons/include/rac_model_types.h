@@ -193,7 +193,6 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 8, /**< VAD models (Silero, etc.) */
     RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION = 9,      /**< Standalone speaker diarization */
     RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 10,   /**< Semantic image segmentation */
-    RAC_MODEL_CATEGORY_VOCODER = 11,                 /**< Mel-spectrogram vocoder */
     RAC_MODEL_CATEGORY_UNKNOWN = 99                  /**< Unknown category */
 } rac_model_category_t;
 

@@ -20,7 +20,6 @@ public extension RASDKComponent {
         case .rag:                return "Retrieval-Augmented Generation"
         case .wakeword:           return "Wake Word"
         case .speakerDiarization: return "Speaker Diarization"
-        case .vocoder:            return "Vocoder"
         default:                  return "Unknown"
         }
     }

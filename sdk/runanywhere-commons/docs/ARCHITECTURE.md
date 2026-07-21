@@ -78,17 +78,17 @@ typedef struct rac_llm_service_ops {
 
 Each backend ships a single `rac_engine_vtable_t` (see
 `include/rac/plugin/rac_engine_vtable.h`) whose `metadata.abi_version`
-must match `RAC_PLUGIN_API_VERSION` (`8u`, in
-`include/rac/plugin/rac_plugin_entry.h`). The vtable carries exactly 10 active
+must match `RAC_PLUGIN_API_VERSION` (`7u`, in
+`include/rac/plugin/rac_plugin_entry.h`). The vtable carries exactly 9 active
 per-primitive op-struct slots (LLM / STT / TTS / VAD / embeddings / VLM /
-diffusion / diarization / segmentation / vocoder) plus 7 reserved slots;
+diffusion / diarization / segmentation) plus 8 reserved slots;
 primitives the engine does not serve are left `NULL`.
 
 ```c
 // engines/llamacpp/rac_plugin_entry_llamacpp.cpp (per-engine example)
 static const rac_engine_vtable_t g_llamacpp_vtable = {
     .metadata = {
-        .abi_version = RAC_PLUGIN_API_VERSION,    // 8u
+        .abi_version = RAC_PLUGIN_API_VERSION,    // 7u
         .name        = "llamacpp",
         .display_name= "llama.cpp",
         // ...
@@ -148,7 +148,7 @@ rac_registry_unload_plugin("llamacpp");
 │          │                  │                  │                │       │
 │  ┌───────▼──────────────────▼──────────────────▼────────────────▼─────┐ │
 │  │                      Plugin Registry                               │ │
-│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 8u)   │ │
+│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 7u)   │ │
 │  │   priority-order primitive op-struct dispatch (rac_plugin_find)     │ │
 │  └────────────────────────────────┬────────────────────────────────────┘ │
 └───────────────────────────────────│─────────────────────────────────────┘
@@ -994,7 +994,7 @@ rac_result_t my_function() {
 
    static const rac_engine_vtable_t g_<name>_vtable = {
        .metadata = {
-           .abi_version  = RAC_PLUGIN_API_VERSION,   // 8u
+           .abi_version  = RAC_PLUGIN_API_VERSION,   // 7u
            .name         = "<name>",
            .display_name = "<Display Name>",
            .priority     = 100,

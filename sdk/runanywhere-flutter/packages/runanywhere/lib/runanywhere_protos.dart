@@ -69,8 +69,6 @@ export 'generated/vad_options.pb.dart';
 export 'generated/vad_options.pbenum.dart';
 export 'generated/vlm_options.pb.dart';
 export 'generated/vlm_options.pbenum.dart';
-export 'generated/vocoder.pb.dart';
-export 'generated/vocoder.pbenum.dart';
 export 'generated/voice_agent_service.pb.dart';
 export 'generated/voice_agent_service.pbenum.dart';
 export 'generated/voice_events.pb.dart';

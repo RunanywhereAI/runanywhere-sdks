@@ -406,17 +406,6 @@ for ABI in "${ABIS[@]}"; do
         "-DCMAKE_C_FLAGS=${PREFIX_MAP_FLAGS}"
         "-DCMAKE_CXX_FLAGS=${PREFIX_MAP_FLAGS}"
         "-DRAC_INCLUDE_LOCAL_DEV_CONFIG=OFF"
-        # These preset directories are intentionally reusable. Force the full
-        # public Android backend set on every configure so a prior focused
-        # QHexRT-only (or other backend-disabled) build cannot leave stale
-        # cache values and cause old libraries to be staged into a new AAR.
-        "-DRAC_BUILD_BACKENDS=ON"
-        "-DRAC_BACKEND_CLOUD=ON"
-        "-DRAC_BACKEND_RAG=ON"
-        "-DRAC_BACKEND_LLAMACPP=ON"
-        "-DRAC_BACKEND_ONNX=ON"
-        "-DRAC_RUNTIME_ONNXRT=ON"
-        "-DRAC_BACKEND_SHERPA=ON"
     )
     QHEXRT_ENABLED=0
     if [ "${ABI}" = "arm64-v8a" ]; then

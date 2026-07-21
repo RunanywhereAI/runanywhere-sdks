@@ -113,7 +113,6 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->diffusion_ops = nullptr;
     model->diarization_ops = nullptr;
     model->segmentation_ops = nullptr;
-    model->vocoder_ops = nullptr;
 }
 
 // Cross-modality DSP eviction. A single Hexagon NPU cannot hold an LLM, a VLM,
@@ -328,24 +327,6 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 };
             }
             break;
-        case RAC_PRIMITIVE_VOCODE:
-            if (!vt->vocoder_ops || !vt->vocoder_ops->create) {
-                return RAC_ERROR_BACKEND_NOT_FOUND;
-            }
-            rc = vt->vocoder_ops->create(resolved_path.c_str(), nullptr, &impl);
-            if (rc == RAC_SUCCESS && impl && vt->vocoder_ops->initialize) {
-                rc = vt->vocoder_ops->initialize(impl, resolved_path.c_str());
-            }
-            if (rc == RAC_SUCCESS && impl) {
-                auto* ops = vt->vocoder_ops;
-                *out_destroy = [ops, impl]() {
-                    if (ops->cleanup)
-                        (void)ops->cleanup(impl);
-                    if (ops->destroy)
-                        ops->destroy(impl);
-                };
-            }
-            break;
         default:
             return RAC_ERROR_UNSUPPORTED_MODALITY;
     }
@@ -391,11 +372,6 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 case RAC_PRIMITIVE_SEGMENT:
                     if (vt->segmentation_ops && vt->segmentation_ops->destroy) {
                         vt->segmentation_ops->destroy(impl);
-                    }
-                    break;
-                case RAC_PRIMITIVE_VOCODE:
-                    if (vt->vocoder_ops && vt->vocoder_ops->destroy) {
-                        vt->vocoder_ops->destroy(impl);
                     }
                     break;
                 default:
@@ -908,8 +884,6 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->diarization_ops = vt->diarization_ops;
     } else if (primitive == RAC_PRIMITIVE_SEGMENT) {
         loaded->segmentation_ops = vt->segmentation_ops;
-    } else if (primitive == RAC_PRIMITIVE_VOCODE) {
-        loaded->vocoder_ops = vt->vocoder_ops;
     }
     loaded->impl = impl;
     loaded->model.CopyFrom(model);

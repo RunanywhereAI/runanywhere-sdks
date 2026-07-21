@@ -428,7 +428,6 @@ export enum ModelCategory {
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
   MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
   MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
-  MODEL_CATEGORY_VOCODER = 12,
   UNRECOGNIZED = -1,
 }
 
@@ -470,9 +469,6 @@ export function modelCategoryFromJSON(object: any): ModelCategory {
     case 11:
     case "MODEL_CATEGORY_SEMANTIC_SEGMENTATION":
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-    case 12:
-    case "MODEL_CATEGORY_VOCODER":
-      return ModelCategory.MODEL_CATEGORY_VOCODER;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -506,8 +502,6 @@ export function modelCategoryToJSON(object: ModelCategory): string {
       return "MODEL_CATEGORY_SPEAKER_DIARIZATION";
     case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       return "MODEL_CATEGORY_SEMANTIC_SEGMENTATION";
-    case ModelCategory.MODEL_CATEGORY_VOCODER:
-      return "MODEL_CATEGORY_VOCODER";
     case ModelCategory.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

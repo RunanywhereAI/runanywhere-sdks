@@ -105,8 +105,6 @@ extension ModelCategoryWireString on ModelCategory {
         return 'speaker-diarization';
       case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
         return 'semantic-segmentation';
-      case ModelCategory.MODEL_CATEGORY_VOCODER:
-        return 'vocoder';
     }
     return '';
   }
@@ -138,8 +136,6 @@ ModelCategory? modelCategoryFromWireString(String value) {
       return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
     case 'semantic-segmentation':
       return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-    case 'vocoder':
-      return ModelCategory.MODEL_CATEGORY_VOCODER;
   }
   return null;
 }

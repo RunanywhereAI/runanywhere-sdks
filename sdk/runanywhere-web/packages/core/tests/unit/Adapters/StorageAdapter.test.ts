@@ -322,7 +322,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     vi.restoreAllMocks();
   });
 
-  it('scans diarization, segmentation, and vocoder lifecycle categories', async () => {
+  it('scans diarization and segmentation lifecycle categories', async () => {
     const scanned: ModelCategory[] = [];
     vi.spyOn(ModelLifecycleAdapter, 'fromModule').mockReturnValue({
       supportsProtoLifecycle: () => true,
@@ -338,7 +338,6 @@ describe('BrowserStorageAnalyzerAdapter', () => {
 
     expect(scanned).toContain(ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION);
     expect(scanned).toContain(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
-    expect(scanned).toContain(ModelCategory.MODEL_CATEGORY_VOCODER);
     adapter.cleanup();
   });
 

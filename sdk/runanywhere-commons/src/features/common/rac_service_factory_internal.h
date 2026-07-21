@@ -167,8 +167,7 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         case RAC_FRAMEWORK_SHERPA:
             return RAC_ENGINE_ID_SHERPA;
         case RAC_FRAMEWORK_ONNX:
-            if (primitive == RAC_PRIMITIVE_EMBED || primitive == RAC_PRIMITIVE_SEGMENT ||
-                primitive == RAC_PRIMITIVE_VOCODE) {
+            if (primitive == RAC_PRIMITIVE_EMBED) {
                 return RAC_ENGINE_ID_ONNX;
             }
             if (primitive == RAC_PRIMITIVE_TRANSCRIBE || primitive == RAC_PRIMITIVE_SYNTHESIZE ||

@@ -872,10 +872,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # ONNX bundle claims the capability and supplies the provider at runtime.
     "_rac_segmentation_segment_lifecycle_proto"
 
-    # Lifecycle-owned mel-spectrogram vocoder. The symbol is in commons; the
-    # ONNX bundle claims the capability and supplies the provider at runtime.
-    "_rac_vocoder_vocode_lifecycle_proto"
-
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
     # library folds into rac_commons). When RAC_BACKEND_RAG=ON these exports

@@ -46,26 +46,10 @@ export interface ProtoCodec<T> {
   decode(input: Uint8Array): T;
 }
 
-/** Native failure metadata captured from both the function return and its proto buffer. */
-export interface ProtoWasmNativeFailure {
-  readonly functionName: string;
-  /** Effective rac_result_t: the buffer status when present, otherwise the function return. */
-  readonly resultCode: number;
-  readonly returnCode: number;
-  readonly bufferStatus: number;
-  readonly message?: string;
-}
-
-/** Opt-in failure handling. Existing adapters retain their null-on-error behavior by default. */
-export interface ProtoWasmCallOptions {
-  readonly onNativeFailure?: (failure: ProtoWasmNativeFailure) => never;
-}
-
 export class ProtoWasmBridge {
   constructor(
     private readonly module: ProtoWasmModule,
     private readonly logger: SDKLogger,
-    private readonly options?: ProtoWasmCallOptions,
   ) {}
 
   hasProtoBufferExports(): boolean {
@@ -154,8 +138,6 @@ export class ProtoWasmBridge {
       mod._rac_proto_buffer_init!(bufferPtr);
       const rc = call(bufferPtr);
       const status = this.readI32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_status!());
-      const failure = this.readNativeFailure(bufferPtr, rc, status, functionName);
-      if (failure) this.options?.onNativeFailure?.(failure);
       if (rc === RAC_ERROR_NOT_FOUND || status === RAC_ERROR_NOT_FOUND) {
         return null;
       }
@@ -164,9 +146,12 @@ export class ProtoWasmBridge {
         return null;
       }
       if (status !== RAC_SUCCESS) {
+        const messagePtr = this.readU32(
+          bufferPtr + mod._rac_wasm_offsetof_proto_buffer_error_message!(),
+        );
+        const message = messagePtr && mod.UTF8ToString ? mod.UTF8ToString(messagePtr) : '';
         this.logger.warning(
-          `${functionName} buffer status ${formatRacResult(status)}` +
-          `${failure?.message ? `: ${failure.message}` : ''}`,
+          `${functionName} buffer status ${formatRacResult(status)}${message ? `: ${message}` : ''}`,
         );
         return null;
       }
@@ -205,8 +190,6 @@ export class ProtoWasmBridge {
       mod._rac_proto_buffer_init!(bufferPtr);
       const rc = await call(bufferPtr);
       const status = this.readI32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_status!());
-      const failure = this.readNativeFailure(bufferPtr, rc, status, functionName);
-      if (failure) this.options?.onNativeFailure?.(failure);
       if (rc === RAC_ERROR_NOT_FOUND || status === RAC_ERROR_NOT_FOUND) {
         return null;
       }
@@ -215,9 +198,12 @@ export class ProtoWasmBridge {
         return null;
       }
       if (status !== RAC_SUCCESS) {
+        const messagePtr = this.readU32(
+          bufferPtr + mod._rac_wasm_offsetof_proto_buffer_error_message!(),
+        );
+        const message = messagePtr && mod.UTF8ToString ? mod.UTF8ToString(messagePtr) : '';
         this.logger.warning(
-          `${functionName} buffer status ${formatRacResult(status)}` +
-          `${failure?.message ? `: ${failure.message}` : ''}`,
+          `${functionName} buffer status ${formatRacResult(status)}${message ? `: ${message}` : ''}`,
         );
         return null;
       }
@@ -354,29 +340,6 @@ export class ProtoWasmBridge {
     if (mod.HEAP32) return mod.HEAP32[ptr >>> 2] ?? 0;
     if (mod.getValue) return mod.getValue(ptr, 'i32') | 0;
     return 0;
-  }
-
-  private readNativeFailure(
-    bufferPtr: number,
-    returnCode: number,
-    bufferStatus: number,
-    functionName: string,
-  ): ProtoWasmNativeFailure | null {
-    if (returnCode === RAC_SUCCESS && bufferStatus === RAC_SUCCESS) return null;
-
-    const messagePtr = this.readU32(
-      bufferPtr + this.module._rac_wasm_offsetof_proto_buffer_error_message!(),
-    );
-    const message = messagePtr && this.module.UTF8ToString
-      ? this.module.UTF8ToString(messagePtr)
-      : '';
-    return {
-      functionName,
-      resultCode: bufferStatus !== RAC_SUCCESS ? bufferStatus : returnCode,
-      returnCode,
-      bufferStatus,
-      message: message || undefined,
-    };
   }
 }
 

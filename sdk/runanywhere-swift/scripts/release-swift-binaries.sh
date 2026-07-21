@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# release-swift-binaries.sh — builds + zips + checksums all eight Apple
+# release-swift-binaries.sh — builds + zips + checksums all seven Apple
 # XCFrameworks (RACommons / RABackendLLAMACPP / RABackendONNX /
-# RABackendSherpa / RABackendCoreML / RABackendMLX /
-# RunAnywhereMLXRuntime / RunAnywhereMLXMetal), packages the separate MLX resource payload, and
+# RABackendSherpa / RABackendMLX / RunAnywhereMLXRuntime /
+# RunAnywhereMLXMetal), packages the separate MLX resource payload, and
 # patches the root/Flutter manifests and Flutter MLX podspec checksums to match.
 #
 # Pre-requisites (manual, one-time on the release machine):
@@ -12,6 +12,7 @@
 #   2. sdk/runanywhere-commons/third_party/onnxruntime-ios/onnxruntime.xcframework
 #      present. Run:
 #        ./sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+#      (or set RAC_BACKEND_ONNX=OFF to skip the ONNX backend.)
 #   3. Pinned iOS Sherpa and macOS static Sherpa/ONNX inventories present. Run:
 #        ./sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
 #        ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
@@ -27,13 +28,12 @@
 # Outputs:
 #   release-artifacts/native-ios-macos/RACommons-ios-v${VERSION}.zip
 #   release-artifacts/native-ios-macos/RABackendLLAMACPP-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RABackendSherpa-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RABackendCoreML-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RunAnywhereMLXRuntime-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RunAnywhereMLXMetal-ios-v${VERSION}.zip
-#   release-artifacts/native-ios-macos/RunAnywhereMLXResources-ios-v${VERSION}.zip
+#   release-artifacts/native-ios-macos/RABackendONNX-ios-v${VERSION}.zip    (if ONNX enabled)
+#   release-artifacts/native-ios-macos/RABackendSherpa-ios-v${VERSION}.zip (if ONNX enabled)
+#   release-artifacts/native-ios-macos/RABackendMLX-ios-v${VERSION}.zip     (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXRuntime-ios-v${VERSION}.zip (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXMetal-ios-v${VERSION}.zip   (if MLX enabled)
+#   release-artifacts/native-ios-macos/RunAnywhereMLXResources-ios-v${VERSION}.zip (if MLX enabled)
 #
 # Tagging and publication stay outside this build helper. The Release workflow
 # rebuilds and verifies these archives from the pushed tag before publishing.
@@ -60,14 +60,11 @@ fi
 
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
-RAC_BACKEND_SHERPA="${RAC_BACKEND_SHERPA:-ON}"
-RAC_BACKEND_COREML="${RAC_BACKEND_COREML:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
-export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_SHERPA RAC_BACKEND_COREML RAC_BACKEND_MLX
+export DRY_RUN RAC_BACKEND_ONNX RAC_BACKEND_MLX
 
-if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_SHERPA}" != "ON" ] || \
-   [ "${RAC_BACKEND_COREML}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
-    echo "error: a Swift release requires every Apple binary/resource payload (ONNX, Sherpa, CoreML, and MLX must be ON)" >&2
+if [ "${RAC_BACKEND_ONNX}" != "ON" ] || [ "${RAC_BACKEND_MLX}" != "ON" ]; then
+    echo "error: a Swift release requires every Apple binary/resource payload (ONNX and MLX must be ON)" >&2
     exit 1
 fi
 
@@ -104,6 +101,8 @@ error: ONNX Runtime iOS xcframework not found at
 
 Run this first (one-time, per checkout):
   ./sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+
+Or re-run with RAC_BACKEND_ONNX=OFF to skip the ONNX backend in this build.
 EOF
     exit 1
 fi
@@ -111,7 +110,7 @@ fi
 mkdir -p "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 1. Build all eight xcframeworks plus the Swift MLX resource payload.
+# 1. Build all seven xcframeworks plus the Swift MLX resource payload.
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}, RAC_BACKEND_MLX=${RAC_BACKEND_MLX})"
 export ZERO_AR_DATE=1

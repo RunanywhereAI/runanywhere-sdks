@@ -524,10 +524,6 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
-                // MLXSortformerPublicLifecycleTests imports MLXRuntime
-                // directly. Declare it so SwiftPM supplies MLX's transitive C
-                // module maps (including _NumericsShims) to this test target.
-                "MLXRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests",

@@ -655,7 +655,6 @@ enum ModelCategory : int {
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
   MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
   MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
-  MODEL_CATEGORY_VOCODER = 12,
   ModelCategory_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   ModelCategory_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -666,11 +665,11 @@ extern const uint32_t ModelCategory_internal_data_[];
 inline constexpr ModelCategory ModelCategory_MIN =
     static_cast<ModelCategory>(0);
 inline constexpr ModelCategory ModelCategory_MAX =
-    static_cast<ModelCategory>(12);
+    static_cast<ModelCategory>(11);
 [[nodiscard]] inline bool ModelCategory_IsValid(int value) {
-  return 0 <= value && value <= 12;
+  return 0 <= value && value <= 11;
 }
-inline constexpr int ModelCategory_ARRAYSIZE = 12 + 1;
+inline constexpr int ModelCategory_ARRAYSIZE = 11 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelCategory_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(ModelCategory) {
@@ -685,7 +684,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& ModelCategory_Name(ModelCategory value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<ModelCategory_descriptor, 0, 12>(
+  return ::google::protobuf::internal::NameOfDenseEnum<ModelCategory_descriptor, 0, 11>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool ModelCategory_Parse(

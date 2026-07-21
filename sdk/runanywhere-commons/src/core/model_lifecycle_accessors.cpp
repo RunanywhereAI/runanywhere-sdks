@@ -419,24 +419,4 @@ void release_lifecycle_segmentation(LifecycleSegmentationRef* ref) {
 #endif
 }
 
-rac_result_t acquire_lifecycle_vocoder(LifecycleVocoderRef* out_ref) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref)
-        *out_ref = {};
-    return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
-#else
-    return acquire_component(runanywhere::v1::SDK_COMPONENT_VOCODER, out_ref,
-                             &LoadedModel::vocoder_ops);
-#endif
-}
-
-void release_lifecycle_vocoder(LifecycleVocoderRef* ref) {
-#if defined(RAC_HAVE_PROTOBUF)
-    release_component(ref);
-#else
-    if (ref)
-        *ref = {};
-#endif
-}
-
 }  // namespace rac::lifecycle

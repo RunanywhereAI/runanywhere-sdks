@@ -456,13 +456,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSegmentationSegmentLifecycleProto(requestProto: ByteArray): ByteArray?
 
-    // VOCODER LIFECYCLE-PROTO ABI. The generated request carries contiguous
-    // float32 little-endian mel data and resolves the lifecycle-owned vocoder
-    // model without a Kotlin-owned component handle.
-
-    @JvmStatic
-    external fun racVocoderVocodeLifecycleProto(requestProto: ByteArray): ByteArray?
-
     // Backend registration
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
     //

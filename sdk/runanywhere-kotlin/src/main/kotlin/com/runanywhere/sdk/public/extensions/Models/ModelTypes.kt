@@ -54,7 +54,6 @@ private fun ModelCategory.defaultFrameworkFallback(): InferenceFramework =
         ModelCategory.MODEL_CATEGORY_EMBEDDING,
         ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
         ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
-        ModelCategory.MODEL_CATEGORY_VOCODER,
         -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
         else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
     }

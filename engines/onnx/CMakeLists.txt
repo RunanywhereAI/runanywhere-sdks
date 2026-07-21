@@ -118,8 +118,6 @@ set(ONNX_BACKEND_SOURCES
     rac_plugin_entry_onnx.cpp
     onnx_segmentation_provider.cpp
     rac_onnx_segmentation_register.cpp
-    onnx_vocoder_provider.cpp
-    rac_onnx_vocoder_register.cpp
 )
 
 # ONNX embedding provider: engine-owned primitive. The
@@ -321,6 +319,5 @@ message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
 message(STATUS "  Speech services: owned by engines/sherpa")
 message(STATUS "  Segmentation: SegFormer FP32 via onnxrt")
-message(STATUS "  Vocoder:     BigVGAN FP32 via onnxrt")
 message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

@@ -274,8 +274,6 @@ class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_SEMANTIC_SEGMENTATION =
       ModelCategory._(
           11, _omitEnumNames ? '' : 'MODEL_CATEGORY_SEMANTIC_SEGMENTATION');
-  static const ModelCategory MODEL_CATEGORY_VOCODER =
-      ModelCategory._(12, _omitEnumNames ? '' : 'MODEL_CATEGORY_VOCODER');
 
   static const $core.List<ModelCategory> values = <ModelCategory>[
     MODEL_CATEGORY_UNSPECIFIED,
@@ -290,11 +288,10 @@ class ModelCategory extends $pb.ProtobufEnum {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
     MODEL_CATEGORY_SPEAKER_DIARIZATION,
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
-    MODEL_CATEGORY_VOCODER,
   ];
 
   static final $core.List<ModelCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 12);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static ModelCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

@@ -129,7 +129,6 @@ enum ModelCategory {
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
     MODEL_CATEGORY_SPEAKER_DIARIZATION      = 10 [(runanywhere.v1.rac_wire_string) = "speaker-diarization"];
     MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
-    MODEL_CATEGORY_VOCODER                  = 12 [(runanywhere.v1.rac_wire_string) = "vocoder"];
 }
 
 // ---------------------------------------------------------------------------

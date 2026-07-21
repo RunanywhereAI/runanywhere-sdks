@@ -9,7 +9,6 @@
  *   - {@link VLMProtoAdapter}
  *   - {@link EmbeddingsProtoAdapter}
  *   - {@link SegmentationProtoAdapter}
- *   - {@link VocoderProtoAdapter}
  *   - {@link DiffusionProtoAdapter}
  *   - {@link RAGProtoAdapter}
  *   - {@link LoRAProtoAdapter}
@@ -40,7 +39,6 @@ import { TTSProtoAdapter } from './TTSProtoAdapter.js';
 import { VADProtoAdapter } from './VADProtoAdapter.js';
 import { VLMProtoAdapter } from './VLMProtoAdapter.js';
 import { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter.js';
-import { VocoderProtoAdapter } from './VocoderProtoAdapter.js';
 
 /**
  * Subset of `WasmCapability` that maps to a ModalityProtoModule slot. The
@@ -56,7 +54,6 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'vad',
   'embedding',
   'segmentation',
-  'vocoder',
   'rag',
   'diffusion',
   'structured-output',
@@ -77,7 +74,6 @@ export { TTSProtoAdapter } from './TTSProtoAdapter.js';
 export { VADProtoAdapter } from './VADProtoAdapter.js';
 export { VLMProtoAdapter } from './VLMProtoAdapter.js';
 export { VoiceAgentProtoAdapter } from './VoiceAgentProtoAdapter.js';
-export { VocoderProtoAdapter } from './VocoderProtoAdapter.js';
 export type {
   ModalityProtoModule,
   ProtoEventHandler,
@@ -113,7 +109,6 @@ export class ModalityProtoAdapter {
       ?? adapterState.modalitySlots.vad
       ?? adapterState.modalitySlots.embedding
       ?? adapterState.modalitySlots.segmentation
-      ?? adapterState.modalitySlots.vocoder
       ?? adapterState.modalitySlots.rag
       ?? adapterState.modalitySlots.diffusion
       ?? adapterState.modalitySlots['structured-output']
@@ -157,7 +152,6 @@ export class ModalityProtoAdapter {
         ?? adapterState.modalitySlots.tts
         ?? adapterState.modalitySlots.vad
         ?? adapterState.modalitySlots.segmentation
-        ?? adapterState.modalitySlots.vocoder
         ?? null;
     }
   }
@@ -214,10 +208,6 @@ export class ModalityProtoAdapter {
 
   segmentation(): SegmentationProtoAdapter {
     return new SegmentationProtoAdapter(this.module);
-  }
-
-  vocoder(): VocoderProtoAdapter {
-    return new VocoderProtoAdapter(this.module);
   }
 
   diffusion(): DiffusionProtoAdapter {

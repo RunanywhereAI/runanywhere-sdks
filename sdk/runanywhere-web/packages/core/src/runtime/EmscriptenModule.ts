@@ -229,12 +229,6 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
 
-  _rac_vocoder_vocode_lifecycle_proto?(
-    requestBytes: number,
-    requestSize: number,
-    outResult: number,
-  ): number;
-
   _rac_diffusion_generate_proto?(
     handle: number,
     optionsBytes: number,
@@ -818,7 +812,7 @@ export interface EmscriptenRunanywhereModule {
 //   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'embedding',
 //                                 'structured-output', 'tool-calling', 'lora'
 //   - racommons-onnx-sherpa.wasm → 'stt', 'tts', 'vad', 'embedding',
-//                                  'segmentation', 'vocoder', 'rag'
+//                                  'segmentation', 'rag'
 //
 // The same module may register multiple capabilities; duplicate registration
 // of a capability replaces the previous owner (last-writer-wins per
@@ -838,7 +832,6 @@ export type WasmCapability =
   | 'vad'               // Voice activity detection
   | 'embedding'         // Embeddings
   | 'segmentation'      // Semantic image segmentation
-  | 'vocoder'           // Mel-spectrogram to waveform vocoding
   | 'rag'               // RAG pipeline (embeddings + retrieval)
   | 'diffusion'         // Diffusion (image generation)
   | 'structured-output' // Structured-output parse/validate/prepare-prompt
@@ -871,7 +864,6 @@ const BACKEND_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
   'vad',
   'embedding',
   'segmentation',
-  'vocoder',
   'rag',
   'diffusion',
 ];
@@ -964,7 +956,7 @@ export function registerWasmModule(
   }
   // The ModalityProtoAdapter's internal per-capability slot is the canonical
   // dispatch table for the modality verbs (LLM/VLM/STT/TTS/VAD/embedding/
-  // segmentation/vocoder/diffusion/rag/lora/voice-agent/structured-output). Push the module into
+  // segmentation/diffusion/rag/lora/voice-agent/structured-output). Push the module into
   // every claimed slot so per-modality `tryDefault()` calls find it.
   ModalityProtoAdapter.registerModuleCapabilities(capabilities, mod);
 }
@@ -1092,7 +1084,6 @@ const FALLBACK_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
   'vlm',
   'embedding',
   'segmentation',
-  'vocoder',
   'rag',
   'tool-calling',
   'structured-output',

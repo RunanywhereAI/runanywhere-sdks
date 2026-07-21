@@ -83,11 +83,6 @@ import type {
   SegmentationRequest,
   SegmentationResult,
 } from '@runanywhere/proto-ts/segmentation';
-import { vocode as vocodeImpl } from './Extensions/RunAnywhere+Vocoder.js';
-import type {
-  VocoderRequest,
-  VocoderResult,
-} from './Extensions/RunAnywhere+Vocoder.js';
 import type {
   VLMGenerationOptions,
   VLMImage,
@@ -1452,12 +1447,6 @@ export const RunAnywhere = {
   async segment(request: SegmentationRequest): Promise<SegmentationResult> {
     await RunAnywhere.ensureServicesReady();
     return segmentImpl(request);
-  },
-
-  /** Convert a mel spectrogram with the lifecycle-owned vocoder model. */
-  async vocode(request: VocoderRequest): Promise<VocoderResult> {
-    await RunAnywhere.ensureServicesReady();
-    return vocodeImpl(request);
   },
 
   async loadModel(

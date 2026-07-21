@@ -53,7 +53,7 @@ rac_result_t rac_backend_onnx_register(void) {
     }
 
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (segmentation + vocoder + optional embeddings)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (segmentation + optional embeddings)");
     return RAC_SUCCESS;
 }
 

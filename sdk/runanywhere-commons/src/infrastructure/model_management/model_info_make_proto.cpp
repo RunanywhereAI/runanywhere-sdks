@@ -116,8 +116,6 @@ runanywhere::v1::ModelCategory model_category_to_proto(rac_model_category_t c) {
             return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-        case RAC_MODEL_CATEGORY_VOCODER:
-            return runanywhere::v1::MODEL_CATEGORY_VOCODER;
         default:
             return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     }
@@ -147,8 +145,6 @@ rac_model_category_t model_category_from_proto(runanywhere::v1::ModelCategory c)
             return RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-        case runanywhere::v1::MODEL_CATEGORY_VOCODER:
-            return RAC_MODEL_CATEGORY_VOCODER;
         default:
             return RAC_MODEL_CATEGORY_UNKNOWN;
     }

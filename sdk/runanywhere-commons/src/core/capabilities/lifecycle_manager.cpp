@@ -113,8 +113,6 @@ SDKComponent component_for_resource_type(rac_resource_type_t type) {
             return runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION;
         case RAC_RESOURCE_TYPE_SEGMENTATION_MODEL:
             return runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION;
-        case RAC_RESOURCE_TYPE_VOCODER_MODEL:
-            return runanywhere::v1::SDK_COMPONENT_VOCODER;
         default:
             return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
     }
@@ -142,8 +140,6 @@ ModelCategory category_for_component(SDKComponent component) {
             return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION:
             return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
-        case runanywhere::v1::SDK_COMPONENT_VOCODER:
-            return runanywhere::v1::MODEL_CATEGORY_VOCODER;
         default:
             return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     }
@@ -208,12 +204,6 @@ void decompose_service(SDKComponent component, rac_handle_t service, detail::Loa
         case runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION: {
             auto* s = static_cast<rac_segmentation_service_t*>(service);
             entry->segmentation_ops = s->ops;
-            entry->impl = s->impl;
-            break;
-        }
-        case runanywhere::v1::SDK_COMPONENT_VOCODER: {
-            auto* s = static_cast<rac_vocoder_service_t*>(service);
-            entry->vocoder_ops = s->ops;
             entry->impl = s->impl;
             break;
         }
@@ -1044,8 +1034,6 @@ const char* rac_resource_type_name(rac_resource_type_t type) {
             return "embeddingsModel";
         case RAC_RESOURCE_TYPE_SEGMENTATION_MODEL:
             return "segmentationModel";
-        case RAC_RESOURCE_TYPE_VOCODER_MODEL:
-            return "vocoderModel";
         default:
             return "unknown";
     }
