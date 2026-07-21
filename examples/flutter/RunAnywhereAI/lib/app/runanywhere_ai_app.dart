@@ -75,21 +75,18 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         await RunAnywhere.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
-          // Staging (not Production) so the custom base URL is honored AND
-          // local logging stays on — Production sets enableLocalLogging:false,
-          // hiding all SDK/telemetry logs. Development would ignore baseURL.
-          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+          // Production + explicit creds — same proven path as the Android
+          // example (custom URL honored, full bearer auth + registration).
+          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
-        debugPrint('✅ SDK initialized with CUSTOM configuration (staging)');
+        debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
       } else {
-        // Staging test build: keyless staging — no API key, no URL; the SDK
-        // resolves the baked staging backend URL and sends unauthenticated
-        // telemetry (PUBLIC-org ingestion). Restore `RunAnywhere.initialize()`
-        // to go back to development behavior.
+        // No credentials supplied: development without a key — telemetry and
+        // registration stay local-only until credentials are provided.
         await RunAnywhere.initialize(
-          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         );
-        debugPrint('✅ SDK initialized in STAGING mode (keyless)');
+        debugPrint('✅ SDK initialized in DEVELOPMENT mode (keyless)');
       }
 
       // Re-apply the persisted HuggingFace token (Settings screen) so private

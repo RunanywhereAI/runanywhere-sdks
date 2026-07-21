@@ -224,27 +224,25 @@ const App: React.FC = () => {
 
         if (configuration) {
           console.log('[App] Found backend configuration');
-          // Staging (not Production) so the custom base URL is honored AND
-          // local logging stays on — Production sets enableLocalLogging:false,
-          // hiding all SDK/telemetry logs. Development would ignore baseURL.
+          // Production + explicit creds — same proven path as the Android
+          // example (custom URL honored, full bearer auth + registration).
           await RunAnywhere.initialize({
             apiKey: configuration.apiKey,
             baseURL: configuration.baseURL,
-            environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+            environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
           });
           console.log(
-            '[App] SDK initialized with backend configuration (staging)'
+            '[App] SDK initialized with backend configuration (production)'
           );
         } else {
-          // Staging test build: keyless staging — no API key, no URL; the SDK
-          // resolves the baked staging backend URL and sends unauthenticated
-          // telemetry (PUBLIC-org ingestion). Restore DEVELOPMENT to go back.
+          // No .env credentials: development without a key — telemetry and
+          // registration stay local-only until credentials are provided.
           await RunAnywhere.initialize({
             apiKey: '',
             baseURL: '',
-            environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+            environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
           });
-          console.log('[App] SDK initialized in STAGING mode (keyless)');
+          console.log('[App] SDK initialized in DEVELOPMENT mode (keyless)');
         }
 
         await registerAll(backendState);
