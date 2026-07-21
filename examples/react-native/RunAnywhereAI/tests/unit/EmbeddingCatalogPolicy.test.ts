@@ -21,6 +21,13 @@ describe('portable NVIDIA embedding catalog policy', () => {
         ),
         memoryRequirement: 807_690_624,
       }),
+      expect.objectContaining({
+        id: 'llama-embed-nemotron-8b-q4_k_m',
+        url: expect.stringContaining(
+          '/resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/'
+        ),
+        memoryRequirement: 4_625_233_184,
+      }),
     ]);
   });
 

@@ -196,13 +196,17 @@ void main() {
       portableNvidiaEmbeddingCatalog
           .map((model) => model.id)
           .toList(growable: false),
-      ['nemotron-3-embed-1b-q4_k_m', 'llama-nemotron-embed-1b-v2-q4_k_m'],
+      [
+        'nemotron-3-embed-1b-q4_k_m',
+        'llama-nemotron-embed-1b-v2-q4_k_m',
+        'llama-embed-nemotron-8b-q4_k_m',
+      ],
     );
     expect(
       portableNvidiaEmbeddingCatalog
           .map((model) => model.memoryRequirement)
           .toList(growable: false),
-      [749352096, 807690624],
+      [749352096, 807690624, 4625233184],
     );
     expect(
       portableNvidiaEmbeddingCatalog.map((model) => model.url),

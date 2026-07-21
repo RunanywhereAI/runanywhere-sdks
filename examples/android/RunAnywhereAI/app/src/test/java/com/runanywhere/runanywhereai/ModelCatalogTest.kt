@@ -45,6 +45,13 @@ class ModelCatalogTest {
         assertEquals(ModelCategory.MODEL_CATEGORY_EMBEDDING, embeddingV2.category)
         assertEquals(807_690_624L, embeddingV2.memoryBytes)
         assertTrue(embeddingV2.url.contains("/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/"))
+
+        val embed8b = byId.getValue("llama-embed-nemotron-8b-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, embed8b.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_EMBEDDING, embed8b.category)
+        assertEquals(4_625_233_184L, embed8b.downloadBytes)
+        assertEquals(6L * 1_024L * 1_024L * 1_024L, embed8b.memoryBytes)
+        assertTrue(embed8b.url.contains("/resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/"))
     }
 
     @Test

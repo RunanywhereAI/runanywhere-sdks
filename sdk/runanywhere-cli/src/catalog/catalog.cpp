@@ -832,6 +832,14 @@ constexpr CatalogEntry kCatalog[] = {
      "resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/"
      "llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
      nullptr, 0, 807690624LL, 0, false},
+    // NVIDIA Llama Embed Nemotron 8B — portable GGUF previously HNPU-only.
+    {"llama-embed-nemotron-8b-q4_k_m", "llama-embed-nemotron",
+     "NVIDIA Llama Embed Nemotron 8B Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/"
+     "resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/"
+     "llama-embed-nemotron-8b.Q4_K_M.gguf",
+     nullptr, 0, 4625233184LL, 0, false},
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},

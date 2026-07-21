@@ -177,6 +177,21 @@ enum ModelCatalogBootstrap {
             modality: .embedding,
             memoryRequirement: 807_690_624
         )
+        // NVIDIA Llama Embed Nemotron 8B — the only NVIDIA embedder whose
+        // portable GGUF was previously catalogued HNPU-only. Same shared
+        // llama.cpp embedding path as the two 1B rows above; the 4.63 GB Q4_K_M
+        // artifact is Web-excluded (exceeds the WASM 4 GiB heap).
+        let llamaEmbedNemotron8BGGUFBaseURL =
+            "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/resolve/" +
+            "e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25"
+        await registerLLM(
+            id: "llama-embed-nemotron-8b-q4_k_m",
+            name: "NVIDIA Llama Embed Nemotron 8B Q4_K_M",
+            url: "\(llamaEmbedNemotron8BGGUFBaseURL)/llama-embed-nemotron-8b.Q4_K_M.gguf",
+            framework: .llamaCpp,
+            modality: .embedding,
+            memoryRequirement: 4_625_233_184
+        )
         // The Nano checkpoint keeps the standard Llama 3.1 GGUF architecture.
         // The Apple provider/build route accepts it, but this exact 4.92 GB
         // artifact has not yet completed an Apple inference smoke.

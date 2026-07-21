@@ -333,6 +333,8 @@ TestResult test_catalog_lookup() {
        "06df1fde6f7009c91f6cc3cd520081921929a678", 749352096LL},
       {"llama-nemotron-embed-1b-v2-q4_k_m", "llama-nemotron-embed",
        "bf7c9832b1d76f86777379e58b7b74805ee58006", 807690624LL},
+      {"llama-embed-nemotron-8b-q4_k_m", "llama-embed-nemotron",
+       "e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25", 4625233184LL},
   };
   for (const PortableNvidiaEmbeddingCase &test_case :
        portable_nvidia_embeddings) {

@@ -553,6 +553,22 @@ internal object ModelCatalog {
             EMBEDDING,
             807_690_624,
         ),
+        // NVIDIA Llama Embed Nemotron 8B — the only NVIDIA embedder with a
+        // portable GGUF that was previously catalogued HNPU-only. Llama-family
+        // bidirectional embedder; runs through the llama.cpp embedding path like
+        // the two 1B rows above. The 4.63 GB Q4_K_M file exceeds the WASM 4 GiB
+        // heap so it is intentionally Web-excluded; on mobile the download
+        // transport size is kept separate from a mandatory 6 GiB available-RAM
+        // preflight (mirrors the Nano-8B gate).
+        SingleFileModel(
+            "llama-embed-nemotron-8b-q4_k_m",
+            "NVIDIA Llama Embed Nemotron 8B Q4_K_M",
+            "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/llama-embed-nemotron-8b.Q4_K_M.gguf",
+            LLAMA,
+            EMBEDDING,
+            memoryBytes = 6L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 4_625_233_184L,
+        ),
         SingleFileModel(
             "silero-vad",
             "Silero VAD",
