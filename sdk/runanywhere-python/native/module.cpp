@@ -28,6 +28,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "win32_platform_adapter.h"
 
@@ -710,12 +711,42 @@ std::string version() {
     return v ? v : "";
 }
 
+// The engine backends compiled into this build (from the RAC_HAVE_BACKEND_<X> defines the
+// CMake backend loop emits). The plugin registry auto-selects the highest-priority registered
+// backend per modality, so this is what a loaded model can route to on this host.
+std::vector<std::string> backends() {
+    std::vector<std::string> out;
+#ifdef RAC_HAVE_BACKEND_LLAMACPP
+    out.push_back("llamacpp");
+#endif
+#ifdef RAC_HAVE_BACKEND_ONNX
+    out.push_back("onnx");
+#endif
+#ifdef RAC_HAVE_BACKEND_SHERPA
+    out.push_back("sherpa");
+#endif
+#ifdef RAC_HAVE_BACKEND_QHEXRT
+    out.push_back("qhexrt");
+#endif
+#ifdef RAC_HAVE_BACKEND_MLX
+    out.push_back("mlx");
+#endif
+#ifdef RAC_HAVE_BACKEND_COREML
+    out.push_back("coreml");
+#endif
+#ifdef RAC_HAVE_BACKEND_CLOUD
+    out.push_back("cloud");
+#endif
+    return out;
+}
+
 }  // namespace
 
 PYBIND11_MODULE(_core, m) {
     m.doc() = "RunAnywhere native core (rac_* C ABI bound via pybind11).";
 
     m.def("version", &version, "Return the RunAnywhere SDK version string.");
+    m.def("backends", &backends, "List the engine backends compiled into this build.");
 
     m.def("initialize", &initialize, py::arg("secure_dir"), py::arg("base_dir") = py::none(),
           "Initialize the runtime: fill the platform adapter, set the base dir, "
