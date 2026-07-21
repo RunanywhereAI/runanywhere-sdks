@@ -636,6 +636,20 @@ enum ModelCatalogBootstrap {
             modality: .speechRecognition,
             memoryRequirement: 670_478_772
         )
+        // The pinned upstream ONNX lacks three metadata entries required by
+        // Sherpa. Commons verifies the transport bytes and applies the exact
+        // reviewed 76-byte append transform before exposing the final model.
+        // Runtime RAM and the exact final download footprint are planned
+        // independently.
+        await registerMultiFile(
+            id: "sherpa-nemo-parakeet-ctc-1.1b-int8",
+            name: "NVIDIA Parakeet CTC 1.1B INT8 (Sherpa-ONNX)",
+            files: parakeetCTCSherpaFiles,
+            framework: .sherpa,
+            modality: .speechRecognition,
+            memoryRequirement: 2_000_000_000,
+            downloadSize: 1_110_024_519
+        )
         let canarySherpaBaseURL =
             "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c"
         await registerMultiFile(
@@ -1176,23 +1190,102 @@ enum ModelCatalogBootstrap {
 
     // MARK: - Registration helpers
 
-    private struct CatalogModelFile {
+    private struct CatalogModelFile: Sendable {
         let url: String
         let filename: String
         let isRequired: Bool
         let sizeBytes: Int64?
+        let checksumSHA256: String?
+        let postDownloadTransform: RAPostDownloadTransform?
 
         init(
             url: String,
             filename: String,
             isRequired: Bool = true,
-            sizeBytes: Int64? = nil
+            sizeBytes: Int64? = nil,
+            checksumSHA256: String? = nil,
+            postDownloadTransform: RAPostDownloadTransform? = nil
         ) {
             self.url = url
             self.filename = filename
             self.isRequired = isRequired
             self.sizeBytes = sizeBytes
+            self.checksumSHA256 = checksumSHA256
+            self.postDownloadTransform = postDownloadTransform
         }
+    }
+
+    private static let parakeetCTCSherpaFiles: [CatalogModelFile] = {
+        let metadataPayload: [UInt8] = [
+            0x72, 0x12, 0x0a, 0x0a, 0x76, 0x6f, 0x63, 0x61, 0x62, 0x5f, 0x73,
+            0x69, 0x7a, 0x65, 0x12, 0x04, 0x31, 0x30, 0x32, 0x35, 0x72, 0x17,
+            0x0a, 0x12, 0x73, 0x75, 0x62, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x69,
+            0x6e, 0x67, 0x5f, 0x66, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x01,
+            0x38, 0x72, 0x1d, 0x0a, 0x0e, 0x6e, 0x6f, 0x72, 0x6d, 0x61, 0x6c,
+            0x69, 0x7a, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x70,
+            0x65, 0x72, 0x5f, 0x66, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65
+        ]
+
+        var appendBytes = RAPostDownloadAppendBytes()
+        appendBytes.payload = Data(metadataPayload)
+        var operation = RAPostDownloadTransformOperation()
+        operation.appendBytes = appendBytes
+
+        var transform = RAPostDownloadTransform()
+        transform.sourceSizeBytes = 1_110_014_069
+        transform.sourceChecksumSha256 =
+            "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d"
+        transform.finalSizeBytes = 1_110_014_145
+        transform.finalChecksumSha256 =
+            "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98"
+        transform.operations = [operation]
+
+        let baseURL =
+            "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/" +
+            "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5"
+        return [
+            CatalogModelFile(
+                url: "\(baseURL)/model.int8.onnx",
+                filename: "model.int8.onnx",
+                sizeBytes: 1_110_014_145,
+                checksumSHA256:
+                    "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+                postDownloadTransform: transform
+            ),
+            CatalogModelFile(
+                url: "\(baseURL)/vocab.txt",
+                filename: "tokens.txt",
+                sizeBytes: 10_374,
+                checksumSHA256:
+                    "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921"
+            )
+        ]
+    }()
+
+    private static func makeDescriptor(
+        for file: CatalogModelFile,
+        modality: ModelCategory
+    ) -> RAModelFileDescriptor? {
+        guard let fileURL = URL(string: file.url) else { return nil }
+        var descriptor = RAModelFileDescriptor(
+            url: fileURL,
+            filename: file.filename,
+            isRequired: file.isRequired
+        )
+        descriptor.role = RunAnywhere.inferModelFileRole(
+            filename: file.filename,
+            modality: modality
+        )
+        if let sizeBytes = file.sizeBytes {
+            descriptor.sizeBytes = sizeBytes
+        }
+        if let checksumSHA256 = file.checksumSHA256 {
+            descriptor.checksumSha256 = checksumSHA256
+        }
+        if let postDownloadTransform = file.postDownloadTransform {
+            descriptor.postDownloadTransform = postDownloadTransform
+        }
+        return descriptor
     }
 
     private static func registerLLM(
@@ -1257,7 +1350,8 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory,
         memoryRequirement: Int64,
         contextLength: Int? = nil,
-        supportsThinking: Bool = false
+        supportsThinking: Bool = false,
+        downloadSize: Int64? = nil
     ) async {
         await registerMultiFile(
             id: id,
@@ -1267,7 +1361,8 @@ enum ModelCatalogBootstrap {
             modality: modality,
             memoryRequirement: memoryRequirement,
             contextLength: contextLength,
-            supportsThinking: supportsThinking
+            supportsThinking: supportsThinking,
+            downloadSize: downloadSize
         )
     }
 
@@ -1279,18 +1374,11 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory,
         memoryRequirement: Int64,
         contextLength: Int? = nil,
-        supportsThinking: Bool = false
+        supportsThinking: Bool = false,
+        downloadSize: Int64? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
-        let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
-            guard let fileURL = URL(string: file.url) else { return nil }
-            var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: file.isRequired)
-            descriptor.role = RunAnywhere.inferModelFileRole(filename: file.filename, modality: modality)
-            if let sizeBytes = file.sizeBytes {
-                descriptor.sizeBytes = sizeBytes
-            }
-            return descriptor
-        }
+        let descriptors = files.compactMap { makeDescriptor(for: $0, modality: modality) }
         guard descriptors.count == files.count else {
             logger.warning("Invalid multi-file URL list for model \(id, privacy: .public)")
             return
@@ -1304,7 +1392,8 @@ enum ModelCatalogBootstrap {
                 modality: modality,
                 memoryRequirement: memoryRequirement,
                 contextLength: contextLength,
-                supportsThinking: supportsThinking
+                supportsThinking: supportsThinking,
+                downloadSize: downloadSize
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

@@ -25,11 +25,20 @@
 
 namespace rcli::catalog {
 
+struct CatalogAppendBytesTransform {
+  int64_t source_size_bytes;
+  const char *source_checksum_sha256;
+  const char *payload;
+  size_t payload_size;
+};
+
 struct CatalogFile {
   const char *url;
   const char *filename;
   bool required;
   int64_t size_bytes = 0;
+  const char *checksum_sha256 = nullptr;
+  const CatalogAppendBytesTransform *append_bytes_transform = nullptr;
 };
 
 struct CatalogEntry {
@@ -45,6 +54,7 @@ struct CatalogEntry {
   int64_t download_size_bytes; // approximate, for display/planning
   int32_t context_length;      // 0 = unknown/not applicable
   bool supports_thinking;
+  int64_t memory_required_bytes = 0; // 0 = unknown/not applicable
 };
 
 /** All built-in entries. */
