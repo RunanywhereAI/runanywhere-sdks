@@ -7,11 +7,18 @@ private struct CatalogFile {
     let url: String
     let filename: String
     let isRequired: Bool
+    let sizeBytes: Int64?
 
-    init(_ url: String, _ filename: String, required: Bool = true) {
+    init(
+        _ url: String,
+        _ filename: String,
+        required: Bool = true,
+        sizeBytes: Int64? = nil
+    ) {
         self.url = url
         self.filename = filename
         self.isRequired = required
+        self.sizeBytes = sizeBytes
     }
 }
 
@@ -48,6 +55,58 @@ private enum MLXCatalog {
         memoryRequirement: 351_383_618,
         contextLength: 4_096,
         supportsThinking: true
+    )
+
+    private static let nemotronNano8BBaseURL =
+        "https://huggingface.co/bourn23/nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/00378e66048eadf358aad0f66c09e5c3750f8243"
+
+    static let nemotronNano8BLLM = CatalogEntry(
+        id: "mlx-llama-3.1-nemotron-nano-8b-v1-4bit",
+        alias: "mlx-nemotron-nano",
+        name: "NVIDIA Llama 3.1 Nemotron Nano 8B 4-bit (MLX)",
+        category: .language,
+        framework: .mlx,
+        files: [
+            .init(
+                "\(nemotronNano8BBaseURL)/chat_template.jinja",
+                "chat_template.jinja",
+                sizeBytes: 2_004
+            ),
+            .init("\(nemotronNano8BBaseURL)/config.json", "config.json", sizeBytes: 1_170),
+            .init(
+                "\(nemotronNano8BBaseURL)/generation_config.json",
+                "generation_config.json",
+                sizeBytes: 185
+            ),
+            .init(
+                "\(nemotronNano8BBaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 4_517_489_554
+            ),
+            .init(
+                "\(nemotronNano8BBaseURL)/model.safetensors.index.json",
+                "model.safetensors.index.json",
+                sizeBytes: 52_421
+            ),
+            .init(
+                "\(nemotronNano8BBaseURL)/special_tokens_map.json",
+                "special_tokens_map.json",
+                sizeBytes: 296
+            ),
+            .init(
+                "\(nemotronNano8BBaseURL)/tokenizer.json",
+                "tokenizer.json",
+                sizeBytes: 17_209_920
+            ),
+            .init(
+                "\(nemotronNano8BBaseURL)/tokenizer_config.json",
+                "tokenizer_config.json",
+                sizeBytes: 50_525
+            ),
+        ],
+        memoryRequirement: 4_534_806_075,
+        contextLength: 131_072,
+        supportsThinking: false
     )
 
     static let llamaLLM = CatalogEntry(
@@ -192,6 +251,116 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    private static let parakeetCTC11BBaseURL =
+        "https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/295d0c0557aef0c445db79b3d09c9a94a69ffeaf"
+
+    static let parakeetCTC11B = CatalogEntry(
+        id: "mlx-parakeet-ctc-1.1b",
+        alias: "mlx-parakeet-ctc",
+        name: "NVIDIA Parakeet CTC 1.1B (MLX)",
+        category: .speechRecognition,
+        framework: .mlx,
+        files: [
+            .init("\(parakeetCTC11BBaseURL)/config.json", "config.json", sizeBytes: 22_393),
+            .init(
+                "\(parakeetCTC11BBaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 4_250_695_964
+            ),
+        ],
+        memoryRequirement: 4_250_718_357,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    private static let parakeetTDTV2BaseURL =
+        "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487"
+
+    static let parakeetTDTV2 = CatalogEntry(
+        id: "mlx-parakeet-tdt-0.6b-v2",
+        alias: "mlx-parakeet-tdt-v2",
+        name: "NVIDIA Parakeet TDT 0.6B v2 (MLX)",
+        category: .speechRecognition,
+        framework: .mlx,
+        files: [
+            .init("\(parakeetTDTV2BaseURL)/config.json", "config.json", sizeBytes: 36_176),
+            .init(
+                "\(parakeetTDTV2BaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 2_471_559_904
+            ),
+        ],
+        memoryRequirement: 2_471_596_080,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    private static let parakeetTDTV3BaseURL =
+        "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15"
+
+    static let parakeetTDTV3 = CatalogEntry(
+        id: "mlx-parakeet-tdt-0.6b-v3",
+        alias: "mlx-parakeet-tdt-v3",
+        name: "NVIDIA Parakeet TDT 0.6B v3 (MLX)",
+        category: .speechRecognition,
+        framework: .mlx,
+        files: [
+            .init("\(parakeetTDTV3BaseURL)/config.json", "config.json", sizeBytes: 244_093),
+            .init(
+                "\(parakeetTDTV3BaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 2_508_288_736
+            ),
+        ],
+        memoryRequirement: 2_508_532_829,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    private static let parakeetRNNT11BBaseURL =
+        "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa"
+
+    static let parakeetRNNT11B = CatalogEntry(
+        id: "mlx-parakeet-rnnt-1.1b",
+        alias: "mlx-parakeet-rnnt",
+        name: "NVIDIA Parakeet RNNT 1.1B (MLX)",
+        category: .speechRecognition,
+        framework: .mlx,
+        files: [
+            .init("\(parakeetRNNT11BBaseURL)/config.json", "config.json", sizeBytes: 37_318),
+            .init(
+                "\(parakeetRNNT11BBaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 4_282_246_596
+            ),
+        ],
+        memoryRequirement: 4_282_283_914,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
+    private static let nemotronStreamingASRBaseURL =
+        "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit/resolve/7279359e4481b5e9e185a318bd618e429c6d86cd"
+
+    static let nemotronStreamingASR = CatalogEntry(
+        id: "mlx-nemotron-3.5-asr-streaming-0.6b-8bit",
+        alias: "mlx-nemotron-asr",
+        name: "NVIDIA Nemotron 3.5 Streaming ASR 0.6B 8-bit (MLX)",
+        category: .speechRecognition,
+        framework: .mlx,
+        files: [
+            .init("\(nemotronStreamingASRBaseURL)/config.json", "config.json", sizeBytes: 159_605),
+            .init(
+                "\(nemotronStreamingASRBaseURL)/model.safetensors",
+                "model.safetensors",
+                sizeBytes: 755_598_923
+            ),
+        ],
+        memoryRequirement: 755_758_528,
+        contextLength: nil,
+        supportsThinking: false
+    )
+
     static let qwen3TTS = CatalogEntry(
         id: "mlx-qwen3-tts-12hz-0.6b-base-8bit",
         alias: "mlx-qwen3-tts",
@@ -323,12 +492,18 @@ private enum MLXCatalog {
 
     static let entries = [
         qwen3LLM,
+        nemotronNano8BLLM,
         llamaLLM,
         fastVLM,
         qwen2VLM,
         qwen3Embedding,
         qwen3ASR,
         glmASR,
+        parakeetCTC11B,
+        parakeetTDTV2,
+        parakeetTDTV3,
+        parakeetRNNT11B,
+        nemotronStreamingASR,
         qwen3TTS,
         qwen3TTS4Bit,
         sopranoTTS,
@@ -436,6 +611,7 @@ private func configureDevSecureStore() throws {
 }
 
 private extension String {
+    @MainActor
     func withModel(_ body: (CatalogEntry) async throws -> Void) async throws {
         guard let entry = MLXCatalog.resolve(self) else { throw CLIError.modelNotFound(self) }
         try await body(entry)
@@ -569,6 +745,9 @@ private func descriptors(for entry: CatalogEntry) -> [RAModelFileDescriptor] {
         guard let url = URL(string: file.url) else { return nil }
         var descriptor = RAModelFileDescriptor(url: url, filename: file.filename, isRequired: file.isRequired)
         descriptor.role = RunAnywhere.inferModelFileRole(filename: file.filename, modality: entry.category)
+        if let sizeBytes = file.sizeBytes {
+            descriptor.sizeBytes = sizeBytes
+        }
         return descriptor
     }
 }

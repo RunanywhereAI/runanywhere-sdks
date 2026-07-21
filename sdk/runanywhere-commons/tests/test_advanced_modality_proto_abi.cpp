@@ -19,6 +19,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -596,9 +597,8 @@ int test_vlm_process_stream_events() {
     runanywhere::v1::SDKEvent cancel_event;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &cancel_event),
           "VLM lifecycle cancel returns SDKEvent");
-    CHECK(cancel_event.has_cancellation() &&
-              cancel_event.cancellation().kind() ==
-                  runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
+    CHECK(cancel_event.has_cancellation() && cancel_event.cancellation().kind() ==
+                                                 runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
           "VLM lifecycle cancel returns completed cancellation event");
     rac_proto_buffer_free(&out);
 
@@ -688,6 +688,40 @@ int test_embeddings_mocked_result() {
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED),
           "embeddings emits completed capability event");
     rac_proto_buffer_free(&out);
+    return 0;
+}
+
+int test_embeddings_options_mapping() {
+    runanywhere::v1::EmbeddingsOptions options;
+    options.set_normalize(false);
+    options.set_normalize_mode(runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_L2);
+    options.set_pooling(runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_CLS);
+    options.set_n_threads(6);
+    options.set_truncate(false);
+    options.set_batch_size(32);
+
+    rac_embeddings_options_t raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(options, &raw),
+          "EmbeddingsOptions maps to the C ABI");
+    CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2,
+          "normalize_mode overrides the legacy normalize bool");
+    CHECK(raw.pooling == RAC_EMBEDDINGS_POOLING_CLS, "embedding pooling maps exactly");
+    CHECK(raw.n_threads == 6, "embedding thread override maps exactly");
+    CHECK(raw.truncate == 0, "explicit truncate=false maps exactly");
+    CHECK(raw.batch_size == 32, "embedding batch size maps exactly");
+
+    runanywhere::v1::EmbeddingsOptions defaults;
+    defaults.set_normalize(true);
+    raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
+    CHECK(rac::foundation::rac_embeddings_options_from_proto(defaults, &raw),
+          "default EmbeddingsOptions maps");
+    CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2 && raw.pooling == -1 && raw.n_threads == 0 &&
+              raw.truncate == -1 && raw.batch_size == 0,
+          "unset exact overrides retain backend defaults");
+
+    options.set_n_threads(-1);
+    CHECK(!rac::foundation::rac_embeddings_options_from_proto(options, &raw),
+          "negative embedding thread override is rejected");
     return 0;
 }
 
@@ -1486,6 +1520,7 @@ int main() {
         test_vlm_process_stream_events();
         test_vlm_companion_resolution();
         test_embeddings_mocked_result();
+        test_embeddings_options_mapping();
         test_diffusion_progress_cancel_and_unsupported();
         test_rag_ingest_query_mocked_path();
         test_rag_auto_embedding_dimension(384, 384, "384-reported");

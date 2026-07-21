@@ -234,10 +234,10 @@ class SherpaSTT {
     // `language_`. Mutex MUST be held by the caller. Returns true on success.
     // Existing recognizer (if any) is destroyed first. Used by load_model() to
     // do the initial build and by transcribe() to honor per-call language /
-    // detect-language requests on Whisper recognizers.
+    // detect-language requests on recognizers that expose language config.
     bool build_offline_recognizer_locked();
 
-    // Cap on the LRU cache of per-language Whisper recognizers.
+    // Cap on the LRU cache of per-language recognizers.
     // Each entry holds a fully constructed SherpaOnnxOfflineRecognizer whose
     // ONNX-runtime session is the heavy part of init, so we keep this small to
     // bound resident model memory. With Whisper-small at ~hundreds of MB per
@@ -248,7 +248,8 @@ class SherpaSTT {
 #if SHERPA_ONNX_AVAILABLE
     const SherpaOnnxOfflineRecognizer* sherpa_recognizer_ = nullptr;
     std::unordered_map<std::string, const SherpaOnnxOfflineStream*> sherpa_streams_;
-    // LRU cache of recognizers keyed by language (empty string == auto-detect).
+    // LRU cache of recognizers keyed by language (empty string == auto-detect
+    // for Whisper; Canary requires an explicit supported language).
     // Populated lazily on first transcribe() per language, hit on subsequent
     // calls so alternating-language workloads don't pay the multi-second
     // SherpaOnnxCreateOfflineRecognizer cost every utterance.
@@ -267,6 +268,7 @@ class SherpaSTT {
     // Kept alive so config string pointers remain valid for recognizer lifetime
     std::string encoder_path_;
     std::string decoder_path_;
+    std::string joiner_path_;
     std::string tokens_path_;
     std::string nemo_ctc_model_path_;
     mutable std::mutex mutex_;

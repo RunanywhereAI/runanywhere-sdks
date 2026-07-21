@@ -37,8 +37,8 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::unique_ptr<rac_sherpa_stt_handle_impl> handle(
-        new (std::nothrow) rac_sherpa_stt_handle_impl());
+    std::unique_ptr<rac_sherpa_stt_handle_impl> handle(new (std::nothrow)
+                                                           rac_sherpa_stt_handle_impl());
     if (!handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -75,6 +75,12 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
                     break;
                 case RAC_STT_SHERPA_MODEL_NEMO_CTC:
                     model_type = runanywhere::STTModelType::NEMO_CTC;
+                    break;
+                case RAC_STT_SHERPA_MODEL_TRANSDUCER:
+                    model_type = runanywhere::STTModelType::TRANSDUCER;
+                    break;
+                case RAC_STT_SHERPA_MODEL_CANARY:
+                    model_type = runanywhere::STTModelType::CANARY;
                     break;
                 case RAC_STT_SHERPA_MODEL_AUTO:
                     // Auto-detect: let load_model figure it out from directory structure

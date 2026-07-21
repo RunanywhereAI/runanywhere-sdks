@@ -331,6 +331,26 @@ if(RAC_BUILD_TESTS)
         target_compile_features(test_qhexrt_model_catalog PRIVATE cxx_std_17)
         add_test(NAME qhexrt_model_catalog_tests COMMAND test_qhexrt_model_catalog)
     endif()
+    # The llama.cpp engine is configured after commons/tests, so its plugin
+    # contract test must be wired here once the backend target exists.
+    if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp AND
+       NOT TARGET test_plugin_entry_llamacpp)
+        add_executable(test_plugin_entry_llamacpp
+            sdk/runanywhere-commons/tests/test_plugin_entry_llamacpp.cpp)
+        target_include_directories(test_plugin_entry_llamacpp PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_llamacpp PRIVATE
+            rac_commons
+            rac_backend_llamacpp
+        )
+        if(COMMAND rac_link_archive_deps)
+            rac_link_archive_deps(test_plugin_entry_llamacpp)
+        endif()
+        target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
+    endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
     # rac_backend_sherpa is built by engines/, which is configured after
     # sdk/runanywhere-commons/. This is also an intentional final-link gate:
@@ -361,6 +381,27 @@ if(RAC_BUILD_TESTS)
         add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
         set_tests_properties(plugin_entry_sherpa_tests PROPERTIES
             LABELS "native;protobuf-isolation;sherpa")
+    endif()
+    # The speech backend and its availability flag are configured after
+    # commons/tests. Wire the real Sherpa STT test here so optional NVIDIA
+    # transducer/Canary fixtures can exercise the shipped backend instead of
+    # being silently omitted by configuration order.
+    if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA AND RAC_SHERPA_ONNX_AVAILABLE AND
+       TARGET rac_backend_onnx AND TARGET rac_backend_sherpa AND NOT TARGET test_stt)
+        add_executable(test_stt sdk/runanywhere-commons/tests/test_stt.cpp)
+        target_include_directories(test_stt PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/sherpa
+        )
+        target_link_libraries(test_stt PRIVATE
+            rac_commons
+            rac_backend_onnx
+            rac_backend_sherpa
+        )
+        target_compile_features(test_stt PRIVATE cxx_std_20)
+        add_test(NAME stt_tests COMMAND test_stt --run-all)
+        set_tests_properties(stt_tests PROPERTIES LABELS "native;sherpa;stt")
     endif()
 
     if(APPLE AND RAC_BACKEND_COREML

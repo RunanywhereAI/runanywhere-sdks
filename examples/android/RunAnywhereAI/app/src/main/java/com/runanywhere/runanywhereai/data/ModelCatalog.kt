@@ -187,6 +187,18 @@ internal object ModelCatalog {
             2_800_000_000,
             supportsThinking = true
         ),
+        // Exact P0 NVIDIA checkpoint. The pinned llama.cpp fork has native
+        // `nemotron` support; this exact Q4_K_M artifact was load/inference
+        // checked through rcli on macOS before being exposed in the catalog.
+        SingleFileModel(
+            "nemotron-mini-4b-instruct-q4_k_m",
+            "NVIDIA Nemotron Mini 4B Instruct Q4_K_M",
+            "https://huggingface.co/bartowski/Nemotron-Mini-4B-Instruct-GGUF/resolve/fb49cde090c86092d89905bea2ffc41c23c2615e/Nemotron-Mini-4B-Instruct-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            2_697_387_072,
+            contextLength = 4_096
+        ),
         // Bonsai family at TRUE 1-bit (Q1_0, ~1.125 bit/wt) on CPU via llama.cpp — the same GGUF
         // that runs on the NPU (bonsai_{4b,8b,27b}_1bit, QHEXRT). Requires a llama.cpp build with
         // qwen3_5 GatedDeltaNet + Q1_0 support (the app's LlamaCPP engine must be the patched fork).
@@ -393,6 +405,44 @@ internal object ModelCatalog {
             TAR_GZ,
             ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY
         ),
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-0.6b-v2-int8",
+            "NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            661_190_513,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx", "encoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx", "decoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx", "joiner.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/tokens.txt", "tokens.txt"),
+            ),
+        ),
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+            "NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            670_478_772,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx", "encoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx", "decoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx", "joiner.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt", "tokens.txt"),
+            ),
+        ),
+        MultiFileModel(
+            "sherpa-nemo-canary-180m-flash-int8",
+            "NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            207_170_046,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx", "encoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx", "decoder.int8.onnx"),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt", "tokens.txt"),
+            ),
+        ),
         ArchiveModel(
             "vits-piper-en_US-lessac-medium",
             "Piper TTS (US English - Medium)",
@@ -416,6 +466,28 @@ internal object ModelCatalog {
     )
 
     private val misc = listOf(
+        // Exact P0 NVIDIA embedding checkpoint. This pinned GGUF passed a real
+        // RunAnywhere llama.cpp embedding-ops smoke on macOS (2048 dimensions,
+        // finite L2-normalized output) before being exposed cross-platform.
+        SingleFileModel(
+            "nemotron-3-embed-1b-q4_k_m",
+            "NVIDIA Nemotron 3 Embed 1B Q4_K_M",
+            "https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/nemotron-3-embed-1b-q4_k_m.gguf",
+            LLAMA,
+            EMBEDDING,
+            749_352_096,
+        ),
+        // Exact P0 Llama Nemotron Embed v2 checkpoint. This pinned GGUF also
+        // passed the real RunAnywhere llama.cpp embedding-ops smoke on macOS
+        // (2048 dimensions, finite L2-normalized output).
+        SingleFileModel(
+            "llama-nemotron-embed-1b-v2-q4_k_m",
+            "NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M",
+            "https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
+            LLAMA,
+            EMBEDDING,
+            807_690_624,
+        ),
         SingleFileModel(
             "silero-vad",
             "Silero VAD",

@@ -5,6 +5,8 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelSource
 import com.runanywhere.runanywhereai.data.ModelCatalog
+import com.runanywhere.runanywhereai.data.MultiFileModel
+import com.runanywhere.runanywhereai.data.SingleFileModel
 import com.runanywhere.runanywhereai.data.isVisibleForNativeNpuCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +14,51 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelCatalogTest {
+    @Test
+    fun portableNvidiaRowsUsePinnedReviewedArtifacts() {
+        val byId = ModelCatalog.models.associateBy { it.id }
+
+        val mini = byId.getValue("nemotron-mini-4b-instruct-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, mini.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_LANGUAGE, mini.category)
+        assertTrue(mini.url.contains("/resolve/fb49cde090c86092d89905bea2ffc41c23c2615e/"))
+
+        val embedding = byId.getValue("nemotron-3-embed-1b-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, embedding.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_EMBEDDING, embedding.category)
+        assertEquals(749_352_096L, embedding.memoryBytes)
+        assertTrue(embedding.url.contains("/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/"))
+
+        val embeddingV2 = byId.getValue("llama-nemotron-embed-1b-v2-q4_k_m") as SingleFileModel
+        assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, embeddingV2.framework)
+        assertEquals(ModelCategory.MODEL_CATEGORY_EMBEDDING, embeddingV2.category)
+        assertEquals(807_690_624L, embeddingV2.memoryBytes)
+        assertTrue(embeddingV2.url.contains("/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/"))
+    }
+
+    @Test
+    fun nvidiaSherpaRowsUseExactPinnedMultiFileBundles() {
+        val byId = ModelCatalog.models.associateBy { it.id }
+        val expected = mapOf(
+            "sherpa-nemo-parakeet-tdt-0.6b-v2-int8" to
+                Pair("1ab9323565ddb038682214b292f588070a538ce2", 661_190_513L),
+            "sherpa-nemo-parakeet-tdt-0.6b-v3-int8" to
+                Pair("2bda32ec70b097a55adaa07d9a7173915b43cc78", 670_478_772L),
+            "sherpa-nemo-canary-180m-flash-int8" to
+                Pair("9077164e0d3dd1d5353743e89ceaa1d3a770838c", 207_170_046L),
+        )
+
+        expected.forEach { (id, pinAndSize) ->
+            val model = byId.getValue(id) as MultiFileModel
+            assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_SHERPA, model.framework)
+            assertEquals(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION, model.category)
+            assertEquals(pinAndSize.second, model.memoryBytes)
+            assertTrue(model.files.isNotEmpty())
+            assertTrue(model.files.all { it.url.contains("/resolve/${pinAndSize.first}/") })
+            assertTrue(model.files.any { it.filename == "tokens.txt" })
+        }
+    }
+
     @Test
     fun npuCatalogMetadataIsPublishableAndUnique() {
         val rows = ModelCatalog.npuCatalog

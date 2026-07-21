@@ -8,8 +8,8 @@ The Web SDK is a Swift-aligned TypeScript facade over the RACommons C/C++ core. 
 - `@runanywhere/web/backend`: the narrow, typed backend integration contract for module installation, capability routing, lifecycle hooks, and safe logging.
 - `@runanywhere/web/internal`: broader core-internal implementation exports; neither applications nor backend packages may depend on this entrypoint.
 - `@runanywhere/web/browser`: browser-only helpers such as audio capture/playback, video capture, and capability detection.
-- `@runanywhere/web-llamacpp`: LLM + VLM + LoRA + tool-calling + structured-output backend. Ships **two execution-mode variants**: `racommons-llamacpp.{js,wasm}` (CPU) and `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU + Asyncify). Both carry the unified llama.cpp vtable (LLM and VLM are modalities of the same engine).
-- `@runanywhere/web-onnx`: embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` — one WASM that registers two vtables (`onnx`, `sherpa`) bundled because they share ONNX Runtime. Core composes its embeddings with llama.cpp generation for cross-WASM RAG.
+- `@runanywhere/web-llamacpp`: LLM + GGUF text embeddings + VLM + LoRA + tool-calling + structured-output backend. Ships **two execution-mode variants**: `racommons-llamacpp.{js,wasm}` (CPU) and `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU + Asyncify). Both carry the unified llama.cpp vtable; model-framework routing lets its embedding primitive coexist with ONNX.
+- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` — one WASM that registers two vtables (`onnx`, `sherpa`) bundled because they share ONNX Runtime. It owns the native ONNX RAG WASM/session path; core can also compose llama.cpp embeddings with llama.cpp generation.
 
 Keep app code on the root `RunAnywhere` facade. Backend packages integrate only through `@runanywhere/web/backend`; browser apps may import UI/device helpers from `@runanywhere/web/browser`.
 

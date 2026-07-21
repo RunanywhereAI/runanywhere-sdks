@@ -17,6 +17,11 @@ let package = Package(
             name: "RunAnywhereMLXCLI",
             dependencies: [
                 .product(name: "RunAnywhere", package: "runanywhere-swift"),
+                // RACommons' static provider registry references every linked
+                // portable backend. Carry their archives in this standalone
+                // CLI so the force-loaded commons library resolves cleanly.
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),
+                .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),
                 .product(name: "RunAnywhereMLX", package: "runanywhere-swift"),
             ],
             path: "Sources/RunAnywhereMLXCLI",

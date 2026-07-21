@@ -803,8 +803,8 @@ export interface EmscriptenRunanywhereModule {
 //
 // Capability ownership (typical layout):
 //   - racommons.wasm           → 'commons'
-//   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'structured-output',
-//                                 'tool-calling', 'lora'
+//   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'embedding',
+//                                 'structured-output', 'tool-calling', 'lora'
 //   - racommons-onnx-sherpa.wasm → 'stt', 'tts', 'vad', 'embedding', 'rag'
 //
 // The same module may register multiple capabilities; duplicate registration
@@ -833,6 +833,10 @@ export type WasmCapability =
 
 /** Capability → module map. Backends register; facade looks up. */
 const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>();
+const _modulesByCapability = new Map<
+  WasmCapability,
+  EmscriptenRunanywhereModule[]
+>();
 
 /**
  * Framework → module map. Each backend WASM owns its own static
@@ -842,6 +846,7 @@ const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>
  * process-wide plugin registry.
  */
 const _moduleByFramework = new Map<string, EmscriptenRunanywhereModule>();
+const _modulesByFramework = new Map<string, EmscriptenRunanywhereModule[]>();
 
 const BACKEND_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
   'llm',
@@ -896,10 +901,19 @@ export function registerWasmModule(
   frameworks: readonly string[] = [],
 ): void {
   for (const cap of capabilities) {
+    const owners = (_modulesByCapability.get(cap) ?? []).filter((owner) => owner !== mod);
+    owners.push(mod);
+    _modulesByCapability.set(cap, owners);
     _moduleByCapability.set(cap, mod);
   }
   for (const fw of frameworks) {
-    if (fw) _moduleByFramework.set(fw.toLowerCase(), mod);
+    if (fw) {
+      const key = fw.toLowerCase();
+      const owners = (_modulesByFramework.get(key) ?? []).filter((owner) => owner !== mod);
+      owners.push(mod);
+      _modulesByFramework.set(key, owners);
+      _moduleByFramework.set(key, mod);
+    }
   }
   // Commons-level adapters (model registry, downloads, events)
   // follow the 'commons' capability — they target SDK-state surface exports
@@ -945,15 +959,36 @@ export function registerWasmModule(
  * switch — it lets siblings keep their slots intact.
  */
 export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
-  for (const [fw, current] of Array.from(_moduleByFramework.entries())) {
-    if (current === mod) _moduleByFramework.delete(fw);
+  for (const [fw, owners] of Array.from(_modulesByFramework.entries())) {
+    const survivors = owners.filter((owner) => owner !== mod);
+    if (survivors.length === owners.length) continue;
+    if (survivors.length === 0) {
+      _modulesByFramework.delete(fw);
+      _moduleByFramework.delete(fw);
+    } else {
+      _modulesByFramework.set(fw, survivors);
+      _moduleByFramework.set(fw, survivors[survivors.length - 1]!);
+    }
   }
   const releasedCapabilities: WasmCapability[] = [];
-  for (const [cap, current] of Array.from(_moduleByCapability.entries())) {
-    if (current === mod) {
+  const restoredCapabilities: Array<{
+    capability: WasmCapability;
+    module: EmscriptenRunanywhereModule;
+  }> = [];
+  for (const [cap, owners] of Array.from(_modulesByCapability.entries())) {
+    const current = _moduleByCapability.get(cap);
+    const survivors = owners.filter((owner) => owner !== mod);
+    if (survivors.length === owners.length) continue;
+    if (survivors.length === 0) {
+      _modulesByCapability.delete(cap);
       _moduleByCapability.delete(cap);
-      releasedCapabilities.push(cap);
+    } else {
+      _modulesByCapability.set(cap, survivors);
+      const restored = survivors[survivors.length - 1]!;
+      _moduleByCapability.set(cap, restored);
+      if (current === mod) restoredCapabilities.push({ capability: cap, module: restored });
     }
+    if (current === mod) releasedCapabilities.push(cap);
   }
   // Drop THIS module from the ModelRegistryAdapter broadcast set
   // regardless of which capability it owned — the broadcast list mirrors
@@ -967,6 +1002,14 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
     SDKEventStreamAdapter.clearDefaultModule();
   }
   ModalityProtoAdapter.unregisterModuleCapabilities(releasedCapabilities, mod);
+  for (const restored of restoredCapabilities) {
+    ModalityProtoAdapter.registerModuleCapabilities([restored.capability], restored.module);
+  }
+  const restoredCommons = _moduleByCapability.get('commons');
+  if (releasedCapabilities.includes('commons') && restoredCommons) {
+    DownloadAdapter.setDefaultModule(restoredCommons);
+    SDKEventStreamAdapter.setDefaultModule(restoredCommons);
+  }
   reelectLifecycleAndRegistryPrimary();
 }
 
@@ -994,8 +1037,8 @@ export function getModuleForCapability(
  */
 export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
   const unique = new Set<EmscriptenRunanywhereModule>();
-  for (const mod of _moduleByCapability.values()) {
-    unique.add(mod);
+  for (const owners of _modulesByCapability.values()) {
+    for (const mod of owners) unique.add(mod);
   }
   return Array.from(unique);
 }
@@ -1003,12 +1046,14 @@ export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
 /** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {
   _moduleByCapability.clear();
+  _modulesByCapability.clear();
   // Framework→module map mirrors the capability registry and is populated
   // alongside it via `registerWasmModule(_, _, frameworks)`. Without this
   // clear, a fresh tab boot followed by re-registration would see stale
   // framework rows from the previous session (e.g. plugin-route lookups
   // routing 'llamacpp' to a torn-down WASM instance).
   _moduleByFramework.clear();
+  _modulesByFramework.clear();
   DownloadAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
   ModelRegistryAdapter.clearDefaultModule();

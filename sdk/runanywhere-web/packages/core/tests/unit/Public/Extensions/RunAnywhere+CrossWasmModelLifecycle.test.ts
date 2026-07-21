@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  CurrentModelRequest,
+  CurrentModelResult,
   InferenceFramework,
   ModelCategory,
   ModelInfo,
   ModelUnloadRequest,
   ModelUnloadResult,
   type ModelInfo as ProtoModelInfo,
+  type CurrentModelRequest as ProtoCurrentModelRequest,
   type ModelUnloadRequest as ProtoModelUnloadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { ModelRegistry } from '../../../../src/Public/Extensions/RunAnywhere+ModelRegistry';
 import { WebModelLifecycle } from '../../../../src/Public/Extensions/RunAnywhere+ModelLifecycle';
+import { Embeddings } from '../../../../src/Public/Extensions/RunAnywhere+Embeddings';
 import {
   clearRunanywhereModule,
   registerWasmModule,
@@ -39,6 +43,27 @@ afterEach(() => {
 });
 
 describe('WebModelLifecycle multi-WASM routing', () => {
+  it('routes framework-scoped current-model queries to the owning WASM', () => {
+    const llama = fakeLifecycleRuntime([
+      { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
+    ]);
+    const onnx = fakeLifecycleRuntime([
+      { id: 'onnx-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
+    ]);
+    registerBackends(llama.module, onnx.module);
+
+    expect(WebModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      includeModelMetadata: false,
+    })?.modelId).toBe('llama-embed');
+    expect(WebModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      includeModelMetadata: false,
+    })?.modelId).toBe('onnx-embed');
+  });
+
   it('routes model-id unloads to the framework owner while sibling models stay loaded', async () => {
     const llama = fakeLifecycleRuntime([
       { id: 'llama-chat', category: ModelCategory.MODEL_CATEGORY_LANGUAGE },
@@ -113,6 +138,36 @@ describe('WebModelLifecycle multi-WASM routing', () => {
     expect(onnx.unloadRequests).toHaveLength(1);
     expect(llama.loadedModelIds()).toEqual([]);
     expect(onnx.loadedModelIds()).toEqual([]);
+  });
+
+  it('unloads embeddings across modules without tearing down other modalities', async () => {
+    const llama = fakeLifecycleRuntime([
+      { id: 'llama-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
+      { id: 'llama-chat', category: ModelCategory.MODEL_CATEGORY_LANGUAGE },
+    ]);
+    const onnx = fakeLifecycleRuntime([
+      { id: 'onnx-embed', category: ModelCategory.MODEL_CATEGORY_EMBEDDING },
+      { id: 'sherpa-stt', category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION },
+    ]);
+    registerBackends(llama.module, onnx.module);
+    vi.spyOn(WebModelLifecycle, 'supportsNativeLifecycle').mockReturnValue(true);
+
+    await expect(Embeddings.unload()).resolves.toBeUndefined();
+
+    expect(llama.unloadRequests).toHaveLength(1);
+    expect(onnx.unloadRequests).toHaveLength(1);
+    expect(llama.unloadRequests[0]).toMatchObject({
+      modelId: '',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      unloadAll: false,
+    });
+    expect(onnx.unloadRequests[0]).toMatchObject({
+      modelId: '',
+      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+      unloadAll: false,
+    });
+    expect(llama.loadedModelIds()).toEqual(['llama-chat']);
+    expect(onnx.loadedModelIds()).toEqual(['sherpa-stt']);
   });
 
   it('fans unknown-model unloads and reset across every initialized module', () => {
@@ -254,6 +309,30 @@ function fakeLifecycleRuntime(
       heapU32.fill(0, bufferPointer >>> 2, (bufferPointer >>> 2) + 4);
     },
     _rac_proto_buffer_free: () => undefined,
+    _rac_model_lifecycle_current_model_proto: (requestPointer, requestSize, outResult) => {
+      const request: ProtoCurrentModelRequest = CurrentModelRequest.decode(
+        heapU8.slice(requestPointer, requestPointer + requestSize),
+      );
+      const match = Array.from(loaded).find(([, category]) => (
+        request.category === undefined || request.category === category
+      ));
+      const resultBytes = CurrentModelResult.encode(CurrentModelResult.create({
+        modelId: match?.[0] ?? '',
+        found: Boolean(match),
+        errorMessage: '',
+        category: match?.[1] ?? ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+        framework: request.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+        resolvedPath: '',
+        resolvedArtifacts: [],
+      })).finish();
+      const dataPointer = allocate(resultBytes.length);
+      heapU8.set(resultBytes, dataPointer);
+      heapU32[outResult >>> 2] = dataPointer;
+      heapU32[(outResult + 4) >>> 2] = resultBytes.length;
+      heap32[(outResult + 8) >>> 2] = 0;
+      heapU32[(outResult + 12) >>> 2] = 0;
+      return 0;
+    },
     _rac_model_lifecycle_unload_proto: (requestPointer, requestSize, outResult) => {
       if (options.throwOnUnload) throw new Error('forced unload failure');
       const request = ModelUnloadRequest.decode(

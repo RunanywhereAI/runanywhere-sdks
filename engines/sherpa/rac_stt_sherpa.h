@@ -14,6 +14,8 @@ typedef enum rac_stt_sherpa_model_type {
     RAC_STT_SHERPA_MODEL_ZIPFORMER = 1,
     RAC_STT_SHERPA_MODEL_PARAFORMER = 2,
     RAC_STT_SHERPA_MODEL_NEMO_CTC = 3,
+    RAC_STT_SHERPA_MODEL_TRANSDUCER = 4,
+    RAC_STT_SHERPA_MODEL_CANARY = 5,
     RAC_STT_SHERPA_MODEL_AUTO = 99
 } rac_stt_sherpa_model_type_t;
 

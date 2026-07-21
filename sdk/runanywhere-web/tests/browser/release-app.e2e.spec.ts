@@ -1432,10 +1432,10 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
 
   test('40 — indexes a real document and returns a grounded RAG answer', async ({ appPage }) => {
     // Reinstantiate the llama.cpp artifact after ONNX registration. This is a
-    // production path (explicit acceleration changes and Qwen VLM fallback)
-    // and previously let llama.cpp steal the embedding capability despite
-    // having no embedding vtable. RAG below proves ONNX lifecycle state and
-    // routing survive last-writer registration order.
+    // production path (explicit acceleration changes and Qwen VLM fallback).
+    // Both llama.cpp and ONNX now expose embeddings, so RAG below proves that
+    // framework-aware routing preserves the ONNX lifecycle regardless of
+    // registration order.
     const accelerationSwitch = await switchToOppositeAcceleration(appPage);
     expect(accelerationSwitch.active).toBe(accelerationSwitch.requested);
     expect(accelerationSwitch.active).not.toBe(accelerationSwitch.previous);

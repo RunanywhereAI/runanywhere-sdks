@@ -186,6 +186,7 @@ set(LLAMACPP_BACKEND_SOURCES
     # LLM Backend
     llamacpp_backend.cpp
     rac_llm_llamacpp.cpp
+    rac_embeddings_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
     # Unified ABI plugin entry — fills both llm_ops and vlm_ops slots.
     rac_plugin_entry_llamacpp.cpp

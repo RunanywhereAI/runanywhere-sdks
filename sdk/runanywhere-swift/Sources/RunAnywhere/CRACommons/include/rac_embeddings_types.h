@@ -98,13 +98,24 @@ typedef struct rac_embeddings_options {
 
     /** Number of threads (0 = auto) */
     int32_t n_threads;
+
+    /**
+     * Long-input policy (-1 = backend default, 0 = reject overflow,
+     * 1 = truncate to the backend context window).
+     *
+     * llama.cpp's backend default is sliding-window aggregation.
+     */
+    int32_t truncate;
+
+    /** Batch chunk size (0 = backend default) */
+    int32_t batch_size;
 } rac_embeddings_options_t;
 
 /**
  * @brief Default embedding options
  */
 static const rac_embeddings_options_t RAC_EMBEDDINGS_OPTIONS_DEFAULT = {
-    .normalize = -1, .pooling = -1, .n_threads = 0};
+    .normalize = -1, .pooling = -1, .n_threads = 0, .truncate = -1, .batch_size = 0};
 
 // =============================================================================
 // RESULT

@@ -6,6 +6,8 @@ import { ModelLifecycleAdapter } from '../../../src/Adapters/ModelLifecycleAdapt
 import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
   clearRunanywhereModule,
+  getModuleForCapability,
+  getModuleForFramework,
   registerWasmModule,
   type EmscriptenRunanywhereModule,
   unregisterWasmModule,
@@ -194,5 +196,23 @@ describe('Emscripten module capability wiring', () => {
     expect(resetCommons).toHaveBeenCalledOnce();
     expect(resetA).toHaveBeenCalledOnce();
     expect(resetB).not.toHaveBeenCalled();
+  });
+
+  it('restores the surviving owner of a shared capability after teardown', () => {
+    const onnx = fakeModule();
+    const llama = fakeModule();
+
+    registerWasmModule(['embedding'], onnx, ['onnx']);
+    registerWasmModule(['embedding'], llama, ['llamacpp']);
+    expect(getModuleForCapability('embedding')).toBe(llama);
+
+    unregisterWasmModule(llama);
+    expect(getModuleForCapability('embedding')).toBe(onnx);
+    expect(getModuleForFramework('onnx')).toBe(onnx);
+    expect(getModuleForFramework('llamacpp')).toBeNull();
+
+    unregisterWasmModule(onnx);
+    expect(getModuleForCapability('embedding')).toBeNull();
+    expect(getModuleForFramework('onnx')).toBeNull();
   });
 });

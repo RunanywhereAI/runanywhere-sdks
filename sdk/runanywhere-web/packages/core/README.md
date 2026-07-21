@@ -15,7 +15,7 @@ There are exactly three publishable Web packages:
 | Package | Responsibility | Native artifacts |
 | --- | --- | --- |
 | `@runanywhere/web` | Backend-neutral lifecycle, generated types, model registry, downloads, storage, events, cross-backend orchestration, and browser helpers | `racommons.{js,wasm}` (commons only) |
-| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, LoRA, tool calling, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
+| `@runanywhere/web-llamacpp` | llama.cpp LLM, GGUF embeddings, VLM, LoRA, tools, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
 | `@runanywhere/web-onnx` | ONNX Runtime embeddings plus Sherpa-ONNX STT, TTS, and VAD | `racommons-onnx-sherpa.{js,wasm}` |
 
 `@runanywhere/web/browser`, `@runanywhere/web/backend`, and
@@ -32,7 +32,7 @@ another. Applications install only the backends they need.
 # Core plus every browser backend
 npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
 
-# LLM/VLM only
+# LLM/GGUF embeddings/VLM only
 npm install @runanywhere/web @runanywhere/web-llamacpp
 
 # Speech/ONNX only

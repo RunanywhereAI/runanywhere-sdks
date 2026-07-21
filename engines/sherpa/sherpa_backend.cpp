@@ -42,8 +42,7 @@
 // production stays quiet; flip on by building Debug or defining SHERPA_CONF_VERBOSE.
 #if defined(__ANDROID__) && (!defined(NDEBUG) || defined(SHERPA_CONF_VERBOSE))
 #include <android/log.h>
-#define SHERPA_CONF_LOG(...) \
-  __android_log_print(ANDROID_LOG_INFO, "SherpaConf", __VA_ARGS__)
+#define SHERPA_CONF_LOG(...) __android_log_print(ANDROID_LOG_INFO, "SherpaConf", __VA_ARGS__)
 #else
 #define SHERPA_CONF_LOG(...) ((void)0)
 #endif
@@ -160,6 +159,7 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     // Scan the model directory for files
     std::string encoder_path;
     std::string decoder_path;
+    std::string joiner_path;
     std::string tokens_path;
     std::string nemo_ctc_model_path;  // Single-file CTC model (model.int8.onnx or
                                       // model.onnx)
@@ -188,6 +188,7 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         // → -111 RAC_ERROR_MODEL_LOAD_FAILED within ~5 ms.
         std::string encoder_fp32, encoder_int8;
         std::string decoder_fp32, decoder_int8;
+        std::string joiner_fp32, joiner_int8;
 
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
@@ -218,6 +219,13 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
                     decoder_fp32 = full_path;
                 }
                 RAC_LOG_DEBUG("Sherpa.STT", "Found decoder candidate: %s", full_path.c_str());
+            } else if (is_onnx && filename.find("joiner") != std::string::npos) {
+                if (is_int8) {
+                    joiner_int8 = full_path;
+                } else {
+                    joiner_fp32 = full_path;
+                }
+                RAC_LOG_DEBUG("Sherpa.STT", "Found joiner candidate: %s", full_path.c_str());
             } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
                                                     filename.find(".txt") != std::string::npos)) {
                 tokens_path = full_path;
@@ -234,11 +242,21 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         }
         closedir(dir);
 
-        // Pair selection: prefer matching int8 pair (encoder + decoder both
-        // quantized). Fall back to fp32 pair, then to whichever side exists.
-        // We deliberately avoid mixing fp32 encoder with int8 decoder because
-        // Sherpa-ONNX requires the pair to come from the same export.
-        if (!encoder_int8.empty() && !decoder_int8.empty()) {
+        // Pair/triple selection: prefer a complete matching int8 transducer
+        // triple when a joiner is present, then a complete fp32 triple. For
+        // encoder/decoder families (Whisper and Canary), prefer a matching
+        // int8 pair and then a matching fp32 pair. Never intentionally mix
+        // quantization variants because Sherpa-ONNX requires every component
+        // to come from the same export.
+        if (!encoder_int8.empty() && !decoder_int8.empty() && !joiner_int8.empty()) {
+            encoder_path = encoder_int8;
+            decoder_path = decoder_int8;
+            joiner_path = joiner_int8;
+        } else if (!encoder_fp32.empty() && !decoder_fp32.empty() && !joiner_fp32.empty()) {
+            encoder_path = encoder_fp32;
+            decoder_path = decoder_fp32;
+            joiner_path = joiner_fp32;
+        } else if (!encoder_int8.empty() && !decoder_int8.empty()) {
             encoder_path = encoder_int8;
             decoder_path = decoder_int8;
         } else if (!encoder_fp32.empty() && !decoder_fp32.empty()) {
@@ -247,6 +265,7 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         } else {
             encoder_path = !encoder_int8.empty() ? encoder_int8 : encoder_fp32;
             decoder_path = !decoder_int8.empty() ? decoder_int8 : decoder_fp32;
+            joiner_path = !joiner_int8.empty() ? joiner_int8 : joiner_fp32;
         }
 
         if (encoder_path.empty()) {
@@ -283,24 +302,34 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         language_ = config["language"].get<std::string>();
     }
 
-    // Auto-detect model type if not explicitly set:
-    // If we found a single-file model (model.int8.onnx / model.onnx) but no
-    // encoder/decoder, this is a NeMo CTC model. Also detect from path keywords.
-    if (model_type_ != STTModelType::NEMO_CTC) {
-        bool has_encoder_decoder = !encoder_path.empty() && !decoder_path.empty();
-        bool has_single_model = !nemo_ctc_model_path.empty();
-        bool path_suggests_nemo = (model_path.find("nemo") != std::string::npos ||
-                                   model_path.find("parakeet") != std::string::npos ||
-                                   model_path.find("ctc") != std::string::npos);
-
-        if ((!has_encoder_decoder && has_single_model) || path_suggests_nemo) {
-            model_type_ = STTModelType::NEMO_CTC;
-            RAC_LOG_INFO("Sherpa.STT", "Auto-detected NeMo CTC model type");
-        }
+    // Auto-detect the exact Sherpa model contract from the complete artifact
+    // layout. This is intentionally structure-first: "parakeet" and "nemo"
+    // occur in CTC, transducer, and Canary package names, so treating either
+    // keyword as synonymous with CTC misroutes valid encoder/decoder/joiner
+    // bundles into the single-file NeMo CTC slot.
+    std::string lower_model_path = model_path;
+    std::transform(lower_model_path.begin(), lower_model_path.end(), lower_model_path.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    const bool has_encoder_decoder = !encoder_path.empty() && !decoder_path.empty();
+    const bool has_transducer_triple = has_encoder_decoder && !joiner_path.empty();
+    const bool has_single_model = !nemo_ctc_model_path.empty();
+    if (has_transducer_triple) {
+        model_type_ = STTModelType::TRANSDUCER;
+        RAC_LOG_INFO("Sherpa.STT", "Auto-detected offline transducer model type");
+    } else if (has_encoder_decoder && lower_model_path.find("canary") != std::string::npos) {
+        model_type_ = STTModelType::CANARY;
+        RAC_LOG_INFO("Sherpa.STT", "Auto-detected NeMo Canary model type");
+    } else if (model_type_ == STTModelType::NEMO_CTC ||
+               ((!has_encoder_decoder && has_single_model) ||
+                (has_single_model && lower_model_path.find("ctc") != std::string::npos))) {
+        model_type_ = STTModelType::NEMO_CTC;
+        RAC_LOG_INFO("Sherpa.STT", "Auto-detected NeMo CTC model type");
     }
 
     // Branch based on model type
-    bool is_nemo_ctc = (model_type_ == STTModelType::NEMO_CTC);
+    const bool is_nemo_ctc = (model_type_ == STTModelType::NEMO_CTC);
+    const bool is_transducer = (model_type_ == STTModelType::TRANSDUCER);
+    const bool is_canary = (model_type_ == STTModelType::CANARY);
 
     if (is_nemo_ctc) {
         // NeMo CTC: single model file + tokens
@@ -314,9 +343,13 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         RAC_LOG_INFO("Sherpa.STT", "NeMo CTC model: %s", nemo_ctc_model_path.c_str());
         RAC_LOG_INFO("Sherpa.STT", "Tokens: %s", tokens_path.c_str());
     } else {
-        // Whisper: encoder + decoder
+        // Whisper/Canary: encoder + decoder. Transducer additionally owns a
+        // joiner graph.
         RAC_LOG_INFO("Sherpa.STT", "Encoder: %s", encoder_path.c_str());
         RAC_LOG_INFO("Sherpa.STT", "Decoder: %s", decoder_path.c_str());
+        if (is_transducer) {
+            RAC_LOG_INFO("Sherpa.STT", "Joiner: %s", joiner_path.c_str());
+        }
         RAC_LOG_INFO("Sherpa.STT", "Tokens: %s", tokens_path.c_str());
     }
     RAC_LOG_INFO("Sherpa.STT", "Language: %s", language_.c_str());
@@ -331,6 +364,11 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
             RAC_LOG_ERROR("Sherpa.STT", "Decoder file not found: %s", decoder_path.c_str());
             return false;
         }
+        if (is_transducer && stat(joiner_path.c_str(), &path_stat) != 0) {
+            RAC_LOG_ERROR("Sherpa.STT", "Transducer joiner file not found: %s",
+                          joiner_path.c_str());
+            return false;
+        }
     }
     if (stat(tokens_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("Sherpa.STT", "Tokens file not found: %s", tokens_path.c_str());
@@ -341,6 +379,7 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
     // lifetime
     encoder_path_ = encoder_path;
     decoder_path_ = decoder_path;
+    joiner_path_ = joiner_path;
     tokens_path_ = tokens_path;
     nemo_ctc_model_path_ = nemo_ctc_model_path;
 
@@ -348,8 +387,11 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         return false;
     }
 
-    RAC_LOG_INFO("Sherpa.STT", "STT model loaded successfully (%s)",
-                 is_nemo_ctc ? "NeMo CTC" : "Whisper");
+    const char* loaded_type = is_nemo_ctc     ? "NeMo CTC"
+                              : is_transducer ? "offline transducer"
+                              : is_canary     ? "NeMo Canary"
+                                              : "Whisper";
+    RAC_LOG_INFO("Sherpa.STT", "STT model loaded successfully (%s)", loaded_type);
     model_loaded_ = true;
     return true;
 
@@ -371,6 +413,8 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     }
 
     const bool is_nemo_ctc = (model_type_ == STTModelType::NEMO_CTC);
+    const bool is_transducer = (model_type_ == STTModelType::TRANSDUCER);
+    const bool is_canary = (model_type_ == STTModelType::CANARY);
 
     // Initialize all config fields explicitly to avoid any uninitialized pointer
     // issues. The struct layout MUST match the prebuilt libsherpa-onnx-c-api.so
@@ -399,6 +443,21 @@ bool SherpaSTT::build_offline_recognizer_locked() {
         recognizer_config.model_config.model_type = "nemo_ctc";
 
         RAC_LOG_INFO("Sherpa.STT", "Configuring NeMo CTC recognizer");
+    } else if (is_transducer) {
+        recognizer_config.model_config.transducer.encoder = encoder_path_.c_str();
+        recognizer_config.model_config.transducer.decoder = decoder_path_.c_str();
+        recognizer_config.model_config.transducer.joiner = joiner_path_.c_str();
+        recognizer_config.model_config.model_type = "nemo_transducer";
+        RAC_LOG_INFO("Sherpa.STT", "Configuring offline NeMo transducer recognizer");
+    } else if (is_canary) {
+        recognizer_config.model_config.canary.encoder = encoder_path_.c_str();
+        recognizer_config.model_config.canary.decoder = decoder_path_.c_str();
+        recognizer_config.model_config.canary.src_lang = language_.c_str();
+        recognizer_config.model_config.canary.tgt_lang = language_.c_str();
+        recognizer_config.model_config.canary.use_pnc = 1;
+        recognizer_config.model_config.model_type = "";
+        RAC_LOG_INFO("Sherpa.STT", "Configuring NeMo Canary recognizer (src=%s, tgt=%s)",
+                     language_.c_str(), language_.c_str());
     } else {
         recognizer_config.model_config.whisper.encoder = encoder_path_.c_str();
         recognizer_config.model_config.whisper.decoder = decoder_path_.c_str();
@@ -444,11 +503,6 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     recognizer_config.model_config.dolphin.model = "";
     recognizer_config.model_config.zipformer_ctc.model = "";
 
-    recognizer_config.model_config.canary.encoder = "";
-    recognizer_config.model_config.canary.decoder = "";
-    recognizer_config.model_config.canary.src_lang = "";
-    recognizer_config.model_config.canary.tgt_lang = "";
-
     recognizer_config.model_config.wenet_ctc.model = "";
     recognizer_config.model_config.omnilingual.model = "";
 
@@ -471,8 +525,12 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     recognizer_config.hr.lexicon = "";
     recognizer_config.hr.rule_fsts = "";
 
+    const char* recognizer_type = is_nemo_ctc     ? "NeMo CTC"
+                                  : is_transducer ? "offline transducer"
+                                  : is_canary     ? "NeMo Canary"
+                                                  : "Whisper";
     RAC_LOG_INFO("Sherpa.STT", "Creating SherpaOnnxOfflineRecognizer (%s, lang=\"%s\")...",
-                 is_nemo_ctc ? "NeMo CTC" : "Whisper", language_.c_str());
+                 recognizer_type, language_.c_str());
 
     try {
         sherpa_recognizer_ = SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
@@ -556,27 +614,38 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         return result;
     }
 
-    // The recognizer is built once with `language_` (default
-    // "en"). Per-call STTRequest.language / detect_language was previously
-    // ignored, so multilingual Whisper users got English-forced output. Honor
-    // the request by rebuilding the Whisper recognizer with the new whisper.
-    // language slot when it differs. detect_language=true maps to Whisper's
-    // auto-detect mode (whisper.language == ""). Non-Whisper recognizers
-    // (e.g. NeMo CTC) are single-language by construction, so an explicit
-    // mismatched per-call language is reported as not-supported.
+    // The recognizer is built once with `language_` (default "en"). Honor a
+    // per-call language by rebuilding models that expose a language field.
+    // Whisper accepts an empty language for auto-detect. Canary requires an
+    // explicit source/target language; its exact RunAnywhere bundle supports
+    // en/es/de/fr. Other recognizers are fixed-language at this layer.
     std::string desired_language = language_;
     if (request.detect_language) {
-        desired_language = "";
+        if (model_type_ != STTModelType::WHISPER) {
+            RAC_LOG_WARNING("Sherpa.STT", "Language auto-detection is only supported for Whisper");
+            set_status(SherpaSttStatus::LanguageNotSupported);
+            return result;
+        }
+        desired_language.clear();
     } else if (!request.language.empty()) {
         desired_language = request.language;
     }
 
     if (desired_language != language_) {
-        if (model_type_ != STTModelType::WHISPER) {
+        const bool language_configurable =
+            model_type_ == STTModelType::WHISPER || model_type_ == STTModelType::CANARY;
+        if (!language_configurable) {
             RAC_LOG_WARNING("Sherpa.STT",
                             "Per-call language='%s' (detect=%d) not supported for "
-                            "non-Whisper recognizer; rejecting request",
+                            "this recognizer; rejecting request",
                             request.language.c_str(), request.detect_language ? 1 : 0);
+            set_status(SherpaSttStatus::LanguageNotSupported);
+            return result;
+        }
+        if (model_type_ == STTModelType::CANARY && desired_language != "en" &&
+            desired_language != "es" && desired_language != "de" && desired_language != "fr") {
+            RAC_LOG_WARNING("Sherpa.STT", "Canary language '%s' is outside en/es/de/fr",
+                            desired_language.c_str());
             set_status(SherpaSttStatus::LanguageNotSupported);
             return result;
         }
@@ -606,7 +675,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             recognizer_cache_.erase(hit);
             recognizer_lru_.remove(desired_language);
             language_ = desired_language;
-            RAC_LOG_INFO("Sherpa.STT", "Reusing cached Whisper recognizer for language=\"%s\"",
+            RAC_LOG_INFO("Sherpa.STT", "Reusing cached recognizer for language=\"%s\"",
                          desired_language.c_str());
         } else {
             // Cache miss: build a fresh recognizer. build_offline_recognizer_locked
@@ -615,7 +684,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             language_ = desired_language;
             if (!build_offline_recognizer_locked()) {
                 RAC_LOG_ERROR("Sherpa.STT",
-                              "Failed to build Whisper recognizer for language=\"%s\"; "
+                              "Failed to build recognizer for language=\"%s\"; "
                               "restoring previous \"%s\" from cache",
                               desired_language.c_str(), previous_language.c_str());
                 // Recover the previous recognizer from the cache we just populated.
@@ -725,8 +794,8 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             for (int32_t i = 0; i < recognizer_result->count; ++i) {
                 sum += recognizer_result->ys_log_probs[i];
             }
-            result.confidence = static_cast<float>(
-                std::exp(sum / static_cast<double>(recognizer_result->count)));
+            result.confidence =
+                static_cast<float>(std::exp(sum / static_cast<double>(recognizer_result->count)));
             SHERPA_CONF_LOG("computed confidence=%.4f from sum=%.4f over %d tokens",
                             result.confidence, sum, recognizer_result->count);
         } else {
@@ -735,8 +804,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         }
 #else
         result.confidence = std::numeric_limits<float>::quiet_NaN();
-        SHERPA_CONF_LOG(
-            "sherpa build has no ys_log_probs field -> confidence=NaN (no signal)");
+        SHERPA_CONF_LOG("sherpa build has no ys_log_probs field -> confidence=NaN (no signal)");
 #endif
 
         SherpaOnnxDestroyOfflineRecognizerResult(recognizer_result);
@@ -1469,8 +1537,7 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
 #else
             setenv("ESPEAK_DATA_PATH", espeak_parent_dir.c_str(), /*overwrite=*/1);
 #endif
-            RAC_LOG_INFO("Sherpa.TTS", "Exported ESPEAK_DATA_PATH=%s",
-                         espeak_parent_dir.c_str());
+            RAC_LOG_INFO("Sherpa.TTS", "Exported ESPEAK_DATA_PATH=%s", espeak_parent_dir.c_str());
         }
     } else {
         espeak_data_dir_ = espeak_data_dir;

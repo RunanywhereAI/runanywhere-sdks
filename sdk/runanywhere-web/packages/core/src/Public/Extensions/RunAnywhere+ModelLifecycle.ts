@@ -273,6 +273,12 @@ export const WebModelLifecycle = {
   currentModel(
     request: CurrentModelRequest = { includeModelMetadata: false },
   ): CurrentModelResult | null {
+    if (
+      request.framework !== undefined
+      && request.framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+    ) {
+      return requireAdapter(request.framework).currentModel(request);
+    }
     // Aggregate across all registered WASM modules: LlamaCPP holds LLM/VLM
     // state in its g_loaded map; ONNX holds STT/TTS/VAD/Embedding state in
     // its own map. The default adapter only sees one — return the first
