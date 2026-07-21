@@ -1293,6 +1293,35 @@ export interface ArchiveArtifact {
   expectedFiles?: ExpectedModelFiles | undefined;
 }
 
+/**
+ * Deterministic byte-level mutations that commons applies after a source file
+ * has downloaded and passed its transport checksum. Operations execute in
+ * declaration order. The source/final contracts make the transform
+ * restart-safe and fail closed if either the downloaded input or derived
+ * artifact differs from the catalog-pinned bytes.
+ */
+export interface PostDownloadAppendBytes {
+  payload: Uint8Array;
+}
+
+export interface PostDownloadTransformOperation {
+  appendBytes?: PostDownloadAppendBytes | undefined;
+}
+
+export interface PostDownloadTransform {
+  /** The exact bytes fetched from the transport before any operation runs. */
+  sourceSizeBytes: number;
+  sourceChecksumSha256: string;
+  /**
+   * The exact bytes published at ModelFileDescriptor.local_path after all
+   * operations run. These values must match the descriptor's size_bytes and
+   * checksum_sha256, which always describe the final on-disk artifact.
+   */
+  finalSizeBytes: number;
+  finalChecksumSha256: string;
+  operations: PostDownloadTransformOperation[];
+}
+
 export interface ModelFileDescriptor {
   url: string;
   filename: string;
@@ -1302,6 +1331,8 @@ export interface ModelFileDescriptor {
    * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
    * canonical "required" flag — the documented `required` boolean from
    * newer SDK sources maps onto it (default true, mirrored in Swift).
+   * Exact final on-disk artifact size. When post_download_transform is set,
+   * transport planning uses its source_size_bytes instead.
    */
   sizeBytes?:
     | number
@@ -1314,8 +1345,22 @@ export interface ModelFileDescriptor {
   relativePath?: string | undefined;
   destinationPath?: string | undefined;
   role?: ModelFileRole | undefined;
-  localPath?: string | undefined;
-  checksumSha256?: string | undefined;
+  localPath?:
+    | string
+    | undefined;
+  /**
+   * Exact final on-disk artifact checksum. When post_download_transform is
+   * set, HTTP verifies its source_checksum_sha256 before the transform.
+   */
+  checksumSha256?:
+    | string
+    | undefined;
+  /**
+   * Optional commons-owned transform applied after the source checksum has
+   * passed and before the model is marked downloaded. Native and Web
+   * consumers receive the same deterministic derived bytes.
+   */
+  postDownloadTransform?: PostDownloadTransform | undefined;
 }
 
 export interface MultiFileArtifact {
@@ -3185,6 +3230,274 @@ export const ArchiveArtifact: MessageFns<ArchiveArtifact> = {
   },
 };
 
+function createBasePostDownloadAppendBytes(): PostDownloadAppendBytes {
+  return { payload: new Uint8Array(0) };
+}
+
+export const PostDownloadAppendBytes: MessageFns<PostDownloadAppendBytes> = {
+  encode(message: PostDownloadAppendBytes, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.payload.length !== 0) {
+      writer.uint32(10).bytes(message.payload);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostDownloadAppendBytes {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostDownloadAppendBytes();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.payload = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PostDownloadAppendBytes {
+    return { payload: isSet(object.payload) ? bytesFromBase64(object.payload) : new Uint8Array(0) };
+  },
+
+  toJSON(message: PostDownloadAppendBytes): unknown {
+    const obj: any = {};
+    if (message.payload.length !== 0) {
+      obj.payload = base64FromBytes(message.payload);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PostDownloadAppendBytes>, I>>(base?: I): PostDownloadAppendBytes {
+    return PostDownloadAppendBytes.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PostDownloadAppendBytes>, I>>(object: I): PostDownloadAppendBytes {
+    const message = createBasePostDownloadAppendBytes();
+    message.payload = object.payload ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBasePostDownloadTransformOperation(): PostDownloadTransformOperation {
+  return { appendBytes: undefined };
+}
+
+export const PostDownloadTransformOperation: MessageFns<PostDownloadTransformOperation> = {
+  encode(message: PostDownloadTransformOperation, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.appendBytes !== undefined) {
+      PostDownloadAppendBytes.encode(message.appendBytes, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostDownloadTransformOperation {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostDownloadTransformOperation();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.appendBytes = PostDownloadAppendBytes.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PostDownloadTransformOperation {
+    return {
+      appendBytes: isSet(object.appendBytes)
+        ? PostDownloadAppendBytes.fromJSON(object.appendBytes)
+        : isSet(object.append_bytes)
+        ? PostDownloadAppendBytes.fromJSON(object.append_bytes)
+        : undefined,
+    };
+  },
+
+  toJSON(message: PostDownloadTransformOperation): unknown {
+    const obj: any = {};
+    if (message.appendBytes !== undefined) {
+      obj.appendBytes = PostDownloadAppendBytes.toJSON(message.appendBytes);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PostDownloadTransformOperation>, I>>(base?: I): PostDownloadTransformOperation {
+    return PostDownloadTransformOperation.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PostDownloadTransformOperation>, I>>(
+    object: I,
+  ): PostDownloadTransformOperation {
+    const message = createBasePostDownloadTransformOperation();
+    message.appendBytes = (object.appendBytes !== undefined && object.appendBytes !== null)
+      ? PostDownloadAppendBytes.fromPartial(object.appendBytes)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePostDownloadTransform(): PostDownloadTransform {
+  return { sourceSizeBytes: 0, sourceChecksumSha256: "", finalSizeBytes: 0, finalChecksumSha256: "", operations: [] };
+}
+
+export const PostDownloadTransform: MessageFns<PostDownloadTransform> = {
+  encode(message: PostDownloadTransform, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sourceSizeBytes !== 0) {
+      writer.uint32(8).int64(message.sourceSizeBytes);
+    }
+    if (message.sourceChecksumSha256 !== "") {
+      writer.uint32(18).string(message.sourceChecksumSha256);
+    }
+    if (message.finalSizeBytes !== 0) {
+      writer.uint32(24).int64(message.finalSizeBytes);
+    }
+    if (message.finalChecksumSha256 !== "") {
+      writer.uint32(34).string(message.finalChecksumSha256);
+    }
+    for (const v of message.operations) {
+      PostDownloadTransformOperation.encode(v!, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostDownloadTransform {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostDownloadTransform();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sourceSizeBytes = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sourceChecksumSha256 = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.finalSizeBytes = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.finalChecksumSha256 = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.operations.push(PostDownloadTransformOperation.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PostDownloadTransform {
+    return {
+      sourceSizeBytes: isSet(object.sourceSizeBytes)
+        ? globalThis.Number(object.sourceSizeBytes)
+        : isSet(object.source_size_bytes)
+        ? globalThis.Number(object.source_size_bytes)
+        : 0,
+      sourceChecksumSha256: isSet(object.sourceChecksumSha256)
+        ? globalThis.String(object.sourceChecksumSha256)
+        : isSet(object.source_checksum_sha256)
+        ? globalThis.String(object.source_checksum_sha256)
+        : "",
+      finalSizeBytes: isSet(object.finalSizeBytes)
+        ? globalThis.Number(object.finalSizeBytes)
+        : isSet(object.final_size_bytes)
+        ? globalThis.Number(object.final_size_bytes)
+        : 0,
+      finalChecksumSha256: isSet(object.finalChecksumSha256)
+        ? globalThis.String(object.finalChecksumSha256)
+        : isSet(object.final_checksum_sha256)
+        ? globalThis.String(object.final_checksum_sha256)
+        : "",
+      operations: globalThis.Array.isArray(object?.operations)
+        ? object.operations.map((e: any) => PostDownloadTransformOperation.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: PostDownloadTransform): unknown {
+    const obj: any = {};
+    if (message.sourceSizeBytes !== 0) {
+      obj.sourceSizeBytes = Math.round(message.sourceSizeBytes);
+    }
+    if (message.sourceChecksumSha256 !== "") {
+      obj.sourceChecksumSha256 = message.sourceChecksumSha256;
+    }
+    if (message.finalSizeBytes !== 0) {
+      obj.finalSizeBytes = Math.round(message.finalSizeBytes);
+    }
+    if (message.finalChecksumSha256 !== "") {
+      obj.finalChecksumSha256 = message.finalChecksumSha256;
+    }
+    if (message.operations?.length) {
+      obj.operations = message.operations.map((e) => PostDownloadTransformOperation.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PostDownloadTransform>, I>>(base?: I): PostDownloadTransform {
+    return PostDownloadTransform.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PostDownloadTransform>, I>>(object: I): PostDownloadTransform {
+    const message = createBasePostDownloadTransform();
+    message.sourceSizeBytes = object.sourceSizeBytes ?? 0;
+    message.sourceChecksumSha256 = object.sourceChecksumSha256 ?? "";
+    message.finalSizeBytes = object.finalSizeBytes ?? 0;
+    message.finalChecksumSha256 = object.finalChecksumSha256 ?? "";
+    message.operations = object.operations?.map((e) => PostDownloadTransformOperation.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseModelFileDescriptor(): ModelFileDescriptor {
   return {
     url: "",
@@ -3196,6 +3509,7 @@ function createBaseModelFileDescriptor(): ModelFileDescriptor {
     role: undefined,
     localPath: undefined,
     checksumSha256: undefined,
+    postDownloadTransform: undefined,
   };
 }
 
@@ -3227,6 +3541,9 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     }
     if (message.checksumSha256 !== undefined) {
       writer.uint32(82).string(message.checksumSha256);
+    }
+    if (message.postDownloadTransform !== undefined) {
+      PostDownloadTransform.encode(message.postDownloadTransform, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -3310,6 +3627,14 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
           message.checksumSha256 = reader.string();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.postDownloadTransform = PostDownloadTransform.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3354,6 +3679,11 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
         : isSet(object.checksum_sha256)
         ? globalThis.String(object.checksum_sha256)
         : undefined,
+      postDownloadTransform: isSet(object.postDownloadTransform)
+        ? PostDownloadTransform.fromJSON(object.postDownloadTransform)
+        : isSet(object.post_download_transform)
+        ? PostDownloadTransform.fromJSON(object.post_download_transform)
+        : undefined,
     };
   },
 
@@ -3386,6 +3716,9 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     if (message.checksumSha256 !== undefined) {
       obj.checksumSha256 = message.checksumSha256;
     }
+    if (message.postDownloadTransform !== undefined) {
+      obj.postDownloadTransform = PostDownloadTransform.toJSON(message.postDownloadTransform);
+    }
     return obj;
   },
 
@@ -3403,6 +3736,10 @@ export const ModelFileDescriptor: MessageFns<ModelFileDescriptor> = {
     message.role = object.role ?? undefined;
     message.localPath = object.localPath ?? undefined;
     message.checksumSha256 = object.checksumSha256 ?? undefined;
+    message.postDownloadTransform =
+      (object.postDownloadTransform !== undefined && object.postDownloadTransform !== null)
+        ? PostDownloadTransform.fromPartial(object.postDownloadTransform)
+        : undefined;
     return message;
   },
 };
@@ -8764,6 +9101,23 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     return message;
   },
 };
+
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; ++i) {
+    arr[i] = bin.charCodeAt(i);
+  }
+  return arr;
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  const bin: string[] = [];
+  arr.forEach((byte) => {
+    bin.push(globalThis.String.fromCharCode(byte));
+  });
+  return globalThis.btoa(bin.join(""));
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
