@@ -58,7 +58,6 @@
 
 #include "rac_http_hf_auth.h"
 #include "rac_http_transport_ref.h"
-#include "rac_http_upsert_mode.h"
 
 #include <chrono>
 #include <cstdint>
@@ -405,16 +404,12 @@ struct rac_http_client {
 
 namespace {
 
-/// Mirror of `PreparedRequest` in `rac_http_client_default.cpp` — see
-/// `rac_http_upsert_mode.h` for rationale. Both dispatch sites apply the
-/// same Supabase-style URL/header rewrite when a request was armed via
-/// `rac_http_request_set_upsert_mode` so behaviour is identical across
-/// native and WASM targets.
+/// Mirror of `PreparedRequest` in `rac_http_client_default.cpp`. Attaches
+/// the Hugging Face bearer Authorization header when configured so behaviour
+/// is identical across native and WASM targets.
 struct PreparedRequest {
     rac_http_request_t effective_request{};
     std::vector<rac_http_header_kv_t> header_storage;
-    std::string url_storage;
-    std::string prefer_value_storage;
     std::string auth_value_storage;
     bool transformed = false;
 };
@@ -422,24 +417,6 @@ struct PreparedRequest {
 PreparedRequest prepare_request(const rac_http_request_t* req) {
     PreparedRequest prepared;
     prepared.effective_request = *req;
-
-    auto transform = rac::http::consume_upsert_transform(req);
-    if (transform.engaged) {
-        prepared.transformed = true;
-        prepared.url_storage = std::move(transform.transformed_url);
-        prepared.prefer_value_storage = std::move(transform.prefer_header_value);
-
-        prepared.header_storage.reserve(req->header_count + 2);
-        for (size_t i = 0; i < req->header_count; ++i) {
-            prepared.header_storage.push_back(req->headers[i]);
-        }
-        prepared.header_storage.push_back(
-            rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
-
-        prepared.effective_request.url = prepared.url_storage.c_str();
-        prepared.effective_request.headers = prepared.header_storage.data();
-        prepared.effective_request.header_count = prepared.header_storage.size();
-    }
 
     auto bearer = rac::http::hf_bearer_for_url(
         prepared.effective_request.url, has_authorization_header(&prepared.effective_request));

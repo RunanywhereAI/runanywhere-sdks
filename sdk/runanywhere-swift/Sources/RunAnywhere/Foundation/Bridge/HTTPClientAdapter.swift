@@ -8,7 +8,6 @@
 //  Thin Swift bridge over the canonical `rac_http_client_*` C ABI.
 //  All cross-platform HTTP policy lives in commons:
 //    - `rac_http_default_headers`         → canonical SDK header list
-//    - `rac_http_request_set_upsert_mode` → Supabase upsert semantics
 //    - `rac_api_error_from_response`      → HTTP-status → SDKException
 //
 
@@ -127,7 +126,6 @@ public actor HTTPClientAdapter {
             urlString: url.absoluteString,
             apiKey: nil,
             authToken: nil,
-            upsertField: nil,
             body: nil,
             trustBoundary: .externalAsset,
             logger: SDKLogger(category: "HTTPClientAdapter.fetchURL")
@@ -157,15 +155,11 @@ public actor HTTPClientAdapter {
                 category: .internal
             )
         }
-        // Supabase device registration uses UPSERT semantics — defer the URL
-        // / header rewrite to commons via `rac_http_request_set_upsert_mode`.
-        let upsertField: String? = path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) ? "device_id" : nil
         return try await Self.dispatch(
             method: method,
             urlString: urlString,
             apiKey: configuration.apiKey,
             authToken: token.isEmpty ? nil : token,
-            upsertField: upsertField,
             body: body,
             trustBoundary: .controlPlane,
             logger: logger
@@ -221,7 +215,6 @@ public actor HTTPClientAdapter {
         urlString: String,
         apiKey: String?,
         authToken: String?,
-        upsertField: String?,
         body: Data?,
         trustBoundary: RequestTrustBoundary,
         logger: SDKLogger
@@ -234,7 +227,6 @@ public actor HTTPClientAdapter {
                         urlString: urlString,
                         apiKey: apiKey,
                         authToken: authToken,
-                        upsertField: upsertField,
                         body: body,
                         trustBoundary: trustBoundary,
                         logger: logger
@@ -249,7 +241,6 @@ public actor HTTPClientAdapter {
         urlString: String,
         apiKey: String?,
         authToken: String?,
-        upsertField: String?,
         body: Data?,
         trustBoundary: RequestTrustBoundary,
         logger: SDKLogger
@@ -301,7 +292,6 @@ public actor HTTPClientAdapter {
                 urlC: urlC,
                 headerKVs: kvBuf,
                 body: body,
-                upsertField: upsertField,
                 trustBoundary: trustBoundary
             )
         }
@@ -316,15 +306,14 @@ public actor HTTPClientAdapter {
         throw mapAPIError(statusCode: status, body: data, url: urlString)
     }
 
-    /// Builds the request struct, optionally arms upsert mode, dispatches,
-    /// and copies the response body into Swift-owned `Data`.
+    /// Builds the request struct, dispatches, and copies the response body
+    /// into Swift-owned `Data`.
     private static func send(
         client: OpaquePointer,
         methodC: UnsafeMutablePointer<CChar>,
         urlC: UnsafeMutablePointer<CChar>,
         headerKVs: UnsafeBufferPointer<rac_http_header_kv_t>,
         body: Data?,
-        upsertField: String?,
         trustBoundary: RequestTrustBoundary
     ) -> (rac_result_t, Int32, Data) {
         func dispatchWith(bodyBase: UnsafePointer<UInt8>?, bodyLen: Int) -> (rac_result_t, Int32, Data) {
@@ -339,9 +328,6 @@ public actor HTTPClientAdapter {
                 follow_redirects: trustBoundary.followsRedirects ? RAC_TRUE : RAC_FALSE,
                 expected_checksum_hex: nil
             )
-            if let upsertField {
-                upsertField.withCString { _ = rac_http_request_set_upsert_mode(&request, $0) }
-            }
             var response = rac_http_response_t()
             let result = rac_http_request_send(client, &request, &response)
             defer { rac_http_response_free(&response) }

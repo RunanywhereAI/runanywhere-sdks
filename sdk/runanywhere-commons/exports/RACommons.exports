@@ -433,7 +433,6 @@ _rac_http_download_execute
 _rac_http_hf_token_set
 _rac_http_hf_token_is_configured
 _rac_http_request_send
-_rac_http_request_set_upsert_mode
 _rac_http_request_stream
 _rac_http_response_free
 _rac_http_transport_is_registered

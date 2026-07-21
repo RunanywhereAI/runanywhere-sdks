@@ -11,14 +11,10 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 
 const char* rac_endpoint_device_registration(rac_environment_t env) {
-    switch (env) {
-        case RAC_ENV_DEVELOPMENT:
-            return RAC_ENDPOINT_DEV_DEVICE_REGISTER;
-        case RAC_ENV_STAGING:
-        case RAC_ENV_PRODUCTION:
-        default:
-            return RAC_ENDPOINT_DEVICE_REGISTER;
-    }
+    // Every environment registers through the backend now; there is no
+    // direct-to-datastore path. The parameter is retained for ABI stability.
+    (void)env;
+    return RAC_ENDPOINT_DEVICE_REGISTER;
 }
 
 const char* rac_endpoint_model_assignments(void) {

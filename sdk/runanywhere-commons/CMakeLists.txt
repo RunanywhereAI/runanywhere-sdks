@@ -814,11 +814,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
-    # Supabase-style upsert request flag. Lets platform SDKs
-    # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
-    # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
-    # consume it and apply the on_conflict URL rewrite + Prefer header.
-    src/infrastructure/http/rac_http_upsert_mode.cpp
     # Process-wide Hugging Face token (rac_http_hf_token_set + HF_TOKEN env
     # fallback). The dispatch sites attach `Authorization: Bearer` to
     # huggingface.co/hf.co requests so downloads, HEAD preflight, and the
