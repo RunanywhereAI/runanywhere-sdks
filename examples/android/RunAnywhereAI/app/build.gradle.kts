@@ -148,6 +148,13 @@ android {
             pickFirsts += "**/libc++_shared.so"
             pickFirsts += "**/libomp.so"
             pickFirsts += "**/librac_commons.so"
+            // Extract native libs to a real nativeLibraryDir. The QNN HTP FastRPC
+            // loader resolves the per-arch DSP skel (libQnnHtpV81Skel.so) as a
+            // filesystem file via ADSP_LIBRARY_PATH; with the default
+            // extractNativeLibs=false the skels stay inside base.apk and the cDSP
+            // cannot open them (contextCreateFromBinary -> 0x36b1). Extracting them
+            // gives the qhexrt engine's dladdr fallback a real skel directory.
+            useLegacyPackaging = true
         }
     }
 }
