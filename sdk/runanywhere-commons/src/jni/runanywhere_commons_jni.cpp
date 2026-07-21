@@ -3494,42 +3494,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVa
 // =============================================================================
 
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsAvailable(JNIEnv* env,
-                                                                                 jclass clazz) {
-    return rac_dev_config_is_available() ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseUrl(JNIEnv* env,
-                                                                                    jclass clazz) {
-    const char* url = rac_dev_config_get_supabase_url();
-    if (url == nullptr || strlen(url) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(url);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseKey(JNIEnv* env,
-                                                                                    jclass clazz) {
-    const char* key = rac_dev_config_get_supabase_key();
-    if (key == nullptr || strlen(key) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(key);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetBuildToken(JNIEnv* env,
-                                                                                   jclass clazz) {
-    const char* token = rac_dev_config_get_build_token();
-    if (token == nullptr || strlen(token) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(token);
-}
-
-JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableCredential(
     JNIEnv* env, jclass clazz, jstring value) {
     (void)clazz;
