@@ -53,7 +53,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
-    {"qwen3_0_6b", kV75V81, true},
+    {"qwen3_0_6b", kV75V81, false},
     {"llama3_2_1b", kV79V81, false},
     {"ternary_bonsai_1_7b", kV75V81, false},
     {"bonsai_1_7b_1bit", kV81, false},
@@ -98,10 +98,10 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"nemotron_asr_streaming", kV75V81, false},
     {"melotts_en", kAllSupportedArches, false},
     // V79 requires model-downloaded executable .so files, which Play disallows.
-    {"kokoro_en", kV75V81, true},
-    {"kitten_nano_0_8", kV75V81, true},
-    {"kitten_mini_0_8", kV75V81, true},
-    {"kitten_micro_0_8", kV75V81, true},
+    {"kokoro_en", kV75V81, false},
+    {"kitten_nano_0_8", kV75V81, false},
+    {"kitten_mini_0_8", kV81, false},
+    {"kitten_micro_0_8", kV81, false},
 };
 
 const ModelPolicy* find_model_policy(std::string_view model_id) {

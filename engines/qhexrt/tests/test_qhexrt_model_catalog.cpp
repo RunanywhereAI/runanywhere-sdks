@@ -68,7 +68,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
         "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
         "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",    "bonsai_4b_1bit",
-        "bonsai_8b_1bit",       "nemotron_nano_8b",    "kitten_mini_0_8", "kitten_micro_0_8",
+        "bonsai_8b_1bit",       "nemotron_nano_8b",
     };
     const std::unordered_set<std::string> v79 = {
         "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
@@ -146,10 +146,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
                   v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
     }
 
-    const std::unordered_set<std::string> private_ids = {
-        "qwen3_0_6b", "kokoro_en", "kitten_nano_0_8", "kitten_mini_0_8", "kitten_micro_0_8",
-    };
-    ASSERT_EQ(private_ids.size(), static_cast<size_t>(5));
+    const std::unordered_set<std::string> private_ids = {};
+    ASSERT_EQ(private_ids.size(), static_cast<size_t>(0));
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
                   private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
@@ -384,7 +382,7 @@ int test_logical_hf_ref_selects_v81_before_commons_registration() {
     return 0;
 }
 
-int test_private_model_skips_network_without_token_and_registers_with_token() {
+int test_public_model_registers_without_token() {
     install_noop_adapter();
     ASSERT_EQ(rac_http_transport_register(&kFakeTransport, nullptr), RAC_SUCCESS);
     const std::string id = "qwen3_0_6b";
@@ -396,19 +394,6 @@ int test_private_model_skips_network_without_token_and_registers_with_token() {
     g_hf_request_count = 0;
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_TRUE;
-    ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
-                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
-                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
-              RAC_SUCCESS);
-    ASSERT_EQ(registered, RAC_FALSE);
-    ASSERT_EQ(out.size, static_cast<size_t>(0));
-    ASSERT_EQ(g_hf_request_count, 0);
-    ASSERT_TRUE(!registry_contains(id));
-    rac_proto_buffer_free(&out);
-
-    rac_http_hf_token_set("test-token-never-logged");
-    ASSERT_EQ(rac_http_hf_token_is_configured(), RAC_TRUE);
-    registered = RAC_FALSE;
     ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
                   reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
                   RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
@@ -470,8 +455,7 @@ int main() {
          test_public_catalog_abi_skips_stub_or_unregistered_backend},
         {"logical_hf_ref_selects_v81_before_commons_registration",
          test_logical_hf_ref_selects_v81_before_commons_registration},
-        {"private_model_skips_network_without_token_and_registers_with_token",
-         test_private_model_skips_network_without_token_and_registers_with_token},
+        {"public_model_registers_without_token", test_public_model_registers_without_token},
         {"invalid_definitions_fail_closed", test_invalid_definitions_fail_closed},
 #endif
     };
