@@ -89,5 +89,18 @@ public class ComponentVTable internal constructor(
                 cleanupFn = { handle -> RunAnywhereBridge.racVadComponentCleanup(handle) },
                 loadModel = { handle, path, id, name -> RunAnywhereBridge.racVadComponentLoadModel(handle, path, id, name) },
             )
+
+        // Standalone speaker-diarization component vtable. Mirrors Swift's
+        // `ComponentVTable.diarization`, whose `cleanup` maps to
+        // `rac_diarization_component_unload` (no separate `_cleanup` C ABI).
+        public val diarization: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION,
+                createFn = { RunAnywhereBridge.racDiarizationComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racDiarizationComponentIsLoaded(handle) },
+                destroyFn = { handle -> RunAnywhereBridge.racDiarizationComponentDestroy(handle) },
+                cleanupFn = { handle -> RunAnywhereBridge.racDiarizationComponentUnload(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racDiarizationComponentLoadModel(handle, path, id, name) },
+            )
     }
 }

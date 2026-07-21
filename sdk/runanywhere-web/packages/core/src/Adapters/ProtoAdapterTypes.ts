@@ -212,6 +212,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     outResult: number,
   ): number;
 
+  _rac_diarization_diarize_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
   _rac_diffusion_generate_lifecycle_proto?(
     requestBytes: number,
     requestSize: number,
@@ -355,6 +361,7 @@ export interface ModalityCapabilitySlots {
   vad: ModalityProtoModule | null;
   embedding: ModalityProtoModule | null;
   segmentation: ModalityProtoModule | null;
+  diarization: ModalityProtoModule | null;
   rag: ModalityProtoModule | null;
   diffusion: ModalityProtoModule | null;
   'structured-output': ModalityProtoModule | null;
@@ -387,6 +394,7 @@ export const adapterState = {
     vad: null,
     embedding: null,
     segmentation: null,
+    diarization: null,
     rag: null,
     diffusion: null,
     'structured-output': null,

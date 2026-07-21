@@ -319,6 +319,7 @@ export class SherpaONNXBridge {
         'voice-agent',
         'embedding',
         'segmentation',
+        'diarization',
         'rag',
       ];
       registerWasmModule(capabilities, this._module, ['onnx', 'sherpa'], {

@@ -836,6 +836,7 @@ export type WasmCapability =
   | 'vad'               // Voice activity detection
   | 'embedding'         // Embeddings
   | 'segmentation'      // Semantic image segmentation
+  | 'diarization'       // Standalone speaker diarization
   | 'rag'               // RAG pipeline (embeddings + retrieval)
   | 'diffusion'         // Diffusion (image generation)
   | 'structured-output' // Structured-output parse/validate/prepare-prompt

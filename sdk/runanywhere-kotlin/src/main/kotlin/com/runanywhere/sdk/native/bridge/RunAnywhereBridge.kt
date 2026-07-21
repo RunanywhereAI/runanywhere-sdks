@@ -278,6 +278,59 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttStreamCancelProto(sessionId: Long): Int
 
+    // SPEAKER DIARIZATION (rac_diarization.h). Component handle family used by
+    // the streaming session path, one offline lifecycle-proto verb, and the
+    // persistent stream-session ABI. Mirrors the STT component + stream ABI.
+
+    @JvmStatic
+    external fun racDiarizationComponentCreate(): Long
+
+    @JvmStatic
+    external fun racDiarizationComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racDiarizationComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racDiarizationComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationComponentDestroy(handle: Long)
+
+    // Takes a serialized DiarizationRequest (audio + options bundled) and
+    // resolves the lifecycle-loaded speaker-diarization model internally.
+    @JvmStatic
+    external fun racDiarizationDiarizeLifecycleProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDiarizationSetStreamProtoCallback(
+        handle: Long,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    @JvmStatic
+    external fun racDiarizationUnsetStreamProtoCallback(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationProtoQuiesce()
+
+    /**
+     * Start a persistent speaker-diarization stream session.
+     *
+     * @return positive session id on success; negative RAC error code on failure.
+     */
+    @JvmStatic
+    external fun racDiarizationStreamStartProto(handle: Long, optionsProto: ByteArray): Long
+
+    @JvmStatic
+    external fun racDiarizationStreamFeedAudioProto(sessionId: Long, audioData: ByteArray): Int
+
+    @JvmStatic
+    external fun racDiarizationStreamStopProto(sessionId: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationStreamCancelProto(sessionId: Long): Int
+
     // TTS COMPONENT (rac_tts_component.h)
 
     @JvmStatic

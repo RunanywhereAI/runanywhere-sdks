@@ -14,6 +14,7 @@ export const WASM_CAPABILITY_EXPORT_MANIFEST: Readonly<Record<WasmCapability, re
   vad: ['_rac_vad_component_process_proto', '_rac_vad_process_lifecycle_proto'],
   embedding: ['_rac_embeddings_embed_batch_proto', '_rac_embeddings_embed_batch_lifecycle_proto'],
   segmentation: ['_rac_segmentation_segment_lifecycle_proto'],
+  diarization: ['_rac_diarization_diarize_lifecycle_proto'],
   rag: ['_rac_rag_session_create_proto', '_rac_rag_query_proto'],
   diffusion: ['_rac_diffusion_generate_lifecycle_proto', '_rac_diffusion_cancel_proto'],
   'structured-output': ['_rac_structured_output_parse_proto', '_rac_structured_output_validate_proto'],

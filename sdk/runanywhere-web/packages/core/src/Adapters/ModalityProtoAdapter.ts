@@ -22,6 +22,7 @@
  * module registration plus its per-modality factory methods.
  */
 
+import { DiarizationProtoAdapter } from './DiarizationProtoAdapter.js';
 import { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
 import { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
 import { LLMProtoAdapter } from './LLMProtoAdapter.js';
@@ -54,6 +55,7 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'vad',
   'embedding',
   'segmentation',
+  'diarization',
   'rag',
   'diffusion',
   'structured-output',
@@ -62,6 +64,7 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'voice-agent',
 ]);
 
+export { DiarizationProtoAdapter } from './DiarizationProtoAdapter.js';
 export { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
 export { EmbeddingsProtoAdapter } from './EmbeddingsProtoAdapter.js';
 export { LLMProtoAdapter } from './LLMProtoAdapter.js';
@@ -208,6 +211,10 @@ export class ModalityProtoAdapter {
 
   segmentation(): SegmentationProtoAdapter {
     return new SegmentationProtoAdapter(this.module);
+  }
+
+  diarization(): DiarizationProtoAdapter {
+    return new DiarizationProtoAdapter(this.module);
   }
 
   diffusion(): DiffusionProtoAdapter {

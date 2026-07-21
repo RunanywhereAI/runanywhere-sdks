@@ -83,6 +83,11 @@ import type {
   SegmentationRequest,
   SegmentationResult,
 } from '@runanywhere/proto-ts/segmentation';
+import { diarize as diarizeImpl } from './Extensions/RunAnywhere+Diarization.js';
+import type {
+  DiarizationRequest,
+  DiarizationResult,
+} from '@runanywhere/proto-ts/diarization';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
 import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
@@ -1618,6 +1623,16 @@ export const RunAnywhere = {
   async segment(request: SegmentationRequest): Promise<SegmentationResult> {
     await RunAnywhere.ensureServicesReady();
     return segmentImpl(request);
+  },
+
+  /**
+   * Diarize raw audio with the lifecycle-owned speaker-diarization model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async diarize(request: DiarizationRequest): Promise<DiarizationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return diarizeImpl(request);
   },
 
   async loadModel(
