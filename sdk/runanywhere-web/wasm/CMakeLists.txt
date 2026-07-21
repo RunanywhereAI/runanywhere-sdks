@@ -261,6 +261,7 @@ set(WASM_PLATFORM_SOURCES
 
 set(WASM_EXPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm_exports.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rac_diffusion_webgpu_ops.cpp
 )
 
 # =============================================================================
@@ -310,6 +311,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_request_resume"
     "_rac_http_response_free"
     "_rac_http_download_execute"
+    # Hugging Face auth token — Swift/RN parity (`rac_http_hf_token_set`).
+    # Consumed by `RunAnywhere.setHfToken` when the rebuilt commons artifact
+    # is packaged; until then TypeScript falls back to localStorage.
+    "_rac_http_hf_token_set"
 
     # Platform HTTP transport registry. The
     # WASM shim in rac_http_client_emscripten.cpp registers an
@@ -409,6 +414,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_registry_plugin_count"
     "_rac_registry_list_plugins"
     "_rac_registry_free_plugin_list"
+    "_rac_plugin_find_for_engine"
 
     # Service registry
     # Legacy rac_service_* exports DELETED. Use rac_plugin_*
@@ -827,11 +833,15 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_structured_output_generate_stream_proto"
     "_rac_structured_output_schema_to_json_proto"
 
-    # Diffusion proto ABI
+    # Diffusion proto ABI (lifecycle is the SDK-facing path; handle APIs retained for engine smoke)
+    "_rac_diffusion_generate_lifecycle_proto"
     "_rac_diffusion_generate_proto"
     "_rac_diffusion_generate_with_progress_proto"
     "_rac_diffusion_cancel_proto"
     "_rac_diffusion_result_free"
+    "_rac_diffusion_stream_start_proto"
+    "_rac_diffusion_stream_stop_proto"
+    "_rac_diffusion_stream_cancel_proto"
 
     # Embeddings proto ABI
     "_rac_embeddings_create_proto"

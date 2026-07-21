@@ -7,6 +7,7 @@ import {
 import {
   SolutionAdapter,
   SolutionHandle,
+  SolutionModuleCoordinator,
   solutions,
 } from '../../../../src/Public/Extensions/RunAnywhere+Solutions';
 
@@ -61,6 +62,48 @@ describe('Solutions generated surface', () => {
     expect(typeof solutions.run).toBe('function');
     expect(typeof SolutionHandle).toBe('function');
     expect(typeof SolutionAdapter.run).toBe('function');
+    expect(typeof SolutionModuleCoordinator.resolve).toBe('function');
+  });
+
+  it('feeds UTF-8 text or bytes, cancels, and waits through deterministic teardown', async () => {
+    const calls: string[] = [];
+    const heap = new Uint8Array(128);
+    let nextPtr = 8;
+    const module = {
+      _rac_solution_cancel: () => {
+        calls.push('cancel');
+        return 0;
+      },
+      _rac_solution_feed: (_handle: number, ptr: number) => {
+        let end = ptr;
+        while (heap[end] !== 0) end += 1;
+        calls.push(`feed:${new TextDecoder().decode(heap.subarray(ptr, end))}`);
+        return 0;
+      },
+      _rac_solution_destroy: () => calls.push('destroy'),
+      _malloc: (size: number) => {
+        const ptr = nextPtr;
+        nextPtr += size;
+        return ptr;
+      },
+      _free: () => undefined,
+      lengthBytesUTF8: (value: string) => new TextEncoder().encode(value).byteLength,
+      stringToUTF8: (value: string, ptr: number, maxBytes: number) => {
+        const bytes = new TextEncoder().encode(value);
+        heap.set(bytes.subarray(0, maxBytes - 1), ptr);
+        heap[ptr + Math.min(bytes.length, maxBytes - 1)] = 0;
+        return bytes.length;
+      },
+    };
+    const handle = new SolutionHandle(42, module as never);
+
+    handle.feed('hello');
+    handle.feed(new TextEncoder().encode('world'));
+    handle.cancel();
+    await handle.wait();
+
+    expect(calls).toEqual(['feed:hello', 'feed:world', 'cancel', 'destroy']);
+    expect(handle.isAlive).toBe(false);
   });
 
   it('rejects an empty SolutionConfig before touching the native module', () => {

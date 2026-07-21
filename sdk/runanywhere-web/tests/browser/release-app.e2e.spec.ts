@@ -472,7 +472,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     }
   });
 
-  test('05 — keeps Bonsai visible but blocks its incompatible app runtime path', async ({ appPage }) => {
+  test('05 — keeps Bonsai 27B visible but explains why WebGPU cannot run it here', async ({ appPage }) => {
     await appPage.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForInteractive(appPage);
     await navigateTo(appPage, 'chat');
@@ -488,21 +488,24 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(row).toBeVisible();
     const unavailable = row.locator('button[data-model-id="bonsai-27b-q1_0"]');
     await expect(unavailable).toBeDisabled();
-    await expect(unavailable).toHaveText('Unavailable in this app');
+    await expect(unavailable).toHaveText('Too large for Web WASM');
     await expect(unavailable).toHaveAttribute(
       'data-compatibility-code',
       'wasm32-address-space',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText('3.803 GB GGUF');
     await expect(row.locator('.model-compatibility-reason')).toContainText(
-      'current llama.cpp/WebGPU backend',
+      'llama.cpp path must stage the full',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText(
       '4 GiB WASM32 heap',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText('281 MiB');
+    await expect(row.locator('.model-compatibility-reason')).toContainText(
+      /WebGPU|webgpu/i,
+    );
     const reference = row.locator('.model-compatibility-reason a');
-    await expect(reference).toHaveText(/Experimental direct-WebGPU reference/);
+    await expect(reference).toHaveText(/PrismML direct-WebGPU demo/);
     await expect(reference).toHaveAttribute(
       'href',
       'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',

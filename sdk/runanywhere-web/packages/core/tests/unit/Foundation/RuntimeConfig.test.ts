@@ -25,4 +25,14 @@ describe('Runtime acceleration state', () => {
     expect(Runtime.preferred).toBe('webgpu');
     expect(Runtime.active).toBe('cpu');
   });
+
+  it('exposes advisory per-module WASM32 budgets below the address-space ceiling', () => {
+    const budget = Runtime.memoryBudget;
+
+    expect(budget.wasm32AddressSpaceBytes).toBe(4 * 1024 ** 3);
+    expect(
+      Object.values(budget.perModuleSoftLimitBytes)
+        .every((limit) => limit > 0 && limit < budget.wasm32AddressSpaceBytes),
+    ).toBe(true);
+  });
 });

@@ -703,6 +703,31 @@ rac_diffusion_mode_t diffusion_mode_from_proto(::runanywhere::v1::DiffusionMode 
 
 }  // namespace
 
+namespace {
+
+bool is_png_bytes(const std::string& bytes) {
+    return bytes.size() >= 8 && static_cast<uint8_t>(bytes[0]) == 0x89 && bytes[1] == 'P' &&
+           bytes[2] == 'N' && bytes[3] == 'G';
+}
+
+bool is_jpeg_bytes(const std::string& bytes) {
+    return bytes.size() >= 3 && static_cast<uint8_t>(bytes[0]) == 0xFF &&
+           static_cast<uint8_t>(bytes[1]) == 0xD8 && static_cast<uint8_t>(bytes[2]) == 0xFF;
+}
+
+bool encoded_image_media_type_matches(const std::string& bytes, const std::string& media_type) {
+    if (media_type.empty()) {
+        return is_png_bytes(bytes) || is_jpeg_bytes(bytes);
+    }
+    if (media_type == "image/png")
+        return is_png_bytes(bytes);
+    if (media_type == "image/jpeg" || media_type == "image/jpg")
+        return is_jpeg_bytes(bytes);
+    return false;
+}
+
+}  // namespace
+
 bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
                                       rac_diffusion_options_t* out) {
     if (!out)
@@ -733,16 +758,33 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
     out->scheduler = diffusion_scheduler_from_proto(in.scheduler());
     out->mode = diffusion_mode_from_proto(in.mode());
     if (!in.input_image().empty()) {
+        // Shared across SDKs: reject non-PNG/JPEG payloads before engine dispatch
+        // so Kotlin/Swift/Web inpaint helpers do not re-implement sniffing.
+        if (!encoded_image_media_type_matches(in.input_image(), in.input_image_media_type()))
+            return fail();
         out->input_image_data = copy_bytes(in.input_image());
         if (!out->input_image_data)
             return fail();
         out->input_image_size = in.input_image().size();
     }
     if (!in.mask_image().empty()) {
+        if (!encoded_image_media_type_matches(in.mask_image(), in.mask_image_media_type()))
+            return fail();
         out->mask_data = copy_bytes(in.mask_image());
         if (!out->mask_data)
             return fail();
         out->mask_size = in.mask_image().size();
+    }
+    if (out->mode == RAC_DIFFUSION_MODE_INPAINTING) {
+        if (!out->input_image_data || out->input_image_size == 0 || !out->mask_data ||
+            out->mask_size == 0) {
+            return fail();
+        }
+    }
+    if (out->mode == RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE) {
+        if (!out->input_image_data || out->input_image_size == 0) {
+            return fail();
+        }
     }
     out->input_image_width = in.input_image_width();
     out->input_image_height = in.input_image_height();

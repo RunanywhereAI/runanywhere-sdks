@@ -14,10 +14,15 @@ import {
   type TTSVoiceInfo as ProtoTTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   collectCallback,
+  decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -25,6 +30,19 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+
+function requireLiveOnnxWorkerOrMain(operation: string) {
+  const host = getActiveBackendWorkerHost('onnx');
+  if (host?.diagnostics.executionContext === 'worker') return host;
+  if (hasBackendWorkerOwnedModels('onnx')) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      'ONNX BackendWorker owns loaded speech models; reload after recovering the worker. '
+        + 'Main-thread fallback is disabled for worker-owned models.',
+    );
+  }
+  return null;
+}
 
 export class TTSProtoAdapter {
   static tryDefault(): TTSProtoAdapter | null {
@@ -56,18 +74,26 @@ export class TTSProtoAdapter {
     ]).length === 0;
   }
 
-  synthesizeLifecycle(
+  async synthesizeLifecycle(
     text: string,
     options: ProtoTTSOptions,
     ssml?: string,
-  ): ProtoTTSOutput | null {
+  ): Promise<ProtoTTSOutput | null> {
+    const request = lifecycleRequest(text, options, ssml);
+    const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycle');
+    if (host) {
+      const response = await host.infer('tts.synthesize', {
+        requestBytes: TTSSynthesisRequest.encode(request).finish(),
+      });
+      return decodeWorkerInferResult(response, TTSOutput);
+    }
     if (!ensureExports(this.module, 'tts.synthesizeLifecycle', [
       '_rac_tts_synthesize_lifecycle_proto',
     ])) {
       return null;
     }
     return this.bridge().withEncodedRequest(
-      lifecycleRequest(text, options, ssml),
+      request,
       TTSSynthesisRequest,
       TTSOutput,
       (requestPtr, requestSize, outResult) => (
@@ -92,12 +118,16 @@ export class TTSProtoAdapter {
     options: ProtoTTSOptions,
     ssml?: string,
   ): AsyncIterable<ProtoTTSStreamEvent> {
-    requireExports(this.module, 'tts.synthesizeLifecycleStream', [
-      '_rac_tts_synthesize_stream_lifecycle_proto',
-    ]);
     const requestBytes = TTSSynthesisRequest.encode(
       lifecycleRequest(text, options, ssml),
     ).finish();
+    const host = requireLiveOnnxWorkerOrMain('tts.synthesizeLifecycleStream');
+    if (host) {
+      return decodeWorkerStream(host.stream('tts.synthesize', { requestBytes }), TTSStreamEvent);
+    }
+    requireExports(this.module, 'tts.synthesizeLifecycleStream', [
+      '_rac_tts_synthesize_stream_lifecycle_proto',
+    ]);
     return streamCallback(
       this.module,
       TTSStreamEvent,

@@ -5,7 +5,10 @@
  *
  * @internal @experimental
  *
- * INTERNAL/EXPERIMENTAL — paired with `OffscreenRuntimeBridge.ts`. No
+ * INTERNAL/EXPERIMENTAL — paired with `OffscreenRuntimeBridge.ts`. Stage 3's
+ * `BackendWorker.ts` is the production-oriented successor for new backend
+ * worker implementations; this stream-only path remains for compatibility.
+ * No
  * production backend currently ships a worker bundle that calls
  * `runStreamWorker`. See the removal contract on
  * `OffscreenRuntimeBridge.ts` for disposition.

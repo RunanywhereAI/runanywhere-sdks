@@ -14,9 +14,14 @@ import {
 } from '@runanywhere/proto-ts/stt_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
+  decodeWorkerInferResult,
+  decodeWorkerStream,
   ensureExports,
   missingExports,
   modalityLogger as logger,
@@ -24,6 +29,19 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+
+function requireLiveOnnxWorkerOrMain(operation: string) {
+  const host = getActiveBackendWorkerHost('onnx');
+  if (host?.diagnostics.executionContext === 'worker') return host;
+  if (hasBackendWorkerOwnedModels('onnx')) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      'ONNX BackendWorker owns loaded speech models; reload after recovering the worker. '
+        + 'Main-thread fallback is disabled for worker-owned models.',
+    );
+  }
+  return null;
+}
 
 export class STTProtoAdapter {
   static tryDefault(): STTProtoAdapter | null {
@@ -47,16 +65,23 @@ export class STTProtoAdapter {
     ]).length === 0;
   }
 
-  transcribeLifecycle(
+  async transcribeLifecycle(
     audioData: Uint8Array,
     options: ProtoSTTOptions,
-  ): ProtoSTTOutput | null {
+  ): Promise<ProtoSTTOutput | null> {
+    const request = lifecycleRequest(audioData, options);
+    const host = requireLiveOnnxWorkerOrMain('stt.transcribeLifecycle');
+    if (host) {
+      const response = await host.infer('stt.transcribe', {
+        requestBytes: STTTranscriptionRequest.encode(request).finish(),
+      });
+      return decodeWorkerInferResult(response, STTOutput);
+    }
     if (!ensureExports(this.module, 'stt.transcribeLifecycle', [
       '_rac_stt_transcribe_lifecycle_proto',
     ])) {
       return null;
     }
-    const request = lifecycleRequest(audioData, options);
     return this.bridge().withEncodedRequest(
       request,
       STTTranscriptionRequest,
@@ -76,15 +101,16 @@ export class STTProtoAdapter {
     audioData: Uint8Array,
     options: ProtoSTTOptions,
   ): AsyncIterable<ProtoSTTStreamEvent> {
-    // Do not route this call through OffscreenRuntimeBridge: lifecycle model
-    // ownership belongs to the registered main runtime, while a mirror worker
-    // has an independent commons registry and therefore no current STT model.
-    requireExports(this.module, 'stt.transcribeLifecycleStream', [
-      '_rac_stt_transcribe_stream_lifecycle_proto',
-    ]);
     const requestBytes = STTTranscriptionRequest.encode(
       lifecycleRequest(audioData, options),
     ).finish();
+    const host = requireLiveOnnxWorkerOrMain('stt.transcribeLifecycleStream');
+    if (host) {
+      return decodeWorkerStream(host.stream('stt.transcribe', { requestBytes }), STTStreamEvent);
+    }
+    requireExports(this.module, 'stt.transcribeLifecycleStream', [
+      '_rac_stt_transcribe_stream_lifecycle_proto',
+    ]);
     return streamCallback(
       this.module,
       STTStreamEvent,
