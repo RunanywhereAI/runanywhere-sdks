@@ -24,7 +24,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
@@ -146,10 +145,9 @@ object CppBridgeEnvironment {
 /**
  * Development configuration bridge.
  *
- * Wraps the four `rac_dev_config_*` accessors that ship with the
- * commons library and are populated by `development_config.cpp` (the
- * Supabase + build-token bundle used in dev mode). Mirrors Swift's
- * `CppBridge.DevConfig` enum namespace.
+ * Wraps the two `rac_dev_config_*` usability helpers that ship with the
+ * commons library (`is_usable_credential` / `is_usable_http_url`).
+ * Mirrors Swift's `CppBridge.DevConfig` enum namespace.
  *
  * Thread safety: every accessor delegates to the native side which is
  * read-only after build time; no Kotlin-side locking is required.
@@ -157,74 +155,6 @@ object CppBridgeEnvironment {
 object CppBridgeDevConfig {
     private val placeholderPattern: Regex =
         Regex("YOUR_|<your|REPLACE_ME|PLACEHOLDER", RegexOption.IGNORE_CASE)
-
-    /**
-     * Whether `rac_dev_config_*` was compiled into commons with a
-     * non-template payload. Mirrors Swift's `DevConfig.isAvailable`.
-     */
-    val isAvailable: Boolean
-        get() = RunAnywhereBridge.racDevConfigIsAvailable()
-
-    /** Supabase URL for development mode. Mirrors Swift's `DevConfig.supabaseURL`. */
-    val supabaseURL: String?
-        get() = RunAnywhereBridge.racDevConfigGetSupabaseUrl()
-
-    /** Supabase anon key for development mode. Mirrors Swift's `DevConfig.supabaseKey`. */
-    val supabaseKey: String?
-        get() = RunAnywhereBridge.racDevConfigGetSupabaseKey()
-
-    /** Build token for development mode. Mirrors Swift's `DevConfig.buildToken`. */
-    val buildToken: String?
-        get() = RunAnywhereBridge.racDevConfigGetBuildToken()?.takeIf { isUsableCredential(it) }
-
-    /**
-     * Whether the dev Supabase config is present and not a template
-     * placeholder. Mirrors Swift's `DevConfig.hasUsableSupabaseConfig`.
-     */
-    val hasUsableSupabaseConfig: Boolean
-        get() {
-            val url = supabaseURL ?: return false
-            val key = supabaseKey ?: return false
-            return isUsableHTTPURL(url) && isUsableCredential(key)
-        }
-
-    /**
-     * Whether the dev build token is present and not a placeholder.
-     * Mirrors Swift's `DevConfig.hasUsableBuildToken`.
-     */
-    val hasUsableBuildToken: Boolean
-        get() = buildToken != null
-
-    /**
-     * Whether dev-mode device registration has every required value.
-     * Mirrors Swift's `DevConfig.hasUsableDevelopmentRegistrationConfig`.
-     */
-    val hasUsableDevelopmentRegistrationConfig: Boolean
-        get() = hasUsableSupabaseConfig && hasUsableBuildToken
-
-    /**
-     * Configure [HTTPClientAdapter] for development mode using the C++
-     * dev-config payload. Returns `true` when the adapter was
-     * configured, `false` when the dev config is unavailable or the
-     * URL/key fail the usability checks.
-     *
-     * Mirrors Swift's `CppBridge.DevConfig.configureHTTP()` —
-     * `async` suspend, validates with the same `isUsableHTTPURL` /
-     * `isUsableCredential` rules, trims the URL + key before handing
-     * them to the HTTP adapter, and returns `false` rather than
-     * throwing when the inputs are unusable.
-     */
-    suspend fun configureHTTP(): Boolean {
-        if (!hasUsableSupabaseConfig) return false
-        val rawUrl = supabaseURL ?: return false
-        val rawKey = supabaseKey ?: return false
-        val trimmedUrl = rawUrl.trim()
-        val trimmedKey = rawKey.trim()
-        if (!isUsableHTTPURL(trimmedUrl)) return false
-        if (!isUsableCredential(trimmedKey)) return false
-        HTTPClientAdapter.configure(baseURL = trimmedUrl, apiKey = trimmedKey)
-        return true
-    }
 
     /**
      * Whether [value] is a usable credential — non-blank and not a
