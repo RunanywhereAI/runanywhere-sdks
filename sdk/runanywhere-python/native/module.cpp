@@ -50,6 +50,15 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+// Model registry (RAG resolves embedding/LLM model ids -> local_path via the
+// global registry) + the proto-byte RAG session ABI + its proto-buffer helpers.
+#include "rac/core/rac_error.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
+#ifdef RAC_HAVE_BACKEND_RAG
+#include "rac/features/rag/rac_rag.h"
+#endif
 
 namespace py = pybind11;
 
@@ -105,6 +114,9 @@ std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
 std::unordered_map<int32_t, rac_handle_t> g_stt_handles;
 std::unordered_map<int32_t, rac_handle_t> g_tts_handles;
 std::unordered_map<int32_t, rac_handle_t> g_vad_handles;
+#ifdef RAC_HAVE_BACKEND_RAG
+std::unordered_map<int32_t, rac_handle_t> g_rag_handles;  // RAG session handles
+#endif
 int32_t g_next_handle_id = 1;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -251,6 +263,11 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
 #ifdef RAC_HAVE_BACKEND_CLOUD
         rac_backend_cloud_register();  // cloud STT provider fallback
 #endif
+#ifdef RAC_HAVE_BACKEND_RAG
+        // RAG pipeline (also registers the ONNX embeddings provider it depends
+        // on if present). Optional: a failure here just leaves RAG unavailable.
+        rac_backend_rag_register();
+#endif
         backends_registered = true;
     }
     g_initialized.store(true);
@@ -347,7 +364,8 @@ int32_t load_model(const std::string& path, std::optional<std::string> id,
 void generate(int32_t handle, const std::string& prompt, py::function on_token,
               std::optional<int32_t> max_tokens, std::optional<float> temperature,
               std::optional<float> top_p, std::optional<int32_t> top_k,
-              std::optional<std::string> system_prompt, std::optional<std::string> grammar) {
+              std::optional<std::string> system_prompt, std::optional<std::string> grammar,
+              std::optional<bool> disable_thinking) {
     rac_handle_t h = handle_for(g_llm_handles, handle);
     if (!h) throw std::runtime_error("invalid handle");
 
@@ -363,6 +381,11 @@ void generate(int32_t handle, const std::string& prompt, py::function on_token,
     if (top_k.has_value()) opts.top_k = *top_k;
     if (!sys_str.empty()) opts.system_prompt = sys_str.c_str();
     if (!gram_str.empty()) opts.grammar = gram_str.c_str();
+    // disable_thinking suppresses the model's <think> phase: commons prepends
+    // the model's no-think directive at the prompt level (the Python host-side
+    // splitter still strips any tags the engine emits regardless).
+    if (disable_thinking.has_value())
+        opts.disable_thinking = *disable_thinking ? RAC_TRUE : RAC_FALSE;
 
     StreamCtx ctx;
     ctx.on_token = std::move(on_token);
@@ -481,6 +504,204 @@ void unload_embedding_model(int32_t handle) {
     rac_handle_t h = take_handle(g_embed_handles, handle);
     if (h) rac_embeddings_destroy(h);
 }
+
+// =============================================================================
+// Model registry: register_model(id, path, framework, category)
+//
+// The RAG session ABI carries *model ids* (RAGConfiguration.embedding_model_id
+// / llm_model_id) and resolves them to on-disk paths through the GLOBAL model
+// registry (rac_get_model -> info->local_path). The Python SDK otherwise loads
+// models purely by path and never populates that registry, so create_rag first
+// registers each resolved model here. Not RAG-gated — it is generally useful
+// and links against core commons only.
+// =============================================================================
+
+// Duplicate a std::string into a malloc'd C string owned by the rac_model_info
+// (rac_model_info_free uses free()). The module static-links commons so both
+// sides share one CRT heap.
+char* dup_cstr(const std::string& s) {
+    char* p = static_cast<char*>(std::malloc(s.size() + 1));
+    if (!p) throw std::bad_alloc();
+    std::memcpy(p, s.c_str(), s.size() + 1);
+    return p;
+}
+
+void register_model(const std::string& model_id, const std::string& local_path, int32_t framework,
+                    int32_t category) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_model_registry_handle_t reg = rac_get_model_registry();
+    if (!reg) throw std::runtime_error("global model registry unavailable");
+
+    rac_model_info_t* info = rac_model_info_alloc();
+    if (!info) throw std::bad_alloc();
+    // isDownloaded is derived from local_path being set; the RAG resolver reads
+    // info->local_path directly, so a non-empty local_path is what matters.
+    info->id = dup_cstr(model_id);
+    info->name = dup_cstr(model_id);
+    info->local_path = dup_cstr(local_path);
+    info->framework = static_cast<rac_inference_framework_t>(framework);
+    info->category = static_cast<rac_model_category_t>(category);
+    info->source = RAC_MODEL_SOURCE_LOCAL;
+
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_model_registry_save(reg, info);
+    }
+    rac_model_info_free(info);  // save deep-copies; free our transient struct
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "register_model");
+}
+
+#ifdef RAC_HAVE_BACKEND_RAG
+// =============================================================================
+// RAG: proto-bytes session ABI (rac_rag_*_proto).
+//
+// Every call is bytes-in / bytes-out over serialized runanywhere.v1.* messages;
+// the Python `runanywhere.rag` facade owns the (de)serialization via the
+// generated _pb2 classes. Session handles reuse the integer-id handle machinery
+// under a dedicated g_rag_handles map. Guarded by RAC_HAVE_BACKEND_RAG so a
+// build without the RAG backend simply omits these bindings (the facade then
+// raises a friendly "rebuild with [rag]" hint).
+// =============================================================================
+
+// Turn a returned rac_proto_buffer_t into py::bytes, or raise. Prefers the
+// buffer's own negative status/message, else the function return code. Frees
+// the buffer either way. Must run with the GIL held.
+py::bytes finish_proto_out(rac_result_t rc, rac_proto_buffer_t* buf, const char* what) {
+    rac_result_t code = (buf->status != RAC_SUCCESS) ? buf->status : rc;
+    if (code != RAC_SUCCESS) {
+        std::string msg = buf->error_message ? std::string(buf->error_message) : std::string(what);
+        rac_proto_buffer_free(buf);
+        raise_rac_error(code, msg);
+    }
+    py::bytes out(reinterpret_cast<const char*>(buf->data), buf->size);
+    rac_proto_buffer_free(buf);
+    return out;
+}
+
+int32_t rag_session_create(const std::string& config_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_handle_t session = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_session_create_proto(reinterpret_cast<const uint8_t*>(config_bytes.data()),
+                                          config_bytes.size(), &session);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rag_session_create");
+    if (!session) throw std::runtime_error("rag_session_create returned a null session");
+    return register_handle(g_rag_handles, session);
+}
+
+py::bytes rag_ingest(int32_t handle, const std::string& document_bytes) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_ingest_proto(h, reinterpret_cast<const uint8_t*>(document_bytes.data()),
+                                  document_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "rag_ingest");
+}
+
+py::bytes rag_query(int32_t handle, const std::string& query_bytes) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_query_proto(h, reinterpret_cast<const uint8_t*>(query_bytes.data()),
+                                 query_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "rag_query");
+}
+
+// Streaming query: each serialized RAGStreamEvent is delivered to on_event(bytes),
+// which returns False to stop early. Same GIL discipline as the LLM stream.
+struct RagStreamCtx {
+    py::function on_event;
+    std::exception_ptr py_exc;  // set if the Python callback raised
+};
+
+rac_bool_t rag_stream_event_cb(const uint8_t* event_bytes, size_t event_size, void* ud) {
+    auto* ctx = static_cast<RagStreamCtx*>(ud);
+    py::gil_scoped_acquire gil;
+    try {
+        py::bytes ev(reinterpret_cast<const char*>(event_bytes), event_size);
+        py::object ret = ctx->on_event(ev);
+        if (py::isinstance<py::bool_>(ret) && !ret.cast<bool>()) return RAC_FALSE;
+        return RAC_TRUE;
+    } catch (py::error_already_set&) {
+        ctx->py_exc = std::current_exception();
+        return RAC_FALSE;
+    } catch (...) {
+        ctx->py_exc = std::current_exception();
+        return RAC_FALSE;
+    }
+}
+
+void rag_query_stream(int32_t handle, const std::string& query_bytes, py::function on_event) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    RagStreamCtx ctx;
+    ctx.on_event = std::move(on_event);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_query_stream_proto(h, reinterpret_cast<const uint8_t*>(query_bytes.data()),
+                                        query_bytes.size(), rag_stream_event_cb, &ctx);
+    }
+    if (ctx.py_exc) std::rethrow_exception(ctx.py_exc);  // callback raised -> resurface
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rag_query_stream");
+}
+
+void rag_cancel(int32_t handle) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_cancel_proto(h);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "rag_cancel");
+}
+
+py::bytes rag_clear(int32_t handle) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_clear_proto(h, &out);
+    }
+    return finish_proto_out(rc, &out, "rag_clear");
+}
+
+py::bytes rag_stats(int32_t handle) {
+    rac_handle_t h = handle_for(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_stats_proto(h, &out);
+    }
+    return finish_proto_out(rc, &out, "rag_stats");
+}
+
+void rag_session_destroy(int32_t handle) {
+    rac_handle_t h = take_handle(g_rag_handles, handle);
+    if (h) rac_rag_session_destroy_proto(h);
+}
+#endif  // RAC_HAVE_BACKEND_RAG
 
 // =============================================================================
 // STT: load_stt_model / transcribe / unload_stt_model   (sherpa)
@@ -656,6 +877,12 @@ void shutdown() {
         // state, and a re-init starts from a clean slate.
         {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
+#ifdef RAC_HAVE_BACKEND_RAG
+            // Destroy RAG sessions first — each owns its internal embedding/LLM
+            // services, independent of the user-loaded handle maps below.
+            for (auto& kv : g_rag_handles) rac_rag_session_destroy_proto(kv.second);
+            g_rag_handles.clear();
+#endif
             for (auto& kv : g_llm_handles) rac_llm_component_destroy(kv.second);
             for (auto& kv : g_vlm_handles) rac_vlm_component_destroy(kv.second);
             for (auto& kv : g_embed_handles) rac_embeddings_destroy(kv.second);
@@ -737,6 +964,9 @@ std::vector<std::string> backends() {
 #ifdef RAC_HAVE_BACKEND_CLOUD
     out.push_back("cloud");
 #endif
+#ifdef RAC_HAVE_BACKEND_RAG
+    out.push_back("rag");
+#endif
     return out;
 }
 
@@ -760,6 +990,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("max_tokens") = py::none(), py::arg("temperature") = py::none(),
           py::arg("top_p") = py::none(), py::arg("top_k") = py::none(),
           py::arg("system_prompt") = py::none(), py::arg("grammar") = py::none(),
+          py::arg("disable_thinking") = py::none(),
           "Stream tokens from an LLM handle; on_token(str) is called per token and "
           "may return False to stop.");
     m.def("unload_model", &unload_model, py::arg("handle"), "Unload an LLM handle.");
@@ -780,6 +1011,33 @@ PYBIND11_MODULE(_core, m) {
           "Embed text; returns a float32 numpy array.");
     m.def("unload_embedding_model", &unload_embedding_model, py::arg("handle"),
           "Unload an embedding handle.");
+
+    // Model registry (id -> local_path) so RAG can resolve model ids to paths.
+    m.def("register_model", &register_model, py::arg("model_id"), py::arg("local_path"),
+          py::arg("framework"), py::arg("category"),
+          "Register a model (id -> local_path + framework/category ints) into the "
+          "global model registry so the RAG session ABI can resolve it.");
+
+#ifdef RAC_HAVE_BACKEND_RAG
+    // RAG — proto-bytes in / proto-bytes out (serialized runanywhere.v1.* msgs).
+    m.def("rag_session_create", &rag_session_create, py::arg("config_bytes"),
+          "Create a RAG session from RAGConfiguration bytes; returns an integer handle.");
+    m.def("rag_ingest", &rag_ingest, py::arg("handle"), py::arg("document_bytes"),
+          "Ingest one RAGDocument (bytes); returns RAGStatistics bytes.");
+    m.def("rag_query", &rag_query, py::arg("handle"), py::arg("query_bytes"),
+          "Query with RAGQueryOptions bytes; returns RAGResult bytes.");
+    m.def("rag_query_stream", &rag_query_stream, py::arg("handle"), py::arg("query_bytes"),
+          py::arg("on_event"),
+          "Stream a RAG query; on_event(RAGStreamEvent bytes) per event, may return False to stop.");
+    m.def("rag_cancel", &rag_cancel, py::arg("handle"),
+          "Request cancellation of the query running on a RAG session.");
+    m.def("rag_clear", &rag_clear, py::arg("handle"),
+          "Clear the RAG index; returns RAGStatistics bytes.");
+    m.def("rag_stats", &rag_stats, py::arg("handle"),
+          "Return RAGStatistics bytes for a RAG session.");
+    m.def("rag_session_destroy", &rag_session_destroy, py::arg("handle"),
+          "Destroy a RAG session handle.");
+#endif
 
     // STT
     m.def("load_stt_model", &load_stt_model, py::arg("dir"), py::arg("id") = py::none(),
