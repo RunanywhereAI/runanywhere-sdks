@@ -35,6 +35,8 @@ from .voice_agent import VoiceAgent
 if TYPE_CHECKING:
     from types import ModuleType
 
+    from .rag import RagSession
+
 # Process-wide native lifecycle. The native core is a single shared runtime, so multiple
 # RunAnywhere clients share one instance: `_init_count` tracks how many clients are up and
 # `_native_up` guards the one-time `core.initialize` / `core.shutdown`. `_state_lock` is an
@@ -355,6 +357,42 @@ class RunAnywhere:
         vad = Vad(core, handle)
         self._register(vad)
         return vad
+
+    def create_rag(
+        self,
+        embedding_model: str,
+        llm_model: str | None = None,
+        *,
+        dir: str | None = None,
+        on_progress: Callable[[DownloadProgress], None] | None = None,
+        **config: object,
+    ) -> "RagSession":
+        """Open a RAG (talk-to-your-documents) session over an embedder (+ optional LLM).
+
+        ``embedding_model`` / ``llm_model`` are catalog ids or local paths (embedders can't be
+        loaded from a URL/HF repo). The models are registered into the native model registry so
+        commons can resolve them, then a session is created. Extra keyword config maps onto
+        ``RAGConfiguration`` — e.g. ``top_k``, ``chunk_size``, ``chunk_overlap``,
+        ``similarity_threshold``, ``prompt_template``, ``index_path``, ``persist_index``,
+        ``rerank_results``, ``reranker_model_id``. Requires the ``[rag]`` extra (protobuf).
+
+        Use it as a context manager, or ``close()`` it, to release the session deterministically
+        (``shutdown()`` also closes any session this client opened)::
+
+            with ra.create_rag("minilm", llm_model="qwen2.5-0.5b") as rag:
+                rag.ingest("Paris is the capital of France.")
+                print(rag.query("Capital of France?").answer)
+        """
+        core = self._require_core()
+        assert_remote_supported(embedding_model, "embedder")
+        from . import rag as _rag
+
+        def _resolve(model_id: str) -> ResolvedModel:
+            return resolve_model(model_id, dir, on_progress)
+
+        session = _rag.create_session(core, embedding_model, llm_model, config, _resolve)
+        self._register(session)
+        return session
 
     # -- secure store --------------------------------------------------------
     def secure_set(self, key: str, value: str) -> None:
