@@ -345,16 +345,26 @@ runanywhere models                     # list catalog models + download state (n
 | `POST /v1/audio/speech` | TTS | `piper-lessac`, `piper-amy` |
 | `GET /v1/models` · `GET /v1/models/{id}` · `GET /health` | catalog | — |
 
-The `model` field accepts any `id_or_path` (catalog id, local path, or HF repo), downloaded on
-first use. Models are loaded lazily and kept resident. Beyond plain chat, `chat/completions` also
-supports:
+The `model` field is a catalog id, loaded lazily on first use and kept resident. Beyond plain
+chat, `chat/completions` also supports:
 
-- **Vision** — OpenAI image content parts (`{"type":"image_url", ...}`, data-URI or URL) route to
-  a VLM.
+- **Vision** — OpenAI image content parts route to a VLM. Send the image as a **data-URI**;
+  server-side `image_url` **fetching is off by default** (SSRF surface) — enable with
+  `--allow-image-urls`.
 - **Structured output** — `response_format={"type":"json_schema", ...}` constrains decoding via a
   GBNF grammar.
 - **Tool calling** — `tools` + `tool_choice`. `"required"`/a named function force a `tool_calls`
   reply; `"auto"` lets the model decide (quality depends on the model — use a tool-tuned one).
+
+**Production defaults (safe by default; opt in only if you trust the clients):**
+
+- Only **catalog model ids** (or the configured `--default-*`) are accepted; pass
+  `--allow-arbitrary-models` to also allow local paths / HF repos from clients.
+- Image `image_url` fetching is off (`--allow-image-urls` to enable; URLs are then SSRF-filtered
+  and redirects refused).
+- Run **single-process** (no `--workers N`): the model cache + native core are per-process.
+- Bearer auth: `--api-key <KEY>` (or the `RUNANYWHERE_API_KEY` env var) then send
+  `Authorization: Bearer <KEY>` on `/v1/*`.
 
 ```python
 from openai import OpenAI
@@ -369,8 +379,8 @@ for chunk in stream:
     print(chunk.choices[0].delta.content or "", end="", flush=True)
 ```
 
-Optional bearer auth: `runanywhere serve --api-key <KEY>` then send `Authorization: Bearer <KEY>`
-on `/v1/*`. Embed the app in your own ASGI stack via `from runanywhere.server import create_app`.
+Embed the app in your own ASGI stack via `from runanywhere.server import create_app` (its
+keyword args mirror the CLI flags: `api_key`, `allow_image_urls`, `allow_arbitrary_models`, …).
 
 ## Error Handling
 
