@@ -75,8 +75,11 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/features/lora/rac_lora_service.h"
+#include "rac/features/diarization/rac_diarization.h"
+#include "rac/features/rerank/rac_rerank.h"
 #include "rac/features/platform/rac_llm_platform.h"
 #include "rac/features/platform/rac_tts_platform.h"
+#include "rac/features/segmentation/rac_segmentation_service.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_stream.h"
@@ -95,6 +98,7 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
+#include "rac/infrastructure/model_management/rac_model_compatibility.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -1528,6 +1532,10 @@ HandleListenerRegistry& sttStreamListeners() {
     static HandleListenerRegistry r;
     return r;
 }
+HandleListenerRegistry& diarizationStreamListeners() {
+    static HandleListenerRegistry r;
+    return r;
+}
 
 // Shared trampoline body. The per-handle proto callbacks differ only by
 // op-name and which registry they read, so route them all through here.
@@ -2284,6 +2292,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     return callModelRegistryProtoBuffer(env, requestProto, rac_model_registry_refresh_proto,
                                         "racModelRegistryRefreshProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelCompatibilityCheckProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_model_compatibility_check_proto,
+                             "racModelCompatibilityCheckProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -4977,6 +4992,266 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttStreamCancelProto
     return static_cast<jint>(rac_stt_stream_cancel_proto(static_cast<uint64_t>(sessionId)));
 }
 
+// =============================================================================
+// SPEAKER DIARIZATION — component handle family + offline lifecycle verb +
+// persistent stream-session ABI. Mirrors the STT component + stream thunks
+// above (Swift parity: CppBridge+Diarization.swift).
+// =============================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationComponentCreate(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_handle_t handle = RAC_INVALID_HANDLE;
+    rac_result_t result = rac_diarization_component_create(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("Failed to create diarization component: %d", result);
+        return 0;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationComponentIsLoaded(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return rac_diarization_component_is_loaded(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                                    : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationComponentLoadModel(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId,
+    jstring modelName) {
+    (void)clazz;
+    std::string path = getCString(env, modelPath);
+    std::string id = getCString(env, modelId);
+    std::string name = getCString(env, modelName);
+    return static_cast<jint>(rac_diarization_component_load_model(
+        handleFromJLong(handle), path.c_str(), id.c_str(), name.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationComponentUnload(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_diarization_component_unload(handleFromJLong(handle)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationComponentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0) {
+        rac_diarization_component_destroy(reinterpret_cast<rac_handle_t>(handle));
+    }
+}
+
+// Swift-aligned: mirror iOS Swift which uses rac_diarization_diarize_lifecycle_proto
+// (no handle, lifecycle-only) for offline diarization.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationDiarizeLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc =
+        rac_diarization_diarize_lifecycle_proto(request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racDiarizationDiarizeLifecycleProto");
+}
+
+static void diarization_stream_proto_trampoline(const uint8_t* proto_bytes, size_t proto_size,
+                                                void* user_data) {
+    dispatchHandleListener(diarizationStreamListeners(), proto_bytes, proto_size, user_data,
+                           "diarizationStreamProtoCallback");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationSetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+    (void)clazz;
+    if (handle == 0L) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    RAC_JNI_TRY {
+        diarizationStreamListeners().set(env, key, listener);
+        rac_result_t rc = rac_diarization_set_stream_proto_callback(
+            handleFromJLong(handle),
+            listener != nullptr ? diarization_stream_proto_trampoline : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr);
+        if (RAC_FAILED(rc)) {
+            diarizationStreamListeners().erase(env, key);
+        }
+        return static_cast<jint>(rc);
+    }
+    RAC_JNI_CATCH_INT()
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationUnsetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    rac_result_t rc = rac_diarization_unset_stream_proto_callback(handleFromJLong(handle));
+    rac_diarization_proto_quiesce();
+    diarizationStreamListeners().erase(env, key);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationProtoQuiesce(JNIEnv* env,
+                                                                                    jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_diarization_proto_quiesce();
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationStreamStartProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray optionsProto) {
+    (void)clazz;
+    if (handle == 0L) {
+        return static_cast<jlong>(RAC_ERROR_NULL_POINTER);
+    }
+    JByteArrayView options(env, optionsProto, true);
+    if (!options.ok) {
+        return static_cast<jlong>(RAC_ERROR_NULL_POINTER);
+    }
+    uint64_t session_id = 0;
+    rac_result_t rc = rac_diarization_stream_start_proto(handleFromJLong(handle), options.u8(),
+                                                         options.size(), &session_id);
+    if (RAC_FAILED(rc)) {
+        return static_cast<jlong>(rc);
+    }
+    return static_cast<jlong>(session_id);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationStreamFeedAudioProto(
+    JNIEnv* env, jclass clazz, jlong sessionId, jbyteArray audioData) {
+    (void)clazz;
+    if (sessionId <= 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    JByteArrayView audio(env, audioData);
+    if (!audio.ok) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    return static_cast<jint>(rac_diarization_stream_feed_audio_proto(
+        static_cast<uint64_t>(sessionId), audio.u8(), audio.size()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationStreamStopProto(
+    JNIEnv* env, jclass clazz, jlong sessionId) {
+    (void)env;
+    (void)clazz;
+    if (sessionId <= 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return static_cast<jint>(rac_diarization_stream_stop_proto(static_cast<uint64_t>(sessionId)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiarizationStreamCancelProto(
+    JNIEnv* env, jclass clazz, jlong sessionId) {
+    (void)env;
+    (void)clazz;
+    if (sessionId <= 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return static_cast<jint>(rac_diarization_stream_cancel_proto(static_cast<uint64_t>(sessionId)));
+}
+
+// =============================================================================
+// CROSS-ENCODER RERANK — component handle family + one handle-scoped proto verb.
+// Mirrors the diarization component thunks above (Swift parity:
+// CppBridge+Rerank.swift). Unlike diarization there is no handle-free
+// `*_lifecycle_proto` verb: rac_rerank_component_rerank_proto's acquire is
+// owner-scoped, so the Kotlin bridge loads the model into this handle first.
+// =============================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentCreate(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_handle_t handle = RAC_INVALID_HANDLE;
+    rac_result_t result = rac_rerank_component_create(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("Failed to create rerank component: %d", result);
+        return 0;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentIsLoaded(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return rac_rerank_component_is_loaded(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                               : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentLoadModel(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId,
+    jstring modelName) {
+    (void)clazz;
+    std::string path = getCString(env, modelPath);
+    std::string id = getCString(env, modelId);
+    std::string name = getCString(env, modelName);
+    return static_cast<jint>(rac_rerank_component_load_model(
+        handleFromJLong(handle), path.c_str(), id.c_str(), name.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentUnload(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_rerank_component_unload(handleFromJLong(handle)));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle != 0) {
+        rac_rerank_component_destroy(reinterpret_cast<rac_handle_t>(handle));
+    }
+}
+
+// Handle-scoped: score a serialized RerankRequest against the model loaded into
+// `handle` via rac_rerank_component_rerank_proto, returning a serialized
+// RerankResult.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRerankComponentRerankProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_rerank_component_rerank_proto(handleFromJLong(handle), request.u8(),
+                                                        request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRerankComponentRerankProto");
+}
+
 // Swift-aligned: mirror iOS Swift which uses rac_tts_synthesize_lifecycle_proto
 // (no handle, lifecycle-only) for TTS synthesis.
 JNIEXPORT jbyteArray JNICALL
@@ -5708,6 +5983,20 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateLif
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_diffusion_generate_lifecycle_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racDiffusionGenerateLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSegmentationSegmentLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc =
+        rac_segmentation_segment_lifecycle_proto(request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racSegmentationSegmentLifecycleProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -7863,6 +8152,7 @@ void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
     vadStreamListeners().clearAll(env);
     llmStreamListeners().clearAll(env);
     sttStreamListeners().clearAll(env);
+    diarizationStreamListeners().clearAll(env);
 
     {
         std::lock_guard<std::mutex> lg(toolCallingCtxMutex());

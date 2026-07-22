@@ -223,6 +223,12 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
 
+  _rac_segmentation_segment_lifecycle_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+
   _rac_diffusion_generate_lifecycle_proto?(
     requestBytes: number,
     requestSize: number,
@@ -829,6 +835,9 @@ export type WasmCapability =
   | 'tts'               // Text-to-speech
   | 'vad'               // Voice activity detection
   | 'embedding'         // Embeddings
+  | 'segmentation'      // Semantic image segmentation
+  | 'diarization'       // Standalone speaker diarization
+  | 'rerank'            // Cross-encoder reranking
   | 'rag'               // RAG pipeline (embeddings + retrieval)
   | 'diffusion'         // Diffusion (image generation)
   | 'structured-output' // Structured-output parse/validate/prepare-prompt
@@ -884,6 +893,7 @@ const BACKEND_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
   'tts',
   'vad',
   'embedding',
+  'segmentation',
   'rag',
   'diffusion',
 ];
@@ -1137,6 +1147,7 @@ const FALLBACK_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
   'llm',
   'vlm',
   'embedding',
+  'segmentation',
   'rag',
   'tool-calling',
   'structured-output',

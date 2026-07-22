@@ -16,6 +16,7 @@
 #include "common/rac_engine_unavailable.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -494,6 +495,98 @@ rac_result_t embedding_create(const char* model_id, const char* /*config_json*/,
     return create_session(RAC_MLX_SESSION_KIND_EMBEDDINGS, model_id, out_impl);
 }
 
+rac_result_t diarization_initialize(void* impl, const char* model_path) {
+    return mlx_initialize(impl, model_path);
+}
+
+rac_result_t diarization_diarize(void* impl, const float* samples, size_t sample_count,
+                                 const rac_diarization_options_t* options,
+                                 rac_diarization_result_t* out_result) {
+    if (!samples || sample_count == 0 || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.diarize == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    const rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.diarize(session->swift_handle, samples, sample_count, options, out_result,
+                             callbacks.user_data);
+}
+
+rac_result_t diarization_stream_create(void* impl, const rac_diarization_options_t* options,
+                                       rac_handle_t* out_stream_handle) {
+    if (!out_stream_handle) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_stream_handle = nullptr;
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.diarization_stream_create == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    const rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.diarization_stream_create(session->swift_handle, options, out_stream_handle,
+                                                callbacks.user_data);
+}
+
+rac_result_t diarization_stream_feed(void* impl, rac_handle_t stream_handle,
+                                     const float* samples, size_t sample_count,
+                                     rac_diarization_stream_callback_t callback, void* user_data) {
+    if (!stream_handle || !callback || (sample_count > 0 && !samples)) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.diarization_stream_feed == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    const rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.diarization_stream_feed(session->swift_handle, stream_handle, samples,
+                                              sample_count, callback, user_data,
+                                              callbacks.user_data);
+}
+
+rac_result_t diarization_stream_destroy(void* impl, rac_handle_t stream_handle) {
+    if (!stream_handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    rac_mlx_callbacks_t callbacks = {};
+    if (!runanywhere::commons::mlx::snapshot_callbacks(&callbacks) ||
+        callbacks.diarization_stream_destroy == nullptr) {
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+    MlxSession* session = nullptr;
+    std::unique_lock<std::mutex> lock;
+    const rac_result_t rc = lock_session(impl, lock, &session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    return callbacks.diarization_stream_destroy(session->swift_handle, stream_handle,
+                                                 callbacks.user_data);
+}
+
+rac_result_t diarization_create(const char* model_id, const char* /*config_json*/,
+                                void** out_impl) {
+    return create_session(RAC_MLX_SESSION_KIND_DIARIZATION, model_id, out_impl);
+}
+
 rac_result_t stt_initialize(void* impl, const char* model_path) {
     return mlx_initialize(impl, model_path);
 }
@@ -737,7 +830,10 @@ rac_result_t rac_mlx_set_callbacks(const rac_mlx_callbacks_t* callbacks) {
         callbacks->llm_generate == nullptr || callbacks->llm_generate_stream == nullptr ||
         callbacks->vlm_process == nullptr || callbacks->vlm_process_stream == nullptr ||
         callbacks->embed_batch == nullptr || callbacks->stt_transcribe == nullptr ||
-        callbacks->tts_synthesize == nullptr || callbacks->destroy == nullptr) {
+        callbacks->tts_synthesize == nullptr || callbacks->diarize == nullptr ||
+        callbacks->diarization_stream_create == nullptr ||
+        callbacks->diarization_stream_feed == nullptr ||
+        callbacks->diarization_stream_destroy == nullptr || callbacks->destroy == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     std::lock_guard<std::mutex> lock(g_callbacks_mutex);
@@ -821,6 +917,17 @@ const rac_tts_service_ops_t g_mlx_tts_ops = {
     .get_languages = nullptr,
 };
 
+const rac_diarization_service_ops_t g_mlx_diarization_ops = {
+    .initialize = diarization_initialize,
+    .diarize = diarization_diarize,
+    .stream_create = diarization_stream_create,
+    .stream_feed_audio_chunk = diarization_stream_feed,
+    .stream_destroy = diarization_stream_destroy,
+    .cleanup = mlx_cleanup,
+    .destroy = mlx_destroy,
+    .create = diarization_create,
+};
+
 static const rac_runtime_id_t k_mlx_runtimes[] = {
     RAC_RUNTIME_CPU,
     RAC_RUNTIME_METAL,
@@ -833,7 +940,7 @@ static const uint32_t k_mlx_formats[] = {
 
 static const rac_primitive_t k_mlx_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE, RAC_PRIMITIVE_SYNTHESIZE,
-    RAC_PRIMITIVE_EMBED,         RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_EMBED,         RAC_PRIMITIVE_VLM,        RAC_PRIMITIVE_DIARIZE,
 };
 
 static const rac_engine_manifest_t k_mlx_manifest = {
@@ -867,9 +974,10 @@ static const rac_engine_vtable_t g_mlx_engine_vtable = {
     /* embedding_ops    */ &g_mlx_embeddings_ops,
     /* vlm_ops          */ &g_mlx_vlm_ops,
     /* diffusion_ops    */ nullptr,
+    /* diarization_ops  */ &g_mlx_diarization_ops,
+    /* segmentation_ops */ nullptr,
 
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

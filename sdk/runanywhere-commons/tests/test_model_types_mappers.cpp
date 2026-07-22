@@ -95,8 +95,8 @@ constexpr rac_inference_framework_t kCAllFrameworks[] = {
     RAC_FRAMEWORK_UNKNOWN,
 };
 
-// ModelCategory — proto 0..9.
-constexpr int32_t kProtoMcAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+// ModelCategory — proto 0..11.
+constexpr int32_t kProtoMcAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
 constexpr rac_model_category_t kCAllCategories[] = {
     RAC_MODEL_CATEGORY_LANGUAGE,
@@ -108,6 +108,8 @@ constexpr rac_model_category_t kCAllCategories[] = {
     RAC_MODEL_CATEGORY_AUDIO,
     RAC_MODEL_CATEGORY_EMBEDDING,
     RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+    RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION,
+    RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
     RAC_MODEL_CATEGORY_UNKNOWN,
 };
 
@@ -486,6 +488,10 @@ int test_canonical_mappings() {
     rac_model_category_t mc = RAC_MODEL_CATEGORY_UNKNOWN;
     EXPECT_RC(rac_model_category_from_proto(1, &mc), RAC_SUCCESS);
     EXPECT_TRUE(mc == RAC_MODEL_CATEGORY_LANGUAGE);
+
+    EXPECT_RC(rac_model_category_from_proto(11, &mc), RAC_SUCCESS);
+    EXPECT_TRUE(mc == RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
+    EXPECT_TRUE(rac_model_category_default_framework(mc) == RAC_FRAMEWORK_ONNX);
 
     rac_model_format_t mf = RAC_MODEL_FORMAT_UNSPECIFIED;
     EXPECT_RC(rac_model_format_from_proto(1, &mf), RAC_SUCCESS);

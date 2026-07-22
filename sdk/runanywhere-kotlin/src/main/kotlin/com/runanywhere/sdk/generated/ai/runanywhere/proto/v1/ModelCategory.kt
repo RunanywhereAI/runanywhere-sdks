@@ -52,6 +52,10 @@ public enum class ModelCategory(
    */
   @RacWireStringOption("voice-activity-detection")
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION(9),
+  @RacWireStringOption("speaker-diarization")
+  MODEL_CATEGORY_SPEAKER_DIARIZATION(10),
+  @RacWireStringOption("semantic-segmentation")
+  MODEL_CATEGORY_SEMANTIC_SEGMENTATION(11),
   ;
 
   public companion object {
@@ -76,6 +80,8 @@ public enum class ModelCategory(
       7 -> MODEL_CATEGORY_AUDIO
       8 -> MODEL_CATEGORY_EMBEDDING
       9 -> MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+      10 -> MODEL_CATEGORY_SPEAKER_DIARIZATION
+      11 -> MODEL_CATEGORY_SEMANTIC_SEGMENTATION
       else -> null
     }
   }

@@ -137,6 +137,75 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_800_000_000,
             supportsThinking: true
         )
+        // Exact P0 NVIDIA checkpoint. The pinned llama.cpp fork has native
+        // `nemotron` support; this exact Q4_K_M artifact was load/inference
+        // checked through rcli on macOS before being exposed in the catalog.
+        let nemotronMiniGGUFBaseURL =
+            "https://huggingface.co/bartowski/Nemotron-Mini-4B-Instruct-GGUF/resolve/" +
+            "fb49cde090c86092d89905bea2ffc41c23c2615e"
+        await registerLLM(
+            id: "nemotron-mini-4b-instruct-q4_k_m",
+            name: "NVIDIA Nemotron Mini 4B Instruct Q4_K_M",
+            url: "\(nemotronMiniGGUFBaseURL)/Nemotron-Mini-4B-Instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_697_387_072
+        )
+        // Exact P0 embedding artifact. The shared llama.cpp embedding primitive
+        // returned a normalized 2048-dimensional vector for this pinned GGUF
+        // in a real macOS CLI pass before the row was exposed here.
+        let nemotronEmbedGGUFBaseURL =
+            "https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/" +
+            "06df1fde6f7009c91f6cc3cd520081921929a678"
+        await registerLLM(
+            id: "nemotron-3-embed-1b-q4_k_m",
+            name: "NVIDIA Nemotron 3 Embed 1B Q4_K_M",
+            url: "\(nemotronEmbedGGUFBaseURL)/nemotron-3-embed-1b-q4_k_m.gguf",
+            framework: .llamaCpp,
+            modality: .embedding,
+            memoryRequirement: 749_352_096
+        )
+        // The same shared llama.cpp embedding path was smoke-tested with this
+        // second P0 checkpoint, producing a finite normalized 2048-d vector.
+        let llamaNemotronEmbedGGUFBaseURL =
+            "https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/" +
+            "bf7c9832b1d76f86777379e58b7b74805ee58006"
+        await registerLLM(
+            id: "llama-nemotron-embed-1b-v2-q4_k_m",
+            name: "NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M",
+            url: "\(llamaNemotronEmbedGGUFBaseURL)/llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            modality: .embedding,
+            memoryRequirement: 807_690_624
+        )
+        // NVIDIA Llama Embed Nemotron 8B — the only NVIDIA embedder whose
+        // portable GGUF was previously catalogued HNPU-only. Same shared
+        // llama.cpp embedding path as the two 1B rows above; the 4.63 GB Q4_K_M
+        // artifact is Web-excluded (exceeds the WASM 4 GiB heap).
+        let llamaEmbedNemotron8BGGUFBaseURL =
+            "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/resolve/" +
+            "e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25"
+        await registerLLM(
+            id: "llama-embed-nemotron-8b-q4_k_m",
+            name: "NVIDIA Llama Embed Nemotron 8B Q4_K_M",
+            url: "\(llamaEmbedNemotron8BGGUFBaseURL)/llama-embed-nemotron-8b.Q4_K_M.gguf",
+            framework: .llamaCpp,
+            modality: .embedding,
+            memoryRequirement: 4_625_233_184
+        )
+        // The Nano checkpoint keeps the standard Llama 3.1 GGUF architecture.
+        // The Apple provider/build route accepts it, but this exact 4.92 GB
+        // artifact has not yet completed an Apple inference smoke.
+        let nemotronNanoGGUFBaseURL =
+            "https://huggingface.co/bartowski/" +
+            "nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/" +
+            "6f3d46cfbc39ce7a1bec89654305515d904e8102"
+        await registerLLM(
+            id: "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
+            name: "NVIDIA Llama 3.1 Nemotron Nano 8B Q4_K_M",
+            url: "\(nemotronNanoGGUFBaseURL)/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 4_920_736_864
+        )
         // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
         // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
         // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.
@@ -195,6 +264,106 @@ enum ModelCatalogBootstrap {
             framework: .mlx,
             memoryRequirement: 650_000_000,
             supportsThinking: true
+        )
+        // This conversion declares model_type=llama, which is implemented by
+        // the linked MLXLLM factory. Keep the complete download manifest pinned
+        // to the reviewed Hub revision; the byte total below is exact.
+        let nemotronNano8BMLXBaseURL =
+            "https://huggingface.co/bourn23/nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/00378e66048eadf358aad0f66c09e5c3750f8243"
+        await registerMultiFile(
+            id: "mlx-llama-3.1-nemotron-nano-8b-v1-4bit",
+            name: "MLX NVIDIA Llama 3.1 Nemotron Nano 8B 4bit",
+            files: [
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/chat_template.jinja",
+                    filename: "chat_template.jinja",
+                    sizeBytes: 2_004
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 1_170
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/generation_config.json",
+                    filename: "generation_config.json",
+                    sizeBytes: 185
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 4_517_489_554
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json",
+                    sizeBytes: 52_421
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/special_tokens_map.json",
+                    filename: "special_tokens_map.json",
+                    sizeBytes: 296
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/tokenizer.json",
+                    filename: "tokenizer.json",
+                    sizeBytes: 17_209_920
+                ),
+                .init(
+                    url: "\(nemotronNano8BMLXBaseURL)/tokenizer_config.json",
+                    filename: "tokenizer_config.json",
+                    sizeBytes: 50_525
+                )
+            ],
+            framework: .mlx,
+            modality: .language,
+            memoryRequirement: 4_534_806_075
+        )
+        // This is the original Nemotron decoder (model_type=nemotron), not a
+        // Llama-family conversion. MLXRuntime registers RunAnywhere's exact
+        // ReLU-squared, LayerNorm1P, and partial-RoPE implementation before
+        // loading. Keep the complete bundle pinned to the reviewed revision.
+        let nemotronMini4BMLXBaseURL =
+            "https://huggingface.co/mlx-community/Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/b5784198153d2d71afcc97d4cc38c049abced8cd"
+        await registerMultiFile(
+            id: "mlx-nemotron-mini-4b-instruct-4bit",
+            name: "NVIDIA Nemotron Mini 4B Instruct 4-bit (MLX)",
+            files: [
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/chat_template.jinja",
+                    filename: "chat_template.jinja",
+                    sizeBytes: 876
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 849
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 2_357_816_399
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/model.safetensors.index.json",
+                    filename: "model.safetensors.index.json",
+                    sizeBytes: 50_559
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/tokenizer.json",
+                    filename: "tokenizer.json",
+                    sizeBytes: 34_810_091
+                ),
+                .init(
+                    url: "\(nemotronMini4BMLXBaseURL)/tokenizer_config.json",
+                    filename: "tokenizer_config.json",
+                    sizeBytes: 329
+                ),
+            ],
+            framework: .mlx,
+            modality: .language,
+            memoryRequirement: 2_392_679_103,
+            contextLength: 4_096
         )
         // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
         // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
@@ -328,6 +497,34 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
+        let sortformerMLXBaseURL =
+            "https://huggingface.co/mlx-community/" +
+            "diar_streaming_sortformer_4spk-v2.1-fp16/resolve/" +
+            "e23e6404bd9859e93edbf94a740eb1c7fc58f12e"
+        await registerMultiFile(
+            id: "mlx-sortformer-4spk-v2.1-fp16",
+            name: "NVIDIA Streaming Sortformer 4-Speaker v2.1 FP16 (MLX)",
+            files: [
+                CatalogModelFile(
+                    url: "\(sortformerMLXBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 1_702,
+                    checksumSHA256:
+                        "17c9f943bed07b0593f2b8dca01e0be6a418053becc6148b01ecabdff9cbd84d"
+                ),
+                CatalogModelFile(
+                    url: "\(sortformerMLXBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 236_108_132,
+                    checksumSHA256:
+                        "3b60b8df29e59a8abaf8061ceeeae6e9284a68fbcd2e762c68f5e058bfceebfa"
+                )
+            ],
+            framework: .mlx,
+            modality: .speakerDiarization,
+            memoryRequirement: 600_000_000,
+            downloadSize: 236_109_834
+        )
         if mlxCatalogEnabled {
             logger.info("MLX models registered")
         } else {
@@ -452,6 +649,64 @@ enum ModelCatalogBootstrap {
             structure: .nestedDirectory,
             memoryRequirement: 75_000_000
         )
+        let parakeetTDTV2SherpaBaseURL =
+            "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2"
+        await registerMultiFile(
+            id: "sherpa-nemo-parakeet-tdt-0.6b-v2-int8",
+            name: "NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)",
+            files: [
+                .init(url: "\(parakeetTDTV2SherpaBaseURL)/encoder.int8.onnx", filename: "encoder.int8.onnx", sizeBytes: 652_184_296),
+                .init(url: "\(parakeetTDTV2SherpaBaseURL)/decoder.int8.onnx", filename: "decoder.int8.onnx", sizeBytes: 7_257_753),
+                .init(url: "\(parakeetTDTV2SherpaBaseURL)/joiner.int8.onnx", filename: "joiner.int8.onnx", sizeBytes: 1_739_080),
+                .init(url: "\(parakeetTDTV2SherpaBaseURL)/tokens.txt", filename: "tokens.txt", sizeBytes: 9_384),
+            ],
+            framework: .sherpa,
+            modality: .speechRecognition,
+            memoryRequirement: 661_190_513
+        )
+        let parakeetTDTV3SherpaBaseURL =
+            "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78"
+        await registerMultiFile(
+            id: "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+            name: "NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)",
+            files: [
+                .init(url: "\(parakeetTDTV3SherpaBaseURL)/encoder.int8.onnx", filename: "encoder.int8.onnx", sizeBytes: 652_184_281),
+                .init(url: "\(parakeetTDTV3SherpaBaseURL)/decoder.int8.onnx", filename: "decoder.int8.onnx", sizeBytes: 11_845_275),
+                .init(url: "\(parakeetTDTV3SherpaBaseURL)/joiner.int8.onnx", filename: "joiner.int8.onnx", sizeBytes: 6_355_277),
+                .init(url: "\(parakeetTDTV3SherpaBaseURL)/tokens.txt", filename: "tokens.txt", sizeBytes: 93_939),
+            ],
+            framework: .sherpa,
+            modality: .speechRecognition,
+            memoryRequirement: 670_478_772
+        )
+        // The pinned upstream ONNX lacks three metadata entries required by
+        // Sherpa. Commons verifies the transport bytes and applies the exact
+        // reviewed 76-byte append transform before exposing the final model.
+        // Runtime RAM and the exact final download footprint are planned
+        // independently.
+        await registerMultiFile(
+            id: "sherpa-nemo-parakeet-ctc-1.1b-int8",
+            name: "NVIDIA Parakeet CTC 1.1B INT8 (Sherpa-ONNX)",
+            files: parakeetCTCSherpaFiles,
+            framework: .sherpa,
+            modality: .speechRecognition,
+            memoryRequirement: 2_000_000_000,
+            downloadSize: 1_110_024_519
+        )
+        let canarySherpaBaseURL =
+            "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c"
+        await registerMultiFile(
+            id: "sherpa-nemo-canary-180m-flash-int8",
+            name: "NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)",
+            files: [
+                .init(url: "\(canarySherpaBaseURL)/encoder.int8.onnx", filename: "encoder.int8.onnx", sizeBytes: 132_678_643),
+                .init(url: "\(canarySherpaBaseURL)/decoder.int8.onnx", filename: "decoder.int8.onnx", sizeBytes: 74_437_848),
+                .init(url: "\(canarySherpaBaseURL)/tokens.txt", filename: "tokens.txt", sizeBytes: 53_555),
+            ],
+            framework: .sherpa,
+            modality: .speechRecognition,
+            memoryRequirement: 207_170_046
+        )
         #endif
 
         // --- STT models (MLX, Apple Metal) -----------------------------------
@@ -553,6 +808,119 @@ enum ModelCatalogBootstrap {
             framework: .mlx,
             modality: .speechRecognition,
             memoryRequirement: 1_288_437_789
+        )
+
+        // The pinned MLXAudioSTT Parakeet loader reads config.json and every
+        // root-level safetensors shard. Pin reviewed Hub revisions so these
+        // explicit bundle definitions and their exact byte totals cannot drift.
+        let parakeetCTC11BBaseURL =
+            "https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/295d0c0557aef0c445db79b3d09c9a94a69ffeaf"
+        await registerMultiFile(
+            id: "mlx-parakeet-ctc-1.1b",
+            name: "MLX Parakeet CTC 1.1B (NVIDIA)",
+            files: [
+                .init(
+                    url: "\(parakeetCTC11BBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 22_393
+                ),
+                .init(
+                    url: "\(parakeetCTC11BBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 4_250_695_964
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 4_250_718_357
+        )
+
+        let parakeetTDTV2BaseURL =
+            "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/8ae155301e23d820d82aa60d24817c900e69e487"
+        await registerMultiFile(
+            id: "mlx-parakeet-tdt-0.6b-v2",
+            name: "MLX Parakeet TDT 0.6B v2 (NVIDIA)",
+            files: [
+                .init(
+                    url: "\(parakeetTDTV2BaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 36_176
+                ),
+                .init(
+                    url: "\(parakeetTDTV2BaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 2_471_559_904
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 2_471_596_080
+        )
+
+        let parakeetTDTV3BaseURL =
+            "https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15"
+        await registerMultiFile(
+            id: "mlx-parakeet-tdt-0.6b-v3",
+            name: "MLX Parakeet TDT 0.6B v3 (NVIDIA)",
+            files: [
+                .init(
+                    url: "\(parakeetTDTV3BaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 244_093
+                ),
+                .init(
+                    url: "\(parakeetTDTV3BaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 2_508_288_736
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 2_508_532_829
+        )
+
+        let parakeetRNNT11BBaseURL =
+            "https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/7f399a0d3442123deae9194e71f5c984b2879efa"
+        await registerMultiFile(
+            id: "mlx-parakeet-rnnt-1.1b",
+            name: "MLX Parakeet RNNT 1.1B (NVIDIA)",
+            files: [
+                .init(
+                    url: "\(parakeetRNNT11BBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 37_318
+                ),
+                .init(
+                    url: "\(parakeetRNNT11BBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 4_282_246_596
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 4_282_283_914
+        )
+
+        let nemotronStreamingASRBaseURL =
+            "https://huggingface.co/mlx-community/nemotron-3.5-asr-streaming-0.6b-8bit/resolve/7279359e4481b5e9e185a318bd618e429c6d86cd"
+        await registerMultiFile(
+            id: "mlx-nemotron-3.5-asr-streaming-0.6b-8bit",
+            name: "MLX Nemotron 3.5 Streaming ASR 0.6B 8bit (NVIDIA)",
+            files: [
+                .init(
+                    url: "\(nemotronStreamingASRBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 159_605
+                ),
+                .init(
+                    url: "\(nemotronStreamingASRBaseURL)/model.safetensors",
+                    filename: "model.safetensors",
+                    sizeBytes: 755_598_923
+                )
+            ],
+            framework: .mlx,
+            modality: .speechRecognition,
+            memoryRequirement: 755_758_528
         )
 
         #if canImport(ONNXRuntime)
@@ -865,16 +1233,102 @@ enum ModelCatalogBootstrap {
 
     // MARK: - Registration helpers
 
-    private struct CatalogModelFile {
+    private struct CatalogModelFile: Sendable {
         let url: String
         let filename: String
         let isRequired: Bool
+        let sizeBytes: Int64?
+        let checksumSHA256: String?
+        let postDownloadTransform: RAPostDownloadTransform?
 
-        init(url: String, filename: String, isRequired: Bool = true) {
+        init(
+            url: String,
+            filename: String,
+            isRequired: Bool = true,
+            sizeBytes: Int64? = nil,
+            checksumSHA256: String? = nil,
+            postDownloadTransform: RAPostDownloadTransform? = nil
+        ) {
             self.url = url
             self.filename = filename
             self.isRequired = isRequired
+            self.sizeBytes = sizeBytes
+            self.checksumSHA256 = checksumSHA256
+            self.postDownloadTransform = postDownloadTransform
         }
+    }
+
+    private static let parakeetCTCSherpaFiles: [CatalogModelFile] = {
+        let metadataPayload: [UInt8] = [
+            0x72, 0x12, 0x0a, 0x0a, 0x76, 0x6f, 0x63, 0x61, 0x62, 0x5f, 0x73,
+            0x69, 0x7a, 0x65, 0x12, 0x04, 0x31, 0x30, 0x32, 0x35, 0x72, 0x17,
+            0x0a, 0x12, 0x73, 0x75, 0x62, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x69,
+            0x6e, 0x67, 0x5f, 0x66, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x01,
+            0x38, 0x72, 0x1d, 0x0a, 0x0e, 0x6e, 0x6f, 0x72, 0x6d, 0x61, 0x6c,
+            0x69, 0x7a, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x70,
+            0x65, 0x72, 0x5f, 0x66, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65
+        ]
+
+        var appendBytes = RAPostDownloadAppendBytes()
+        appendBytes.payload = Data(metadataPayload)
+        var operation = RAPostDownloadTransformOperation()
+        operation.appendBytes = appendBytes
+
+        var transform = RAPostDownloadTransform()
+        transform.sourceSizeBytes = 1_110_014_069
+        transform.sourceChecksumSha256 =
+            "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d"
+        transform.finalSizeBytes = 1_110_014_145
+        transform.finalChecksumSha256 =
+            "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98"
+        transform.operations = [operation]
+
+        let baseURL =
+            "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/" +
+            "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5"
+        return [
+            CatalogModelFile(
+                url: "\(baseURL)/model.int8.onnx",
+                filename: "model.int8.onnx",
+                sizeBytes: 1_110_014_145,
+                checksumSHA256:
+                    "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+                postDownloadTransform: transform
+            ),
+            CatalogModelFile(
+                url: "\(baseURL)/vocab.txt",
+                filename: "tokens.txt",
+                sizeBytes: 10_374,
+                checksumSHA256:
+                    "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921"
+            )
+        ]
+    }()
+
+    private static func makeDescriptor(
+        for file: CatalogModelFile,
+        modality: ModelCategory
+    ) -> RAModelFileDescriptor? {
+        guard let fileURL = URL(string: file.url) else { return nil }
+        var descriptor = RAModelFileDescriptor(
+            url: fileURL,
+            filename: file.filename,
+            isRequired: file.isRequired
+        )
+        descriptor.role = RunAnywhere.inferModelFileRole(
+            filename: file.filename,
+            modality: modality
+        )
+        if let sizeBytes = file.sizeBytes {
+            descriptor.sizeBytes = sizeBytes
+        }
+        if let checksumSHA256 = file.checksumSHA256 {
+            descriptor.checksumSha256 = checksumSHA256
+        }
+        if let postDownloadTransform = file.postDownloadTransform {
+            descriptor.postDownloadTransform = postDownloadTransform
+        }
+        return descriptor
     }
 
     private static func registerLLM(
@@ -937,7 +1391,10 @@ enum ModelCatalogBootstrap {
         files: [(url: String, filename: String)],
         framework: InferenceFramework,
         modality: ModelCategory,
-        memoryRequirement: Int64
+        memoryRequirement: Int64,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false,
+        downloadSize: Int64? = nil
     ) async {
         await registerMultiFile(
             id: id,
@@ -945,7 +1402,10 @@ enum ModelCatalogBootstrap {
             files: files.map { CatalogModelFile(url: $0.url, filename: $0.filename) },
             framework: framework,
             modality: modality,
-            memoryRequirement: memoryRequirement
+            memoryRequirement: memoryRequirement,
+            contextLength: contextLength,
+            supportsThinking: supportsThinking,
+            downloadSize: downloadSize
         )
     }
 
@@ -955,15 +1415,13 @@ enum ModelCatalogBootstrap {
         files: [CatalogModelFile],
         framework: InferenceFramework,
         modality: ModelCategory,
-        memoryRequirement: Int64
+        memoryRequirement: Int64,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false,
+        downloadSize: Int64? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
-        let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
-            guard let fileURL = URL(string: file.url) else { return nil }
-            var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: file.isRequired)
-            descriptor.role = RunAnywhere.inferModelFileRole(filename: file.filename, modality: modality)
-            return descriptor
-        }
+        let descriptors = files.compactMap { makeDescriptor(for: $0, modality: modality) }
         guard descriptors.count == files.count else {
             logger.warning("Invalid multi-file URL list for model \(id, privacy: .public)")
             return
@@ -975,7 +1433,10 @@ enum ModelCatalogBootstrap {
                 name: name,
                 framework: framework,
                 modality: modality,
-                memoryRequirement: memoryRequirement
+                memoryRequirement: memoryRequirement,
+                contextLength: contextLength,
+                supportsThinking: supportsThinking,
+                downloadSize: downloadSize
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

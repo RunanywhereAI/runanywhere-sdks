@@ -14,7 +14,7 @@
 
 /* eslint-disable */
 
-import { RacTestConfig, RacTestMode } from '../test_options';
+import { RacTestConfig, RacTestMode, RacTestPlainMode } from '../test_options';
 import { ValidationError } from './_errors';
 
 export const racTestModeWireString = (e: RacTestMode): string => {
@@ -85,6 +85,8 @@ export const racTestConfigDefaults = (): RacTestConfig => ({
   precisionDouble: 0.7,
   enableFeatureBool: true,
   modeEnum: RacTestMode.RAC_TEST_MODE_BALANCED,
+  monoChannelCount: 1,
+  plainModeEnum: RacTestPlainMode.RAC_TEST_PLAIN_MODE_ENABLED,
 });
 
 export const validateRacTestConfig = (m: RacTestConfig): void => {
@@ -106,16 +108,22 @@ export const validateRacTestConfig = (m: RacTestConfig): void => {
       message: `limit_int64 must be in 1...65536 (got ${m.limitInt64})`,
     });
   }
-  if (m.thresholdFloat < 0.0 || m.thresholdFloat > 1.0) {
+  if (m.thresholdFloat !== undefined && (!Number.isFinite(m.thresholdFloat) || m.thresholdFloat < 0.0 || m.thresholdFloat > 1.0)) {
     throw new ValidationError({
       fieldPath: 'RacTestConfig.threshold_float',
       message: `threshold_float must be in 0.0...1.0 (got ${m.thresholdFloat})`,
     });
   }
-  if (m.precisionDouble < 0.0 || m.precisionDouble > 1.0) {
+  if (!Number.isFinite(m.precisionDouble) || m.precisionDouble < 0.0 || m.precisionDouble > 1.0) {
     throw new ValidationError({
       fieldPath: 'RacTestConfig.precision_double',
       message: `precision_double must be in 0.0...1.0 (got ${m.precisionDouble})`,
+    });
+  }
+  if (m.monoChannelCount !== undefined && (m.monoChannelCount < 1 || m.monoChannelCount > 1)) {
+    throw new ValidationError({
+      fieldPath: 'RacTestConfig.mono_channel_count',
+      message: `mono_channel_count must be in 1...1 (got ${m.monoChannelCount})`,
     });
   }
 };

@@ -78,17 +78,17 @@ typedef struct rac_llm_service_ops {
 
 Each backend ships a single `rac_engine_vtable_t` (see
 `include/rac/plugin/rac_engine_vtable.h`) whose `metadata.abi_version`
-must match `RAC_PLUGIN_API_VERSION` (`3u`, in
-`include/rac/plugin/rac_plugin_entry.h`). The vtable carries 8 active
-per-primitive op-struct slots (LLM / STT / TTS / VAD / embeddings / rerank /
-VLM / diffusion) plus 10 reserved slots; primitives the engine does not
-serve are left `NULL`.
+must match `RAC_PLUGIN_API_VERSION` (`7u`, in
+`include/rac/plugin/rac_plugin_entry.h`). The vtable carries exactly 9 active
+per-primitive op-struct slots (LLM / STT / TTS / VAD / embeddings / VLM /
+diffusion / diarization / segmentation) plus 8 reserved slots;
+primitives the engine does not serve are left `NULL`.
 
 ```c
 // engines/llamacpp/rac_plugin_entry_llamacpp.cpp (per-engine example)
 static const rac_engine_vtable_t g_llamacpp_vtable = {
     .metadata = {
-        .abi_version = RAC_PLUGIN_API_VERSION,    // 3u
+        .abi_version = RAC_PLUGIN_API_VERSION,    // 7u
         .name        = "llamacpp",
         .display_name= "llama.cpp",
         // ...
@@ -148,7 +148,7 @@ rac_registry_unload_plugin("llamacpp");
 │          │                  │                  │                │       │
 │  ┌───────▼──────────────────▼──────────────────▼────────────────▼─────┐ │
 │  │                      Plugin Registry                               │ │
-│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 4u)   │ │
+│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 7u)   │ │
 │  │   priority-order primitive op-struct dispatch (rac_plugin_find)     │ │
 │  └────────────────────────────────┬────────────────────────────────────┘ │
 └───────────────────────────────────│─────────────────────────────────────┘
@@ -975,7 +975,8 @@ rac_result_t my_function() {
    ```
 
 3. **Implement primitive op-struct(s)** — one per capability the engine
-   serves (LLM / STT / TTS / VAD / embeddings / rerank / VLM / diffusion):
+   serves (LLM / STT / TTS / VAD / embeddings / VLM / diffusion /
+   diarization / segmentation):
    ```cpp
    // engines/<name>/rac_backend_<name>_register.cpp
    static const rac_llm_service_ops_t g_<name>_llm_ops = {
@@ -993,7 +994,7 @@ rac_result_t my_function() {
 
    static const rac_engine_vtable_t g_<name>_vtable = {
        .metadata = {
-           .abi_version  = RAC_PLUGIN_API_VERSION,   // 3u
+           .abi_version  = RAC_PLUGIN_API_VERSION,   // 7u
            .name         = "<name>",
            .display_name = "<Display Name>",
            .priority     = 100,

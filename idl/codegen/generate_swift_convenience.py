@@ -310,7 +310,7 @@ def _emit_message_validate(
         if (min_f is not None or max_f is not None) and field.type in FLOAT_TYPES:
             value_expr = _value_expression(field, swift_field)
             presence_guard = _optional_presence_guard(field, swift_field)
-            parts = []
+            parts = [f"!{value_expr}.isFinite"]
             if min_f is not None:
                 parts.append(f"{value_expr} < {min_f}")
             if max_f is not None:

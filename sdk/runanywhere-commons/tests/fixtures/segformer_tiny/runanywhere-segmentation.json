@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "contract": "segformer-tiny-test-fp32-v1",
+  "architecture": "SegformerForSemanticSegmentation",
+  "source_repo": "runanywhere/test-segformer-tiny",
+  "source_revision": "41fcc8f1b6d509a90b825dc52dcbad501c40b9a5d68ac1dee03997f9c9dabcb0",
+  "upstream_repo": "runanywhere/test-segformer-tiny",
+  "model_file": "model.onnx",
+  "model_size": 1027,
+  "model_sha256": "41fcc8f1b6d509a90b825dc52dcbad501c40b9a5d68ac1dee03997f9c9dabcb0",
+  "config_size": 3546,
+  "config_sha256": "7fceaae0cbb0910bdfd3bc48b6e4eff773b7b1ef66d731f81c89dbfcc1819818",
+  "preprocessor_config_size": 290,
+  "preprocessor_config_sha256": "b1aac9a509a8c05ec544d8d008c2074776dce39dbd3b82c84e76550b5621f61c",
+  "input": {
+    "name": "pixel_values",
+    "dtype": "float32",
+    "shape": [1, 3, 512, 512]
+  },
+  "output": {
+    "name": "logits",
+    "dtype": "float32",
+    "shape": [1, 150, 128, 128]
+  }
+}

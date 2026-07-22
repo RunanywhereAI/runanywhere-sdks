@@ -707,6 +707,35 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vad_stream_stop_proto"
     "_rac_vad_stream_cancel_proto"
 
+    # Standalone speaker diarization service, lifecycle component and
+    # persistent proto stream session.
+    "_rac_diarization_create"
+    "_rac_diarization_initialize"
+    "_rac_diarization_diarize"
+    "_rac_diarization_cleanup"
+    "_rac_diarization_destroy"
+    "_rac_diarization_result_free"
+    "_rac_diarization_stream_create"
+    "_rac_diarization_stream_feed_audio_chunk"
+    "_rac_diarization_stream_destroy"
+    "_rac_diarization_component_create"
+    "_rac_diarization_component_is_loaded"
+    "_rac_diarization_component_get_model_id"
+    "_rac_diarization_component_load_model"
+    "_rac_diarization_component_unload"
+    "_rac_diarization_component_get_state"
+    "_rac_diarization_component_get_metrics"
+    "_rac_diarization_component_destroy"
+    "_rac_diarization_component_diarize_proto"
+    "_rac_diarization_diarize_lifecycle_proto"
+    "_rac_diarization_set_stream_proto_callback"
+    "_rac_diarization_unset_stream_proto_callback"
+    "_rac_diarization_proto_quiesce"
+    "_rac_diarization_stream_start_proto"
+    "_rac_diarization_stream_feed_audio_proto"
+    "_rac_diarization_stream_stop_proto"
+    "_rac_diarization_stream_cancel_proto"
+
     # Voice Agent
     "_rac_audio_pipeline_state_name"
     "_rac_audio_pipeline_can_activate_microphone"
@@ -848,6 +877,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_embed_batch_lifecycle_proto"
     "_rac_embeddings_result_free"
+
+    # Lifecycle-owned semantic segmentation. The symbol is in commons; the
+    # ONNX bundle claims the capability and supplies the provider at runtime.
+    "_rac_segmentation_segment_lifecycle_proto"
 
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
@@ -1014,6 +1047,8 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
 )
 
 set(RAC_EXPORTED_FUNCTIONS_ONNX
+    # Browser env-var support (setenv/getenv) for provider configuration.
+    "_setenv"
     # Lifecycle-owned STT. These handle-less exports resolve the model loaded
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
     "_rac_stt_transcribe_lifecycle_proto"

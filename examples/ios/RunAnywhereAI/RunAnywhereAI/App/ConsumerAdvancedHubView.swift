@@ -37,7 +37,31 @@ struct ConsumerAdvancedHubView: View {
                         subtitle: "Speech/silence diagnostics"
                     )
                 }
+
+                #if canImport(UIKit)
+                NavigationLink(destination: DiarizationView()) {
+                    AdvancedFeatureRow(
+                        icon: "person.2.wave.2",
+                        color: AppColors.primaryAccent,
+                        title: "Diarization",
+                        subtitle: "Who spoke when (NVIDIA Sortformer)"
+                    )
+                }
+                #endif
             }
+
+            #if canImport(UIKit)
+            Section("Vision Utilities") {
+                NavigationLink(destination: SegmentationView()) {
+                    AdvancedFeatureRow(
+                        icon: "square.stack.3d.up",
+                        color: AppColors.primaryAccent,
+                        title: "Segmentation",
+                        subtitle: "Semantic image segmentation (SegFormer)"
+                    )
+                }
+            }
+            #endif
 
             Section {
                 NavigationLink(destination: BenchmarkDashboardView()) {

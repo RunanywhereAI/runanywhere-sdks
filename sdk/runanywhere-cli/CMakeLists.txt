@@ -45,9 +45,11 @@ set(RCLI_SOURCES
     src/commands/cmd_rm.cpp
     src/commands/cmd_run.cpp
     src/commands/cmd_image.cpp
+    src/commands/cmd_segment.cpp
     src/commands/cmd_serve.cpp
     src/commands/cmd_show.cpp
     src/commands/cmd_stt.cpp
+    src/commands/cmd_diarize.cpp
     src/commands/cmd_embed.cpp
     src/commands/cmd_tts.cpp
     src/commands/cmd_vad.cpp

@@ -201,6 +201,10 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->category = RAC_MODEL_CATEGORY_VISION;
         else if (category == "audio")
             model->category = RAC_MODEL_CATEGORY_AUDIO;
+        else if (category == "speaker-diarization" || category == "diarization")
+            model->category = RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
+        else if (category == "semantic-segmentation" || category == "segmentation")
+            model->category = RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
         else if (category == "multimodal")
             model->category = RAC_MODEL_CATEGORY_MULTIMODAL;
         else
@@ -934,6 +938,10 @@ static ModelCategory category_from_assignment_token(const std::string& token) {
             case 8:
             case 9:
                 return runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+            case 10:
+                return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
+            case 11:
+                return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
             default:
                 return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
         }
@@ -964,6 +972,14 @@ static ModelCategory category_from_assignment_token(const std::string& token) {
     if (lower == "vad" || lower == "voice_activity_detection" ||
         lower == "voice-activity-detection") {
         return runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    }
+    if (lower == "diarization" || lower == "speaker_diarization" ||
+        lower == "speaker-diarization") {
+        return runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION;
+    }
+    if (lower == "segmentation" || lower == "semantic_segmentation" ||
+        lower == "semantic-segmentation") {
+        return runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
     }
     return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
 }

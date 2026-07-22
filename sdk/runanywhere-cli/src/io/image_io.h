@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace rcli::image {
 
@@ -23,6 +24,21 @@ namespace rcli::image {
  */
 bool write_png(const std::string& path, const uint8_t* rgba, int width, int height,
                std::string* error);
+
+/** Decoded 8-bit RGB image (row-major, width*height*3 bytes, tightly packed). */
+struct RgbImage {
+    std::vector<uint8_t> rgb;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
+/**
+ * Read a binary PPM (P6, maxval 255) image into tightly-packed RGB8. PPM is the
+ * dependency-free counterpart to write_png: `magick in.png out.ppm` (or
+ * `ffmpeg -i in.png out.ppm`) produces one. Returns false + fills `error` on any
+ * malformed input.
+ */
+bool read_ppm(const std::string& path, RgbImage* out, std::string* error);
 
 }  // namespace rcli::image
 

@@ -268,6 +268,12 @@ class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION =
       ModelCategory._(
           9, _omitEnumNames ? '' : 'MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION');
+  static const ModelCategory MODEL_CATEGORY_SPEAKER_DIARIZATION =
+      ModelCategory._(
+          10, _omitEnumNames ? '' : 'MODEL_CATEGORY_SPEAKER_DIARIZATION');
+  static const ModelCategory MODEL_CATEGORY_SEMANTIC_SEGMENTATION =
+      ModelCategory._(
+          11, _omitEnumNames ? '' : 'MODEL_CATEGORY_SEMANTIC_SEGMENTATION');
 
   static const $core.List<ModelCategory> values = <ModelCategory>[
     MODEL_CATEGORY_UNSPECIFIED,
@@ -280,10 +286,12 @@ class ModelCategory extends $pb.ProtobufEnum {
     MODEL_CATEGORY_AUDIO,
     MODEL_CATEGORY_EMBEDDING,
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+    MODEL_CATEGORY_SPEAKER_DIARIZATION,
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
   ];
 
   static final $core.List<ModelCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static ModelCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

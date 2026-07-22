@@ -186,6 +186,7 @@ export {
   LoRAProtoAdapter,
   ModalityProtoAdapter,
   RAGProtoAdapter,
+  SegmentationProtoAdapter,
   STTProtoAdapter,
   TTSProtoAdapter,
   VADProtoAdapter,

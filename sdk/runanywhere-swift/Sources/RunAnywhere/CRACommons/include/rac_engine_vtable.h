@@ -13,8 +13,8 @@
  *   - `metadata.abi_version` MUST equal `RAC_PLUGIN_API_VERSION` at load time.
  *     Mismatch rejects the plugin with `RAC_ERROR_ABI_VERSION_MISMATCH`.
  *   - Primitive slot pointers (llm_ops, stt_ops, …) are stable; new primitives
- *     go into one of the 10 reserved slots at the end of the struct (enforced
- *     by `RAC_PRIMITIVE_RESERVED_{9..18}` in `rac_primitive.h`).
+ *     go into one of the reserved slots at the end of the struct (enforced
+ *     by `RAC_PRIMITIVE_RESERVED_{11..18}` in `rac_primitive.h`).
  *   - `capability_check` is called once after ABI version validation but
  *     before the plugin is added to the registry; returning non-zero rejects
  *     the plugin without logging it as an error (e.g. for Metal-only engines
@@ -53,6 +53,8 @@ struct rac_vad_service_ops;        /* rac/features/vad/rac_vad_service.h */
 struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_service.h */
 struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
+struct rac_diarization_service_ops; /* rac/features/diarization/rac_diarization_service.h */
+struct rac_segmentation_service_ops; /* reserved for semantic segmentation service */
 
 /**
  * @brief Plugin metadata carried in every vtable.
@@ -143,7 +145,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (7 active) ─────────── */
+    /* ─────────── Primitive slot groups (9 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -166,7 +168,13 @@ typedef struct rac_engine_vtable {
     /** Diffusion / image generation (`RAC_PRIMITIVE_DIFFUSION`). */
     const struct rac_diffusion_service_ops* diffusion_ops;
 
-    /* ─────────── Reserved slot pool (10 slots) ─────────── */
+    /** Standalone speaker diarization (`RAC_PRIMITIVE_DIARIZE`). */
+    const struct rac_diarization_service_ops* diarization_ops;
+
+    /** Semantic image segmentation (`RAC_PRIMITIVE_SEGMENT`). */
+    const struct rac_segmentation_service_ops* segmentation_ops;
+
+    /* ─────────── Reserved slot pool (8 slots) ─────────── */
     /*
      * Keeps the struct layout binary-stable as new primitives land. Each
      * reserved slot is a `const void*` so the compiler can fill with NULL
@@ -177,8 +185,6 @@ typedef struct rac_engine_vtable {
      *   3. Bumping RAC_PLUGIN_API_VERSION.
      * Old binaries will fail ABI version check and be rejected safely.
      */
-    const void* reserved_slot_0;
-    const void* reserved_slot_1;
     const void* reserved_slot_2;
     const void* reserved_slot_3;
     const void* reserved_slot_4;
@@ -221,12 +227,14 @@ typedef struct rac_engine_vtable {
     X(RAC_PRIMITIVE_DETECT_VOICE, vad_ops, "detect_voice")   \
     X(RAC_PRIMITIVE_EMBED, embedding_ops, "embed")           \
     X(RAC_PRIMITIVE_VLM, vlm_ops, "vlm")                     \
-    X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")
+    X(RAC_PRIMITIVE_DIFFUSION, diffusion_ops, "diffusion")   \
+    X(RAC_PRIMITIVE_DIARIZE, diarization_ops, "diarize")     \
+    X(RAC_PRIMITIVE_SEGMENT, segmentation_ops, "segment")
 
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by
  * `rac_primitive_t`. Returns NULL for primitives the engine does not serve,
- * or for primitives outside the 1..8 range. The returned pointer must be
+ * or for primitives without a live slot. The returned pointer must be
  * cast to the primitive's per-domain ops struct type.
  */
 const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_t primitive);

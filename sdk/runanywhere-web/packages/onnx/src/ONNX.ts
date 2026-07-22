@@ -39,6 +39,7 @@ let _backendWorkerHost: BackendWorkerHost | null = null;
 export interface ONNXRegisterOptions {
   /** Override URL to the `racommons-onnx-sherpa.js` glue file. */
   wasmUrl?: string;
+
   /** Optional worker factory. Defaults to this package's worker entrypoint. */
   backendWorkerFactory?: BackendWorkerFactory;
   /** Prefer worker-owned ONNX/Sherpa model lifecycle and inference. */

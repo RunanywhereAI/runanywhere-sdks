@@ -13,7 +13,9 @@
 // ignore_for_file: prefer_const_constructors, unnecessary_this
 // ignore_for_file: constant_identifier_names, non_constant_identifier_names
 
+import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/diarization.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
 import 'package:runanywhere/generated/logging.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart';
@@ -99,6 +101,10 @@ extension ModelCategoryWireString on ModelCategory {
         return 'embedding';
       case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
         return 'voice-activity-detection';
+      case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+        return 'speaker-diarization';
+      case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+        return 'semantic-segmentation';
     }
     return '';
   }
@@ -126,6 +132,10 @@ ModelCategory? modelCategoryFromWireString(String value) {
       return ModelCategory.MODEL_CATEGORY_EMBEDDING;
     case 'voice-activity-detection':
       return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    case 'speaker-diarization':
+      return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
+    case 'semantic-segmentation':
+      return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
   }
   return null;
 }
@@ -224,6 +234,55 @@ ArchiveStructure? archiveStructureFromWireString(String value) {
   return null;
 }
 
+extension DiarizationOptionsConvenience on DiarizationOptions {
+  static DiarizationOptions defaults() {
+    final r = DiarizationOptions();
+    r.sampleRateHz = 16000;
+    r.channelCount = 1;
+    r.encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    r.threshold = 0.5;
+    return r;
+  }
+}
+
+extension DiarizationOptionsValidate on DiarizationOptions {
+  void validate() {
+    final effectiveSampleRateHz = hasSampleRateHz() ? sampleRateHz : 16000;
+    if (effectiveSampleRateHz < 8000 || effectiveSampleRateHz > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate_hz must be in 8000...48000 (got $effectiveSampleRateHz)',
+        fieldPath: 'DiarizationOptions.sample_rate_hz',
+      );
+    }
+    final effectiveChannelCount = hasChannelCount() ? channelCount : 1;
+    if (effectiveChannelCount < 1 || effectiveChannelCount > 1) {
+      throw SDKException.validationFailed(
+        'channel_count must be in 1...1 (got $effectiveChannelCount)',
+        fieldPath: 'DiarizationOptions.channel_count',
+      );
+    }
+    final effectiveThreshold = hasThreshold() ? threshold : 0.5;
+    if (!effectiveThreshold.isFinite || effectiveThreshold < 0.0 || effectiveThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'threshold must be in 0.0...1.0 (got $effectiveThreshold)',
+        fieldPath: 'DiarizationOptions.threshold',
+      );
+    }
+    if (minimumDurationMs < Int64(0)) {
+      throw SDKException.validationFailed(
+        'minimum_duration_ms must be >= 0 (got $minimumDurationMs)',
+        fieldPath: 'DiarizationOptions.minimum_duration_ms',
+      );
+    }
+    if (mergeGapMs < Int64(0)) {
+      throw SDKException.validationFailed(
+        'merge_gap_ms must be >= 0 (got $mergeGapMs)',
+        fieldPath: 'DiarizationOptions.merge_gap_ms',
+      );
+    }
+  }
+}
+
 extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
   static EmbeddingsConfiguration defaults() {
     final r = EmbeddingsConfiguration();
@@ -289,7 +348,7 @@ extension VADConfigurationValidate on VADConfiguration {
         fieldPath: 'VADConfiguration.frame_length_ms',
       );
     }
-    if (threshold < 0.0 || threshold > 1.0) {
+    if (!threshold.isFinite || threshold < 0.0 || threshold > 1.0) {
       throw SDKException.validationFailed(
         'threshold must be in 0.0...1.0 (got $threshold)',
         fieldPath: 'VADConfiguration.threshold',
@@ -377,27 +436,31 @@ extension RAGConfigurationConvenience on RAGConfiguration {
 
 extension RAGConfigurationValidate on RAGConfiguration {
   void validate() {
-    if (topK < 1) {
+    final effectiveTopK = hasTopK() ? topK : 5;
+    if (effectiveTopK < 1) {
       throw SDKException.validationFailed(
-        'top_k must be >= 1 (got $topK)',
+        'top_k must be >= 1 (got $effectiveTopK)',
         fieldPath: 'RAGConfiguration.top_k',
       );
     }
-    if (similarityThreshold < 0.0 || similarityThreshold > 1.0) {
+    final effectiveSimilarityThreshold = hasSimilarityThreshold() ? similarityThreshold : 0.0;
+    if (!effectiveSimilarityThreshold.isFinite || effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0) {
       throw SDKException.validationFailed(
-        'similarity_threshold must be in 0.0...1.0 (got $similarityThreshold)',
+        'similarity_threshold must be in 0.0...1.0 (got $effectiveSimilarityThreshold)',
         fieldPath: 'RAGConfiguration.similarity_threshold',
       );
     }
-    if (chunkSize < 1) {
+    final effectiveChunkSize = hasChunkSize() ? chunkSize : 512;
+    if (effectiveChunkSize < 1) {
       throw SDKException.validationFailed(
-        'chunk_size must be >= 1 (got $chunkSize)',
+        'chunk_size must be >= 1 (got $effectiveChunkSize)',
         fieldPath: 'RAGConfiguration.chunk_size',
       );
     }
-    if (chunkOverlap < 0) {
+    final effectiveChunkOverlap = hasChunkOverlap() ? chunkOverlap : 64;
+    if (effectiveChunkOverlap < 0) {
       throw SDKException.validationFailed(
-        'chunk_overlap must be >= 0 (got $chunkOverlap)',
+        'chunk_overlap must be >= 0 (got $effectiveChunkOverlap)',
         fieldPath: 'RAGConfiguration.chunk_overlap',
       );
     }
@@ -417,9 +480,10 @@ extension RAGQueryOptionsConvenience on RAGQueryOptions {
 
 extension RAGQueryOptionsValidate on RAGQueryOptions {
   void validate() {
-    if (multiQueryCount < 1 || multiQueryCount > 8) {
+    final effectiveMultiQueryCount = hasMultiQueryCount() ? multiQueryCount : 3;
+    if (effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8) {
       throw SDKException.validationFailed(
-        'multi_query_count must be in 1...8 (got $multiQueryCount)',
+        'multi_query_count must be in 1...8 (got $effectiveMultiQueryCount)',
         fieldPath: 'RAGQueryOptions.multi_query_count',
       );
     }
