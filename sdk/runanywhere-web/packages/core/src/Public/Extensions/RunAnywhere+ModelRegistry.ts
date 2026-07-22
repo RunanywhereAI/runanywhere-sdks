@@ -68,20 +68,28 @@ export const ModelRegistry = {
     return requireAdapter().updateDownloadStatus(modelId, localPath);
   },
 
+  // Read APIs degrade gracefully when no backend adapter is installed yet
+  // (backends register asynchronously on Web), returning the declared `null`
+  // instead of throwing. This mirrors iOS (`RAModelGetResult(found: false)` /
+  // `RAModelListResult(success: false)`) and Kotlin, which return empty
+  // results rather than throwing on not-ready reads. Use `availability()` to
+  // distinguish "not installed" from "installed but empty". Mutating APIs above
+  // still throw via `requireAdapter()`, since a write with no registry is a
+  // caller error.
   getModel(modelId: string): ModelInfo | null {
-    return requireAdapter().get(modelId);
+    return ModelRegistryAdapter.tryDefault()?.get(modelId) ?? null;
   },
 
   listModels(): ModelInfoList | null {
-    return requireAdapter().list();
+    return ModelRegistryAdapter.tryDefault()?.list() ?? null;
   },
 
   queryModels(query: ModelQuery): ModelInfoList | null {
-    return requireAdapter().query(query);
+    return ModelRegistryAdapter.tryDefault()?.query(query) ?? null;
   },
 
   downloadedModels(): ModelInfoList | null {
-    return requireAdapter().listDownloaded();
+    return ModelRegistryAdapter.tryDefault()?.listDownloaded() ?? null;
   },
 
   removeModel(modelId: string): boolean {
