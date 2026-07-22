@@ -107,12 +107,12 @@ class RunAnywhereApplication : Application() {
         // resolves the baked staging backend URL and sends unauthenticated
         // telemetry (PUBLIC-org ingestion). Restore the config-driven
         // selection below to go back to production/development behavior.
-        val environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING
-        // val environment = if (hasBackendConfig) {
-        //     SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-        // } else {
-        //     SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-        // }
+        //val environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING
+         val environment = if (hasBackendConfig) {
+             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+         } else {
+             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+         }
         RunAnywhere.initialize(
             context = this@RunAnywhereApplication,
             apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {

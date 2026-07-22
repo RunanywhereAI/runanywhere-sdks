@@ -61,6 +61,7 @@
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "../infrastructure/device/rac_device_live_state_internal.h"
 #include "../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
@@ -1618,6 +1619,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInit(JNIEnv* env, jc
         LOGe("racInit failed with code: %d", result);
     } else {
         LOGi("racInit succeeded");
+        // JNI callbacks attach the calling thread, so live battery/RAM
+        // sampling on telemetry events is safe from any thread here.
+        rac_telemetry_enable_live_platform_sampling();
     }
 
     return static_cast<jint>(result);

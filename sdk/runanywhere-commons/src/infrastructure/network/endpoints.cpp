@@ -11,8 +11,9 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 
 const char* rac_endpoint_device_registration(rac_environment_t env) {
-    // Every environment registers through the backend now; there is no
-    // direct-to-datastore path. The parameter is retained for ABI stability.
+    // Every environment registers against the FastAPI backend now; the
+    // Supabase-direct dev path is retired. The parameter is retained for ABI
+    // stability.
     (void)env;
     return RAC_ENDPOINT_DEVICE_REGISTER;
 }

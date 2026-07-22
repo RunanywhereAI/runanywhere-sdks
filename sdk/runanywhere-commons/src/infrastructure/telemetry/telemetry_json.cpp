@@ -284,6 +284,19 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
     json.add_string("error_code", payload->error_code);
     json.add_bool("is_streaming", payload->is_streaming, payload->has_is_streaming);
 
+    // ---- SDK origin + live device state (stamped by the manager) ----------
+    json.add_string("sdk_binding", payload->sdk_binding);
+    json.add_double_or_null("battery_level", payload->battery_level, payload->battery_level >= 0);
+    json.add_string_or_null("battery_state", payload->battery_state);
+    json.add_bool("is_low_power_mode", payload->is_low_power_mode, payload->has_is_low_power_mode);
+    json.add_int_or_null("total_memory", payload->total_memory, payload->total_memory > 0);
+    json.add_int_or_null("available_memory", payload->available_memory,
+                         payload->available_memory > 0);
+    json.add_double_or_null("cpu_usage_percent", payload->cpu_usage_percent,
+                            payload->cpu_usage_percent >= 0);
+    json.add_int_or_null("online_core_count", payload->online_core_count,
+                         payload->online_core_count > 0);
+
     // ---- Modality-specific fields ------------------------------------------
     const char* modality = payload->modality ? payload->modality : "system";
     if (strcmp(modality, "llm") == 0) {
@@ -483,56 +496,13 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
     JsonBuilder json;
     json.start_object();
 
-    // For development mode (Supabase), flatten the structure to match Supabase schema
-    // For production/staging, use nested device_info structure
-    if (env == RAC_ENV_DEVELOPMENT) {
-        // Flattened structure for Supabase (matches Kotlin SDK DevDeviceRegistrationRequest)
-        const rac_device_registration_info_t* info = &request->device_info;
-
-        // Required fields (matching Supabase schema)
-        if (info->device_id) {
-            json.add_string("device_id", info->device_id);
-        }
-        if (info->platform) {
-            json.add_string("platform", info->platform);
-        }
-        if (info->os_version) {
-            json.add_string("os_version", info->os_version);
-        }
-        if (info->device_model) {
-            json.add_string("device_model", info->device_model);
-        }
-        if (request->sdk_version) {
-            json.add_string("sdk_version", request->sdk_version);
-        }
-        if (has_client_info(request->client_info)) {
-            add_client_info_fields(json, request->client_info);
-        }
-
-        // Optional fields
-        if (request->build_token) {
-            json.add_string("build_token", request->build_token);
-        }
-        if (info->total_memory > 0) {
-            json.add_int("total_memory", info->total_memory);
-        }
-        if (info->architecture) {
-            json.add_string("architecture", info->architecture);
-        }
-        if (info->chip_name) {
-            json.add_string("chip_name", info->chip_name);
-        }
-        if (info->form_factor) {
-            json.add_string("form_factor", info->form_factor);
-        }
-        // has_neural_engine is always set (rac_bool_t), so we can always include it
-        json.add_bool("has_neural_engine", info->has_neural_engine, RAC_TRUE);
-        // Add last_seen_at timestamp for UPSERT to update existing records
-        if (request->last_seen_at_ms > 0) {
-            json.add_timestamp("last_seen_at", request->last_seen_at_ms);
-        }
-    } else {
-        // Nested structure for production/staging
+    // Nested device_info structure for every environment. The backend route
+    // (POST /devices/register, DeviceRegistrationRequest) requires it; the old
+    // development-only flat shape (a direct-to-Supabase relic) 422'd against
+    // the FastAPI backend, so dev devices never upgraded their auth-time
+    // "Unknown"/"SDK Device" placeholder row.
+    (void)env;
+    {
         // Matches backend schemas/device.py DeviceInfo schema
         const rac_device_registration_info_t* info = &request->device_info;
 

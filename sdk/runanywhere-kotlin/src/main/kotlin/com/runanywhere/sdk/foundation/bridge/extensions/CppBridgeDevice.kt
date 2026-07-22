@@ -32,8 +32,17 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.DeviceInfo
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.res.Configuration
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
@@ -235,7 +244,7 @@ object CppBridgeDevice {
         val provider = deviceInfoProvider
 
         val deviceModel = provider?.getDeviceModel() ?: getDefaultDeviceModel()
-        val deviceName = provider?.getDeviceName() ?: deviceModel
+        val deviceName = provider?.getDeviceName() ?: getDefaultDeviceName(deviceModel)
         val manufacturer = provider?.getDeviceManufacturer() ?: getDefaultManufacturer()
         val osVersion = provider?.getOSVersion() ?: getDefaultOsVersion()
         val osBuildId = provider?.getOSBuildId() ?: ""
@@ -247,20 +256,21 @@ object CppBridgeDevice {
                 .getDefault()
                 .id
         val isEmulator = provider?.isEmulator() ?: false
-        val formFactor = provider?.getFormFactor() ?: "phone"
+        val formFactor = provider?.getFormFactor() ?: getDefaultFormFactor()
         val architecture = provider?.getArchitecture() ?: CppBridgeHardware.defaultArchitecture()
         val chipName = provider?.getChipName() ?: CppBridgeHardware.defaultChipName(architecture)
         val totalMemory = provider?.getTotalMemory() ?: CppBridgeHardware.defaultTotalMemory()
-        val availableMemory = provider?.getAvailableMemory() ?: (totalMemory / 2)
-        val hasNeuralEngine = provider?.hasNeuralEngine() ?: false
+        val availableMemory = provider?.getAvailableMemory() ?: CppBridgeHardware.defaultAvailableMemory(totalMemory)
+        val hasNeuralEngine = provider?.hasNeuralEngine() ?: CppBridgeHardware.defaultHasNeuralEngine(chipName)
         val neuralEngineCores = provider?.getNeuralEngineCores() ?: 0
         val gpuFamily = provider?.getGPUFamily() ?: CppBridgeHardware.defaultGpuFamily(chipName)
-        val batteryLevel = provider?.getBatteryLevel() ?: -1.0
-        val batteryState = provider?.getBatteryState()
-        val isLowPowerMode = provider?.isLowPowerMode() ?: false
+        val batteryLevel = provider?.getBatteryLevel() ?: getDefaultBatteryLevel()
+        val batteryState = provider?.getBatteryState() ?: getDefaultBatteryState()
+        val isLowPowerMode = provider?.isLowPowerMode() ?: getDefaultIsLowPowerMode()
         val coreCount = provider?.getCoreCount() ?: Runtime.getRuntime().availableProcessors()
-        val performanceCores = provider?.getPerformanceCores() ?: (coreCount / 2)
-        val efficiencyCores = provider?.getEfficiencyCores() ?: (coreCount - performanceCores)
+        val defaultCoreSplit = CppBridgeHardware.defaultCoreSplit(coreCount)
+        val performanceCores = provider?.getPerformanceCores() ?: defaultCoreSplit.first
+        val efficiencyCores = provider?.getEfficiencyCores() ?: defaultCoreSplit.second
         val deviceIdValue = deviceId ?: ""
 
         val deviceInfo =
@@ -472,37 +482,114 @@ object CppBridgeDevice {
         )
     }
 
-    /** Android-specific Build.MODEL fallback via reflection. */
-    private fun getDefaultDeviceModel(): String =
+    /** Application context, or null when the SDK has no context yet. */
+    private fun appContextOrNull(): Context? =
         try {
-            Class.forName("android.os.Build").getField("MODEL").get(null) as? String ?: "unknown"
+            if (AndroidPlatformContext.isInitialized()) {
+                AndroidPlatformContext.applicationContext
+            } else {
+                null
+            }
         } catch (_: Exception) {
-            System.getProperty("os.name") ?: "unknown"
+            null
         }
 
-    /** Android-specific Build.MANUFACTURER fallback via reflection. */
-    private fun getDefaultManufacturer(): String =
-        try {
-            Class.forName("android.os.Build").getField("MANUFACTURER").get(null) as? String ?: "unknown"
-        } catch (_: Exception) {
-            System.getProperty("java.vendor") ?: "unknown"
-        }
+    /** Manufacturer-prefixed model, e.g. "Nothing A059". */
+    private fun getDefaultDeviceModel(): String {
+        val model = Build.MODEL?.takeIf { it.isNotBlank() } ?: "unknown"
+        val manufacturer = Build.MANUFACTURER?.takeIf { it.isNotBlank() } ?: return model
+        if (model.contains(manufacturer, ignoreCase = true)) return model
+        val prefix = manufacturer.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+        return "$prefix $model"
+    }
 
-    /** Android-specific Build.VERSION.RELEASE fallback via reflection. */
-    private fun getDefaultOsVersion(): String =
-        try {
-            Class.forName("android.os.Build\$VERSION").getField("RELEASE").get(null) as? String ?: "unknown"
-        } catch (_: Exception) {
-            System.getProperty("os.version") ?: "unknown"
+    /**
+     * User-facing device name: `Settings.Global.DEVICE_NAME` (API 25+),
+     * then the Bluetooth name, then the manufacturer-prefixed model.
+     */
+    private fun getDefaultDeviceName(deviceModel: String): String {
+        val context = appContextOrNull()
+        if (context != null) {
+            try {
+                val resolver = context.contentResolver
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                    Settings.Global
+                        .getString(resolver, Settings.Global.DEVICE_NAME)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { return it }
+                }
+                Settings.Secure
+                    .getString(resolver, "bluetooth_name")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { return it }
+            } catch (_: Exception) {
+                // Fall through to model
+            }
         }
+        return deviceModel
+    }
 
-    /** Android-specific Build.VERSION.SDK_INT fallback via reflection. */
-    private fun getDefaultSdkVersion(): Int =
-        try {
-            Class.forName("android.os.Build\$VERSION").getField("SDK_INT").get(null) as? Int ?: 0
+    private fun getDefaultManufacturer(): String = Build.MANUFACTURER?.takeIf { it.isNotBlank() } ?: "unknown"
+
+    private fun getDefaultOsVersion(): String = Build.VERSION.RELEASE?.takeIf { it.isNotBlank() } ?: "unknown"
+
+    private fun getDefaultSdkVersion(): Int = Build.VERSION.SDK_INT
+
+    /** Derive form factor from UI mode (tv) and screen layout size (tablet). */
+    private fun getDefaultFormFactor(): String {
+        val context = appContextOrNull() ?: return "phone"
+        return try {
+            val config = context.resources.configuration
+            val screenSize = config.screenLayout and Configuration.SCREENLAYOUT_SIZE_MASK
+            when {
+                (config.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION -> "tv"
+                screenSize >= Configuration.SCREENLAYOUT_SIZE_LARGE -> "tablet"
+                else -> "phone"
+            }
         } catch (_: Exception) {
-            0
+            "phone"
         }
+    }
+
+    /** Battery level in 0.0–1.0, or -1.0 when unavailable. */
+    private fun getDefaultBatteryLevel(): Double {
+        val context = appContextOrNull() ?: return -1.0
+        return try {
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager ?: return -1.0
+            val percent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            if (percent in 0..100) percent / 100.0 else -1.0
+        } catch (_: Exception) {
+            -1.0
+        }
+    }
+
+    /** "charging" / "full" / "unplugged" from the sticky battery intent. */
+    private fun getDefaultBatteryState(): String? {
+        val context = appContextOrNull() ?: return null
+        return try {
+            val intent =
+                context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return null
+            when (intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+                BatteryManager.BATTERY_STATUS_FULL -> "full"
+                BatteryManager.BATTERY_STATUS_DISCHARGING,
+                BatteryManager.BATTERY_STATUS_NOT_CHARGING,
+                -> "unplugged"
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun getDefaultIsLowPowerMode(): Boolean {
+        val context = appContextOrNull() ?: return false
+        return try {
+            (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isPowerSaveMode ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /** Escape special chars for embedding in a JSON string value. */
     private fun escapeJson(value: String): String =

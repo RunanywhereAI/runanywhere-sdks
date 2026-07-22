@@ -66,7 +66,8 @@ bool rac_env_requires_auth(rac_environment_t env) {
 
 bool rac_env_auth_expected(rac_environment_t env, const char* api_key) {
     if (!rac_env_requires_auth(env)) {
-        return false;
+        // Development authenticates when the caller supplied an explicit key.
+        return api_key != nullptr && api_key[0] != '\0';
     }
     // Staging accepts keyless clients — requests go out unauthenticated and
     // the backend attributes them to the PUBLIC org. Production stays strict.

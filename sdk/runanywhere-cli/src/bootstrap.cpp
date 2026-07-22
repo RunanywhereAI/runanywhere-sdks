@@ -30,6 +30,7 @@
 
 #include "catalog/catalog.h"
 #include "config/cli_paths.h"
+#include "device_info.h"
 #include "io/output.h"
 
 #if defined(RCLI_HAS_LLAMACPP)
@@ -211,7 +212,7 @@ void initialize_sdk_metadata() {
   sdk_config.device_id = device_id[0] != '\0' ? device_id : "";
   sdk_config.platform = desktop_platform();
   sdk_config.sdk_version = RCLI_VERSION;
-  sdk_config.client_info.sdk_binding = "rcli";
+  sdk_config.client_info.sdk_binding = "cli";
   sdk_config.client_info.app_identifier = "ai.runanywhere.rcli";
   sdk_config.client_info.app_name = "RunAnywhere CLI";
   sdk_config.client_info.app_version = RCLI_VERSION;
@@ -490,6 +491,9 @@ rac_result_t bootstrap(const GlobalOptions &options, Bootstrapped *out) {
     }
 
     initialize_sdk_metadata();
+    if (install_device_callbacks() != RAC_SUCCESS) {
+      out::status_line("warning: device info callbacks failed to register");
+    }
     initialize_telemetry_auth();
 
 #if defined(RCLI_HAS_LLAMACPP)

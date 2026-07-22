@@ -57,6 +57,7 @@ set(RCLI_SOURCES
     src/commands/engine_options.cpp
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
+    src/device_info.cpp
     src/io/wav_io.cpp
     src/io/image_io.cpp
     src/io/output.cpp

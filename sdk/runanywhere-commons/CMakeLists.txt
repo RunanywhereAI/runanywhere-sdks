@@ -828,6 +828,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
+    src/infrastructure/device/cpu_state.cpp
     # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
