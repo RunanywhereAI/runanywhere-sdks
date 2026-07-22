@@ -40,6 +40,13 @@ target_include_directories(rac_runtime_onnxrt PRIVATE
 
 target_link_libraries(rac_runtime_onnxrt PUBLIC
     onnxruntime
+    # The onnxrt registrar (RAC_STATIC_RUNTIME_REGISTER) calls
+    # rac_runtime_register / rac_runtime_get_by_id, which are defined in
+    # rac_commons. Declare that dependency so every consumer links rac_commons
+    # AFTER this archive; GNU ld's strict left-to-right static resolution
+    # otherwise leaves those symbols undefined when a target pulls onnxrt only
+    # transitively (e.g. the rcli-linux release link of test_plugin_entry_onnx).
+    rac_commons
 )
 
 target_compile_definitions(rac_runtime_onnxrt PUBLIC RAC_HAS_ONNX)
