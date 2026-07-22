@@ -27,7 +27,7 @@ dependencies = ["numpy>=1.21"]
 test = ["pytest>=7", "httpx>=0.24"]
 # The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
 # plain `pip install runanywhere` stays numpy + stdlib only.
-server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.18"]
 
 [project.scripts]
 runanywhere = "runanywhere.__main__:main"
