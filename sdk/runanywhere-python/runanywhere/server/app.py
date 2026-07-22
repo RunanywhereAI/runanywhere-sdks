@@ -149,7 +149,7 @@ def _apply_response_format(rf: Optional[dict], opts: dict[str, Any]) -> Optional
             try:
                 opts["grammar"] = json_schema_to_grammar(schema)
             except Exception as exc:  # noqa: BLE001 — a bad schema is a client error (400), not 500
-                raise SDKException.invalid_input(f"invalid response_format json_schema: {exc}")
+                raise SDKException.invalid_input(f"invalid response_format json_schema: {exc}") from exc
         return None
     if rf_type == "json_object":
         return "You must respond with a single valid JSON object."
@@ -273,7 +273,7 @@ def _validate_public_host(url: str) -> None:
     try:
         infos = socket.getaddrinfo(host, None)
     except OSError:
-        raise SDKException.invalid_input("could not resolve image host")
+        raise SDKException.invalid_input("could not resolve image host") from None
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         mapped = getattr(ip, "ipv4_mapped", None)
@@ -303,7 +303,7 @@ def _fetch_image_bytes(url: str) -> bytes:
     except SDKException:
         raise
     except Exception:  # noqa: BLE001 — generic message; exact error stays server-side (recon oracle)
-        raise SDKException.invalid_input("could not fetch image URL")
+        raise SDKException.invalid_input("could not fetch image URL") from None
     if len(raw) > MAX_IMAGE_BYTES:
         raise SDKException.invalid_input("image exceeds the size limit")
     return raw
@@ -321,7 +321,7 @@ def _materialize_image(ref: str, allow_urls: bool) -> tuple[str, bool]:
         try:
             raw = base64.b64decode(data) if ";base64" in header else urllib.parse.unquote_to_bytes(data)
         except Exception:  # noqa: BLE001
-            raise SDKException.invalid_input("could not decode data-URI image")
+            raise SDKException.invalid_input("could not decode data-URI image") from None
         if len(raw) > MAX_IMAGE_BYTES:
             raise SDKException.invalid_input("image exceeds the size limit")
         fd, path = tempfile.mkstemp(suffix=_img_suffix(header))
@@ -725,7 +725,7 @@ def create_app(
         try:
             sample_rate, samples = decode_wav(raw)
         except Exception:  # noqa: BLE001 — generic client-facing message; details stay server-side
-            raise HTTPException(status_code=400, detail="could not decode audio (send a 16-bit WAV)")
+            raise HTTPException(status_code=400, detail="could not decode audio (send a 16-bit WAV)") from None
         if sample_rate != STT_SAMPLE_RATE:
             samples = downsample(samples, sample_rate, STT_SAMPLE_RATE)
         pcm16 = pcm16_bytes(samples)
