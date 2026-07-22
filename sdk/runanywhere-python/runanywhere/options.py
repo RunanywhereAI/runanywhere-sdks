@@ -29,6 +29,9 @@ class GenerateOptions:
     top_k: int | None = None
     system_prompt: str | None = None
     grammar: str | None = None
+    #: Suppress the model's ``<think>`` reasoning phase for this call (commons prepends the
+    #: model's no-think directive). Mirrors Swift/Web ``disableThinking``.
+    disable_thinking: bool | None = None
 
 
 @dataclass
@@ -63,13 +66,22 @@ class ChatOptions:
 
 # The only keys forwarded to the native ``_core.generate`` call. A value of None
 # means "unset" and is dropped so the backend applies its own default.
-_GENERATE_KEYS = ("max_tokens", "temperature", "top_p", "top_k", "system_prompt", "grammar")
+_GENERATE_KEYS = (
+    "max_tokens",
+    "temperature",
+    "top_p",
+    "top_k",
+    "system_prompt",
+    "grammar",
+    "disable_thinking",
+)
 
 
 def generate_kwargs(**opts: object) -> dict:
     """Build the ``_core.generate`` kwargs, keeping only known keys with non-None values.
 
     Unknown keys are ignored; any of ``max_tokens``/``temperature``/``top_p``/``top_k``/
-    ``system_prompt``/``grammar`` whose value is None is dropped (backend default applies).
+    ``system_prompt``/``grammar``/``disable_thinking`` whose value is None is dropped
+    (backend default applies).
     """
     return {k: opts[k] for k in _GENERATE_KEYS if opts.get(k) is not None}
