@@ -6,6 +6,7 @@ import os
 import re
 import json
 import tarfile
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -241,21 +242,31 @@ def _safe_extract(tar: tarfile.TarFile, dest_dir: str) -> None:
         tar.extractall(dest_dir)
 
 
-# Dedup concurrent downloads to the SAME destination. Two resolve_model calls for one
-# source would otherwise open two write streams on the same `.part` file and corrupt it.
-_IN_FLIGHT: dict[str, bool] = {}
+# Dedup concurrent downloads to the SAME destination. Two resolve_model calls for one source
+# would otherwise open two write streams on the same `.part` file and corrupt it. A per-dest
+# Event (minted under a lock) is the sync point: the first caller downloads; the rest WAIT for it
+# to finish (so they never hand back a ResolvedModel pointing at a not-yet-written file).
+_IN_FLIGHT_LOCK = threading.Lock()
+_IN_FLIGHT: dict[str, threading.Event] = {}
 
 
 def _download_once(
     url: str, dest: str, on_progress: Callable[[DownloadProgress], None] | None
 ) -> None:
-    if _IN_FLIGHT.get(dest):
+    with _IN_FLIGHT_LOCK:
+        event = _IN_FLIGHT.get(dest)
+        own = event is None
+        if own:
+            event = _IN_FLIGHT[dest] = threading.Event()
+    if not own:
+        event.wait()  # another caller is downloading this dest — wait until it's done
         return
-    _IN_FLIGHT[dest] = True
     try:
         download_file(url, dest, on_progress)
     finally:
-        _IN_FLIGHT.pop(dest, None)
+        with _IN_FLIGHT_LOCK:
+            _IN_FLIGHT.pop(dest, None)
+        event.set()
 
 
 _RE_URL = re.compile(r"^https?://", re.IGNORECASE)
