@@ -323,6 +323,55 @@ Model sources accepted anywhere you pass an `id_or_path`:
 STT/TTS/embedder models must come from a catalog id or a local path (URL/HF sources aren't
 supported for those yet).
 
+## Local OpenAI-compatible server
+
+Turn the SDK into a **drop-in OpenAI API** — 100% local, offline, no keys. Point any OpenAI
+client (the `openai` library, LangChain, LlamaIndex, the Vercel AI SDK, curl) at
+`http://localhost:8000/v1` and it just works. Installed as an optional extra so the base install
+stays lean:
+
+```bash
+pip install "runanywhere[server]"      # adds fastapi + uvicorn
+runanywhere serve                      # http://127.0.0.1:8000  (see `runanywhere serve --help`)
+runanywhere models                     # list catalog models + download state (no extra needed)
+```
+
+| OpenAI endpoint | Backed by | `model` field |
+|---|---|---|
+| `POST /v1/chat/completions` (stream + non-stream) | LLM / VLM | `qwen2.5-0.5b`, `smolvlm-256m`, … |
+| `POST /v1/completions` | LLM | `qwen2.5-0.5b`, … |
+| `POST /v1/embeddings` (`float` + `base64`) | Embedder | `minilm` |
+| `POST /v1/audio/transcriptions` (Whisper API) | STT | `whisper-tiny`, `whisper-base` |
+| `POST /v1/audio/speech` | TTS | `piper-lessac`, `piper-amy` |
+| `GET /v1/models` · `GET /v1/models/{id}` · `GET /health` | catalog | — |
+
+The `model` field accepts any `id_or_path` (catalog id, local path, or HF repo), downloaded on
+first use. Models are loaded lazily and kept resident. Beyond plain chat, `chat/completions` also
+supports:
+
+- **Vision** — OpenAI image content parts (`{"type":"image_url", ...}`, data-URI or URL) route to
+  a VLM.
+- **Structured output** — `response_format={"type":"json_schema", ...}` constrains decoding via a
+  GBNF grammar.
+- **Tool calling** — `tools` + `tool_choice`. `"required"`/a named function force a `tool_calls`
+  reply; `"auto"` lets the model decide (quality depends on the model — use a tool-tuned one).
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed")
+
+stream = client.chat.completions.create(
+    model="qwen2.5-0.5b",
+    messages=[{"role": "user", "content": "Capital of France? One word."}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="", flush=True)
+```
+
+Optional bearer auth: `runanywhere serve --api-key <KEY>` then send `Authorization: Bearer <KEY>`
+on `/v1/*`. Embed the app in your own ASGI stack via `from runanywhere.server import create_app`.
+
 ## Error Handling
 
 Every SDK error is an `SDKException` carrying a canonical `code` and `category`:
