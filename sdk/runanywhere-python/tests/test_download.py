@@ -163,10 +163,10 @@ def test_assert_remote_supported():
         with pytest.raises(SDKException):
             assert_remote_supported("https://x/y.gguf", kind)
     # llm/vlm remote sources are allowed (no raise).
-    assert_remote_supported("https://x/y.gguf", "llm") is None
-    assert_remote_supported("https://x/y.gguf", "vlm") is None
+    assert assert_remote_supported("https://x/y.gguf", "llm") is None
+    assert assert_remote_supported("https://x/y.gguf", "vlm") is None
     # A local path is fine for any kind.
-    assert_remote_supported("/some/local/path", "embedder") is None
+    assert assert_remote_supported("/some/local/path", "embedder") is None
 
 
 def test_resolve_model_local_path_unchanged(tmp_path):
@@ -195,3 +195,31 @@ def test_resolve_model_direct_url(server, tmp_path):
 def test_models_root_shape():
     root = models_root()
     assert root.endswith(os.path.join(".runanywhere", "models"))
+
+
+def test_download_once_dedups_concurrent_calls(monkeypatch, tmp_path):
+    """Concurrent _download_once for one dest: exactly one real download; waiters return after it
+    finishes (never handing back a path to a not-yet-written file)."""
+    import os
+    import threading
+    import time
+
+    from runanywhere import download as dl
+
+    calls = []
+
+    def slow_download(url, dest, on_progress):
+        calls.append(dest)
+        time.sleep(0.25)
+        with open(dest, "w") as f:
+            f.write("done")
+
+    monkeypatch.setattr(dl, "download_file", slow_download)
+    dest = str(tmp_path / "m.gguf")
+    threads = [threading.Thread(target=dl._download_once, args=("u", dest, None)) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert calls.count(dest) == 1  # only one thread actually downloaded
+    assert os.path.exists(dest)  # the file is complete once every waiter returned
