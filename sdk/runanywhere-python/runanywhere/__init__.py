@@ -57,6 +57,16 @@ from .options import (
     LoadOptions,
     VadOptions,
 )
+# RAG value types. `rag` guards its optional protobuf import internally, so importing it here
+# never pulls protobuf (or `_core`) into a base install — only actually running a RAG op does.
+from .rag import (
+    RagDocument,
+    RagResult,
+    RagSearchResult,
+    RagSession,
+    RagStatistics,
+    RagStreamEvent,
+)
 from .results import (
     DownloadProgress,
     LLMGenerationResult,
@@ -95,6 +105,13 @@ __all__ = [
     "Chat",
     "ChatMessage",
     "VoiceAgent",
+    # RAG (talk-to-your-documents)
+    "RagSession",
+    "RagDocument",
+    "RagResult",
+    "RagSearchResult",
+    "RagStatistics",
+    "RagStreamEvent",
     # options
     "InitOptions",
     "GenerateOptions",
