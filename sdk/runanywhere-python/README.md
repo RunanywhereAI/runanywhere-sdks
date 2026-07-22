@@ -382,6 +382,48 @@ for chunk in stream:
 Embed the app in your own ASGI stack via `from runanywhere.server import create_app` (its
 keyword args mirror the CLI flags: `api_key`, `allow_image_urls`, `allow_arbitrary_models`, …).
 
+## Command-line interface
+
+`pip install runanywhere` also installs a `runanywhere` command — a Python CLI over the SDK with
+parity for the core commands of the (C++) `rcli`, so it can drive the same smoke/integration flows.
+Results go to **stdout**, logs/progress to **stderr**, and `--json` prints one JSON document
+(pipeable: `runanywhere run qwen2.5-0.5b "hi" --json | jq`). Exit codes: `0` ok, `1` error, `2`
+usage, `130` Ctrl-C.
+
+```bash
+runanywhere run qwen2.5-0.5b "Capital of France? One word."   # LLM (add --image for a VLM)
+runanywhere chat qwen2.5-0.5b                                  # interactive multi-turn
+runanywhere embed "on-device AI" -m minilm --json
+runanywhere stt  -i speech.wav                                 # transcribe
+runanywhere tts  -t "hello" -o out.wav                         # synthesize
+runanywhere vad  -i speech.wav                                 # speech segments
+runanywhere voice -i speech.wav -o reply.wav                   # STT -> LLM -> TTS
+runanywhere list [--all]   pull <model>   show <model>   rm <model>
+runanywhere backends       info           version          serve
+```
+
+Migrating from the C++ `rcli`? The command names + flags match (`run`/`chat`/`list`/`pull`/`show`/
+`rm`/`embed`/`stt`/`tts`/`vad`/`voice`/`backends`/`info`/`version`/`serve`). `lora` and `image`
+(macOS-CoreML) are not yet ported.
+
+### Thinking models
+
+For a model that emits `<think>…</think>` reasoning, the SDK separates it from the answer
+host-side: streamed events flag reasoning tokens (`event.is_thinking`), and the final result carries
+the clean answer plus the reasoning:
+
+```python
+for event in llm.generate_stream("Solve: 17 * 23"):
+    if event.is_final:
+        print("thinking:", event.result.thinking_content)   # the <think> block (or None)
+        print("answer:", event.result.text)                 # answer, reasoning stripped
+    elif not event.is_thinking:
+        print(event.token, end="")                          # stream just the answer
+```
+
+The CLI's `run` streams the answer to stdout and the reasoning (dimmed) to stderr; `--no-think`
+suppresses the reasoning display.
+
 ## Error Handling
 
 Every SDK error is an `SDKException` carrying a canonical `code` and `category`:
