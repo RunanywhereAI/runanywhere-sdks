@@ -145,12 +145,26 @@ async function sendChat() {
   bubble.classList.add('streaming');
   setStatus('generating…');
   try {
-    const h = await llm();
     let result = null;
-    await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
-      if (e.isFinal) { result = e.result; }
-      else { asst.content += e.token; bubble.innerHTML = md(asst.content); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
-    });
+    const runGen = async () => {
+      asst.content = '';
+      const h = await llm();
+      await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+        if (e.isFinal) { result = e.result; }
+        else { asst.content += e.token; bubble.innerHTML = md(asst.content); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
+      });
+    };
+    try {
+      await runGen();
+    } catch (e) {
+      // The backend keeps ONE LLM loaded at a time, so loading a model from the
+      // Models tab evicts the chat model and our memoized handle goes stale. Drop
+      // it and reload the chat model once before surfacing an error.
+      if (/no model|not loaded|model.*load/i.test(e.message || '')) {
+        delete handles.llm;
+        await runGen();
+      } else throw e;
+    }
     asst.content = asst.content.trim();
     if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
     bubble.classList.remove('streaming');
