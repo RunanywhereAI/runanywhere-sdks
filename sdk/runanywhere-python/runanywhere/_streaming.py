@@ -232,10 +232,13 @@ async def aiter_tokens(
     finally:
         bridge.request_stop()
         # Drain so a worker parked on a pending Future is released, then join off-loop so
-        # we never block the event loop on thread teardown.
+        # we never block the event loop on thread teardown. Shield the join so a cancellation
+        # arriving DURING teardown (client disconnect / shutdown) still completes it — otherwise
+        # the worker could outlive this frame and a caller's generation guard could be released
+        # while the native call is still running (two in-flight calls on one model handle).
         while not bridge._q.empty():
             try:
                 bridge._q.get_nowait()
             except asyncio.QueueEmpty:
                 break
-        await loop.run_in_executor(None, bridge.join)
+        await asyncio.shield(loop.run_in_executor(None, bridge.join))
