@@ -62,7 +62,7 @@ enum ModelSelectionContext {
     var allowedFrameworks: Set<InferenceFramework>? {
         switch self {
         case .ragEmbedding:
-            return [.onnx, .mlx]
+            return [.llamaCpp, .onnx, .mlx]
         case .ragLLM:
             return [.llamaCpp, .mlx]
         default:

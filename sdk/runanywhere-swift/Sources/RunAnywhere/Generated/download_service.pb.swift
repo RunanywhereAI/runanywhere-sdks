@@ -461,37 +461,55 @@ public nonisolated struct RADownloadPlanRequest: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public nonisolated struct RADownloadFilePlan: Sendable {
+public nonisolated struct RADownloadFilePlan: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var file: RAModelFileDescriptor {
-    get {_file ?? RAModelFileDescriptor()}
-    set {_file = newValue}
+    get {_storage._file ?? RAModelFileDescriptor()}
+    set {_uniqueStorage()._file = newValue}
   }
   /// Returns true if `file` has been explicitly set.
-  public var hasFile: Bool {self._file != nil}
+  public var hasFile: Bool {_storage._file != nil}
   /// Clears the value of `file`. Subsequent reads from it will return its default value.
-  public mutating func clearFile() {self._file = nil}
+  public mutating func clearFile() {_uniqueStorage()._file = nil}
 
-  public var storageKey: String = String()
+  public var storageKey: String {
+    get {_storage._storageKey}
+    set {_uniqueStorage()._storageKey = newValue}
+  }
 
-  public var destinationPath: String = String()
+  public var destinationPath: String {
+    get {_storage._destinationPath}
+    set {_uniqueStorage()._destinationPath = newValue}
+  }
 
-  public var expectedBytes: Int64 = 0
+  public var expectedBytes: Int64 {
+    get {_storage._expectedBytes}
+    set {_uniqueStorage()._expectedBytes = newValue}
+  }
 
-  public var requiresExtraction: Bool = false
+  public var requiresExtraction: Bool {
+    get {_storage._requiresExtraction}
+    set {_uniqueStorage()._requiresExtraction = newValue}
+  }
 
-  public var checksumSha256: String = String()
+  public var checksumSha256: String {
+    get {_storage._checksumSha256}
+    set {_uniqueStorage()._checksumSha256 = newValue}
+  }
 
-  public var isResumeCandidate: Bool = false
+  public var isResumeCandidate: Bool {
+    get {_storage._isResumeCandidate}
+    set {_uniqueStorage()._isResumeCandidate = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _file: RAModelFileDescriptor? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct RADownloadPlanResult: Sendable {
@@ -1034,61 +1052,109 @@ nonisolated extension RADownloadFilePlan: SwiftProtobuf.Message, SwiftProtobuf._
   public static let protoMessageName: String = _protobuf_package + ".DownloadFilePlan"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}storage_key\0\u{3}destination_path\0\u{3}expected_bytes\0\u{3}requires_extraction\0\u{3}checksum_sha256\0\u{3}is_resume_candidate\0")
 
+  fileprivate class _StorageClass {
+    var _file: RAModelFileDescriptor? = nil
+    var _storageKey: String = String()
+    var _destinationPath: String = String()
+    var _expectedBytes: Int64 = 0
+    var _requiresExtraction: Bool = false
+    var _checksumSha256: String = String()
+    var _isResumeCandidate: Bool = false
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _file = source._file
+      _storageKey = source._storageKey
+      _destinationPath = source._destinationPath
+      _expectedBytes = source._expectedBytes
+      _requiresExtraction = source._requiresExtraction
+      _checksumSha256 = source._checksumSha256
+      _isResumeCandidate = source._isResumeCandidate
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._file) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.storageKey) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.destinationPath) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.expectedBytes) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.requiresExtraction) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.checksumSha256) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.isResumeCandidate) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._file) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._storageKey) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._destinationPath) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._expectedBytes) }()
+        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._requiresExtraction) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._checksumSha256) }()
+        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._isResumeCandidate) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._file {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.storageKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.storageKey, fieldNumber: 2)
-    }
-    if !self.destinationPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.destinationPath, fieldNumber: 3)
-    }
-    if self.expectedBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.expectedBytes, fieldNumber: 4)
-    }
-    if self.requiresExtraction != false {
-      try visitor.visitSingularBoolField(value: self.requiresExtraction, fieldNumber: 5)
-    }
-    if !self.checksumSha256.isEmpty {
-      try visitor.visitSingularStringField(value: self.checksumSha256, fieldNumber: 6)
-    }
-    if self.isResumeCandidate != false {
-      try visitor.visitSingularBoolField(value: self.isResumeCandidate, fieldNumber: 7)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._file {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if !_storage._storageKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._storageKey, fieldNumber: 2)
+      }
+      if !_storage._destinationPath.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._destinationPath, fieldNumber: 3)
+      }
+      if _storage._expectedBytes != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._expectedBytes, fieldNumber: 4)
+      }
+      if _storage._requiresExtraction != false {
+        try visitor.visitSingularBoolField(value: _storage._requiresExtraction, fieldNumber: 5)
+      }
+      if !_storage._checksumSha256.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._checksumSha256, fieldNumber: 6)
+      }
+      if _storage._isResumeCandidate != false {
+        try visitor.visitSingularBoolField(value: _storage._isResumeCandidate, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RADownloadFilePlan, rhs: RADownloadFilePlan) -> Bool {
-    if lhs._file != rhs._file {return false}
-    if lhs.storageKey != rhs.storageKey {return false}
-    if lhs.destinationPath != rhs.destinationPath {return false}
-    if lhs.expectedBytes != rhs.expectedBytes {return false}
-    if lhs.requiresExtraction != rhs.requiresExtraction {return false}
-    if lhs.checksumSha256 != rhs.checksumSha256 {return false}
-    if lhs.isResumeCandidate != rhs.isResumeCandidate {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._file != rhs_storage._file {return false}
+        if _storage._storageKey != rhs_storage._storageKey {return false}
+        if _storage._destinationPath != rhs_storage._destinationPath {return false}
+        if _storage._expectedBytes != rhs_storage._expectedBytes {return false}
+        if _storage._requiresExtraction != rhs_storage._requiresExtraction {return false}
+        if _storage._checksumSha256 != rhs_storage._checksumSha256 {return false}
+        if _storage._isResumeCandidate != rhs_storage._isResumeCandidate {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

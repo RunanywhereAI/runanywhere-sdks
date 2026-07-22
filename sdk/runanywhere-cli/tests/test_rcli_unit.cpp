@@ -253,10 +253,9 @@ TestResult test_catalog_lookup() {
     return result;
   }
 
-  const rcli::catalog::CatalogEntry *mlx_llm =
-      rcli::catalog::find("mlx-qwen3");
-  if (!mlx_llm || mlx_llm->framework !=
-                      runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+  const rcli::catalog::CatalogEntry *mlx_llm = rcli::catalog::find("mlx-qwen3");
+  if (!mlx_llm ||
+      mlx_llm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_llm->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
       mlx_llm->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
       mlx_llm->files == nullptr || mlx_llm->file_count != 9 ||
@@ -267,8 +266,8 @@ TestResult test_catalog_lookup() {
 
   const rcli::catalog::CatalogEntry *mlx_vlm =
       rcli::catalog::find("mlx-qwen2-vl");
-  if (!mlx_vlm || mlx_vlm->category !=
-                      runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
+  if (!mlx_vlm ||
+      mlx_vlm->category != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       mlx_vlm->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_vlm->files == nullptr || mlx_vlm->file_count != 11) {
     result.details = "mlx-qwen2-vl should be a complete MLX VLM bundle";
@@ -281,7 +280,8 @@ TestResult test_catalog_lookup() {
         std::string(mlx_vlm->files[i].filename) == "preprocessor_config.json";
   }
   if (!has_preprocessor) {
-    result.details = "MLX VLM catalog entry must include preprocessor_config.json";
+    result.details =
+        "MLX VLM catalog entry must include preprocessor_config.json";
     return result;
   }
 
@@ -306,18 +306,270 @@ TestResult test_catalog_lookup() {
          (filename == "processing_fastvlm.py" || filename == "llava_qwen.py"));
   }
   if (!has_processor_config || !has_fastvlm_companion) {
-    result.details =
-        "MLX FastVLM catalog entry must include processor config and companions";
+    result.details = "MLX FastVLM catalog entry must include processor config "
+                     "and companions";
     return result;
   }
 
   const rcli::catalog::CatalogEntry *mlx_embed =
       rcli::catalog::find("mlx-qwen3-embed");
-  if (!mlx_embed || mlx_embed->category !=
-                       runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+  if (!mlx_embed ||
+      mlx_embed->category != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
       mlx_embed->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       mlx_embed->files == nullptr || mlx_embed->file_count != 11) {
-    result.details = "mlx-qwen3-embed should be a complete MLX embedding bundle";
+    result.details =
+        "mlx-qwen3-embed should be a complete MLX embedding bundle";
+    return result;
+  }
+
+  struct PortableNvidiaEmbeddingCase {
+    const char *id;
+    const char *alias;
+    const char *revision;
+    int64_t download_size_bytes;
+  };
+  const PortableNvidiaEmbeddingCase portable_nvidia_embeddings[] = {
+      {"nemotron-3-embed-1b-q4_k_m", "nemotron-3-embed",
+       "06df1fde6f7009c91f6cc3cd520081921929a678", 749352096LL},
+      {"llama-nemotron-embed-1b-v2-q4_k_m", "llama-nemotron-embed",
+       "bf7c9832b1d76f86777379e58b7b74805ee58006", 807690624LL},
+      {"llama-embed-nemotron-8b-q4_k_m", "llama-embed-nemotron",
+       "e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25", 4625233184LL},
+  };
+  for (const PortableNvidiaEmbeddingCase &test_case :
+       portable_nvidia_embeddings) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.id);
+    if (!entry || entry != rcli::catalog::find(test_case.alias) ||
+        entry->category != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_GGUF ||
+        entry->files != nullptr || entry->url == nullptr ||
+        entry->download_size_bytes != test_case.download_size_bytes ||
+        std::string(entry->url).find(test_case.revision) == std::string::npos) {
+      result.details = std::string(test_case.id) +
+                       " should be an exact pinned llama.cpp embedding";
+      return result;
+    }
+  }
+
+  const rcli::catalog::CatalogEntry *nemotron_nano =
+      rcli::catalog::find("mlx-nemotron-nano");
+  if (!nemotron_nano ||
+      nemotron_nano->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      nemotron_nano->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      nemotron_nano->files == nullptr || nemotron_nano->file_count != 8 ||
+      nemotron_nano->download_size_bytes != 4534806075LL ||
+      nemotron_nano->context_length != 131072) {
+    result.details = "mlx-nemotron-nano should be a complete pinned MLX bundle";
+    return result;
+  }
+
+  const rcli::catalog::CatalogEntry *nemotron_mini =
+      rcli::catalog::find("mlx-nemotron-mini");
+  if (!nemotron_mini ||
+      nemotron_mini->category != runanywhere::v1::MODEL_CATEGORY_LANGUAGE ||
+      nemotron_mini->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+      nemotron_mini->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+      nemotron_mini->files == nullptr || nemotron_mini->file_count != 6 ||
+      nemotron_mini->download_size_bytes != 2392679103LL ||
+      nemotron_mini->context_length != 4096) {
+    result.details = "mlx-nemotron-mini should be a complete pinned MLX bundle";
+    return result;
+  }
+  for (size_t i = 0; i < nemotron_mini->file_count; ++i) {
+    if (std::string(nemotron_mini->files[i].url)
+            .find("/resolve/b5784198153d2d71afcc97d4cc38c049abced8cd/") ==
+        std::string::npos) {
+      result.details = "mlx-nemotron-mini files must use the pinned revision";
+      return result;
+    }
+  }
+
+  struct NvidiaSpeechCase {
+    const char *alias;
+    int64_t download_size_bytes;
+  };
+  const NvidiaSpeechCase nvidia_speech_cases[] = {
+      {"mlx-parakeet-ctc", 4250718357LL},
+      {"mlx-parakeet-tdt-v2", 2471596080LL},
+      {"mlx-parakeet-tdt-v3", 2508532829LL},
+      {"mlx-parakeet-rnnt", 4282283914LL},
+      {"mlx-nemotron-asr", 755758528LL},
+  };
+  for (const NvidiaSpeechCase &test_case : nvidia_speech_cases) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.alias);
+    if (!entry ||
+        entry->category != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+        entry->files == nullptr || entry->file_count != 2 ||
+        entry->download_size_bytes != test_case.download_size_bytes ||
+        std::string(entry->files[0].url).find("/resolve/") ==
+            std::string::npos) {
+      result.details = std::string(test_case.alias) +
+                       " should be a complete pinned MLX speech bundle";
+      return result;
+    }
+  }
+
+  result.passed = true;
+  return result;
+}
+
+TestResult test_nvidia_sherpa_catalog() {
+  TestResult result;
+  result.test_name = "nvidia_sherpa_catalog";
+
+  struct ExpectedFile {
+    const char *filename;
+    int64_t size_bytes;
+  };
+  constexpr ExpectedFile parakeet_v2_files[] = {
+      {"encoder.int8.onnx", 652184296LL},
+      {"decoder.int8.onnx", 7257753LL},
+      {"joiner.int8.onnx", 1739080LL},
+      {"tokens.txt", 9384LL},
+  };
+  constexpr ExpectedFile parakeet_v3_files[] = {
+      {"encoder.int8.onnx", 652184281LL},
+      {"decoder.int8.onnx", 11845275LL},
+      {"joiner.int8.onnx", 6355277LL},
+      {"tokens.txt", 93939LL},
+  };
+  constexpr ExpectedFile canary_files[] = {
+      {"encoder.int8.onnx", 132678643LL},
+      {"decoder.int8.onnx", 74437848LL},
+      {"tokens.txt", 53555LL},
+  };
+
+  struct Case {
+    const char *id;
+    const char *alias;
+    const char *repo;
+    const char *revision;
+    const ExpectedFile *files;
+    size_t file_count;
+    int64_t total_size_bytes;
+  };
+  const Case cases[] = {
+      {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", "parakeet-tdt-v2",
+       "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+       "1ab9323565ddb038682214b292f588070a538ce2", parakeet_v2_files, 4,
+       661190513LL},
+      {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", "parakeet-tdt-v3",
+       "csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+       "2bda32ec70b097a55adaa07d9a7173915b43cc78", parakeet_v3_files, 4,
+       670478772LL},
+      {"sherpa-nemo-canary-180m-flash-int8", "canary-180m",
+       "csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8",
+       "9077164e0d3dd1d5353743e89ceaa1d3a770838c", canary_files, 3,
+       207170046LL},
+  };
+
+  for (const Case &test_case : cases) {
+    const rcli::catalog::CatalogEntry *entry =
+        rcli::catalog::find(test_case.id);
+    if (!entry || entry != rcli::catalog::find(test_case.alias)) {
+      result.details =
+          std::string(test_case.id) + " should resolve by exact id and alias";
+      return result;
+    }
+    if (entry->category != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        entry->framework != runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA ||
+        entry->format != runanywhere::v1::MODEL_FORMAT_ONNX ||
+        entry->url != nullptr || entry->files == nullptr ||
+        entry->file_count != test_case.file_count ||
+        entry->download_size_bytes != test_case.total_size_bytes) {
+      result.details = std::string(test_case.id) +
+                       " should be an exact Sherpa-ONNX STT bundle";
+      return result;
+    }
+
+    const std::string base_url = std::string("https://huggingface.co/") +
+                                 test_case.repo + "/resolve/" +
+                                 test_case.revision + "/";
+    int64_t manifest_total = 0;
+    for (size_t i = 0; i < test_case.file_count; ++i) {
+      const rcli::catalog::CatalogFile &actual = entry->files[i];
+      const ExpectedFile &expected = test_case.files[i];
+      const std::string expected_url = base_url + expected.filename;
+      if (actual.url == nullptr || actual.filename == nullptr ||
+          std::string(actual.url) != expected_url ||
+          std::string(actual.filename) != expected.filename ||
+          !actual.required || actual.size_bytes != expected.size_bytes) {
+        result.details = std::string(test_case.id) +
+                         " has a mismatched pinned file manifest at index " +
+                         std::to_string(i);
+        return result;
+      }
+      manifest_total += actual.size_bytes;
+    }
+    if (manifest_total != test_case.total_size_bytes) {
+      result.details = std::string(test_case.id) +
+                       " per-file sizes should sum to the exact bundle total";
+      return result;
+    }
+  }
+
+  const rcli::catalog::CatalogEntry *parakeet_ctc =
+      rcli::catalog::find("sherpa-nemo-parakeet-ctc-1.1b-int8");
+  if (!parakeet_ctc || parakeet_ctc != rcli::catalog::find("parakeet-ctc") ||
+      parakeet_ctc->category !=
+          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      parakeet_ctc->framework != runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA ||
+      parakeet_ctc->format != runanywhere::v1::MODEL_FORMAT_ONNX ||
+      parakeet_ctc->url != nullptr || parakeet_ctc->files == nullptr ||
+      parakeet_ctc->file_count != 2 ||
+      parakeet_ctc->download_size_bytes != 1110024519LL ||
+      parakeet_ctc->memory_required_bytes != 2147483648LL) {
+    result.details = "Parakeet CTC should be an exact Sherpa-ONNX bundle";
+    return result;
+  }
+
+  const std::string base_url = "https://huggingface.co/OpenVoiceOS/"
+                               "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
+                               "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/";
+  const rcli::catalog::CatalogFile &model = parakeet_ctc->files[0];
+  const rcli::catalog::CatalogFile &tokens = parakeet_ctc->files[1];
+  if (std::string(model.url) != base_url + "model.int8.onnx" ||
+      std::string(model.filename) != "model.int8.onnx" || !model.required ||
+      model.size_bytes != 1110014145LL || model.checksum_sha256 == nullptr ||
+      std::string(model.checksum_sha256) !=
+          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
+      model.append_bytes_transform == nullptr) {
+    result.details = "Parakeet CTC final model descriptor is not exact";
+    return result;
+  }
+  const rcli::catalog::CatalogAppendBytesTransform &transform =
+      *model.append_bytes_transform;
+  std::string payload_hex;
+  constexpr char kHexDigits[] = "0123456789abcdef";
+  for (size_t i = 0; i < transform.payload_size; ++i) {
+    const auto byte = static_cast<unsigned char>(transform.payload[i]);
+    payload_hex.push_back(kHexDigits[byte >> 4]);
+    payload_hex.push_back(kHexDigits[byte & 0x0f]);
+  }
+  if (transform.source_size_bytes != 1110014069LL ||
+      transform.source_checksum_sha256 == nullptr ||
+      std::string(transform.source_checksum_sha256) !=
+          "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d" ||
+      transform.payload_size != 76 ||
+      payload_hex !=
+          "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c"
+          "696e675f666163746f72120138721d0a0e6e6f726d616c697a655f7479706512"
+          "0b7065725f66656174757265") {
+    result.details = "Parakeet CTC source transform is not exact";
+    return result;
+  }
+  if (std::string(tokens.url) != base_url + "vocab.txt" ||
+      std::string(tokens.filename) != "tokens.txt" || !tokens.required ||
+      tokens.size_bytes != 10374LL || tokens.checksum_sha256 == nullptr ||
+      std::string(tokens.checksum_sha256) !=
+          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921" ||
+      tokens.append_bytes_transform != nullptr) {
+    result.details = "Parakeet CTC vocabulary rename/checksum is not exact";
     return result;
   }
 
@@ -392,8 +644,8 @@ private:
   std::vector<std::string> ids_;
 };
 
-bool get_registered_model(const std::string &id, runanywhere::v1::ModelInfo *out,
-                          std::string *error) {
+bool get_registered_model(const std::string &id,
+                          runanywhere::v1::ModelInfo *out, std::string *error) {
   rac_proto_buffer_t found;
   rac_proto_buffer_init(&found);
   const rac_result_t rc = rac_model_registry_get_proto_buffer(
@@ -422,8 +674,19 @@ TestResult test_mlx_catalog_registration() {
       "mlx-qwen3-embedding-0.6b-4bit-dwq",
       "mlx-qwen3-asr-0.6b-8bit",
       "mlx-glm-asr-nano-2512-4bit",
+      "mlx-llama-3.1-nemotron-nano-8b-v1-4bit",
+      "mlx-nemotron-mini-4b-instruct-4bit",
+      "mlx-parakeet-ctc-1.1b",
+      "mlx-parakeet-tdt-0.6b-v2",
+      "mlx-parakeet-tdt-0.6b-v3",
+      "mlx-parakeet-rnnt-1.1b",
+      "mlx-nemotron-3.5-asr-streaming-0.6b-8bit",
       "mlx-qwen3-tts-12hz-0.6b-base-8bit",
       "mlx-soprano-1.1-80m-5bit",
+      "sherpa-nemo-parakeet-tdt-0.6b-v2-int8",
+      "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+      "sherpa-nemo-parakeet-ctc-1.1b-int8",
+      "sherpa-nemo-canary-180m-flash-int8",
   });
 
   runanywhere::v1::ModelInfo qwen;
@@ -448,8 +711,8 @@ TestResult test_mlx_catalog_registration() {
   }
   bool preprocessor_registered = false;
   for (const auto &file : vlm.multi_file().files()) {
-    preprocessor_registered =
-        preprocessor_registered || file.filename() == "preprocessor_config.json";
+    preprocessor_registered = preprocessor_registered ||
+                              file.filename() == "preprocessor_config.json";
   }
   if (vlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       vlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
@@ -471,9 +734,8 @@ TestResult test_mlx_catalog_registration() {
         processor_registered || file.filename() == "processor_config.json";
     companion_registered =
         companion_registered ||
-        (!file.is_required() &&
-         (file.filename() == "processing_fastvlm.py" ||
-          file.filename() == "llava_qwen.py"));
+        (!file.is_required() && (file.filename() == "processing_fastvlm.py" ||
+                                 file.filename() == "llava_qwen.py"));
   }
   if (fastvlm.category() != runanywhere::v1::MODEL_CATEGORY_MULTIMODAL ||
       fastvlm.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
@@ -492,14 +754,16 @@ TestResult test_mlx_catalog_registration() {
   if (embedding.category() != runanywhere::v1::MODEL_CATEGORY_EMBEDDING ||
       embedding.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       embedding.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
-      !embedding.has_multi_file() || embedding.multi_file().files_size() != 11) {
+      !embedding.has_multi_file() ||
+      embedding.multi_file().files_size() != 11) {
     result.details = "registered MLX embedding metadata is incomplete";
     return result;
   }
 
   runanywhere::v1::ModelInfo qwen_asr;
   if (!get_registered_model("mlx-qwen3-asr-0.6b-8bit", &qwen_asr, &error) ||
-      qwen_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      qwen_asr.category() !=
+          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
       qwen_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !qwen_asr.has_multi_file() || qwen_asr.multi_file().files_size() != 9) {
     result.details = "registered MLX Qwen3-ASR metadata is incomplete";
@@ -508,15 +772,160 @@ TestResult test_mlx_catalog_registration() {
 
   runanywhere::v1::ModelInfo glm_asr;
   if (!get_registered_model("mlx-glm-asr-nano-2512-4bit", &glm_asr, &error) ||
-      glm_asr.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+      glm_asr.category() !=
+          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
       glm_asr.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !glm_asr.has_multi_file() || glm_asr.multi_file().files_size() != 9) {
     result.details = "registered MLX GLM-ASR metadata is incomplete";
     return result;
   }
 
+  struct RegisteredNvidiaCase {
+    const char *id;
+    int expected_files;
+    int64_t expected_size;
+  };
+  const RegisteredNvidiaCase registered_nvidia_cases[] = {
+      {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", 8, 4534806075LL},
+      {"mlx-nemotron-mini-4b-instruct-4bit", 6, 2392679103LL},
+      {"mlx-parakeet-ctc-1.1b", 2, 4250718357LL},
+      {"mlx-parakeet-tdt-0.6b-v2", 2, 2471596080LL},
+      {"mlx-parakeet-tdt-0.6b-v3", 2, 2508532829LL},
+      {"mlx-parakeet-rnnt-1.1b", 2, 4282283914LL},
+      {"mlx-nemotron-3.5-asr-streaming-0.6b-8bit", 2, 755758528LL},
+  };
+  for (const RegisteredNvidiaCase &test_case : registered_nvidia_cases) {
+    runanywhere::v1::ModelInfo model;
+    if (!get_registered_model(test_case.id, &model, &error) ||
+        model.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
+        model.format() != runanywhere::v1::MODEL_FORMAT_SAFETENSORS ||
+        !model.has_multi_file() ||
+        model.multi_file().files_size() != test_case.expected_files ||
+        model.download_size_bytes() != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA MLX metadata is incomplete: ") +
+          test_case.id;
+      return result;
+    }
+  }
+
+  struct RegisteredSherpaCase {
+    const char *id;
+    int expected_files;
+    int64_t expected_size;
+  };
+  const RegisteredSherpaCase registered_sherpa_cases[] = {
+      {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", 4, 661190513LL},
+      {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", 4, 670478772LL},
+      {"sherpa-nemo-parakeet-ctc-1.1b-int8", 2, 1110024519LL},
+      {"sherpa-nemo-canary-180m-flash-int8", 3, 207170046LL},
+  };
+  for (const RegisteredSherpaCase &test_case : registered_sherpa_cases) {
+    runanywhere::v1::ModelInfo model;
+    if (!get_registered_model(test_case.id, &model, &error) ||
+        model.category() !=
+            runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION ||
+        model.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA ||
+        model.format() != runanywhere::v1::MODEL_FORMAT_ONNX ||
+        !model.has_multi_file() ||
+        model.multi_file().files_size() != test_case.expected_files ||
+        model.download_size_bytes() != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA Sherpa metadata is incomplete: ") +
+          test_case.id;
+      return result;
+    }
+    int64_t registered_file_total = 0;
+    for (const auto &file : model.multi_file().files()) {
+      if (!file.has_size_bytes() || file.size_bytes() <= 0) {
+        result.details =
+            std::string("registered NVIDIA Sherpa file size is missing: ") +
+            test_case.id;
+        return result;
+      }
+      registered_file_total += file.size_bytes();
+    }
+    if (registered_file_total != test_case.expected_size) {
+      result.details =
+          std::string("registered NVIDIA Sherpa file sizes do not sum: ") +
+          test_case.id;
+      return result;
+    }
+  }
+
+  runanywhere::v1::ModelInfo parakeet_ctc;
+  if (!get_registered_model("sherpa-nemo-parakeet-ctc-1.1b-int8", &parakeet_ctc,
+                            &error)) {
+    result.details = "registered Parakeet CTC metadata is missing: " + error;
+    return result;
+  }
+  const runanywhere::v1::ModelFileDescriptor *registered_model = nullptr;
+  const runanywhere::v1::ModelFileDescriptor *registered_tokens = nullptr;
+  for (const auto &file : parakeet_ctc.multi_file().files()) {
+    if (file.filename() == "model.int8.onnx") {
+      registered_model = &file;
+    } else if (file.filename() == "tokens.txt") {
+      registered_tokens = &file;
+    }
+  }
+  if (registered_model == nullptr || registered_tokens == nullptr ||
+      registered_model->url() !=
+          "https://huggingface.co/OpenVoiceOS/"
+          "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
+          "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx" ||
+      !registered_model->has_size_bytes() ||
+      registered_model->size_bytes() != 1110014145LL ||
+      !registered_model->has_checksum_sha256() ||
+      registered_model->checksum_sha256() !=
+          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
+      !registered_model->has_post_download_transform() ||
+      !parakeet_ctc.has_memory_required_bytes() ||
+      parakeet_ctc.memory_required_bytes() != 2147483648LL) {
+    result.details =
+        "registered Parakeet CTC final descriptor tuple is incomplete";
+    return result;
+  }
+  const auto &registered_transform =
+      registered_model->post_download_transform();
+  const rcli::catalog::CatalogEntry *catalog_entry =
+      rcli::catalog::find("sherpa-nemo-parakeet-ctc-1.1b-int8");
+  const auto *catalog_transform =
+      catalog_entry == nullptr ? nullptr
+                               : catalog_entry->files[0].append_bytes_transform;
+  if (catalog_transform == nullptr ||
+      registered_transform.source_size_bytes() != 1110014069LL ||
+      registered_transform.source_checksum_sha256() !=
+          "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d" ||
+      registered_transform.final_size_bytes() != 1110014145LL ||
+      registered_transform.final_checksum_sha256() !=
+          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
+      registered_transform.operations_size() != 1 ||
+      !registered_transform.operations(0).has_append_bytes() ||
+      registered_transform.operations(0).append_bytes().payload() !=
+          std::string(catalog_transform->payload,
+                      catalog_transform->payload_size)) {
+    result.details =
+        "registered Parakeet CTC source transform tuple is incomplete";
+    return result;
+  }
+  if (registered_tokens->url() !=
+          "https://huggingface.co/OpenVoiceOS/"
+          "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
+          "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt" ||
+      !registered_tokens->has_size_bytes() ||
+      registered_tokens->size_bytes() != 10374LL ||
+      !registered_tokens->has_checksum_sha256() ||
+      registered_tokens->checksum_sha256() !=
+          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921" ||
+      registered_tokens->has_post_download_transform()) {
+    result.details =
+        "registered Parakeet CTC token rename/checksum is incomplete";
+    return result;
+  }
+
   runanywhere::v1::ModelInfo qwen_tts;
-  if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts, &error) ||
+  if (!get_registered_model("mlx-qwen3-tts-12hz-0.6b-base-8bit", &qwen_tts,
+                            &error) ||
       qwen_tts.category() != runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS ||
       qwen_tts.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_MLX ||
       !qwen_tts.has_multi_file() || qwen_tts.multi_file().files_size() != 12) {
@@ -604,6 +1013,7 @@ int main(int argc, char **argv) {
   suite.add("resolve_home_precedence", test_resolve_home_precedence);
   suite.add("state_dir", test_state_dir);
   suite.add("catalog_lookup", test_catalog_lookup);
+  suite.add("nvidia_sherpa_catalog", test_nvidia_sherpa_catalog);
   suite.add("engine_hint_parsing", test_engine_hint_parsing);
   suite.add("mlx_catalog_registration", test_mlx_catalog_registration);
   suite.add("hf_ref_registration", test_hf_ref_registration);

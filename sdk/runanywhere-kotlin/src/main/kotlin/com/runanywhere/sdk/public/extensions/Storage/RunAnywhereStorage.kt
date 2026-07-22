@@ -68,6 +68,7 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
+    downloadSize: Long? = memoryRequirement,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -84,11 +85,11 @@ suspend fun RunAnywhere.registerModel(
             source = ModelSource.MODEL_SOURCE_REMOTE,
             id = id,
             memory_required_bytes = memoryRequirement,
-            // Mirror Swift `RunAnywhere+Storage.swift`: a caller-supplied size is
-            // both the memory estimate and the download size. Without
-            // download_size_bytes the download planner can't verify free storage
-            // and fails when the server (e.g. an HF redirect) omits Content-Length.
-            download_size_bytes = memoryRequirement,
+            // Memory and transport size usually match in legacy catalogs, so
+            // downloadSize defaults to memoryRequirement. Exact large-model
+            // rows may provide both independently: compatibility needs runtime
+            // headroom while the download planner verifies exact artifact bytes.
+            download_size_bytes = downloadSize,
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
             artifact_type = artifactType,
@@ -167,6 +168,7 @@ suspend fun RunAnywhere.registerModel(
     contextLength: Int? = null,
     supportsThinking: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    downloadSize: Long? = memoryRequirement,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -180,6 +182,11 @@ suspend fun RunAnywhere.registerModel(
             framework = framework,
             category = modality,
             memory_required_bytes = memoryRequirement,
+            // Runtime compatibility and storage planning are independent.
+            // Legacy callers retain the old behavior because downloadSize
+            // defaults to memoryRequirement, while exact catalogs can provide
+            // the aggregate final artifact size separately.
+            download_size_bytes = downloadSize,
             context_length = contextLength,
             supports_thinking = if (supportsThinking) true else null,
             source = source,

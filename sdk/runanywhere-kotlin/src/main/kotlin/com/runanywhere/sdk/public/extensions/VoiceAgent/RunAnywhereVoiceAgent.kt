@@ -132,9 +132,9 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
             model_id = targetID,
             category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
         )
-    val result = CppBridgeModelLifecycle.load(loadRequest)
-    if (result == null || !result.success) {
-        val errorMessage = result?.error_message.orEmpty()
+    val result = loadModel(loadRequest)
+    if (!result.success) {
+        val errorMessage = result.error_message
         voiceAgentLogger.warning(
             "Default VAD '$targetID' auto-load failed: $errorMessage — voice agent will use energy fallback",
         )

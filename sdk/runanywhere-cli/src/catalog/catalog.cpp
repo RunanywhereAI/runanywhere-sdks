@@ -53,6 +53,91 @@ constexpr CatalogFile kMiniLmFiles[] = {
      "vocab.txt", true},
 };
 
+constexpr CatalogFile kSherpaParakeetTdtV2Files[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 652184296LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 7257753LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx",
+     "joiner.int8.onnx", true, 1739080LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/"
+     "1ab9323565ddb038682214b292f588070a538ce2/tokens.txt",
+     "tokens.txt", true, 9384LL},
+};
+
+constexpr CatalogFile kSherpaParakeetTdtV3Files[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 652184281LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 11845275LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx",
+     "joiner.int8.onnx", true, 6355277LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/"
+     "2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt",
+     "tokens.txt", true, 93939LL},
+};
+
+constexpr CatalogFile kSherpaCanary180MFiles[] = {
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx",
+     "encoder.int8.onnx", true, 132678643LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx",
+     "decoder.int8.onnx", true, 74437848LL},
+    {"https://huggingface.co/csukuangfj/"
+     "sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/"
+     "9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt",
+     "tokens.txt", true, 53555LL},
+};
+
+constexpr char kSherpaParakeetCtcMetadata[] = {
+    0x72, 0x12, 0x0a, 0x0a, 0x76, 0x6f, 0x63, 0x61, 0x62, 0x5f, 0x73,
+    0x69, 0x7a, 0x65, 0x12, 0x04, 0x31, 0x30, 0x32, 0x35, 0x72, 0x17,
+    0x0a, 0x12, 0x73, 0x75, 0x62, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x69,
+    0x6e, 0x67, 0x5f, 0x66, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x01,
+    0x38, 0x72, 0x1d, 0x0a, 0x0e, 0x6e, 0x6f, 0x72, 0x6d, 0x61, 0x6c,
+    0x69, 0x7a, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x70,
+    0x65, 0x72, 0x5f, 0x66, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65,
+};
+static_assert(sizeof(kSherpaParakeetCtcMetadata) == 76);
+
+constexpr CatalogAppendBytesTransform kSherpaParakeetCtcTransform = {
+    1110014069LL,
+    "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d",
+    kSherpaParakeetCtcMetadata,
+    sizeof(kSherpaParakeetCtcMetadata),
+};
+
+constexpr CatalogFile kSherpaParakeetCtcFiles[] = {
+    {"https://huggingface.co/OpenVoiceOS/"
+     "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
+     "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx",
+     "model.int8.onnx", true, 1110014145LL,
+     "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+     &kSherpaParakeetCtcTransform},
+    {"https://huggingface.co/OpenVoiceOS/"
+     "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
+     "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt",
+     "tokens.txt", true, 10374LL,
+     "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921"},
+};
+
 constexpr CatalogFile kMlxQwen3_06BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
      "added_tokens.json",
@@ -81,6 +166,70 @@ constexpr CatalogFile kMlxQwen3_06BFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-0.6B-4bit/resolve/main/"
      "vocab.json",
      "vocab.json", true},
+};
+
+constexpr CatalogFile kMlxNemotronNano8BFiles[] = {
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/config.json",
+     "config.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/generation_config.json",
+     "generation_config.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/special_tokens_map.json",
+     "special_tokens_map.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/bourn23/"
+     "nvidia-llama-3.1-nemotron-nano-8b-v1-mlx-4bit/resolve/"
+     "00378e66048eadf358aad0f66c09e5c3750f8243/tokenizer_config.json",
+     "tokenizer_config.json", true},
+};
+
+constexpr CatalogFile kMlxNemotronMini4BFiles[] = {
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/chat_template.jinja",
+     "chat_template.jinja", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/model.safetensors",
+     "model.safetensors", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/"
+     "model.safetensors.index.json",
+     "model.safetensors.index.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/tokenizer.json",
+     "tokenizer.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "Nemotron-Mini-4B-Instruct-4bit-mlx/resolve/"
+     "b5784198153d2d71afcc97d4cc38c049abced8cd/tokenizer_config.json",
+     "tokenizer_config.json", true},
 };
 
 constexpr CatalogFile kMlxLlama32_1BFiles[] = {
@@ -309,6 +458,53 @@ constexpr CatalogFile kMlxGlmAsrNano2512Files[] = {
      "tokenizer_config.json", true},
 };
 
+constexpr CatalogFile kMlxParakeetCtc11BFiles[] = {
+    {"https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/"
+     "295d0c0557aef0c445db79b3d09c9a94a69ffeaf/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-ctc-1.1b/resolve/"
+     "295d0c0557aef0c445db79b3d09c9a94a69ffeaf/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetTdtV2Files[] = {
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/"
+     "8ae155301e23d820d82aa60d24817c900e69e487/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v2/resolve/"
+     "8ae155301e23d820d82aa60d24817c900e69e487/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetTdtV3Files[] = {
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/"
+     "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-tdt-0.6b-v3/resolve/"
+     "ed2b7e8c15f9aaa0b5772e2efb986255eaef7e15/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxParakeetRnnt11BFiles[] = {
+    {"https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/"
+     "7f399a0d3442123deae9194e71f5c984b2879efa/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/parakeet-rnnt-1.1b/resolve/"
+     "7f399a0d3442123deae9194e71f5c984b2879efa/model.safetensors",
+     "model.safetensors", true},
+};
+
+constexpr CatalogFile kMlxNemotronStreamingAsrFiles[] = {
+    {"https://huggingface.co/mlx-community/"
+     "nemotron-3.5-asr-streaming-0.6b-8bit/resolve/"
+     "7279359e4481b5e9e185a318bd618e429c6d86cd/config.json",
+     "config.json", true},
+    {"https://huggingface.co/mlx-community/"
+     "nemotron-3.5-asr-streaming-0.6b-8bit/resolve/"
+     "7279359e4481b5e9e185a318bd618e429c6d86cd/model.safetensors",
+     "model.safetensors", true},
+};
+
 constexpr CatalogFile kMlxQwen3Tts06BBaseFiles[] = {
     {"https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/"
      "resolve/main/"
@@ -417,25 +613,27 @@ constexpr CatalogFile kMlxBonsai27B1BitFiles[] = {
 // PrismML Bonsai 1-bit MLX at 1.7B/4B/8B — same 8-file set as the 27B above
 // (mlx-swift-lm needs weights + tokenizer + config; vision preprocessor stubs
 // on some repos are not required for text-only LLM use).
-#define BONSAI_MLX_FILES(repo)                                               \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/chat_template.jinja", \
-   "chat_template.jinja", true},                                             \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",      \
-   "config.json", true},                                                    \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/merges.txt",       \
-   "merges.txt", true},                                                     \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/model.safetensors", \
-   "model.safetensors", true},                                              \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/model.safetensors.index.json",                            \
-   "model.safetensors.index.json", true},                                   \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json",   \
-   "tokenizer.json", true},                                                 \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/tokenizer_config.json",                                   \
-   "tokenizer_config.json", true},                                          \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/vocab.json",       \
-   "vocab.json", true},
+#define BONSAI_MLX_FILES(repo)                                                 \
+  {"https://huggingface.co/prism-ml/" repo                                     \
+   "/resolve/main/chat_template.jinja",                                        \
+   "chat_template.jinja", true},                                               \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",    \
+       "config.json", true},                                                   \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/merges.txt",     \
+       "merges.txt", true},                                                    \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors",                                      \
+       "model.safetensors", true},                                             \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors.index.json",                           \
+       "model.safetensors.index.json", true},                                  \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json", \
+       "tokenizer.json", true},                                                \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/tokenizer_config.json",                                  \
+       "tokenizer_config.json", true},                                         \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/vocab.json",     \
+       "vocab.json", true},
 
 constexpr CatalogFile kMlxBonsai1_7B1BitFiles[] = {
     BONSAI_MLX_FILES("Bonsai-1.7B-mlx-1bit")};
@@ -448,21 +646,23 @@ constexpr CatalogFile kMlxBonsai8B1BitFiles[] = {
 // merges.txt/vocab.json (tokenizer.json is the self-contained fast-tokenizer
 // format here), unlike the plain-Bonsai repos above. Verified via HF API file
 // listing this session — do not add those two filenames or the download 404s.
-#define TERNARY_BONSAI_MLX_FILES_SMALL(repo)                                 \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/chat_template.jinja", \
-   "chat_template.jinja", true},                                             \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",      \
-   "config.json", true},                                                    \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/model.safetensors", \
-   "model.safetensors", true},                                              \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/model.safetensors.index.json",                            \
-   "model.safetensors.index.json", true},                                   \
-  {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json",   \
-   "tokenizer.json", true},                                                 \
-  {"https://huggingface.co/prism-ml/" repo                                  \
-   "/resolve/main/tokenizer_config.json",                                   \
-   "tokenizer_config.json", true},
+#define TERNARY_BONSAI_MLX_FILES_SMALL(repo)                                   \
+  {"https://huggingface.co/prism-ml/" repo                                     \
+   "/resolve/main/chat_template.jinja",                                        \
+   "chat_template.jinja", true},                                               \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/config.json",    \
+       "config.json", true},                                                   \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors",                                      \
+       "model.safetensors", true},                                             \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/model.safetensors.index.json",                           \
+       "model.safetensors.index.json", true},                                  \
+      {"https://huggingface.co/prism-ml/" repo "/resolve/main/tokenizer.json", \
+       "tokenizer.json", true},                                                \
+      {"https://huggingface.co/prism-ml/" repo                                 \
+       "/resolve/main/tokenizer_config.json",                                  \
+       "tokenizer_config.json", true},
 
 constexpr CatalogFile kMlxTernaryBonsai1_7B2BitFiles[] = {
     TERNARY_BONSAI_MLX_FILES_SMALL("Ternary-Bonsai-1.7B-mlx-2bit")};
@@ -576,6 +776,26 @@ constexpr CatalogEntry kCatalog[] = {
      "runanywhere-models-v1/"
      "sherpa-onnx-whisper-tiny.en.tar.gz",
      nullptr, 0, 75 * MB, 0, false},
+    {"sherpa-nemo-parakeet-tdt-0.6b-v2-int8", "parakeet-tdt-v2",
+     "NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaParakeetTdtV2Files, 4, 661190513LL,
+     0, false},
+    {"sherpa-nemo-parakeet-tdt-0.6b-v3-int8", "parakeet-tdt-v3",
+     "NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaParakeetTdtV3Files, 4, 670478772LL,
+     0, false},
+    {"sherpa-nemo-parakeet-ctc-1.1b-int8", "parakeet-ctc",
+     "NVIDIA Parakeet CTC 1.1B INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaParakeetCtcFiles, 2, 1110024519LL,
+     0, false, 2147483648LL},
+    {"sherpa-nemo-canary-180m-flash-int8", "canary-180m",
+     "NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_SHERPA,
+     v1::MODEL_FORMAT_ONNX, nullptr, kSherpaCanary180MFiles, 3, 207170046LL, 0,
+     false},
     {"vits-piper-en_US-lessac-medium", "piper",
      "Piper TTS US English (Lessac Medium)",
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_SHERPA,
@@ -597,6 +817,29 @@ constexpr CatalogEntry kCatalog[] = {
      nullptr, 0, 2327524, 0, false},
 
     // --- Embeddings ---
+    {"nemotron-3-embed-1b-q4_k_m", "nemotron-3-embed",
+     "NVIDIA Nemotron 3 Embed 1B Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/zenmagnets/"
+     "Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/"
+     "06df1fde6f7009c91f6cc3cd520081921929a678/"
+     "nemotron-3-embed-1b-q4_k_m.gguf",
+     nullptr, 0, 749352096LL, 0, false},
+    {"llama-nemotron-embed-1b-v2-q4_k_m", "llama-nemotron-embed",
+     "NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/"
+     "resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/"
+     "llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
+     nullptr, 0, 807690624LL, 0, false},
+    // NVIDIA Llama Embed Nemotron 8B — portable GGUF previously HNPU-only.
+    {"llama-embed-nemotron-8b-q4_k_m", "llama-embed-nemotron",
+     "NVIDIA Llama Embed Nemotron 8B Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/"
+     "resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/"
+     "llama-embed-nemotron-8b.Q4_K_M.gguf",
+     nullptr, 0, 4625233184LL, 0, false},
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
@@ -619,6 +862,16 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
      v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxQwen3_06BFiles, 9, 351383618,
      4096, true},
+    {"mlx-llama-3.1-nemotron-nano-8b-v1-4bit", "mlx-nemotron-nano",
+     "NVIDIA Llama 3.1 Nemotron Nano 8B 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronNano8BFiles, 8,
+     4534806075LL, 131072, false},
+    {"mlx-nemotron-mini-4b-instruct-4bit", "mlx-nemotron-mini",
+     "NVIDIA Nemotron Mini 4B Instruct 4-bit (MLX)",
+     v1::MODEL_CATEGORY_LANGUAGE, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronMini4BFiles, 6,
+     2392679103LL, 4096, false},
     // PrismML Bonsai family 1-bit MLX. Needs the PrismML mlx-swift fork
     // (bits=1 quantization support) pinned in Package.swift/Package.resolved.
     {"mlx-bonsai-1.7b-1bit", "mlx-bonsai-1.7b", "MLX Bonsai-1.7B 1-bit",
@@ -670,8 +923,8 @@ constexpr CatalogEntry kCatalog[] = {
      kMlxQwen2Vl2BFiles, 11, 1261853827, 2048, false},
     {"mlx-fastvlm-0.5b-bf16", "mlx-fastvlm", "FastVLM 0.5B bf16 (MLX)",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_MLX,
-     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14,
-     1256926974, 2048, false},
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxFastVlm05BFiles, 14, 1256926974,
+     2048, false},
     {"mlx-qwen3-embedding-0.6b-4bit-dwq", "mlx-qwen3-embed",
      "Qwen3 Embedding 0.6B 4-bit DWQ (MLX)", v1::MODEL_CATEGORY_EMBEDDING,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
@@ -684,6 +937,27 @@ constexpr CatalogEntry kCatalog[] = {
      "GLM-ASR Nano 2512 4-bit (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
      v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
      kMlxGlmAsrNano2512Files, 9, 1288437789, 0, false},
+    {"mlx-parakeet-ctc-1.1b", "mlx-parakeet-ctc",
+     "NVIDIA Parakeet CTC 1.1B (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetCtc11BFiles, 2, 4250718357LL, 0, false},
+    {"mlx-parakeet-tdt-0.6b-v2", "mlx-parakeet-tdt-v2",
+     "NVIDIA Parakeet TDT 0.6B v2 (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetTdtV2Files, 2, 2471596080LL, 0, false},
+    {"mlx-parakeet-tdt-0.6b-v3", "mlx-parakeet-tdt-v3",
+     "NVIDIA Parakeet TDT 0.6B v3 (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetTdtV3Files, 2, 2508532829LL, 0, false},
+    {"mlx-parakeet-rnnt-1.1b", "mlx-parakeet-rnnt",
+     "NVIDIA Parakeet RNNT 1.1B (MLX)", v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+     v1::INFERENCE_FRAMEWORK_MLX, v1::MODEL_FORMAT_SAFETENSORS, nullptr,
+     kMlxParakeetRnnt11BFiles, 2, 4282283914LL, 0, false},
+    {"mlx-nemotron-3.5-asr-streaming-0.6b-8bit", "mlx-nemotron-asr",
+     "NVIDIA Nemotron 3.5 Streaming ASR 0.6B 8-bit (MLX)",
+     v1::MODEL_CATEGORY_SPEECH_RECOGNITION, v1::INFERENCE_FRAMEWORK_MLX,
+     v1::MODEL_FORMAT_SAFETENSORS, nullptr, kMlxNemotronStreamingAsrFiles, 2,
+     755758528LL, 0, false},
     {"mlx-qwen3-tts-12hz-0.6b-base-8bit", "mlx-qwen3-tts",
      "Qwen3-TTS 12Hz 0.6B Base 8-bit (MLX)",
      v1::MODEL_CATEGORY_SPEECH_SYNTHESIS, v1::INFERENCE_FRAMEWORK_MLX,
@@ -733,6 +1007,9 @@ rac_result_t register_entry(const CatalogEntry &entry) {
     request.set_category(entry.category);
     request.set_format(entry.format);
     request.set_download_size_bytes(entry.download_size_bytes);
+    if (entry.memory_required_bytes > 0) {
+      request.set_memory_required_bytes(entry.memory_required_bytes);
+    }
     if (entry.context_length > 0) {
       request.set_context_length(entry.context_length);
     }
@@ -744,6 +1021,26 @@ rac_result_t register_entry(const CatalogEntry &entry) {
       file->set_url(entry.files[i].url);
       file->set_filename(entry.files[i].filename);
       file->set_is_required(entry.files[i].required);
+      if (entry.files[i].size_bytes > 0) {
+        file->set_size_bytes(entry.files[i].size_bytes);
+      }
+      if (entry.files[i].checksum_sha256 != nullptr) {
+        file->set_checksum_sha256(entry.files[i].checksum_sha256);
+      }
+      if (entry.files[i].append_bytes_transform != nullptr) {
+        const CatalogAppendBytesTransform &source =
+            *entry.files[i].append_bytes_transform;
+        v1::PostDownloadTransform *transform =
+            file->mutable_post_download_transform();
+        transform->set_source_size_bytes(source.source_size_bytes);
+        transform->set_source_checksum_sha256(source.source_checksum_sha256);
+        transform->set_final_size_bytes(entry.files[i].size_bytes);
+        transform->set_final_checksum_sha256(entry.files[i].checksum_sha256);
+        v1::PostDownloadTransformOperation *operation =
+            transform->add_operations();
+        operation->mutable_append_bytes()->set_payload(
+            std::string(source.payload, source.payload_size));
+      }
     }
     const std::string bytes = proto::serialize(request);
     rc = rac_register_multi_file_model_proto(
