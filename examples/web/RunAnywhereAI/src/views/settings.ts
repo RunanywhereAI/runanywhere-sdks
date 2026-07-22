@@ -15,6 +15,7 @@
 import {
   environmentDescription,
   environmentShouldSendTelemetry,
+  getStoredHfToken,
   RunAnywhere,
 } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
@@ -233,6 +234,31 @@ export function initSettingsTab(el: HTMLElement): void {
         </div>
       </div>
 
+      <!-- Hugging Face access token for gated/private model downloads. The SDK
+           owns storage (RunAnywhere.setHfToken); this app never writes it to its
+           own localStorage, matching the iOS Keychain / Android Keystore examples. -->
+      <div class="settings-section">
+        <div class="settings-section-title">Hugging Face Access</div>
+        <div class="setting-row">
+          <span class="setting-label">Token</span>
+          <span class="setting-value" id="settings-hf-state">${getStoredHfToken() ? 'Configured' : 'Not set'}</span>
+        </div>
+        <div class="setting-row setting-row--stacked">
+          <input type="password" class="text-input w-full" id="settings-hf-token" placeholder="hf_..." autocomplete="off" spellcheck="false">
+          <p class="setting-hint">
+            Optional. Add a Hugging Face token to download gated or private
+            models; public models need none. The token is passed to the SDK via
+            <code>RunAnywhere.setHfToken</code> and is never written to this
+            app's settings or logs.
+            <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
+          </p>
+          <div class="flex items-center gap-sm">
+            <button type="button" class="btn btn-secondary" id="settings-hf-clear">Clear</button>
+            <span class="setting-hint" id="settings-hf-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+
       <!-- Logging -->
       <div class="settings-section">
         <div class="settings-section-title">Logging</div>
@@ -314,6 +340,33 @@ export function initSettingsTab(el: HTMLElement): void {
   const status = container.querySelector('#settings-api-status') as HTMLElement;
   applyButton.addEventListener('click', () => {
     void applyAPIConfiguration(apiKeyInput, baseURLInput, applyButton, status);
+  });
+
+  // Hugging Face access token. Storage is SDK-owned (RunAnywhere.setHfToken /
+  // getStoredHfToken); the token is never written to this app's localStorage,
+  // matching the iOS Keychain / Android Keystore examples. Public models need
+  // no token; gated/private models download once a token is set.
+  const hfInput = container.querySelector('#settings-hf-token') as HTMLInputElement;
+  const hfState = container.querySelector('#settings-hf-state') as HTMLElement;
+  const hfStatus = container.querySelector('#settings-hf-status') as HTMLElement;
+  hfInput.addEventListener('change', () => {
+    const token = hfInput.value.trim();
+    if (!token) return;
+    try {
+      RunAnywhere.setHfToken(token);
+      hfInput.value = '';
+      hfState.textContent = 'Configured';
+      hfStatus.textContent = 'Token saved for model downloads.';
+    } catch (error) {
+      hfStatus.textContent =
+        error instanceof Error ? error.message : 'Failed to set the token.';
+    }
+  });
+  container.querySelector('#settings-hf-clear')!.addEventListener('click', () => {
+    RunAnywhere.setHfToken(null);
+    hfInput.value = '';
+    hfState.textContent = 'Not set';
+    hfStatus.textContent = 'Token cleared.';
   });
 
   // Docs link

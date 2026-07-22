@@ -53,6 +53,8 @@ class SDKComponent extends $pb.ProtobufEnum {
   static const SDKComponent SDK_COMPONENT_SEMANTIC_SEGMENTATION =
       SDKComponent._(
           12, _omitEnumNames ? '' : 'SDK_COMPONENT_SEMANTIC_SEGMENTATION');
+  static const SDKComponent SDK_COMPONENT_RERANK =
+      SDKComponent._(13, _omitEnumNames ? '' : 'SDK_COMPONENT_RERANK');
 
   static const $core.List<SDKComponent> values = <SDKComponent>[
     SDK_COMPONENT_UNSPECIFIED,
@@ -68,10 +70,11 @@ class SDKComponent extends $pb.ProtobufEnum {
     SDK_COMPONENT_WAKEWORD,
     SDK_COMPONENT_SPEAKER_DIARIZATION,
     SDK_COMPONENT_SEMANTIC_SEGMENTATION,
+    SDK_COMPONENT_RERANK,
   ];
 
   static final $core.List<SDKComponent?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 12);
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
   static SDKComponent? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

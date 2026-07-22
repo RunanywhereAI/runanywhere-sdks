@@ -21,10 +21,6 @@ import MLXAudioSTT
 import MLXAudioTTS
 #endif
 
-#if canImport(MLXAudioVAD)
-import MLXAudioVAD
-#endif
-
 #if RUNANYWHERE_MLX_DISTRIBUTION
 // The CocoaPods distribution uses a tiny dynamic XCFramework to carry the
 // platform-selected Metal library. This strong reference makes the final app
@@ -112,10 +108,6 @@ public enum MLX {
         callbacks.tts_synthesize_stream = mlxTTSSynthesizeStream
         callbacks.tts_stop = mlxTTSStop
         callbacks.tts_info = mlxTTSInfo
-        callbacks.diarize = mlxDiarize
-        callbacks.diarization_stream_create = mlxDiarizationStreamCreate
-        callbacks.diarization_stream_feed = mlxDiarizationStreamFeed
-        callbacks.diarization_stream_destroy = mlxDiarizationStreamDestroy
         callbacks.cancel = mlxCancel
         callbacks.cleanup = mlxCleanup
         callbacks.destroy = mlxDestroy
@@ -223,7 +215,6 @@ private enum MLXSessionKind {
     case embeddings
     case stt
     case tts
-    case diarization
 }
 
 private struct TransformersTokenizerLoader: TokenizerLoader {
@@ -449,24 +440,6 @@ private struct MLXTTSOptionsSnapshot: Sendable {
     }
 }
 
-private struct MLXDiarizationOptionsSnapshot: Sendable {
-    let value: MLXSortformerOptions
-
-    init(_ options: UnsafePointer<rac_diarization_options_t>?) throws {
-        let resolved = options?.pointee ?? RAC_DIARIZATION_OPTIONS_DEFAULT
-        guard resolved.channel_count == 1 else {
-            throw MLXRuntimeError.unsupportedAudioFormat
-        }
-        var value = MLXSortformerOptions()
-        value.sampleRate = Int(resolved.sample_rate_hz)
-        value.threshold = resolved.threshold
-        value.minimumDuration = Float(resolved.minimum_duration_ms) / 1_000
-        value.mergeGap = Float(resolved.merge_gap_ms) / 1_000
-        try value.validateConfiguration()
-        self.value = value
-    }
-}
-
 /// The native callback owns this opaque context for the duration of its
 /// synchronous MLX call. `syncWait` completes before that call returns, so the
 /// pointer is only transported back to the same callback and is never retained.
@@ -605,18 +578,6 @@ private enum RepetitionRunDecision {
     case stop
 }
 
-enum MLXSessionCancellationGate {
-    static func run<Value>(
-        isCancelled: () -> Bool,
-        operation: () async throws -> Value
-    ) async throws -> Value {
-        if isCancelled() { throw CancellationError() }
-        let value = try await operation()
-        if isCancelled() { throw CancellationError() }
-        return value
-    }
-}
-
 // swiftlint:disable:next type_body_length
 private final class MLXSession: @unchecked Sendable {
     private struct State {
@@ -637,9 +598,6 @@ private final class MLXSession: @unchecked Sendable {
         #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
         var sttModel: STTGenerationModel?
         var ttsModel: SpeechGenerationModel?
-        #endif
-        #if canImport(MLXAudioVAD)
-        var sortformerProvider: MLXSortformerProvider?
         #endif
     }
 
@@ -697,13 +655,6 @@ private final class MLXSession: @unchecked Sendable {
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             let model = try await MLXAudioTTS.TTS.loadModel(modelRepo: directory.path)
             modelLock.withLockUnchecked { $0.ttsModel = model }
-            #else
-            throw MLXRuntimeError.mlxAudioUnavailable
-            #endif
-        case .diarization:
-            #if canImport(MLXAudioVAD)
-            let provider = try MLXSortformerProvider(modelDirectory: directory)
-            modelLock.withLockUnchecked { $0.sortformerProvider = provider }
             #else
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
@@ -779,9 +730,6 @@ private final class MLXSession: @unchecked Sendable {
             #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
             models.sttModel = nil
             models.ttsModel = nil
-            #endif
-            #if canImport(MLXAudioVAD)
-            models.sortformerProvider = nil
             #endif
         }
         if isGenerationSession {
@@ -1186,54 +1134,6 @@ private final class MLXSession: @unchecked Sendable {
         return info
     }
 
-    func diarize(
-        samples: [Float],
-        options: MLXDiarizationOptionsSnapshot
-    ) async throws -> MLXSortformerResult {
-        #if canImport(MLXAudioVAD)
-        guard let provider = modelLock.withLockUnchecked({ $0.sortformerProvider }) else {
-            throw MLXRuntimeError.notLoaded(modelID)
-        }
-        return try await MLXSessionCancellationGate.run(
-            isCancelled: { self.isCancelled },
-            operation: {
-                try await provider.diarize(samples: samples, options: options.value)
-            }
-        )
-        #else
-        throw MLXRuntimeError.mlxAudioUnavailable
-        #endif
-    }
-
-    func makeDiarizationStream(
-        options: MLXDiarizationOptionsSnapshot
-    ) throws -> MLXSortformerPersistentStream {
-        #if canImport(MLXAudioVAD)
-        guard let provider = modelLock.withLockUnchecked({ $0.sortformerProvider }) else {
-            throw MLXRuntimeError.notLoaded(modelID)
-        }
-        return try provider.makePersistentStream(options: options.value)
-        #else
-        throw MLXRuntimeError.mlxAudioUnavailable
-        #endif
-    }
-
-    func feedDiarizationStream(
-        _ stream: MLXSortformerPersistentStream,
-        samples: [Float]
-    ) async throws -> MLXSortformerResult {
-        #if canImport(MLXAudioVAD)
-        return try await MLXSessionCancellationGate.run(
-            isCancelled: { self.isCancelled },
-            operation: {
-                try await stream.feed(samples: samples)
-            }
-        )
-        #else
-        throw MLXRuntimeError.mlxAudioUnavailable
-        #endif
-    }
-
     private var isCancelled: Bool {
         lock.withLock { $0.isCancelled }
     }
@@ -1261,8 +1161,6 @@ private final class MLXSession: @unchecked Sendable {
             return "STT"
         case .tts:
             return "TTS"
-        case .diarization:
-            return "speaker diarization"
         }
     }
 
@@ -1661,8 +1559,6 @@ private let mlxCreate: rac_mlx_create_fn = { kind, modelIDPtr, outHandle, _ in
         sessionKind = .stt
     case RAC_MLX_SESSION_KIND_TTS:
         sessionKind = .tts
-    case RAC_MLX_SESSION_KIND_DIARIZATION:
-        sessionKind = .diarization
     default:
         sessionKind = .llm
     }
@@ -1997,162 +1893,6 @@ private let mlxTTSInfo: rac_mlx_tts_info_fn = { handle, outInfo, _ in
     outInfo.pointee = session.ttsInfo()
     return RAC_SUCCESS
 }
-
-private final class MLXDiarizationStreamHandle: @unchecked Sendable {
-    let owner: ObjectIdentifier
-    let stream: MLXSortformerPersistentStream
-
-    init(owner: MLXSession, stream: MLXSortformerPersistentStream) {
-        self.owner = ObjectIdentifier(owner)
-        self.stream = stream
-    }
-}
-
-private func mlxDiarizationStream(
-    from handle: rac_handle_t?,
-    owner: MLXSession
-) -> MLXDiarizationStreamHandle? {
-    guard let handle else { return nil }
-    let stream = Unmanaged<MLXDiarizationStreamHandle>.fromOpaque(handle).takeUnretainedValue()
-    return stream.owner == ObjectIdentifier(owner) ? stream : nil
-}
-
-private func fillDiarizationResult(
-    _ result: MLXSortformerResult,
-    modelID: String,
-    outResult: UnsafeMutablePointer<rac_diarization_result_t>
-) -> rac_result_t {
-    outResult.pointee = rac_diarization_result_t()
-    outResult.pointee.speaker_count = Int32(clamping: result.activeSpeakerCount)
-    outResult.pointee.audio_duration_ms = result.audioDurationMilliseconds
-    outResult.pointee.processing_time_ms = result.processingTimeMilliseconds
-    outResult.pointee.model_id = strdup(modelID)
-    guard outResult.pointee.model_id != nil else { return RAC_ERROR_OUT_OF_MEMORY }
-
-    guard !result.segments.isEmpty else { return RAC_SUCCESS }
-    let count = result.segments.count
-    guard let rawSegments = calloc(count, MemoryLayout<rac_diarization_segment_t>.stride) else {
-        rac_diarization_result_free(outResult)
-        return RAC_ERROR_OUT_OF_MEMORY
-    }
-    let segments = rawSegments.bindMemory(to: rac_diarization_segment_t.self, capacity: count)
-    outResult.pointee.segments = segments
-    outResult.pointee.segment_count = count
-
-    for (index, source) in result.segments.enumerated() {
-        segments[index].start_ms = source.startMilliseconds
-        segments[index].end_ms = source.endMilliseconds
-        segments[index].speaker_index = Int32(clamping: source.speakerIndex)
-        segments[index].speaker_id = strdup(source.speakerID)
-        if segments[index].speaker_id == nil {
-            rac_diarization_result_free(outResult)
-            return RAC_ERROR_OUT_OF_MEMORY
-        }
-    }
-    return RAC_SUCCESS
-}
-
-private let mlxDiarize: rac_mlx_diarize_fn = { handle, samples, sampleCount, options, outResult, _ in
-    guard let session = session(from: handle), let samples, sampleCount > 0, let outResult else {
-        return RAC_ERROR_INVALID_PARAMETER
-    }
-    let optionsSnapshot: MLXDiarizationOptionsSnapshot
-    do {
-        optionsSnapshot = try MLXDiarizationOptionsSnapshot(options)
-    } catch {
-        recordMLXFailure("MLX speaker diarization options", error: error)
-        return RAC_ERROR_INVALID_ARGUMENT
-    }
-    let input = Array(UnsafeBufferPointer(start: samples, count: Int(sampleCount)))
-    switch syncWait({ try await session.diarize(samples: input, options: optionsSnapshot) }) {
-    case .success(let result):
-        return fillDiarizationResult(result, modelID: session.modelID, outResult: outResult)
-    case .failure(let error):
-        if error is CancellationError { return RAC_ERROR_CANCELLED }
-        if let providerError = error as? MLXSortformerProviderError,
-           providerError == .providerBusy {
-            return RAC_ERROR_INVALID_STATE
-        }
-        recordMLXFailure("MLX speaker diarization", error: error)
-        return RAC_ERROR_INFERENCE_FAILED
-    }
-}
-
-// swiftlint:disable closure_parameter_position
-private let mlxDiarizationStreamCreate: rac_mlx_diarization_stream_create_fn = {
-    handle, options, outStreamHandle, _ in
-    guard let session = session(from: handle), let outStreamHandle else {
-        return RAC_ERROR_INVALID_PARAMETER
-    }
-    outStreamHandle.pointee = nil
-    do {
-        let optionsSnapshot = try MLXDiarizationOptionsSnapshot(options)
-        let stream = try session.makeDiarizationStream(options: optionsSnapshot)
-        let holder = MLXDiarizationStreamHandle(owner: session, stream: stream)
-        outStreamHandle.pointee = Unmanaged.passRetained(holder).toOpaque()
-        return RAC_SUCCESS
-    } catch let error as MLXSortformerProviderError where error == .providerBusy {
-        return RAC_ERROR_INVALID_STATE
-    } catch {
-        recordMLXFailure("MLX speaker diarization stream creation", error: error)
-        return RAC_ERROR_INVALID_ARGUMENT
-    }
-}
-
-private let mlxDiarizationStreamFeed: rac_mlx_diarization_stream_feed_fn = {
-    handle, streamHandle, samples, sampleCount, callback, callbackUserData, _ in
-    guard let session = session(from: handle),
-          let stream = mlxDiarizationStream(from: streamHandle, owner: session),
-          let callback,
-          sampleCount == 0 || samples != nil else {
-        return RAC_ERROR_INVALID_PARAMETER
-    }
-
-    let input: [Float]
-    if let samples, sampleCount > 0 {
-        input = Array(UnsafeBufferPointer(start: samples, count: Int(sampleCount)))
-    } else {
-        input = []
-    }
-    switch syncWait({
-        try await session.feedDiarizationStream(stream.stream, samples: input)
-    }) {
-    case .success(let result):
-        var rawResult = rac_diarization_result_t()
-        let fillResult = fillDiarizationResult(
-            result,
-            modelID: session.modelID,
-            outResult: &rawResult
-        )
-        guard fillResult == RAC_SUCCESS else { return fillResult }
-        callback(&rawResult, callbackUserData)
-        rac_diarization_result_free(&rawResult)
-        return RAC_SUCCESS
-    case .failure(let error):
-        if error is CancellationError { return RAC_ERROR_CANCELLED }
-        if let providerError = error as? MLXSortformerProviderError,
-           providerError == .providerBusy || providerError == .streamClosed {
-            return RAC_ERROR_INVALID_STATE
-        }
-        recordMLXFailure("MLX speaker diarization stream feed", error: error)
-        return RAC_ERROR_INFERENCE_FAILED
-    }
-}
-
-private let mlxDiarizationStreamDestroy: rac_mlx_diarization_stream_destroy_fn = {
-    handle, streamHandle, _ in
-    guard let session = session(from: handle),
-          let streamHandle,
-          mlxDiarizationStream(from: streamHandle, owner: session) != nil else {
-        return RAC_ERROR_INVALID_PARAMETER
-    }
-    let holder = Unmanaged<MLXDiarizationStreamHandle>
-        .fromOpaque(streamHandle)
-        .takeRetainedValue()
-    holder.stream.close()
-    return RAC_SUCCESS
-}
-// swiftlint:enable closure_parameter_position
 
 private let mlxCancel: rac_mlx_cancel_fn = { handle, _ in
     guard let session = session(from: handle) else { return RAC_ERROR_INVALID_PARAMETER }

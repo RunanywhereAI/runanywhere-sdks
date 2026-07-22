@@ -30,10 +30,6 @@ struct FakeSession {
     rac_mlx_session_kind_t kind = RAC_MLX_SESSION_KIND_LLM;
 };
 
-struct FakeDiarizationStream {
-    size_t sample_count = 0;
-};
-
 struct BlockingState {
     std::mutex mutex;
     std::condition_variable changed;
@@ -181,77 +177,6 @@ rac_result_t fake_tts_synthesize(rac_handle_t handle, const char*, const rac_tts
     return RAC_SUCCESS;
 }
 
-rac_result_t fill_fake_diarization_result(size_t sample_count,
-                                          rac_diarization_result_t* out_result) {
-    if (!out_result) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-    *out_result = {};
-    out_result->segments = static_cast<rac_diarization_segment_t*>(
-        std::calloc(1, sizeof(rac_diarization_segment_t)));
-    if (!out_result->segments) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    out_result->segment_count = 1;
-    out_result->segments[0].start_ms = 0;
-    out_result->segments[0].end_ms = static_cast<int64_t>(sample_count * 1000 / 16000);
-    out_result->segments[0].speaker_index = 0;
-    out_result->segments[0].speaker_id = strdup("speaker_0");
-    out_result->model_id = strdup("mlx-test-diarization");
-    if (!out_result->segments[0].speaker_id || !out_result->model_id) {
-        rac_diarization_result_free(out_result);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    out_result->speaker_count = 1;
-    out_result->audio_duration_ms = out_result->segments[0].end_ms;
-    return RAC_SUCCESS;
-}
-
-rac_result_t fake_diarize(rac_handle_t handle, const float*, size_t sample_count,
-                          const rac_diarization_options_t*, rac_diarization_result_t* out_result,
-                          void*) {
-    auto* session = static_cast<FakeSession*>(handle);
-    if (!session || session->kind != RAC_MLX_SESSION_KIND_DIARIZATION || sample_count == 0) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    return fill_fake_diarization_result(sample_count, out_result);
-}
-
-rac_result_t fake_diarization_stream_create(rac_handle_t handle,
-                                            const rac_diarization_options_t*,
-                                            rac_handle_t* out_stream, void*) {
-    auto* session = static_cast<FakeSession*>(handle);
-    if (!session || session->kind != RAC_MLX_SESSION_KIND_DIARIZATION || !out_stream) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    *out_stream = new FakeDiarizationStream();
-    return RAC_SUCCESS;
-}
-
-rac_result_t fake_diarization_stream_feed(rac_handle_t, rac_handle_t stream_handle, const float*,
-                                          size_t sample_count,
-                                          rac_diarization_stream_callback_t callback,
-                                          void* callback_user_data, void*) {
-    auto* stream = static_cast<FakeDiarizationStream*>(stream_handle);
-    if (!stream || !callback) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    stream->sample_count += sample_count;
-    rac_diarization_result_t result = {};
-    const rac_result_t rc = fill_fake_diarization_result(stream->sample_count, &result);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-    callback(&result, callback_user_data);
-    rac_diarization_result_free(&result);
-    return RAC_SUCCESS;
-}
-
-rac_result_t fake_diarization_stream_destroy(rac_handle_t, rac_handle_t stream_handle, void*) {
-    delete static_cast<FakeDiarizationStream*>(stream_handle);
-    return RAC_SUCCESS;
-}
-
 rac_result_t fake_cancel(rac_handle_t handle, void*) {
     auto* session = static_cast<FakeSession*>(handle);
     {
@@ -310,10 +235,6 @@ bool install_callbacks() {
     callbacks.stt_transcribe = fake_stt_transcribe;
     callbacks.tts_synthesize = fake_tts_synthesize;
     callbacks.tts_stop = fake_tts_stop;
-    callbacks.diarize = fake_diarize;
-    callbacks.diarization_stream_create = fake_diarization_stream_create;
-    callbacks.diarization_stream_feed = fake_diarization_stream_feed;
-    callbacks.diarization_stream_destroy = fake_diarization_stream_destroy;
     callbacks.cancel = fake_cancel;
     callbacks.cleanup = fake_cleanup;
     callbacks.destroy = fake_destroy;
@@ -470,84 +391,15 @@ void test_tts_stop_during_blocked_unary_synthesis() {
     ops->destroy(impl);
 }
 
-struct DiarizationCallbackState {
-    int callbacks = 0;
-    int64_t duration_ms = 0;
-    std::string speaker_id;
-};
-
-void capture_diarization(const rac_diarization_result_t* result, void* user_data) {
-    auto* state = static_cast<DiarizationCallbackState*>(user_data);
-    if (!state || !result) {
-        return;
-    }
-    state->callbacks += 1;
-    state->duration_ms = result->audio_duration_ms;
-    if (result->segment_count > 0 && result->segments[0].speaker_id) {
-        state->speaker_id = result->segments[0].speaker_id;
-    }
-}
-
-void test_diarization_vtable_and_persistent_stream() {
-    std::cout << "test_diarization_vtable_and_persistent_stream\n";
-    const auto* vtable = mlx_vtable();
-    check(vtable->diarization_ops != nullptr, "MLX fills the DIARIZE vtable slot");
-    check(rac_engine_vtable_slot(vtable, RAC_PRIMITIVE_DIARIZE) == vtable->diarization_ops,
-          "MLX DIARIZE primitive resolves its vtable slot");
-    const rac_engine_manifest_t* manifest = rac_engine_manifest_find("mlx");
-    bool manifest_has_diarization = false;
-    if (manifest) {
-        for (size_t index = 0; index < manifest->primitives_count; ++index) {
-            manifest_has_diarization =
-                manifest_has_diarization || manifest->primitives[index] == RAC_PRIMITIVE_DIARIZE;
-        }
-    }
-    check(manifest && manifest_has_diarization,
-          "MLX manifest declares the DIARIZE primitive served by its vtable");
-
-    const auto* ops = vtable->diarization_ops;
-    void* impl = nullptr;
-    check(ops->create("mlx-test-diarization", nullptr, &impl) == RAC_SUCCESS,
-          "diarization session creates with the dedicated MLX kind");
-    check(ops->initialize(impl, "/tmp/mlx-test-diarization") == RAC_SUCCESS,
-          "diarization session initializes");
-
-    float samples[1600] = {};
-    rac_diarization_result_t offline = {};
-    check(ops->diarize(impl, samples, 1600, nullptr, &offline) == RAC_SUCCESS,
-          "offline diarization dispatches through the Swift callback table");
-    check(offline.speaker_count == 1 && offline.audio_duration_ms == 100,
-          "offline diarization preserves malloc-owned result fields");
-    rac_diarization_result_free(&offline);
-
-    rac_handle_t stream = nullptr;
-    check(ops->stream_create(impl, nullptr, &stream) == RAC_SUCCESS && stream != nullptr,
-          "persistent diarization stream creates");
-    DiarizationCallbackState callback_state;
-    check(ops->stream_feed_audio_chunk(impl, stream, samples, 1600, capture_diarization,
-                                       &callback_state) == RAC_SUCCESS,
-          "persistent stream feed dispatches synchronously");
-    check(callback_state.callbacks == 1 && callback_state.duration_ms == 100 &&
-              callback_state.speaker_id == "speaker_0",
-          "feed callback is complete before feed returns");
-    check(ops->stream_feed_audio_chunk(impl, stream, nullptr, 0, capture_diarization,
-                                       &callback_state) == RAC_SUCCESS,
-          "persistent stream flush dispatches synchronously");
-    check(callback_state.callbacks == 2, "flush emits exactly one provider snapshot");
-    check(ops->stream_destroy(impl, stream) == RAC_SUCCESS,
-          "persistent stream destroy quiesces and releases the Swift handle");
-    ops->destroy(impl);
-}
-
 }  // namespace
 
 int main() {
     std::cout << "test_mlx_cancellation\n";
     check(install_callbacks(), "MLX test callbacks install");
     const auto* vtable = mlx_vtable();
-    check(vtable && vtable->llm_ops && vtable->tts_ops && vtable->diarization_ops,
-          "MLX LLM/TTS/diarization vtables are available");
-    if (!vtable || !vtable->llm_ops || !vtable->tts_ops || !vtable->diarization_ops) {
+    check(vtable && vtable->llm_ops && vtable->tts_ops,
+          "MLX LLM/TTS vtables are available");
+    if (!vtable || !vtable->llm_ops || !vtable->tts_ops) {
         return EXIT_FAILURE;
     }
     check(rac_plugin_register(vtable) == RAC_SUCCESS,
@@ -556,7 +408,6 @@ int main() {
     test_llm_cancel_during_blocked_inference();
     test_late_interrupt_does_not_poison_successor();
     test_tts_stop_during_blocked_unary_synthesis();
-    test_diarization_vtable_and_persistent_stream();
     check(rac_plugin_unregister("mlx") == RAC_SUCCESS, "MLX test registration unloads cleanly");
 
     std::cout << "  "

@@ -317,17 +317,10 @@ let package = Package(
             name: "RunAnywhereTests",
             dependencies: [
                 "RunAnywhere",
-                "MLXRuntime",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
             path: "Tests/RunAnywhereTests",
             exclude: ["Fixtures"]
-        ),
-
-        .testTarget(
-            name: "MLXRuntimeTests",
-            dependencies: ["MLXRuntime"],
-            path: "Tests/MLXRuntimeTests"
         ),
 
         // -------------------------------------------------------------------

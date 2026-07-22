@@ -158,11 +158,11 @@ public class SegmentationResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<SegmentationResult> =
         object : ProtoAdapter<SegmentationResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SegmentationResult::class,
-      "type.googleapis.com/runanywhere.v1.SegmentationResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SegmentationResult::class, 
+      "type.googleapis.com/runanywhere.v1.SegmentationResult", 
+      PROTO_3, 
+      null, 
       "segmentation.proto"
     ) {
       override fun encodedSize(`value`: SegmentationResult): Int {

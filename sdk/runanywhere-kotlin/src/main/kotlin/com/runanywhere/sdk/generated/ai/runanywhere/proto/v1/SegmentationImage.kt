@@ -112,11 +112,11 @@ public class SegmentationImage(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SegmentationImage> = object : ProtoAdapter<SegmentationImage>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SegmentationImage::class,
-      "type.googleapis.com/runanywhere.v1.SegmentationImage",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SegmentationImage::class, 
+      "type.googleapis.com/runanywhere.v1.SegmentationImage", 
+      PROTO_3, 
+      null, 
       "segmentation.proto"
     ) {
       override fun encodedSize(`value`: SegmentationImage): Int {

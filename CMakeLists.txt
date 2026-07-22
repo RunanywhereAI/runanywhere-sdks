@@ -403,10 +403,9 @@ if(RAC_BUILD_TESTS)
         set_tests_properties(plugin_entry_onnx_tests PROPERTIES
             LABELS "native;onnx;segmentation")
     endif()
-    # Native semantic-segmentation gates. The mandatory fixture target compiles
-    # the production provider against a separately hard-pinned, real tiny ONNX
-    # graph; the production backend remains pinned exclusively to the NVIDIA
-    # bundle. The exact-model parity target is opt-in via environment variables.
+    # Native semantic-segmentation gate. The fixture target compiles the
+    # production provider against a real tiny SegFormer-architecture ONNX graph
+    # to exercise the generic resize/normalize/argmax inference path.
     if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx AND
        TARGET rac_runtime_onnxrt AND RAC_PROTOBUF_RUNTIME_ENABLED)
         add_executable(test_segmentation_onnx
@@ -447,37 +446,6 @@ if(RAC_BUILD_TESTS)
         add_test(NAME segmentation_onnx_tests COMMAND test_segmentation_onnx)
         set_tests_properties(segmentation_onnx_tests PROPERTIES
             LABELS "native;onnx;segmentation;real-fixture")
-
-        add_executable(test_segmentation_onnx_exact
-            sdk/runanywhere-commons/tests/test_segmentation_onnx_exact.cpp)
-        target_include_directories(test_segmentation_onnx_exact PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
-            ${Protobuf_INCLUDE_DIRS}
-        )
-        target_compile_definitions(test_segmentation_onnx_exact PRIVATE RAC_HAVE_PROTOBUF=1)
-        target_link_libraries(test_segmentation_onnx_exact PRIVATE
-            rac_commons
-            rac_backend_onnx
-        )
-        if(TARGET protobuf::libprotobuf)
-            target_link_libraries(test_segmentation_onnx_exact PRIVATE protobuf::libprotobuf)
-        elseif(Protobuf_LIBRARIES)
-            target_link_libraries(test_segmentation_onnx_exact PRIVATE ${Protobuf_LIBRARIES})
-        endif()
-        if(RAC_ABSL_LIBS)
-            target_link_libraries(test_segmentation_onnx_exact PRIVATE ${RAC_ABSL_LIBS})
-        endif()
-        if(COMMAND rac_link_archive_deps)
-            rac_link_archive_deps(test_segmentation_onnx_exact)
-        endif()
-        target_compile_features(test_segmentation_onnx_exact PRIVATE cxx_std_20)
-        add_test(NAME segmentation_onnx_exact_model_tests
-                 COMMAND test_segmentation_onnx_exact)
-        set_tests_properties(segmentation_onnx_exact_model_tests PROPERTIES
-            LABELS "native;onnx;segmentation;exact-model;license-opt-in"
-            SKIP_RETURN_CODE 77)
 
         # Streaming-Sortformer diarization: op-table wiring, the self-contained
         # DSP math (FFT / mel filterbank / median / binarization) vs independent

@@ -33,8 +33,8 @@ public enum class SegmentationPixelFormat(
     @JvmField
     public val ADAPTER: ProtoAdapter<SegmentationPixelFormat> =
         object : EnumAdapter<SegmentationPixelFormat>(
-      SegmentationPixelFormat::class,
-      PROTO_3,
+      SegmentationPixelFormat::class, 
+      PROTO_3, 
       SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SegmentationPixelFormat? = SegmentationPixelFormat.fromValue(`value`)

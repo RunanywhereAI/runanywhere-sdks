@@ -241,30 +241,6 @@ const rac_segmentation_service_ops_t* fixture_segmentation_ops() {
     return &kOps;
 }
 
-std::filesystem::path copy_fixture(const char* suffix) {
-    const auto unique = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
-    const auto destination = std::filesystem::temp_directory_path() /
-                             (std::string("rac-segmentation-") + suffix + unique);
-    std::filesystem::copy(RAC_SEGMENTATION_FIXTURE_DIR, destination,
-                          std::filesystem::copy_options::recursive);
-    return destination;
-}
-
-rac_result_t initialize_bundle_direct(const std::filesystem::path& path) {
-    void* impl = nullptr;
-    const rac_result_t create_rc =
-        g_onnx_segmentation_ops.create(path.string().c_str(), nullptr, &impl);
-    if (create_rc != RAC_SUCCESS || !impl) {
-        return create_rc == RAC_SUCCESS ? RAC_ERROR_BACKEND_NOT_READY : create_rc;
-    }
-    const rac_result_t rc = g_onnx_segmentation_ops.initialize(impl, path.string().c_str());
-    if (g_onnx_segmentation_ops.cleanup) {
-        (void)g_onnx_segmentation_ops.cleanup(impl);
-    }
-    g_onnx_segmentation_ops.destroy(impl);
-    return rc;
-}
-
 }  // namespace
 
 int main() {
@@ -323,32 +299,6 @@ int main() {
     CHECK(!segment_proto(component, malformed, &ignored, &malformed_rc) &&
               malformed_rc == RAC_ERROR_INVALID_ARGUMENT,
           "proto ABI rejects non-tightly-packed pixel bytes");
-
-    const auto bad_checksum = copy_fixture("bad-checksum-");
-    {
-        std::fstream config(bad_checksum / "config.json", std::ios::in | std::ios::out);
-        std::string bytes((std::istreambuf_iterator<char>(config)),
-                          std::istreambuf_iterator<char>());
-        const auto position = bytes.find("class_0");
-        if (position != std::string::npos) {
-            bytes[position + 2] = 'A';
-            config.clear();
-            config.seekp(0);
-            config.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
-        }
-    }
-    CHECK(initialize_bundle_direct(bad_checksum) == RAC_ERROR_MODEL_VALIDATION_FAILED,
-          "bundle checksum is verified against a hard-pinned identity");
-    std::filesystem::remove_all(bad_checksum);
-
-    const auto malformed_json = copy_fixture("malformed-json-");
-    {
-        std::ofstream manifest(malformed_json / "runanywhere-segmentation.json", std::ios::trunc);
-        manifest << "{\"schema_version\":\"wrong-type\"}";
-    }
-    CHECK(initialize_bundle_direct(malformed_json) == RAC_ERROR_MODEL_VALIDATION_FAILED,
-          "malformed JSON types are rejected without crossing the C ABI");
-    std::filesystem::remove_all(malformed_json);
 
     OperationGate gate;
     rac::segmentation::set_component_operation_admitted_test_hook(block_admitted_operation, &gate);

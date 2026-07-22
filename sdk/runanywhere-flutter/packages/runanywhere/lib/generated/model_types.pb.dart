@@ -984,6 +984,246 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
   ExpectedModelFiles ensureExpectedFiles() => $_ensure(4);
 }
 
+/// Deterministic byte-level mutations that commons applies after a source file
+/// has downloaded and passed its transport checksum. Operations execute in
+/// declaration order. The source/final contracts make the transform
+/// restart-safe and fail closed if either the downloaded input or derived
+/// artifact differs from the catalog-pinned bytes.
+class PostDownloadAppendBytes extends $pb.GeneratedMessage {
+  factory PostDownloadAppendBytes({
+    $core.List<$core.int>? payload,
+  }) {
+    final result = create();
+    if (payload != null) result.payload = payload;
+    return result;
+  }
+
+  PostDownloadAppendBytes._();
+
+  factory PostDownloadAppendBytes.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PostDownloadAppendBytes.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostDownloadAppendBytes',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'payload', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadAppendBytes clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadAppendBytes copyWith(
+          void Function(PostDownloadAppendBytes) updates) =>
+      super.copyWith((message) => updates(message as PostDownloadAppendBytes))
+          as PostDownloadAppendBytes;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadAppendBytes create() => PostDownloadAppendBytes._();
+  @$core.override
+  PostDownloadAppendBytes createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadAppendBytes getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PostDownloadAppendBytes>(create);
+  static PostDownloadAppendBytes? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get payload => $_getN(0);
+  @$pb.TagNumber(1)
+  set payload($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPayload() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPayload() => $_clearField(1);
+}
+
+enum PostDownloadTransformOperation_Operation { appendBytes, notSet }
+
+class PostDownloadTransformOperation extends $pb.GeneratedMessage {
+  factory PostDownloadTransformOperation({
+    PostDownloadAppendBytes? appendBytes,
+  }) {
+    final result = create();
+    if (appendBytes != null) result.appendBytes = appendBytes;
+    return result;
+  }
+
+  PostDownloadTransformOperation._();
+
+  factory PostDownloadTransformOperation.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PostDownloadTransformOperation.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, PostDownloadTransformOperation_Operation>
+      _PostDownloadTransformOperation_OperationByTag = {
+    1: PostDownloadTransformOperation_Operation.appendBytes,
+    0: PostDownloadTransformOperation_Operation.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostDownloadTransformOperation',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1])
+    ..aOM<PostDownloadAppendBytes>(1, _omitFieldNames ? '' : 'appendBytes',
+        subBuilder: PostDownloadAppendBytes.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadTransformOperation clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadTransformOperation copyWith(
+          void Function(PostDownloadTransformOperation) updates) =>
+      super.copyWith(
+              (message) => updates(message as PostDownloadTransformOperation))
+          as PostDownloadTransformOperation;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadTransformOperation create() =>
+      PostDownloadTransformOperation._();
+  @$core.override
+  PostDownloadTransformOperation createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadTransformOperation getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PostDownloadTransformOperation>(create);
+  static PostDownloadTransformOperation? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  PostDownloadTransformOperation_Operation whichOperation() =>
+      _PostDownloadTransformOperation_OperationByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  void clearOperation() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  PostDownloadAppendBytes get appendBytes => $_getN(0);
+  @$pb.TagNumber(1)
+  set appendBytes(PostDownloadAppendBytes value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAppendBytes() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAppendBytes() => $_clearField(1);
+  @$pb.TagNumber(1)
+  PostDownloadAppendBytes ensureAppendBytes() => $_ensure(0);
+}
+
+class PostDownloadTransform extends $pb.GeneratedMessage {
+  factory PostDownloadTransform({
+    $fixnum.Int64? sourceSizeBytes,
+    $core.String? sourceChecksumSha256,
+    $fixnum.Int64? finalSizeBytes,
+    $core.String? finalChecksumSha256,
+    $core.Iterable<PostDownloadTransformOperation>? operations,
+  }) {
+    final result = create();
+    if (sourceSizeBytes != null) result.sourceSizeBytes = sourceSizeBytes;
+    if (sourceChecksumSha256 != null)
+      result.sourceChecksumSha256 = sourceChecksumSha256;
+    if (finalSizeBytes != null) result.finalSizeBytes = finalSizeBytes;
+    if (finalChecksumSha256 != null)
+      result.finalChecksumSha256 = finalChecksumSha256;
+    if (operations != null) result.operations.addAll(operations);
+    return result;
+  }
+
+  PostDownloadTransform._();
+
+  factory PostDownloadTransform.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PostDownloadTransform.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PostDownloadTransform',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'sourceSizeBytes')
+    ..aOS(2, _omitFieldNames ? '' : 'sourceChecksumSha256')
+    ..aInt64(3, _omitFieldNames ? '' : 'finalSizeBytes')
+    ..aOS(4, _omitFieldNames ? '' : 'finalChecksumSha256')
+    ..pPM<PostDownloadTransformOperation>(
+        5, _omitFieldNames ? '' : 'operations',
+        subBuilder: PostDownloadTransformOperation.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadTransform clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PostDownloadTransform copyWith(
+          void Function(PostDownloadTransform) updates) =>
+      super.copyWith((message) => updates(message as PostDownloadTransform))
+          as PostDownloadTransform;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadTransform create() => PostDownloadTransform._();
+  @$core.override
+  PostDownloadTransform createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PostDownloadTransform getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PostDownloadTransform>(create);
+  static PostDownloadTransform? _defaultInstance;
+
+  /// The exact bytes fetched from the transport before any operation runs.
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sourceSizeBytes => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sourceSizeBytes($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourceSizeBytes() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourceSizeBytes() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sourceChecksumSha256 => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sourceChecksumSha256($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSourceChecksumSha256() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSourceChecksumSha256() => $_clearField(2);
+
+  /// The exact bytes published at ModelFileDescriptor.local_path after all
+  /// operations run. These values must match the descriptor's size_bytes and
+  /// checksum_sha256, which always describe the final on-disk artifact.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get finalSizeBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set finalSizeBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFinalSizeBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFinalSizeBytes() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get finalChecksumSha256 => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set finalChecksumSha256($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFinalChecksumSha256() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFinalChecksumSha256() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<PostDownloadTransformOperation> get operations => $_getList(4);
+}
+
 class ModelFileDescriptor extends $pb.GeneratedMessage {
   factory ModelFileDescriptor({
     $core.String? url,
@@ -995,6 +1235,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     ModelFileRole? role,
     $core.String? localPath,
     $core.String? checksumSha256,
+    PostDownloadTransform? postDownloadTransform,
   }) {
     final result = create();
     if (url != null) result.url = url;
@@ -1006,6 +1247,8 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     if (role != null) result.role = role;
     if (localPath != null) result.localPath = localPath;
     if (checksumSha256 != null) result.checksumSha256 = checksumSha256;
+    if (postDownloadTransform != null)
+      result.postDownloadTransform = postDownloadTransform;
     return result;
   }
 
@@ -1032,6 +1275,9 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
         enumValues: ModelFileRole.values)
     ..aOS(9, _omitFieldNames ? '' : 'localPath')
     ..aOS(10, _omitFieldNames ? '' : 'checksumSha256')
+    ..aOM<PostDownloadTransform>(
+        11, _omitFieldNames ? '' : 'postDownloadTransform',
+        subBuilder: PostDownloadTransform.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1084,6 +1330,8 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
   /// canonical "required" flag — the documented `required` boolean from
   /// newer SDK sources maps onto it (default true, mirrored in Swift).
+  /// Exact final on-disk artifact size. When post_download_transform is set,
+  /// transport planning uses its source_size_bytes instead.
   @$pb.TagNumber(4)
   $fixnum.Int64 get sizeBytes => $_getI64(3);
   @$pb.TagNumber(4)
@@ -1132,6 +1380,8 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearLocalPath() => $_clearField(9);
 
+  /// Exact final on-disk artifact checksum. When post_download_transform is
+  /// set, HTTP verifies its source_checksum_sha256 before the transform.
   @$pb.TagNumber(10)
   $core.String get checksumSha256 => $_getSZ(8);
   @$pb.TagNumber(10)
@@ -1140,6 +1390,21 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   $core.bool hasChecksumSha256() => $_has(8);
   @$pb.TagNumber(10)
   void clearChecksumSha256() => $_clearField(10);
+
+  /// Optional commons-owned transform applied after the source checksum has
+  /// passed and before the model is marked downloaded. Native and Web
+  /// consumers receive the same deterministic derived bytes.
+  @$pb.TagNumber(11)
+  PostDownloadTransform get postDownloadTransform => $_getN(9);
+  @$pb.TagNumber(11)
+  set postDownloadTransform(PostDownloadTransform value) =>
+      $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasPostDownloadTransform() => $_has(9);
+  @$pb.TagNumber(11)
+  void clearPostDownloadTransform() => $_clearField(11);
+  @$pb.TagNumber(11)
+  PostDownloadTransform ensurePostDownloadTransform() => $_ensure(9);
 }
 
 class MultiFileArtifact extends $pb.GeneratedMessage {

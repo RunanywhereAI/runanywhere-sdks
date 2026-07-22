@@ -1,4 +1,6 @@
-/** @file onnx_segmentation_provider.h @brief ONNX Runtime SegFormer provider. */
+/** @file onnx_segmentation_provider.h
+ *  @brief Generic ONNX Runtime semantic-segmentation provider (model-agnostic).
+ */
 
 #ifndef RUNANYWHERE_ONNX_SEGMENTATION_PROVIDER_H
 #define RUNANYWHERE_ONNX_SEGMENTATION_PROVIDER_H
