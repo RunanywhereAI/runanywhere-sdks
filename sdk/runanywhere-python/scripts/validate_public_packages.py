@@ -80,10 +80,12 @@ PLATFORMS: dict[str, PlatformLibs] = {
         base=("libonnxruntime", "libsherpa-onnx-c-api"),
         gpu=("libcudart", "libcublas", "libcublasLt"),
     ),
-    # delocate vendors into `<package>/.dylibs/`.
+    # delocate vendors into `<package>/.dylibs/`. On macOS sherpa/onnxruntime are built as STATIC
+    # archives (.a) and linked into _core, so there are no runtime sidecar dylibs to vendor — the
+    # wheel is self-contained. base is therefore empty (delocate finds nothing to relocate).
     "macos": PlatformLibs(
         libs_dir="runanywhere/.dylibs",
-        base=("libonnxruntime", "libsherpa-onnx-c-api"),
+        base=(),
         gpu=("libcudart", "libcublas", "libcublasLt"),
     ),
 }
