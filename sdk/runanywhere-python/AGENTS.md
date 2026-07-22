@@ -103,6 +103,13 @@ sdk/runanywhere-python/
 │   ├── structured.py         # structured output + tool-call schema/prompt/parse
 │   ├── stream_metrics.py     # wrap a token stream in LLMStreamEvent + metrics
 │   ├── audio.py              # PCM/float/WAV helpers (numpy)
+│   ├── __main__.py           # `runanywhere` CLI (serve / models / --version)
+│   ├── server/               # OpenAI-compatible HTTP server — OPTIONAL [server] extra
+│   │   ├── __init__.py       # create_app + serve (uvicorn lazy-imported)
+│   │   ├── schemas.py        # pydantic request models
+│   │   ├── errors.py         # SDK ErrorCode → HTTP status + OpenAI error body
+│   │   ├── manager.py        # lazy multi-model load/cache (no fastapi import)
+│   │   └── app.py            # routes: chat/completions/embeddings/audio/models/health
 │   ├── py.typed              # PEP 561 marker (ships type hints)
 │   └── _native/              # lazy loader for the compiled extension
 │       ├── __init__.py       # get_core() — imports _core once, on demand
@@ -112,7 +119,10 @@ sdk/runanywhere-python/
 
 Python target: **3.9+** (`requires-python = ">=3.9"`). The one runtime dependency is
 `numpy>=1.21`; `pytest>=7` is the only test dependency. All HTTP is stdlib `urllib` — do NOT
-add a third-party HTTP client.
+add a third-party HTTP client. The `server/` subpackage is the sole exception: it needs the
+optional `[server]` extra (fastapi/uvicorn) and MUST NOT be imported by `runanywhere/__init__.py`
+(it would break the fastapi-free, native-lazy import invariant). `tests/test_server.py` gates
+itself with `pytest.importorskip("fastapi")`.
 
 ## Architecture
 
