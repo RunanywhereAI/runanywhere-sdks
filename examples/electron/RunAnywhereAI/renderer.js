@@ -29,7 +29,15 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const llm = () => ensure('llm', () => ra.loadLLM('qwen2.5-0.5b'));
+const DEFAULT_LLM = 'qwen2.5-0.5b';
+// The chat's active LLM. Loading another LLM from the Models tab replaces it (the
+// backend keeps one loaded at a time), so we track it in loadedById/loadedType too
+// to keep the Models badges coherent — exactly one LLM ever shows "loaded".
+const llm = () => ensure('llm', async () => {
+  const h = await ra.loadLLM(DEFAULT_LLM);
+  loadedById[DEFAULT_LLM] = h; loadedType[DEFAULT_LLM] = 'llm';
+  return h;
+});
 const embedder = () => ensure('embedder', () => ra.loadEmbedder('minilm'));
 const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
 const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
@@ -162,6 +170,7 @@ async function sendChat() {
       // it and reload the chat model once before surfacing an error.
       if (/no model|not loaded|model.*load/i.test(e.message || '')) {
         delete handles.llm;
+        for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale LLM badges
         await runGen();
       } else throw e;
     }
@@ -178,6 +187,8 @@ async function sendChat() {
 const loaders = { llm: (id) => ra.loadLLM(id), vlm: (id) => ra.loadVLM(id), embedder: (id) => ra.loadEmbedder(id), stt: (id) => ra.loadSTT(id), tts: (id) => ra.loadTTS(id) };
 const unloaders = { llm: (h) => ra.unloadLLM(h), vlm: (h) => ra.unloadVLM(h), embedder: (h) => ra.unloadEmbedder(h), stt: (h) => ra.unloadSTT(h), tts: (h) => ra.unloadTTS(h) };
 const loadedById = {};
+const loadedType = {}; // key -> model type, so we can enforce one-LLM-at-a-time
+function forgetLoaded(key) { delete loadedById[key]; delete loadedType[key]; }
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const TYPE_ICON = {
   llm: svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
@@ -226,8 +237,21 @@ function buildCard(o) {
       btns.forEach((x) => (x.disabled = true));
       b.textContent = loaded ? 'Unloading…' : 'Loading…';
       try {
-        if (loaded) { await unloaders[o.type](loaded); delete loadedById[o.key]; }
-        else { loadedById[o.key] = await loaders[o.type](o.source); }
+        if (loaded) {
+          await unloaders[o.type](loaded); forgetLoaded(o.key);
+          if (o.type === 'llm') delete handles.llm; // chat reloads its default next time
+        } else {
+          if (o.type === 'llm') {
+            // Backend keeps ONE LLM loaded — unload whichever is active first.
+            for (const k of Object.keys(loadedById)) {
+              if (loadedType[k] === 'llm') { try { await unloaders.llm(loadedById[k]); } catch { /* already gone */ } forgetLoaded(k); }
+            }
+            delete handles.llm;
+          }
+          loadedById[o.key] = await loaders[o.type](o.source);
+          loadedType[o.key] = o.type;
+          if (o.type === 'llm') handles.llm = Promise.resolve(loadedById[o.key]); // chat now uses this model
+        }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
     });
@@ -235,7 +259,7 @@ function buildCard(o) {
   }
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
-      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } delete loadedById[o.key]; }
+      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); if (o.type === 'llm') delete handles.llm; }
       customModels = customModels.filter((m) => m.id !== o.key); persistCustom(); renderModels();
     }));
   }
