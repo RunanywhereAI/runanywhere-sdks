@@ -529,13 +529,24 @@ void llamacpp_embeddings_destroy(void* implementation) {
     delete handle;
 }
 
+// llama.cpp treats backend init/free as process-lifecycle calls, so the shared
+// backend is initialized exactly once regardless of how many embeddings handles
+// are created; a per-handle llama_backend_init() would accumulate uncoordinated
+// global state. No teardown is paired here because the backend is process-global
+// and shared with the LLM/VLM/rerank paths, so it is released only at process
+// exit.
+void ensure_llama_backend_initialized() {
+    static std::once_flag backend_once;
+    std::call_once(backend_once, []() { llama_backend_init(); });
+}
+
 rac_result_t llamacpp_embeddings_create(const char* model_id, const char* /*config_json*/,
                                         void** output) {
     if (model_id == nullptr || output == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
     *output = nullptr;
-    llama_backend_init();
+    ensure_llama_backend_initialized();
     auto handle = std::make_unique<LlamaCppEmbeddingsHandle>();
     handle->model_id = model_id;
     const unsigned int hardware_threads = std::thread::hardware_concurrency();

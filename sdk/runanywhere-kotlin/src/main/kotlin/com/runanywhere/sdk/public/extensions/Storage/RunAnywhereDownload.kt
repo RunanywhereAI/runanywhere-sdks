@@ -49,12 +49,21 @@ suspend fun RunAnywhere.downloadModel(
     if (!RunAnywhere.isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
+    ensureServicesReady()
+    val resolvedModel = resolveModelForDownload(model)
+    // Commons computes the compatibility verdict from the registry entry, so the
+    // preflight can only gate a model that is actually registered. A direct download
+    // of a model absent from the registry (resolveModelForDownload's caller-supplied
+    // fallback) has no registry entry to evaluate and must proceed straight to
+    // planning -- mirroring Swift's downloadModel, which runs no preflight. Gating on
+    // registry presence would reject valid direct downloads.
+    if (!isModelRegistered(resolvedModel.id)) {
+        return downloadCompatibleModel(resolvedModel, onProgress)
+    }
     return withModelCompatibilityPreflight(
         operation = ModelCompatibilityOperation.DOWNLOAD,
-        resultProvider = { checkModelCompatibility(model.id) },
+        resultProvider = { checkModelCompatibility(resolvedModel.id) },
     ) {
-        ensureServicesReady()
-        val resolvedModel = resolveModelForDownload(model)
         downloadCompatibleModel(resolvedModel, onProgress)
     }
 }
@@ -195,6 +204,12 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
     }
     return model
 }
+
+// True only when commons can produce a compatibility verdict for [modelId] (it
+// derives the verdict from the registry entry). Direct downloads of unregistered
+// models return false and skip the resource preflight.
+private suspend fun RunAnywhere.isModelRegistered(modelId: String): Boolean =
+    getModel(ModelGetRequest(model_id = modelId)).found
 
 // Oversize-partial self-healing happens inside the commons planner
 // (validate_existing_bytes deletes stale partials and replans as a fresh

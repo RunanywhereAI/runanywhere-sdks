@@ -1027,7 +1027,9 @@ rac_result_t register_entry(const CatalogEntry &entry) {
       if (entry.files[i].checksum_sha256 != nullptr) {
         file->set_checksum_sha256(entry.files[i].checksum_sha256);
       }
-      if (entry.files[i].append_bytes_transform != nullptr) {
+      if (entry.files[i].append_bytes_transform != nullptr &&
+          entry.files[i].size_bytes > 0 &&
+          entry.files[i].checksum_sha256 != nullptr) {
         const CatalogAppendBytesTransform &source =
             *entry.files[i].append_bytes_transform;
         v1::PostDownloadTransform *transform =

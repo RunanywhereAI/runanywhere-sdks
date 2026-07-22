@@ -357,6 +357,11 @@ private struct RunAnywhereNemotronConfiguration: Codable, Sendable,
                 "Expected model_type 'nemotron', got '\(modelType)'"
             )
         }
+        guard vocabularySize > 0 else {
+            throw ModelFactoryError.invalidConfiguration(
+                "Nemotron vocab_size must be positive"
+            )
+        }
         guard hiddenActivation == "relu2" else {
             throw ModelFactoryError.invalidConfiguration(
                 "Nemotron hidden_act '\(hiddenActivation)' is unsupported"

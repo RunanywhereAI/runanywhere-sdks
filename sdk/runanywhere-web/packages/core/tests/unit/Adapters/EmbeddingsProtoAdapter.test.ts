@@ -11,7 +11,7 @@ import {
   clearRunanywhereModule,
   registerWasmModule,
   type EmscriptenRunanywhereModule,
-} from '../../../src/runtime/EmscriptenModule';
+} from '../../../src/runtime/EmscriptenModule.js';
 
 describe('EmbeddingsProtoAdapter lifecycle routing', () => {
   afterEach(() => {
