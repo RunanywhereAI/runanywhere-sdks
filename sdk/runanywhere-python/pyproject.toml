@@ -23,11 +23,20 @@ classifiers = [
 dependencies = ["numpy>=1.21"]
 
 [project.optional-dependencies]
-# httpx is needed by fastapi's TestClient (tests/test_server.py); it is test-only.
-test = ["pytest>=7", "httpx>=0.24"]
+# httpx is needed by fastapi's TestClient (tests/test_server.py); protobuf lets the hermetic
+# RAG tests (tests/test_rag.py) build proto bytes and exercise the facade. Both are test-only.
+test = ["pytest>=7", "httpx>=0.24", "protobuf>=5.29"]
 # The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
 # plain `pip install runanywhere` stays numpy + stdlib only.
 server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.18"]
+# RAG (`runanywhere.rag` / RunAnywhere.create_rag). The native core already carries the RAG
+# pipeline; this extra just adds the protobuf runtime the facade uses to (de)serialize the
+# rac_rag_*_proto byte ABI. The generated *_pb2.py were built with protoc 5.29 and carry their
+# own ValidateProtobufRuntimeVersion(5,29,0) guard, which accepts any newer runtime (verified
+# under 6.x/7.x) — so we floor at 5.29 without an upper bound to avoid conflicting with the
+# protobuf 6.x/7.x that grpcio and friends pull in. A plain `pip install runanywhere` stays
+# protobuf-free.
+rag = ["protobuf>=5.29"]
 
 [project.scripts]
 runanywhere = "runanywhere.__main__:main"
@@ -41,6 +50,13 @@ cmake.args = [
     "-DRAC_STATIC_PLUGINS=ON",
     "-DRAC_BUILD_SHARED=OFF",
     "-DRAC_BUILD_PLATFORM=OFF",
+    # RAG: fold the RAG pipeline (rac_rag_*_proto) into rac_commons and build the
+    # protobuf runtime it needs. Both default ON for native builds, but pin them
+    # explicitly so the RAG bindings can never silently degrade to unavailable
+    # stubs on a default-drift. Protobuf is vendored + namespace-isolated (static),
+    # so the wheel stays self-contained — no extra sidecar to repair.
+    "-DRAC_BACKEND_RAG=ON",
+    "-DRAC_ENABLE_PROTOBUF=ON",
 ]
 # Optional accelerator/engine backends are additive build-flag opt-ins (native/CMakeLists.txt
 # links + registers whatever rac_backend_<x> targets a build produces). Enable per build via
