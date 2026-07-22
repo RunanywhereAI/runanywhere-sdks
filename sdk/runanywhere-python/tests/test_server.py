@@ -659,3 +659,18 @@ def test_malformed_request_is_openai_400():
         r = c.post("/v1/chat/completions", json={"model": "m"})  # missing required 'messages'
         assert r.status_code == 400
         assert r.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_raw_http_exceptions_use_openai_error_envelope():
+    # Auth 401, model 404, bad-audio 400 are raised as HTTPException — they must still use the
+    # OpenAI {"error": {...}} shape (not FastAPI's {"detail": ...}) so OpenAI clients can parse them.
+    with _client(api_key="secret") as c:
+        r401 = c.post("/v1/chat/completions",
+                      json={"model": "m", "messages": [{"role": "user", "content": "hi"}]})
+        assert r401.status_code == 401
+        assert "error" in r401.json() and "detail" not in r401.json()
+    with _client() as c:
+        r404 = c.get("/v1/models/nope-not-a-model")
+        assert r404.status_code == 404 and r404.json()["error"]["type"] == "invalid_request_error"
+        r400 = c.post("/v1/audio/transcriptions", files={"file": ("a.wav", b"not wav", "audio/wav")})
+        assert r400.status_code == 400 and "error" in r400.json()
