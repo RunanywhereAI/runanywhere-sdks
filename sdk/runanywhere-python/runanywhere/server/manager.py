@@ -43,8 +43,9 @@ class ModelManager:
         self.default_stt = default_stt
         self.default_tts = default_tts
         self._cache: dict[tuple[str, str], object] = {}
-        self._locks: dict[tuple[str, str], asyncio.Lock] = {}
-        self._load_lock = asyncio.Lock()
+        self._locks: dict[tuple[str, str], asyncio.Lock] = {}  # per-model in-flight guard
+        self._load_locks: dict[tuple[str, str], asyncio.Lock] = {}  # per-model cold-load guard
+        self._load_lock = asyncio.Lock()  # only guards creation of the per-model load locks
 
     # -- lifecycle -----------------------------------------------------------
     def start(self) -> None:
@@ -67,10 +68,13 @@ class ModelManager:
         self, kind: str, model_id: str, loader: Callable[[str], Any]
     ) -> tuple[object, asyncio.Lock]:
         key = (kind, model_id)
+        async with self._load_lock:  # tiny critical section: just mint the per-model load lock
+            load_lock = self._load_locks.setdefault(key, asyncio.Lock())
         if key not in self._cache:
-            async with self._load_lock:
-                if key not in self._cache:  # double-checked under the lock
+            async with load_lock:  # per-model, so a slow load of one model never blocks another
+                if key not in self._cache:  # double-checked under the per-model lock
                     # Loading is blocking (download on first use + native load); off-thread it.
+                    # If it raises, the cache/lock stay unset -> a later request cleanly retries.
                     self._cache[key] = await asyncio.to_thread(loader, model_id)
                     self._locks[key] = asyncio.Lock()
         return self._cache[key], self._locks[key]
