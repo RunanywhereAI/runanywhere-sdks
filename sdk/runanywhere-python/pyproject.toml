@@ -23,7 +23,14 @@ classifiers = [
 dependencies = ["numpy>=1.21"]
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+# httpx is needed by fastapi's TestClient (tests/test_server.py); it is test-only.
+test = ["pytest>=7", "httpx>=0.24"]
+# The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
+# plain `pip install runanywhere` stays numpy + stdlib only.
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9"]
+
+[project.scripts]
+runanywhere = "runanywhere.__main__:main"
 
 [tool.scikit-build]
 cmake.source-dir = "../.."
@@ -66,7 +73,8 @@ include = [
 
 [tool.cibuildwheel]
 build-frontend = "build"
-test-extras = ["test"]
+# [server] so tests/test_server.py runs (fastapi/uvicorn/multipart); [test] adds pytest + httpx.
+test-extras = ["server", "test"]
 test-command = "pytest {project}/tests"
 
 [tool.cibuildwheel.windows]
