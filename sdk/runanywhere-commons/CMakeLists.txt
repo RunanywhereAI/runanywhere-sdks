@@ -675,25 +675,19 @@ else()
         message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
     endif()
     set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
-    # The tracked template carries only "YOUR_*" placeholders (never real
-    # credentials). Release/CI builds substitute the real values from the
-    # environment (GitHub Actions secrets SUPABASE_URL / SUPABASE_ANON_KEY /
-    # BUILD_TOKEN) into the generated source — so credentials live in CI secrets,
-    # never in the public source tree. When the env is unset (normal local build)
-    # the placeholders pass through and the dev config stays the credential-free
-    # stub (usability checks treat "YOUR_*" as unavailable).
+    # The tracked template carries only the "YOUR_STAGING_BASE_URL" placeholder
+    # (never a real host). Release/CI builds substitute the neutral backend base
+    # URL from the environment (GitHub Actions secret STAGING_BASE_URL) into the
+    # generated source. When the env is unset (normal local build) the placeholder
+    # passes through and the dev config stays a stub (usability checks treat
+    # "YOUR_*" as unavailable). No credentials, project refs, or tokens are ever
+    # baked — only this neutral base URL.
     file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
-    if(NOT "$ENV{SUPABASE_URL}" STREQUAL "")
-        string(REPLACE "YOUR_SUPABASE_PROJECT_URL" "$ENV{SUPABASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
-        string(REPLACE "YOUR_SUPABASE_ANON_KEY" "$ENV{SUPABASE_ANON_KEY}" _rac_dev_cfg "${_rac_dev_cfg}")
-        string(REPLACE "YOUR_BUILD_TOKEN" "$ENV{BUILD_TOKEN}" _rac_dev_cfg "${_rac_dev_cfg}")
-        message(STATUS "Injected development config from environment (CI secrets)")
-    else()
-        message(STATUS "Using credential-free development config stub")
-    endif()
     if(NOT "$ENV{STAGING_BASE_URL}" STREQUAL "")
         string(REPLACE "YOUR_STAGING_BASE_URL" "$ENV{STAGING_BASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
         message(STATUS "Injected staging base URL from environment (CI secret)")
+    else()
+        message(STATUS "Using placeholder staging base URL (no baked backend URL)")
     endif()
     file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
 endif()
@@ -820,11 +814,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
-    # Supabase-style upsert request flag. Lets platform SDKs
-    # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
-    # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
-    # consume it and apply the on_conflict URL rewrite + Prefer header.
-    src/infrastructure/http/rac_http_upsert_mode.cpp
     # Process-wide Hugging Face token (rac_http_hf_token_set + HF_TOKEN env
     # fallback). The dispatch sites attach `Authorization: Bearer` to
     # huggingface.co/hf.co requests so downloads, HEAD preflight, and the

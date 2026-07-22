@@ -75,7 +75,7 @@ interface FakeModuleHandle {
   setNativeRegistered(value: boolean): void;
 }
 
-function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeModuleHandle {
+function createFakeModule(): FakeModuleHandle {
   const memory = new ArrayBuffer(1 << 20);
   const heap = new Uint8Array(memory);
   const view = new DataView(memory);
@@ -108,8 +108,6 @@ function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeM
   };
   const deviceIdPtr = writeString('web-device-id');
   const accessTokenPtr = writeString('test-access-token');
-  const devURLPtr = writeString('https://development.invalid');
-  const devKeyPtr = writeString('test-development-key');
 
   const moduleShape: Partial<DeviceRegistrationModule> = {
     HEAPU8: heap,
@@ -157,9 +155,6 @@ function createFakeModule(options: { devConfigAvailable?: boolean } = {}): FakeM
     _rac_state_is_device_registered: () => nativeRegistered ? 1 : 0,
     _rac_state_set_device_registered(value: number): void { nativeRegistered = value !== 0; },
     _rac_auth_get_access_token: () => accessTokenPtr,
-    _rac_wasm_dev_config_is_available: () => options.devConfigAvailable ? 1 : 0,
-    _rac_wasm_dev_config_get_supabase_url: () => devURLPtr,
-    _rac_wasm_dev_config_get_supabase_key: () => devKeyPtr,
 
     _rac_wasm_sizeof_device_callbacks: () => CALLBACK.size,
     _rac_wasm_offsetof_device_callbacks_get_device_info: () => CALLBACK.getInfo,
@@ -358,7 +353,7 @@ describe('DeviceRegistrationAdapter', () => {
     adapter.cleanup();
   });
 
-  it('distinguishes HTTP rejection, development upsert, and missing configuration', async () => {
+  it('distinguishes HTTP rejection, development registration, and missing configuration', async () => {
     const prod = createFakeModule();
     const prodAdapter = DeviceRegistrationAdapter.install(prod.module, {
       baseURL: 'https://relay.test',
@@ -379,21 +374,28 @@ describe('DeviceRegistrationAdapter', () => {
 
     fetchStub.mockClear();
     fetchStub.mockResolvedValueOnce({ ok: true, status: 204 } as Response);
-    const dev = createFakeModule({ devConfigAvailable: true });
+    // Every environment (including development/keyless) registers through the
+    // backend endpoint using the effective base URL + API key from commons
+    // state. The device-registration URL is used as-is, with no query rewrite
+    // and no extra request-preference header.
+    const dev = createFakeModule();
     const devAdapter = DeviceRegistrationAdapter.install(dev.module, {
+      baseURL: 'https://development.invalid',
+      apiKey: 'test-development-key',
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
       sdkVersion: '0.19.13',
     });
-    const devEndpoint = dev.allocateString('/rest/v1/sdk_devices');
+    const devEndpoint = dev.allocateString('/api/v1/devices/register');
     const devBody = dev.allocateString('{}');
     const devResponse = dev.allocateString(' '.repeat(RESPONSE.size));
-    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(-100);
+    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 1, devResponse, 0)).toBe(-100);
     await DeviceRegistrationAdapter.waitForPendingRegistration(dev.module);
-    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 0, devResponse, 0)).toBe(0);
-    expect(fetchStub.mock.calls[0][0]).toContain('?on_conflict=device_id');
+    expect(callback(dev, CALLBACK.httpPost)(devEndpoint, devBody, 1, devResponse, 0)).toBe(0);
+    expect(fetchStub.mock.calls[0][0]).toBe('https://development.invalid/api/v1/devices/register');
     const devHeaders = new Headers((fetchStub.mock.calls[0][1] as RequestInit).headers);
-    expect(devHeaders.get('authorization')).toBe('Bearer test-development-key');
-    expect(devHeaders.get('prefer')).toContain('merge-duplicates');
+    expect(devHeaders.get('apikey')).toBe('test-development-key');
+    expect(devHeaders.get('authorization')).toBe('Bearer test-access-token');
+    expect(devHeaders.get('prefer')).toBeNull();
     devAdapter.cleanup();
 
     fetchStub.mockClear();
@@ -402,7 +404,7 @@ describe('DeviceRegistrationAdapter', () => {
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
       sdkVersion: '0.19.13',
     });
-    const noConfigEndpoint = noConfig.allocateString('/rest/v1/sdk_devices');
+    const noConfigEndpoint = noConfig.allocateString('/api/v1/devices/register');
     const noConfigBody = noConfig.allocateString('{}');
     const noConfigResponse = noConfig.allocateString(' '.repeat(RESPONSE.size));
     expect(callback(noConfig, CALLBACK.httpPost)(
@@ -423,13 +425,13 @@ describe('DeviceRegistrationAdapter', () => {
       { baseURL: 'https://attacker.invalid' },
       { apiKey: 'configured-key-without-origin' },
     ]) {
-      const handle = createFakeModule({ devConfigAvailable: true });
+      const handle = createFakeModule();
       const adapter = DeviceRegistrationAdapter.install(handle.module, {
         ...configuration,
         environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         sdkVersion: '0.19.13',
       });
-      const endpoint = handle.allocateString('/rest/v1/sdk_devices');
+      const endpoint = handle.allocateString('/api/v1/devices/register');
       const body = handle.allocateString('{}');
       const response = handle.allocateString(' '.repeat(RESPONSE.size));
 

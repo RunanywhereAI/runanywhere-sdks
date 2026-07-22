@@ -98,7 +98,6 @@ import 'package:runanywhere/generated/voice_events.pb.dart'
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_hf_auth.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
@@ -488,10 +487,11 @@ abstract final class RunAnywhere {
 
     if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
         (baseURL == null || baseURL.isEmpty)) {
-      // Development without an explicit baseURL falls back to the dev
-      // placeholder / Supabase-derived URL. A caller-supplied baseURL is
-      // honored so dev builds can target a real backend (the placeholder
-      // DNS alias is unreachable on most machines).
+      // Development without an explicit baseURL uses the dev placeholder; the
+      // backend is reached only through the effective base URL resolved by
+      // commons state. A caller-supplied baseURL is honored (see below) so dev
+      // builds can target a real backend (the placeholder DNS alias is
+      // unreachable on most machines).
       params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
     } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       final parsed = Uri.tryParse(baseURL!);
@@ -674,20 +674,16 @@ abstract final class RunAnywhere {
     // whatever the app passed (baked URL, keyless).
     final effectiveBaseURL =
         DartBridgeState.instance.baseURL ?? params.baseURL.toString();
+    // Effective config from commons state, for every environment: staging
+    // resolves the baked keyless base URL, dev/prod use whatever the app
+    // passed. There is no direct-to-datastore path — the backend is always
+    // reached through this base URL. Auth stays in C++. Mirrors Swift's unified
+    // Phase-2 HTTP setup in RunAnywhere._performServicesInitialization().
     HTTPClientAdapter.shared.configure(
       baseURL: effectiveBaseURL,
       apiKey: params.apiKey,
       environment: params.environment,
     );
-    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      final supabaseConfig = SupabaseConfig.configuration(params.environment);
-      if (supabaseConfig != null) {
-        HTTPClientAdapter.shared.configureDev(
-          supabaseURL: supabaseConfig.projectURL.toString(),
-          supabaseKey: supabaseConfig.anonKey,
-        );
-      }
-    }
 
     // Step 2 (moved to Phase 1): the model-paths base directory is now set
     // inside [initializeWithParams] before it returns — see the Swift
@@ -721,10 +717,6 @@ abstract final class RunAnywhere {
       apiKey: params.apiKey,
       baseURL: params.baseURL.toString(),
       deviceId: telemetryDeviceId,
-      buildToken:
-          params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-          ? DartBridgeDevConfig.buildToken
-          : null,
       forceRefreshAssignments: false,
       flushTelemetry: true,
       discoverDownloadedModels: true,

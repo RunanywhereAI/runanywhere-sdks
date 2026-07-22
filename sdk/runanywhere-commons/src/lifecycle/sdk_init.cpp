@@ -110,25 +110,15 @@ bool environment_requires_external_config(rac_environment_t env) {
 
 bool http_setup_applicable_for_state() {
     const rac_environment_t env = rac_state_get_environment();
-    if (!environment_requires_external_config(env)) {
-        // Development with explicit credentials (api key + base URL from
-        // Phase 1) authenticates against the real backend, same contract as
-        // staging/production. The legacy Supabase-direct config remains the
-        // fallback for credential-free dev builds.
-        if (rac_dev_config_is_usable_http_url(rac_state_get_base_url()) &&
-            rac_dev_config_is_usable_credential(rac_state_get_api_key())) {
-            return true;
-        }
-        return rac_dev_config_is_usable_http_url(rac_dev_config_get_supabase_url()) &&
-               rac_dev_config_is_usable_credential(rac_dev_config_get_supabase_key());
-    }
-
     const char* api_key = rac_state_get_api_key();
     const char* base_url = rac_state_get_base_url();
+    // Every environment reaches the backend through a usable base URL — there is
+    // no direct-to-datastore path anymore.
     if (!rac_dev_config_is_usable_http_url(base_url)) {
         return false;
     }
-    // Keyless staging is a valid HTTP setup (unauthenticated public ingestion)
+    // Keyless (dev / keyless-staging) is a valid HTTP setup: unauthenticated
+    // public-org ingestion. Auth-required environments need a usable API key.
     return rac_dev_config_is_usable_credential(api_key) || !rac_env_auth_expected(env, api_key);
 }
 

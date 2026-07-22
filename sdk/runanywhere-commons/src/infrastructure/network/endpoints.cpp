@@ -11,15 +11,11 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 
 const char* rac_endpoint_device_registration(rac_environment_t env) {
-    switch (env) {
-        case RAC_ENV_DEVELOPMENT:
-        case RAC_ENV_STAGING:
-        case RAC_ENV_PRODUCTION:
-        default:
-            // Every environment registers against the FastAPI backend; the
-            // Supabase-direct dev path is retired.
-            return RAC_ENDPOINT_DEVICE_REGISTER;
-    }
+    // Every environment registers against the FastAPI backend now; the
+    // Supabase-direct dev path is retired. The parameter is retained for ABI
+    // stability.
+    (void)env;
+    return RAC_ENDPOINT_DEVICE_REGISTER;
 }
 
 const char* rac_endpoint_model_assignments(void) {

@@ -1322,9 +1322,9 @@ export const RunAnywhere = {
         if (typeof module._rac_sdk_init_phase2_proto === 'function') {
           const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
           const bytes = SdkInitPhase2Request.encode({
-            buildToken: environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-              ? (_initOptions?.buildToken ?? '')
-              : '',
+            // No released SDK bakes or forwards a build token; the backend is
+            // reached only through the effective base URL (keyless staging).
+            buildToken: '',
             forceRefreshAssignments: false,
             flushTelemetry: true,
             discoverDownloadedModels: true,
@@ -1340,7 +1340,7 @@ export const RunAnywhere = {
           await completePendingDeviceRegistration(
             module,
             environment,
-            _initOptions?.buildToken ?? '',
+            '',
             lifecycleGeneration,
           );
           if (lifecycleGeneration !== _lifecycleGeneration) return;

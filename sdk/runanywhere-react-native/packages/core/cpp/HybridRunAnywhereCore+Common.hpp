@@ -9,7 +9,7 @@
 #include "HybridRunAnywhereCore.hpp"
 
 // RACommons headers
-#include "rac_dev_config.h"  // For rac_dev_config_get_build_token
+#include "rac_dev_config.h"  // Dev-config usability checks (staging base URL only)
 
 // Core bridges - aligned with actual RACommons API
 #include "bridges/InitBridge.hpp"

@@ -433,7 +433,6 @@ _rac_http_download_execute
 _rac_http_hf_token_set
 _rac_http_hf_token_is_configured
 _rac_http_request_send
-_rac_http_request_set_upsert_mode
 _rac_http_request_stream
 _rac_http_response_free
 _rac_http_transport_is_registered
@@ -495,13 +494,8 @@ _rac_validate_base_url
 _rac_validate_config
 _rac_validation_error_message
 
-# Dev-only config (Supabase URL/key, build token) — reached
+# Dev config (staging base URL + shared usability checks) — reached
 # through CppBridge+Environment.swift.
-_rac_dev_config_get_build_token
-_rac_dev_config_get_supabase_key
-_rac_dev_config_get_supabase_url
-_rac_dev_config_has_build_token
-_rac_dev_config_is_available
 _rac_dev_config_is_usable_credential
 _rac_dev_config_is_usable_http_url
 
@@ -835,7 +829,6 @@ _rac_cpu_runtime_get_provider_session
 _rac_cpu_runtime_register_provider
 _rac_cpu_runtime_unregister_provider
 _rac_detect_archive_type
-_rac_dev_config_has_supabase
 _rac_device_registration_endpoint
 _rac_device_registration_to_json
 _rac_diffusion_model_registry_cleanup

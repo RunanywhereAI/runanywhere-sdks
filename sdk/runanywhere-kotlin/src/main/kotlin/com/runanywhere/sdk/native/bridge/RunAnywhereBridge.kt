@@ -902,34 +902,6 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
 
     /**
-     * Check if development config is available (has Supabase credentials configured).
-     * @return true if dev config is available
-     */
-    @JvmStatic
-    external fun racDevConfigIsAvailable(): Boolean
-
-    /**
-     * Get Supabase URL for development mode.
-     * @return Supabase URL or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseUrl(): String?
-
-    /**
-     * Get Supabase anon key for development mode.
-     * @return Supabase anon key or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseKey(): String?
-
-    /**
-     * Get build token for development mode.
-     * @return Build token or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetBuildToken(): String?
-
-    /**
      * Whether a baked-in credential is usable: non-empty and not a scaffolding
      * placeholder. Canonical commons rule shared by all SDKs.
      */
@@ -1415,10 +1387,6 @@ object RunAnywhereBridge {
     // `HTTPClientAdapter` to converge on the same canonical SDK header
     // list and structured API-error parsing Swift consumes, instead of
     // inlining the policy on the Kotlin side.
-    //
-    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
-    // commons does not expose an upsert-mode HTTP variant through the
-    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical

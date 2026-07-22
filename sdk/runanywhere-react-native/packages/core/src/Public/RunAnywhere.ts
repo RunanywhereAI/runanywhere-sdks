@@ -279,7 +279,9 @@ export const RunAnywhere = {
 
         const phase2Request: SdkInitPhase2RequestMessage =
           SdkInitPhase2Request.create();
-        phase2Request.buildToken = options.buildToken?.trim() ?? '';
+        // The baked dev build token is gone; the backend is reached solely
+        // through the effective base URL. Keep the proto field, always empty.
+        phase2Request.buildToken = '';
         phase2Request.forceRefreshAssignments =
           options.forceRefreshAssignments ?? false;
         phase2Request.flushTelemetry = options.flushTelemetry ?? true;

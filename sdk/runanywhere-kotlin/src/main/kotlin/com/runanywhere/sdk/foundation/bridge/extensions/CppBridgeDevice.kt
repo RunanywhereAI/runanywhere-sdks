@@ -7,7 +7,7 @@
  * Mirrors Swift `CppBridge+Device.swift`: a thin glue layer that wires
  * a callback bag into the C++ device manager (`rac_device_manager_*`)
  * and exposes the four registration-state thunks. ALL business logic
- * (when to register, dev-vs-prod routing, JSON payload assembly,
+ * (when to register, endpoint routing, JSON payload assembly,
  * retry/backoff, last-seen tracking) lives in commons. Kotlin only
  * provides:
  *
@@ -44,7 +44,6 @@ import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 
@@ -368,19 +367,13 @@ object CppBridgeDevice {
     }
 
     /**
-     * Mirrors Swift's `UserDefaults` lookup: dev mode always returns
-     * `false` so commons performs the Supabase UPSERT every launch;
-     * prod/staging consults the persisted flag so we only send the
-     * full payload once per installation.
+     * Mirrors Swift's `UserDefaults` lookup on the registered key: returns
+     * the persisted flag so commons only sends the full registration
+     * payload once per installation. Every environment now registers
+     * through the backend, so there is no dev-mode special case.
      */
     @JvmStatic
-    fun isDeviceRegisteredCallback(): Boolean {
-        // Mirrors Swift: development (and pre-init `nil`) always returns false so
-        // commons performs the Supabase UPSERT every launch.
-        val env = CppBridgeTelemetry.currentEnvironment
-        if (env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return false
-        return deviceRegistered
-    }
+    fun isDeviceRegisteredCallback(): Boolean = deviceRegistered
 
     /**
      * Mirrors Swift's `UserDefaults.set(_, forKey:)` on the registered
@@ -403,10 +396,9 @@ object CppBridgeDevice {
      * Mirrors Swift's `callbacks.http_post = { ... CppBridge.HTTP.shared.postRaw(...) }`.
      *
      * Routes through the canonical [HTTPClientAdapter] — same path used
-     * by auth and telemetry. The adapter handles base-URL resolution,
-     * auth header injection, and Supabase upsert detection from the
-     * endpoint path. The JNI caller is synchronous, so we bridge to the
-     * adapter's `suspend` API with `runBlocking` (mirrors Swift's
+     * by auth and telemetry. The adapter handles base-URL resolution and
+     * auth header injection. The JNI caller is synchronous, so we bridge
+     * to the adapter's `suspend` API with `runBlocking` (mirrors Swift's
      * `DispatchSemaphore.wait()` in `CppBridge+Device.swift`).
      *
      * @return HTTP status code on response (200/201/409 are success-ish),
