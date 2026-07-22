@@ -359,6 +359,53 @@ jobs:
           cp -r tests "$tmp/tests"
           cd "$tmp" && python -m pytest tests -q
 
+  python-macos:
+    # macOS sibling of python-linux: builds the wheel, repairs it with delocate (vendors the
+    # onnxruntime/sherpa dylibs into runanywhere/.dylibs), installs it, runs the hermetic suite.
+    # macos-14 is arm64; the native posix adapter + @loader_path rpath are already macOS-ready.
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: macos
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build tools
+        run: |
+          brew install ninja
+          python -m pip install --upgrade pip build delocate pytest
+      - name: Sherpa-ONNX prebuilts
+        run: ./sdk/runanywhere-commons/scripts/macos/download-sherpa-onnx.sh
+      - name: Build wheel
+        working-directory: sdk/runanywhere-python
+        run: python -m build --wheel -o dist
+      - name: Repair wheel (vendor sidecar dylibs)
+        working-directory: sdk/runanywhere-python
+        run: |
+          # sherpa/onnxruntime are static (.a) on macOS and linked into _core, so the wheel is
+          # self-contained and delocate has nothing to vendor — it just re-tags/validates archs.
+          wheel="$(ls dist/*.whl | head -1)"
+          delocate-wheel --require-archs arm64 -w wheelhouse -v "$wheel"
+      - name: Validate release boundary (no host paths, no binaries in sdist)
+        working-directory: sdk/runanywhere-python
+        run: |
+          python -m build --sdist -o wheelhouse
+          ver="$(tr -d '[:space:]' < ../runanywhere-commons/VERSION)"
+          python scripts/validate_public_packages.py --dist wheelhouse --expected-version "$ver"
+      - name: Install + hermetic tests
+        working-directory: sdk/runanywhere-python
+        run: |
+          wheel="$(ls wheelhouse/*.whl | head -1)"
+          python -m pip install "${wheel}[server,test]"
+          tmp="$RUNNER_TEMP/ratests"; mkdir -p "$tmp"
+          cp -r tests "$tmp/tests"
+          cd "$tmp" && python -m pytest tests -q
+
   wasm:
     runs-on: ubuntu-22.04
     steps:
