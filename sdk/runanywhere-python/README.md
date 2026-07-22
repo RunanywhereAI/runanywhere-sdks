@@ -222,6 +222,44 @@ with RunAnywhere() as ra:
     print(vec.shape)
 ```
 
+## RAG (talk to your documents)
+
+Retrieval-augmented generation runs entirely on-device: ingest documents, then ask questions
+that are answered *grounded* in the retrieved chunks. It pairs an embedder (for retrieval) with
+an LLM (for the answer), reusing the tuned commons RAG pipeline over a native binding.
+
+Install the extra (adds the protobuf runtime the binding uses): `pip install "runanywhere[rag]"`.
+
+```python
+with RunAnywhere() as ra:
+    with ra.create_rag("minilm", llm_model="qwen2.5-0.5b") as rag:
+        rag.ingest("Paris is the capital of France.")
+        rag.ingest("The Eiffel Tower is 330 metres tall.")
+
+        result = rag.query("How tall is the Eiffel Tower?")
+        print(result.answer)                       # grounded answer
+        for chunk in result.retrieved_chunks:      # the evidence it used
+            print(f"  [{chunk.similarity_score:.2f}] {chunk.text}")
+```
+
+Stream the answer token-by-token (retrieval events, then answer tokens, then a terminal result):
+
+```python
+for event in rag.query_stream("What is the capital of France?"):
+    if event.is_token:
+        print(event.token, end="", flush=True)
+    elif event.is_final:
+        print("\n\nsources:", [c.source_document for c in event.result.retrieved_chunks])
+```
+
+`create_rag` takes catalog ids or local paths (embedders must be local/catalog, not a URL/HF
+repo), an optional `llm_model` (omit for a retrieval-only index), and `RAGConfiguration` knobs as
+keywords — `top_k`, `chunk_size`, `chunk_overlap`, `similarity_threshold`, `prompt_template`,
+`index_path`, `persist_index`, `rerank_results`/`reranker_model_id`. Other methods: `ingest_many`,
+`stats()`, `clear()`, `cancel()`, plus async twins `aquery` / `aquery_stream`. A plain
+`pip install runanywhere` (no `[rag]`) still imports fine; a RAG call then raises a clear
+"install runanywhere[rag]" hint.
+
 ## Speech-to-Text
 
 ```python
