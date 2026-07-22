@@ -149,6 +149,9 @@ class FakeManager:
 
 
 def _client(manager=None, **kw):
+    # Tests exercise routing/wire-format with fake model ids like "m", so allow arbitrary ids by
+    # default; the catalog-restriction path is covered explicitly in its own tests.
+    kw.setdefault("allow_arbitrary_models", True)
     return TestClient(create_app(model_manager=manager or FakeManager(), **kw))
 
 
@@ -564,6 +567,95 @@ def test_models_downloaded_flag_reflects_status():
 
 
 def test_body_size_limit_returns_413():
-    with TestClient(create_app(model_manager=FakeManager(), max_body_bytes=100)) as c:
+    with TestClient(create_app(model_manager=FakeManager(), max_body_bytes=100,
+                               allow_arbitrary_models=True)) as c:
         big = {"model": "m", "messages": [{"role": "user", "content": "x" * 500}]}
         assert c.post("/v1/chat/completions", json=big).status_code == 413
+
+
+# --------------------------------------------------------------------------- hardening (review fixes)
+def test_empty_messages_is_400():
+    with _client() as c:
+        assert c.post("/v1/chat/completions", json={"model": "m", "messages": []}).status_code == 400
+
+
+@pytest.mark.parametrize("inp", [[], ""])
+def test_empty_embeddings_input_is_400(inp):
+    with _client() as c:
+        assert c.post("/v1/embeddings", json={"model": "m", "input": inp}).status_code == 400
+
+
+def test_max_tokens_zero_is_400():
+    with _client() as c:
+        r = c.post("/v1/chat/completions", json={
+            "model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 0})
+        assert r.status_code == 400  # pydantic ge=1 -> validation error -> OpenAI 400 envelope
+        assert r.json()["error"]["type"] == "invalid_request_error"
+
+
+def test_speech_pcm_is_rejected():
+    with _client() as c:
+        r = c.post("/v1/audio/speech", json={"model": "m", "input": "hi", "response_format": "pcm"})
+        assert r.status_code == 400
+
+
+def test_catalog_restriction_rejects_unknown_model():
+    # Default (allow_arbitrary_models=False): a non-catalog id -> 404; a catalog id -> 200.
+    with TestClient(create_app(model_manager=FakeManager())) as c:
+        assert c.post("/v1/chat/completions", json={
+            "model": "not-a-real-model", "messages": [{"role": "user", "content": "hi"}]
+        }).status_code == 404
+        assert c.post("/v1/chat/completions", json={
+            "model": "qwen2.5-0.5b", "messages": [{"role": "user", "content": "hi"}]
+        }).status_code == 200
+
+
+def test_image_urls_disabled_by_default():
+    with _client() as c:  # allow_image_urls defaults False
+        r = c.post("/v1/chat/completions", json={"model": "m", "messages": [{
+            "role": "user", "content": [{"type": "image_url",
+                                         "image_url": {"url": "http://example.com/x.png"}}]}]})
+        assert r.status_code == 400  # URL fetch is opt-in
+
+
+def test_response_format_boolean_subschema_does_not_500():
+    # A boolean sub-schema ({"properties": {"x": true}}) must not crash grammar building.
+    llm = FakeLLM(text='{"x": 1}')
+    with _client(FakeManager(llm=llm)) as c:
+        r = c.post("/v1/chat/completions", json={
+            "model": "m", "messages": [{"role": "user", "content": "json"}],
+            "response_format": {"type": "json_schema", "json_schema": {
+                "schema": {"type": "object", "properties": {"x": True}}}}})
+        assert r.status_code == 200
+
+
+def test_api_key_non_ascii_header_is_401_not_500():
+    # raise_server_exceptions=False so that if the compare ever raised (old str-compare bug) we'd
+    # see a 500 here; with the bytes compare it's a clean 401.
+    app = create_app(model_manager=FakeManager(), api_key="secret", allow_arbitrary_models=True)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.post("/v1/chat/completions",
+                   json={"model": "m", "messages": [{"role": "user", "content": "hi"}]},
+                   headers=[(b"authorization", b"Bearer \xff")])
+        assert r.status_code == 401  # bytes compare never raises -> clean 401, not a 500
+
+
+def test_unexpected_error_is_generic_500_no_leak():
+    class RaisingEmbedder:
+        def embed(self, text):
+            raise ValueError("internal path /secret/thing")
+
+    # TestClient re-raises unhandled exceptions by default; disable that to inspect the 500 body
+    # (a real uvicorn returns this body to the client and logs the detail server-side).
+    app = create_app(model_manager=FakeManager(embedder=RaisingEmbedder()), allow_arbitrary_models=True)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.post("/v1/embeddings", json={"model": "m", "input": "a"})
+        assert r.status_code == 500
+        assert r.json()["error"]["message"] == "internal server error"  # no ValueError text leaked
+
+
+def test_malformed_request_is_openai_400():
+    with _client() as c:
+        r = c.post("/v1/chat/completions", json={"model": "m"})  # missing required 'messages'
+        assert r.status_code == 400
+        assert r.json()["error"]["type"] == "invalid_request_error"
