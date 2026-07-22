@@ -456,12 +456,12 @@ void initialize_telemetry_auth(const Connection &connection) {
 
 rac_result_t resolve_connection(const GlobalOptions &options, Connection *out,
                                 std::string *error) {
-  // Prefer explicit flags / CLI11 envname (RUNANYWHERE_ENV). Fall back to the
-  // base-branch alias RUNANYWHERE_ENVIRONMENT so existing scripts keep working.
+  // Prefer explicit --environment; otherwise CLI11 / getenv via
+  // RUNANYWHERE_ENVIRONMENT (the single canonical name on the cross-fit line).
   std::string environment_name = options.environment;
   if (environment_name.empty()) {
     environment_name =
-        first_env_value("RUNANYWHERE_ENVIRONMENT", "RUNANYWHERE_ENV", nullptr);
+        first_env_value("RUNANYWHERE_ENVIRONMENT", nullptr, nullptr);
   }
   std::string base_url = options.base_url;
   if (base_url.empty()) {

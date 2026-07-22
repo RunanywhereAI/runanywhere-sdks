@@ -34,9 +34,8 @@ struct GlobalOptions {
     // Control-plane connection. Empty defaults preserve the historical
     // offline development-mode behavior exactly. CLI11 fills these from
     // --base-url/--api-key/--environment with RUNANYWHERE_BASE_URL /
-    // RUNANYWHERE_API_KEY / RUNANYWHERE_ENV env-var fallbacks (app.cpp).
-    // resolve_connection() also accepts RUNANYWHERE_ENVIRONMENT as an alias
-    // for the environment name (keyless staging remains valid).
+    // RUNANYWHERE_API_KEY / RUNANYWHERE_ENVIRONMENT env-var fallbacks (app.cpp).
+    // Staging may omit key+URL (keyless / baked staging URL).
     std::string environment;  // dev|development|staging|prod|production ("" → dev)
     std::string base_url;     // staging may omit (baked URL); prod requires https
     std::string api_key;      // staging may omit (keyless); prod requires ≥10 chars
@@ -64,7 +63,7 @@ struct Connection {
  *   - staging: keyless OK (baked staging URL / PUBLIC-org); optional key+URL.
  *   - prod: api key + https base URL required; localhost rejected.
  *
- * Env aliases: RUNANYWHERE_ENV (CLI11) and RUNANYWHERE_ENVIRONMENT (fallback).
+ * Env: RUNANYWHERE_ENVIRONMENT (also --environment).
  */
 rac_result_t resolve_connection(const GlobalOptions& options, Connection* out, std::string* error);
 

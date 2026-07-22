@@ -30,12 +30,10 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
 
     // Control-plane connection. Absent flags keep the historical offline
     // development-mode defaults; validation happens in resolve_connection().
-    // RUNANYWHERE_ENV is the CLI11 envname; resolve_connection() also accepts
-    // RUNANYWHERE_ENVIRONMENT so scripts written for the cross-fit branch work.
     app.add_option("--environment", options.environment,
                    "Control-plane environment: dev (default, offline), staging "
                    "(keyless OK; http + localhost allowed) or prod (https only)")
-        ->envname("RUNANYWHERE_ENV")
+        ->envname("RUNANYWHERE_ENVIRONMENT")
         ->check(CLI::IsMember({"dev", "development", "staging", "prod", "production"}));
     app.add_option("--base-url", options.base_url,
                    "Control-plane base URL, e.g. https://api.runanywhere.ai or "

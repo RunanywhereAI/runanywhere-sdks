@@ -94,14 +94,13 @@ rcli can drive any RunAnywhere control plane — including a local backend on
 
 | Flag | Env var | Meaning |
 |---|---|---|
-| `--environment <dev\|staging\|prod>` | `RUNANYWHERE_ENV` | `dev` (default) is offline — no control plane. `staging` allows `http://` and localhost URLs. `prod` requires `https://` and rejects localhost |
-| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Backend origin, e.g. `https://api.runanywhere.ai` or `http://127.0.0.1:8000` |
-| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Control-plane API key (≥ 10 chars), required for staging/prod |
+| `--environment <dev\|staging\|prod>` | `RUNANYWHERE_ENVIRONMENT` | `dev` (default) is offline — no control plane. `staging` allows keyless + `http://`/localhost. `prod` requires `https://` and rejects localhost |
+| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Backend origin, e.g. `https://api.runanywhere.ai` or `http://127.0.0.1:8000` (optional on staging when the baked URL is present) |
+| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Control-plane API key (≥ 10 chars); optional on staging (keyless), required for prod |
 
-Combos are validated client-side before any network call: staging/prod
-require both a key and a URL; passing credentials while in dev mode is an
-error. With no flags at all, every command behaves exactly as before
-(offline development mode).
+Combos are validated client-side before any network call. Passing credentials
+while in dev mode is an error. With no flags at all, every command behaves
+exactly as before (offline development mode).
 
 ```console
 $ rcli --environment staging --base-url http://127.0.0.1:8000 --api-key $KEY auth login
