@@ -61,6 +61,12 @@ def json_schema_to_grammar(schema: dict) -> str:
     counter = {"n": 0}
 
     def build(s: dict) -> str:
+        # A JSON Schema value may legally be a bool (`{"properties": {"x": true}}`) or otherwise
+        # non-dict. JS reads missing keys off it as undefined and falls through to `string`;
+        # Python would raise AttributeError on `.get`, so coerce to that same "no constraint" path.
+        if not isinstance(s, dict):
+            used["string"] = None
+            return "string"
         any_of = s.get("anyOf")
         if any_of:
             name = f"any{counter['n']}"
