@@ -42,10 +42,14 @@ def _fresh_interpreter(code: str) -> subprocess.CompletedProcess:
 
 
 def test_import_runanywhere_without_native() -> None:
-    """The package imports cleanly and does not eagerly load the native extension."""
+    """The package imports cleanly and pulls in neither the native extension NOR the optional
+    server subpackage (which imports fastapi — an optional [server] dep)."""
     r = _fresh_interpreter(
         "import runanywhere, sys; "
-        "assert 'runanywhere._native._core' not in sys.modules; print('ok')"
+        "assert 'runanywhere._native._core' not in sys.modules, 'native leaked'; "
+        "assert 'runanywhere.server' not in sys.modules, 'server leaked'; "
+        "assert 'fastapi' not in sys.modules, 'fastapi leaked'; "
+        "print('ok')"
     )
     assert r.returncode == 0, r.stderr
     assert "ok" in r.stdout
