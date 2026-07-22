@@ -78,6 +78,7 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "blob_store.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -1403,7 +1404,17 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
                      file.storage_key.c_str(), static_cast<long long>(file.expected_bytes));
     }
 
-    if (!already_complete) {
+    // Content-addressed de-dup: when another model already downloaded this exact
+    // content (identical sha256 from the HF LFS oid), hardlink the shared blob into
+    // place and skip the network entirely. Non-archive files only. A no-op on web /
+    // when the store is unusable, so it falls through to a normal download.
+    bool deduped = false;
+    if (!already_complete && !file.requires_extraction) {
+        deduped = rac::download::blob_store::link_from_blob(
+            file.checksum_sha256, file.expected_bytes, file.destination_path);
+    }
+
+    if (!already_complete && !deduped) {
         // Runtime free-space safety net. The planner gate runs once up front,
         // but free space can shrink between planning and this file's turn (other
         // downloads, the bytes already written by earlier files in this bundle),
@@ -1547,6 +1558,12 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         }
     } else {
         final_path = file.destination_path;
+        // Publish this verified file into the content-addressed store so future
+        // models with the same content de-dup against it (hardlink, no re-download).
+        // Skipped when it was itself a de-dup hit (already a link to the blob).
+        if (!deduped && !file.checksum_sha256.empty()) {
+            rac::download::blob_store::promote(file.checksum_sha256, file.destination_path);
+        }
     }
 
     if (total_expected > 0) {
@@ -1737,6 +1754,17 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
                 continue;
             }
 
+            // Content-addressed de-dup (mirrors the sequential path): when the same
+            // content was already downloaded by another model, hardlink the shared
+            // blob in and skip the network for this part entirely.
+            if (!file.requires_extraction &&
+                rac::download::blob_store::link_from_blob(
+                    file.checksum_sha256, file.expected_bytes, file.destination_path)) {
+                update_parallel_progress(task, i, file.expected_bytes, file.expected_bytes,
+                                         total_expected, true);
+                continue;
+            }
+
             if (file.expected_bytes > 0) {
                 int64_t available = filesystem_available_bytes(file.destination_path);
                 const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
@@ -1801,6 +1829,10 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
             }
 
             const int64_t final_size = file_size_or_zero(file.destination_path);
+            // Publish the verified file into the shared store for future de-dup.
+            if (!file.requires_extraction && !file.checksum_sha256.empty()) {
+                rac::download::blob_store::promote(file.checksum_sha256, file.destination_path);
+            }
             update_parallel_progress(task, i, final_size,
                                      file.expected_bytes > 0 ? file.expected_bytes : final_size,
                                      total_expected, true);

@@ -20,6 +20,7 @@
 #include <cstring>
 #include <string>
 
+#include "infrastructure/download/blob_store.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -307,6 +308,12 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
     }
 
     RAC_LOG_INFO(LOG_CATEGORY, "Deleted model folder");
+
+    // The deleted model's files were hardlinks into the content-addressed blob
+    // store; removing them may have orphaned shared blobs (now only referenced by
+    // the store itself). Reclaim those. No-op when the store is unused/disabled.
+    rac::download::blob_store::gc_orphans();
+
     return RAC_SUCCESS;
 }
 
