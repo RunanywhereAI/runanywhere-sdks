@@ -38,9 +38,19 @@ def openai_error_body(
 
 
 def install_error_handlers(app: Any) -> None:
-    """Register a handler turning any ``SDKException`` into an OpenAI-shaped HTTP error."""
+    """Register handlers turning SDK / validation / unexpected errors into OpenAI-shaped bodies.
+
+    Crucially the catch-all never echoes a traceback or internal path to the client (it logs the
+    detail server-side and returns a generic 500), so the response is safe even if the app is
+    ever run with ``debug=True``.
+    """
+    import logging
+
     from fastapi import Request
+    from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
+
+    logger = logging.getLogger("runanywhere.server")
 
     @app.exception_handler(SDKException)
     async def _handle_sdk_exception(_request: "Request", exc: SDKException) -> "JSONResponse":
@@ -49,3 +59,13 @@ def install_error_handlers(app: Any) -> None:
             exc.message, status, code=int(exc.code), param=getattr(exc, "field_path", None)
         )
         return JSONResponse(status_code=status, content=body)
+
+    @app.exception_handler(RequestValidationError)
+    async def _handle_validation(_request: "Request", exc: RequestValidationError) -> "JSONResponse":
+        # Malformed request body / missing fields -> OpenAI-shaped 400 (not FastAPI's 422 shape).
+        return JSONResponse(status_code=400, content=openai_error_body(str(exc.errors()), 400))
+
+    @app.exception_handler(Exception)
+    async def _handle_unexpected(_request: "Request", exc: Exception) -> "JSONResponse":
+        logger.exception("unhandled server error")  # full detail to logs, never to the client
+        return JSONResponse(status_code=500, content=openai_error_body("internal server error", 500))
