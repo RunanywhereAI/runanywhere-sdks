@@ -27,7 +27,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from ..audio import decode_wav, downsample, encode_wav, pcm16_bytes
-from ..catalog import CATALOG
+from ..catalog import CATALOG, is_catalog_id
 from ..errors import SDKException
 from ..grammar import json_schema_to_grammar
 from ..structured import ToolCall, ToolSpec
@@ -38,6 +38,7 @@ from .schemas import ChatMessage, ChatRequest, CompletionRequest, EmbeddingsRequ
 STT_SAMPLE_RATE = 16000
 _DONE = "data: [DONE]\n\n"
 MAX_IMAGE_BYTES = 20 * 1024 * 1024  # cap decoded/fetched image bytes (DoS guard)
+_MAX_DATA_URI_CHARS = (MAX_IMAGE_BYTES // 3 + 1) * 4 + 64  # base64 input cap (pre-decode)
 DEFAULT_MAX_BODY_BYTES = 50 * 1024 * 1024  # reject larger request bodies with 413
 
 
@@ -145,7 +146,10 @@ def _apply_response_format(rf: Optional[dict], opts: dict[str, Any]) -> Optional
     if rf_type == "json_schema":
         schema = (rf.get("json_schema") or {}).get("schema")
         if schema:
-            opts["grammar"] = json_schema_to_grammar(schema)
+            try:
+                opts["grammar"] = json_schema_to_grammar(schema)
+            except Exception as exc:  # noqa: BLE001 — a bad schema is a client error (400), not 500
+                raise SDKException.invalid_input(f"invalid response_format json_schema: {exc}")
         return None
     if rf_type == "json_object":
         return "You must respond with a single valid JSON object."
@@ -255,35 +259,69 @@ def _img_suffix(header: str) -> str:
     return ".jpg"
 
 
-def _reject_ssrf(url: str) -> None:
-    """Reject an image URL whose host resolves to a private/loopback/link-local/reserved
-    address — a network request must not be usable to reach internal services or cloud
-    metadata (SSRF)."""
+def _validate_public_host(url: str) -> None:
+    """Reject a URL whose host resolves to a non-globally-routable address (SSRF guard).
+
+    Uses ``not is_global`` (allowlist) plus explicit reserved/mapped checks so loopback,
+    private, link-local (169.254/16, incl. cloud metadata), CGNAT, and IPv4-mapped-IPv6
+    loopback are all rejected. NOTE: a residual DNS-rebinding TOCTOU remains (urllib re-resolves
+    at connect); URL fetch is therefore opt-in (allow_image_urls) — data-URIs are the safe path.
+    """
     host = urllib.parse.urlparse(url).hostname
     if not host:
         raise SDKException.invalid_input("invalid image URL")
     try:
         infos = socket.getaddrinfo(host, None)
-    except OSError as exc:
-        raise SDKException.invalid_input(f"could not resolve image host: {exc}")
+    except OSError:
+        raise SDKException.invalid_input("could not resolve image host")
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
-                or ip.is_multicast or ip.is_unspecified):
+        mapped = getattr(ip, "ipv4_mapped", None)
+        if mapped is not None:  # normalise ::ffff:127.0.0.1 -> 127.0.0.1 before the check
+            ip = mapped
+        if not ip.is_global or ip.is_reserved:
             raise SDKException.invalid_input("image URL host is not allowed")
 
 
-def _materialize_image(ref: str) -> tuple[str, bool]:
-    """Return ``(temp_path, True)`` for a data-URI or http(s) image. Blocking (base64 decode /
-    network fetch / file write) — call it via ``asyncio.to_thread``. Local filesystem paths are
-    NOT accepted from a network request (arbitrary-file-read guard); size is capped (DoS guard);
-    URLs are SSRF-filtered. Raises ``SDKException.invalid_input`` (-> HTTP 400) on any rejection."""
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow redirects — a redirect can bounce an allowed public URL to an internal
+    address, bypassing the SSRF host check (which only vets the original URL)."""
+
+    def redirect_request(self, *_args, **_kwargs):  # noqa: D102
+        raise SDKException.invalid_input("image URL redirects are not allowed")
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def _fetch_image_bytes(url: str) -> bytes:
+    """Fetch an http(s) image with the SSRF host check + no redirects + a hard size cap."""
+    _validate_public_host(url)
+    try:
+        with _NO_REDIRECT_OPENER.open(url, timeout=10) as r:  # noqa: S310 — host-vetted, no redirects
+            raw = r.read(MAX_IMAGE_BYTES + 1)
+    except SDKException:
+        raise
+    except Exception:  # noqa: BLE001 — generic message; exact error stays server-side (recon oracle)
+        raise SDKException.invalid_input("could not fetch image URL")
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise SDKException.invalid_input("image exceeds the size limit")
+    return raw
+
+
+def _materialize_image(ref: str, allow_urls: bool) -> tuple[str, bool]:
+    """Return ``(temp_path, True)`` for a data-URI (or, if ``allow_urls``, an http(s)) image.
+    Blocking (decode / fetch / write) — call via ``asyncio.to_thread``. Local filesystem paths
+    are never accepted (arbitrary-file-read guard); size is capped BEFORE decode (DoS guard).
+    Raises ``SDKException.invalid_input`` (-> HTTP 400) on any rejection."""
     if ref.startswith("data:"):
         header, _, data = ref.partition(",")
+        if len(data) > _MAX_DATA_URI_CHARS:  # cap the base64 INPUT before allocating the decode
+            raise SDKException.invalid_input("image exceeds the size limit")
         try:
             raw = base64.b64decode(data) if ";base64" in header else urllib.parse.unquote_to_bytes(data)
-        except Exception as exc:  # noqa: BLE001
-            raise SDKException.invalid_input(f"could not decode data-URI image: {exc}")
+        except Exception:  # noqa: BLE001
+            raise SDKException.invalid_input("could not decode data-URI image")
         if len(raw) > MAX_IMAGE_BYTES:
             raise SDKException.invalid_input("image exceeds the size limit")
         fd, path = tempfile.mkstemp(suffix=_img_suffix(header))
@@ -291,16 +329,12 @@ def _materialize_image(ref: str) -> tuple[str, bool]:
             f.write(raw)
         return path, True
     if ref.startswith("http://") or ref.startswith("https://"):
-        _reject_ssrf(ref)
-        try:
-            with urllib.request.urlopen(ref, timeout=10) as r:  # noqa: S310 — SSRF-filtered above
-                raw = r.read(MAX_IMAGE_BYTES + 1)
-        except SDKException:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            raise SDKException.invalid_input(f"could not fetch image URL: {exc}")
-        if len(raw) > MAX_IMAGE_BYTES:
-            raise SDKException.invalid_input("image exceeds the size limit")
+        if not allow_urls:
+            raise SDKException.invalid_input(
+                "image URLs are disabled; send the image as a data: URI "
+                "(or start the server with allow_image_urls=True)"
+            )
+        raw = _fetch_image_bytes(ref)
         fd, path = tempfile.mkstemp(suffix=".img")
         with os.fdopen(fd, "wb") as f:
             f.write(raw)
@@ -309,11 +343,24 @@ def _materialize_image(ref: str) -> tuple[str, bool]:
     raise SDKException.invalid_input("image_url must be a data: URI or an http(s) URL")
 
 
-def _pick_vlm(req_model: Optional[str], default_vlm: str) -> str:
-    """A known VLM id or an unknown (custom-path) id is trusted; a known non-VLM id falls back."""
+def _resolve_model_id(req_model: Optional[str], default: str, allow_arbitrary: bool) -> str:
+    """The model id to load. Client-supplied ids must be catalog ids (or match the operator's
+    configured default) unless ``allow_arbitrary`` — so a network client can't make the server
+    load an arbitrary local path / HF repo (arbitrary-load + unbounded-model-pinning guard)."""
+    model = req_model or default
+    if allow_arbitrary or model == default or is_catalog_id(model):
+        return model
+    raise SDKException.model_not_found(model)
+
+
+def _pick_vlm(req_model: Optional[str], default_vlm: str, allow_arbitrary: bool) -> str:
+    """Resolve the VLM: a known VLM id is used; a custom path only if ``allow_arbitrary`` or it is
+    the configured default; anything else falls back to the default VLM (vision never 404s here)."""
     if req_model:
         entry = CATALOG.get(req_model)
-        if entry is None or entry.type == "vlm":
+        if entry is not None and entry.type == "vlm":
+            return req_model
+        if entry is None and (allow_arbitrary or req_model == default_vlm):
             return req_model
     return default_vlm
 
@@ -383,6 +430,57 @@ async def _completions_sse(agen_factory, lock, cid: str, model: str) -> AsyncIte
         yield _DONE
 
 
+class _BodyLimitMiddleware:
+    """Reject request bodies over ``max_bytes`` with 413, enforced on ACTUAL bytes (so a chunked
+    body with no Content-Length can't bypass a header-only check). Buffers up to the limit, then
+    replays the body to the app — bounding memory to ``max_bytes`` per request."""
+
+    def __init__(self, app, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        body = b""
+        more = True
+        while more:
+            msg = await receive()
+            if msg["type"] != "http.request":
+                return await self.app(scope, _prepend(msg, receive), send)
+            body += msg.get("body", b"")
+            more = msg.get("more_body", False)
+            if len(body) > self.max_bytes:
+                await send({"type": "http.response.start", "status": 413,
+                            "headers": [(b"content-type", b"application/json")]})
+                await send({"type": "http.response.body",
+                            "body": json.dumps(openai_error_body("request body too large", 413)).encode()})
+                return
+        replayed = False
+
+        async def replay():
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        return await self.app(scope, replay, send)
+
+
+def _prepend(first, receive):
+    sent = False
+
+    async def _recv():
+        nonlocal sent
+        if not sent:
+            sent = True
+            return first
+        return await receive()
+
+    return _recv
+
+
 # --------------------------------------------------------------------------- app factory
 def create_app(
     model_manager: Optional[ModelManager] = None,
@@ -394,9 +492,16 @@ def create_app(
     default_stt: Optional[str] = None,
     default_tts: Optional[str] = None,
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
+    allow_image_urls: bool = False,
+    allow_arbitrary_models: bool = False,
 ) -> FastAPI:
     """Build the FastAPI app. Pass ``model_manager`` to inject a (fake) manager for tests; else a
-    real one is built in the lifespan so importing/creating the app never touches native code."""
+    real one is built in the lifespan so importing/creating the app never touches native code.
+
+    Security defaults (opt in only if you trust the clients): ``allow_image_urls=False`` accepts
+    only data-URI images (no server-side URL fetch = no SSRF); ``allow_arbitrary_models=False``
+    accepts only catalog model ids (or the configured defaults), not arbitrary paths / HF repos.
+    """
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -413,8 +518,8 @@ def create_app(
             }
             mgr = ModelManager(**overrides)
         app.state.manager = mgr
-        mgr.start()
         try:
+            mgr.start()  # inside the try so a failed init still runs stop() (idempotent)
             yield
         finally:
             mgr.stop()
@@ -423,22 +528,15 @@ def create_app(
     if model_manager is not None:
         app.state.manager = model_manager
     install_error_handlers(app)
-
-    @app.middleware("http")
-    async def _limit_body_size(request: Request, call_next):
-        cl = request.headers.get("content-length")
-        if cl and cl.isdigit() and int(cl) > max_body_bytes:
-            return JSONResponse(
-                status_code=413,
-                content=openai_error_body("request body too large", 413),
-            )
-        return await call_next(request)
+    app.add_middleware(_BodyLimitMiddleware, max_bytes=max_body_bytes)
 
     async def require_api_key(authorization: Optional[str] = Header(default=None)) -> None:
         if api_key is None:
             return
-        # Constant-time compare so the Bearer token isn't a timing side channel.
-        if authorization is None or not hmac.compare_digest(authorization, f"Bearer {api_key}"):
+        # Constant-time compare on bytes (never raises on a non-ASCII header, unlike str compare).
+        expected = f"Bearer {api_key}".encode()
+        got = authorization.encode() if isinstance(authorization, str) else b""
+        if not hmac.compare_digest(got, expected):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
     guarded = [Depends(require_api_key)]
@@ -483,6 +581,8 @@ def create_app(
     # -- chat ---------------------------------------------------------------
     @app.post("/v1/chat/completions", dependencies=guarded)
     async def chat_completions(req: ChatRequest, mgr: ModelManager = Depends(get_manager)):
+        if not req.messages:
+            raise SDKException.invalid_input("messages must not be empty")
         cid = f"chatcmpl-{uuid.uuid4().hex}"
         image_ref = _last_user_image(req.messages)
         if image_ref is not None:
@@ -495,7 +595,7 @@ def create_app(
         if system:
             opts["system_prompt"] = system
 
-        model = req.model or mgr.default_llm
+        model = _resolve_model_id(req.model, mgr.default_llm, allow_arbitrary_models)
         llm, lock = await mgr.llm(model)
 
         specs = _tools_to_specs(req.tools)
@@ -536,10 +636,10 @@ def create_app(
 
     async def _handle_vision(mgr, req, image_ref, cid):
         prompt = _last_user_text(req.messages) or "Describe the image."
-        model = _pick_vlm(req.model, mgr.default_vlm)
+        model = _pick_vlm(req.model, mgr.default_vlm, allow_arbitrary_models)
         vlm, lock = await mgr.vlm(model)
         # Blocking (decode / SSRF-filtered fetch / write) -> off the event loop; may raise -> 400.
-        path, is_temp = await asyncio.to_thread(_materialize_image, image_ref)
+        path, is_temp = await asyncio.to_thread(_materialize_image, image_ref, allow_image_urls)
 
         if req.stream:
             async def sse() -> AsyncIterator[str]:
@@ -574,7 +674,7 @@ def create_app(
     async def completions(req: CompletionRequest, mgr: ModelManager = Depends(get_manager)):
         prompt = req.prompt if isinstance(req.prompt, str) else "\n".join(req.prompt)
         opts = _gen_opts(req)
-        model = req.model or mgr.default_llm
+        model = _resolve_model_id(req.model, mgr.default_llm, allow_arbitrary_models)
         llm, lock = await mgr.llm(model)
         cid = f"cmpl-{uuid.uuid4().hex}"
         if req.stream:
@@ -595,7 +695,9 @@ def create_app(
     @app.post("/v1/embeddings", dependencies=guarded)
     async def embeddings(req: EmbeddingsRequest, mgr: ModelManager = Depends(get_manager)):
         inputs = [req.input] if isinstance(req.input, str) else list(req.input)
-        model = req.model or mgr.default_embedder
+        if not inputs or any(not isinstance(t, str) or t == "" for t in inputs):
+            raise SDKException.invalid_input("input must be a non-empty string or list of non-empty strings")
+        model = _resolve_model_id(req.model, mgr.default_embedder, allow_arbitrary_models)
         embedder, lock = await mgr.embedder(model)
         data, total = [], 0
         async with lock:
@@ -618,12 +720,12 @@ def create_app(
         model: Optional[str] = Form(default=None),
         mgr: ModelManager = Depends(get_manager),
     ):
-        stt, lock = await mgr.stt(model or mgr.default_stt)
+        stt, lock = await mgr.stt(_resolve_model_id(model, mgr.default_stt, allow_arbitrary_models))
         raw = await file.read()
         try:
             sample_rate, samples = decode_wav(raw)
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=400, detail=f"could not decode audio (send WAV): {exc}")
+        except Exception:  # noqa: BLE001 — generic client-facing message; details stay server-side
+            raise HTTPException(status_code=400, detail="could not decode audio (send a 16-bit WAV)")
         if sample_rate != STT_SAMPLE_RATE:
             samples = downsample(samples, sample_rate, STT_SAMPLE_RATE)
         pcm16 = pcm16_bytes(samples)
@@ -633,9 +735,9 @@ def create_app(
 
     @app.post("/v1/audio/speech", dependencies=guarded)
     async def speech(req: SpeechRequest, mgr: ModelManager = Depends(get_manager)):
-        if req.response_format not in ("wav", "pcm"):
+        if req.response_format != "wav":
             raise HTTPException(status_code=400, detail="only response_format=wav is supported")
-        tts, lock = await mgr.tts(req.model or mgr.default_tts)
+        tts, lock = await mgr.tts(_resolve_model_id(req.model, mgr.default_tts, allow_arbitrary_models))
         async with lock:
             synth = await tts.asynthesize(req.input)
         return Response(content=encode_wav(synth.samples, synth.sample_rate), media_type="audio/wav")
