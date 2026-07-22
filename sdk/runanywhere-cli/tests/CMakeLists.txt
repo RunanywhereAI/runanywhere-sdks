@@ -6,6 +6,14 @@ target_include_directories(test_rcli_unit PRIVATE
 target_link_libraries(test_rcli_unit PRIVATE rcli_core)
 add_test(NAME rcli_unit_tests COMMAND test_rcli_unit --run-all)
 
+# rcli segment-command tests — parse/validation/render coverage, no backend.
+add_executable(test_rcli_segment test_rcli_segment.cpp)
+target_include_directories(test_rcli_segment PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/tests
+)
+target_link_libraries(test_rcli_segment PRIVATE rcli_core)
+add_test(NAME rcli_segment_tests COMMAND test_rcli_segment --run-all)
+
 if(TARGET rac_backend_mlx)
     add_executable(test_rcli_mlx_e2e test_rcli_mlx_e2e.cpp)
     target_include_directories(test_rcli_mlx_e2e PRIVATE

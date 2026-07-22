@@ -475,6 +475,74 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diarization_onnx_tests COMMAND test_diarization_onnx)
         set_tests_properties(diarization_onnx_tests PROPERTIES
             LABELS "native;onnx;diarization")
+
+        # Generic-derivation gate. Proves the provider derives class count, input
+        # size, mean/std/rescale, do_normalize/do_rescale, and labels from the
+        # bundle sidecars + the model output tensor -- every value here DIFFERS
+        # from the file-local SegFormer defaults, so a regression that falls back
+        # to a hardcoded default is observable. The test TU #includes
+        # onnx_segmentation_provider.cpp (white-box helpers) and compiles
+        # rac_onnx_segmentation_register.cpp alongside for g_onnx_segmentation_ops;
+        # neither links rac_backend_onnx, so the provider symbols are defined
+        # exactly once. The N=4 / 256-input / 64x64-logits ONNX fixture is
+        # generated at build time (no binary checked in) by the committed python
+        # generator; the test is added only when python + onnx are available.
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        set(_seg_generic_py_ok FALSE)
+        if(Python3_Interpreter_FOUND)
+            execute_process(
+                COMMAND ${Python3_EXECUTABLE} -c "import onnx, numpy"
+                RESULT_VARIABLE _seg_generic_py_check
+                OUTPUT_QUIET ERROR_QUIET)
+            if(_seg_generic_py_check EQUAL 0)
+                set(_seg_generic_py_ok TRUE)
+            endif()
+        endif()
+        if(_seg_generic_py_ok AND NOT TARGET test_segmentation_generic)
+            set(_seg_generic_fixture_dir
+                "${CMAKE_CURRENT_BINARY_DIR}/fixtures/segmentation_generic")
+            add_custom_command(
+                OUTPUT "${_seg_generic_fixture_dir}/model.onnx"
+                       "${_seg_generic_fixture_dir}/config.json"
+                       "${_seg_generic_fixture_dir}/preprocessor_config.json"
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests/fixtures/generate_segmentation_generic_fixture.py"
+                        "${_seg_generic_fixture_dir}"
+                DEPENDS
+                        "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests/fixtures/generate_segmentation_generic_fixture.py"
+                COMMENT "Generating generic semantic-segmentation ONNX fixture (N=4, 256->64)"
+                VERBATIM)
+            add_custom_target(segmentation_generic_fixture
+                DEPENDS "${_seg_generic_fixture_dir}/model.onnx")
+
+            add_executable(test_segmentation_generic
+                sdk/runanywhere-commons/tests/test_segmentation_generic.cpp
+                engines/onnx/rac_onnx_segmentation_register.cpp
+            )
+            add_dependencies(test_segmentation_generic segmentation_generic_fixture)
+            target_include_directories(test_segmentation_generic PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/engines/onnx
+                ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+                ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+                ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/src
+            )
+            target_compile_definitions(test_segmentation_generic PRIVATE
+                "RAC_SEGMENTATION_GENERIC_FIXTURE_DIR=\"${_seg_generic_fixture_dir}\""
+                "RAC_SEGMENTATION_SEGFORMER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests/fixtures/segformer_tiny\""
+            )
+            target_link_libraries(test_segmentation_generic PRIVATE
+                rac_commons
+                rac_runtime_onnxrt
+                nlohmann_json::nlohmann_json
+            )
+            if(COMMAND rac_link_archive_deps)
+                rac_link_archive_deps(test_segmentation_generic)
+            endif()
+            target_compile_features(test_segmentation_generic PRIVATE cxx_std_20)
+            add_test(NAME segmentation_generic_tests COMMAND test_segmentation_generic)
+            set_tests_properties(segmentation_generic_tests PROPERTIES
+                LABELS "native;onnx;segmentation;generic")
+        endif()
     endif()
     # commons-010: sherpa plugin-entry smoke test. Wired here because
     # rac_backend_sherpa is built by engines/, which is configured after

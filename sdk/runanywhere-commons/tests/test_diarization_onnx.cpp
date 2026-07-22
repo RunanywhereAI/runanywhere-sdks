@@ -24,8 +24,11 @@
 // math helpers compute_log_mel_features / median_filter_preds / binarize_preds
 // and the FftTables / Slaney helpers are in this translation unit.
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -429,6 +432,243 @@ bool test_graceful_failure() {
     return ok;
 }
 
+// -----------------------------------------------------------------------------
+// (d) Directory-fallback model loader (Impl::initialize). Self-contained, no
+//     weights: throwaway dirs distinguish "no model file"
+//     (MODEL_VALIDATION_FAILED) from "a file was found but ORT rejected it"
+//     (MODEL_LOAD_FAILED). rac_runtime_onnxrt is linked, so Session::create is
+//     live; on garbage bytes it returns null and the provider maps that to
+//     MODEL_LOAD_FAILED.
+// -----------------------------------------------------------------------------
+namespace fs = std::filesystem;
+
+fs::path make_temp_dir(const std::string& tag) {
+    static int counter = 0;
+    const fs::path dir =
+        fs::temp_directory_path() / ("rac-diar-onnx-" + tag + "-" + std::to_string(counter++));
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir, ec);
+    return dir;
+}
+
+void write_file(const fs::path& path, const std::string& contents) {
+    std::ofstream out(path, std::ios::binary);
+    out.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+}
+
+bool test_loader_directory_fallback() {
+    const rac_diarization_service_ops_t& ops = g_onnx_diarization_ops;
+    void* impl = nullptr;
+    const rac_result_t create_rc = ops.create("diar-model", nullptr, &impl);
+    CHECK(create_rc == RAC_SUCCESS && impl != nullptr, "loader: create() allocates a provider impl");
+    if (create_rc != RAC_SUCCESS || !impl) {
+        return false;
+    }
+
+    // (a) Empty directory: no .onnx present -> validation failure.
+    {
+        const fs::path dir = make_temp_dir("empty");
+        CHECK(ops.initialize(impl, dir.string().c_str()) == RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "loader: empty directory -> MODEL_VALIDATION_FAILED");
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+    }
+    // (b) Directory with only a non-.onnx file -> validation failure.
+    {
+        const fs::path dir = make_temp_dir("nononnx");
+        write_file(dir / "notes.txt", "not a model");
+        CHECK(ops.initialize(impl, dir.string().c_str()) == RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "loader: directory without a .onnx file -> MODEL_VALIDATION_FAILED");
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+    }
+    // (c) Single garbage foo.onnx: a file WAS found and handed to Session::create,
+    //     which rejects it -> load failure (separates "no file" from "bad file").
+    {
+        const fs::path dir = make_temp_dir("garbage");
+        write_file(dir / "foo.onnx", "not a real onnx graph");
+        CHECK(ops.initialize(impl, dir.string().c_str()) == RAC_ERROR_MODEL_LOAD_FAILED,
+              "loader: garbage .onnx is found then ORT-rejected -> MODEL_LOAD_FAILED");
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+    }
+    // (d) Pinned-name precedence: the canonical Sortformer filename is chosen
+    //     even beside another .onnx; both garbage -> still reaches ORT.
+    {
+        const fs::path dir = make_temp_dir("pinned");
+        write_file(dir / kModelFileName, "garbage pinned");
+        write_file(dir / "zzz.onnx", "garbage other");
+        CHECK(ops.initialize(impl, dir.string().c_str()) == RAC_ERROR_MODEL_LOAD_FAILED,
+              "loader: pinned Sortformer filename is selected -> MODEL_LOAD_FAILED");
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+    }
+    // (e) A non-existent path is neither a directory nor a file -> validation.
+    {
+        const fs::path missing = fs::temp_directory_path() / "rac-diar-onnx-definitely-absent-path";
+        std::error_code ec;
+        fs::remove_all(missing, ec);
+        CHECK(ops.initialize(impl, missing.string().c_str()) == RAC_ERROR_MODEL_VALIDATION_FAILED,
+              "loader: a non-existent path -> MODEL_VALIDATION_FAILED");
+    }
+
+    ops.destroy(impl);
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// (e) Streaming register-ABI guards on a created-but-uninitialized impl.
+// -----------------------------------------------------------------------------
+bool test_register_stream_guards() {
+    const rac_diarization_service_ops_t& ops = g_onnx_diarization_ops;
+    void* impl = nullptr;
+    const rac_result_t create_rc = ops.create("diar-model", nullptr, &impl);
+    CHECK(create_rc == RAC_SUCCESS && impl != nullptr,
+          "stream-guards: create() allocates a provider impl");
+    if (create_rc != RAC_SUCCESS || !impl) {
+        return false;
+    }
+
+    // No successful initialize: session_ is null.
+    rac_diarization_options_t opts = RAC_DIARIZATION_OPTIONS_DEFAULT;
+    rac_handle_t handle = nullptr;
+    CHECK(ops.stream_create(impl, &opts, &handle) == RAC_ERROR_BACKEND_NOT_READY &&
+              handle == nullptr,
+          "stream_create before initialize -> BACKEND_NOT_READY");
+
+    const std::vector<float> pcm(160, 0.0f);
+    rac_handle_t bogus = reinterpret_cast<rac_handle_t>(uintptr_t{1});
+    CHECK(ops.stream_feed_audio_chunk(impl, bogus, pcm.data(), pcm.size(), nullptr, nullptr) ==
+              RAC_ERROR_NULL_POINTER,
+          "stream_feed with a null callback -> NULL_POINTER (adapter guard)");
+    CHECK(ops.stream_destroy(impl, bogus) == RAC_ERROR_INVALID_ARGUMENT,
+          "stream_destroy of an unknown handle -> INVALID_ARGUMENT");
+
+    ops.destroy(impl);
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// (f) diarize register-adapter guards + provider precedence (0-count wins).
+// -----------------------------------------------------------------------------
+bool test_register_diarize_guards() {
+    const rac_diarization_service_ops_t& ops = g_onnx_diarization_ops;
+    void* impl = nullptr;
+    const rac_result_t create_rc = ops.create("diar-model", nullptr, &impl);
+    CHECK(create_rc == RAC_SUCCESS && impl != nullptr,
+          "diarize-guards: create() allocates a provider impl");
+    if (create_rc != RAC_SUCCESS || !impl) {
+        return false;
+    }
+
+    rac_diarization_options_t opts = RAC_DIARIZATION_OPTIONS_DEFAULT;
+    const std::vector<float> pcm(160, 0.1f);
+    rac_diarization_result_t result = {};
+
+    // sample_count==0 is checked by the provider BEFORE session_, so a
+    // zero-length request wins over BACKEND_NOT_READY.
+    CHECK(ops.diarize(impl, pcm.data(), 0, &opts, &result) == RAC_ERROR_INVALID_ARGUMENT,
+          "diarize with sample_count 0 -> INVALID_ARGUMENT (wins over BACKEND_NOT_READY)");
+    rac_diarization_result_free(&result);
+
+    // Null options is rejected by the adapter guard.
+    CHECK(ops.diarize(impl, pcm.data(), pcm.size(), nullptr, &result) == RAC_ERROR_NULL_POINTER,
+          "diarize with null options -> NULL_POINTER (adapter guard)");
+    rac_diarization_result_free(&result);
+
+    ops.destroy(impl);
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// (g) Degenerate binarize/median inputs + the threshold-0.0->0.5 fallback.
+// -----------------------------------------------------------------------------
+bool test_binarize_median_degenerate() {
+    bool ok = true;
+
+    // Threshold 0.0 must be treated as the 0.5 default (provider .cpp:339). A
+    // 0.3 dip stays BELOW 0.5 and splits the run into two segments; if 0.0 were
+    // used literally, 0.3 >= 0.0 would keep one run. Hand-computed, not oracle
+    // parity, because the fallback is subtle and easily broken.
+    {
+        const size_t frames = 5;
+        std::vector<float> preds(frames * kNumSpeakers, 0.0f);
+        const float col[5] = {0.6f, 0.6f, 0.3f, 0.6f, 0.6f};
+        for (size_t t = 0; t < frames; ++t) {
+            preds[t * kNumSpeakers + 0] = col[t];
+        }
+        rac_diarization_options_t opt = RAC_DIARIZATION_OPTIONS_DEFAULT;
+        opt.threshold = 0.0f;
+        const auto segs = binarize_preds(preds, frames, opt);
+        const bool split = segs.size() == 2 && segs[0].start_ms == 0 &&
+                           segs[0].end_ms == 2 * kFrameDurationMs && segs[0].speaker == 0 &&
+                           segs[1].start_ms == 3 * kFrameDurationMs &&
+                           segs[1].end_ms == 5 * kFrameDurationMs && segs[1].speaker == 0;
+        CHECK(split, "binarize treats threshold 0.0 as the 0.5 default (0.3 dip splits the run)");
+        ok &= split;
+    }
+
+    // Zero frames -> no segments.
+    {
+        std::vector<float> preds(4 * kNumSpeakers, 0.9f);
+        rac_diarization_options_t opt = RAC_DIARIZATION_OPTIONS_DEFAULT;
+        const auto segs = binarize_preds(preds, 0, opt);
+        CHECK(segs.empty(), "binarize over 0 frames returns no segments");
+        ok &= segs.empty();
+    }
+
+    // Median filter over 0 frames returns the input unchanged.
+    {
+        std::vector<float> preds(3 * kNumSpeakers, 0.42f);
+        const std::vector<float> out = median_filter_preds(preds, 0);
+        CHECK(out == preds, "median_filter_preds over 0 frames returns the input unchanged");
+        ok &= out == preds;
+    }
+    return ok;
+}
+
+// -----------------------------------------------------------------------------
+// (h) build_result: distinct-speaker counting, speaker ids, empty input.
+// -----------------------------------------------------------------------------
+bool test_build_result() {
+    bool ok = true;
+
+    // Two segments for the SAME speaker -> speaker_count 1; ids are stable.
+    {
+        const std::vector<Segment> segments = {Segment{0, 100, 2}, Segment{200, 300, 2}};
+        rac_diarization_result_t result = {};
+        const rac_result_t rc = build_result(segments, 300, 5, &result);
+        bool shape_ok = rc == RAC_SUCCESS && result.segment_count == 2 &&
+                        result.speaker_count == 1 && result.segments != nullptr &&
+                        result.model_id != nullptr && std::string(result.model_id) == kModelId;
+        if (shape_ok) {
+            for (size_t i = 0; i < result.segment_count; ++i) {
+                shape_ok = shape_ok && result.segments[i].speaker_id != nullptr &&
+                           std::string(result.segments[i].speaker_id) == "speaker_2";
+            }
+        }
+        CHECK(shape_ok,
+              "build_result counts distinct speakers (2 same-speaker segments -> count 1)");
+        ok &= shape_ok;
+        rac_diarization_result_free(&result);
+    }
+
+    // Empty segments -> null array, zero counts, still a non-null model id.
+    {
+        rac_diarization_result_t result = {};
+        const rac_result_t rc = build_result({}, 0, 0, &result);
+        const bool empty_ok = rc == RAC_SUCCESS && result.segments == nullptr &&
+                              result.segment_count == 0 && result.speaker_count == 0 &&
+                              result.model_id != nullptr &&
+                              std::string(result.model_id) == kModelId;
+        CHECK(empty_ok, "build_result on empty segments -> null segments + non-null model_id");
+        ok &= empty_ok;
+        rac_diarization_result_free(&result);
+    }
+    return ok;
+}
+
 }  // namespace
 
 int main() {
@@ -439,6 +679,11 @@ int main() {
     test_median();
     test_binarize();
     test_graceful_failure();
+    test_loader_directory_fallback();
+    test_register_stream_guards();
+    test_register_diarize_guards();
+    test_binarize_median_degenerate();
+    test_build_result();
     std::fprintf(stdout, "\n%d checks, %d failed\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 }

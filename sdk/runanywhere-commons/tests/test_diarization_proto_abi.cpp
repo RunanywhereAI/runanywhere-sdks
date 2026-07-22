@@ -60,6 +60,7 @@ std::mutex g_options_mutex;
 rac_diarization_options_t g_last_options = RAC_DIARIZATION_OPTIONS_DEFAULT;
 size_t g_last_sample_count = 0;
 std::atomic<bool> g_emit_invalid_result{false};
+std::atomic<bool> g_emit_zero_speaker_count{false};
 std::atomic<int> g_partial_stream_create_calls{0};
 
 struct FakeStream {
@@ -130,7 +131,7 @@ rac_result_t fake_diarize(void* impl, const float*, size_t sample_count,
     *out_result = {
         .segments = segments,
         .segment_count = 2,
-        .speaker_count = 2,
+        .speaker_count = g_emit_zero_speaker_count.load(std::memory_order_relaxed) ? 0 : 2,
         .audio_duration_ms = 500,
         .processing_time_ms = 7,
         .model_id = ::strdup("fake-diarizer"),
@@ -245,6 +246,14 @@ std::string f32le(float value) {
     bytes[1] = static_cast<char>((bits >> 8U) & 0xffU);
     bytes[2] = static_cast<char>((bits >> 16U) & 0xffU);
     bytes[3] = static_cast<char>((bits >> 24U) & 0xffU);
+    return bytes;
+}
+
+std::string s16le(int16_t value) {
+    const uint16_t bits = static_cast<uint16_t>(value);
+    std::string bytes(sizeof(bits), '\0');
+    bytes[0] = static_cast<char>(bits & 0xffU);
+    bytes[1] = static_cast<char>((bits >> 8U) & 0xffU);
     return bytes;
 }
 
@@ -594,6 +603,139 @@ int main() {
     g_emit_invalid_result.store(false, std::memory_order_relaxed);
     rac_proto_buffer_free(&output);
 
+    // ---- options_from_proto range validation (diarization_module.cpp:317) ----
+    // Each out-of-range scalar is its own INVALID_PARAMETER branch, distinct
+    // from the AUDIO_FORMAT_NOT_SUPPORTED / INVALID_ARGUMENT codes above. The
+    // helper drives one offline request per option set and returns only the rc.
+    auto diarize_options_rc = [&](const runanywhere::v1::DiarizationOptions& opts) -> rac_result_t {
+        request.Clear();
+        request.set_audio_data(f32le(0.1f) + f32le(0.2f));
+        *request.mutable_options() = opts;
+        (void)request.SerializeToString(&request_bytes);
+        rac_proto_buffer_t local_output{};
+        const rac_result_t rc = rac_diarization_component_diarize_proto(
+            component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &local_output);
+        rac_proto_buffer_free(&local_output);
+        return rc;
+    };
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_sample_rate_hz(4000);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "sample_rate_hz below 8000 is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_sample_rate_hz(96000);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "sample_rate_hz above 48000 is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_sample_rate_hz(8000);
+        CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
+              "sample_rate_hz 8000 (inclusive lower bound) is accepted");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_sample_rate_hz(48000);
+        CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
+              "sample_rate_hz 48000 (inclusive upper bound) is accepted");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_threshold(1.5f);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "threshold above 1.0 is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_threshold(-0.1f);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "threshold below 0.0 is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_threshold(std::numeric_limits<float>::quiet_NaN());
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "non-finite (NaN) threshold is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_minimum_duration_ms(-1);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "negative minimum_duration_ms is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_merge_gap_ms(-1);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
+              "negative merge_gap_ms is rejected");
+    }
+    {
+        runanywhere::v1::DiarizationOptions opts;
+        opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
+              "offline diarize rejects an unspecified audio encoding");
+    }
+
+    // ---- Valid S16 offline round-trip (decode_audio S16 success path) --------
+    // Only F32 succeeds elsewhere; drive the sample/32768 decode to a result.
+    request.Clear();
+    request.set_audio_data(s16le(16384) + s16le(-16384));
+    request.mutable_options()->set_encoding(
+        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+    (void)request.SerializeToString(&request_bytes);
+    CHECK(rac_diarization_component_diarize_proto(
+              component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+              request_bytes.size(), &output) == RAC_SUCCESS,
+          "valid S16 offline request succeeds");
+    {
+        runanywhere::v1::DiarizationResult s16_offline;
+        CHECK(s16_offline.ParseFromArray(output.data, static_cast<int>(output.size)) &&
+                  s16_offline.segments_size() == 2,
+              "S16 offline result carries the backend segments");
+    }
+    rac_proto_buffer_free(&output);
+    {
+        std::lock_guard<std::mutex> lock(g_options_mutex);
+        CHECK(g_last_sample_count == 2, "S16 decode produced two mono samples");
+    }
+
+    // ---- Empty audio at the offline path (decode_audio require_nonempty) -----
+    request.Clear();
+    request.set_audio_data("");
+    (void)request.SerializeToString(&request_bytes);
+    CHECK(rac_diarization_component_diarize_proto(
+              component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+              request_bytes.size(), &output) == RAC_ERROR_INVALID_ARGUMENT,
+          "empty offline audio is rejected");
+    rac_proto_buffer_free(&output);
+
+    // ---- Malformed request bytes (diarize_with_service parse guard) ----------
+    {
+        const std::string garbage_request(4, '\xff');
+        CHECK(rac_diarization_component_diarize_proto(
+                  component, reinterpret_cast<const uint8_t*>(garbage_request.data()),
+                  garbage_request.size(), &output) == RAC_ERROR_DECODING_ERROR,
+              "malformed DiarizationRequest bytes are rejected as a decode error");
+        rac_proto_buffer_free(&output);
+    }
+
+    // ---- result_to_proto guard: segments present but speaker_count 0 ---------
+    // A silent-corruption guard distinct from the out-of-range speaker index.
+    request.Clear();
+    request.set_audio_data(f32le(0.1f));
+    (void)request.SerializeToString(&request_bytes);
+    g_emit_zero_speaker_count.store(true, std::memory_order_relaxed);
+    CHECK(rac_diarization_component_diarize_proto(
+              component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+              request_bytes.size(), &output) == RAC_ERROR_ENCODING_ERROR,
+          "segment-bearing result with zero speaker_count is rejected");
+    g_emit_zero_speaker_count.store(false, std::memory_order_relaxed);
+    rac_proto_buffer_free(&output);
+
     EventCollector collector;
     CHECK(rac_diarization_set_stream_proto_callback(component, collect_event, &collector) ==
               RAC_SUCCESS,
@@ -621,6 +763,112 @@ int main() {
                   collector.events[2].result().segments_size() == 1 &&
                   collector.events[2].result().processing_time_ms() == 99,
               "one final carries the provider's last flush refinement");
+    }
+
+    // ---- Session-id ABI guards on feed/stop/cancel --------------------------
+    // A zero or unknown session id is rejected before any backend work.
+    CHECK(rac_diarization_stream_feed_audio_proto(
+              0, reinterpret_cast<const uint8_t*>(chunk.data()), chunk.size()) ==
+              RAC_ERROR_INVALID_ARGUMENT,
+          "feed rejects session_id 0");
+    CHECK(rac_diarization_stream_stop_proto(0) == RAC_ERROR_INVALID_ARGUMENT,
+          "stop rejects session_id 0");
+    CHECK(rac_diarization_stream_cancel_proto(0) == RAC_ERROR_INVALID_ARGUMENT,
+          "cancel rejects session_id 0");
+    CHECK(rac_diarization_stream_feed_audio_proto(
+              999999, reinterpret_cast<const uint8_t*>(chunk.data()), chunk.size()) ==
+              RAC_ERROR_INVALID_ARGUMENT,
+          "feed rejects an unknown session id");
+    CHECK(rac_diarization_stream_stop_proto(999999) == RAC_ERROR_INVALID_ARGUMENT,
+          "stop rejects an unknown session id");
+    CHECK(rac_diarization_stream_cancel_proto(999999) == RAC_ERROR_INVALID_ARGUMENT,
+          "cancel rejects an unknown session id");
+
+    // ---- Zero-length feed to a LIVE session is a no-op success --------------
+    {
+        uint64_t empty_feed_session = 0;
+        CHECK(rac_diarization_stream_start_proto(component, nullptr, 0, &empty_feed_session) ==
+                  RAC_SUCCESS,
+              "empty-feed test stream starts");
+        const size_t before_empty_feed = event_count(&collector);
+        CHECK(rac_diarization_stream_feed_audio_proto(empty_feed_session, nullptr, 0) == RAC_SUCCESS,
+              "zero-length feed to a live session succeeds");
+        CHECK(event_count(&collector) == before_empty_feed,
+              "zero-length feed emits no new stream event");
+        CHECK(rac_diarization_stream_cancel_proto(empty_feed_session) == RAC_SUCCESS,
+              "empty-feed test session cancels");
+    }
+
+    // ---- Double-stop is rejected once the session is finalized/removed ------
+    {
+        uint64_t stopped_session = 0;
+        CHECK(rac_diarization_stream_start_proto(component, nullptr, 0, &stopped_session) ==
+                  RAC_SUCCESS,
+              "double-stop test stream starts");
+        CHECK(rac_diarization_stream_stop_proto(stopped_session) == RAC_SUCCESS,
+              "first stop flushes and finalizes the session");
+        CHECK(rac_diarization_stream_stop_proto(stopped_session) == RAC_ERROR_INVALID_ARGUMENT,
+              "second stop of an already-stopped session is rejected");
+    }
+
+    // ---- stream_start_proto options-bytes branch (rac_diarization_stream.cpp:653) --
+    {
+        uint64_t garbage_opts_session = 12345;
+        const std::string garbage_opts(4, '\xff');
+        CHECK(rac_diarization_stream_start_proto(
+                  component, reinterpret_cast<const uint8_t*>(garbage_opts.data()),
+                  garbage_opts.size(), &garbage_opts_session) == RAC_ERROR_DECODING_ERROR &&
+                  garbage_opts_session == 0,
+              "stream start rejects unparseable options bytes");
+    }
+    {
+        runanywhere::v1::DiarizationOptions bad_range;
+        bad_range.set_threshold(2.0f);
+        std::string bad_range_bytes;
+        (void)bad_range.SerializeToString(&bad_range_bytes);
+        uint64_t bad_range_session = 999;
+        CHECK(rac_diarization_stream_start_proto(
+                  component, reinterpret_cast<const uint8_t*>(bad_range_bytes.data()),
+                  bad_range_bytes.size(), &bad_range_session) == RAC_ERROR_INVALID_PARAMETER &&
+                  bad_range_session == 0,
+              "stream start propagates options range validation failure");
+    }
+    {
+        runanywhere::v1::DiarizationOptions unsupported_enc;
+        unsupported_enc.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        std::string unsupported_enc_bytes;
+        (void)unsupported_enc.SerializeToString(&unsupported_enc_bytes);
+        uint64_t unsupported_enc_session = 777;
+        CHECK(rac_diarization_stream_start_proto(
+                  component, reinterpret_cast<const uint8_t*>(unsupported_enc_bytes.data()),
+                  unsupported_enc_bytes.size(), &unsupported_enc_session) ==
+                      RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED &&
+                  unsupported_enc_session == 0,
+              "stream start rejects an unsupported audio encoding");
+    }
+
+    // ---- S16-configured stream: stored encoding drives feed decode ----------
+    {
+        runanywhere::v1::DiarizationOptions s16_opts;
+        s16_opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+        std::string s16_opts_bytes;
+        (void)s16_opts.SerializeToString(&s16_opts_bytes);
+        uint64_t s16_session = 0;
+        CHECK(rac_diarization_stream_start_proto(
+                  component, reinterpret_cast<const uint8_t*>(s16_opts_bytes.data()),
+                  s16_opts_bytes.size(), &s16_session) == RAC_SUCCESS &&
+                  s16_session != 0,
+              "S16-configured stream starts");
+        const size_t before_s16_feed = event_count(&collector);
+        const std::string s16_chunk = s16le(16384) + s16le(-16384);
+        CHECK(rac_diarization_stream_feed_audio_proto(
+                  s16_session, reinterpret_cast<const uint8_t*>(s16_chunk.data()),
+                  s16_chunk.size()) == RAC_SUCCESS,
+              "S16 stream accepts a 2-byte-aligned chunk");
+        CHECK(event_count(&collector) == before_s16_feed + 1,
+              "S16 stream feed emits exactly one update");
+        CHECK(rac_diarization_stream_stop_proto(s16_session) == RAC_SUCCESS,
+              "S16 stream stops cleanly");
     }
 
     uint64_t error_session = 0;

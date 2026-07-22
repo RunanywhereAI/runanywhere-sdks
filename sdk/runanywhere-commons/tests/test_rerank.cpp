@@ -22,12 +22,14 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/features/rerank/rac_rerank.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 
+#include "rag.pb.h"
 #include "rerank.pb.h"
 
 namespace {
@@ -264,6 +266,75 @@ int main() {
         rac_proto_buffer_free(&out);
     }
 
+    // Empty candidate list is a valid request: the component returns a
+    // well-formed, empty result rather than an error.
+    {
+        const std::string request_bytes = build_request("q", {}, /*top_n=*/0);
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_rerank_component_rerank_proto(
+            component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &out);
+        check(rc == RAC_SUCCESS, "rerank with zero candidates succeeds");
+        uint8_t* data = nullptr;
+        size_t size = 0;
+        if (rac_proto_buffer_take_data(&out, &data, &size) == RAC_SUCCESS) {
+            runanywhere::v1::RerankResult result;
+            check(result.ParseFromArray(data, static_cast<int>(size)) && result.items_size() == 0,
+                  "zero-candidate result carries no items");
+            std::free(data);
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // top_n larger than the candidate count clamps to all available candidates.
+    {
+        const std::string request_bytes =
+            build_request("q", {{"a", "short"}, {"b", "longer text"}}, /*top_n=*/9);
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_rerank_component_rerank_proto(
+            component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &out);
+        check(rc == RAC_SUCCESS, "rerank with an oversized top_n succeeds");
+        uint8_t* data = nullptr;
+        size_t size = 0;
+        if (rac_proto_buffer_take_data(&out, &data, &size) == RAC_SUCCESS) {
+            runanywhere::v1::RerankResult result;
+            check(result.ParseFromArray(data, static_cast<int>(size)) && result.items_size() == 2,
+                  "top_n greater than the candidate count returns all candidates");
+            std::free(data);
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // A candidate with empty text is still ranked (scored by length 0) and kept
+    // in the result, ordered below any longer candidate.
+    {
+        const std::string request_bytes =
+            build_request("q", {{"empty", ""}, {"full", "meaningful passage"}}, /*top_n=*/0);
+        rac_proto_buffer_t out = {};
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = rac_rerank_component_rerank_proto(
+            component, reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+            &out);
+        check(rc == RAC_SUCCESS, "rerank with an empty-text candidate succeeds");
+        uint8_t* data = nullptr;
+        size_t size = 0;
+        if (rac_proto_buffer_take_data(&out, &data, &size) == RAC_SUCCESS) {
+            runanywhere::v1::RerankResult result;
+            const bool shape =
+                result.ParseFromArray(data, static_cast<int>(size)) && result.items_size() == 2;
+            check(shape, "empty-text candidate is still returned, ranked");
+            if (shape) {
+                check(result.items(0).id() == "full" && result.items(1).id() == "empty",
+                      "empty-text candidate ranks below a longer candidate");
+            }
+            std::free(data);
+        }
+        rac_proto_buffer_free(&out);
+    }
+
     // Invalid request (empty query) is rejected gracefully with an error buffer.
     {
         const std::string request_bytes = build_request("", {{"a", "alpha"}}, 0);
@@ -304,6 +375,44 @@ int main() {
     rac_plugin_unregister("fake_rerank");
     check(rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr,
           "rerank route removed after unregister");
+
+    // (6) RAG reranker_model_id routing. A RAGConfiguration naming a dedicated
+    // cross-encoder routes to RAC_PRIMITIVE_RERANK at session-create: with no
+    // rerank backend registered the request is refused up front; with a backend
+    // registered the routing gate clears and the failure moves downstream to
+    // model resolution (proving the routing decision). No real GGUF or embedding
+    // model is needed — the reranker gate runs before any model is loaded.
+    {
+        runanywhere::v1::RAGConfiguration config;
+        config.set_embedding_model_id("embed-x");
+        config.set_reranker_model_id("rerank-x");
+        const std::string config_bytes = config.SerializeAsString();
+
+        rac_handle_t session = nullptr;
+        const rac_result_t no_backend = rac_rag_session_create_proto(
+            reinterpret_cast<const uint8_t*>(config_bytes.data()), config_bytes.size(), &session);
+        if (no_backend == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+            std::fprintf(stdout, "  skip: RAG not compiled in this build; routing gate unreachable\n");
+        } else {
+            check(no_backend == RAC_ERROR_BACKEND_NOT_FOUND,
+                  "reranker_model_id without a registered rerank backend -> BACKEND_NOT_FOUND");
+            check(session == nullptr, "no RAG session is created when the reranker gate fails");
+
+            static rac_engine_vtable_t routing_vt = make_fake_vtable();
+            check(rac_plugin_register(&routing_vt) == RAC_SUCCESS,
+                  "fake rerank engine registers for the routing check");
+            rac_handle_t session2 = nullptr;
+            const rac_result_t with_backend = rac_rag_session_create_proto(
+                reinterpret_cast<const uint8_t*>(config_bytes.data()), config_bytes.size(),
+                &session2);
+            check(with_backend != RAC_ERROR_BACKEND_NOT_FOUND,
+                  "a registered rerank backend clears the reranker_model_id routing gate");
+            check(with_backend != RAC_SUCCESS,
+                  "an unresolvable reranker model still fails downstream of the routing gate");
+            check(session2 == nullptr, "no RAG session leaks when reranker resolution fails");
+            rac_plugin_unregister("fake_rerank");
+        }
+    }
 
     if (g_failures == 0) {
         std::fprintf(stdout, "  ok: rerank primitive wiring, routing, proto round-trip, graceful "
