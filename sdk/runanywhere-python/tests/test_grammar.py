@@ -584,3 +584,23 @@ def test_tool_call_composite():
     assert len(alts) == 2
     assert all(re.match(r"^obj\d+$", a) for a in alts)
     assert alts[0] != alts[1]
+
+
+# --------------------------------------------------------------------------
+# Non-dict sub-schemas (a boolean is a legal JSON Schema) must not crash — the
+# JS original reads missing keys off a boolean as undefined and falls through
+# to `string`; the Python port must do the same, not raise AttributeError.
+# --------------------------------------------------------------------------
+
+def test_boolean_property_subschema_does_not_raise():
+    g = json_schema_to_grammar({"type": "object", "properties": {"x": True}})
+    assert "root ::=" in g  # built a grammar instead of crashing
+
+
+def test_boolean_items_subschema_does_not_raise():
+    g = json_schema_to_grammar({"type": "array", "items": True})
+    assert "root ::=" in g
+
+
+def test_top_level_boolean_schema_does_not_raise():
+    assert "root ::=" in json_schema_to_grammar(True)
