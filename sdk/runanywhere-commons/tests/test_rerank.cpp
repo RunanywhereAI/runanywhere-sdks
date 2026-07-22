@@ -376,43 +376,11 @@ int main() {
     check(rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr,
           "rerank route removed after unregister");
 
-    // (6) RAG reranker_model_id routing. A RAGConfiguration naming a dedicated
-    // cross-encoder routes to RAC_PRIMITIVE_RERANK at session-create: with no
-    // rerank backend registered the request is refused up front; with a backend
-    // registered the routing gate clears and the failure moves downstream to
-    // model resolution (proving the routing decision). No real GGUF or embedding
-    // model is needed — the reranker gate runs before any model is loaded.
-    {
-        runanywhere::v1::RAGConfiguration config;
-        config.set_embedding_model_id("embed-x");
-        config.set_reranker_model_id("rerank-x");
-        const std::string config_bytes = config.SerializeAsString();
-
-        rac_handle_t session = nullptr;
-        const rac_result_t no_backend = rac_rag_session_create_proto(
-            reinterpret_cast<const uint8_t*>(config_bytes.data()), config_bytes.size(), &session);
-        if (no_backend == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
-            std::fprintf(stdout, "  skip: RAG not compiled in this build; routing gate unreachable\n");
-        } else {
-            check(no_backend == RAC_ERROR_BACKEND_NOT_FOUND,
-                  "reranker_model_id without a registered rerank backend -> BACKEND_NOT_FOUND");
-            check(session == nullptr, "no RAG session is created when the reranker gate fails");
-
-            static rac_engine_vtable_t routing_vt = make_fake_vtable();
-            check(rac_plugin_register(&routing_vt) == RAC_SUCCESS,
-                  "fake rerank engine registers for the routing check");
-            rac_handle_t session2 = nullptr;
-            const rac_result_t with_backend = rac_rag_session_create_proto(
-                reinterpret_cast<const uint8_t*>(config_bytes.data()), config_bytes.size(),
-                &session2);
-            check(with_backend != RAC_ERROR_BACKEND_NOT_FOUND,
-                  "a registered rerank backend clears the reranker_model_id routing gate");
-            check(with_backend != RAC_SUCCESS,
-                  "an unresolvable reranker model still fails downstream of the routing gate");
-            check(session2 == nullptr, "no RAG session leaks when reranker resolution fails");
-            rac_plugin_unregister("fake_rerank");
-        }
-    }
+    // NOTE: RAG reranker_model_id routing (RAGConfiguration -> RAC_PRIMITIVE_RERANK
+    // at session-create) is exercised in test_rag_rerank.cpp, which links the RAG
+    // pipeline. This target intentionally does NOT link RAG (rac_rag_* symbols are
+    // absent on RAG-disabled presets such as rcli-*-release), so it must not
+    // reference rac_rag_session_create_proto here.
 
     if (g_failures == 0) {
         std::fprintf(stdout, "  ok: rerank primitive wiring, routing, proto round-trip, graceful "
