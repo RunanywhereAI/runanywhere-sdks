@@ -290,9 +290,11 @@ jobs:
         working-directory: sdk/runanywhere-python
         run: |
           $wheel = Get-ChildItem wheelhouse/*.whl | Select-Object -First 1
-          python -m pip install $wheel.FullName
+          # [server,test] pulls fastapi/uvicorn/multipart + httpx so tests/test_server.py runs
+          # (not skips); the gated native/model smoke tests still self-skip (no models).
+          python -m pip install "$($wheel.FullName)[server,test]"
           # Run the hermetic suite from a temp dir so `runanywhere` resolves to the
-          # installed wheel, not the source tree; the gated smoke tests self-skip (no models).
+          # installed wheel, not the source tree.
           $tmp = New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\ratests" -Force
           Copy-Item tests -Destination $tmp -Recurse -Force
           python -m pytest $tmp\tests -q
@@ -348,9 +350,11 @@ jobs:
         working-directory: sdk/runanywhere-python
         run: |
           wheel="$(ls wheelhouse/*.whl | head -1)"
-          python -m pip install "$wheel"
+          # [server,test] pulls fastapi/uvicorn/multipart + httpx so tests/test_server.py runs
+          # (not skips); the gated native/model smoke tests still self-skip (no models).
+          python -m pip install "${wheel}[server,test]"
           # Run the hermetic suite from a temp dir so `runanywhere` resolves to the installed
-          # wheel, not the source tree; the gated smoke tests self-skip (no models).
+          # wheel, not the source tree.
           tmp="$RUNNER_TEMP/ratests"; mkdir -p "$tmp"
           cp -r tests "$tmp/tests"
           cd "$tmp" && python -m pytest tests -q
