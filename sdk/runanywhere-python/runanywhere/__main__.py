@@ -36,6 +36,8 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         default_embedder=args.default_embedder,
         default_stt=args.default_stt,
         default_tts=args.default_tts,
+        allow_image_urls=args.allow_image_urls,
+        allow_arbitrary_models=args.allow_arbitrary_models,
         log_level=args.log_level,
     )
     return 0
@@ -72,6 +74,10 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--default-embedder", default=None)
     serve.add_argument("--default-stt", default=None)
     serve.add_argument("--default-tts", default=None)
+    serve.add_argument("--allow-image-urls", action="store_true",
+                       help="fetch http(s) image_url inputs (off by default; SSRF surface)")
+    serve.add_argument("--allow-arbitrary-models", action="store_true",
+                       help="allow non-catalog model ids (local paths / HF repos) from clients")
     serve.add_argument("--log-level", default="info")
 
     sub.add_parser("models", help="list the built-in catalog models + download state")
