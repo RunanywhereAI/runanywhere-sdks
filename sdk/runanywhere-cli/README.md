@@ -78,10 +78,55 @@ clear unsupported-backend error.
 | `rcli serve [model]` | OpenAI-compatible HTTP server (`/v1/chat/completions`, `/v1/models`, `/health`). LLM-only, one model per process |
 | `rcli backends` | Registered inference backends per primitive |
 | `rcli info` / `rcli version` | Environment / versions |
+| `rcli auth login` | Real control-plane handshake: API key → JWT, device registration, model-assignment fetch |
+| `rcli telemetry emit --modality <m>` | Emit model-free telemetry events of one modality through the real pipeline |
+| `rcli telemetry blast` | Emit events of all 12 modalities in one run and print a per-modality result table |
 
 Global flags: `--json` (one machine-readable document on stdout),
-`--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`.
+`--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`, plus the
+control-plane connection flags below.
 Exit codes: `0` ok · `1` runtime error · `2` usage error · `130` cancelled.
+
+## Control plane
+
+rcli can drive any RunAnywhere control plane — including a local backend on
+`http://localhost` — with three global flags (each with an env-var fallback):
+
+| Flag | Env var | Meaning |
+|---|---|---|
+| `--environment <dev\|staging\|prod>` | `RUNANYWHERE_ENVIRONMENT` | `dev` (default) is offline — no control plane. `staging` allows keyless + `http://`/localhost. `prod` requires `https://` and rejects localhost |
+| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Backend origin, e.g. `https://api.runanywhere.ai` or `http://127.0.0.1:8000` (optional on staging when the baked URL is present) |
+| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Control-plane API key (≥ 10 chars); optional on staging (keyless), required for prod |
+
+Combos are validated client-side before any network call. Passing credentials
+while in dev mode is an error. With no flags at all, every command behaves
+exactly as before (offline development mode).
+
+```console
+$ rcli --environment staging --base-url http://127.0.0.1:8000 --api-key $KEY auth login
+organization   293beb67-…
+device         e87d77a2-…
+token expires  2026-07-19T08:44:31Z
+device row     registered
+assignments    0 model(s)
+
+$ rcli --environment staging --base-url http://127.0.0.1:8000 --api-key $KEY telemetry blast
+MODALITY      RESULT    STATUS      RECEIVED    STORED    SKIPPED
+llm           ok        HTTP 200    1           1         0
+…                                            (one row per modality, 12 total)
+```
+
+- `auth login` runs the same handshake the mobile SDKs run
+  (`/api/v1/auth/sdk/authenticate` → `/api/v1/devices/register` →
+  model assignments) and exits non-zero with the server's error surfaced when
+  anything fails.
+- `telemetry emit|blast` drive the real commons telemetry pipeline: payloads
+  are batched per modality and POSTed to `/api/v2/sdk/telemetry/{modality}`
+  with the JWT from the login handshake. The V2 endpoints require a JWT, so
+  both commands log in first — one process performs login + emit (the token
+  is held in-process, not persisted). Modalities: `llm stt tts vlm rag
+  imagegen embeddings vad voice lora model system`. Exit is non-zero when any
+  POST fails or any tracked event never reached the backend.
 
 ### `rcli run` REPL
 

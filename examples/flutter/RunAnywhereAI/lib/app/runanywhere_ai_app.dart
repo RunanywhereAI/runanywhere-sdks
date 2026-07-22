@@ -221,20 +221,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryBlue,
+          seedColor: AppColors.brandOrange,
           brightness: Brightness.light,
-        ),
+        ).copyWith(primary: AppColors.brandOrange),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         navigationBarTheme: NavigationBarThemeData(
-          indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+          indicatorColor: AppColors.primaryAccent.withValues(alpha: 0.2),
         ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryBlue,
+          seedColor: AppColors.brandOrange,
           brightness: Brightness.dark,
-        ),
+        ).copyWith(primary: AppColors.brandOrange),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),

@@ -17,6 +17,7 @@
 #include <string>
 
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/network/rac_environment.h"
 
 typedef struct rac_telemetry_manager rac_telemetry_manager_t;
 
@@ -29,7 +30,42 @@ struct GlobalOptions {
     bool quiet = false;
     bool no_progress = false;
     std::string home_override;  // --home flag
+
+    // Control-plane connection. Empty defaults preserve the historical
+    // offline development-mode behavior exactly. CLI11 fills these from
+    // --base-url/--api-key/--environment with RUNANYWHERE_BASE_URL /
+    // RUNANYWHERE_API_KEY / RUNANYWHERE_ENVIRONMENT env-var fallbacks (app.cpp).
+    // Staging may omit key+URL (keyless / baked staging URL).
+    std::string environment;  // dev|development|staging|prod|production ("" → dev)
+    std::string base_url;     // staging may omit (baked URL); prod requires https
+    std::string api_key;      // staging may omit (keyless); prod requires ≥10 chars
 };
+
+/**
+ * Validated control-plane connection resolved from GlobalOptions.
+ * bootstrap() threads these values into rac_state / rac_sdk_config so the
+ * commons auth, device-registration, and telemetry paths can read them.
+ */
+struct Connection {
+    rac_environment_t environment = RAC_ENV_DEVELOPMENT;
+    std::string base_url;
+    std::string api_key;
+};
+
+/**
+ * Resolve + validate the connection flags client-side (before any network
+ * call). On failure fills `error` with an actionable message and returns
+ * RAC_ERROR_INVALID_CONFIGURATION.
+ *
+ * Rules (mirrors commons rac_validate_api_key / rac_validate_base_url):
+ *   - dev (default): no credentials allowed — pass --environment staging to
+ *     target a real control plane (localhost is allowed on staging).
+ *   - staging: keyless OK (baked staging URL / PUBLIC-org); optional key+URL.
+ *   - prod: api key + https base URL required; localhost rejected.
+ *
+ * Env: RUNANYWHERE_ENVIRONMENT (also --environment).
+ */
+rac_result_t resolve_connection(const GlobalOptions& options, Connection* out, std::string* error);
 
 /** Resolved environment after bootstrap. */
 struct Bootstrapped {

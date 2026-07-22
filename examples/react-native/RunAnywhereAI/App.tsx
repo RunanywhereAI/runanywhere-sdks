@@ -26,16 +26,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import RootNavigator from './src/navigation/RootNavigator';
 import IntroScreen from './src/features/intro/IntroScreen';
-import { ThemeProvider, useTheme } from './src/theme/system';
-import { Colors } from './src/theme/colors';
-import { Typography } from './src/theme/typography';
 import {
-  Spacing,
-  Padding,
-  BorderRadius,
-  IconSize,
-  ButtonHeight,
-} from './src/theme/spacing';
+  ThemeProvider,
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from './src/theme/system';
 
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
 import {
@@ -119,21 +116,25 @@ type InitState = 'loading' | 'ready' | 'error';
 const InitializationErrorView: React.FC<{
   error: string;
   onRetry: () => void;
-}> = ({ error, onRetry }) => (
-  <View style={styles.errorContainer}>
-    <View style={styles.errorContent}>
-      <View style={styles.errorIconContainer}>
-        <Icon name="alert-circle-outline" size={48} color={Colors.primaryRed} />
+}> = ({ error, onRetry }) => {
+  const { colors } = useTheme();
+  const errorStyles = useThemedStyles(createErrorStyles);
+  return (
+    <View style={errorStyles.errorContainer}>
+      <View style={errorStyles.errorContent}>
+        <View style={errorStyles.errorIconContainer}>
+          <Icon name="alert-circle-outline" size={48} color={colors.error} />
+        </View>
+        <Text style={errorStyles.errorTitle}>Initialization Failed</Text>
+        <Text style={errorStyles.errorMessage}>{error}</Text>
+        <TouchableOpacity style={errorStyles.retryButton} onPress={onRetry}>
+          <Icon name="refresh" size={20} color={colors.onPrimary} />
+          <Text style={errorStyles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.errorTitle}>Initialization Failed</Text>
-      <Text style={styles.errorMessage}>{error}</Text>
-      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-        <Icon name="refresh" size={20} color={Colors.textWhite} />
-        <Text style={styles.retryButtonText}>Retry</Text>
-      </TouchableOpacity>
     </View>
-  </View>
-);
+  );
+};
 
 /**
  * Register backend engine plugins. Stays in App.tsx (platform/backends
@@ -339,51 +340,55 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  errorContainer: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Padding.padding24,
-  },
-  errorContent: {
-    alignItems: 'center',
-    maxWidth: 300,
-  },
-  errorIconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.badgeRed,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xLarge,
-  },
-  errorTitle: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.medium,
-  },
-  errorMessage: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.xLarge,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.smallMedium,
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding24,
-    height: ButtonHeight.regular,
-    borderRadius: BorderRadius.large,
-  },
-  retryButtonText: {
-    ...Typography.headline,
-    color: Colors.textWhite,
-  },
 });
+
+const createErrorStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    errorContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    errorContent: {
+      alignItems: 'center',
+      maxWidth: 300,
+    },
+    errorIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.errorContainer,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    errorTitle: {
+      ...typography.titleLarge,
+      color: colors.onSurface,
+      marginBottom: 10,
+    },
+    errorMessage: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    retryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      height: 44,
+      borderRadius: 12,
+    },
+    retryButtonText: {
+      ...typography.titleMedium,
+      color: colors.onPrimary,
+    },
+  });
 
 export default App;
