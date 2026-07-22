@@ -74,7 +74,7 @@ internal object ModelCatalog {
         // into an always-empty reasoning section.
         SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_text_HNPU/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = false),
         SingleFileModel("cosmos3_edge_vlm", "Cosmos3-Edge Vision (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_vlm_HNPU/v81/cosmos3-edge-vlm.json", QHEXRT, MULTIMODAL, 3505000000L, contextLength = 2_048),
-        SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Diffusion (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_diffusion_HNPU/v81/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
+        SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Image (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_diffusion_HNPU/v81/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
         SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
         SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L),
         SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 2_364_667_194L, contextLength = 512),
