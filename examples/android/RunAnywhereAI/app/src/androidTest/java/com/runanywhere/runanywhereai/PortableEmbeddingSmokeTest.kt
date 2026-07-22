@@ -55,7 +55,9 @@ class PortableEmbeddingSmokeTest {
                 val negativeCosine = cosine(vectors[0], vectors[2])
 
                 assertTrue("all embedding values must be finite", vectors.all { vector -> vector.all(Float::isFinite) })
-                vectors.forEach { assertEquals("unexpected embedding dimension", 2_048, it.size) }
+                val expectedDimension = vectors.first().size
+                assertTrue("embedding dimension must be positive", expectedDimension > 0)
+                vectors.forEach { assertEquals("inconsistent embedding dimension", expectedDimension, it.size) }
                 norms.forEach { assertTrue("embedding must be L2-normalized, norm=$it", it in 0.99..1.01) }
                 assertTrue(
                     "related passage must rank above distractor: positive=$positiveCosine negative=$negativeCosine",

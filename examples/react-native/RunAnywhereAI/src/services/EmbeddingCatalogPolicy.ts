@@ -44,6 +44,7 @@ export const PORTABLE_NVIDIA_EMBEDDING_MODELS = [
 export const RAG_EMBEDDING_FRAMEWORKS: ReadonlySet<InferenceFramework> =
   new Set([
     InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    InferenceFramework.INFERENCE_FRAMEWORK_MLX,
     InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
     InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
   ]);

@@ -5,8 +5,8 @@ import {
   type EmbeddingsRequest as ProtoEmbeddingsRequest,
 } from '@runanywhere/proto-ts/embeddings_options';
 import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import { EmbeddingsProtoAdapter } from '../../../src/Adapters/EmbeddingsProtoAdapter';
-import type { ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterTypes';
+import { EmbeddingsProtoAdapter } from '../../../src/Adapters/EmbeddingsProtoAdapter.js';
+import type { ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterTypes.js';
 import {
   clearRunanywhereModule,
   registerWasmModule,

@@ -34,6 +34,7 @@ describe('portable NVIDIA embedding catalog policy', () => {
   it('allows llama.cpp embeddings in the RAG picker', () => {
     expect([...RAG_EMBEDDING_FRAMEWORKS]).toEqual([
       InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      InferenceFramework.INFERENCE_FRAMEWORK_MLX,
       InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
     ]);
