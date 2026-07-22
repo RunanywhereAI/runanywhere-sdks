@@ -15,6 +15,7 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/CloudSttProvider.swift|swift:json-bridge
