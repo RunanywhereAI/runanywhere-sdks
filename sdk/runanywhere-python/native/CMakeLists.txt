@@ -68,6 +68,23 @@ foreach(_ra_b IN LISTS _ra_backends)
 endforeach()
 message(STATUS "runanywhere-python: engine backends -> ${_ra_linked_backends}")
 
+# RAG is NOT an engine backend in the loop above: it is an OBJECT library
+# (rac_backend_rag) whose objects commons folds directly into rac_commons, so
+# the rac_rag_*_proto symbols are already in the lib we link. Linking
+# rac_backend_rag here would re-pull its ONNX dependency and form a shared-lib
+# cycle (the reason commons uses TARGET_OBJECTS, not target_link_libraries).
+# So we only DEFINE RAC_HAVE_BACKEND_RAG for module.cpp — and only when the
+# protobuf runtime is actually built (RAC_PROTOBUF_RUNTIME_ENABLED), since the
+# rac_rag_*_proto ABI is unavailable stubs without it.
+if(TARGET rac_backend_rag AND RAC_PROTOBUF_RUNTIME_ENABLED)
+    target_compile_definitions(runanywhere_core PRIVATE RAC_HAVE_BACKEND_RAG)
+    message(STATUS "runanywhere-python: RAG proto ABI enabled (folded into rac_commons)")
+else()
+    message(STATUS "runanywhere-python: RAG proto ABI NOT enabled "
+                   "(rac_backend_rag target: ${RAC_BACKEND_RAG}, protobuf runtime: "
+                   "${RAC_PROTOBUF_RUNTIME_ENABLED})")
+endif()
+
 if(MSVC)
     target_link_directories(runanywhere_core PRIVATE "${_ra_bundled_dir}")
     target_link_libraries(runanywhere_core PRIVATE Crypt32)
