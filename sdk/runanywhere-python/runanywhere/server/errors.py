@@ -49,8 +49,17 @@ def install_error_handlers(app: Any) -> None:
     from fastapi import Request
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import JSONResponse
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
     logger = logging.getLogger("runanywhere.server")
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _handle_http_exception(_request: "Request", exc: StarletteHTTPException) -> "JSONResponse":
+        # Raw HTTPExceptions (auth 401, model 404, bad-audio 400, body-limit 413, …) otherwise
+        # fall back to FastAPI's {"detail": ...} shape; wrap them in the OpenAI error envelope too.
+        return JSONResponse(
+            status_code=exc.status_code, content=openai_error_body(str(exc.detail), exc.status_code)
+        )
 
     @app.exception_handler(SDKException)
     async def _handle_sdk_exception(_request: "Request", exc: SDKException) -> "JSONResponse":
