@@ -1132,7 +1132,7 @@ _rac_uuid_v4
 # Net-new RAC_API-decorated decls discovered in the commons headers and
 # not already covered by an earlier curated section. Routing rules live
 # in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).
-# Added 26 symbols to RACommons.exports, sorted alphabetically.
+# Added 57 symbols to RACommons.exports, sorted alphabetically.
 # ============================================================================
 _rac_diarization_cleanup
 _rac_diarization_component_create

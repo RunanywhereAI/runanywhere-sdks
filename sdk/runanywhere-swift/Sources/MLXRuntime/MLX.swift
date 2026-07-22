@@ -2069,6 +2069,10 @@ private let mlxDiarize: rac_mlx_diarize_fn = { handle, samples, sampleCount, opt
         return fillDiarizationResult(result, modelID: session.modelID, outResult: outResult)
     case .failure(let error):
         if error is CancellationError { return RAC_ERROR_CANCELLED }
+        if let providerError = error as? MLXSortformerProviderError,
+           providerError == .providerBusy {
+            return RAC_ERROR_INVALID_STATE
+        }
         recordMLXFailure("MLX speaker diarization", error: error)
         return RAC_ERROR_INFERENCE_FAILED
     }

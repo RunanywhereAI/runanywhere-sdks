@@ -258,7 +258,7 @@ int main() {
         rac_plugin_unregister("null-slot");
     }
 
-    // (5) unregister nonexistent
+    // (5) v7 slot resolution — diarization/segmentation ops resolve and names are stable
     {
         const int diarization_sentinel = 9;
         const int segmentation_sentinel = 10;

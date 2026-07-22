@@ -11,6 +11,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RASegmentationRequest
 import com.runanywhere.sdk.public.types.RASegmentationResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -40,7 +41,9 @@ object CppBridgeSegmentation {
                 }
             } catch (error: SDKException) {
                 throw error
-            } catch (error: Throwable) {
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 throw SDKException.operation(
                     "Semantic segmentation failed: ${error.message ?: error::class.java.simpleName}",
                     error,

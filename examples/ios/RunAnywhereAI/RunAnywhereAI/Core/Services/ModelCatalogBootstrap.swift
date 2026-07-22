@@ -192,20 +192,14 @@ enum ModelCatalogBootstrap {
             modality: .embedding,
             memoryRequirement: 4_625_233_184
         )
-        // The Nano checkpoint keeps the standard Llama 3.1 GGUF architecture.
-        // The Apple provider/build route accepts it, but this exact 4.92 GB
-        // artifact has not yet completed an Apple inference smoke.
-        let nemotronNanoGGUFBaseURL =
-            "https://huggingface.co/bartowski/" +
-            "nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/" +
-            "6f3d46cfbc39ce7a1bec89654305515d904e8102"
-        await registerLLM(
-            id: "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
-            name: "NVIDIA Llama 3.1 Nemotron Nano 8B Q4_K_M",
-            url: "\(nemotronNanoGGUFBaseURL)/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
-            framework: .llamaCpp,
-            memoryRequirement: 4_920_736_864
-        )
+        // NOTE: The NVIDIA Llama 3.1 Nemotron Nano 8B GGUF is intentionally NOT
+        // registered. The Nano checkpoint keeps the standard Llama 3.1 GGUF
+        // architecture and the Apple provider/build route accepts it, but this
+        // exact 4.92 GB artifact has not yet completed an Apple inference smoke,
+        // so it is not exposed in the production catalog. Re-enable via
+        // registerLLM — bartowski revision
+        // 6f3d46cfbc39ce7a1bec89654305515d904e8102,
+        // nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf — once that smoke passes.
         // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
         // GatedDeltaNet arch). Requires the PrismML llama.cpp fork pinned in
         // sdk/runanywhere-commons/VERSIONS — stock upstream cannot load it.

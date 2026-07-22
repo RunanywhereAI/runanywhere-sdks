@@ -12,7 +12,16 @@ import SwiftProtobuf
 
 private enum DiarizationLifecycleProtoABI {
     static let diarizeName = "rac_diarization_diarize_lifecycle_proto"
-    static let diarize = NativeProtoABI.load(diarizeName, as: NativeProtoABI.ProtoRequest.self)
+    static let diarize: NativeProtoABI.ProtoRequest? = {
+        // RACommons ships as a static archive on Apple platforms. Keep a
+        // typed reference so the linker retains the diarization archive
+        // member even when RTLD_DEFAULT cannot enumerate executable symbols.
+        let linked: NativeProtoABI.ProtoRequest = rac_diarization_diarize_lifecycle_proto
+        return NativeProtoABI.load(
+            diarizeName,
+            as: NativeProtoABI.ProtoRequest.self
+        ) ?? linked
+    }()
 }
 
 private enum DiarizationStreamSessionABI {
@@ -41,34 +50,62 @@ private enum DiarizationStreamSessionABI {
     typealias Finish = @convention(c) (UInt64) -> rac_result_t
     typealias Quiesce = @convention(c) () -> Void
 
-    static let setCallback = NativeProtoABI.load(
-        "rac_diarization_set_stream_proto_callback",
-        as: SetCallback.self
-    )
-    static let unsetCallback = NativeProtoABI.load(
-        "rac_diarization_unset_stream_proto_callback",
-        as: UnsetCallback.self
-    )
-    static let start = NativeProtoABI.load(
-        "rac_diarization_stream_start_proto",
-        as: Start.self
-    )
-    static let feedAudio = NativeProtoABI.load(
-        "rac_diarization_stream_feed_audio_proto",
-        as: FeedAudio.self
-    )
-    static let stop = NativeProtoABI.load(
-        "rac_diarization_stream_stop_proto",
-        as: Finish.self
-    )
-    static let cancel = NativeProtoABI.load(
-        "rac_diarization_stream_cancel_proto",
-        as: Finish.self
-    )
-    static let quiesce = NativeProtoABI.load(
-        "rac_diarization_proto_quiesce",
-        as: Quiesce.self
-    )
+    // Keep a typed reference to each diarization stream entry point. RACommons
+    // ships as a static archive on Apple platforms; a dlsym-only reference does
+    // not pull an otherwise-unreferenced archive member into the final app, so
+    // the symbol can be dead-stripped even though it is present in the
+    // XCFramework. The direct fallback is both a link-time anchor and a valid
+    // invocation path when RTLD_DEFAULT cannot enumerate executable symbols.
+
+    static let setCallback: SetCallback? = {
+        let linked: SetCallback = rac_diarization_set_stream_proto_callback
+        return NativeProtoABI.load(
+            "rac_diarization_set_stream_proto_callback",
+            as: SetCallback.self
+        ) ?? linked
+    }()
+    static let unsetCallback: UnsetCallback? = {
+        let linked: UnsetCallback = rac_diarization_unset_stream_proto_callback
+        return NativeProtoABI.load(
+            "rac_diarization_unset_stream_proto_callback",
+            as: UnsetCallback.self
+        ) ?? linked
+    }()
+    static let start: Start? = {
+        let linked: Start = rac_diarization_stream_start_proto
+        return NativeProtoABI.load(
+            "rac_diarization_stream_start_proto",
+            as: Start.self
+        ) ?? linked
+    }()
+    static let feedAudio: FeedAudio? = {
+        let linked: FeedAudio = rac_diarization_stream_feed_audio_proto
+        return NativeProtoABI.load(
+            "rac_diarization_stream_feed_audio_proto",
+            as: FeedAudio.self
+        ) ?? linked
+    }()
+    static let stop: Finish? = {
+        let linked: Finish = rac_diarization_stream_stop_proto
+        return NativeProtoABI.load(
+            "rac_diarization_stream_stop_proto",
+            as: Finish.self
+        ) ?? linked
+    }()
+    static let cancel: Finish? = {
+        let linked: Finish = rac_diarization_stream_cancel_proto
+        return NativeProtoABI.load(
+            "rac_diarization_stream_cancel_proto",
+            as: Finish.self
+        ) ?? linked
+    }()
+    static let quiesce: Quiesce? = {
+        let linked: Quiesce = rac_diarization_proto_quiesce
+        return NativeProtoABI.load(
+            "rac_diarization_proto_quiesce",
+            as: Quiesce.self
+        ) ?? linked
+    }()
 
     struct Functions {
         let setCallback: SetCallback
