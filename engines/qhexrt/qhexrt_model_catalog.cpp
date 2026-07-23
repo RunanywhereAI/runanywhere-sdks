@@ -77,6 +77,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"llama_embed_nemotron_8b", kV81, false},
     {"nv_embedcode_7b", kV81, false},
     {"nv_embedqa_1b", kV75V81, false},
+    {"nemotron_3_embed_1b", kV75, false},
     {"nv_rerankqa_1b", kV75V81, false},
     {"deepseek_r1_distill_qwen_1_5b", kV79V81, false},
     {"deepseek_r1_distill_qwen_7b", kV81, false},
