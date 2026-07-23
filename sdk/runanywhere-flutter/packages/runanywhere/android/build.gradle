@@ -160,15 +160,7 @@ task downloadNativeLibs {
 
     doLast {
         if (shouldDownloadAndroidLibs()) {
-            println "📦 Remote mode: Downloading RACommons Android native libraries..."
-
             def jniLibsDir = file('build/jniLibs')
-            if (jniLibsDir.exists()) {
-                delete(jniLibsDir)
-            }
-            jniLibsDir.mkdirs()
-
-            buildDir.mkdirs()
             def requiredLibs = [
                 'librac_commons.so',
                 'librunanywhere_jni.so',
@@ -176,6 +168,31 @@ task downloadNativeLibs {
                 'libomp.so',
                 'libc++_shared.so',
             ]
+
+            // Skip the wipe + network round trip when a previous build already
+            // staged every required lib for this exact core version. Deleting
+            // build/jniLibs (or bumping VERSION) forces a fresh download.
+            def versionStamp = new File(jniLibsDir, '.rac-natives-version')
+            def upToDate = versionStamp.isFile() &&
+                versionStamp.text.trim() == coreVersion &&
+                commonsAndroidUrls.keySet().every { abi ->
+                    requiredLibs.every { libName ->
+                        new File(jniLibsDir, "${abi}/${libName}").isFile()
+                    }
+                }
+            if (upToDate) {
+                println "✅ RACommons native libraries v${coreVersion} already present - skipping download"
+                return
+            }
+
+            println "📦 Remote mode: Downloading RACommons Android native libraries..."
+
+            if (jniLibsDir.exists()) {
+                delete(jniLibsDir)
+            }
+            jniLibsDir.mkdirs()
+
+            buildDir.mkdirs()
             commonsAndroidUrls.each { abi, downloadUrl ->
                 def zipFile = file("${buildDir}/racommons-${abi}.zip")
                 def tempDir = file("${buildDir}/racommons-${abi}-temp")
@@ -204,6 +221,7 @@ task downloadNativeLibs {
                 delete(zipFile, tempDir)
             }
 
+            versionStamp.text = coreVersion
             println "✅ RACommons native libraries downloaded successfully"
         } else {
             println "🔧 Local mode: Using native libraries from src/main/jniLibs/"
