@@ -77,7 +77,17 @@ export function dispatch(port: DispatchPort, req: RpcRequest, deps: DispatchDeps
         .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
       return;
     }
-    port.postMessage({ id, ok: true, result: api[method](...args) });
+    // A binding may return a value synchronously OR a Promise (RAG ingest/query
+    // run on a worker thread so they don't block the host event loop). Await the
+    // thenable case; keep the sync case synchronous.
+    const result = api[method](...args) as unknown;
+    if (result != null && typeof (result as { then?: unknown }).then === 'function') {
+      (result as Promise<unknown>)
+        .then((r) => port.postMessage({ id, ok: true, result: r }))
+        .catch((e) => port.postMessage({ id, ok: false, error: errmsg(e) }));
+    } else {
+      port.postMessage({ id, ok: true, result });
+    }
   } catch (e) {
     port.postMessage({ id, ok: false, error: errmsg(e) });
   }
