@@ -104,6 +104,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"parakeet_tdt_0_6b_v2", kV75V81, false},
     {"parakeet_tdt_0_6b_v3", kV75V81, false},
     {"parakeet_rnnt_1_1b", kV75V81, false},
+    {"parakeet_ctc_1_1b", kV75, false},
     {"canary_qwen_2_5b", kV81, false},
     {"canary_1b_flash", kV75V81, false},
     {"nemotron_asr_streaming", kV75V81, false},
