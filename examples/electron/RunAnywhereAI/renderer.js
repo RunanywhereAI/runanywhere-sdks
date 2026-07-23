@@ -74,11 +74,16 @@ function md(text) {
 // per-token streaming hot path so we don't cross the context bridge each token.
 function splitThink(text) {
   if (!text) return { response: '', thinking: '' };
-  const closed = /<(think|thinking)>([\s\S]*?)<\/\1>/i.exec(text);
-  if (closed) return { thinking: closed[2].trim(), response: (text.slice(0, closed.index) + text.slice(closed.index + closed[0].length)).trim() };
-  const open = /<(think|thinking)>/i.exec(text);
-  if (open) return { response: text.slice(0, open.index).trim(), thinking: text.slice(open.index + open[0].length).trim() };
-  return { response: text.trim(), thinking: '' };
+  // indexOf scan (O(n)) — not a backreference regex, which backtracks on
+  // adversarial model output (ReDoS). Mirrors the SDK's splitThinking.
+  let idx = -1, tag = '';
+  for (const t of ['<think>', '<thinking>']) { const i = text.indexOf(t); if (i >= 0 && (idx < 0 || i < idx)) { idx = i; tag = t; } }
+  if (idx < 0) return { response: text.trim(), thinking: '' };
+  const afterOpen = idx + tag.length;
+  const closeTag = tag === '<think>' ? '</think>' : '</thinking>';
+  const close = text.indexOf(closeTag, afterOpen);
+  if (close < 0) return { response: text.slice(0, idx).trim(), thinking: text.slice(afterOpen).trim() };
+  return { thinking: text.slice(afterOpen, close).trim(), response: (text.slice(0, idx) + text.slice(close + closeTag.length)).trim() };
 }
 // Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
 // above the rendered answer. `streaming` keeps reasoning open + shows a
