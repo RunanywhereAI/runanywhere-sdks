@@ -481,6 +481,7 @@ _rac_sdk_set_client_info
 
 # SDKEnvironment helpers + URL / API key validators called from
 # Public/Configuration/SDKEnvironment.swift and CppBridge+Environment.swift.
+_rac_env_auth_expected
 _rac_env_default_log_level
 _rac_env_description
 _rac_env_is_production
@@ -497,6 +498,7 @@ _rac_validation_error_message
 
 # Dev config (staging base URL + shared usability checks) — reached
 # through CppBridge+Environment.swift.
+_rac_dev_config_get_staging_base_url
 _rac_dev_config_is_usable_credential
 _rac_dev_config_is_usable_http_url
 

@@ -17,8 +17,11 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
+ * ---------------------------------------------------------------------------
  * SDK environment — product surface is development + production only.
+ * Number 2 was formerly SDK_ENVIRONMENT_STAGING; reserved so wire values
  * never shift PRODUCTION=3.
+ * ---------------------------------------------------------------------------
  */
 public enum class SDKEnvironment(
   override val `value`: Int,
@@ -45,8 +48,7 @@ public enum class SDKEnvironment(
     public fun fromValue(`value`: Int): SDKEnvironment? = when (`value`) {
       0 -> SDK_ENVIRONMENT_UNSPECIFIED
       1 -> SDK_ENVIRONMENT_DEVELOPMENT
-      // Former staging (=2) → treat as production at the Kotlin boundary.
-      2, 3 -> SDK_ENVIRONMENT_PRODUCTION
+      3 -> SDK_ENVIRONMENT_PRODUCTION
       else -> null
     }
   }

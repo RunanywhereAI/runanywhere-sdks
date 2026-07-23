@@ -31,7 +31,7 @@ import okio.ByteString
 /**
  * ---------------------------------------------------------------------------
  * SDK logging configuration. Per-environment presets
- * (development/production) stay in each SDK as factory helpers.
+ * (development/staging/production) stay in each SDK as factory helpers.
  * ---------------------------------------------------------------------------
  */
 public class LoggingConfiguration(

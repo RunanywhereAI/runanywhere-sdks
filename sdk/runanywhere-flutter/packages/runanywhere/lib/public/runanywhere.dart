@@ -507,38 +507,31 @@ abstract final class RunAnywhere {
         environment: environment,
       );
     } else {
-      // Keyless staging is valid: commons overrides the base URL with the
-      // baked staging backend and requests go out unauthenticated
-      // (PUBLIC-org ingestion). Production stays strict.
-      if (!isStaging && (apiKey == null || apiKey.isEmpty)) {
+      // Production (and any non-development env): API key + HTTPS base URL.
+      final trimmedKey = (apiKey ?? '').trim();
+      final trimmedUrl = (baseURL ?? '').trim();
+      if (trimmedKey.isEmpty) {
         throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
           fieldPath: 'SDKInitParams.apiKey',
         );
       }
-      if (!isStaging && (baseURL == null || baseURL.isEmpty)) {
+      if (trimmedUrl.isEmpty) {
         throw SDKException.validationFailed(
           'Base URL is required for ${environment.description} mode',
           fieldPath: 'SDKInitParams.baseURL',
         );
       }
-      final Uri uri;
-      if (baseURL == null || baseURL.isEmpty) {
-        // Staging placeholder — replaced by the baked staging URL in commons.
-        uri = Uri.parse('https://staging.runanywhere.local');
-      } else {
-        final parsed = Uri.tryParse(baseURL);
-        if (parsed == null) {
-          throw SDKException.validationFailed(
-            'Invalid base URL: $baseURL',
-            fieldPath: 'SDKInitParams.baseURL',
-          );
-        }
-        uri = parsed;
+      final parsed = Uri.tryParse(trimmedUrl);
+      if (parsed == null) {
+        throw SDKException.validationFailed(
+          'Invalid base URL: $trimmedUrl',
+          fieldPath: 'SDKInitParams.baseURL',
+        );
       }
       params = SDKInitParams(
-        apiKey: apiKey ?? '',
-        baseURL: uri,
+        apiKey: trimmedKey,
+        baseURL: parsed,
         environment: environment,
       );
     }

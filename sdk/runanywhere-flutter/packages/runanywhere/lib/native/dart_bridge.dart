@@ -563,7 +563,6 @@ class DartBridge {
   static void _configureLogging(SDKEnvironment environment) {
     int logLevel;
     switch (environment) {
-        break;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         logLevel = RacLogLevel.warning;
         break;

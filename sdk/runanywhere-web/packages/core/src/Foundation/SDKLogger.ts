@@ -33,12 +33,6 @@ export function loggingConfigurationForEnvironment(
   environment: SDKEnvironment,
 ): LoggingConfiguration {
   switch (environment) {
-        enableLocalLogging: true,
-        minLogLevel: LogLevel.LOG_LEVEL_INFO,
-        includeSourceLocation: false,
-        includeDeviceMetadata: true,
-        enableRemoteLogging: false,
-      });
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: false,
@@ -47,6 +41,7 @@ export function loggingConfigurationForEnvironment(
         includeDeviceMetadata: true,
         enableRemoteLogging: false,
       });
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
     default:
       return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: true,

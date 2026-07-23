@@ -17,7 +17,13 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * Environment values — must match RAC_ENV_* (development=0, production=2).
+ * ---------------------------------------------------------------------------
+ * Environment values — must match RAC_ENV_* in
+ * sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
+ * (development=0, production=2). Numeric values are part of the wire format;
+ * do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
+ * reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
+ * ---------------------------------------------------------------------------
  */
 public enum class SdkInitEnvironment(
   override val `value`: Int,
@@ -39,8 +45,7 @@ public enum class SdkInitEnvironment(
     @JvmStatic
     public fun fromValue(`value`: Int): SdkInitEnvironment? = when (`value`) {
       0 -> SDK_INIT_ENVIRONMENT_DEVELOPMENT
-      // Former staging (=1) → production.
-      1, 2 -> SDK_INIT_ENVIRONMENT_PRODUCTION
+      2 -> SDK_INIT_ENVIRONMENT_PRODUCTION
       else -> null
     }
   }

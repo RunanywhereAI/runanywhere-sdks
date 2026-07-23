@@ -203,10 +203,10 @@ export const TTS = {
     options?: Partial<TTSOptions>,
   ): AsyncIterable<TTSOutput> {
     const adapter = TTSProtoAdapter.tryDefault();
-    if (!adapter || !adapter.supportsProtoTTS()) {
+    if (!adapter || !adapter.supportsLifecycleProtoTTS()) {
       throw SDKException.backendNotAvailable(
         'TTS.synthesizeStreamAuto',
-        'No Web WASM backend with rac_tts_*_proto exports is registered.',
+        'No Web WASM backend with rac_tts_*_proto lifecycle exports is registered.',
       );
     }
     return adapter.synthesizeLifecycleStream(text, defaultTTSOptions(options));
