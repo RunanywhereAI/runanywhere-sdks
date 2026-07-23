@@ -78,9 +78,16 @@ def _memory_info():
 def _read_wav_16k(path: str):
     with open(path, "rb") as f:
         raw = f.read()
-    rate, samples = decode_wav(raw)
-    if rate != 16000:
-        samples = downsample(samples, rate, 16000)
+    # decode_wav/downsample raise ValueError on a malformed or non-16-bit WAV (a common
+    # real-world input). Re-raise as SDKException.invalid_input so the audio handlers'
+    # `except (SDKException, OSError)` maps it to a clean `error:` + exit 1 instead of
+    # dumping a raw traceback.
+    try:
+        rate, samples = decode_wav(raw)
+        if rate != 16000:
+            samples = downsample(samples, rate, 16000)
+    except ValueError as exc:
+        raise SDKException.invalid_input(f"{path}: {exc}") from exc
     return samples
 
 
