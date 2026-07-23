@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <cctype>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -136,6 +137,67 @@ int32_t register_handle(std::unordered_map<int32_t, rac_handle_t>& map, rac_hand
 // Pop a handle out of its map (returns nullptr if the id is unknown).
 rac_handle_t take_handle(std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
     std::lock_guard<std::mutex> lock(g_handles_mutex);
+    auto it = map.find(id);
+    if (it == map.end()) return nullptr;
+    rac_handle_t h = it->second;
+    map.erase(it);
+    return h;
+}
+
+// =============================================================================
+// In-flight operation tracking — prevents destroy-during-call use-after-free.
+//
+// A blocking rac_* call (generate/generate_vlm/transcribe/synthesize/embed/rag_*)
+// runs with the GIL released, often on a worker thread (streaming) or an executor
+// thread (async twins), while another thread may call unload_*()/shutdown(). Without
+// serialization, destroy could free the component mid-call. We mark a handle busy for
+// the duration of every blocking op (keyed by the same globally-unique integer id) and
+// make unload_*()/shutdown() WAIT for the handle to go idle before destroying it.
+// =============================================================================
+std::condition_variable g_inflight_cv;
+std::unordered_map<int32_t, int> g_inflight;  // handle id -> active blocking-op count
+
+// Look up a handle AND atomically mark it in-flight, so a concurrent unload cannot slip
+// between the lookup and the blocking call. Returns nullptr (and marks nothing) if unknown.
+rac_handle_t begin_op(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    auto it = map.find(id);
+    if (it == map.end()) return nullptr;
+    ++g_inflight[id];
+    return it->second;
+}
+
+// Clear one in-flight mark and wake any unload/shutdown waiter.
+void end_op(int32_t id) {
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_inflight.find(id);
+        if (it != g_inflight.end() && --it->second <= 0) g_inflight.erase(it);
+    }
+    g_inflight_cv.notify_all();
+}
+
+// RAII: end_op on scope exit — covers the throwing finish_stream / raise_rac_error paths.
+struct OpScope {
+    int32_t id;
+    explicit OpScope(int32_t i) : id(i) {}
+    ~OpScope() { end_op(id); }
+    OpScope(const OpScope&) = delete;
+    OpScope& operator=(const OpScope&) = delete;
+};
+
+// Wait until handle `id` is idle, then remove and return it from `map` (nullptr if unknown).
+// The CALLER MUST release the GIL first: a streaming worker's token callback needs the GIL to
+// drive the native loop to completion so the in-flight count can drain. Generation is bounded
+// (max_tokens) and sync/async stream teardown stops the worker, so the wait is bounded in
+// normal use; a caller that abandons a paused stream without closing it is the only way to
+// block here, which is a caller-side leak, not a hang we can safely pre-empt.
+rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
+    std::unique_lock<std::mutex> lock(g_handles_mutex);
+    g_inflight_cv.wait(lock, [&] {
+        auto it = g_inflight.find(id);
+        return it == g_inflight.end() || it->second == 0;
+    });
     auto it = map.find(id);
     if (it == map.end()) return nullptr;
     rac_handle_t h = it->second;
@@ -366,8 +428,9 @@ void generate(int32_t handle, const std::string& prompt, py::function on_token,
               std::optional<float> top_p, std::optional<int32_t> top_k,
               std::optional<std::string> system_prompt, std::optional<std::string> grammar,
               std::optional<bool> disable_thinking) {
-    rac_handle_t h = handle_for(g_llm_handles, handle);
+    rac_handle_t h = begin_op(g_llm_handles, handle);
     if (!h) throw std::runtime_error("invalid handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
     // Hold the option strings by value so their c_str() stays valid for the
     // whole streaming call.
@@ -400,7 +463,11 @@ void generate(int32_t handle, const std::string& prompt, py::function on_token,
 }
 
 void unload_model(int32_t handle) {
-    rac_handle_t h = take_handle(g_llm_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;  // let an in-flight generate's callback drain
+        h = take_handle_when_idle(g_llm_handles, handle);
+    }
     if (h) rac_llm_component_destroy(h);
 }
 
@@ -434,8 +501,9 @@ int32_t load_vlm_model(const std::string& model_path, const std::string& mmproj_
 
 void generate_vlm(int32_t handle, const std::string& image_path, const std::string& prompt,
                   py::function on_token) {
-    rac_handle_t h = handle_for(g_vlm_handles, handle);
+    rac_handle_t h = begin_op(g_vlm_handles, handle);
     if (!h) throw std::runtime_error("invalid vlm handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
     StreamCtx ctx;
     ctx.on_token = std::move(on_token);
@@ -457,7 +525,11 @@ void generate_vlm(int32_t handle, const std::string& image_path, const std::stri
 }
 
 void unload_vlm_model(int32_t handle) {
-    rac_handle_t h = take_handle(g_vlm_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_vlm_handles, handle);
+    }
     if (h) rac_vlm_component_destroy(h);
 }
 
@@ -477,8 +549,9 @@ int32_t load_embedding_model(const std::string& path) {
 }
 
 py::array_t<float> embed(int32_t handle, const std::string& text) {
-    rac_handle_t h = handle_for(g_embed_handles, handle);
+    rac_handle_t h = begin_op(g_embed_handles, handle);
     if (!h) throw std::runtime_error("invalid embedding handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
@@ -501,7 +574,11 @@ py::array_t<float> embed(int32_t handle, const std::string& text) {
 }
 
 void unload_embedding_model(int32_t handle) {
-    rac_handle_t h = take_handle(g_embed_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_embed_handles, handle);
+    }
     if (h) rac_embeddings_destroy(h);
 }
 
@@ -734,8 +811,9 @@ int32_t load_stt_model(const std::string& dir, std::optional<std::string> id,
 // Accepts any buffer-protocol object (bytes, bytearray, memoryview, numpy uint8
 // array), mirroring the Electron addon's "Buffer OR TypedArray" acceptance.
 std::string transcribe(int32_t handle, const py::buffer& pcm16) {
-    rac_handle_t h = handle_for(g_stt_handles, handle);
+    rac_handle_t h = begin_op(g_stt_handles, handle);
     if (!h) throw std::runtime_error("invalid stt handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
     // Borrow the raw bytes without copying; the buffer stays alive for the call.
     py::buffer_info info = pcm16.request();
@@ -756,7 +834,11 @@ std::string transcribe(int32_t handle, const py::buffer& pcm16) {
 }
 
 void unload_stt_model(int32_t handle) {
-    rac_handle_t h = take_handle(g_stt_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_stt_handles, handle);
+    }
     if (h) rac_stt_component_destroy(h);
 }
 
@@ -789,8 +871,9 @@ int32_t load_tts_voice(const std::string& dir, std::optional<std::string> id,
 
 // synthesize(handle, text) -> (samples float32 ndarray, sample_rate int).
 py::tuple synthesize(int32_t handle, const std::string& text) {
-    rac_handle_t h = handle_for(g_tts_handles, handle);
+    rac_handle_t h = begin_op(g_tts_handles, handle);
     if (!h) throw std::runtime_error("invalid tts handle");
+    OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
 
     rac_tts_result_t result;
     std::memset(&result, 0, sizeof(result));
@@ -810,7 +893,11 @@ py::tuple synthesize(int32_t handle, const std::string& text) {
 }
 
 void unload_tts_voice(int32_t handle) {
-    rac_handle_t h = take_handle(g_tts_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_tts_handles, handle);
+    }
     if (h) rac_tts_component_destroy(h);
 }
 
@@ -876,7 +963,20 @@ void shutdown() {
         // outlives the runtime — a later unload/use can't touch freed native
         // state, and a re-init starts from a clean slate.
         {
-            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            // Release the GIL and wait for every in-flight blocking op to drain before freeing
+            // its component — otherwise destroy / rac_shutdown() could race a live rac_* call on
+            // a worker or executor thread (use-after-free). Normally client.shutdown() has already
+            // unloaded each model (each unload_*() waited + freed), so this drains only stragglers.
+            // RAG sessions + VAD are intentionally not in g_inflight: rac_rag_session_destroy_proto
+            // is documented safe concurrent with active ops, and vad_process holds the GIL.
+            py::gil_scoped_release release;
+            std::unique_lock<std::mutex> lock(g_handles_mutex);
+            g_inflight_cv.wait(lock, [] {
+                for (auto& kv : g_inflight) {
+                    if (kv.second > 0) return false;
+                }
+                return true;
+            });
 #ifdef RAC_HAVE_BACKEND_RAG
             // Destroy RAG sessions first — each owns its internal embedding/LLM
             // services, independent of the user-loaded handle maps below.
@@ -895,6 +995,7 @@ void shutdown() {
             g_stt_handles.clear();
             g_tts_handles.clear();
             g_vad_handles.clear();
+            g_inflight.clear();
         }
         rac_shutdown();
     }
