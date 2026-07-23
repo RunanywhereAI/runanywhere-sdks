@@ -95,10 +95,11 @@ class EventBus:
         for listener in list(self._listeners):
             try:
                 listener(event)
-            except BaseException:
-                # A misbehaving listener must not disrupt the others — mirror the
-                # Electron bus's bare `catch {}`, which also isolates BaseException
-                # subclasses (asyncio.CancelledError, KeyboardInterrupt, ...).
+            except Exception:
+                # A misbehaving listener must not disrupt the others. Catch Exception
+                # (NOT BaseException) so control-flow signals — KeyboardInterrupt,
+                # SystemExit, asyncio.CancelledError (a BaseException since 3.8) — still
+                # propagate to the caller instead of being silently swallowed here.
                 pass
 
     def remove_all(self) -> None:
