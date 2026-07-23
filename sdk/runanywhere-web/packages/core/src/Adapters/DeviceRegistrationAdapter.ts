@@ -42,13 +42,25 @@ interface BrowserNavigator extends Navigator {
   userAgentData?: {
     mobile?: boolean;
     platform?: string;
+    brands?: ReadonlyArray<{ brand?: string; version?: string }>;
   };
+  getBattery?: () => Promise<{ level?: number; charging?: boolean }>;
 }
 
-interface BrowserPerformance extends Performance {
-  memory?: {
-    usedJSHeapSize?: number;
-    jsHeapSizeLimit?: number;
+interface WebGPUAdapterInfoLike {
+  vendor?: string;
+  architecture?: string;
+  description?: string;
+}
+
+interface WebGPUAdapterLike {
+  info?: WebGPUAdapterInfoLike;
+  requestAdapterInfo?: () => Promise<WebGPUAdapterInfoLike>;
+}
+
+interface NavigatorWithWebGPU {
+  gpu?: {
+    requestAdapter: () => Promise<WebGPUAdapterLike | null>;
   };
 }
 
@@ -59,9 +71,6 @@ export interface DeviceRegistrationModule extends EmscriptenRunanywhereModule {
   _rac_state_is_device_registered?(): number;
   _rac_state_set_device_registered?(registered: number): void;
   _rac_auth_get_access_token?(): number;
-  _rac_wasm_dev_config_get_supabase_url?(): number;
-  _rac_wasm_dev_config_get_supabase_key?(): number;
-  _rac_wasm_dev_config_is_available?(): number;
 
   _rac_wasm_sizeof_device_callbacks?(): number;
   _rac_wasm_offsetof_device_callbacks_get_device_info?(): number;
@@ -159,10 +168,38 @@ interface DeviceProfile {
   architecture: 'unknown';
   chipName: string;
   totalMemory: number;
-  availableMemory: number;
-  gpuFamily: string | null;
+  /** Browsers expose no real free-RAM API; 0 means unknown rather than a JS-heap guess. */
+  availableMemory: 0;
+  gpuFamily: string;
+  batteryLevel: number;
+  batteryState: string | null;
+  deviceFingerprint: string | null;
   coreCount: number;
 }
+
+/**
+ * Hardware facts that only async browser APIs can produce (WebGPU adapter,
+ * Battery Status, WebCrypto digest). Pre-fetched once per page so the
+ * synchronous native `get_device_info` callback can consume cached values.
+ */
+interface HardwareSnapshot {
+  gpuFamily: string;
+  chipName: string;
+  batteryLevel: number;
+  batteryState: string | null;
+  fingerprint: string;
+}
+
+const DEFAULT_HARDWARE_SNAPSHOT: HardwareSnapshot = {
+  gpuFamily: 'unknown',
+  chipName: 'unknown',
+  batteryLevel: -1,
+  batteryState: null,
+  fingerprint: '',
+};
+
+let hardwareSnapshot: HardwareSnapshot = DEFAULT_HARDWARE_SNAPSHOT;
+let hardwareSnapshotPrefetch: Promise<void> | null = null;
 
 interface ResolvedControlPlaneConfiguration {
   baseURL: string;
@@ -233,35 +270,181 @@ function browserOSVersion(userAgent: string, platform: string): string {
   return (normalizedPlatform || 'unknown').slice(0, MAX_OS_VERSION_LENGTH);
 }
 
+function browserOSName(userAgent: string, uaDataPlatform: string): string {
+  const normalized = uaDataPlatform.toLowerCase();
+  if (normalized.startsWith('win')) return 'Windows';
+  if (normalized === 'macos' || normalized.startsWith('mac')) return 'macOS';
+  if (normalized === 'android') return 'Android';
+  if (normalized === 'ios') return 'iOS';
+  if (normalized === 'chromeos' || normalized === 'chrome os') return 'ChromeOS';
+  if (normalized === 'linux') return 'Linux';
+  if (/Windows/i.test(userAgent)) return 'Windows';
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+  if (/Mac OS X|Macintosh/i.test(userAgent)) return 'macOS';
+  if (/CrOS/i.test(userAgent)) return 'ChromeOS';
+  if (/Linux/i.test(userAgent)) return 'Linux';
+  return uaDataPlatform.trim() || 'Web';
+}
+
+function browserName(nav: BrowserNavigator): string {
+  const brands = nav.userAgentData?.brands ?? [];
+  const realBrands = brands
+    .map((entry) => entry.brand?.trim() ?? '')
+    .filter((brand) => brand.length > 0 && !/not.?a.?brand/i.test(brand));
+  const brand = realBrands.find((name) => !/^chromium$/i.test(name)) ?? realBrands[0];
+  if (brand) return brand;
+  const ua = nav.userAgent;
+  if (/Firefox\//i.test(ua)) return 'Firefox';
+  if (/Edg(?:e|A|iOS)?\//i.test(ua)) return 'Edge';
+  if (/OPR\//i.test(ua)) return 'Opera';
+  if (/Chrome\//i.test(ua)) return 'Chrome';
+  if (/Safari\//i.test(ua)) return 'Safari';
+  return 'Browser';
+}
+
+/** GPU renderer string via the WebGL debug extension (sync, cheap, cacheable). */
+function webglRendererString(): string {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = (canvas.getContext('webgl') ?? canvas.getContext('experimental-webgl')) as
+      | WebGLRenderingContext
+      | null;
+    if (!gl) return '';
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info') as
+      | { UNMASKED_RENDERER_WEBGL: number }
+      | null;
+    if (!debugInfo) return '';
+    const renderer: unknown = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+    return typeof renderer === 'string' ? renderer.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeGPUFamily(renderer: string): string {
+  const value = renderer.toLowerCase();
+  if (!value) return '';
+  if (value.includes('apple')) return 'apple';
+  if (value.includes('adreno')) return 'adreno';
+  if (value.includes('mali')) return 'mali';
+  if (value.includes('nvidia') || value.includes('geforce') || value.includes('quadro')) {
+    return 'nvidia';
+  }
+  if (value.includes('amd') || value.includes('radeon')) return 'amd';
+  if (value.includes('intel')) return 'intel';
+  return '';
+}
+
+async function webgpuAdapterInfo(): Promise<{ family: string; description: string }> {
+  try {
+    const gpu = (navigator as unknown as NavigatorWithWebGPU).gpu;
+    if (!gpu) return { family: '', description: '' };
+    const adapter = await gpu.requestAdapter();
+    if (!adapter) return { family: '', description: '' };
+    let info = adapter.info;
+    if (!info && typeof adapter.requestAdapterInfo === 'function') {
+      info = await adapter.requestAdapterInfo();
+    }
+    return {
+      family: info?.architecture?.trim() || info?.vendor?.trim() || '',
+      description: info?.description?.trim() ?? '',
+    };
+  } catch {
+    return { family: '', description: '' };
+  }
+}
+
+async function batteryStatus(): Promise<{ level: number; state: string | null }> {
+  try {
+    const nav = navigator as BrowserNavigator;
+    if (typeof nav.getBattery !== 'function') return { level: -1, state: null };
+    const battery = await nav.getBattery();
+    const rawLevel = battery.level;
+    if (typeof rawLevel !== 'number' || !Number.isFinite(rawLevel)) {
+      return { level: -1, state: null };
+    }
+    const level = Math.min(1, Math.max(0, rawLevel));
+    const charging = battery.charging === true;
+    const state = charging ? (level === 1 ? 'full' : 'charging') : 'unplugged';
+    return { level, state };
+  } catch {
+    return { level: -1, state: null };
+  }
+}
+
+/** Stable composite hardware fingerprint (SHA-256 hex over coarse hardware facts). */
+async function computeDeviceFingerprint(renderer: string): Promise<string> {
+  try {
+    const nav = navigator as BrowserNavigator;
+    const material = [
+      nav.userAgentData?.platform?.trim() || nav.platform?.trim() || '',
+      String(nav.hardwareConcurrency ?? 0),
+      String(nav.deviceMemory ?? 0),
+      renderer,
+    ].join('|');
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material));
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return '';
+  }
+}
+
+async function collectHardwareSnapshot(): Promise<HardwareSnapshot> {
+  const renderer = webglRendererString();
+  const [gpu, battery, fingerprint] = await Promise.all([
+    webgpuAdapterInfo(),
+    batteryStatus(),
+    computeDeviceFingerprint(renderer),
+  ]);
+  return {
+    gpuFamily: gpu.family || normalizeGPUFamily(renderer) || 'unknown',
+    chipName: renderer || gpu.description || 'unknown',
+    batteryLevel: battery.level,
+    batteryState: battery.state,
+    fingerprint,
+  };
+}
+
+function prefetchHardwareSnapshot(): Promise<void> {
+  hardwareSnapshotPrefetch ??= collectHardwareSnapshot()
+    .then((snapshot) => {
+      hardwareSnapshot = snapshot;
+    })
+    .catch(() => {
+      // Defaults stay in place; every collector already degrades per-field.
+    });
+  return hardwareSnapshotPrefetch;
+}
+
 function browserDeviceProfile(): DeviceProfile {
   const nav = navigator as BrowserNavigator;
-  const perf = performance as BrowserPerformance;
-  const platform = nav.userAgentData?.platform?.trim()
-    || nav.platform?.trim()
-    || 'Web Browser';
+  const hardware = hardwareSnapshot;
+  const osName = browserOSName(
+    nav.userAgent,
+    nav.userAgentData?.platform?.trim() ?? nav.platform?.trim() ?? '',
+  );
   const coreCount = Math.max(1, Math.trunc(nav.hardwareConcurrency || 1));
   const totalMemory = Math.max(
     BYTES_PER_GIB,
     Math.trunc((nav.deviceMemory || DEFAULT_DEVICE_MEMORY_GIB) * BYTES_PER_GIB),
   );
-  const heapLimit = perf.memory?.jsHeapSizeLimit;
-  const heapUsed = perf.memory?.usedJSHeapSize ?? 0;
-  const availableMemory = typeof heapLimit === 'number' && Number.isFinite(heapLimit)
-    ? Math.min(totalMemory, Math.max(0, Math.trunc(heapLimit - heapUsed)))
-    : totalMemory;
   const mobile = nav.userAgentData?.mobile
     ?? /Android|iPhone|iPad|Mobile/i.test(nav.userAgent);
 
   return {
-    deviceModel: platform,
-    deviceName: document.title.trim() || 'RunAnywhere Web',
-    osVersion: browserOSVersion(nav.userAgent, platform),
+    deviceModel: `${osName} ${mobile ? 'Mobile' : 'Desktop'}`,
+    deviceName: `${browserName(nav)} on ${osName}`,
+    osVersion: browserOSVersion(nav.userAgent, osName),
     formFactor: mobile ? 'phone' : 'desktop',
     architecture: 'unknown',
-    chipName: platform,
+    chipName: hardware.chipName,
     totalMemory,
-    availableMemory,
-    gpuFamily: 'gpu' in nav ? 'webgpu' : null,
+    availableMemory: 0,
+    gpuFamily: hardware.gpuFamily,
+    batteryLevel: hardware.batteryLevel,
+    batteryState: hardware.batteryState,
+    deviceFingerprint: hardware.fingerprint || null,
     coreCount,
   };
 }
@@ -313,6 +496,9 @@ export class DeviceRegistrationAdapter {
     module: DeviceRegistrationModule,
     configuration: DeviceRegistrationConfiguration,
   ): DeviceRegistrationAdapter {
+    // Async hardware facts (GPU adapter, battery, fingerprint digest) are cached
+    // before native registration retries so the sync callback can use them.
+    void prefetchHardwareSnapshot();
     const adapter = new DeviceRegistrationAdapter(module, configuration);
     adapter.register();
     DeviceRegistrationAdapter.installedAdapters.set(module, adapter);
@@ -490,8 +676,12 @@ export class DeviceRegistrationAdapter {
     this.module.setValue(outInfoPtr + this.deviceInfoLayout.hasNeuralEngine, 0, 'i32');
     this.module.setValue(outInfoPtr + this.deviceInfoLayout.neuralEngineCores, 0, 'i32');
     writeString(this.deviceInfoLayout.gpuFamily, profile.gpuFamily);
-    this.module.setValue(outInfoPtr + this.deviceInfoLayout.batteryLevel, -1, 'double');
-    this.module.setValue(outInfoPtr + this.deviceInfoLayout.batteryState, 0, '*');
+    this.module.setValue(
+      outInfoPtr + this.deviceInfoLayout.batteryLevel,
+      profile.batteryLevel,
+      'double',
+    );
+    writeString(this.deviceInfoLayout.batteryState, profile.batteryState);
     this.module.setValue(outInfoPtr + this.deviceInfoLayout.isLowPowerMode, 0, 'i32');
     this.module.setValue(outInfoPtr + this.deviceInfoLayout.coreCount, profile.coreCount, 'i32');
     this.module.setValue(
@@ -500,11 +690,15 @@ export class DeviceRegistrationAdapter {
       'i32',
     );
     this.module.setValue(outInfoPtr + this.deviceInfoLayout.efficiencyCores, 0, 'i32');
-    this.module.setValue(
-      outInfoPtr + this.deviceInfoLayout.deviceFingerprint,
-      deviceIdPtr,
-      '*',
-    );
+    if (profile.deviceFingerprint) {
+      writeString(this.deviceInfoLayout.deviceFingerprint, profile.deviceFingerprint);
+    } else {
+      this.module.setValue(
+        outInfoPtr + this.deviceInfoLayout.deviceFingerprint,
+        deviceIdPtr,
+        '*',
+      );
+    }
   }
 
   private readDeviceIdPointer(): number {
@@ -545,7 +739,6 @@ export class DeviceRegistrationAdapter {
     try {
       const endpoint = this.module.UTF8ToString(endpointPtr);
       const jsonBody = this.module.UTF8ToString(jsonBodyPtr);
-      const isDevelopmentRegistration = endpoint.startsWith('/rest/v1/');
       const controlPlane = this.currentControlPlaneConfiguration();
       if (!controlPlane) {
         return this.writeHTTPFailure(
@@ -556,8 +749,8 @@ export class DeviceRegistrationAdapter {
         );
       }
       const { baseURL, apiKey } = controlPlane;
-      const resolvedURL = resolveControlPlaneURL(baseURL, endpoint);
-      if (!resolvedURL) {
+      const url = resolveControlPlaneURL(baseURL, endpoint);
+      if (!url) {
         return this.writeHTTPFailure(
           outResponsePtr,
           RAC_ERROR_INVALID_CONFIGURATION,
@@ -566,11 +759,7 @@ export class DeviceRegistrationAdapter {
         );
       }
 
-      const accessToken = requiresAuth !== 0
-        ? this.currentAccessToken()
-        : isDevelopmentRegistration
-          ? apiKey
-          : '';
+      const accessToken = requiresAuth !== 0 ? this.currentAccessToken() : '';
       if (requiresAuth !== 0 && (!apiKey || !accessToken)) {
         return this.writeHTTPFailure(
           outResponsePtr,
@@ -580,9 +769,6 @@ export class DeviceRegistrationAdapter {
         );
       }
 
-      const url = isDevelopmentRegistration
-        ? `${resolvedURL}?on_conflict=device_id`
-        : resolvedURL;
       // Native reconstructs the registration payload for the retry and refreshes
       // volatile fields such as last_seen_at_ms. Correlate the prepared response
       // with the only operation this callback serves (route + auth mode), rather
@@ -617,7 +803,6 @@ export class DeviceRegistrationAdapter {
           jsonBody,
           apiKey,
           accessToken,
-          isDevelopmentRegistration,
         });
         this.pendingRequest = pending;
         void pending.finally(() => {
@@ -658,21 +843,19 @@ export class DeviceRegistrationAdapter {
     return this.readNativeString(this.module._rac_auth_get_access_token);
   }
 
-  /** Resolve URL + credential atomically so embedded secrets never cross origins. */
+  /**
+   * Resolve URL + credential atomically so embedded secrets never cross origins.
+   *
+   * No released SDK bakes or reads Supabase credentials or a build token: the
+   * backend is reached only through the effective base URL supplied by commons
+   * state (keyless staging attributes to a PUBLIC org). The dev/keyless path
+   * therefore falls through to the same effective-base-URL configuration as any
+   * other environment — there is no separate dev-config credential branch.
+   */
   private currentControlPlaneConfiguration(): ResolvedControlPlaneConfiguration | null {
-    if (this.configuredBaseURL || this.configuredApiKey) {
-      return this.configuredBaseURL && this.configuredApiKey
-        ? { baseURL: this.configuredBaseURL, apiKey: this.configuredApiKey }
-        : null;
-    }
-    try {
-      if (this.module._rac_wasm_dev_config_is_available?.() !== 1) return null;
-      const baseURL = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_url);
-      const apiKey = this.readNativeString(this.module._rac_wasm_dev_config_get_supabase_key);
-      return baseURL && apiKey ? { baseURL, apiKey } : null;
-    } catch {
-      return null;
-    }
+    return this.configuredBaseURL && this.configuredApiKey
+      ? { baseURL: this.configuredBaseURL, apiKey: this.configuredApiKey }
+      : null;
   }
 
   private async prepareHTTPRequest(options: {
@@ -681,7 +864,6 @@ export class DeviceRegistrationAdapter {
     jsonBody: string;
     apiKey: string;
     accessToken: string;
-    isDevelopmentRegistration: boolean;
   }): Promise<void> {
     const controller = new AbortController();
     this.activeRequestController = controller;
@@ -696,9 +878,6 @@ export class DeviceRegistrationAdapter {
       });
       if (options.apiKey) headers.set('apikey', options.apiKey);
       if (options.accessToken) headers.set('Authorization', `Bearer ${options.accessToken}`);
-      if (options.isDevelopmentRegistration) {
-        headers.set('Prefer', 'resolution=merge-duplicates,return=representation');
-      }
       const response = await fetch(options.url, {
         method: 'POST',
         headers,

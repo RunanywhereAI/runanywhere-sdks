@@ -4,8 +4,8 @@
 //
 //  RunAnywhere Brand Color Palette
 //  Color scheme matching RunAnywhere.ai website
-//  Primary accent: Vibrant orange-red (#FF5500) - matches website branding
-//  Dark theme backgrounds: Deep dark blue-gray matching website aesthetic
+//  Primary accent: RunAnywhere brand orange (#FF6900) - the logo primary
+//  Brand tokens mirror examples/DESIGN_GUIDELINE.md (canonical source)
 //
 
 import SwiftUI
@@ -34,8 +34,8 @@ struct AppColors {
     // PRIMARY ACCENT COLORS - RunAnywhere Brand Colors
     // ====================
     // Primary brand color - vibrant orange/red from RunAnywhere.ai website
-    static let primaryAccent = Color(hex: 0xFF5500)  // Vibrant orange-red - primary brand color
-    static let primaryOrange = Color(hex: 0xFF5500)  // Same as primary accent
+    static let primaryAccent = Color(hex: 0xFF6900)  // RunAnywhere brand orange - the logo primary
+    static let primaryOrange = Color(hex: 0xFF6900)  // Same as primary accent
     static let primaryBlue = Color(hex: 0x3B82F6)    // Blue-500 - for secondary elements
     static let primaryGreen = Color(hex: 0x10B981)   // Emerald-500 - success green
     static let primaryRed = Color(hex: 0xEF4444)     // Red-500 - error red
@@ -96,7 +96,7 @@ struct AppColors {
     // ====================
     // User bubbles (with gradient support) - using vibrant orange/red brand color
     static let userBubbleGradientStart = primaryAccent         // Vibrant orange-red
-    static let userBubbleGradientEnd = Color(hex: 0xE64500)    // Slightly darker orange-red
+    static let userBubbleGradientEnd = Color(hex: 0xE65E00)    // Slightly darker brand orange
     static let messageBubbleUser = primaryAccent               // Vibrant orange-red
 
     // Assistant bubbles - clean gray (uses system colors for dark mode adaptation)
@@ -106,7 +106,7 @@ struct AppColors {
     static let messageBubbleAssistantGradientEnd = backgroundGray6
 
     // Dark mode - toned down variant for reduced eye strain in low-light
-    static let messageBubbleUserDark = Color(hex: 0xCC4400)    // Darker orange-red (80% brightness)
+    static let messageBubbleUserDark = Color(hex: 0xCC5400)    // Darker brand orange (80% brightness)
     static let messageBubbleAssistantDark = backgroundGray5Dark // Dark gray
 
     // ====================

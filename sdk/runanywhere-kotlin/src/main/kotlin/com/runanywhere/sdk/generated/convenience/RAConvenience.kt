@@ -110,7 +110,6 @@ public val SDKEnvironment.wireString: String
     get() = when (this) {
         SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "unspecified"
         SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "development"
-        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> "staging"
         SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "production"
         else -> ""
     }
@@ -120,7 +119,6 @@ public fun SDKEnvironment.Companion.fromWireString(value: String): SDKEnvironmen
     when (value.lowercase()) {
         "unspecified" -> SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED
         "development" -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-        "staging" -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
         "production" -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
         else -> null
     }

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// App Colors (mirroring iOS AppColors.swift)
+/// App Colors (mirroring iOS AppColors.swift).
+/// Brand primary is #FF6900 — see examples/DESIGN_GUIDELINE.md (the canonical palette).
 class AppColors {
   // MARK: - Semantic Colors
-  static Color get primaryAccent => Colors.blue;
-  static const Color primaryBlue = Colors.blue;
+  /// RunAnywhere brand orange — the logo primary (was Colors.blue).
+  static const Color brandOrange = Color(0xFFFF6900);
+  static const Color gradientEnd = Color(0xFFFB2C36);
+  static Color get primaryAccent => brandOrange;
+  static const Color primaryBlue = Colors.blue; // genuine secondary blue accent
   static const Color primaryGreen = Colors.green;
   static const Color primaryRed = Colors.red;
   static const Color primaryOrange = Colors.orange;

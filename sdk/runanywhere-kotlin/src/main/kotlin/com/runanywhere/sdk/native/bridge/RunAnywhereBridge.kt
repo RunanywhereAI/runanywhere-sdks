@@ -737,7 +737,7 @@ object RunAnywhereBridge {
 
     /**
      * Register device with backend if not already registered.
-     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param environment SDK environment (0=DEVELOPMENT, 2=PRODUCTION)
      * @param buildToken Optional build token for development mode
      */
     @JvmStatic
@@ -996,34 +996,6 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
 
     /**
-     * Check if development config is available (has Supabase credentials configured).
-     * @return true if dev config is available
-     */
-    @JvmStatic
-    external fun racDevConfigIsAvailable(): Boolean
-
-    /**
-     * Get Supabase URL for development mode.
-     * @return Supabase URL or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseUrl(): String?
-
-    /**
-     * Get Supabase anon key for development mode.
-     * @return Supabase anon key or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseKey(): String?
-
-    /**
-     * Get build token for development mode.
-     * @return Build token or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetBuildToken(): String?
-
-    /**
      * Whether a baked-in credential is usable: non-empty and not a scaffolding
      * placeholder. Canonical commons rule shared by all SDKs.
      */
@@ -1043,7 +1015,7 @@ object RunAnywhereBridge {
      * This must be called during SDK initialization for device registration
      * to include the correct sdk_version (instead of "unknown").
      *
-     * @param environment Environment (0=development, 1=staging, 2=production)
+     * @param environment Environment (0=development, 2=production; 1 reserved)
      * @param deviceId Device ID string
      * @param platform Platform string (e.g., "android")
      * @param sdkVersion SDK version string (e.g., "0.1.0")
@@ -1509,10 +1481,6 @@ object RunAnywhereBridge {
     // `HTTPClientAdapter` to converge on the same canonical SDK header
     // list and structured API-error parsing Swift consumes, instead of
     // inlining the policy on the Kotlin side.
-    //
-    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
-    // commons does not expose an upsert-mode HTTP variant through the
-    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical
@@ -1580,7 +1548,7 @@ object RunAnywhereBridge {
 
     /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.
      *  Returns null on error. The 6-arg signature mirrors rac_sdk_config_t.
-     *  environment: 0 = DEVELOPMENT, 1 = STAGING, 2 = PRODUCTION. */
+     *  environment: 0 = DEVELOPMENT, 2 = PRODUCTION (1 reserved). */
     @JvmStatic external fun racAuthBuildAuthenticateRequest(
         apiKey: String,
         baseUrl: String,

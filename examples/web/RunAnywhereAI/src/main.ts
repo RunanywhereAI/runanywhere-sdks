@@ -767,8 +767,8 @@ function showLoadingScreen(): void {
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
         <defs>
           <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#FF5500"/>
-            <stop offset="100%" style="stop-color:#E64500"/>
+            <stop offset="0%" style="stop-color:#FF6900"/>
+            <stop offset="100%" style="stop-color:#FB2C36"/>
           </linearGradient>
         </defs>
         <circle cx="50" cy="50" r="45" fill="url(#logo-grad)" opacity="0.15"/>

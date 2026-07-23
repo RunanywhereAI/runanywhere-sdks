@@ -104,7 +104,6 @@ extension RASDKEnvironment {
         switch self {
         case .unspecified: return "unspecified"
         case .development: return "development"
-        case .staging: return "staging"
         case .production: return "production"
         default: return ""
         }
@@ -118,7 +117,6 @@ extension RASDKEnvironment {
         switch wireString.lowercased() {
         case "unspecified": return .unspecified
         case "development": return .development
-        case "staging": return .staging
         case "production": return .production
         default: return nil
         }

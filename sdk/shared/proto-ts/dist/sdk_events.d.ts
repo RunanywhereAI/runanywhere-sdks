@@ -704,6 +704,8 @@ export interface GenerationEvent {
     durationMs: number;
     /** InferenceFramework enum int */
     framework: number;
+    /** prompt eval (prefill) duration */
+    promptEvalTimeMs: number;
 }
 /**
  * ---------------------------------------------------------------------------

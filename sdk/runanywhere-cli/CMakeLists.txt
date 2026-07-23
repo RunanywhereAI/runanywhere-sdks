@@ -38,6 +38,7 @@ set(RCLI_SOURCES
     src/catalog/model_ref.cpp
     src/commands/cmd_version.cpp
     src/commands/cmd_info.cpp
+    src/commands/cmd_auth.cpp
     src/commands/cmd_backends.cpp
     src/commands/cmd_list.cpp
     src/commands/cmd_lora.cpp
@@ -51,12 +52,17 @@ set(RCLI_SOURCES
     src/commands/cmd_stt.cpp
     src/commands/cmd_diarize.cpp
     src/commands/cmd_embed.cpp
+    src/commands/cmd_telemetry.cpp
     src/commands/cmd_tts.cpp
     src/commands/cmd_vad.cpp
     src/commands/cmd_voice.cpp
+    src/commands/cmd_rag.cpp
+    src/commands/cmd_bench.cpp
     src/commands/engine_options.cpp
     src/commands/model_setup.cpp
     src/config/cli_paths.cpp
+    src/device_info.cpp
+    src/net/control_plane.cpp
     src/io/wav_io.cpp
     src/io/image_io.cpp
     src/io/output.cpp
@@ -89,6 +95,11 @@ target_include_directories(rcli_core PUBLIC
 target_link_libraries(rcli_core PUBLIC rac_commons)
 target_compile_features(rcli_core PUBLIC cxx_std_20)
 
+# macOS battery / memory sampling in device_info.cpp (IOKit + CoreFoundation).
+if(APPLE)
+    target_link_libraries(rcli_core PUBLIC "-framework IOKit" "-framework CoreFoundation")
+endif()
+
 # Version string: single source of truth is sdk/runanywhere-commons/VERSION,
 # already read into PROJECT_VERSION by the root CMakeLists.
 target_compile_definitions(rcli_core PUBLIC
@@ -111,6 +122,12 @@ if(NOT RAC_PROTOBUF_RUNTIME_ENABLED
                         "for the model-lifecycle proto ABI")
 endif()
 target_compile_definitions(rcli_core PUBLIC RAC_HAVE_PROTOBUF=1)
+# The RAG pipeline is folded into rac_commons only when RAC_BACKEND_RAG is ON
+# (it is OFF on the Windows CLI preset). rac_commons keeps RAC_HAVE_RAG PRIVATE,
+# so re-attach it here to gate the `rag` command's rac_rag_*_proto references.
+if(RAC_BACKEND_RAG)
+    target_compile_definitions(rcli_core PUBLIC RAC_HAVE_RAG=1)
+endif()
 if(RAC_PROTOBUF_NAMESPACE_ISOLATED)
     # Generated messages and the statically bundled runtime must use the same
     # private namespace token rewrite. rac_commons keeps this definition

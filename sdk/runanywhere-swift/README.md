@@ -248,7 +248,6 @@ try RunAnywhere.initialize(
 | Environment     | Description                                      |
 |-----------------|--------------------------------------------------|
 | `.development`  | Verbose logging, mock services, local analytics  |
-| `.staging`      | Testing with real services                       |
 | `.production`   | Minimal logging, full authentication, telemetry  |
 
 ### Generation Options

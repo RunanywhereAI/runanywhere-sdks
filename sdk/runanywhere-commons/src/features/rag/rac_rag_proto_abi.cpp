@@ -99,7 +99,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
                         int64_t top_k = 0, double retrieval_time_ms = 0.0,
                         const char* embedding_model = nullptr,
-                        rac_result_t error_code = RAC_SUCCESS, int reranker_used = -1) {
+                        rac_result_t error_code = RAC_SUCCESS, int reranker_used = -1,
+                        int64_t query_token_count = 0, int64_t context_tokens = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -148,6 +149,12 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (reranker_used >= 0) {
         (*event.mutable_properties())["reranker_used"] = reranker_used != 0 ? "1" : "0";
+    }
+    if (query_token_count > 0) {
+        (*event.mutable_properties())["query_token_count"] = std::to_string(query_token_count);
+    }
+    if (context_tokens > 0) {
+        (*event.mutable_properties())["context_tokens"] = std::to_string(context_tokens);
     }
     publish_event(event);
 }
@@ -517,12 +524,21 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     const int64_t effective_top_k =
         overrides.retrieval_top_k > 0 ? static_cast<int64_t>(overrides.retrieval_top_k)
                                       : static_cast<int64_t>(s->retrieval_top_k);
+    // Token counts use the same ~4-chars-per-token heuristic the RAG pipeline uses
+    // for its context budget (rag_pipeline_graph.cpp kCharsPerToken=4); there is no
+    // separate tokenizer at this ABI layer. query_token_count = the question;
+    // context_tokens = the assembled retrieved context passed to the LLM.
+    constexpr int64_t kCharsPerToken = 4;
+    const int64_t query_token_count = static_cast<int64_t>(question.size()) / kCharsPerToken;
+    const int64_t context_tokens =
+        static_cast<int64_t>(proto.context_used().size()) / kCharsPerToken;
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
                        "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
                        s->llm_model_id.empty() ? s->embedding_model_id.c_str()
                                                : s->llm_model_id.c_str(),
                        effective_top_k, retrieval_ms, s->embedding_model_id.c_str(),
-                       /*error_code=*/RAC_SUCCESS, /*reranker_used=*/s->rerank ? 1 : 0);
+                       /*error_code=*/RAC_SUCCESS, /*reranker_used=*/s->rerank ? 1 : 0,
+                       query_token_count, context_tokens);
     rac_llm_result_free(&llm_result);
     return RAC_SUCCESS;
 }

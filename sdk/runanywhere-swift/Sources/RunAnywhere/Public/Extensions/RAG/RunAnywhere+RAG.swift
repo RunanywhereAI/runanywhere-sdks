@@ -197,6 +197,16 @@ public extension RunAnywhere {
 
         return try await CppBridge.RAG.shared.runQueryStream(options)
     }
+
+    /// Immediately request cancellation of the active RAG query on the shared
+    /// session. Session-scoped, backed by `rac_rag_cancel_proto`: the in-flight
+    /// unary or streaming query ends with an ERROR event carrying the
+    /// cancellation status. Breaking out of a `ragQueryStream` already cancels
+    /// cooperatively — this is the explicit imperative form and mirrors the
+    /// cross-SDK `ragCancelQuery()` surface (Kotlin/React Native/Web).
+    static func ragCancelQuery() async {
+        await CppBridge.RAG.shared.cancelActiveQuery()
+    }
 }
 
 private extension RunAnywhere {

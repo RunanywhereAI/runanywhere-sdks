@@ -388,23 +388,28 @@ object CppBridge {
             // platform services. Auth and control-plane orchestration are
             // driven by rac_sdk_init_phase2_proto through the registered
             // OkHttp transport.
+            //
+            // Effective config from commons state, for every environment:
+            // staging resolves the baked keyless base URL, dev/prod use whatever
+            // the app passed. There is no direct-to-datastore (dev Supabase)
+            // path — the backend is always reached through this base URL, and
+            // auth stays in C++. Mirrors Swift's `_performServicesInitialization`
+            // Step 1.
             if (!HTTPClientAdapter.isConfigured) {
+                val effectiveBaseUrl =
+                    RunAnywhereBridge.racStateGetBaseUrl()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: CppBridgeTelemetry.getBaseUrl()
+                val apiKey = CppBridgeTelemetry.getApiKey()
                 val configured =
-                    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                        CppBridgeDevConfig.configureHTTP()
+                    if (!effectiveBaseUrl.isNullOrEmpty() &&
+                        CppBridgeDevConfig.isUsableHTTPURL(effectiveBaseUrl)
+                    ) {
+                        HTTPClientAdapter.configure(effectiveBaseUrl, apiKey)
+                        true
                     } else {
-                        val baseUrl = CppBridgeTelemetry.getBaseUrl()
-                        val apiKey = CppBridgeTelemetry.getApiKey()
-                        if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
-                            HTTPClientAdapter.configure(baseUrl, apiKey)
-                            true
-                        } else {
-                            logger.warn(
-                                "HTTP adapter NOT configured: baseUrl present=${!baseUrl.isNullOrEmpty()}, " +
-                                    "apiKey present=${!apiKey.isNullOrEmpty()}",
-                            )
-                            false
-                        }
+                        logger.debug("HTTP adapter disabled: no usable external config")
+                        false
                     }
                 logger.info(
                     "Phase 2 HTTP adapter configuration: configured=$configured " +

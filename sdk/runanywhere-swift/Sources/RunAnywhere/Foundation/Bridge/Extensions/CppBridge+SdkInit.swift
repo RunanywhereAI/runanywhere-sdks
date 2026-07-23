@@ -146,7 +146,6 @@ extension CppBridge {
         private static func mapEnvironment(_ env: SDKEnvironment) -> RASdkInitEnvironment {
             switch env {
             case .development: return .development
-            case .staging:     return .staging
             case .production:  return .production
             default:           return .development
             }

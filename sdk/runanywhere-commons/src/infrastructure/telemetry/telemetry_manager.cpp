@@ -5,6 +5,7 @@
  * Handles event queuing, batching by modality, and HTTP callbacks.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -16,7 +17,10 @@
 #include <string>
 #include <vector>
 
+#include "../device/rac_device_live_state_internal.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_sdk_state.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -73,6 +77,34 @@ struct rac_telemetry_manager {
     // platform that never drains (Flutter isolate gone) grew it without limit.
     static constexpr size_t MAX_HTTP_QUEUE_SIZE = 64;
     int64_t last_flush_time_ms = 0;  // Track last flush time for timeout
+
+    // Live device-state snapshot cached across events. Sampling goes through
+    // the device manager's platform callback (JNI/Swift/FFI), so a short TTL
+    // bounds the cost without staling benchmark-relevant readings.
+    static constexpr int64_t LIVE_STATE_TTL_MS = 5000;
+    std::mutex live_state_mutex;
+    rac_device_live_state_t live_state_cache = {};
+    int64_t live_state_sampled_ms = 0;
+    bool live_state_valid = false;
+
+    // Bounded HTTP retry. Sent batches sit in `inflight` until the platform
+    // reports the outcome via rac_telemetry_manager_http_complete; failures
+    // move to `retry_queue` with exponential backoff and re-send on a later
+    // flush. Safe at-least-once: the backend dedupes on the per-event unique
+    // id, so a batch retried after an ambiguous failure never double-counts.
+    struct PendingBatch {
+        std::string endpoint;
+        std::string json;
+        int attempts = 0;
+        int64_t next_attempt_ms = 0;
+    };
+    std::deque<PendingBatch> inflight;
+    std::deque<PendingBatch> retry_queue;
+    std::mutex retry_mutex;
+    static constexpr int MAX_SEND_ATTEMPTS = 3;
+    static constexpr size_t MAX_RETRY_QUEUE = 16;
+    static constexpr size_t MAX_INFLIGHT = 16;
+    static constexpr int64_t RETRY_BASE_DELAY_MS = 5000;
 };
 
 // =============================================================================
@@ -144,6 +176,8 @@ void free_payload_strings(rac_telemetry_payload_t& event) {
     free((void*)event.scheduler);
     free((void*)event.output_format);
     free((void*)event.routed_backend);
+    free((void*)event.sdk_binding);
+    free((void*)event.battery_state);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -350,6 +384,104 @@ rac_result_t rac_telemetry_manager_poll_http_request(rac_telemetry_manager_t* ma
 // EVENT TRACKING
 // =============================================================================
 
+std::atomic<bool> g_live_platform_sampling{false};
+
+extern "C" void rac_telemetry_enable_live_platform_sampling(void) {
+    g_live_platform_sampling.store(true, std::memory_order_relaxed);
+}
+
+// Pushed live state for bridges whose callbacks are not thread-safe from
+// telemetry threads (Dart FFI is isolate-bound): the platform pushes fresh
+// values from its own thread and stamping only ever reads this cache.
+namespace {
+std::mutex g_pushed_state_mutex;
+rac_device_live_state_t g_pushed_state = {};
+bool g_pushed_state_valid = false;
+}  // namespace
+
+extern "C" void rac_telemetry_push_live_device_state(double battery_level,
+                                                     const char* battery_state,
+                                                     rac_bool_t is_low_power_mode,
+                                                     int64_t total_memory,
+                                                     int64_t available_memory) {
+    std::lock_guard<std::mutex> lock(g_pushed_state_mutex);
+    g_pushed_state = {};
+    g_pushed_state.battery_level = battery_level;
+    if (battery_state != nullptr && battery_state[0] != '\0') {
+        strncpy(g_pushed_state.battery_state, battery_state,
+                sizeof(g_pushed_state.battery_state) - 1);
+    }
+    g_pushed_state.is_low_power_mode = is_low_power_mode;
+    g_pushed_state.has_low_power_mode = RAC_TRUE;
+    g_pushed_state.total_memory = total_memory;
+    g_pushed_state.available_memory = available_memory;
+    g_pushed_state_valid = true;
+}
+
+namespace {
+
+// Stamp SDK origin + a live device snapshot onto the queued copy. Battery and
+// registration-derived memory come from the device manager callback behind a
+// short TTL cache; RAM is refreshed from the platform adapter when the
+// optional get_memory_info slot exists; CPU state is read in-process. Every
+// source degrades to unknown sentinels — tracking never fails on this path.
+void stamp_live_device_state(rac_telemetry_manager_t* manager, rac_telemetry_payload_t& copy) {
+    const rac_client_info_t* client_info = rac_sdk_get_client_info();
+    if (client_info && client_info->sdk_binding && client_info->sdk_binding[0] != '\0') {
+        copy.sdk_binding = dup_string(client_info->sdk_binding);
+    }
+
+    rac_device_live_state_t state = {};
+    bool have_state = false;
+    {
+        std::lock_guard<std::mutex> lock(g_pushed_state_mutex);
+        if (g_pushed_state_valid) {
+            state = g_pushed_state;
+            have_state = true;
+        }
+    }
+    if (!have_state && g_live_platform_sampling.load(std::memory_order_relaxed)) {
+        std::lock_guard<std::mutex> lock(manager->live_state_mutex);
+        const int64_t now = get_current_timestamp_ms();
+        if (manager->live_state_valid &&
+            (now - manager->live_state_sampled_ms) < rac_telemetry_manager::LIVE_STATE_TTL_MS) {
+            state = manager->live_state_cache;
+            have_state = true;
+        } else if (rac_device_manager_sample_live_state(&state) == RAC_SUCCESS) {
+            manager->live_state_cache = state;
+            manager->live_state_sampled_ms = now;
+            manager->live_state_valid = true;
+            have_state = true;
+        }
+    }
+    if (have_state) {
+        copy.battery_level = state.battery_level;
+        if (state.battery_state[0] != '\0') {
+            copy.battery_state = dup_string(state.battery_state);
+        }
+        copy.is_low_power_mode = state.is_low_power_mode;
+        copy.has_is_low_power_mode = state.has_low_power_mode;
+        copy.total_memory = state.total_memory;
+        copy.available_memory = state.available_memory;
+    }
+
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (g_live_platform_sampling.load(std::memory_order_relaxed) && adapter &&
+        adapter->get_memory_info) {
+        rac_memory_info_t mem = {};
+        if (adapter->get_memory_info(&mem, adapter->user_data) == RAC_SUCCESS &&
+            mem.total_bytes > 0) {
+            copy.total_memory = static_cast<int64_t>(mem.total_bytes);
+            copy.available_memory = static_cast<int64_t>(mem.available_bytes);
+        }
+    }
+
+    copy.cpu_usage_percent = rac_cpu_sample_usage_percent();
+    copy.online_core_count = rac_cpu_online_core_count();
+}
+
+}  // namespace
+
 rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
                                          const rac_telemetry_payload_t* payload) {
     if (!manager || !payload) {
@@ -358,6 +490,7 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
 
     // Deep copy payload for queue
     rac_telemetry_payload_t copy = *payload;
+    stamp_live_device_state(manager, copy);
     copy.id = dup_string(payload->id);
     copy.event_type = dup_string(payload->event_type);
     copy.modality = dup_string(payload->modality);
@@ -924,6 +1057,7 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.has_processing_time_ms = RAC_TRUE;
             payload.generation_time_ms = dur;
             payload.tokens_per_second = g.tokens_per_second();
+            payload.prompt_eval_time_ms = static_cast<double>(g.prompt_eval_time_ms());
             payload.time_to_first_token_ms = g.time_to_first_token_ms() != 0
                                                  ? static_cast<double>(g.time_to_first_token_ms())
                                                  : static_cast<double>(g.first_token_latency_ms());
@@ -1195,6 +1329,10 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (vet_it != ev.properties().end()) {
                         payload.vision_encode_time_ms = std::atof(vet_it->second.c_str());
                     }
+                    auto pe_it = ev.properties().find("prompt_eval_time_ms");
+                    if (pe_it != ev.properties().end()) {
+                        payload.prompt_eval_time_ms = std::atof(pe_it->second.c_str());
+                    }
                     auto ir_it = ev.properties().find("image_resolution");
                     if (ir_it != ev.properties().end() && !ir_it->second.empty()) {
                         payload.image_resolution = ir_it->second.c_str();
@@ -1223,6 +1361,16 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                         payload.reranker_used = rr_it->second == "1" ? RAC_TRUE : RAC_FALSE;
                         payload.has_reranker_used = RAC_TRUE;
                     }
+                    auto qtc_it = ev.properties().find("query_token_count");
+                    if (qtc_it != ev.properties().end()) {
+                        payload.query_token_count =
+                            static_cast<int32_t>(std::atoi(qtc_it->second.c_str()));
+                    }
+                    auto ctx_it = ev.properties().find("context_tokens");
+                    if (ctx_it != ev.properties().end()) {
+                        payload.context_tokens =
+                            static_cast<int32_t>(std::atoi(ctx_it->second.c_str()));
+                    }
                     break;
                 }
                 case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS: {
@@ -1235,6 +1383,15 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     if (dim_it != ev.properties().end()) {
                         payload.embedding_dimension =
                             static_cast<int32_t>(std::atoi(dim_it->second.c_str()));
+                    }
+                    auto etot_it = ev.properties().find("total_tokens");
+                    if (etot_it != ev.properties().end()) {
+                        payload.total_tokens =
+                            static_cast<int32_t>(std::atoi(etot_it->second.c_str()));
+                    }
+                    auto bs_it = ev.properties().find("batch_size");
+                    if (bs_it != ev.properties().end()) {
+                        payload.batch_size = static_cast<int32_t>(std::atoi(bs_it->second.c_str()));
                     }
                     break;
                 }
@@ -1390,8 +1547,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.has_success = RAC_TRUE;
         } else if (ends_with(".completed") || ends_with(".loaded") || ends_with(".deleted") ||
                    ends_with(".cleared") || ends_with(".cleaned") || ends_with(".registered") ||
-                   ends_with(".stopped") || ends_with(".succeeded") || ends_with(".authenticated") ||
-                   ends_with(".refreshed") || ends_with(".token_refreshed")) {
+                   ends_with(".stopped") || ends_with(".succeeded") ||
+                   ends_with(".authenticated") || ends_with(".refreshed") ||
+                   ends_with(".token_refreshed")) {
             // ".succeeded"/".authenticated"/".refreshed"/".token_refreshed" cover the
             // auth lifecycle (auth.succeeded, auth.token_refreshed) whose success flag
             // was otherwise left null on the system row.
@@ -1424,6 +1582,46 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
 // FLUSH
 // =============================================================================
 
+namespace {
+
+// Deliver one serialized batch and record it in the in-flight window so
+// rac_telemetry_manager_http_complete can retry it on failure. Delivery is
+// FIFO per manager (URLSession/OkHttp callbacks preserve submission order for
+// these sequential posts), so completions are matched front-of-queue; a
+// mismatch only re-sends a real batch, which the backend dedupes by event id.
+void send_batch_json(rac_telemetry_manager_t* manager, const std::string& endpoint,
+                     const char* json, size_t json_len, int attempts) {
+    {
+        std::lock_guard<std::mutex> lock(manager->retry_mutex);
+        while (manager->inflight.size() >= rac_telemetry_manager::MAX_INFLIGHT) {
+            // Platform never reported these completions — age them out.
+            manager->inflight.pop_front();
+        }
+        manager->inflight.push_back({endpoint, std::string(json, json_len), attempts, 0});
+    }
+
+    if (manager->http_wakeup) {
+        // Isolate-safe path: enqueue an owned copy and signal the platform to
+        // drain it from its own thread/isolate (see poll_http_request). Used
+        // by Flutter, whose Dart FFI data callbacks are isolate-bound.
+        {
+            std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
+            while (manager->http_queue.size() >= rac_telemetry_manager::MAX_HTTP_QUEUE_SIZE) {
+                RAC_LOG_WARNING("Telemetry",
+                                "HTTP queue full (%zu) — dropping oldest pending batch",
+                                manager->http_queue.size());
+                manager->http_queue.pop_front();
+            }
+            manager->http_queue.push_back({endpoint, std::string(json, json_len), true});
+        }
+        manager->http_wakeup(manager->http_wakeup_user_data);
+    } else if (manager->http_callback) {
+        manager->http_callback(manager->http_user_data, endpoint.c_str(), json, json_len, RAC_TRUE);
+    }
+}
+
+}  // namespace
+
 rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     if (!manager) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -1437,8 +1635,11 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     // The V2 telemetry endpoints only accept a JWT; flushing before
     // authentication would 401 and silently drop the batch (the HTTP callback
     // is fire-and-forget). Keep events queued — rac_auth_handle_*_response
-    // kicks a flush the moment a token lands.
-    if (rac_env_requires_auth(manager->environment) && !rac_auth_is_authenticated()) {
+    // kicks a flush the moment a token lands. Keyless staging never expects a
+    // token: events flush unauthenticated and the backend attributes them to
+    // the PUBLIC org.
+    if (rac_env_auth_expected(manager->environment, rac_state_get_api_key()) &&
+        !rac_auth_is_authenticated()) {
         size_t queued = 0;
         {
             std::lock_guard<std::mutex> lock(manager->queue_mutex);
@@ -1449,6 +1650,31 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
                           queued);
         }
         return RAC_SUCCESS;
+    }
+
+    // Re-send batches whose earlier delivery failed once their backoff has
+    // elapsed — runs even when no new events are queued.
+    {
+        std::vector<rac_telemetry_manager::PendingBatch> due;
+        {
+            std::lock_guard<std::mutex> lock(manager->retry_mutex);
+            const int64_t now = get_current_timestamp_ms();
+            auto it = manager->retry_queue.begin();
+            while (it != manager->retry_queue.end()) {
+                if (it->next_attempt_ms <= now) {
+                    due.push_back(std::move(*it));
+                    it = manager->retry_queue.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        for (auto& batch : due) {
+            RAC_LOG_DEBUG("Telemetry", "Retrying telemetry batch (attempt %d): %s",
+                          batch.attempts + 1, batch.endpoint.c_str());
+            send_batch_json(manager, batch.endpoint, batch.json.c_str(), batch.json.size(),
+                            batch.attempts);
+        }
     }
 
     // Get events from queue
@@ -1505,25 +1731,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
         const std::string endpoint = std::string(RAC_ENDPOINT_TELEMETRY_V2_PREFIX) + modality;
         RAC_LOG_DEBUG("Telemetry", "POST %s (%zu bytes): %.500s", endpoint.c_str(), json_len, json);
-        if (manager->http_wakeup) {
-            // Isolate-safe path: enqueue an owned copy and signal the platform to
-            // drain it from its own thread/isolate (see poll_http_request). Used
-            // by Flutter, whose Dart FFI data callbacks are isolate-bound.
-            {
-                std::lock_guard<std::mutex> lock(manager->http_queue_mutex);
-                while (manager->http_queue.size() >= rac_telemetry_manager::MAX_HTTP_QUEUE_SIZE) {
-                    RAC_LOG_WARNING("Telemetry",
-                                    "HTTP queue full (%zu) — dropping oldest pending batch",
-                                    manager->http_queue.size());
-                    manager->http_queue.pop_front();
-                }
-                manager->http_queue.push_back({endpoint, std::string(json, json_len), true});
-            }
-            manager->http_wakeup(manager->http_wakeup_user_data);
-        } else if (manager->http_callback) {
-            manager->http_callback(manager->http_user_data, endpoint.c_str(), json, json_len,
-                                   RAC_TRUE);
-        }
+        send_batch_json(manager, endpoint, json, json_len, 0);
         free(json);
     }
 
@@ -1554,12 +1762,42 @@ void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_b
     if (!manager)
         return;
 
-    if (success == RAC_TRUE) {
-        RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
-    } else {
-        RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",
-                        error_message ? error_message : "unknown");
+    rac_telemetry_manager::PendingBatch batch;
+    bool have_batch = false;
+    {
+        std::lock_guard<std::mutex> lock(manager->retry_mutex);
+        if (!manager->inflight.empty()) {
+            batch = std::move(manager->inflight.front());
+            manager->inflight.pop_front();
+            have_batch = true;
+        }
     }
 
-    // Could parse response and handle retries here if needed
+    if (success == RAC_TRUE) {
+        RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
+        return;
+    }
+
+    RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",
+                    error_message ? error_message : "unknown");
+    if (!have_batch) {
+        return;
+    }
+
+    batch.attempts += 1;
+    if (batch.attempts >= rac_telemetry_manager::MAX_SEND_ATTEMPTS) {
+        RAC_LOG_WARNING("Telemetry", "Dropping telemetry batch after %d failed attempts: %s",
+                        batch.attempts, batch.endpoint.c_str());
+        return;
+    }
+
+    // Exponential backoff: 5s, 10s, ... — re-sent by a later flush.
+    batch.next_attempt_ms = get_current_timestamp_ms() +
+                            (rac_telemetry_manager::RETRY_BASE_DELAY_MS << (batch.attempts - 1));
+    std::lock_guard<std::mutex> lock(manager->retry_mutex);
+    while (manager->retry_queue.size() >= rac_telemetry_manager::MAX_RETRY_QUEUE) {
+        RAC_LOG_WARNING("Telemetry", "Retry queue full — dropping oldest pending batch");
+        manager->retry_queue.pop_front();
+    }
+    manager->retry_queue.push_back(std::move(batch));
 }

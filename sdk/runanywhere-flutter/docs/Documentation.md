@@ -435,7 +435,7 @@ All public API types are protobuf-generated from `idl/*.proto`. They live under
 
 | Type | Proto enum values |
 |------|-------------------|
-| `SDKEnvironment` | `SDK_ENVIRONMENT_DEVELOPMENT`, `SDK_ENVIRONMENT_STAGING`, `SDK_ENVIRONMENT_PRODUCTION` |
+| `SDKEnvironment` | `SDK_ENVIRONMENT_DEVELOPMENT`, `SDK_ENVIRONMENT_PRODUCTION` |
 | `InferenceFramework` | `INFERENCE_FRAMEWORK_LLAMA_CPP`, `INFERENCE_FRAMEWORK_MLX`, `INFERENCE_FRAMEWORK_SHERPA`, `INFERENCE_FRAMEWORK_ONNX`, `INFERENCE_FRAMEWORK_SYSTEM_TTS`, ... |
 | `ModelCategory` | `MODEL_CATEGORY_LANGUAGE`, `MODEL_CATEGORY_SPEECH_RECOGNITION`, `MODEL_CATEGORY_SPEECH_SYNTHESIS`, `MODEL_CATEGORY_MULTIMODAL`, `MODEL_CATEGORY_EMBEDDING`, `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION`, ... |
 | `DownloadStage` | `DOWNLOAD_STAGE_UNSPECIFIED`, `DOWNLOAD_STAGE_DOWNLOADING`, `DOWNLOAD_STAGE_EXTRACTING`, `DOWNLOAD_STAGE_COMPLETED` |
@@ -486,8 +486,7 @@ The event stream is a pure `dart:async` broadcast stream. (`rxdart` is not a dep
 
 ```dart
 enum SDKEnvironment {
-  SDK_ENVIRONMENT_DEVELOPMENT,  // local-only, verbose logging, no auth
-  SDK_ENVIRONMENT_STAGING,      // real services for testing
+  SDK_ENVIRONMENT_DEVELOPMENT,  // keyless OSS, verbose logging, no auth
   SDK_ENVIRONMENT_PRODUCTION,   // minimal logging, full auth, telemetry
 }
 ```

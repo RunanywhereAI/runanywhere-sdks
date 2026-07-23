@@ -28,6 +28,21 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
                    "RunAnywhere home directory (default: $RUNANYWHERE_HOME or "
                    "~/.local/share/runanywhere; models live under <home>/Models)");
 
+    // Control-plane connection. validation happens in resolve_connection().
+    app.add_option("--environment", options.environment,
+                   "SDK environment: development (default, keyless OSS → baked staging "
+                   "backend) or production (API key + https URL).")
+        ->envname("RUNANYWHERE_ENVIRONMENT")
+        ->check(CLI::IsMember({"dev", "development", "prod", "production"}));
+    app.add_option("--base-url", options.base_url,
+                   "Backend base URL. Optional in development (baked staging URL). "
+                   "Required https for production.")
+        ->envname("RUNANYWHERE_BASE_URL");
+    app.add_option("--api-key", options.api_key,
+                   "Control-plane API key (required for production; omit for "
+                   "keyless development)")
+        ->envname("RUNANYWHERE_API_KEY");
+
     commands::register_version(app, options);
     commands::register_info(app, options);
     commands::register_backends(app, options);
@@ -45,7 +60,11 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     commands::register_tts(app, options);
     commands::register_vad(app, options);
     commands::register_voice(app, options);
+    commands::register_rag(app, options);
+    commands::register_bench(app, options);
     commands::register_serve(app, options);
+    commands::register_auth(app, options);
+    commands::register_telemetry(app, options);
 }
 
 int run(int argc, char** argv) {

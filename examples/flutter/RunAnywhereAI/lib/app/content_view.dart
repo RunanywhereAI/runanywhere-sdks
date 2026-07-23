@@ -61,7 +61,7 @@ class _ContentViewState extends State<ContentView> {
         // accessibility tap-target bounds match the visible icon centres
         // and the "Transcribe" label doesn't truncate.
         height: 80,
-        indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+        indicatorColor: AppColors.primaryAccent.withValues(alpha: 0.2),
         onDestinationSelected: (index) {
           setState(() {
             _selectedTab = index;

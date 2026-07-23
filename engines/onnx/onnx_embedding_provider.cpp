@@ -550,7 +550,7 @@ class ONNXEmbeddingProvider::Impl {
 
     ~Impl() = default;
 
-    std::vector<float> embed(const std::string& text) {
+    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr) {
         if (!ready_) {
             LOGE("Embedding provider not ready");
             return {};
@@ -560,6 +560,10 @@ class ONNXEmbeddingProvider::Impl {
 
         try {
             auto token_ids = tokenizer_.encode_unpadded(text, max_seq_length_);
+            const size_t real_tokens = token_ids.size();
+            if (out_total_tokens) {
+                *out_total_tokens = real_tokens;
+            }
             const size_t pad_length = align_up(token_ids.size(), 8);
             tokenizer_.pad_to(token_ids, pad_length);
 
@@ -630,14 +634,18 @@ class ONNXEmbeddingProvider::Impl {
         }
     }
 
-    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts) {
+    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
+                                                size_t* out_total_tokens = nullptr) {
+        if (out_total_tokens) {
+            *out_total_tokens = 0;
+        }
         if (texts.empty()) {
             return {};
         }
 
         // Delegate to single embed for batch_size == 1
         if (texts.size() == 1) {
-            return {embed(texts[0])};
+            return {embed(texts[0], out_total_tokens)};
         }
 
         if (!ready_) {
@@ -649,6 +657,7 @@ class ONNXEmbeddingProvider::Impl {
 
         std::vector<std::vector<float>> all_results;
         all_results.reserve(texts.size());
+        size_t total_tokens = 0;
 
         for (size_t offset = 0; offset < texts.size(); offset += kMaxSubBatchSize) {
             size_t sub_batch_size = std::min(kMaxSubBatchSize, texts.size() - offset);
@@ -656,15 +665,21 @@ class ONNXEmbeddingProvider::Impl {
             LOGI("Embedding sub-batch %zu/%zu (size=%zu)", offset / kMaxSubBatchSize + 1,
                  (texts.size() + kMaxSubBatchSize - 1) / kMaxSubBatchSize, sub_batch_size);
 
-            auto sub_results = embed_sub_batch(texts, offset, sub_batch_size);
+            size_t sub_tokens = 0;
+            auto sub_results = embed_sub_batch(texts, offset, sub_batch_size, &sub_tokens);
             if (sub_results.empty()) {
                 LOGE("Sub-batch embedding failed at offset %zu", offset);
                 return {};
             }
+            total_tokens += sub_tokens;
 
             for (auto& r : sub_results) {
                 all_results.push_back(std::move(r));
             }
+        }
+
+        if (out_total_tokens) {
+            *out_total_tokens = total_tokens;
         }
 
         LOGI("Generated batch embeddings: count=%zu, dim=%zu", all_results.size(), embedding_dim_);
@@ -684,14 +699,20 @@ class ONNXEmbeddingProvider::Impl {
     }
 
     std::vector<std::vector<float>> embed_sub_batch(const std::vector<std::string>& texts,
-                                                    size_t offset, size_t count) {
+                                                    size_t offset, size_t count,
+                                                    size_t* out_total_tokens = nullptr) {
         try {
             std::vector<std::vector<int64_t>> all_token_ids(count);
             size_t max_actual_len = 0;
+            size_t total_tokens = 0;
 
             for (size_t i = 0; i < count; ++i) {
                 all_token_ids[i] = tokenizer_.encode_unpadded(texts[offset + i], max_seq_length_);
                 max_actual_len = std::max(max_actual_len, all_token_ids[i].size());
+                total_tokens += all_token_ids[i].size();
+            }
+            if (out_total_tokens) {
+                *out_total_tokens = total_tokens;
             }
 
             const size_t pad_length = align_up(max_actual_len, 8);
@@ -863,13 +884,13 @@ ONNXEmbeddingProvider::~ONNXEmbeddingProvider() = default;
 ONNXEmbeddingProvider::ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept = default;
 ONNXEmbeddingProvider& ONNXEmbeddingProvider::operator=(ONNXEmbeddingProvider&&) noexcept = default;
 
-std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text) {
-    return impl_->embed(text);
+std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text, size_t* out_total_tokens) {
+    return impl_->embed(text, out_total_tokens);
 }
 
 std::vector<std::vector<float>>
-ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts) {
-    return impl_->embed_batch(texts);
+ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts, size_t* out_total_tokens) {
+    return impl_->embed_batch(texts, out_total_tokens);
 }
 
 size_t ONNXEmbeddingProvider::dimension() const noexcept {

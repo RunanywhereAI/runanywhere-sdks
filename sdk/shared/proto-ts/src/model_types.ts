@@ -510,19 +510,14 @@ export function modelCategoryToJSON(object: ModelCategory): string {
 
 /**
  * ---------------------------------------------------------------------------
- * SDK environment. Sources pre-IDL:
- *   Swift  SDKEnvironment.swift:5     (development, staging, production)
- *   Kotlin RunAnywhere.kt:47          (DEVELOPMENT, STAGING, PRODUCTION, cEnvironment)
- *   Kotlin SDKLogger.kt:159           (DEVELOPMENT, STAGING, PRODUCTION) ← duplicate
- *   Dart   sdk_environment.dart:5     (development, staging, production)
- *   RN     enums.ts:11                (Development, Staging, Production)
- *   Web    enums.ts:9                 (Development, Staging, Production)
+ * SDK environment — product surface is development + production only.
+ * Number 2 was formerly SDK_ENVIRONMENT_STAGING; reserved so wire values
+ * never shift PRODUCTION=3.
  * ---------------------------------------------------------------------------
  */
 export enum SDKEnvironment {
   SDK_ENVIRONMENT_UNSPECIFIED = 0,
   SDK_ENVIRONMENT_DEVELOPMENT = 1,
-  SDK_ENVIRONMENT_STAGING = 2,
   SDK_ENVIRONMENT_PRODUCTION = 3,
   UNRECOGNIZED = -1,
 }
@@ -535,9 +530,6 @@ export function sDKEnvironmentFromJSON(object: any): SDKEnvironment {
     case 1:
     case "SDK_ENVIRONMENT_DEVELOPMENT":
       return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    case 2:
-    case "SDK_ENVIRONMENT_STAGING":
-      return SDKEnvironment.SDK_ENVIRONMENT_STAGING;
     case 3:
     case "SDK_ENVIRONMENT_PRODUCTION":
       return SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
@@ -554,8 +546,6 @@ export function sDKEnvironmentToJSON(object: SDKEnvironment): string {
       return "SDK_ENVIRONMENT_UNSPECIFIED";
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       return "SDK_ENVIRONMENT_DEVELOPMENT";
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return "SDK_ENVIRONMENT_STAGING";
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return "SDK_ENVIRONMENT_PRODUCTION";
     case SDKEnvironment.UNRECOGNIZED:

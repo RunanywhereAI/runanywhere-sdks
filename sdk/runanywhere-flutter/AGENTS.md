@@ -115,7 +115,7 @@ iOS requires `use_frameworks! :linkage => :static` in the Podfile and `-all_load
 await RunAnywhere.initialize(
   apiKey: 'optional',
   baseURL: 'optional',
-  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT, // or SDK_ENVIRONMENT_STAGING, SDK_ENVIRONMENT_PRODUCTION
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT, // or SDK_ENVIRONMENT_PRODUCTION
 );
 
 // Capability accessors (shared capability instances)

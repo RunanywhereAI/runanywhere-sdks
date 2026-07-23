@@ -75,15 +75,18 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         await RunAnywhere.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
-          // Staging (not Production) so the custom base URL is honored AND
-          // local logging stays on — Production sets enableLocalLogging:false,
-          // hiding all SDK/telemetry logs. Development would ignore baseURL.
-          environment: SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+          // Production + explicit creds — same proven path as the Android
+          // example (custom URL honored, full bearer auth + registration).
+          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
-        debugPrint('✅ SDK initialized with CUSTOM configuration (staging)');
+        debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
       } else {
-        await RunAnywhere.initialize();
-        debugPrint('✅ SDK initialized in DEVELOPMENT mode');
+        // No credentials supplied: development without a key — telemetry and
+        // registration stay local-only until credentials are provided.
+        await RunAnywhere.initialize(
+          environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+        );
+        debugPrint('✅ SDK initialized in DEVELOPMENT mode (keyless)');
       }
 
       // Re-apply the persisted HuggingFace token (Settings screen) so private
@@ -218,20 +221,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryBlue,
+          seedColor: AppColors.brandOrange,
           brightness: Brightness.light,
-        ),
+        ).copyWith(primary: AppColors.brandOrange),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         navigationBarTheme: NavigationBarThemeData(
-          indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+          indicatorColor: AppColors.primaryAccent.withValues(alpha: 0.2),
         ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primaryBlue,
+          seedColor: AppColors.brandOrange,
           brightness: Brightness.dark,
-        ),
+        ).copyWith(primary: AppColors.brandOrange),
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),

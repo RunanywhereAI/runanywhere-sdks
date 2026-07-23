@@ -435,6 +435,7 @@ message GenerationEvent {
     string              model_name               = 31;
     double              duration_ms              = 32;   // wall-clock generation duration
     int32               framework                = 33;   // InferenceFramework enum int
+    int64               prompt_eval_time_ms      = 34;   // prompt eval (prefill) duration
 }
 
 enum GenerationEventKind {

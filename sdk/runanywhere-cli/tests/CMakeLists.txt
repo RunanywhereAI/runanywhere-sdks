@@ -14,6 +14,16 @@ target_include_directories(test_rcli_segment PRIVATE
 target_link_libraries(test_rcli_segment PRIVATE rcli_core)
 add_test(NAME rcli_segment_tests COMMAND test_rcli_segment --run-all)
 
+# Live telemetry integration — real authenticated POST per modality against the
+# configured backend. Opt-in: no-ops without `--live` + creds, so it stays safe
+# in ctest/CI. Links rcli_core for bootstrap() + the HTTP transport + auth.
+add_executable(test_rcli_telemetry_live test_rcli_telemetry_live.cpp)
+target_include_directories(test_rcli_telemetry_live PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/tests
+)
+target_link_libraries(test_rcli_telemetry_live PRIVATE rcli_core)
+add_test(NAME rcli_telemetry_live_tests COMMAND test_rcli_telemetry_live)
+
 if(TARGET rac_backend_mlx)
     add_executable(test_rcli_mlx_e2e test_rcli_mlx_e2e.cpp)
     target_include_directories(test_rcli_mlx_e2e PRIVATE

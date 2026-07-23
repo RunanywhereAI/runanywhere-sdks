@@ -9,6 +9,9 @@
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/CloudSttProvider.kt|kotlin:org-json-usage
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/Cloud.kt|kotlin:org-json-usage
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt|kotlin:json-serialisation
+# Web-search tool parses the external DuckDuckGo JSON response (not an SDK DTO);
+# mirrors the already-allowlisted Swift RunAnywhere+WebSearchTool.swift.
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereWebSearchTool.kt|kotlin:json-serialisation
 
 # Swift public value types and typed JSON boundaries.
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:types-dto-file

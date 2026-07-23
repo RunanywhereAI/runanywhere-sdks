@@ -8,9 +8,11 @@
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
+import {
+  typography,
+  useThemedStyles,
+  type ColorScheme,
+} from '../../theme/system';
 
 interface TypingIndicatorProps {
   /** Label text */
@@ -20,6 +22,7 @@ interface TypingIndicatorProps {
 export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   label = 'AI is thinking...',
 }) => {
+  const styles = useThemedStyles(createStyles);
   // Animation values for each dot
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -87,36 +90,37 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'flex-start',
-    paddingHorizontal: Padding.padding16,
-    marginVertical: Spacing.xSmall,
-  },
-  bubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: BorderRadius.xLarge,
-    borderBottomLeftRadius: BorderRadius.small,
-    paddingHorizontal: Padding.padding14,
-    paddingVertical: Padding.padding10,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    gap: Spacing.xSmall,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.textSecondary,
-  },
-  label: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      alignItems: 'flex-start',
+      paddingHorizontal: 16,
+      marginVertical: 4,
+    },
+    bubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.surfaceContainerHighest,
+      borderRadius: 16,
+      borderBottomLeftRadius: 4,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    dotsContainer: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.onSurfaceVariant,
+    },
+    label: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+  });
 
 export default TypingIndicator;

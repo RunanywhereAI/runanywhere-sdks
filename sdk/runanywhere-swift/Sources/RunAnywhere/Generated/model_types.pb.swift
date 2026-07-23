@@ -436,19 +436,14 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
 }
 
 /// ---------------------------------------------------------------------------
-/// SDK environment. Sources pre-IDL:
-///   Swift  SDKEnvironment.swift:5     (development, staging, production)
-///   Kotlin RunAnywhere.kt:47          (DEVELOPMENT, STAGING, PRODUCTION, cEnvironment)
-///   Kotlin SDKLogger.kt:159           (DEVELOPMENT, STAGING, PRODUCTION) ← duplicate
-///   Dart   sdk_environment.dart:5     (development, staging, production)
-///   RN     enums.ts:11                (Development, Staging, Production)
-///   Web    enums.ts:9                 (Development, Staging, Production)
+/// SDK environment — product surface is development + production only.
+/// Number 2 was formerly SDK_ENVIRONMENT_STAGING; reserved so wire values
+/// never shift PRODUCTION=3.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case development // = 1
-  case staging // = 2
   case production // = 3
   case UNRECOGNIZED(Int)
 
@@ -460,7 +455,6 @@ public nonisolated enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable
     switch rawValue {
     case 0: self = .unspecified
     case 1: self = .development
-    case 2: self = .staging
     case 3: self = .production
     default: self = .UNRECOGNIZED(rawValue)
     }
@@ -470,7 +464,6 @@ public nonisolated enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable
     switch self {
     case .unspecified: return 0
     case .development: return 1
-    case .staging: return 2
     case .production: return 3
     case .UNRECOGNIZED(let i): return i
     }
@@ -480,7 +473,6 @@ public nonisolated enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable
   public static let allCases: [RASDKEnvironment] = [
     .unspecified,
     .development,
-    .staging,
     .production,
   ]
 
@@ -3007,7 +2999,7 @@ nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_ENVIRONMENT_UNSPECIFIED\0\u{1}SDK_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_ENVIRONMENT_STAGING\0\u{1}SDK_ENVIRONMENT_PRODUCTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_ENVIRONMENT_UNSPECIFIED\0\u{1}SDK_ENVIRONMENT_DEVELOPMENT\0\u{2}\u{2}SDK_ENVIRONMENT_PRODUCTION\0")
 }
 
 nonisolated extension RAModelSource: SwiftProtobuf._ProtoNameProviding {

@@ -357,6 +357,17 @@ public class GenerationEvent(
     schemaIndex = 32,
   )
   public val framework: Int = 0,
+  /**
+   * prompt eval (prefill) duration
+   */
+  @field:WireField(
+    tag = 34,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "promptEvalTimeMs",
+    schemaIndex = 33,
+  )
+  public val prompt_eval_time_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<GenerationEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -402,6 +413,7 @@ public class GenerationEvent(
     if (model_name != other.model_name) return false
     if (duration_ms != other.duration_ms) return false
     if (framework != other.framework) return false
+    if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
     return true
   }
 
@@ -442,6 +454,7 @@ public class GenerationEvent(
       result = result * 37 + model_name.hashCode()
       result = result * 37 + duration_ms.hashCode()
       result = result * 37 + framework.hashCode()
+      result = result * 37 + prompt_eval_time_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -482,6 +495,7 @@ public class GenerationEvent(
     result += """model_name=${sanitize(model_name)}"""
     result += """duration_ms=$duration_ms"""
     result += """framework=$framework"""
+    result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
     return result.joinToString(prefix = "GenerationEvent{", separator = ", ", postfix = "}")
   }
 
@@ -519,8 +533,9 @@ public class GenerationEvent(
     model_name: String = this.model_name,
     duration_ms: Double = this.duration_ms,
     framework: Int = this.framework,
+    prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, duration_ms, framework, unknownFields)
+  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, duration_ms, framework, prompt_eval_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -633,6 +648,9 @@ public class GenerationEvent(
         if (value.framework != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(33, value.framework)
         }
+        if (value.prompt_eval_time_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(34, value.prompt_eval_time_ms)
+        }
         return size
       }
 
@@ -736,11 +754,17 @@ public class GenerationEvent(
         if (value.framework != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
         }
+        if (value.prompt_eval_time_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 34, value.prompt_eval_time_ms)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: GenerationEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.prompt_eval_time_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 34, value.prompt_eval_time_ms)
+        }
         if (value.framework != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
         }
@@ -876,6 +900,7 @@ public class GenerationEvent(
         var model_name: String = ""
         var duration_ms: Double = 0.0
         var framework: Int = 0
+        var prompt_eval_time_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -915,6 +940,7 @@ public class GenerationEvent(
             31 -> model_name = ProtoAdapter.STRING.decode(reader)
             32 -> duration_ms = ProtoAdapter.DOUBLE.decode(reader)
             33 -> framework = ProtoAdapter.INT32.decode(reader)
+            34 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -952,6 +978,7 @@ public class GenerationEvent(
           model_name = model_name,
           duration_ms = duration_ms,
           framework = framework,
+          prompt_eval_time_ms = prompt_eval_time_ms,
           unknownFields = unknownFields
         )
       }

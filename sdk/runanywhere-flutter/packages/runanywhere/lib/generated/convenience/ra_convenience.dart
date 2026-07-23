@@ -147,8 +147,6 @@ extension SDKEnvironmentWireString on SDKEnvironment {
         return 'unspecified';
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'development';
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 'staging';
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'production';
     }
@@ -162,8 +160,6 @@ SDKEnvironment? sdkEnvironmentFromWireString(String value) {
       return SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED;
     case 'development':
       return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    case 'staging':
-      return SDKEnvironment.SDK_ENVIRONMENT_STAGING;
     case 'production':
       return SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
   }

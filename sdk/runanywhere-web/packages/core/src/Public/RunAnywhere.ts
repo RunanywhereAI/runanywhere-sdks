@@ -278,8 +278,6 @@ function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
   switch (env) {
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
     default:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
@@ -1337,9 +1335,9 @@ export const RunAnywhere = {
         if (typeof module._rac_sdk_init_phase2_proto === 'function') {
           const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
           const bytes = SdkInitPhase2Request.encode({
-            buildToken: environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-              ? (_initOptions?.buildToken ?? '')
-              : '',
+            // No released SDK bakes or forwards a build token; the backend is
+            // reached only through the effective base URL (keyless staging).
+            buildToken: '',
             forceRefreshAssignments: false,
             flushTelemetry: true,
             discoverDownloadedModels: true,
@@ -1355,7 +1353,7 @@ export const RunAnywhere = {
           await completePendingDeviceRegistration(
             module,
             environment,
-            _initOptions?.buildToken ?? '',
+            '',
             lifecycleGeneration,
           );
           if (lifecycleGeneration !== _lifecycleGeneration) return;
@@ -2119,15 +2117,17 @@ export const RunAnywhere = {
   },
 
   synthesizeStream(
-    handle: Parameters<typeof TTSCapability.synthesizeStream>[0],
-    text: Parameters<typeof TTSCapability.synthesizeStream>[1],
-    options: Parameters<typeof TTSCapability.synthesizeStream>[2],
+    text: Parameters<typeof TTSCapability.synthesizeStreamAuto>[0],
+    options?: Parameters<typeof TTSCapability.synthesizeStreamAuto>[1],
     extra: CancellableCall = {},
-  ): ReturnType<typeof TTSCapability.synthesizeStream> {
+  ): ReturnType<typeof TTSCapability.synthesizeStreamAuto> {
+    // Swift-shaped lifecycle-owned stream: mirrors
+    // `RunAnywhere.synthesizeStream(_:options:)` (no component handle). The
+    // handle-owning form stays on `RunAnywhere.tts.synthesizeStream(handle,...)`.
     throwIfAborted(extra.signal, 'synthesizeStream');
-    const iterable = TTSCapability.synthesizeStream(handle, text, options);
+    const iterable = TTSCapability.synthesizeStreamAuto(text, options);
     if (!extra.signal) return iterable;
-    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stop(handle));
+    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stopLoaded());
     return (async function* () {
       try {
         yield* iterable;

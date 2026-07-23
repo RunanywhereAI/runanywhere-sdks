@@ -907,7 +907,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         const char* framework = nullptr, double temperature = -1.0,
                         int32_t max_tokens = 0, int64_t vision_tokens = 0,
                         double vision_encode_ms = 0.0, const char* image_resolution = nullptr,
-                        int32_t context_length = 0) {
+                        int32_t context_length = 0, double prompt_eval_ms = 0.0) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -948,6 +948,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (ttft_ms > 0.0) {
         (*event.mutable_properties())["time_to_first_token_ms"] = std::to_string(ttft_ms);
+    }
+    if (prompt_eval_ms > 0.0) {
+        (*event.mutable_properties())["prompt_eval_time_ms"] = std::to_string(prompt_eval_ms);
     }
     // temperature=0.0 is a valid (greedy) setting, so a -1.0 sentinel marks
     // "not provided"; max_tokens 0 means unset.
@@ -1296,7 +1299,8 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                        static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                        static_cast<double>(options.temperature), options.max_tokens,
                        result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
-                       vlm_gen_res.empty() ? nullptr : vlm_gen_res.c_str(), raw.context_length);
+                       vlm_gen_res.empty() ? nullptr : vlm_gen_res.c_str(), raw.context_length,
+                       static_cast<double>(raw.prompt_eval_time_ms));
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));

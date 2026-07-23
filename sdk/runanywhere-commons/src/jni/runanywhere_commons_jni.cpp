@@ -61,6 +61,7 @@
 #include "request_cancellation_relay.h"
 
 #include "../features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "../infrastructure/device/rac_device_live_state_internal.h"
 #include "../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
@@ -1626,6 +1627,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInit(JNIEnv* env, jc
         LOGe("racInit failed with code: %d", result);
     } else {
         LOGi("racInit succeeded");
+        // JNI callbacks attach the calling thread, so live battery/RAM
+        // sampling on telemetry events is safe from any thread here.
+        rac_telemetry_enable_live_platform_sampling();
     }
 
     return static_cast<jint>(result);
@@ -3509,42 +3513,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVa
 // =============================================================================
 
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsAvailable(JNIEnv* env,
-                                                                                 jclass clazz) {
-    return rac_dev_config_is_available() ? JNI_TRUE : JNI_FALSE;
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseUrl(JNIEnv* env,
-                                                                                    jclass clazz) {
-    const char* url = rac_dev_config_get_supabase_url();
-    if (url == nullptr || strlen(url) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(url);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseKey(JNIEnv* env,
-                                                                                    jclass clazz) {
-    const char* key = rac_dev_config_get_supabase_key();
-    if (key == nullptr || strlen(key) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(key);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetBuildToken(JNIEnv* env,
-                                                                                   jclass clazz) {
-    const char* token = rac_dev_config_get_build_token();
-    if (token == nullptr || strlen(token) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(token);
-}
-
-JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableCredential(
     JNIEnv* env, jclass clazz, jstring value) {
     (void)clazz;
@@ -3579,7 +3547,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableHtt
  * This must be called during SDK initialization for device registration
  * to include the correct sdk_version (instead of "unknown").
  *
- * @param environment Environment (0=development, 1=staging, 2=production)
+ * @param environment Environment (0=development, 2=production; 1 reserved)
  * @param deviceId Device ID string
  * @param platform Platform string (e.g., "android")
  * @param sdkVersion SDK version string (e.g., "0.1.0")

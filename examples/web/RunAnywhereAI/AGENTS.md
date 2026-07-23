@@ -50,6 +50,19 @@ keep each view focused on DOM state and user-flow orchestration.
   toggle, treat a download as inference success, or silently label a failed
   backend/model as ready.
 
+## Design System
+
+Brand primary is `#FF6900` (the logo orange), with the brand gradient
+`linear-gradient(135deg, #FF6900, #FB2C36)`. The canonical palette, typography,
+and contrast rules live in `../../DESIGN_GUIDELINE.md`; this app hand-maintains
+its mirror of those values as CSS custom properties in
+`src/styles/design-system.css` (the single token layer — `commons.css` and
+`components.css` consume the variables). Light/dark theming works via
+`:root[data-theme="light"|"dark"]` for the explicit toggle plus
+`@media (prefers-color-scheme: light)` when no explicit choice was made. Do not
+reintroduce the legacy `#FF5500`/`#E65500` orange or hardcode brand hexes in
+views — use the tokens.
+
 ## Commands
 
 Run from `examples/web/RunAnywhereAI/`.

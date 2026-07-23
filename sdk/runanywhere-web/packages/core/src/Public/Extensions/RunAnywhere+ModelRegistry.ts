@@ -7,7 +7,8 @@ import type {
 
   ModelCategory} from '@runanywhere/proto-ts/model_types';
 import {
-  InferenceFramework
+  InferenceFramework,
+  ModelFileRole,
 } from '@runanywhere/proto-ts/model_types';
 import {
   ModelRegistryAdapter,
@@ -18,6 +19,10 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+
+const logger = new SDKLogger('ModelRegistry');
 
 interface DefaultFrameworkModule extends EmscriptenRunanywhereModule {
   /** Proto-int wrapper over rac_model_category_default_framework (wasm_exports.cpp). */
@@ -106,5 +111,27 @@ export const ModelRegistry = {
     return (protoFramework in InferenceFramework
       ? protoFramework
       : InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN) as InferenceFramework;
+  },
+
+  /**
+   * Classify a sidecar filename's descriptor role for a given modality.
+   * Routed through the shared commons classifier
+   * (`rac_wasm_infer_model_file_role`) so the heuristic stays byte-identical
+   * with every other SDK. Mirrors Swift
+   * `RunAnywhere.inferModelFileRole(filename:modality:)`. Returns
+   * `MODEL_FILE_ROLE_PRIMARY_MODEL` when the WASM export is unavailable.
+   */
+  inferModelFileRole(filename: string, modality: ModelCategory): ModelFileRole {
+    const module = getModuleForCapability('commons');
+    if (!module) {
+      return ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
+    }
+    const role = new ProtoWasmBridge(module, logger).inferModelFileRole(
+      filename,
+      modality,
+    );
+    return (role in ModelFileRole
+      ? role
+      : ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL) as ModelFileRole;
   },
 };

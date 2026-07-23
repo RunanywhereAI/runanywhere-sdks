@@ -167,8 +167,25 @@ function encodeDownloadCompletedRequest(
 
 /**
  * Apply one or more LoRA adapters to the current logical LLM session.
+ *
+ * Two forms mirror Swift's overloaded `apply`: a full `LoRAApplyRequest`, or a
+ * registered catalog entry (delegating to {@link applyCatalogAdapter}).
  */
-async function apply(request: LoRAApplyRequest): Promise<LoRAApplyResult> {
+function apply(request: LoRAApplyRequest): Promise<LoRAApplyResult>;
+function apply(
+  entry: LoraAdapterCatalogEntry,
+  options?: { localPath?: string; scale?: number; replaceExisting?: boolean }
+): Promise<LoRAApplyResult>;
+async function apply(
+  requestOrEntry: LoRAApplyRequest | LoraAdapterCatalogEntry,
+  options?: { localPath?: string; scale?: number; replaceExisting?: boolean }
+): Promise<LoRAApplyResult> {
+  // A LoRAApplyRequest always carries an `adapters` array; a catalog entry does
+  // not — use that to route the entry form to applyCatalogAdapter.
+  if (!Array.isArray((requestOrEntry as LoRAApplyRequest).adapters)) {
+    return applyCatalogAdapter(requestOrEntry as LoraAdapterCatalogEntry, options);
+  }
+  const request = requestOrEntry as LoRAApplyRequest;
   const native = ensureNative();
   const result = decodeRequired(
     await native.loraApplyProto(encodeApplyRequest(request)),

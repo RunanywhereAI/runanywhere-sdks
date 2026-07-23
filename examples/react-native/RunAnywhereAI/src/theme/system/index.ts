@@ -8,3 +8,4 @@ export * from './motion';
 export * from './typography';
 export * from './icons';
 export * from './ThemeProvider';
+export * from './themedStyles';

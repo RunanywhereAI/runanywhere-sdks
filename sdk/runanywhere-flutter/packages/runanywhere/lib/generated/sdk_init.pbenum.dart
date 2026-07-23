@@ -47,43 +47,26 @@ class SdkInitPhase extends $pb.ProtobufEnum {
 /// ---------------------------------------------------------------------------
 /// Environment values — must match RAC_ENV_* in
 /// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-/// (development=0, staging=1, production=2). Numeric values are part of the
-/// wire format; do not reorder.
-///
-/// The prior attempt to
-/// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
-/// Swift iOS at runtime — the shipped librac_commons.a in
-/// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
-/// original 0/1/2 layout, so Swift sending the regenerated enum value 1
-/// (DEVELOPMENT) was decoded as STAGING by the old C++ side, which then failed
-/// validation with RAC_ERROR_INVALID_ARGUMENT ("API key required"). The other
-/// SDKs (Kotlin / Flutter / RN / Web) were never regenerated for the bumped
-/// layout either, so reverting to the original 0/1/2 wire-format restores
-/// cross-SDK consistency without requiring a coordinated xcframework rebuild.
-/// Re-introducing UNSPECIFIED=0 must be paired with a synchronized rebuild of
-/// every prebuilt commons binary AND regeneration of all five SDK bindings.
+/// (development=0, production=2). Numeric values are part of the wire format;
+/// do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
+/// reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
 /// ---------------------------------------------------------------------------
 class SdkInitEnvironment extends $pb.ProtobufEnum {
   static const SdkInitEnvironment SDK_INIT_ENVIRONMENT_DEVELOPMENT =
       SdkInitEnvironment._(
           0, _omitEnumNames ? '' : 'SDK_INIT_ENVIRONMENT_DEVELOPMENT');
-  static const SdkInitEnvironment SDK_INIT_ENVIRONMENT_STAGING =
-      SdkInitEnvironment._(
-          1, _omitEnumNames ? '' : 'SDK_INIT_ENVIRONMENT_STAGING');
   static const SdkInitEnvironment SDK_INIT_ENVIRONMENT_PRODUCTION =
       SdkInitEnvironment._(
           2, _omitEnumNames ? '' : 'SDK_INIT_ENVIRONMENT_PRODUCTION');
 
   static const $core.List<SdkInitEnvironment> values = <SdkInitEnvironment>[
     SDK_INIT_ENVIRONMENT_DEVELOPMENT,
-    SDK_INIT_ENVIRONMENT_STAGING,
     SDK_INIT_ENVIRONMENT_PRODUCTION,
   ];
 
-  static final $core.List<SdkInitEnvironment?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static SdkInitEnvironment? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
+  static final $core.Map<$core.int, SdkInitEnvironment> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static SdkInitEnvironment? valueOf($core.int value) => _byValue[value];
 
   const SdkInitEnvironment._(super.value, super.name);
 }
