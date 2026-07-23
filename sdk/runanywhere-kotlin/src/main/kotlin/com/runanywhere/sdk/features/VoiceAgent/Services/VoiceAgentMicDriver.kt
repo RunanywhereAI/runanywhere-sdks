@@ -20,7 +20,6 @@ package com.runanywhere.sdk.features.VoiceAgent.Services
 import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
-import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.channels.BufferOverflow
@@ -44,7 +43,6 @@ internal class VoiceAgentMicDriver(
 ) {
     private val logger = SDKLogger("VoiceAgentMic")
     private val capture = AudioCaptureManager()
-    private val playback = AudioPlaybackManager()
 
     suspend fun run() {
         val chunks =
@@ -58,7 +56,6 @@ internal class VoiceAgentMicDriver(
             feedLoop(chunks)
         } finally {
             capture.stopRecording()
-            playback.stop()
             chunks.close()
             logger.info("Voice-agent mic capture stopped")
         }
@@ -67,6 +64,14 @@ internal class VoiceAgentMicDriver(
     private suspend fun feedLoop(chunks: Channel<ByteArray>) {
         while (currentCoroutineContext().isActive) {
             val chunk = chunks.receive()
+
+            // Half-duplex: while a streaming reply is playing out the speaker
+            // (plus a short acoustic-decay tail), drop captured frames instead
+            // of feeding them to the core. Playback is now async + app-side
+            // (StreamingAudioPlayer), so without this the mic re-records the
+            // device's own TTS and the agent transcribes + answers itself in an
+            // endless loop. No barge-in by design, so dropping here is correct.
+            if (VoiceTtsPlaybackGate.micSuppressed()) continue
 
             val resultBytes =
                 try {
@@ -99,29 +104,47 @@ internal class VoiceAgentMicDriver(
                 } ?: continue
 
             // A non-empty reply means the core closed an utterance and ran a full
-            // turn this call. synthesized_audio is self-describing WAV.
+            // turn this call. Audio is played INCREMENTALLY by StreamingAudioPlayer
+            // as AudioFrameEvents arrive on the streamVoiceAgent flow. The whole
+            // reply WAV is already synthesized by the time this blocking call
+            // returns, so we know exactly how long it will play — mute the mic for
+            // that duration + a tail RIGHT NOW, before receiving another frame.
+            // This is the deterministic echo guard: without it the device speaker's
+            // own reply is re-captured, transcribed, and answered in an endless
+            // loop (worse on the phone speaker than a distant one). Also drain any
+            // frames captured while the turn ran.
             val reply = result.synthesized_audio
             if (reply != null && reply.size > 0) {
-                logger.info("Playing agent reply (${reply.size} WAV bytes)")
-                playReply(reply.toByteArray())
-                // Drop frames captured while the turn ran / the device spoke so
-                // stale audio is not folded into the next turn.
                 while (chunks.tryReceive().isSuccess) Unit
+                val playbackMs = wavPlaybackMs(reply.toByteArray())
+                if (playbackMs > 0) {
+                    VoiceTtsPlaybackGate.suppressForMs(playbackMs + REPLY_TAIL_MS)
+                    logger.info("turn reply ~${playbackMs}ms; muting mic through playback")
+                }
             }
         }
     }
 
-    private suspend fun playReply(wav: ByteArray) {
-        if (wav.isEmpty()) return
-        try {
-            playback.play(wav)
-        } catch (e: CancellationException) {
-            playback.stop()
-            throw e
-        } catch (e: Exception) {
-            logger.warning("Agent reply playback failed: ${e.message}")
-        }
+    /**
+     * Duration in ms of a canonical little-endian WAV (as written by the core's
+     * float32→WAV helper): byteRate is a uint32 at byte offset 28, the data-chunk
+     * size a uint32 at offset 40. Falls back to (total − 44-byte header) if the
+     * stored data size looks wrong. Returns 0 for anything too short to be a WAV.
+     */
+    private fun wavPlaybackMs(wav: ByteArray): Long {
+        if (wav.size < WAV_HEADER_BYTES) return 0
+        val byteRate = le32(wav, 28)
+        if (byteRate <= 0) return 0
+        val stored = le32(wav, 40)
+        val dataSize = if (stored in 1..(wav.size - WAV_HEADER_BYTES).toLong()) stored else (wav.size - WAV_HEADER_BYTES).toLong()
+        return dataSize * 1000 / byteRate
     }
+
+    private fun le32(b: ByteArray, off: Int): Long =
+        (b[off].toLong() and 0xFF) or
+            ((b[off + 1].toLong() and 0xFF) shl 8) or
+            ((b[off + 2].toLong() and 0xFF) shl 16) or
+            ((b[off + 3].toLong() and 0xFF) shl 24)
 
     private companion object {
         const val SAMPLE_RATE_HZ = 16_000
@@ -133,5 +156,15 @@ internal class VoiceAgentMicDriver(
          * frames captured mid-turn are discarded anyway (no barge-in).
          */
         const val MIC_CHANNEL_CAPACITY = 128
+
+        /** Canonical PCM/float WAV header size (RIFF + fmt + data headers). */
+        const val WAV_HEADER_BYTES = 44
+
+        /**
+         * Extra mute past the reply's raw duration: absorbs AudioTrack start-up
+         * latency, inter-chunk pacing, and the speaker→mic acoustic decay so the
+         * reply's final syllable is never re-transcribed.
+         */
+        const val REPLY_TAIL_MS = 1_200L
     }
 }
