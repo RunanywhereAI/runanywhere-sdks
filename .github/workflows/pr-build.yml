@@ -362,8 +362,11 @@ jobs:
   python-macos:
     # macOS sibling of python-linux: builds the wheel, repairs it with delocate (vendors the
     # onnxruntime/sherpa dylibs into runanywhere/.dylibs), installs it, runs the hermetic suite.
-    # macos-14 is arm64; the native posix adapter + @loader_path rpath are already macOS-ready.
-    runs-on: macos-14
+    # Uses the macOS 26 / Xcode 26 runner line like the other SDK lanes (macos-debug/release):
+    # setup-toolchain platform:macos pins Xcode 26.6, which only exists on macos-26 (macos-14
+    # fails toolchain setup with "Could not find Xcode version 26.6"). macos-26 is arm64; the
+    # native posix adapter + @loader_path rpath are already macOS-ready.
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
