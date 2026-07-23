@@ -80,12 +80,25 @@ def _guarded_iter(guard: _GenerationGuard, source: Iterator[str]) -> Iterator[st
 async def _aguarded_iter(
     guard: _GenerationGuard, source: AsyncIterator[str]
 ) -> AsyncIterator[str]:
-    """Async twin of :func:`_guarded_iter`."""
+    """Async twin of :func:`_guarded_iter`.
+
+    Unlike sync ``yield from`` (which forwards ``GeneratorExit`` into the delegated
+    generator on close), ``async for`` does NOT close ``source`` when this generator is
+    ``aclose``d. We must close it explicitly in the ``finally`` — that runs
+    ``aiter_tokens``'s own cleanup (stop the native loop, drain, join the worker) — and
+    do so BEFORE releasing the guard, so the model stays reserved until the native call
+    is truly stopped. Without this, an early-stopped async stream leaks the worker thread
+    (the native decode keeps running) and the guard is freed while a native call is still
+    in flight — allowing a second concurrent generation on the same handle.
+    """
     guard.acquire()
     try:
         async for token in source:
             yield token
     finally:
+        aclose = getattr(source, "aclose", None)
+        if aclose is not None:
+            await aclose()
         guard.release()
 
 
