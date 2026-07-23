@@ -1733,8 +1733,12 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     // place and skip the network entirely. Non-archive files only. A no-op on web /
     // when the store is unusable, so it falls through to a normal download. Runs
     // BEFORE the free-space gate so a hardlink-able file is never refused for space.
+    // Never de-dup a file that carries a post-download transform: its plan
+    // checksum is the SOURCE (pre-transform) content, so linking a shared blob
+    // by that checksum and then transforming in place would corrupt the blob and
+    // mislabel the file. Such files download + transform normally.
     bool deduped = false;
-    if (!already_complete && !file.requires_extraction) {
+    if (!already_complete && !file.requires_extraction && !file.has_post_download_transform) {
         deduped = rac::download::blob_store::link_from_blob(
             file.checksum_sha256, file.expected_bytes, file.destination_path);
     }
@@ -1929,8 +1933,10 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         final_path = file.destination_path;
         // Publish this verified file into the content-addressed store so future
         // models with the same content de-dup against it (hardlink, no re-download).
-        // Skipped when it was itself a de-dup hit (already a link to the blob).
-        if (!deduped && !file.checksum_sha256.empty()) {
+        // Skipped when it was itself a de-dup hit (already a link to the blob), and
+        // for transformed files whose on-disk (final) bytes do not match their
+        // plan (source) checksum — promoting those would poison the store.
+        if (!deduped && !file.has_post_download_transform && !file.checksum_sha256.empty()) {
             rac::download::blob_store::promote(file.checksum_sha256, file.destination_path);
         }
     }
@@ -2126,7 +2132,7 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
             // Content-addressed de-dup (mirrors the sequential path): when the same
             // content was already downloaded by another model, hardlink the shared
             // blob in and skip the network for this part entirely.
-            if (!file.requires_extraction &&
+            if (!file.requires_extraction && !file.has_post_download_transform &&
                 rac::download::blob_store::link_from_blob(
                     file.checksum_sha256, file.expected_bytes, file.destination_path)) {
                 update_parallel_progress(task, i, file.expected_bytes, file.expected_bytes,
@@ -2199,7 +2205,10 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
 
             const int64_t final_size = file_size_or_zero(file.destination_path);
             // Publish the verified file into the shared store for future de-dup.
-            if (!file.requires_extraction && !file.checksum_sha256.empty()) {
+            // Skip transformed files: their on-disk (final) bytes do not match
+            // their plan (source) checksum, so promoting would poison the store.
+            if (!file.requires_extraction && !file.has_post_download_transform &&
+                !file.checksum_sha256.empty()) {
                 rac::download::blob_store::promote(file.checksum_sha256, file.destination_path);
             }
             update_parallel_progress(task, i, final_size,
