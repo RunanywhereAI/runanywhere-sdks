@@ -53,6 +53,32 @@ _services_ready = False
 _HOME = os.path.join(os.path.expanduser("~"), ".runanywhere")
 
 
+def _validate_secure_key(key: str) -> str:
+    """Reject secure-store keys that could escape the store directory.
+
+    The native adapter maps each key onto a file ``<store_dir>/<key>``, and a key containing a
+    path separator, ``..``, or an absolute/drive path would read/write/delete an arbitrary file
+    (path traversal). The secure store is a flat key-value namespace, so only simple names are
+    valid. Enforced here at the public boundary; the native adapters validate too (defense in
+    depth). Returns the key unchanged when valid.
+    """
+    if not isinstance(key, str) or not key:
+        raise SDKException.invalid_input("secure store key must be a non-empty string")
+    if (
+        "/" in key
+        or "\\" in key
+        or key in (".", "..")
+        or os.path.isabs(key)
+        or (os.altsep and os.altsep in key)
+        or "\x00" in key
+    ):
+        raise SDKException.invalid_input(
+            f"invalid secure store key {key!r}: must be a simple name "
+            "(no path separators, '..', absolute paths, or NUL)"
+        )
+    return key
+
+
 class RunAnywhere:
     """On-device AI client: load models, generate, chat, run voice turns.
 
@@ -397,15 +423,15 @@ class RunAnywhere:
     # -- secure store --------------------------------------------------------
     def secure_set(self, key: str, value: str) -> None:
         """Store an encrypted key-value pair (requires initialize())."""
-        self._require_core().secure_set(key, value)
+        self._require_core().secure_set(_validate_secure_key(key), value)
 
     def secure_get(self, key: str) -> str | None:
         """Read a value from the secure store, or None if absent."""
-        return self._require_core().secure_get(key)
+        return self._require_core().secure_get(_validate_secure_key(key))
 
     def secure_delete(self, key: str) -> None:
         """Delete a value from the secure store (a missing key is a no-op)."""
-        self._require_core().secure_delete(key)
+        self._require_core().secure_delete(_validate_secure_key(key))
 
     # -- internals -----------------------------------------------------------
     def _require_core(self) -> "ModuleType":
