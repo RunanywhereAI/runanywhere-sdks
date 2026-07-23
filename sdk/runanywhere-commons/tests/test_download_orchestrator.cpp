@@ -10,6 +10,7 @@
 
 #include "test_common.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -21,11 +22,13 @@
 #include <thread>
 #include <utility>
 
+#include "infrastructure/download/post_download_transform_internal.h"
+#include "rac/core/rac_core.h"
+#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/core/rac_core.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
@@ -470,9 +473,45 @@ std::vector<uint8_t> fake_payload(size_t n) {
     return bytes;
 }
 
+std::string parakeet_ctc_metadata_suffix() {
+    std::string suffix;
+    suffix.append("\x72\x12\x0a\x0a", 4);
+    suffix.append("vocab_size");
+    suffix.append("\x12\x04", 2);
+    suffix.append("1025");
+    suffix.append("\x72\x17\x0a\x12", 4);
+    suffix.append("subsampling_factor");
+    suffix.append("\x12\x01", 2);
+    suffix.append("8");
+    suffix.append("\x72\x1d\x0a\x0e", 4);
+    suffix.append("normalize_type");
+    suffix.append("\x12\x0b", 2);
+    suffix.append("per_feature");
+    return suffix;
+}
+
+rav1::PostDownloadTransform fixture_transform(const std::string& source,
+                                              const std::string& suffix) {
+    rav1::PostDownloadTransform transform;
+    transform.set_source_size_bytes(static_cast<int64_t>(source.size()));
+    transform.set_source_checksum_sha256(runanywhere::sha256_hex(source));
+    const std::string final_bytes = source + suffix;
+    transform.set_final_size_bytes(static_cast<int64_t>(final_bytes.size()));
+    transform.set_final_checksum_sha256(runanywhere::sha256_hex(final_bytes));
+    transform.add_operations()->mutable_append_bytes()->set_payload(suffix);
+    return transform;
+}
+
+std::string read_binary_file(const std::string& path) {
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
 struct FakeTransport {
     std::vector<uint8_t> payload = fake_payload(static_cast<size_t>(256) * 1024);
     int sleep_ms_per_chunk = 0;
+    std::atomic<int> active_streams{0};
+    std::atomic<int> max_active_streams{0};
     // Flaky-mode accounting for "/flaky" URLs (transient-retry coverage). Each
     // distinct URL fails its FIRST fresh-stream attempt with a mid-transfer
     // network drop (after flushing a prefix to the ".part" sidecar), then every
@@ -481,7 +520,19 @@ struct FakeTransport {
     std::mutex flaky_mutex;
     std::set<std::string> flaky_urls_failed_once;  // URLs that already took their fail
     int stream_attempts = 0;                       // total fresh-stream calls seen
-    int resume_attempts = 0;                        // total resume calls seen
+    int resume_attempts = 0;                       // total resume calls seen
+};
+
+struct ScopedActiveFakeStream {
+    explicit ScopedActiveFakeStream(FakeTransport* fake) : fake(fake) {
+        const int active = fake->active_streams.fetch_add(1) + 1;
+        int observed = fake->max_active_streams.load();
+        while (active > observed &&
+               !fake->max_active_streams.compare_exchange_weak(observed, active)) {}
+    }
+    ~ScopedActiveFakeStream() { fake->active_streams.fetch_sub(1); }
+
+    FakeTransport* fake;
 };
 
 // The prefix a "/flaky" stream flushes to disk before the simulated drop. Small
@@ -518,8 +569,8 @@ bool fake_send_prefix(rac_http_body_chunk_fn cb, void* cb_user_data,
     for (size_t offset = start; offset < end; offset += chunk_size) {
         size_t n = std::min(chunk_size, end - offset);
         delivered += n;
-        if (cb(payload.data() + offset, n, delivered,
-               static_cast<uint64_t>(payload.size() - start), cb_user_data) == RAC_FALSE) {
+        if (cb(payload.data() + offset, n, delivered, static_cast<uint64_t>(payload.size() - start),
+               cb_user_data) == RAC_FALSE) {
             return false;
         }
     }
@@ -549,6 +600,11 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         out_resp_meta->status = 500;
         return RAC_SUCCESS;
     }
+    ScopedActiveFakeStream active_stream(fake);
+    {
+        std::lock_guard<std::mutex> lock(fake->flaky_mutex);
+        fake->stream_attempts++;
+    }
     // Transient-failure simulation: the first fresh-stream attempt for each
     // distinct "/flaky" URL flushes a prefix to the ".part" sidecar and then
     // reports a network drop, so the orchestrator's bounded resume-retry loop
@@ -557,7 +613,6 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         bool should_fail = false;
         {
             std::lock_guard<std::mutex> lock(fake->flaky_mutex);
-            fake->stream_attempts++;
             should_fail = fake->flaky_urls_failed_once.insert(url).second;
         }
         if (should_fail) {
@@ -788,6 +843,147 @@ bool wait_for_downloaded_progress(ProgressCapture* capture) {
 
 }  // namespace
 
+static TestResult test_post_download_transform_parakeet_contract() {
+    TestResult r;
+    r.test_name = "post_download_transform_parakeet_contract";
+
+    const std::string suffix = parakeet_ctc_metadata_suffix();
+    ASSERT_TRUE(suffix.size() == 76, "Parakeet CTC metadata append must be exactly 76 bytes");
+    ASSERT_TRUE(
+        runanywhere::bytes_to_hex(reinterpret_cast<const uint8_t*>(suffix.data()), suffix.size()) ==
+            "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c696e675f"
+            "666163746f72120138721d0a0e6e6f726d616c697a655f74797065120b7065725f666561"
+            "74757265",
+        "Parakeet CTC append bytes must match the reviewed ONNX metadata_props encoding");
+
+    rav1::PostDownloadTransform transform;
+    transform.set_source_size_bytes(1'110'014'069);
+    transform.set_source_checksum_sha256(
+        "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d");
+    transform.set_final_size_bytes(1'110'014'145);
+    transform.set_final_checksum_sha256(
+        "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98");
+    transform.add_operations()->mutable_append_bytes()->set_payload(suffix);
+
+    std::string error;
+    ASSERT_TRUE(rac::download::validate_post_download_transform(transform, &error),
+                "Reviewed Parakeet CTC transform contract should validate");
+    ASSERT_TRUE(error.empty(), "Valid Parakeet CTC transform should not report an error");
+
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_post_download_transform_applies_and_is_idempotent() {
+    TestResult r;
+    r.test_name = "post_download_transform_applies_and_is_idempotent";
+
+    const std::string dir = create_temp_dir("post_transform_apply");
+    ASSERT_TRUE(!dir.empty(), "Failed to create temp dir");
+    const std::string path = dir + "/model.int8.onnx";
+    const std::string source("\x3a\x00fixture-onnx", 14);
+    const std::string suffix = parakeet_ctc_metadata_suffix();
+    const rav1::PostDownloadTransform transform = fixture_transform(source, suffix);
+    write_dummy_file(path, source);
+
+    rac::download::post_download_transform_outcome outcome;
+    std::string error;
+    ASSERT_TRUE(rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Valid source fixture should transform");
+    ASSERT_TRUE(outcome == rac::download::post_download_transform_outcome::kApplied,
+                "Source-sized fixture should report applied");
+    const std::string expected = source + suffix;
+    ASSERT_TRUE(read_binary_file(path) == expected, "Transform must append the exact 76 bytes");
+    ASSERT_TRUE(static_cast<int64_t>(read_binary_file(path).size()) == transform.final_size_bytes(),
+                "Transformed fixture must match the declared final size");
+    ASSERT_TRUE(runanywhere::sha256_hex(read_binary_file(path)) ==
+                    transform.final_checksum_sha256(),
+                "Transformed fixture must match the declared final SHA-256");
+
+    ASSERT_TRUE(rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Already-final fixture should be accepted idempotently");
+    ASSERT_TRUE(outcome == rac::download::post_download_transform_outcome::kAlreadyFinal,
+                "Second application should report already-final");
+    ASSERT_TRUE(read_binary_file(path) == expected,
+                "Idempotent application must not append the suffix twice");
+
+    remove_dir(dir);
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_post_download_transform_rejects_size_and_hash_tampering() {
+    TestResult r;
+    r.test_name = "post_download_transform_rejects_size_and_hash_tampering";
+
+    const std::string dir = create_temp_dir("post_transform_tamper");
+    ASSERT_TRUE(!dir.empty(), "Failed to create temp dir");
+    const std::string path = dir + "/model.int8.onnx";
+    const std::string source("\x3a\x00fixture-onnx", 14);
+    const std::string suffix = parakeet_ctc_metadata_suffix();
+    const rav1::PostDownloadTransform transform = fixture_transform(source, suffix);
+    rac::download::post_download_transform_outcome outcome;
+    std::string error;
+
+    write_dummy_file(path, source.substr(0, source.size() - 1));
+    ASSERT_TRUE(!rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Short source fixture must fail closed");
+    ASSERT_TRUE(error.find("size mismatch") != std::string::npos,
+                "Short source rejection should identify the size contract");
+
+    std::string source_tamper = source;
+    source_tamper[2] ^= 0x01;
+    write_dummy_file(path, source_tamper);
+    ASSERT_TRUE(!rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Same-size source tamper must fail closed");
+    ASSERT_TRUE(error.find("source SHA-256 mismatch") != std::string::npos,
+                "Source tamper rejection should identify source SHA-256");
+
+    std::string final_tamper = source + suffix;
+    final_tamper[2] ^= 0x01;
+    write_dummy_file(path, final_tamper);
+    ASSERT_TRUE(!rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Same-size final tamper must fail closed");
+    ASSERT_TRUE(error.find("final SHA-256 mismatch") != std::string::npos,
+                "Final tamper rejection should identify final SHA-256");
+
+    remove_dir(dir);
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_post_download_transform_recovers_partial_suffix() {
+    TestResult r;
+    r.test_name = "post_download_transform_recovers_partial_suffix";
+
+    const std::string dir = create_temp_dir("post_transform_recovery");
+    ASSERT_TRUE(!dir.empty(), "Failed to create temp dir");
+    const std::string path = dir + "/model.int8.onnx";
+    const std::string source("\x3a\x00fixture-onnx", 14);
+    const std::string suffix = parakeet_ctc_metadata_suffix();
+    const rav1::PostDownloadTransform transform = fixture_transform(source, suffix);
+    rac::download::post_download_transform_outcome outcome;
+    std::string error;
+
+    write_dummy_file(path, source + suffix.substr(0, 23));
+    ASSERT_TRUE(rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Exact partial append prefix should recover after restart");
+    ASSERT_TRUE(outcome == rac::download::post_download_transform_outcome::kRecoveredPartial,
+                "Partial append should report recovered-partial");
+    ASSERT_TRUE(read_binary_file(path) == source + suffix,
+                "Recovery must append only the missing suffix tail");
+
+    write_dummy_file(path, source + std::string(23, 'x'));
+    ASSERT_TRUE(!rac::download::apply_post_download_transform(path, transform, &outcome, &error),
+                "Non-matching partial suffix must be rejected as tampering");
+    ASSERT_TRUE(error.find("partial append suffix mismatch") != std::string::npos,
+                "Partial tamper rejection should identify the suffix mismatch");
+
+    remove_dir(dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_plan_single_file() {
     TestResult r;
     r.test_name = "proto_plan_single_file";
@@ -805,6 +1001,79 @@ static TestResult test_proto_plan_single_file() {
     ASSERT_TRUE(plan.total_bytes() == 4096, "Plan should preserve expected bytes");
     ASSERT_TRUE(plan.files(0).destination_path().find("model.gguf") != std::string::npos,
                 "Plan should include a concrete destination path");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown() {
+    TestResult r;
+    r.test_name = "proto_plan_multifile_uses_declared_aggregate_when_head_unknown";
+
+    // The fake HEAD transport deliberately returns no Content-Length. A
+    // curated multi-file model with an exact aggregate must remain startable
+    // even when legacy descriptors do not carry their per-file sizes.
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_multifile_aggregate");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    constexpr int64_t kCanaryBundleBytes = 207170046;
+    rav1::DownloadPlanRequest request;
+    request.set_model_id("canary-aggregate-fallback");
+    request.set_available_storage_bytes(1LL << 30);  // 1 GiB
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(request.model_id());
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_SHERPA);
+    model->set_format(rav1::MODEL_FORMAT_ONNX);
+
+    for (const char* filename : {"encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"}) {
+        rav1::ModelFileDescriptor* file = model->mutable_multi_file()->add_files();
+        file->set_url(std::string("http://fake/no-content-length/") + filename);
+        file->set_filename(filename);
+        file->set_is_required(true);
+    }
+
+    std::string unknown_bytes = serialize_msg(request);
+    rac_proto_buffer_t unknown_buffer;
+    rac_proto_buffer_init(&unknown_buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(unknown_bytes.data()),
+                                        unknown_bytes.size(), &unknown_buffer) == RAC_SUCCESS,
+                "Unknown-size plan call should return a result proto");
+    rav1::DownloadPlanResult unknown_plan;
+    ASSERT_TRUE(parse_plan(unknown_buffer, &unknown_plan), "Unknown-size plan should parse");
+    rac_proto_buffer_free(&unknown_buffer);
+    ASSERT_TRUE(!unknown_plan.can_start(), "Missing per-file and aggregate sizes must fail closed");
+    ASSERT_TRUE(unknown_plan.total_bytes() == 0, "Unknown-size plan must not invent a total");
+
+    model->set_download_size_bytes(kCanaryBundleBytes);
+    std::string bytes = serialize_msg(request);
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), &buffer) == RAC_SUCCESS,
+                "Plan call should return a result proto");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+    rac_proto_buffer_free(&buffer);
+
+    ASSERT_TRUE(plan.can_start(), "Declared aggregate should keep the multi-file plan startable");
+    ASSERT_TRUE(plan.total_bytes() == kCanaryBundleBytes,
+                "Plan should use the model's declared aggregate size");
+    ASSERT_TRUE(plan.files_size() == 3, "Plan should preserve every file");
+    for (const auto& file : plan.files()) {
+        ASSERT_TRUE(file.expected_bytes() == 0,
+                    "Aggregate fallback must not invent a per-file expected size");
+    }
+    bool aggregate_warning = false;
+    for (const auto& warning : plan.warnings()) {
+        aggregate_warning = aggregate_warning ||
+                            warning.find("using model download_size_bytes") != std::string::npos;
+    }
+    ASSERT_TRUE(aggregate_warning, "Plan should disclose the aggregate-size fallback");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -1174,6 +1443,159 @@ static TestResult test_proto_start_progress_callback_complete() {
     return r;
 }
 
+static TestResult test_proto_transform_executes_sequentially_in_commons() {
+    TestResult r;
+    r.test_name = "proto_transform_executes_sequentially_in_commons";
+
+    FakeTransport fake;
+    fake.sleep_ms_per_chunk = 1;
+    ScopedFakeTransport scoped(&fake);
+
+    const std::string base_dir = create_temp_dir("proto_transform_pipeline");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-parakeet-transform-fixture";
+    const std::string model_name = "Parakeet transform fixture";
+    const std::string model_url = "http://fake/success";
+    rac_model_info_t registered{};
+    registered.id = const_cast<char*>(model_id.c_str());
+    registered.name = const_cast<char*>(model_name.c_str());
+    registered.download_url = const_cast<char*>(model_url.c_str());
+    registered.category = RAC_MODEL_CATEGORY_SPEECH_RECOGNITION;
+    registered.framework = RAC_FRAMEWORK_SHERPA;
+    registered.format = RAC_MODEL_FORMAT_ONNX;
+    ASSERT_TRUE(rac_register_model(&registered) == RAC_SUCCESS,
+                "Fixture model must be registered for canonical Sherpa storage");
+
+    const std::string source(reinterpret_cast<const char*>(fake.payload.data()),
+                             fake.payload.size());
+    const std::string suffix = parakeet_ctc_metadata_suffix();
+    const rav1::PostDownloadTransform transform = fixture_transform(source, suffix);
+
+    rav1::DownloadPlanRequest request;
+    request.set_model_id(model_id);
+    request.set_available_storage_bytes(1LL << 30);
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(model_id);
+    model->set_name(model_name);
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_SHERPA);
+    model->set_format(rav1::MODEL_FORMAT_ONNX);
+    model->set_download_size_bytes(static_cast<int64_t>(fake.payload.size() * 2));
+
+    rav1::ModelFileDescriptor* model_file = model->mutable_multi_file()->add_files();
+    model_file->set_url(model_url + "/model.int8.onnx");
+    model_file->set_filename("model.int8.onnx");
+    model_file->set_is_required(true);
+    model_file->set_size_bytes(transform.final_size_bytes());
+    model_file->set_checksum_sha256(transform.final_checksum_sha256());
+    *model_file->mutable_post_download_transform() = transform;
+
+    rav1::ModelFileDescriptor* tokens_file = model->mutable_multi_file()->add_files();
+    tokens_file->set_url(model_url + "/tokens.txt");
+    tokens_file->set_filename("tokens.txt");
+    tokens_file->set_is_required(true);
+    tokens_file->set_size_bytes(static_cast<int64_t>(fake.payload.size()));
+    tokens_file->set_checksum_sha256(transform.source_checksum_sha256());
+
+    // Network bytes alone would fit, but the final transformed artifact would
+    // not. Storage planning must include the derived 76-byte suffix while the
+    // public plan total remains transport/progress bytes.
+    rav1::DownloadPlanRequest tight_storage_request = request;
+    const int64_t transport_total = static_cast<int64_t>(fake.payload.size() * 2);
+    tight_storage_request.set_available_storage_bytes(transport_total + (128LL * 1024 * 1024) + 1);
+    const std::string tight_request_bytes = serialize_msg(tight_storage_request);
+    rac_proto_buffer_t tight_plan_buffer;
+    rac_proto_buffer_init(&tight_plan_buffer);
+    ASSERT_TRUE(
+        rac_download_plan_proto(reinterpret_cast<const uint8_t*>(tight_request_bytes.data()),
+                                tight_request_bytes.size(), &tight_plan_buffer) == RAC_SUCCESS,
+        "Tight-storage transform request should produce a plan result");
+    rav1::DownloadPlanResult tight_plan;
+    ASSERT_TRUE(parse_plan(tight_plan_buffer, &tight_plan),
+                "Tight-storage transform plan should parse");
+    rac_proto_buffer_free(&tight_plan_buffer);
+    ASSERT_TRUE(!tight_plan.can_start(),
+                "Storage gate must include bytes derived by the post-download transform");
+    ASSERT_TRUE(tight_plan.total_bytes() == transport_total,
+                "Plan total must remain source transport bytes for progress accounting");
+    ASSERT_TRUE(tight_plan.failure_reason() == rav1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE,
+                "Derived-byte storage undercount must fail as insufficient storage");
+
+    const std::string request_bytes = serialize_msg(request);
+    rac_proto_buffer_t plan_buffer;
+    rac_proto_buffer_init(&plan_buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                        request_bytes.size(), &plan_buffer) == RAC_SUCCESS,
+                "Transform fixture should produce a plan result");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(plan_buffer, &plan), "Transform fixture plan should parse");
+    rac_proto_buffer_free(&plan_buffer);
+    ASSERT_TRUE(plan.can_start() && plan.files_size() == 2,
+                "Transform fixture plan should preserve both files");
+    ASSERT_TRUE(plan.files(0).file().has_post_download_transform(),
+                "Typed transform must survive model-to-plan conversion");
+    ASSERT_TRUE(plan.files(0).file().size_bytes() == transform.final_size_bytes(),
+                "Plan descriptor must retain the final on-disk size");
+    ASSERT_TRUE(plan.files(0).file().checksum_sha256() == transform.final_checksum_sha256(),
+                "Plan descriptor must retain the final on-disk SHA-256");
+    ASSERT_TRUE(plan.files(0).expected_bytes() == transform.source_size_bytes(),
+                "Plan must count downloaded source bytes, not derived final bytes");
+    ASSERT_TRUE(plan.files(0).checksum_sha256() == transform.source_checksum_sha256(),
+                "HTTP plan must verify the source SHA-256 before transformation");
+
+    rav1::DownloadPlanResult invalid_source_plan = plan;
+    invalid_source_plan.mutable_files(0)->set_expected_bytes(transform.final_size_bytes());
+    rav1::DownloadStartResult invalid_source_start;
+    ASSERT_TRUE(start_from_plan(invalid_source_plan, false, &invalid_source_start),
+                "Caller-supplied invalid source tuple should return a start result");
+    ASSERT_TRUE(!invalid_source_start.accepted(),
+                "Start must reject a transformed plan whose transfer tuple is not source-pinned");
+
+    // A corrupt destination from an interrupted/foreign write must fail once,
+    // be removed, and allow the next attempt to fetch clean source bytes.
+    mkdir_p(std::filesystem::path(plan.files(0).destination_path()).parent_path().string());
+    write_dummy_file(plan.files(0).destination_path(), "invalid-transform-destination");
+    rav1::DownloadStartResult invalid_start;
+    ASSERT_TRUE(start_from_plan(plan, false, &invalid_start),
+                "Invalid-destination transform start should parse");
+    ASSERT_TRUE(invalid_start.accepted(), "Invalid-destination attempt should be accepted");
+    rav1::DownloadProgress invalid_terminal;
+    ASSERT_TRUE(wait_for_terminal(invalid_start.task_id(), &invalid_terminal),
+                "Invalid-destination attempt should reach a terminal state");
+    ASSERT_TRUE(invalid_terminal.state() == rav1::DOWNLOAD_STATE_FAILED,
+                "Invalid destination must fail closed before model publication");
+    ASSERT_TRUE(!std::filesystem::exists(plan.files(0).destination_path()),
+                "Transform-invalid destination must be removed so retry refetches");
+
+    rav1::DownloadStartResult start;
+    ASSERT_TRUE(start_from_plan(plan, false, &start), "Transform fixture start should parse");
+    ASSERT_TRUE(start.accepted(), "Transform fixture should be accepted");
+    rav1::DownloadProgress terminal;
+    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal),
+                "Transform fixture should reach a terminal state");
+    ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
+                terminal.error_message().empty() ? "Transform fixture should complete"
+                                                 : terminal.error_message().c_str());
+    ASSERT_TRUE(fake.max_active_streams.load() == 1,
+                "Any plan containing a post-download transform must disable parallel files");
+
+    char model_folder[4096];
+    ASSERT_TRUE(rac_model_paths_get_model_folder(model_id.c_str(), RAC_FRAMEWORK_SHERPA,
+                                                 model_folder, sizeof(model_folder)) == RAC_SUCCESS,
+                "Canonical Sherpa model folder should resolve");
+    ASSERT_TRUE(read_binary_file(std::string(model_folder) + "/model.int8.onnx") == source + suffix,
+                "Commons orchestration must publish the exact transformed model bytes");
+    ASSERT_TRUE(read_binary_file(std::string(model_folder) + "/tokens.txt") == source,
+                "Non-transformed companion bytes must remain unchanged");
+    ASSERT_TRUE(fake.stream_attempts == 2,
+                "Retry must refetch both source files after deleting the invalid destination");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_nested_multifile_reports_model_root() {
     TestResult r;
     r.test_name = "proto_nested_multifile_reports_model_root";
@@ -1230,7 +1652,8 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
     ASSERT_TRUE(start_from_plan(plan, false, &start), "Nested multi-file start should parse");
     ASSERT_TRUE(start.accepted(), "Nested multi-file start should be accepted");
     rav1::DownloadProgress terminal;
-    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal), "Nested multi-file download should finish");
+    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal),
+                "Nested multi-file download should finish");
     ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
                 "Nested multi-file download should complete");
 
@@ -1238,8 +1661,9 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
     ASSERT_TRUE(rac_model_paths_get_model_folder(model_id.c_str(), RAC_FRAMEWORK_QHEXRT,
                                                  model_folder, sizeof(model_folder)) == RAC_SUCCESS,
                 "Canonical model root should resolve");
-    ASSERT_TRUE(terminal.local_path() == std::string(model_folder),
-                "Completed multi-file local_path must be the model root, not the first nested parent");
+    ASSERT_TRUE(
+        terminal.local_path() == std::string(model_folder),
+        "Completed multi-file local_path must be the model root, not the first nested parent");
     ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/context/model.bin").good(),
                 "Nested context should exist under the model root");
     ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/manifest.json").good(),
@@ -1581,7 +2005,17 @@ int main(int argc, char** argv) {
 
 #ifdef RAC_HAVE_PROTOBUF
         // proto-byte workflow ABI
+        suite.add("post_download_transform_parakeet_contract",
+                  test_post_download_transform_parakeet_contract);
+        suite.add("post_download_transform_applies_and_is_idempotent",
+                  test_post_download_transform_applies_and_is_idempotent);
+        suite.add("post_download_transform_rejects_size_and_hash_tampering",
+                  test_post_download_transform_rejects_size_and_hash_tampering);
+        suite.add("post_download_transform_recovers_partial_suffix",
+                  test_post_download_transform_recovers_partial_suffix);
         suite.add("proto_plan_single_file", test_proto_plan_single_file);
+        suite.add("proto_plan_multifile_uses_declared_aggregate_when_head_unknown",
+                  test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown);
         suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
         suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
         suite.add("proto_plan_self_heals_oversized_existing_bytes",
@@ -1594,6 +2028,8 @@ int main(int argc, char** argv) {
         suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
         suite.add("proto_start_progress_callback_complete",
                   test_proto_start_progress_callback_complete);
+        suite.add("proto_transform_executes_sequentially_in_commons",
+                  test_proto_transform_executes_sequentially_in_commons);
         suite.add("proto_nested_multifile_reports_model_root",
                   test_proto_nested_multifile_reports_model_root);
         // #4 parallel download retry-with-resume (shared execute_stream_with_retry).

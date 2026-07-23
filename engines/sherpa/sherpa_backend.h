@@ -89,6 +89,16 @@ enum class SherpaSttStatus {
     BackendUnavailable,     // built without SHERPA_ONNX_AVAILABLE
 };
 
+enum class SherpaRecognizerMode {
+    Offline,
+    OnlineTransducer,
+};
+
+struct SherpaStreamUpdate {
+    std::string text;
+    bool is_final = false;
+};
+
 // =============================================================================
 // TTS TYPES
 // =============================================================================
@@ -216,10 +226,13 @@ class SherpaSTT {
     // empty. The default nullptr keeps existing call sites source-compatible.
     STTResult transcribe(const STTRequest& request, SherpaSttStatus* out_status = nullptr);
     bool supports_streaming() const;
+    bool supports_persistent_streaming() const;
 
     std::string create_stream(const nlohmann::json& config = {});
     bool feed_audio(const std::string& stream_id, const std::vector<float>& samples,
                     int sample_rate);
+    bool feed_audio_and_decode(const std::string& stream_id, const std::vector<float>& samples,
+                               std::vector<SherpaStreamUpdate>* updates);
     bool is_stream_ready(const std::string& stream_id);
     STTResult decode(const std::string& stream_id);
     bool is_endpoint(const std::string& stream_id);
@@ -234,10 +247,15 @@ class SherpaSTT {
     // `language_`. Mutex MUST be held by the caller. Returns true on success.
     // Existing recognizer (if any) is destroyed first. Used by load_model() to
     // do the initial build and by transcribe() to honor per-call language /
-    // detect-language requests on Whisper recognizers.
+    // detect-language requests on recognizers that expose language config.
     bool build_offline_recognizer_locked();
 
-    // Cap on the LRU cache of per-language Whisper recognizers.
+    // Builds a stateful Sherpa online transducer recognizer. Used only after
+    // structure-first ONNX inspection identifies streaming encoder cache
+    // inputs; offline encoder/decoder/joiner bundles never enter this path.
+    bool build_online_recognizer_locked();
+
+    // Cap on the LRU cache of per-language recognizers.
     // Each entry holds a fully constructed SherpaOnnxOfflineRecognizer whose
     // ONNX-runtime session is the heavy part of init, so we keep this small to
     // bound resident model memory. With Whisper-small at ~hundreds of MB per
@@ -246,9 +264,19 @@ class SherpaSTT {
 
     SherpaBackend* backend_;
 #if SHERPA_ONNX_AVAILABLE
+    struct StreamState {
+        const SherpaOnnxOfflineStream* offline = nullptr;
+        const SherpaOnnxOnlineStream* online = nullptr;
+        int sample_rate = 16000;
+        std::string language;
+        std::string last_text;
+    };
+
     const SherpaOnnxOfflineRecognizer* sherpa_recognizer_ = nullptr;
-    std::unordered_map<std::string, const SherpaOnnxOfflineStream*> sherpa_streams_;
-    // LRU cache of recognizers keyed by language (empty string == auto-detect).
+    const SherpaOnnxOnlineRecognizer* sherpa_online_recognizer_ = nullptr;
+    std::unordered_map<std::string, StreamState> sherpa_streams_;
+    // LRU cache of recognizers keyed by language (empty string == auto-detect
+    // for Whisper; Canary requires an explicit supported language).
     // Populated lazily on first transcribe() per language, hit on subsequent
     // calls so alternating-language workloads don't pay the multi-second
     // SherpaOnnxCreateOfflineRecognizer cost every utterance.
@@ -260,6 +288,8 @@ class SherpaSTT {
     void* sherpa_recognizer_ = nullptr;
 #endif
     STTModelType model_type_ = STTModelType::WHISPER;
+    SherpaRecognizerMode recognizer_mode_ = SherpaRecognizerMode::Offline;
+    bool uses_language_prompt_ = false;
     std::atomic<bool> model_loaded_{false};
     int stream_counter_ = 0;
     std::string model_dir_;
@@ -267,6 +297,7 @@ class SherpaSTT {
     // Kept alive so config string pointers remain valid for recognizer lifetime
     std::string encoder_path_;
     std::string decoder_path_;
+    std::string joiner_path_;
     std::string tokens_path_;
     std::string nemo_ctc_model_path_;
     mutable std::mutex mutex_;

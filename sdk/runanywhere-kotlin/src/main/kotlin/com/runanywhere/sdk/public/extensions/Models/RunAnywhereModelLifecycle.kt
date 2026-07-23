@@ -24,6 +24,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,32 +39,31 @@ private val logger = SDKLogger("ModelLifecycle")
 suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) {
-            return@withContext RAModelLoadResult(
-                success = false,
-                model_id = request.model_id,
-                category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-                framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-                error_message = "SDK not initialized",
-            )
+            return@withContext modelLoadFailure(request, "SDK not initialized")
         }
-        try {
-            ensureServicesReady()
-        } catch (_: Throwable) {
+
+        withModelLoadCompatibilityPreflight(
+            request = request,
+            resultProvider = { checkModelCompatibility(request.model_id) },
+        ) {
+            try {
+                ensureServicesReady()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+            val result =
+                CppBridgeModelLifecycle.load(request)
+                    ?: modelLoadFailure(
+                        request,
+                        "Native model lifecycle load proto API unavailable",
+                    )
+            if (result.success) {
+                val modelID = result.model_id.ifEmpty { request.model_id }
+                logger.info("Model load succeeded for $modelID")
+            }
+            result
         }
-        val result =
-            CppBridgeModelLifecycle.load(request)
-                ?: return@withContext RAModelLoadResult(
-                    success = false,
-                    model_id = request.model_id,
-                    category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-                    framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-                    error_message = "Native model lifecycle load proto API unavailable",
-                )
-        if (result.success) {
-            val modelID = result.model_id.ifEmpty { request.model_id }
-            logger.info("Model load succeeded for $modelID")
-        }
-        result
     }
 
 suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
@@ -190,3 +190,15 @@ private val RAModelInfo.lifecycleLookupCategories: List<ModelCategory>
             ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> emptyList()
             else -> listOf(category)
         }
+
+private fun modelLoadFailure(
+    request: RAModelLoadRequest,
+    message: String,
+): RAModelLoadResult =
+    RAModelLoadResult(
+        success = false,
+        model_id = request.model_id,
+        category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+        framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+        error_message = message,
+    )

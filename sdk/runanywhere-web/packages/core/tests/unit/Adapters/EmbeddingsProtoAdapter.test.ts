@@ -1,13 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   EmbeddingsRequest,
   EmbeddingsResult,
   type EmbeddingsRequest as ProtoEmbeddingsRequest,
 } from '@runanywhere/proto-ts/embeddings_options';
-import { EmbeddingsProtoAdapter } from '../../../src/Adapters/EmbeddingsProtoAdapter';
-import type { ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterTypes';
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+import { EmbeddingsProtoAdapter } from '../../../src/Adapters/EmbeddingsProtoAdapter.js';
+import type { ModalityProtoModule } from '../../../src/Adapters/ProtoAdapterTypes.js';
+import {
+  clearRunanywhereModule,
+  registerWasmModule,
+  type EmscriptenRunanywhereModule,
+} from '../../../src/runtime/EmscriptenModule.js';
 
 describe('EmbeddingsProtoAdapter lifecycle routing', () => {
+  afterEach(() => {
+    clearRunanywhereModule();
+  });
+
   it('uses the handle-less lifecycle ABI instead of treating zero as a handle', async () => {
     const harness = fakeEmbeddingsModule();
     const adapter = new EmbeddingsProtoAdapter(harness.module);
@@ -41,6 +51,46 @@ describe('EmbeddingsProtoAdapter lifecycle routing', () => {
       argumentCount: 3,
       async: true,
     }]);
+  });
+
+  it('routes llama.cpp and ONNX embeddings by model framework', async () => {
+    const llama = fakeEmbeddingsModule();
+    const onnx = fakeEmbeddingsModule();
+    registerWasmModule(
+      [],
+      llama.module as unknown as EmscriptenRunanywhereModule,
+      ['llamacpp'],
+    );
+    registerWasmModule(
+      [],
+      onnx.module as unknown as EmscriptenRunanywhereModule,
+      ['onnx'],
+    );
+
+    const llamaAdapter = EmbeddingsProtoAdapter.tryDefaultForFramework(
+      InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    );
+    const onnxAdapter = EmbeddingsProtoAdapter.tryDefaultForFramework(
+      InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    );
+    expect(llamaAdapter).not.toBeNull();
+    expect(onnxAdapter).not.toBeNull();
+
+    await llamaAdapter!.embedBatchLifecycle(EmbeddingsRequest.create({
+      texts: ['NVIDIA embedding'],
+      modelId: 'nemotron-3-embed-1b-q4_k_m',
+      metadata: {},
+    }));
+    expect(llama.lifecycleCalls).toBe(1);
+    expect(onnx.lifecycleCalls).toBe(0);
+
+    await onnxAdapter!.embedBatchLifecycle(EmbeddingsRequest.create({
+      texts: ['ONNX embedding'],
+      modelId: 'all-minilm-l6-v2',
+      metadata: {},
+    }));
+    expect(llama.lifecycleCalls).toBe(1);
+    expect(onnx.lifecycleCalls).toBe(1);
   });
 });
 
