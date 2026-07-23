@@ -576,6 +576,12 @@ void run_generate_loop(ToolCallingSession& session) {
     auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
         session.generation, session.iteration, session.has_tool_choice, session.tool_choice,
         session.format);
+    // Grammar-constrain (QHexRT) only while a tool call is still possible this turn.
+    // After a call has run and tools are not kept available, this is a synthesis
+    // turn — leave decoding unconstrained so the final answer is free text.
+    if (!session.all_tool_calls.empty() && !session.keep_tools_available) {
+        step_generation.tool_names.clear();
+    }
     rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
         &session.active_ref_mu, &session.active_ref, &session.cancel_requested,
         &session.generation_started};
@@ -801,6 +807,8 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
+        // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
+        session->generation.tool_names.push_back(tool.name());
     }
 
     std::string tool_choice_error;
