@@ -455,6 +455,8 @@ let package = Package(
                 "src/commands/cmd_vad.cpp",
                 "src/commands/cmd_voice.cpp",
                 "src/commands/cmd_image.cpp",
+                "src/commands/cmd_segment.cpp",
+                "src/commands/cmd_diarize.cpp",
                 "src/commands/engine_options.cpp",
                 "src/commands/model_setup.cpp",
                 "src/config/cli_paths.cpp",
