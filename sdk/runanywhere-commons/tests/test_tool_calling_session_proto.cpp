@@ -53,6 +53,8 @@ struct MockLlm {
 std::mutex g_responses_mutex;
 std::vector<std::string> g_responses;
 std::vector<std::string> g_prompts;
+// rac_llm_options_t.grammar as each generate saw it (RUN-80 grammar path).
+std::vector<std::string> g_grammars;
 int g_generate_calls = 0;
 
 char* dup_cstr(const char* value) {
@@ -77,7 +79,7 @@ rac_result_t mock_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t*,
+rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* options,
                            rac_llm_result_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -86,6 +88,7 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t*,
         std::lock_guard<std::mutex> lg(g_responses_mutex);
         g_generate_calls++;
         g_prompts.emplace_back(prompt ? prompt : "");
+        g_grammars.emplace_back(options && options->grammar ? options->grammar : "");
         if (g_responses.empty()) {
             response = "empty-response";
         } else {
@@ -159,6 +162,12 @@ void set_responses(std::vector<std::string> responses) {
     g_responses = std::move(responses);
     g_generate_calls = 0;
     g_prompts.clear();
+    g_grammars.clear();
+}
+
+std::vector<std::string> generated_grammars() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_grammars;
 }
 
 int generate_calls() {
@@ -171,13 +180,17 @@ std::vector<std::string> generated_prompts() {
     return g_prompts;
 }
 
-runanywhere::v1::ModelInfo build_llm_model() {
+runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework framework =
+                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     runanywhere::v1::ModelInfo model;
     model.set_id("toolsession.llm");
     model.set_name("ToolSession LLM");
     model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
-    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    // A QHexRT framework with no registered qhexrt plugin still loads via the
+    // primitive fallback to the mock GENERATE_TEXT vtable, so the session grammar
+    // path can be exercised with the mock ops (supports_grammar=true).
+    model.set_framework(framework);
     model.set_local_path("/tmp/toolsession-test.gguf");
     model.set_is_downloaded(true);
     model.set_is_available(true);
@@ -193,7 +206,8 @@ void cleanup_environment() {
     set_responses({});
 }
 
-bool load_mock_llm() {
+bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
+                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
     if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
         return false;
@@ -203,7 +217,7 @@ bool load_mock_llm() {
     }
 
     std::vector<uint8_t> model_bytes;
-    auto model = build_llm_model();
+    auto model = build_llm_model(framework);
     if (!serialize(model, &model_bytes) ||
         rac_model_registry_register_proto(g_registry, model_bytes.data(), model_bytes.size()) !=
             RAC_SUCCESS) {
@@ -1004,6 +1018,60 @@ int test_destroy_clears_state() {
     return 0;
 }
 
+// RUN-80 (review follow-up): the session path is a PARALLEL grammar wiring to the
+// run loop. Prove the capability gate here too: a QHexRT-framework session's
+// decision generate is constrained with "toolcall_opt:<names>", while a
+// non-grammar engine gets none.
+int test_session_grammar_gated_on_framework() {
+    // Grammar backend (QHexRT): decision generate is grammar-constrained.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "grammar-backend session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "one decision generate");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0] == "toolcall_opt:get_weather,calculate",
+                  "session decision turn is grammar-constrained on QHexRT");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // Non-grammar backend (llama.cpp): no grammar attached.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "non-grammar session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "one generate");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0].empty(), "non-grammar session gets no grammar");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -1021,6 +1089,7 @@ int main() {
         test_forced_tool_name_only_promotes_session_to_specific();
         test_none_vetoes_forced_name_in_session();
         test_none_blocks_session_call_when_validation_disabled();
+        test_session_grammar_gated_on_framework();
         test_forced_target_blocks_wrong_session_call_when_validation_disabled();
         test_specific_session_target_must_be_nonempty_and_present();
         test_specific_and_required_sessions_reject_initial_no_call();
