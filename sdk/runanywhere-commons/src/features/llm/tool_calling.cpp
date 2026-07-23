@@ -2029,9 +2029,14 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
         }
     } else {
         const auto& tool_result = request.tool_results(0);
+        // tool_choice=NONE suppresses further calls even on the follow-up/synthesis
+        // turn: never re-advertise the tools body nor invite "use another tool".
+        const rac_bool_t keep_tools =
+            (converted.options.keep_tools_available == RAC_TRUE && !suppress_tools) ? RAC_TRUE
+                                                                                   : RAC_FALSE;
         std::string tools_prompt;
         char* tools_prompt_raw = nullptr;
-        if (converted.options.keep_tools_available == RAC_TRUE) {
+        if (keep_tools == RAC_TRUE) {
             const rac_result_t tools_rc = rac_tool_call_format_prompt_json_with_format_name(
                 effective_tools_json.c_str(), converted.format_key.c_str(), &tools_prompt_raw);
             if (tools_rc != RAC_SUCCESS) {
@@ -2064,7 +2069,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
                 tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
                 tool_result.name().empty() ? tool_result.tool_call_id().c_str()
                                            : tool_result.name().c_str(),
-                payload.c_str(), converted.options.keep_tools_available, &prompt);
+                payload.c_str(), keep_tools, &prompt);
         } else {
             std::string followup;
             if (!tools_prompt.empty()) {
@@ -2086,7 +2091,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
                 followup += "\n";
             }
             followup += "\nUsing all results above, answer the original question. ";
-            if (converted.options.keep_tools_available == RAC_TRUE) {
+            if (keep_tools == RAC_TRUE) {
                 followup += "You may use another tool if needed.";
             } else {
                 followup += "Do not emit tool calls or tool tags.";
@@ -2094,6 +2099,22 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
             prompt = dup_owned_string(followup);
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
+    }
+
+    // tool_choice=REQUIRED: the neutralized body says "call a tool only when
+    // needed" (RUN-80), but REQUIRED means the caller wants a call THIS turn — the
+    // run loop structurally errors ("tool_choice=REQUIRED requires a tool call")
+    // if none is made. Append one firm directive so the model actually calls,
+    // WITHOUT reintroducing the global "ALWAYS use a tool" bias for AUTO callers.
+    // Only on an initial, tool-advertising turn (not NONE, not a follow-up).
+    if (rc == RAC_SUCCESS && prompt != nullptr && !suppress_tools &&
+        request.tool_results_size() == 0 &&
+        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED) {
+        std::string firm = prompt;
+        firm += "\n\nYou must call exactly one tool now.";
+        free(prompt);
+        prompt = dup_owned_string(firm);
+        rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     }
 
     if (rc != RAC_SUCCESS) {
@@ -2681,25 +2702,21 @@ extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
 static std::string get_format_instructions(rac_tool_call_format_t format) {
     std::string instructions;
 
+    // Neutral, tool-agnostic guidance (RUN-80): describes HOW to call a tool when
+    // one is needed, without biasing toward calling or toward specific tool names.
+    // Kept in parity with the JSON path (get_format_example_json / RULES block).
     switch (format) {
         case RAC_TOOL_FORMAT_LFM2:
             // Liquid AI LFM2 format
             instructions += "TOOL CALLING FORMAT (LFM2):\n";
-            instructions += "When you need to use a tool, output ONLY this format:\n";
+            instructions += "To call a tool, output exactly one call in this format:\n";
             instructions +=
-                "<|tool_call_start|>[TOOL_NAME(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>"
-                "\n\n";
-
-            instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
-            instructions +=
-                "- User asks 'weather in Tokyo' -> "
-                "<|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
-            instructions +=
-                "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San "
-                "Francisco\")]<|tool_call_end|>\n\n";
+                "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n\n";
 
             instructions += "RULES:\n";
-            instructions += "1. For greetings or general chat, respond normally without tools\n";
+            instructions +=
+                "1. Call a tool only when it is needed; for greetings or general chat, respond "
+                "normally without tools\n";
             instructions += "2. Use Python-style function call syntax inside the tags\n";
             instructions += "3. String values MUST be quoted with double quotes\n";
             instructions += "4. Multiple arguments are separated by commas";
@@ -2708,24 +2725,17 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         case RAC_TOOL_FORMAT_DEFAULT:
         default:
             // Default SDK format
-            instructions += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
+            instructions += "TOOL CALLING FORMAT:\n";
+            instructions += "To call a tool, output exactly one call in this format:\n";
             instructions +=
-                "When you need to use a tool, output ONLY this (no other text before or after):\n";
-            instructions +=
-                "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": "
-                "\"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
-
-            instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
-            instructions +=
-                "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", "
-                "\"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
-            instructions +=
-                "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", "
-                "\"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
+                "<tool_call>{\"tool\": \"<tool_name>\", \"arguments\": {\"<param>\": "
+                "\"<value>\"}}</tool_call>\n\n";
 
             instructions += "RULES:\n";
-            instructions += "1. For greetings or general chat, respond normally without tools\n";
-            instructions += "2. When using a tool, output ONLY the <tool_call> tag, nothing else\n";
+            instructions +=
+                "1. Call a tool only when it is needed; for greetings or general chat, respond "
+                "normally without tools\n";
+            instructions += "2. When you call a tool, output only the <tool_call> tag for it\n";
             instructions += "3. Use the exact parameter names shown in the tool definitions above";
             break;
     }
@@ -2739,52 +2749,24 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
 static std::string get_format_example_json(rac_tool_call_format_t format) {
     std::string example;
 
+    // Format skeleton ONLY — a neutral placeholder that shows the required shape.
+    // The hardcoded weather/calculate few-shot examples were removed: they biased
+    // small models toward calling those exact tools (and toward calling at all)
+    // even when the caller's tools were different or no tool was needed (RUN-80).
     switch (format) {
         case RAC_TOOL_FORMAT_LFM2:
-            // LFM2 format - enhanced with more math examples for better reliability
             example += "## OUTPUT FORMAT\n";
-            example += "You MUST respond with ONLY a tool call in this exact format:\n";
-            example += "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n\n";
-            example +=
-                "CRITICAL: Always include the FULL format with <|tool_call_start|> and "
-                "<|tool_call_end|> tags.\n\n";
-            example += "## EXAMPLES\n";
-            example += "Q: What's the weather in NYC?\n";
-            example +=
-                "A: <|tool_call_start|>[get_weather(location=\"New York\")]<|tool_call_end|>\n\n";
-            example += "Q: weather in sf\n";
-            example +=
-                "A: <|tool_call_start|>[get_weather(location=\"San "
-                "Francisco\")]<|tool_call_end|>\n\n";
-            example += "Q: calculate 2+2\n";
-            example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n\n";
-            example += "Q: What's 5*10?\n";
-            example +=
-                "A: <|tool_call_start|>[calculate(expression=\"5*10\")]<|tool_call_end|>\n\n";
-            example += "Q: What is 100/4?\n";
-            example += "A: <|tool_call_start|>[calculate(expression=\"100/4\")]<|tool_call_end|>\n";
+            example += "A tool call has exactly this shape:\n";
+            example += "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n";
             break;
 
         case RAC_TOOL_FORMAT_DEFAULT:
         default:
             example += "## OUTPUT FORMAT\n";
-            example += "You MUST respond with ONLY a tool call in this exact format:\n";
+            example += "A tool call has exactly this shape:\n";
             example +=
                 "<tool_call>{\"tool\": \"<tool_name>\", \"arguments\": {\"<param>\": "
-                "\"<value>\"}}</tool_call>\n\n";
-            example += "## EXAMPLES\n";
-            example += "Q: What's the weather in NYC?\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"New "
-                "York\"}}</tool_call>\n\n";
-            example += "Q: weather in sf\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San "
-                "Francisco\"}}</tool_call>\n\n";
-            example += "Q: calculate 2+2\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": "
-                "\"2+2\"}}</tool_call>\n";
+                "\"<value>\"}}</tool_call>\n";
             break;
     }
 
@@ -2890,19 +2872,16 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += get_format_example_json(actual_format);
 
     prompt += "\n\n## RULES\n";
-    prompt += "- Weather question = call get_weather\n";
-    prompt +=
-        "- Math/calculation question (add, subtract, multiply, divide, \"what's X*Y\", etc.) = "
-        "call calculate with the EXPRESSION as a string\n";
-    prompt += "- Time question = call get_current_time\n";
-    prompt +=
-        "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
+    prompt += "- Call a tool only when it is needed to answer; otherwise reply normally.\n";
+    prompt += "- Use only the tools listed above, with their exact names and parameters.\n";
 
-    // Format-specific tag instructions
+    // Format-specific tag instructions (the parser keys on these exact tags, so a
+    // tool call must always be wrapped in them — but this does NOT mean a tool must
+    // be called; it only describes the shape of a call when one is made).
     if (actual_format == RAC_TOOL_FORMAT_LFM2) {
-        prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
+        prompt += "- When you call a tool, wrap it in <|tool_call_start|> and <|tool_call_end|>.\n";
     } else {
-        prompt += "- ALWAYS include <tool_call> and </tool_call> tags.\n";
+        prompt += "- When you call a tool, wrap it in <tool_call> and </tool_call>.\n";
     }
 
     RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", (int)actual_format,
@@ -2966,20 +2945,16 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     std::string full_prompt;
     full_prompt.reserve(2048);
 
-    // Add system prompt if provided
+    // Add the caller's system prompt if provided. Its placement is the same either
+    // way; whether it REPLACES the tool-instruction body is decided just below.
     if (options && options->system_prompt) {
-        if (options->replace_system_prompt != 0) {
-            // Replace entirely - just use the system prompt
-            full_prompt += options->system_prompt;
-            full_prompt += "\n\n";
-        } else {
-            // Append tool instructions after system prompt
-            full_prompt += options->system_prompt;
-            full_prompt += "\n\n";
-        }
+        full_prompt += options->system_prompt;
+        full_prompt += "\n\n";
     }
 
-    // Add tools prompt (unless replace_system_prompt is true and we already have system_prompt)
+    // Add the tools body UNLESS the caller opted to own the whole prompt
+    // (replace_system_prompt set together with a system_prompt). In that case the
+    // caller's system prompt stands alone with no auto-injected tool guidance.
     if (options == nullptr || options->replace_system_prompt == 0 ||
         options->system_prompt == nullptr) {
         if (tools_prompt && strlen(tools_prompt) > 0) {
