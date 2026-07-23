@@ -166,6 +166,11 @@
       .reasontoggle { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; cursor: pointer; }
       .reasontoggle input { margin-top: 2px; flex: 0 0 auto; }
       .reasontoggle strong { color: var(--fg-2); }
+      #ragsources { margin-top: 6px; }
+      .ragchunk { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-top: 8px; background: rgba(255,255,255,.02); }
+      .ragchunk .meta { font-size: 11.5px; color: var(--fg-3); margin-bottom: 4px; display: flex; gap: 10px; }
+      .ragchunk .txt { font-size: 13px; color: var(--fg-2); line-height: 1.55; white-space: pre-wrap; }
+      .ragscore { color: var(--accent-lift); }
       .bubble ul { margin: 8px 0; padding-left: 20px; } .bubble li { margin: 3px 0; }
       .empty { max-width: 540px; margin: 16vh auto 0; text-align: center; animation: pop .4s var(--ease); }
       .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 12px 40px var(--accent-glow); }
@@ -223,6 +228,7 @@
           <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3 18v3h3l6.5-6.5a4 4 0 0 0 5.2-5.2l-2.7 2.7-2-2z"/></svg> Tools</button>
           <button data-tab="vision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Vision</button>
           <button data-tab="embeddings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8M18 9l-5 7"/></svg> Embeddings</button>
+          <button data-tab="rag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Knowledge</button>
           <button data-tab="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Voice</button>
           <button data-tab="vad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> VAD</button>
         </div>
@@ -343,6 +349,25 @@
             </div>
             <div style="margin-top:12px"><button class="btn" id="embgo">Compare</button></div>
             <div id="embout" class="out"></div>
+          </div></section>
+
+          <section class="panel" id="rag"><div class="wrap">
+            <h2 class="lead">Knowledge (RAG)</h2>
+            <p class="hint">Retrieval-augmented generation — add documents, then ask questions grounded in them. Embeddings (MiniLM) index your text; the LLM answers from the retrieved chunks. First run downloads MiniLM + the chat model.</p>
+            <div class="label">Add a document</div>
+            <textarea id="ragdoc" rows="4" placeholder="Paste any text — notes, an article, docs…"></textarea>
+            <div class="row" style="margin-top:10px; align-items:center">
+              <button class="btn" id="ragadd">Add to knowledge</button>
+              <button class="btn ghost" id="ragclear">Clear all</button>
+              <span id="ragstats" class="muted"></span>
+            </div>
+            <div class="label" style="margin-top:20px">Ask a question</div>
+            <div class="row" style="align-items:center">
+              <input id="ragq" type="text" placeholder="What does the document say about…?" style="flex:1" />
+              <button class="btn" id="ragask" style="flex:0 0 auto">Ask</button>
+            </div>
+            <div id="ragout" class="out"></div>
+            <div id="ragsources"></div>
           </div></section>
 
           <section class="panel" id="voice"><div class="wrap">
