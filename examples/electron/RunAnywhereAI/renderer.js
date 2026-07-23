@@ -20,7 +20,7 @@ const TOOLS = [
 ];
 
 // ---- settings + conversations + custom models (persisted via demoStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256 };
+let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -29,7 +29,15 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const llm = () => ensure('llm', () => ra.loadLLM('qwen2.5-0.5b'));
+const DEFAULT_LLM = 'qwen2.5-0.5b';
+// The chat's active LLM. Loading another LLM from the Models tab replaces it (the
+// backend keeps one loaded at a time), so we track it in loadedById/loadedType too
+// to keep the Models badges coherent — exactly one LLM ever shows "loaded".
+const llm = () => ensure('llm', async () => {
+  const h = await ra.loadLLM(DEFAULT_LLM);
+  loadedById[DEFAULT_LLM] = h; loadedType[DEFAULT_LLM] = 'llm';
+  return h;
+});
 const embedder = () => ensure('embedder', () => ra.loadEmbedder('minilm'));
 const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
 const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
@@ -61,6 +69,36 @@ function md(text) {
   return s.replace(/(\d+)/g, (_m, i) => `<pre><code>${blocks[+i]}</code></pre>`);
 }
 
+// Split a reasoning model's <think>…</think> from its answer. Mirrors the SDK's
+// splitThinking (also on window.runanywhere.splitThinking) — inlined here for the
+// per-token streaming hot path so we don't cross the context bridge each token.
+function splitThink(text) {
+  if (!text) return { response: '', thinking: '' };
+  // indexOf scan (O(n)) — not a backreference regex, which backtracks on
+  // adversarial model output (ReDoS). Mirrors the SDK's splitThinking.
+  let idx = -1, tag = '';
+  for (const t of ['<think>', '<thinking>']) { const i = text.indexOf(t); if (i >= 0 && (idx < 0 || i < idx)) { idx = i; tag = t; } }
+  if (idx < 0) return { response: text.trim(), thinking: '' };
+  const afterOpen = idx + tag.length;
+  const closeTag = tag === '<think>' ? '</think>' : '</thinking>';
+  const close = text.indexOf(closeTag, afterOpen);
+  if (close < 0) return { response: text.slice(0, idx).trim(), thinking: text.slice(afterOpen).trim() };
+  return { thinking: text.slice(afterOpen, close).trim(), response: (text.slice(0, idx) + text.slice(close + closeTag.length)).trim() };
+}
+// Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
+// above the rendered answer. `streaming` keeps reasoning open + shows a
+// placeholder while the answer is still empty.
+function assistantHtml(raw, streaming) {
+  const { response, thinking } = splitThink(raw || '');
+  let out = '';
+  if (thinking) {
+    const open = streaming && !response ? ' open' : '';
+    out += `<details class="reason"${open}><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(thinking)}</div></details>`;
+  }
+  out += md(response || (streaming ? '…' : ''));
+  return out;
+}
+
 // ---- conversations ----
 const activeConv = () => conversations.find((c) => c.id === activeId);
 function newConversation() {
@@ -86,7 +124,7 @@ function renderSidebar() {
   }
 }
 function bubbleHtml(m) {
-  const body = m.role === 'assistant' ? md(m.content || '…') : escapeHtml(m.content);
+  const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
   const metrics = m.metrics ? `<div class="metrics">⚡ ${m.metrics.tokens} tokens · ${m.metrics.tps.toFixed(1)} tok/s · TTFT ${Math.round(m.metrics.ttft)}ms</div>` : '';
   const av = m.role === 'assistant' ? '✦' : 'U';
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
@@ -120,7 +158,11 @@ function renderChat() {
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
 }
 function buildPrompt(priorMessages, userText) {
-  let p = settings.systemPrompt + '\n\n';
+  let sys = settings.systemPrompt;
+  // Reasoning mode: ask the model to think in <think></think> first. The SDK's
+  // splitThinking (mirrored by assistantHtml) peels that back out for display.
+  if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
+  let p = sys + '\n\n';
   for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
   return p + 'User: ' + userText + '\nAssistant:';
 }
@@ -145,12 +187,27 @@ async function sendChat() {
   bubble.classList.add('streaming');
   setStatus('generating…');
   try {
-    const h = await llm();
     let result = null;
-    await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
-      if (e.isFinal) { result = e.result; }
-      else { asst.content += e.token; bubble.innerHTML = md(asst.content); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
-    });
+    const runGen = async () => {
+      asst.content = '';
+      const h = await llm();
+      await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+        if (e.isFinal) { result = e.result; }
+        else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
+      });
+    };
+    try {
+      await runGen();
+    } catch (e) {
+      // The backend keeps ONE LLM loaded at a time, so loading a model from the
+      // Models tab evicts the chat model and our memoized handle goes stale. Drop
+      // it and reload the chat model once before surfacing an error.
+      if (/no model|not loaded|model.*load/i.test(e.message || '')) {
+        delete handles.llm;
+        for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale LLM badges
+        await runGen();
+      } else throw e;
+    }
     asst.content = asst.content.trim();
     if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
     bubble.classList.remove('streaming');
@@ -164,6 +221,8 @@ async function sendChat() {
 const loaders = { llm: (id) => ra.loadLLM(id), vlm: (id) => ra.loadVLM(id), embedder: (id) => ra.loadEmbedder(id), stt: (id) => ra.loadSTT(id), tts: (id) => ra.loadTTS(id) };
 const unloaders = { llm: (h) => ra.unloadLLM(h), vlm: (h) => ra.unloadVLM(h), embedder: (h) => ra.unloadEmbedder(h), stt: (h) => ra.unloadSTT(h), tts: (h) => ra.unloadTTS(h) };
 const loadedById = {};
+const loadedType = {}; // key -> model type, so we can enforce one-LLM-at-a-time
+function forgetLoaded(key) { delete loadedById[key]; delete loadedType[key]; }
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const TYPE_ICON = {
   llm: svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
@@ -212,8 +271,21 @@ function buildCard(o) {
       btns.forEach((x) => (x.disabled = true));
       b.textContent = loaded ? 'Unloading…' : 'Loading…';
       try {
-        if (loaded) { await unloaders[o.type](loaded); delete loadedById[o.key]; }
-        else { loadedById[o.key] = await loaders[o.type](o.source); }
+        if (loaded) {
+          await unloaders[o.type](loaded); forgetLoaded(o.key);
+          if (o.type === 'llm') delete handles.llm; // chat reloads its default next time
+        } else {
+          if (o.type === 'llm') {
+            // Backend keeps ONE LLM loaded — unload whichever is active first.
+            for (const k of Object.keys(loadedById)) {
+              if (loadedType[k] === 'llm') { try { await unloaders.llm(loadedById[k]); } catch { /* already gone */ } forgetLoaded(k); }
+            }
+            delete handles.llm;
+          }
+          loadedById[o.key] = await loaders[o.type](o.source);
+          loadedType[o.key] = o.type;
+          if (o.type === 'llm') handles.llm = Promise.resolve(loadedById[o.key]); // chat now uses this model
+        }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
     });
@@ -221,7 +293,7 @@ function buildCard(o) {
   }
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
-      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } delete loadedById[o.key]; }
+      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); if (o.type === 'llm') delete handles.llm; }
       customModels = customModels.filter((m) => m.id !== o.key); persistCustom(); renderModels();
     }));
   }
@@ -322,9 +394,10 @@ function applySettingsToUi() {
   $('setsystem').value = settings.systemPrompt;
   $('settemp').value = settings.temperature; $('settempval').textContent = settings.temperature;
   $('setmax').value = settings.maxTokens;
+  if ($('setreason')) $('setreason').checked = !!settings.reasoning;
 }
 async function saveSettings() {
-  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256 };
+  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256, reasoning: !!($('setreason') && $('setreason').checked) };
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
@@ -345,6 +418,38 @@ async function runEmbeddings(a, b) {
   for (let i = 0; i < ea.length; i++) { dot += ea[i] * eb[i]; na += ea[i] * ea[i]; nb += eb[i] * eb[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
+// ---- RAG (Knowledge tab) ----
+// rac model-registry enums: category EMBEDDING=7 / LANGUAGE=0, framework ONNX=0 / LLAMACPP=1.
+let ragSession = null; // native session handle, created lazily on first use.
+async function ragEnsureSession() {
+  if (ragSession != null) return ragSession;
+  setStatus('preparing knowledge base…');
+  // Download (idempotent) to get on-disk paths, register them so commons' RAG can
+  // resolve the ids, then create the session over MiniLM (embed) + the chat LLM.
+  const em = await ra.downloadModel('minilm');
+  const lm = await ra.downloadModel(DEFAULT_LLM);
+  await ra.registerModel('minilm', em.primary, 7, 0);
+  await ra.registerModel(DEFAULT_LLM, lm.primary, 0, 1);
+  ragSession = await ra.ragCreateSession({
+    embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
+    topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+  });
+  return ragSession;
+}
+function ragStatsText(s) {
+  if (!s) return '';
+  return `${s.indexedDocuments} document${s.indexedDocuments === 1 ? '' : 's'} · ${s.indexedChunks} chunk${s.indexedChunks === 1 ? '' : 's'} indexed`;
+}
+function renderRagSources(chunks) {
+  const el = $('ragsources');
+  if (!chunks || !chunks.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="label" style="margin-top:16px">Sources</div>' + chunks.map((c) => {
+    const src = c.sourceDocument ? escapeHtml(c.sourceDocument) : 'document';
+    const score = typeof c.similarityScore === 'number' ? c.similarityScore.toFixed(3) : '';
+    return `<div class="ragchunk"><div class="meta"><span>${src}</span><span class="ragscore">${score}</span></div><div class="txt">${escapeHtml(c.text || '')}</div></div>`;
+  }).join('');
+}
+
 async function runVision(imagePath, onToken) {
   let caption = '';
   await ra.generateVlm(await vlm(), imagePath, 'Describe this image in one sentence.', (t) => { caption += t; onToken?.(t); });
@@ -394,6 +499,47 @@ function wireUi() {
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
   $('toolsgo').addEventListener('click', out('toolsout', async () => { const c = await runTools($('toolstext').value); return `${c.name}(${JSON.stringify(c.arguments)})`; }));
   $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
+
+  $('ragadd').addEventListener('click', async () => {
+    const text = $('ragdoc').value.trim();
+    if (!text) return;
+    $('ragadd').disabled = true;
+    try {
+      const h = await ragEnsureSession();
+      const stats = await ra.ragIngest(h, { text });
+      $('ragstats').textContent = ragStatsText(stats);
+      $('ragdoc').value = '';
+    } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
+    finally { $('ragadd').disabled = false; setStatus('ready'); }
+  });
+  $('ragclear').addEventListener('click', async () => {
+    if (ragSession == null) { $('ragstats').textContent = ''; return; }
+    try { const s = await ra.ragClear(ragSession); $('ragstats').textContent = ragStatsText(s); $('ragout').textContent = ''; renderRagSources([]); } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
+  });
+  let ragQuerying = false;
+  const askRag = async () => {
+    if (ragQuerying) return; // one query at a time (Enter can re-fire past the disabled button)
+    const q = $('ragq').value.trim();
+    if (!q) return;
+    ragQuerying = true;
+    $('ragask').disabled = true; $('ragq').value = ''; $('ragout').innerHTML = '…'; renderRagSources([]);
+    setStatus('retrieving + answering…');
+    try {
+      const h = await ragEnsureSession();
+      const res = await ra.ragQuery(h, { question: q, maxTokens: settings.maxTokens, temperature: settings.temperature });
+      // Render reasoning + answer SEPARATELY (commons already split thinkingContent
+      // out) — do NOT re-wrap in <think> tags, or a literal </think> in retrieved
+      // document text would mis-split the answer into the reasoning drawer.
+      const reason = res.thinkingContent
+        ? `<details class="reason"><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(res.thinkingContent)}</div></details>`
+        : '';
+      $('ragout').innerHTML = reason + md(res.answer || '');
+      renderRagSources(res.retrievedChunks);
+    } catch (e) { $('ragout').textContent = 'error: ' + e.message; }
+    finally { ragQuerying = false; $('ragask').disabled = false; setStatus('ready'); }
+  };
+  $('ragask').addEventListener('click', askRag);
+  $('ragq').addEventListener('keydown', (e) => { if (e.key === 'Enter') askRag(); });
 
   const vf = $('visionfile');
   vf.addEventListener('change', () => {

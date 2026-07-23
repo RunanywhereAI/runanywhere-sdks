@@ -37,6 +37,8 @@ export type {
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
+export { splitThinking, stripThinking, isThinking } from './thinking';
+export type { ThinkingSplit } from './thinking';
 export { streamWithMetrics } from './stream';
 export {
   float32ToPcm16,
@@ -64,3 +66,5 @@ export { CATALOG, isCatalogId } from './catalog';
 export type { CatalogEntry, ModelType } from './catalog';
 export { resolveModel, downloadFile, modelsRoot } from './download';
 export type { DownloadProgress, ResolvedModel } from './download';
+export { RagSession } from './rag';
+export type { RagConfig, RagDoc, RagQuery, RagResult, RagChunk, RagStats, RagBridge } from './rag';

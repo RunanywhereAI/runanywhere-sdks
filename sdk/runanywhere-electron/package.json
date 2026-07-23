@@ -54,6 +54,9 @@
     "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
     "prepack": "npm run build && npm run bundle:native"
   },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1"
+  },
   "devDependencies": {
     "@types/node": "^22.7.0",
     "electron": "^43.1.1",

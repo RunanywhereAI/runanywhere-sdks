@@ -347,6 +347,42 @@ test('the id from req is echoed on every posted message', async () => {
   }
 });
 
+// ---- async (Promise-returning) unary bindings (e.g. ragQuery/ragIngest) --
+
+test('a Promise-returning unary binding is awaited and its resolved value posted', async () => {
+  const port = makePort();
+  const deps = makeDeps({
+    api: { ragQuery: async (h, bytes) => new Uint8Array([h, bytes.length, 9]) },
+  });
+  dispatch(port, { id: 40, method: 'ragQuery', args: [3, new Uint8Array([1, 2])] }, deps);
+  assert.equal(port.posts.length, 0, 'nothing posted synchronously — the result is awaited');
+  await tick();
+  assert.equal(port.posts.length, 1);
+  assert.equal(port.posts[0].id, 40);
+  assert.equal(port.posts[0].ok, true);
+  assert.deepEqual(Array.from(port.posts[0].result), [3, 2, 9]);
+});
+
+test('a rejected Promise from a unary binding is posted as an error', async () => {
+  const port = makePort();
+  const deps = makeDeps({
+    api: { ragIngest: async () => { throw new Error('ingest boom'); } },
+  });
+  dispatch(port, { id: 41, method: 'ragIngest', args: [1, new Uint8Array()] }, deps);
+  await tick();
+  assert.deepEqual(port.posts, [{ id: 41, ok: false, error: 'ingest boom' }]);
+});
+
+test('a synchronous unary binding still posts synchronously (no regression)', () => {
+  const port = makePort();
+  const deps = makeDeps({ api: { ragStats: () => new Uint8Array([5]) } });
+  dispatch(port, { id: 42, method: 'ragStats', args: [1] }, deps);
+  // Sync methods must not be deferred to a microtask.
+  assert.equal(port.posts.length, 1);
+  assert.equal(port.posts[0].ok, true);
+  assert.deepEqual(Array.from(port.posts[0].result), [5]);
+});
+
 // ---- STREAMING_METHODS membership --------------------------------------
 
 test('STREAMING_METHODS contains generate and generateVlm, not embed/loadModel', () => {
