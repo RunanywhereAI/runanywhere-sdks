@@ -9,6 +9,14 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
+import {
+  RAGConfiguration,
+  RAGDocument,
+  RAGQueryOptions,
+  RAGResult,
+  RAGStatistics,
+} from '../proto/rag';
+import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
@@ -212,6 +220,32 @@ contextBridge.exposeInMainWorld('runanywhere', {
   synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
   unloadTTS: (handle: number) =>
     emitAfter(send('unloadTtsVoice', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'tts' as Modality })),
+
+  // Register a downloaded model (id -> local path) in commons' global registry so
+  // RAG can resolve embedding/LLM ids. category/framework are rac enums
+  // (EMBEDDING=7, LANGUAGE=0; ONNX=0, LLAMACPP=1); omit to leave UNKNOWN.
+  registerModel: (id: string, localPath: string, category?: number, framework?: number) =>
+    send('registerModel', [id, localPath, category, framework]),
+
+  // ---- RAG (retrieval-augmented generation) ----
+  // Object-in / object-out: we encode the runanywhere.v1 proto messages here and
+  // pass raw bytes over the RPC; commons returns serialized RAGResult/RAGStatistics
+  // which we decode back. The addon (utility host) is a generic proto-byte pass-through.
+  ragCreateSession: (config: RagConfig): Promise<number> =>
+    send('ragCreateSession', [RAGConfiguration.encode(RAGConfiguration.fromPartial(config)).finish()]) as Promise<number>,
+  ragIngest: async (handle: number, doc: RagDoc): Promise<RagStats> => {
+    const bytes = RAGDocument.encode(RAGDocument.fromPartial(doc)).finish();
+    return RAGStatistics.decode(new Uint8Array((await send('ragIngest', [handle, bytes])) as Uint8Array)) as RagStats;
+  },
+  ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
+    const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
+    return RAGResult.decode(new Uint8Array((await send('ragQuery', [handle, bytes])) as Uint8Array)) as RagResult;
+  },
+  ragStats: async (handle: number): Promise<RagStats> =>
+    RAGStatistics.decode(new Uint8Array((await send('ragStats', [handle])) as Uint8Array)) as RagStats,
+  ragClear: async (handle: number): Promise<RagStats> =>
+    RAGStatistics.decode(new Uint8Array((await send('ragClear', [handle])) as Uint8Array)) as RagStats,
+  ragDestroySession: (handle: number): Promise<void> => send('ragDestroySession', [handle]) as Promise<void>,
 
   secureSet: (key: string, value: string) => send('secureSet', [key, value]),
   secureGet: (key: string) => send('secureGet', [key]),
