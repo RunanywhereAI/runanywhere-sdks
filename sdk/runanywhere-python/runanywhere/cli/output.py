@@ -9,6 +9,16 @@ import json
 import sys
 from typing import Any
 
+# When True (set by `--quiet`), suppress status/progress lines on stderr — results (stdout) and
+# errors are still emitted. Set once by cli.main() after parsing the global flags.
+_QUIET = False
+
+
+def set_quiet(quiet: bool) -> None:
+    """Toggle quiet mode (suppresses status/progress). Wired from the ``--quiet`` global flag."""
+    global _QUIET
+    _QUIET = bool(quiet)
+
 
 def result(text: str = "") -> None:
     """A result line -> stdout."""
@@ -23,12 +33,16 @@ def result_raw(text: str) -> None:
 
 
 def status(text: str = "") -> None:
-    """A log/status line -> stderr."""
+    """A log/status line -> stderr (suppressed under ``--quiet``)."""
+    if _QUIET:
+        return
     sys.stderr.write(text + "\n")
     sys.stderr.flush()
 
 
 def status_raw(text: str) -> None:
+    if _QUIET:
+        return
     sys.stderr.write(text)
     sys.stderr.flush()
 
