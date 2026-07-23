@@ -33,9 +33,9 @@ def defined_rule_names(grammar: str) -> set[str]:
 
 def assert_closed(grammar: str) -> None:
     """Every referenced identifier must be a defined rule; exactly one root; no dup LHS."""
-    lines = [l for l in grammar.split("\n") if "::=" in l]
+    lines = [ln for ln in grammar.split("\n") if "::=" in ln]
 
-    root_lines = [l for l in lines if l.split("::=")[0].strip() == "root"]
+    root_lines = [ln for ln in lines if ln.split("::=")[0].strip() == "root"]
     assert len(root_lines) == 1, f"expected exactly one root ::= line in:\n{grammar}"
 
     seen: dict[str, int] = {}
