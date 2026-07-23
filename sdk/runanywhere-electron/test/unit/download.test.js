@@ -66,6 +66,21 @@ test('parseHfUrl maps a /blob/ file URL to repo + explicit file', () => {
   });
 });
 
+test('parseHfUrl decodes percent-escapes in the file path', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/a%20b/model.gguf'), {
+    repo: 'owner/repo',
+    file: 'a b/model.gguf',
+  });
+});
+
+test('parseHfUrl does not throw on a malformed percent-escape (falls back to raw)', () => {
+  // decodeURIComponent('%ZZ') throws URIError — must be caught, not propagated.
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/a%ZZbad.gguf'), {
+    repo: 'owner/repo',
+    file: 'a%ZZbad.gguf',
+  });
+});
+
 test('parseHfUrl returns null for a /resolve/ (direct-download) URL and non-HF URLs', () => {
   // /resolve/ is already a raw file URL — keep it a direct download.
   assert.equal(download.parseHfUrl('https://huggingface.co/owner/repo/resolve/main/model.gguf'), null);
