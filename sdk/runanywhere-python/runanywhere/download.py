@@ -244,29 +244,51 @@ def _safe_extract(tar: tarfile.TarFile, dest_dir: str) -> None:
 
 # Dedup concurrent downloads to the SAME destination. Two resolve_model calls for one source
 # would otherwise open two write streams on the same `.part` file and corrupt it. A per-dest
-# Event (minted under a lock) is the sync point: the first caller downloads; the rest WAIT for it
-# to finish (so they never hand back a ResolvedModel pointing at a not-yet-written file).
+# state holder (minted under a lock) is the sync point: the first caller downloads; the rest WAIT
+# for it to finish (so they never hand back a ResolvedModel pointing at a not-yet-written file).
 _IN_FLIGHT_LOCK = threading.Lock()
-_IN_FLIGHT: dict[str, threading.Event] = {}
+
+
+class _DownloadState:
+    """Shared outcome for one in-flight destination: an Event + the owner's error (if any)."""
+
+    __slots__ = ("event", "error")
+
+    def __init__(self) -> None:
+        self.event = threading.Event()
+        self.error: BaseException | None = None
+
+
+_IN_FLIGHT: dict[str, _DownloadState] = {}
 
 
 def _download_once(
     url: str, dest: str, on_progress: Callable[[DownloadProgress], None] | None
 ) -> None:
     with _IN_FLIGHT_LOCK:
-        event = _IN_FLIGHT.get(dest)
-        own = event is None
+        state = _IN_FLIGHT.get(dest)
+        own = state is None
         if own:
-            event = _IN_FLIGHT[dest] = threading.Event()
+            state = _IN_FLIGHT[dest] = _DownloadState()
     if not own:
-        event.wait()  # another caller is downloading this dest — wait until it's done
+        state.event.wait()  # another caller is downloading this dest — wait until it's done
+        if state.error is not None:
+            # The owning download FAILED. Every waiter must fail too — otherwise resolve_model
+            # would hand back a path to a file that was never written (one transient network
+            # error silently becoming N broken model loads).
+            raise SDKException.generation_failed(
+                f"download failed for {os.path.basename(dest)}", cause=state.error
+            )
         return
     try:
         download_file(url, dest, on_progress)
+    except BaseException as exc:
+        state.error = exc  # publish the failure to any waiters holding this state
+        raise
     finally:
         with _IN_FLIGHT_LOCK:
             _IN_FLIGHT.pop(dest, None)
-        event.set()
+        state.event.set()
 
 
 _RE_URL = re.compile(r"^https?://", re.IGNORECASE)
