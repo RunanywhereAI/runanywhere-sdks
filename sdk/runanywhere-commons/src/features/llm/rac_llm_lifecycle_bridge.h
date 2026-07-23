@@ -12,6 +12,11 @@ struct LifecycleLlmRef {
     const char* model_id = nullptr;
     const char* framework_name = nullptr;
     bool supports_lora = false;
+    // Backend capability: the engine honors rac_llm_options_t.grammar
+    // (grammar-constrained decoding). Set by the lifecycle accessor per framework.
+    // Defaults false so every non-grammar engine (llama.cpp/onnx/cloud) is
+    // unaffected; only backends that actually consume options.grammar set it true.
+    bool supports_grammar = false;
     void* opaque = nullptr;
 };
 
