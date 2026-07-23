@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "win32_platform_adapter.h"
 
@@ -912,6 +913,80 @@ static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const c
     return out;
 }
 
+// rac_rag_ingest_proto / rac_rag_query_proto run a full embedding / LLM
+// generation and can take seconds, so run them on a worker thread and resolve a
+// Promise (parity with generate()). A synchronous call would block the entire
+// utility-host JS event loop — starving every other RPC — for the whole query.
+// The input bytes are copied because the worker outlives the JS call.
+using RagProtoOp = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+
+class RagProtoWorker : public Napi::AsyncWorker {
+ public:
+    RagProtoWorker(Napi::Env env, rac_handle_t session, std::vector<uint8_t> input,
+                   RagProtoOp op, const char* what)
+        : Napi::AsyncWorker(env),
+          deferred_(Napi::Promise::Deferred::New(env)),
+          session_(session), input_(std::move(input)), op_(op), what_(what) {}
+
+    Napi::Promise Promise() { return deferred_.Promise(); }
+
+    void Execute() override {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+        if (out.status == RAC_SUCCESS && out.data != nullptr) {
+            result_.assign(out.data, out.data + out.size);
+            ok_ = true;
+        } else {
+            err_ = std::string(what_) + " failed: " + std::to_string(out.status);
+            if (out.error_message) { err_ += " ("; err_ += out.error_message; err_ += ")"; }
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        if (ok_) {
+            deferred_.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), result_.data(), result_.size()));
+        } else {
+            deferred_.Reject(Napi::Error::New(Env(), err_).Value());
+        }
+    }
+
+    void OnError(const Napi::Error& e) override {
+        Napi::HandleScope scope(Env());
+        deferred_.Reject(e.Value());
+    }
+
+ private:
+    Napi::Promise::Deferred deferred_;
+    rac_handle_t session_;
+    std::vector<uint8_t> input_;
+    RagProtoOp op_;
+    std::string what_;
+    std::vector<uint8_t> result_;
+    std::string err_;
+    bool ok_ = false;
+};
+
+// Validate (handleId, protoBytes) and dispatch a RagProtoWorker; returns its Promise.
+static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, const char* what) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
+        Napi::TypeError::New(env, std::string(what) + "(handleId, protoBytes) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    Napi::Uint8Array bytes = info[1].As<Napi::Uint8Array>();
+    std::vector<uint8_t> copy(bytes.Data(), bytes.Data() + bytes.ByteLength());
+    auto* worker = new RagProtoWorker(env, h, std::move(copy), op, what);
+    Napi::Promise promise = worker->Promise();
+    worker->Queue();
+    return promise;
+}
+
 // Register a downloaded model in commons' global registry (id -> local_path) so
 // RAG session-create can resolve embedding/LLM model ids to on-disk paths. The
 // Electron SDK otherwise loads models by explicit path and never populates the
@@ -978,36 +1053,14 @@ Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
     return Napi::Number::New(env, hid);
 }
 
+// Async (worker-thread) — a document's chunks are embedded, which can be slow.
 Napi::Value RagIngest(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
-        Napi::TypeError::New(env, "ragIngest(handleId, documentProtoBytes) bad args").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
-    Napi::Uint8Array doc = info[1].As<Napi::Uint8Array>();
-    rac_proto_buffer_t out;
-    rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_rag_ingest_proto(h, doc.Data(), doc.ByteLength(), &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
-    return rag_out_to_js(env, &out, "rag ingest");
+    return rag_async_op(info, rac_rag_ingest_proto, "rag ingest");
 }
 
+// Async (worker-thread) — a query runs retrieval + a full LLM generation.
 Napi::Value RagQuery(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
-        Napi::TypeError::New(env, "ragQuery(handleId, queryProtoBytes) bad args").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
-    Napi::Uint8Array q = info[1].As<Napi::Uint8Array>();
-    rac_proto_buffer_t out;
-    rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_rag_query_proto(h, q.Data(), q.ByteLength(), &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
-    return rag_out_to_js(env, &out, "rag query");
+    return rag_async_op(info, rac_rag_query_proto, "rag query");
 }
 
 Napi::Value RagClear(const Napi::CallbackInfo& info) {
