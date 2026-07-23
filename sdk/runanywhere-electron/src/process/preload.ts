@@ -8,6 +8,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
+import { splitThinking } from '../thinking';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
@@ -100,6 +101,10 @@ contextBridge.exposeInMainWorld('runanywhere', {
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
+
+  // ---- reasoning ----
+  // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
+  splitThinking: (text: string) => splitThinking(text),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,
