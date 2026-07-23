@@ -6,9 +6,10 @@ Global flags (``--json -v -q --no-progress --home``) work before *and* after the
 from __future__ import annotations
 
 import argparse
+import os
 from typing import Optional
 
-from . import handlers
+from . import handlers, output
 
 
 # Global flags are shared (via parents=) by BOTH the top parser and every subparser, so they work
@@ -50,6 +51,14 @@ def main(argv: Optional[list] = None) -> int:
     for flag, default in _GLOBAL_DEFAULTS.items():  # fill SUPPRESS'd globals that weren't passed
         if not hasattr(args, flag):
             setattr(args, flag, default)
+    # Wire the verbosity flags (previously parsed but unused): --verbose raises the runtime log
+    # level (the native core reads RUNANYWHERE_LOG_LEVEL at init), --quiet lowers it AND suppresses
+    # CLI status/progress lines. Respect a log level the user already set in the environment.
+    if args.verbose and "RUNANYWHERE_LOG_LEVEL" not in os.environ:
+        os.environ["RUNANYWHERE_LOG_LEVEL"] = "debug"
+    elif args.quiet and "RUNANYWHERE_LOG_LEVEL" not in os.environ:
+        os.environ["RUNANYWHERE_LOG_LEVEL"] = "error"
+    output.set_quiet(args.quiet)
     if getattr(args, "version", False):
         from .. import __version__
 
