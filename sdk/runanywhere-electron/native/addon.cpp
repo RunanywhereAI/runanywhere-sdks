@@ -38,6 +38,10 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/features/rag/rac_rag.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 // Internal (non-proto) embeddings service factory — its header lives under
 // commons/src/, not include/, so re-declare the prototype here. The addon
@@ -63,6 +67,7 @@ std::unordered_map<int32_t, rac_handle_t> g_embed_handles;
 std::unordered_map<int32_t, rac_handle_t> g_stt_handles;
 std::unordered_map<int32_t, rac_handle_t> g_tts_handles;
 std::unordered_map<int32_t, rac_handle_t> g_vad_handles;
+std::unordered_map<int32_t, rac_handle_t> g_rag_handles;
 int32_t g_next_handle_id = 1;
 
 rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
@@ -886,6 +891,169 @@ Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
+// ---- RAG (retrieval-augmented generation) -------------------------------
+//
+// Proto-byte C ABI: the SDK encodes runanywhere.v1 RAG* messages (ts-proto) and
+// hands them across as Buffers; commons returns serialized RAGResult/RAGStatistics
+// in an owned rac_proto_buffer_t that we copy into a Napi::Buffer and free.
+
+// Copy an owned proto-out buffer to a JS Buffer (throwing on failure), always
+// releasing the native buffer.
+static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const char* what) {
+    if (buf->status != RAC_SUCCESS || buf->data == nullptr) {
+        std::string msg = std::string(what) + " failed: " + std::to_string(buf->status);
+        if (buf->error_message) { msg += " ("; msg += buf->error_message; msg += ")"; }
+        rac_proto_buffer_free(buf);
+        Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Napi::Buffer<uint8_t> out = Napi::Buffer<uint8_t>::Copy(env, buf->data, buf->size);
+    rac_proto_buffer_free(buf);
+    return out;
+}
+
+// Register a downloaded model in commons' global registry (id -> local_path) so
+// RAG session-create can resolve embedding/LLM model ids to on-disk paths. The
+// Electron SDK otherwise loads models by explicit path and never populates the
+// registry, so RAG needs this bridge. rac_register_model deep-copies the struct.
+static char* rag_dup_cstr(const std::string& s) {
+    char* p = static_cast<char*>(std::malloc(s.size() + 1));
+    if (p) std::memcpy(p, s.c_str(), s.size() + 1);
+    return p;
+}
+
+Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
+        Napi::TypeError::New(env, "registerModel(id, path, category?, framework?) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string id = info[0].As<Napi::String>().Utf8Value();
+    std::string path = info[1].As<Napi::String>().Utf8Value();
+    int32_t category = (info.Length() > 2 && info[2].IsNumber())
+                           ? info[2].As<Napi::Number>().Int32Value()
+                           : static_cast<int32_t>(RAC_MODEL_CATEGORY_UNKNOWN);
+    int32_t framework = (info.Length() > 3 && info[3].IsNumber())
+                            ? info[3].As<Napi::Number>().Int32Value()
+                            : static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN);
+    rac_model_info_t* mi = rac_model_info_alloc();
+    if (!mi) {
+        Napi::Error::New(env, "rac_model_info_alloc failed").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    mi->id = rag_dup_cstr(id);
+    mi->local_path = rag_dup_cstr(path);
+    mi->category = static_cast<rac_model_category_t>(category);
+    mi->framework = static_cast<rac_inference_framework_t>(framework);
+    rac_result_t rc = rac_register_model(mi);
+    rac_model_info_free(mi);
+    if (rc != RAC_SUCCESS) {
+        Napi::Error::New(env, "registerModel failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return env.Undefined();
+}
+
+Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    // Proto bytes arrive as a Uint8Array (Buffers degrade to Uint8Array crossing
+    // the utility-host MessagePort), so accept any typed array, not just Buffer.
+    if (info.Length() < 1 || !info[0].IsTypedArray()) {
+        Napi::TypeError::New(env, "ragCreateSession(configProtoBytes) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Napi::Uint8Array cfg = info[0].As<Napi::Uint8Array>();
+    rac_handle_t h = nullptr;
+    rac_result_t rc = rac_rag_session_create_proto(cfg.Data(), cfg.ByteLength(), &h);
+    if (rc != RAC_SUCCESS || h == nullptr) {
+        Napi::Error::New(env, "rag session create failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        hid = g_next_handle_id++;
+        g_rag_handles[hid] = h;
+    }
+    return Napi::Number::New(env, hid);
+}
+
+Napi::Value RagIngest(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
+        Napi::TypeError::New(env, "ragIngest(handleId, documentProtoBytes) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    Napi::Uint8Array doc = info[1].As<Napi::Uint8Array>();
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_rag_ingest_proto(h, doc.Data(), doc.ByteLength(), &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    return rag_out_to_js(env, &out, "rag ingest");
+}
+
+Napi::Value RagQuery(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
+        Napi::TypeError::New(env, "ragQuery(handleId, queryProtoBytes) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    Napi::Uint8Array q = info[1].As<Napi::Uint8Array>();
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_rag_query_proto(h, q.Data(), q.ByteLength(), &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    return rag_out_to_js(env, &out, "rag query");
+}
+
+Napi::Value RagClear(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "ragClear(handleId) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_rag_clear_proto(h, &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    return rag_out_to_js(env, &out, "rag clear");
+}
+
+Napi::Value RagStats(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) {
+        Napi::TypeError::New(env, "ragStats(handleId) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_rag_stats_proto(h, &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+    return rag_out_to_js(env, &out, "rag stats");
+}
+
+Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_rag_handles.find(hid);
+        if (it != g_rag_handles.end()) { h = it->second; g_rag_handles.erase(it); }
+    }
+    if (h) rac_rag_session_destroy_proto(h);
+    return env.Undefined();
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("initialize", Napi::Function::New(env, Initialize));
     exports.Set("secureSet", Napi::Function::New(env, SecureSet));
@@ -912,6 +1080,13 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("loadTtsVoice", Napi::Function::New(env, LoadTtsVoice));
     exports.Set("synthesize", Napi::Function::New(env, Synthesize));
     exports.Set("unloadTtsVoice", Napi::Function::New(env, UnloadTtsVoice));
+    exports.Set("registerModel", Napi::Function::New(env, RegisterModel));
+    exports.Set("ragCreateSession", Napi::Function::New(env, RagCreateSession));
+    exports.Set("ragIngest", Napi::Function::New(env, RagIngest));
+    exports.Set("ragQuery", Napi::Function::New(env, RagQuery));
+    exports.Set("ragClear", Napi::Function::New(env, RagClear));
+    exports.Set("ragStats", Napi::Function::New(env, RagStats));
+    exports.Set("ragDestroySession", Napi::Function::New(env, RagDestroySession));
     exports.Set("shutdown", Napi::Function::New(env, Shutdown));
     exports.Set("version", Napi::String::New(env, rac_sdk_get_version()));
     return exports;
