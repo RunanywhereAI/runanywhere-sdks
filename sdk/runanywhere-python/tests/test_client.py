@@ -245,6 +245,23 @@ def test_secure_store_delegates_to_core(fake_core: FakeCore) -> None:
     ra.shutdown()
 
 
+def test_secure_store_rejects_traversal_keys(fake_core: FakeCore) -> None:
+    from runanywhere.client import _validate_secure_key
+
+    ra = RunAnywhere().initialize()
+    for bad in ("../evil", "..\\evil", "/etc/passwd", "a/b", "", ".", "..", "sub\\x", "x\x00y"):
+        with pytest.raises(SDKException) as ei:
+            ra.secure_set(bad, "v")
+        assert ei.value.code == ErrorCode.INVALID_INPUT
+    # No traversal key ever reached the store.
+    assert fake_core.count("secure_set") == 0
+    # A simple flat name is accepted and delegates to the core.
+    ra.secure_set("api_key", "ok")
+    assert fake_core.count("secure_set") == 1
+    ra.shutdown()
+    assert _validate_secure_key("api_key") == "api_key"
+
+
 def test_shutdown_before_initialize_is_noop(fake_core: FakeCore) -> None:
     ra = RunAnywhere()
     ra.shutdown()  # must not raise, must not touch the core
