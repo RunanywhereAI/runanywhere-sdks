@@ -2,6 +2,7 @@
 // proto-byte bridge (window.runanywhere.rag*) so callers work with plain objects:
 // create a session over an embedding model (+ optional LLM), ingest documents,
 // then ask grounded questions. Proto encode/decode lives in the preload bridge.
+import { SDKException } from './errors';
 
 /** Configuration for a RAG session. Only `embeddingModelId` is required. */
 export interface RagConfig {
@@ -101,7 +102,9 @@ export class RagSession {
 
   /** Create a session over the given embedding model (+ optional LLM). */
   static async create(bridge: RagBridge, config: RagConfig): Promise<RagSession> {
-    if (!config || !config.embeddingModelId) throw new Error('RagSession.create: embeddingModelId is required');
+    if (!config || !config.embeddingModelId) {
+      throw SDKException.validationFailed({ fieldPath: 'embeddingModelId', message: 'RagSession.create: embeddingModelId is required' });
+    }
     const handle = await bridge.ragCreateSession(config);
     return new RagSession(bridge, handle);
   }
@@ -145,6 +148,6 @@ export class RagSession {
   }
 
   private assertOpen(): void {
-    if (this.closed) throw new Error('RagSession is closed');
+    if (this.closed) throw SDKException.invalidState('RagSession is closed');
   }
 }
