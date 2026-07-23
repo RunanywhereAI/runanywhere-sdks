@@ -150,8 +150,7 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
         }.getOrNull()
 
     private fun needsToken(model: RAModelInfo): Boolean =
-        model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank() &&
-            com.runanywhere.runanywhereai.BuildConfig.HF_TOKEN.isBlank()
+        model.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
 
     /** Raw RGBA (row-major, R,G,B,A per pixel) -> ARGB_8888 Bitmap. */
     private fun toBitmap(rgba: ByteArray, width: Int, height: Int): Bitmap? {

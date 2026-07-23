@@ -374,14 +374,9 @@ private struct RunAnywhereNemotronConfiguration: Codable, Sendable,
                 "Nemotron attention dimensions are inconsistent"
             )
         }
-        if let headDimension, headDimension != resolvedHeadDimension {
+        if let headDimension, let keyValueChannels, headDimension != keyValueChannels {
             throw ModelFactoryError.invalidConfiguration(
-                "Nemotron head_dim conflicts with the resolved attention head dimension"
-            )
-        }
-        if let keyValueChannels, keyValueChannels != resolvedHeadDimension {
-            throw ModelFactoryError.invalidConfiguration(
-                "Nemotron kv_channels conflicts with the resolved attention head dimension"
+                "Nemotron head_dim conflicts with kv_channels"
             )
         }
         let rotaryDimensions = partialRotaryFactor * Float(resolvedHeadDimension)

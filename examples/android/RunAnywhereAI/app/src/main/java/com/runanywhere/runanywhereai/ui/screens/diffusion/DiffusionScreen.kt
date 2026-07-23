@@ -61,6 +61,12 @@ fun DiffusionScreen() {
             value = vm.prompt,
             onValueChange = vm::onPromptChange,
             label = { Text("Prompt") },
+            supportingText = {
+                Text(
+                    "Preview build: this Cosmos3-Edge export renders a fixed baked prompt; " +
+                        "free-form prompts arrive with the prompt-conditioned export.",
+                )
+            },
             singleLine = false,
             enabled = !vm.isGenerating,
             modifier = Modifier.fillMaxWidth(),

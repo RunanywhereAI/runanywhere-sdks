@@ -1,6 +1,7 @@
 #include "blob_store.h"
 
 #include <filesystem>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <unordered_set>
@@ -14,6 +15,14 @@ namespace {
 namespace fs = std::filesystem;
 constexpr const char* kLogTag = "BlobStore";
 constexpr const char* kBlobDirName = ".blobs";
+
+// Serializes store mutations (promote / link / GC) so a blob that is momentarily
+// unreferenced mid-promote (moved into the store before its symlink exists yet) can't
+// be swept by a concurrent gc_orphans() running from a delete path on another thread.
+std::mutex& store_mutex() {
+    static std::mutex m;
+    return m;
+}
 
 // {base_dir}/RunAnywhere/Models — the root that holds per-framework model dirs + .blobs.
 std::string models_root() {
@@ -65,6 +74,7 @@ std::string blob_path(const std::string& sha256_hex) {
 bool link_from_blob(const std::string& sha256_hex, int64_t expected_bytes,
                     const std::string& dest) {
     if (!enabled() || !is_hex(sha256_hex) || dest.empty()) return false;
+    const std::lock_guard<std::mutex> lock(store_mutex());
     const std::string blob = blob_path(sha256_hex);
     std::error_code ec;
     if (!fs::exists(blob, ec) || ec) return false;
@@ -84,6 +94,7 @@ bool link_from_blob(const std::string& sha256_hex, int64_t expected_bytes,
 
 void promote(const std::string& sha256_hex, const std::string& dest) {
     if (!enabled() || !is_hex(sha256_hex) || dest.empty()) return;
+    const std::lock_guard<std::mutex> lock(store_mutex());
     std::error_code ec;
     // Already a symlink (this file came in via a de-dup hit) — nothing to publish.
     if (fs::is_symlink(dest, ec) && !ec) return;
@@ -129,6 +140,7 @@ void promote(const std::string& sha256_hex, const std::string& dest) {
 
 int64_t gc_orphans() {
     if (!enabled()) return 0;
+    const std::lock_guard<std::mutex> lock(store_mutex());
     const std::string dir = store_dir();
     const std::string root = models_root();
     std::error_code ec;
@@ -151,6 +163,16 @@ int64_t gc_orphans() {
         const fs::path tgt = fs::read_symlink(p, e2);
         if (e2) continue;
         referenced.insert(tgt.filename().string());  // the blob's sha filename
+    }
+
+    // If the mark pass ended on an error the `referenced` set may be incomplete;
+    // sweeping now could delete a blob still linked by an unscanned model. Bail
+    // out and reclaim nothing rather than risk deleting live shared content.
+    if (ec) {
+        RAC_LOG_WARNING(kLogTag,
+                        "GC mark pass failed (%s); skipping sweep to avoid deleting live blobs",
+                        ec.message().c_str());
+        return 0;
     }
 
     // Sweep: any blob nobody references is orphaned.

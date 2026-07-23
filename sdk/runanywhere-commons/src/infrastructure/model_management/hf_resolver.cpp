@@ -589,12 +589,14 @@ void collect_json_strings(const nlohmann::json& j, std::vector<std::string>& out
     }
 }
 
-// Fetch a pinned manifest and return the set of file BASENAMES it references (that also
-// exist in `bundle`). Generic — matches any JSON string value whose basename is a bundle
-// file, so it captures a manifest's artifacts (decode/embed/lmhead/vision/DiT/vae/tokenizer)
-// regardless of nesting, with zero per-framework schema in commons. Empty set => couldn't
-// prune (fetch/parse failed or nothing matched) => caller registers the whole folder.
-std::unordered_set<std::string> manifest_referenced_basenames(
+// Fetch a pinned manifest and return the set of bundle-relative PATHS it references (that
+// also exist in `bundle`). Generic — matches any JSON string value that is a bundle file by
+// exact relative path, or by basename when that basename is unique in the bundle, so it
+// captures a manifest's artifacts (decode/embed/lmhead/vision/DiT/vae/tokenizer) regardless
+// of nesting while keeping siblings like text/weights.bin and vision/weights.bin distinct,
+// with zero per-framework schema in commons. Empty set => couldn't prune (fetch/parse failed
+// or nothing matched) => caller registers the whole folder.
+std::unordered_set<std::string> manifest_referenced_paths(
     const std::string& manifest_url, const std::vector<TreeFile>& bundle) {
     std::unordered_set<std::string> refs;
     rac_http_client_t* client = nullptr;
@@ -616,13 +618,30 @@ std::unordered_set<std::string> manifest_referenced_basenames(
     if (body.empty()) return refs;
     const nlohmann::json doc = nlohmann::json::parse(body, nullptr, /*allow_exceptions=*/false);
     if (doc.is_discarded()) return refs;
-    std::unordered_set<std::string> bundle_basenames;
-    for (const auto& f : bundle) bundle_basenames.insert(basename_of(f.path));
+    std::unordered_set<std::string> bundle_paths;
+    std::map<std::string, std::string> unique_basename_to_path;  // unique basename -> its path
+    std::unordered_set<std::string> ambiguous_basenames;
+    for (const auto& f : bundle) {
+        bundle_paths.insert(f.path);
+        const std::string b = basename_of(f.path);
+        if (b.empty() || ambiguous_basenames.count(b) > 0) continue;
+        const auto [it, inserted] = unique_basename_to_path.emplace(b, f.path);
+        if (!inserted) {
+            unique_basename_to_path.erase(it);
+            ambiguous_basenames.insert(b);
+        }
+    }
     std::vector<std::string> strings;
     collect_json_strings(doc, strings);
     for (const auto& s : strings) {
-        const std::string b = basename_of(s);
-        if (!b.empty() && bundle_basenames.count(b) > 0) refs.insert(b);
+        // Prefer an exact bundle-relative path match so nested siblings stay distinct.
+        if (bundle_paths.count(s) > 0) {
+            refs.insert(s);
+            continue;
+        }
+        // Otherwise fall back to basename matching only when that basename is unambiguous.
+        const auto it = unique_basename_to_path.find(basename_of(s));
+        if (it != unique_basename_to_path.end()) refs.insert(it->second);
     }
     return refs;
 }
@@ -748,14 +767,14 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
     // whole folder when the manifest can't be fetched/parsed (referenced stays empty).
     std::unordered_set<std::string> referenced;
     if (!primary_rel.empty()) {
-        referenced = manifest_referenced_basenames(
+        referenced = manifest_referenced_paths(
             url_base + prefix + bundle[primary_index].path, bundle);
     }
     constexpr int64_t kPruneMinBytes = 1 * 1024 * 1024;  // always keep tiny aux/config files
     auto keep = [&](const TreeFile& part) {
         if (referenced.empty()) return true;                // no prune info -> unchanged behavior
         if (part.size_bytes < kPruneMinBytes) return true;  // small aux/config always kept
-        return referenced.count(basename_of(part.path)) > 0;
+        return referenced.count(part.path) > 0;
     };
     append(bundle[primary_index], prefix + bundle[primary_index].path);
     for (size_t i = 0; i < bundle.size(); ++i) {

@@ -235,8 +235,8 @@ export function initSettingsTab(el: HTMLElement): void {
       </div>
 
       <!-- Hugging Face access token for gated/private model downloads. The SDK
-           owns storage (RunAnywhere.setHfToken); this app never writes it to its
-           own localStorage, matching the iOS Keychain / Android Keystore examples. -->
+           owns the token (RunAnywhere.setHfToken); it is held in memory for the
+           current session only and is never persisted to browser storage. -->
       <div class="settings-section">
         <div class="settings-section-title">Hugging Face Access</div>
         <div class="setting-row">
@@ -248,8 +248,9 @@ export function initSettingsTab(el: HTMLElement): void {
           <p class="setting-hint">
             Optional. Add a Hugging Face token to download gated or private
             models; public models need none. The token is passed to the SDK via
-            <code>RunAnywhere.setHfToken</code> and is never written to this
-            app's settings or logs.
+            <code>RunAnywhere.setHfToken</code>, kept in memory for this session
+            only, and never persisted to browser storage; re-enter it after a
+            reload.
             <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
           </p>
           <div class="flex items-center gap-sm">
@@ -342,10 +343,10 @@ export function initSettingsTab(el: HTMLElement): void {
     void applyAPIConfiguration(apiKeyInput, baseURLInput, applyButton, status);
   });
 
-  // Hugging Face access token. Storage is SDK-owned (RunAnywhere.setHfToken /
-  // getStoredHfToken); the token is never written to this app's localStorage,
-  // matching the iOS Keychain / Android Keystore examples. Public models need
-  // no token; gated/private models download once a token is set.
+  // Hugging Face access token. The SDK owns it (RunAnywhere.setHfToken /
+  // getStoredHfToken) and holds it in memory for the current session only; it
+  // is never persisted to browser storage. Public models need no token;
+  // gated/private models download once a token is set.
   const hfInput = container.querySelector('#settings-hf-token') as HTMLInputElement;
   const hfState = container.querySelector('#settings-hf-state') as HTMLElement;
   const hfStatus = container.querySelector('#settings-hf-status') as HTMLElement;
@@ -356,17 +357,22 @@ export function initSettingsTab(el: HTMLElement): void {
       RunAnywhere.setHfToken(token);
       hfInput.value = '';
       hfState.textContent = 'Configured';
-      hfStatus.textContent = 'Token saved for model downloads.';
+      hfStatus.textContent = 'Token set for downloads this session.';
     } catch (error) {
       hfStatus.textContent =
         error instanceof Error ? error.message : 'Failed to set the token.';
     }
   });
   container.querySelector('#settings-hf-clear')!.addEventListener('click', () => {
-    RunAnywhere.setHfToken(null);
-    hfInput.value = '';
-    hfState.textContent = 'Not set';
-    hfStatus.textContent = 'Token cleared.';
+    try {
+      RunAnywhere.setHfToken(null);
+      hfInput.value = '';
+      hfState.textContent = 'Not set';
+      hfStatus.textContent = 'Token cleared.';
+    } catch (error) {
+      hfStatus.textContent =
+        error instanceof Error ? error.message : 'Unable to clear the token. Please try again.';
+    }
   });
 
   // Docs link

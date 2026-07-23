@@ -52,9 +52,6 @@ val runanywhereBaseUrl = releaseValue("RUNANYWHERE_BASE_URL", "runanywhere.baseU
 val runanywhereApiKey = releaseValue("RUNANYWHERE_API_KEY", "runanywhere.apiKey")
 val privacyPolicyUrl = releaseValue("RUNANYWHERE_PRIVACY_POLICY_URL", "runanywhere.privacyPolicyUrl")
 val webSearchUrl = releaseValue("RUNANYWHERE_WEB_SEARCH_URL", "runanywhere.webSearchUrl")
-// Optional HuggingFace token for gated/private HNPU bundles; sourced from env HF_TOKEN or
-// local.properties `hf.token` (both gitignored). Blank in offline/CI builds.
-val hfToken = releaseValue("HF_TOKEN", "hf.token")
 require(runanywhereBaseUrl.isBlank() == runanywhereApiKey.isBlank()) {
     "RUNANYWHERE_BASE_URL and RUNANYWHERE_API_KEY must either both be set or both be blank"
 }
@@ -114,7 +111,6 @@ android {
         buildConfigField("String", "RUNANYWHERE_API_KEY", runanywhereApiKey.asBuildConfigString())
         buildConfigField("String", "PRIVACY_POLICY_URL", privacyPolicyUrl.asBuildConfigString())
         buildConfigField("String", "WEB_SEARCH_URL", webSearchUrl.asBuildConfigString())
-        buildConfigField("String", "HF_TOKEN", hfToken.asBuildConfigString())
 
         // Release/device builds ship arm64-v8a: the Qualcomm Hexagon NPU (QHexRT, Hexagon v75+)
         // is arm64-only hardware, and target devices (Snapdragon 8 Gen 3+) are all
