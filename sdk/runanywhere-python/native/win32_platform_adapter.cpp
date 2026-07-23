@@ -43,17 +43,57 @@ const char* level_name(rac_log_level_t lvl) {
     }
 }
 
+// The platform-adapter contract states paths are UTF-8. On MSVC, narrow fopen() and
+// fs::path(const char*) interpret bytes in the process ANSI code page, so a non-ASCII path
+// (common on localized Windows profiles, e.g. C:\Users\<accented>\...) fails to open. Convert
+// UTF-8 -> UTF-16 explicitly and build fs::path from the wide string / open with _wfopen.
+std::wstring utf8_to_wide(const char* utf8) {
+    if (!utf8 || !*utf8) return std::wstring();
+    int n = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+    if (n <= 0) return std::wstring();
+    std::wstring w(static_cast<size_t>(n - 1), L'\0');  // n counts the NUL terminator
+    MultiByteToWideChar(CP_UTF8, 0, utf8, -1, w.data(), n);
+    return w;
+}
+
+std::string wide_to_utf8(const std::wstring& w) {
+    if (w.empty()) return std::string();
+    int n = WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 0) return std::string();
+    std::string s(static_cast<size_t>(n - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.c_str(), -1, s.data(), n, nullptr, nullptr);
+    return s;
+}
+
+fs::path utf8_path(const char* p) { return fs::path(utf8_to_wide(p)); }
+
+FILE* wfopen_utf8(const fs::path& p, const wchar_t* mode) { return _wfopen(p.c_str(), mode); }
+
+// The secure store is a flat key -> file namespace. Reject a key that could escape the store
+// directory (path separators, '..', or an absolute/drive path) so secure_set/get/delete cannot
+// touch an arbitrary file. Defense in depth: the Python facade validates too.
+bool secure_key_ok(const char* key) {
+    if (!key || !*key) return false;
+    std::string k(key);
+    if (k == "." || k == "..") return false;
+    if (k.find('/') != std::string::npos || k.find('\\') != std::string::npos) return false;
+    // Drive-absolute (C:...) or rooted paths.
+    if (k.size() >= 2 && k[1] == ':') return false;
+    if (utf8_path(key).is_absolute()) return false;
+    return true;
+}
+
 rac_bool_t win_file_exists(const char* path, void*) {
     if (!path) return RAC_FALSE;
     std::error_code ec;
-    return (fs::exists(fs::path(path), ec) && !ec) ? RAC_TRUE : RAC_FALSE;
+    return (fs::exists(utf8_path(path), ec) && !ec) ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, void*) {
     if (!path || !out_data || !out_size) return RAC_ERROR_INVALID_ARGUMENT;
     *out_data = nullptr;
     *out_size = 0;
-    FILE* f = fopen(path, "rb");
+    FILE* f = wfopen_utf8(utf8_path(path), L"rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
@@ -80,7 +120,7 @@ rac_result_t win_file_read(const char* path, void** out_data, size_t* out_size, 
 
 rac_result_t win_file_write(const char* path, const void* data, size_t size, void*) {
     if (!path || (!data && size)) return RAC_ERROR_INVALID_ARGUMENT;
-    FILE* f = fopen(path, "wb");
+    FILE* f = wfopen_utf8(utf8_path(path), L"wb");
     if (!f) return RAC_ERROR_FILE_WRITE_FAILED;
     size_t put = size ? fwrite(data, 1, size, f) : 0;
     fclose(f);
@@ -90,11 +130,13 @@ rac_result_t win_file_write(const char* path, const void* data, size_t size, voi
 rac_result_t win_file_delete(const char* path, void*) {
     if (!path) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
-    fs::remove(fs::path(path), ec);
+    fs::remove(utf8_path(path), ec);
     return ec ? RAC_ERROR_INTERNAL : RAC_SUCCESS;
 }
 
-fs::path secure_path(const char* key) { return fs::path(g_secure_dir) / fs::path(key); }
+fs::path secure_path(const char* key) {
+    return fs::path(utf8_to_wide(g_secure_dir.c_str())) / fs::path(utf8_to_wide(key));
+}
 
 // Secure store backed by Windows DPAPI: values are encrypted with the current
 // user's credentials (CryptProtectData, no UI) before hitting disk and decrypted
@@ -103,11 +145,12 @@ fs::path secure_path(const char* key) { return fs::path(g_secure_dir) / fs::path
 // headless. Data is only decryptable by the same Windows user on this machine.
 rac_result_t win_secure_get(const char* key, char** out_value, void*) {
     if (!key || !out_value) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     *out_value = nullptr;
     std::error_code ec;
     fs::path p = secure_path(key);
     if (!fs::exists(p, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;  // clean miss contract
-    FILE* f = fopen(p.string().c_str(), "rb");
+    FILE* f = wfopen_utf8(p, L"rb");
     if (!f) return RAC_ERROR_FILE_NOT_FOUND;
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
@@ -144,8 +187,9 @@ rac_result_t win_secure_get(const char* key, char** out_value, void*) {
 
 rac_result_t win_secure_set(const char* key, const char* value, void*) {
     if (!key || !value) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
-    fs::create_directories(fs::path(g_secure_dir), ec);
+    fs::create_directories(fs::path(utf8_to_wide(g_secure_dir.c_str())), ec);
 
     DATA_BLOB in{static_cast<DWORD>(std::strlen(value)),
                  reinterpret_cast<BYTE*>(const_cast<char*>(value))};
@@ -154,7 +198,7 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
                           CRYPTPROTECT_UI_FORBIDDEN, &out)) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
-    FILE* f = fopen(secure_path(key).string().c_str(), "wb");
+    FILE* f = wfopen_utf8(secure_path(key), L"wb");
     if (!f) {
         LocalFree(out.pbData);
         return RAC_ERROR_SECURE_STORAGE_FAILED;
@@ -168,6 +212,7 @@ rac_result_t win_secure_set(const char* key, const char* value, void*) {
 
 rac_result_t win_secure_delete(const char* key, void*) {
     if (!key) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::remove(secure_path(key), ec);
     return RAC_SUCCESS;  // a clean miss is success
@@ -198,14 +243,14 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
                           size_t* in_out_count, void*) {
     if (!dir_path || !in_out_count) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
-    fs::path dir(dir_path);
+    fs::path dir = utf8_path(dir_path);
     if (!fs::is_directory(dir, ec) || ec) return RAC_ERROR_FILE_NOT_FOUND;
     const size_t cap = out_entries ? *in_out_count : 0;
     size_t written = 0, total = 0;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
         ++total;
         if (!out_entries || written >= cap) continue;
-        std::string name = it->path().filename().string();
+        std::string name = wide_to_utf8(it->path().filename().wstring());  // UTF-8 contract
         if (name.size() + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) continue;  // skip oversized
         std::strncpy(out_entries[written].name, name.c_str(), RAC_DIRECTORY_ENTRY_NAME_MAX - 1);
         out_entries[written].name[RAC_DIRECTORY_ENTRY_NAME_MAX - 1] = '\0';
@@ -223,7 +268,7 @@ rac_result_t win_list_dir(const char* dir_path, rac_directory_entry_t* out_entri
 rac_bool_t win_is_non_empty_dir(const char* path, void*) {
     if (!path) return RAC_FALSE;
     std::error_code ec;
-    fs::path p(path);
+    fs::path p = utf8_path(path);
     if (!fs::is_directory(p, ec) || ec) return RAC_FALSE;
     fs::directory_iterator it(p, ec), end;
     return (!ec && it != end) ? RAC_TRUE : RAC_FALSE;
