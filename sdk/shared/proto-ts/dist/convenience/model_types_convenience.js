@@ -130,8 +130,6 @@ const sDKEnvironmentWireString = (e) => {
             return 'unspecified';
         case model_types_1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
             return 'development';
-        case model_types_1.SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-            return 'staging';
         case model_types_1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
             return 'production';
         default:
@@ -145,8 +143,6 @@ const sDKEnvironmentFromWireString = (s) => {
             return model_types_1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED;
         case 'development':
             return model_types_1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-        case 'staging':
-            return model_types_1.SDKEnvironment.SDK_ENVIRONMENT_STAGING;
         case 'production':
             return model_types_1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
         default:

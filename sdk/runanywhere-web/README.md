@@ -140,6 +140,11 @@ Also serve `.wasm` with `Content-Type: application/wasm`. Safari does not
 support `credentialless`; use `require-corp` responses or the COI service
 worker pattern in `examples/web/RunAnywhereAI`.
 
+For the browser support matrix, actionable isolation failures, deployment CSP,
+canonical static asset rules, and model memory/download guidance, see
+[docs/BROWSER_SUPPORT.md](./docs/BROWSER_SUPPORT.md) and
+[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+
 ### Vite
 
 ```ts

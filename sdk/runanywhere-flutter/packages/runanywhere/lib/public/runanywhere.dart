@@ -32,13 +32,27 @@ import 'package:runanywhere/generated/model_types.pb.dart'
     show
         CurrentModelRequest,
         CurrentModelResult,
+        ModelFileDescriptor,
+        ModelGetRequest,
+        ModelGetResult,
+        ModelImportRequest,
+        ModelImportResult,
         ModelInfo,
+        ModelListResult,
         ModelLoadRequest,
         ModelLoadResult,
+        ModelQuery,
         ModelUnloadRequest,
         ModelUnloadResult;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework, ModelCategory;
+    show
+        ArchiveStructure,
+        ArchiveType,
+        InferenceFramework,
+        ModelArtifactType,
+        ModelCategory,
+        ModelFileRole,
+        ModelSource;
 import 'package:runanywhere/generated/rag.pb.dart'
     show
         RAGConfiguration,
@@ -51,7 +65,11 @@ import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
 import 'package:runanywhere/generated/storage_types.pb.dart'
-    show StorageDeleteRequest, StorageDeleteResult;
+    show
+        StorageDeleteRequest,
+        StorageDeleteResult,
+        StorageInfoRequest,
+        StorageInfoResult;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -69,15 +87,22 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolResult;
 import 'package:runanywhere/generated/tts_options.pb.dart'
     show TTSOptions, TTSOutput, TTSSpeakResult;
-import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
+import 'package:runanywhere/generated/vad_options.pb.dart'
+    show VADOptions, VADResult;
+import 'package:runanywhere/generated/vlm_options.pb.dart'
+    show VLMGenerationOptions, VLMImage, VLMResult, VLMStreamEvent;
+import 'package:runanywhere/generated/voice_agent_service.pb.dart'
+    show VoiceAgentComposeConfig, VoiceAgentResult;
+import 'package:runanywhere/generated/voice_events.pb.dart'
+    show VoiceAgentComponentStates, VoiceEvent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_hf_auth.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
+import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
     show ProtoInferenceFrameworkCppBridge;
@@ -460,34 +485,53 @@ abstract final class RunAnywhere {
   }) async {
     final SDKInitParams params;
 
-    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      // Development mode ignores any caller-supplied baseURL and always uses
-      // the dev placeholder / Supabase-derived URL. Mirrors Swift
-      // RunAnywhere.swift:125-127 (`SDKInitParams(forDevelopmentWithAPIKey:)`).
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
+        (baseURL == null || baseURL.isEmpty)) {
+      // Development without an explicit baseURL uses the dev placeholder; the
+      // backend is reached only through the effective base URL resolved by
+      // commons state. A caller-supplied baseURL is honored (see below) so dev
+      // builds can target a real backend (the placeholder DNS alias is
+      // unreachable on most machines).
       params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
-    } else {
-      if (apiKey == null || apiKey.isEmpty) {
-        throw SDKException.validationFailed(
-          'API key is required for ${environment.description} mode',
-          fieldPath: 'SDKInitParams.apiKey',
-        );
-      }
-      if (baseURL == null || baseURL.isEmpty) {
-        throw SDKException.validationFailed(
-          'Base URL is required for ${environment.description} mode',
-          fieldPath: 'SDKInitParams.baseURL',
-        );
-      }
-      final uri = Uri.tryParse(baseURL);
-      if (uri == null) {
+    } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      final parsed = Uri.tryParse(baseURL!);
+      if (parsed == null) {
         throw SDKException.validationFailed(
           'Invalid base URL: $baseURL',
           fieldPath: 'SDKInitParams.baseURL',
         );
       }
       params = SDKInitParams(
-        apiKey: apiKey,
-        baseURL: uri,
+        apiKey: apiKey ?? '',
+        baseURL: parsed,
+        environment: environment,
+      );
+    } else {
+      // Production (and any non-development env): API key + HTTPS base URL.
+      final trimmedKey = (apiKey ?? '').trim();
+      final trimmedUrl = (baseURL ?? '').trim();
+      if (trimmedKey.isEmpty) {
+        throw SDKException.validationFailed(
+          'API key is required for ${environment.description} mode',
+          fieldPath: 'SDKInitParams.apiKey',
+        );
+      }
+      if (trimmedUrl.isEmpty) {
+        throw SDKException.validationFailed(
+          'Base URL is required for ${environment.description} mode',
+          fieldPath: 'SDKInitParams.baseURL',
+        );
+      }
+      final parsed = Uri.tryParse(trimmedUrl);
+      if (parsed == null) {
+        throw SDKException.validationFailed(
+          'Invalid base URL: $trimmedUrl',
+          fieldPath: 'SDKInitParams.baseURL',
+        );
+      }
+      params = SDKInitParams(
+        apiKey: trimmedKey,
+        baseURL: parsed,
         environment: environment,
       );
     }
@@ -618,20 +662,20 @@ abstract final class RunAnywhere {
   static Future<void> _runPhase2(SDKInitParams params, SDKLogger logger) async {
     // Step 1: Configure the shared HTTP client. Mirrors Swift's inlined
     // HTTP setup inside `RunAnywhere.performCoreInit()` (no DI container).
+    // Read the effective base URL from commons state: staging overrides
+    // whatever the app passed (baked URL, keyless).
+    final effectiveBaseURL =
+        DartBridgeState.instance.baseURL ?? params.baseURL.toString();
+    // Effective config from commons state (baked OSS URL fills development when empty)
+    // resolves the baked keyless base URL, dev/prod use whatever the app
+    // passed. There is no direct-to-datastore path — the backend is always
+    // reached through this base URL. Auth stays in C++. Mirrors Swift's unified
+    // Phase-2 HTTP setup in RunAnywhere._performServicesInitialization().
     HTTPClientAdapter.shared.configure(
-      baseURL: params.baseURL.toString(),
+      baseURL: effectiveBaseURL,
       apiKey: params.apiKey,
       environment: params.environment,
     );
-    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      final supabaseConfig = SupabaseConfig.configuration(params.environment);
-      if (supabaseConfig != null) {
-        HTTPClientAdapter.shared.configureDev(
-          supabaseURL: supabaseConfig.projectURL.toString(),
-          supabaseKey: supabaseConfig.anonKey,
-        );
-      }
-    }
 
     // Step 2 (moved to Phase 1): the model-paths base directory is now set
     // inside [initializeWithParams] before it returns — see the Swift
@@ -665,10 +709,6 @@ abstract final class RunAnywhere {
       apiKey: params.apiKey,
       baseURL: params.baseURL.toString(),
       deviceId: telemetryDeviceId,
-      buildToken:
-          params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-          ? DartBridgeDevConfig.buildToken
-          : null,
       forceRefreshAssignments: false,
       flushTelemetry: true,
       discoverDownloadedModels: true,
@@ -1171,4 +1211,236 @@ abstract final class RunAnywhere {
   /// Mirrors Swift `RunAnywhere.cancelImageGeneration()`.
   static Future<void> cancelImageGeneration() =>
       RunAnywhereDiffusion.shared.cancelImageGeneration();
+
+  // --- Flat aliases: VAD (mirror Swift's flat RunAnywhere.* surface) ----------
+
+  /// Flat alias — detect voice activity in a PCM16 buffer.
+  /// Mirrors Swift `RunAnywhere.detectVoiceActivity(_:options:)`.
+  static Future<VADResult> detectVoiceActivity(
+    Uint8List audio, [
+    VADOptions? options,
+  ]) => RunAnywhereVAD.shared.detectVoiceActivity(audio, options);
+
+  /// Flat alias — stream voice-activity results over a PCM16 chunk stream.
+  /// Mirrors Swift `RunAnywhere.streamVAD(audio:)`.
+  static Stream<VADResult> streamVAD(Stream<Uint8List> audio) =>
+      RunAnywhereVAD.shared.streamVAD(audio);
+
+  /// Flat alias — reset VAD state. Mirrors Swift `RunAnywhere.resetVAD()`.
+  static void resetVAD() => RunAnywhereVAD.shared.reset();
+
+  // --- Flat aliases: VLM ------------------------------------------------------
+
+  /// Flat alias — process an image with the loaded VLM. [prompt] is applied
+  /// onto the options when unset. Mirrors Swift
+  /// `RunAnywhere.processImage(_:options:)`.
+  static Future<VLMResult> processImage(
+    VLMImage image, {
+    String? prompt,
+    VLMGenerationOptions? options,
+  }) => RunAnywhereVLM.shared.processImage(
+    image,
+    prompt: prompt,
+    options: options,
+  );
+
+  /// Flat alias — stream VLM generation events. Mirrors Swift
+  /// `RunAnywhere.processImageStream(_:options:)` and its prompt overload.
+  static Stream<VLMStreamEvent> processImageStream(
+    VLMImage image, {
+    String? prompt,
+    VLMGenerationOptions? options,
+  }) => RunAnywhereVLM.shared.processImageStream(
+    image,
+    prompt: prompt,
+    options: options,
+  );
+
+  /// Flat alias — cancel the in-flight VLM generation.
+  /// Mirrors Swift `RunAnywhere.cancelVLMGeneration()`.
+  static Future<void> cancelVLMGeneration() =>
+      RunAnywhereVLM.shared.cancelVLMGeneration();
+
+  // --- Flat aliases: TTS streaming --------------------------------------------
+
+  /// Flat alias — stream synthesized audio chunks.
+  /// Mirrors Swift `RunAnywhere.synthesizeStream(_:options:)`.
+  static Stream<TTSOutput> synthesizeStream(
+    String text, {
+    TTSOptions? options,
+  }) => RunAnywhereTTS.shared.synthesizeStream(text, options: options);
+
+  /// Flat alias — stop TTS playback. Mirrors Swift `RunAnywhere.stopSpeaking()`.
+  static Future<void> stopSpeaking() => RunAnywhereTTS.shared.stopSpeaking();
+
+  // --- Flat aliases: Voice Agent ----------------------------------------------
+
+  /// Default catalogued VAD model id. Mirrors Swift
+  /// `RunAnywhere.defaultVADModelID`.
+  static String get defaultVADModelID =>
+      RunAnywhereVoice.shared.defaultVADModelID;
+
+  /// Flat alias — ensure the default VAD model is available.
+  /// Mirrors Swift `RunAnywhere.ensureDefaultVAD(modelID:)`.
+  static Future<bool> ensureDefaultVAD({String? modelID}) =>
+      RunAnywhereVoice.shared.ensureDefaultVAD(modelID: modelID);
+
+  /// Flat alias — initialize the voice agent from a compose config.
+  /// Mirrors Swift `RunAnywhere.initializeVoiceAgent(_:)`.
+  static Future<void> initializeVoiceAgent(VoiceAgentComposeConfig config) =>
+      RunAnywhereVoice.shared.initializeVoiceAgent(config);
+
+  /// Flat alias — initialize the voice agent over already-loaded models.
+  /// Mirrors Swift `RunAnywhere.initializeVoiceAgentWithLoadedModels(...)`.
+  static Future<void> initializeVoiceAgentWithLoadedModels({
+    String? ttsVoiceID,
+    bool ensureVAD = true,
+  }) => RunAnywhereVoice.shared.initializeWithLoadedModels(
+    ttsVoiceID: ttsVoiceID,
+    ensureVAD: ensureVAD,
+  );
+
+  /// Flat alias — read the voice agent's per-component load states.
+  /// Mirrors Swift `RunAnywhere.getVoiceAgentComponentStates()`.
+  static Future<VoiceAgentComponentStates> getVoiceAgentComponentStates() =>
+      RunAnywhereVoice.shared.componentStates();
+
+  /// Flat alias — run a one-shot voice turn (audio in → result out).
+  /// Mirrors Swift `RunAnywhere.processVoiceTurn(_:)`.
+  static Future<VoiceAgentResult> processVoiceTurn(Uint8List audioData) =>
+      RunAnywhereVoice.shared.processVoiceTurn(audioData);
+
+  /// Flat alias — tear down voice agent native resources.
+  /// Mirrors Swift `RunAnywhere.cleanupVoiceAgent()`.
+  static void cleanupVoiceAgent() => RunAnywhereVoice.shared.cleanup();
+
+  // --- Flat aliases: Model registry -------------------------------------------
+
+  /// Flat alias — list registered models. Mirrors Swift
+  /// `RunAnywhere.listModels(_:)`.
+  static Future<ModelListResult> listModels({ModelQuery? query}) =>
+      RunAnywhereModels.shared.list(query: query);
+
+  /// Flat alias — query models with a generated filter.
+  /// Mirrors Swift `RunAnywhere.queryModels(_:)`.
+  static Future<ModelListResult> queryModels(ModelQuery query) =>
+      RunAnywhereModels.shared.queryModels(query);
+
+  /// Flat alias — fetch one model by generated request.
+  /// Mirrors Swift `RunAnywhere.getModel(_:)`.
+  static Future<ModelGetResult> getModel(ModelGetRequest request) =>
+      RunAnywhereModels.shared.getModel(request);
+
+  /// Flat alias — list downloaded models.
+  /// Mirrors Swift `RunAnywhere.downloadedModels()`.
+  static Future<ModelListResult> downloadedModels() =>
+      RunAnywhereModels.shared.downloadedModels();
+
+  /// Flat alias — infer a model file's role from its name + modality.
+  /// Mirrors Swift `RunAnywhere.inferModelFileRole(filename:modality:)`.
+  static ModelFileRole inferModelFileRole({
+    required String filename,
+    required ModelCategory modality,
+  }) => RunAnywhereModels.shared.inferModelFileRole(
+    filename: filename,
+    modality: modality,
+  );
+
+  // --- Flat alias: streaming download -----------------------------------------
+
+  /// Flat alias — stream download progress for a model.
+  /// Mirrors Swift `RunAnywhere.downloadModelStream(_:)`.
+  static Stream<DownloadProgress> downloadModelStream(String modelId) =>
+      RunAnywhereDownloads.shared.start(modelId);
+
+  // --- Flat aliases: Storage / model registration -----------------------------
+
+  /// Flat alias — register a single-file remote model by URL.
+  /// Mirrors Swift `RunAnywhere.registerModel(id:name:url:framework:...)`.
+  static Future<ModelInfo> registerModel({
+    String? id,
+    required String name,
+    required String url,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ModelArtifactType? artifactType,
+    int? memoryRequirement,
+    bool supportsThinking = false,
+    bool supportsLora = false,
+  }) => RunAnywhereStorage.registerModel(
+    id: id,
+    name: name,
+    url: url,
+    framework: framework,
+    modality: modality,
+    artifactType: artifactType,
+    memoryRequirement: memoryRequirement,
+    supportsThinking: supportsThinking,
+    supportsLora: supportsLora,
+  );
+
+  /// Flat alias — register an archive-packaged model.
+  /// Mirrors Swift `RunAnywhere.registerModel(archive:structure:...)`.
+  static Future<ModelInfo> registerArchiveModel({
+    required String archiveUrl,
+    required ArchiveStructure structure,
+    String? id,
+    required String name,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ArchiveType? archiveType,
+    int? memoryRequirement,
+    bool supportsThinking = false,
+    bool supportsLora = false,
+  }) => RunAnywhereStorage.registerArchiveModel(
+    archiveUrl: archiveUrl,
+    structure: structure,
+    id: id,
+    name: name,
+    framework: framework,
+    modality: modality,
+    archiveType: archiveType,
+    memoryRequirement: memoryRequirement,
+    supportsThinking: supportsThinking,
+    supportsLora: supportsLora,
+  );
+
+  /// Flat alias — register a multi-file model.
+  /// Mirrors Swift `RunAnywhere.registerModel(multiFile:id:name:framework:...)`.
+  static Future<ModelInfo> registerMultiFileModel({
+    required List<ModelFileDescriptor> files,
+    required String id,
+    required String name,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    int? memoryRequirement,
+    int? contextLength,
+    bool supportsThinking = false,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+  }) => RunAnywhereStorage.registerMultiFileModel(
+    files: files,
+    id: id,
+    name: name,
+    framework: framework,
+    modality: modality,
+    memoryRequirement: memoryRequirement,
+    contextLength: contextLength,
+    supportsThinking: supportsThinking,
+    source: source,
+  );
+
+  /// Flat alias — import a local model into the registry.
+  /// Mirrors Swift `RunAnywhere.importModel(_:)`.
+  static Future<ModelImportResult> importModel(ModelImportRequest request) =>
+      RunAnywhereStorage.importModel(request);
+
+  /// Flat alias — read storage info as a generated result.
+  /// Mirrors Swift `RunAnywhere.getStorageInfo(_:)`.
+  static Future<StorageInfoResult> getStorageInfo([
+    StorageInfoRequest? request,
+  ]) => RunAnywhereDownloads.shared.getStorageInfoResult(request);
+
+  /// Flat alias — clear the model/download cache.
+  /// Mirrors Swift `RunAnywhere.clearCache()`.
+  static Future<void> clearCache() => RunAnywhereDownloads.shared.clearCache();
 }

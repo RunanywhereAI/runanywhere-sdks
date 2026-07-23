@@ -9,15 +9,12 @@ export 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
 
 extension SDKEnvironmentExtension on SDKEnvironment {
-  /// C `rac_environment_t` value (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION).
-  /// Mirrors Swift `cEnvironment` (SDKEnvironment.swift:52-59): unknown
-  /// values map to RAC_ENV_DEVELOPMENT.
+  /// C `rac_environment_t` value (RAC_ENV_DEVELOPMENT / RAC_ENV_PRODUCTION).
+  /// Mirrors Swift `cEnvironment`: unknown values map to RAC_ENV_DEVELOPMENT.
   int get _cEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0; // RAC_ENV_DEVELOPMENT
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1; // RAC_ENV_STAGING
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2; // RAC_ENV_PRODUCTION
       default:
@@ -37,8 +34,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'Development Environment';
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 'Staging Environment';
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'Production Environment';
       default:
@@ -68,8 +63,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   bool get isCompatibleWithCurrentBuild {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return true;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         var isDebug = false;
         assert(() {
@@ -95,8 +88,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return LogLevel.LOG_LEVEL_DEBUG;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return LogLevel.LOG_LEVEL_INFO;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return LogLevel.LOG_LEVEL_WARNING;
       default:
@@ -124,47 +115,10 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   );
 }
 
-class SupabaseConfig {
-  final Uri projectURL;
-  final String anonKey;
-
-  SupabaseConfig({required this.projectURL, required this.anonKey});
-
-  static SupabaseConfig? configuration(SDKEnvironment environment) {
-    switch (environment) {
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        final supabaseUrl = DartBridgeDevConfig.supabaseURL;
-        final supabaseKey = DartBridgeDevConfig.supabaseKey;
-
-        // Delegate the placeholder + URL-shape checks to the canonical commons
-        // rule (via DartBridge) so every SDK agrees instead of each carrying its
-        // own regex.
-        if (supabaseUrl == null ||
-            supabaseKey == null ||
-            !DartBridgeDevConfig.isUsableHttpUrl(supabaseUrl) ||
-            !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
-          return null;
-        }
-
-        final uri = Uri.tryParse(supabaseUrl);
-        if (uri == null) {
-          return null;
-        }
-
-        return SupabaseConfig(projectURL: uri, anonKey: supabaseKey);
-      default:
-        return null;
-    }
-  }
-}
-
 class SDKInitParams {
   final String apiKey;
   final Uri baseURL;
   final SDKEnvironment environment;
-
-  SupabaseConfig? get supabaseConfig =>
-      SupabaseConfig.configuration(environment);
 
   SDKInitParams({
     required this.apiKey,
@@ -210,14 +164,12 @@ class SDKInitParams {
   }
 
   factory SDKInitParams.forDevelopment({String apiKey = ''}) {
-    final supabaseConfig = SupabaseConfig.configuration(
-      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-    );
+    // Development mode uses local analytics; the backend is reached only
+    // through the effective base URL resolved by commons state, so this is a
+    // placeholder. Mirrors Swift's `SDKInitParams(forDevelopmentWithAPIKey:)`.
     return SDKInitParams(
       apiKey: apiKey,
-      baseURL:
-          supabaseConfig?.projectURL ??
-          Uri.parse('https://dev.runanywhere.local'),
+      baseURL: Uri.parse('https://dev.runanywhere.local'),
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     );
   }

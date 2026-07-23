@@ -111,6 +111,17 @@ std::string human_size(int64_t bytes) {
 // not exist yet, so walk up to the nearest existing ancestor. Returns -1 when
 // it cannot be determined (e.g. WASM/MEMFS), so callers can skip the gate.
 int64_t filesystem_available_bytes(const std::string& path) {
+#if defined(__EMSCRIPTEN__)
+    // MEMFS `fs::space` reports WASM-heap leftovers (often ~1–2 GB), not the
+    // browser Origin Private File System quota. Trusting that figure falsely
+    // refuses multi-GB model downloads even when OPFS has tens of GB free.
+    // The Web SDK passes `available_storage_bytes` from
+    // `navigator.storage.estimate()`; when it does not, treat free space as
+    // unknown so the EMSCRIPTEN fail-open path (require_free_space=false)
+    // applies instead of a misleading MEMFS comparison.
+    (void)path;
+    return -1;
+#else
     std::error_code ec;
     fs::path probe(path);
     while (!probe.empty()) {
@@ -131,6 +142,7 @@ int64_t filesystem_available_bytes(const std::string& path) {
     if (si.available > static_cast<uintmax_t>(INT64_MAX))
         return INT64_MAX;
     return static_cast<int64_t>(si.available);
+#endif
 }
 
 // Synchronous HTTP HEAD to learn a remote file's Content-Length. Returns the
@@ -1518,6 +1530,9 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Drop the unreadable archive so the next retry re-downloads
+            // instead of re-opening a corrupt OPFS/MEMFS stub.
+            delete_file(file.destination_path.c_str());
             set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                               total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
                               total_expected, static_cast<int32_t>(i), file.storage_key, "",
@@ -2138,6 +2153,9 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Corrupt/incomplete OPFS archives must not stick around for the
+            // next Voice AI setup retry (web 416 path previously kept them).
+            delete_file(file.destination_path.c_str());
             set_task_progress(
                 task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                 drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,

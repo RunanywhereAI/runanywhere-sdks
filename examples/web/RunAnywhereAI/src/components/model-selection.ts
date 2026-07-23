@@ -25,6 +25,10 @@ import {
   RunAnywhere,
   ModelCategory,
 } from '@runanywhere/web';
+import {
+  ensureDownloadStorageReady,
+  LARGE_DOWNLOAD_BYTES,
+} from '@runanywhere/web/browser';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
@@ -425,11 +429,15 @@ function renderSheet(): void {
   // the async capability probe resolves.
   void ensureCapabilities().then(() => {
     if (modalEl) {
+      if (catalogRegistered) hydrateRowStatesFromRegistry();
       renderBanner();
       renderRows();
     }
   });
 
+  // Always re-read the registry when opening the sheet so OPFS-hydrated
+  // downloads (or loads from other tabs) are not stuck on "Download".
+  if (catalogRegistered) hydrateRowStatesFromRegistry();
   renderBanner();
   renderRows();
 }
@@ -840,17 +848,18 @@ function stateOf(id: string): RowState {
 function matchesSearch(entry: CatalogEntry, query: string): boolean {
   if (!query) return true;
   const family = modelFamily(entry);
-  const haystack = [
+  const normalize = (value: string): string => value.toLowerCase().replace(/[-_./]+/g, ' ');
+  const haystack = normalize([
+    entry.id,
     entry.name,
     entry.description,
     family.name,
     family.tagline,
     variantSizeFeel(entry),
     ...consumerTags(entry).map((tag) => tag.label),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  ].join(' '));
+  const needle = normalize(query).trim();
+  return needle.length === 0 || haystack.includes(needle);
 }
 
 /** Render a rich recommended card with a single clean tag row. */
@@ -920,8 +929,14 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   `;
 }
 
+function compatibilityFor(entry: CatalogEntry) {
+  return webModelCompatibility(entry, {
+    hasWebGPU: capabilitiesCache?.hasWebGPU,
+  });
+}
+
 function renderCompatibilityReason(entry: CatalogEntry): string {
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (compatibility.supported) return '';
   const reference = compatibility.reference
     ? ` <a href="${escapeHtml(compatibility.reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(compatibility.reference.label)} &nearr;</a>`
@@ -931,9 +946,9 @@ function renderCompatibilityReason(entry: CatalogEntry): string {
 
 function actionButton(entry: CatalogEntry, state: RowState): string {
   const safeModelId = escapeHtml(entry.id);
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (!compatibility.supported && state.status !== 'loaded') {
-    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>Unavailable in this app</button>`;
+    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>${escapeHtml(compatibility.actionLabel)}</button>`;
   }
   switch (state.status) {
     case 'registered':
@@ -978,25 +993,78 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
 async function startDownload(modelId: string): Promise<void> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return;
     }
   }
+
+  let model = RunAnywhere.getModel(modelId);
+  if (!model && entry) {
+    // Catalog UI can outlive a partial registry wipe (backend re-register).
+    // Re-seed the declarative entry before failing the Download click.
+    try {
+      const { registerModelCatalog } = await import('../services/model-catalog');
+      registerModelCatalog();
+      model = RunAnywhere.getModel(modelId);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!model) {
+    showToast(`Model ${modelId} not found in registry`, 'warning');
+    return;
+  }
+
+  const requiredBytes = entry
+    ? modelDisplaySizeBytes(entry)
+    : (() => {
+      const parsed = Number(model.downloadSizeBytes ?? 0);
+      return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    })();
+
+  // First async step after the Download click — request persist() while the
+  // user gesture is still active, then verify origin quota.
+  const storage = await ensureDownloadStorageReady({ requiredBytes });
+  if (requiredBytes > 0 && !storage.sufficient) {
+    const fallbackMessage = RunAnywhere.storage.isLocalStorageSupported
+      ? 'Free space or open Storage → Choose Storage Folder.'
+      : 'Please free up space in your browser.';
+    showToast(
+      `Not enough browser storage for this model (need ${formatBytes(requiredBytes)}, `
+        + `${formatBytes(storage.availableBytes)} free). ${fallbackMessage}`,
+      'warning',
+      6000,
+    );
+    return;
+  }
+
+  // Large downloads use browser OPFS by default. Do not open the OS folder
+  // picker here — it steals the Download click and is easy to dismiss while
+  // the download continues anyway. Only mention Choose Storage Folder when
+  // the browser supports that path and no durable folder is already active.
+  if (
+    requiredBytes >= LARGE_DOWNLOAD_BYTES
+    && !storage.persisted
+    && !RunAnywhere.storage.isLocalStorageReady
+    && RunAnywhere.storage.isLocalStorageSupported
+  ) {
+    showToast(
+      'Storing this model in browser OPFS. For a durable disk folder, open Storage → Choose Storage Folder.',
+      'info',
+      5000,
+    );
+  }
+
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const model = RunAnywhere.getModel(modelId);
-    if (!model) {
-      throw new Error(`Model ${modelId} not found in registry`);
-    }
-
     const progress = await RunAnywhere.downloadModel({
       modelId,
       model,
       allowMeteredNetwork: true,
-      resumeExisting: false,
+      resumeExisting: true,
       verifyChecksums: false,
       validateExistingBytes: false,
       updateRegistryOnCompletion: true,
@@ -1017,7 +1085,7 @@ async function startDownload(modelId: string): Promise<void> {
 async function loadModel(modelId: string): Promise<boolean> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return false;
@@ -1114,9 +1182,35 @@ function applyProgress(modelId: string, progress: DownloadProgress): void {
 // State + toolbar updates
 // ---------------------------------------------------------------------------
 
+/** Patch progress UI in place so download ticks do not rebuild the whole sheet. */
+function updateDownloadProgressInPlace(modelId: string, progress: number): boolean {
+  const host = document.getElementById('model-sheet-list');
+  if (!host) return false;
+
+  const row = host.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
+  if (!row) return false;
+
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+  const progressBtn = row.querySelector('.model-action-btn--progress');
+  if (progressBtn) progressBtn.textContent = `${pct}%`;
+
+  const fill = row.querySelector('.progress-fill') as HTMLElement | null;
+  if (fill) {
+    fill.style.width = `${pct}%`;
+    return true;
+  }
+  return progressBtn !== null;
+}
+
 function setRow(modelId: string, state: RowState): void {
+  const previous = rowStates.get(modelId);
   rowStates.set(modelId, state);
-  if (modalEl) renderRows();
+  if (modalEl) {
+    const progressOnly = previous?.status === 'downloading'
+      && state.status === 'downloading'
+      && updateDownloadProgressInPlace(modelId, state.progress);
+    if (!progressOnly) renderRows();
+  }
   refreshToolbarLabel();
   refreshOverlayVisibility();
   for (const listener of listeners) {

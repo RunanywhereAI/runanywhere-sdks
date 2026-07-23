@@ -2687,6 +2687,8 @@ export interface GenerationEvent {
   durationMs: number;
   /** InferenceFramework enum int */
   framework: number;
+  /** prompt eval (prefill) duration */
+  promptEvalTimeMs: number;
 }
 
 /**
@@ -4957,6 +4959,7 @@ function createBaseGenerationEvent(): GenerationEvent {
     modelName: "",
     durationMs: 0,
     framework: 0,
+    promptEvalTimeMs: 0,
   };
 }
 
@@ -5060,6 +5063,9 @@ export const GenerationEvent: MessageFns<GenerationEvent> = {
     }
     if (message.framework !== 0) {
       writer.uint32(264).int32(message.framework);
+    }
+    if (message.promptEvalTimeMs !== 0) {
+      writer.uint32(272).int64(message.promptEvalTimeMs);
     }
     return writer;
   },
@@ -5335,6 +5341,14 @@ export const GenerationEvent: MessageFns<GenerationEvent> = {
           message.framework = reader.int32();
           continue;
         }
+        case 34: {
+          if (tag !== 272) {
+            break;
+          }
+
+          message.promptEvalTimeMs = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5483,6 +5497,11 @@ export const GenerationEvent: MessageFns<GenerationEvent> = {
         ? globalThis.Number(object.duration_ms)
         : 0,
       framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+      promptEvalTimeMs: isSet(object.promptEvalTimeMs)
+        ? globalThis.Number(object.promptEvalTimeMs)
+        : isSet(object.prompt_eval_time_ms)
+        ? globalThis.Number(object.prompt_eval_time_ms)
+        : 0,
     };
   },
 
@@ -5587,6 +5606,9 @@ export const GenerationEvent: MessageFns<GenerationEvent> = {
     if (message.framework !== 0) {
       obj.framework = Math.round(message.framework);
     }
+    if (message.promptEvalTimeMs !== 0) {
+      obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
+    }
     return obj;
   },
 
@@ -5628,6 +5650,7 @@ export const GenerationEvent: MessageFns<GenerationEvent> = {
     message.modelName = object.modelName ?? "";
     message.durationMs = object.durationMs ?? 0;
     message.framework = object.framework ?? 0;
+    message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
     return message;
   },
 };

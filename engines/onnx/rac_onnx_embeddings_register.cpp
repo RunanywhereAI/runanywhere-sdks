@@ -56,7 +56,8 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
         return RAC_ERROR_BACKEND_NOT_READY;
 
     try {
-        auto embedding = h->provider->embed(text);
+        size_t total_tokens = 0;
+        auto embedding = h->provider->embed(text, &total_tokens);
         // The provider uses an empty vector as its failure sentinel
         // (onnx_embedding_provider.cpp:591-633 — model run / dtype mismatch /
         // exception all return {}). Treat that as RAC_ERROR_INFERENCE_FAILED so
@@ -71,7 +72,7 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
         out_result->num_embeddings = 1;
         out_result->dimension = dim;
         out_result->processing_time_ms = 0;
-        out_result->total_tokens = 0;
+        out_result->total_tokens = static_cast<int32_t>(total_tokens);
 
         out_result->embeddings =
             static_cast<rac_embedding_vector_t*>(malloc(sizeof(rac_embedding_vector_t)));
@@ -113,7 +114,8 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
             texts_vec.emplace_back(texts[i]);
         }
 
-        auto batch_results = h->provider->embed_batch(texts_vec);
+        size_t total_tokens = 0;
+        auto batch_results = h->provider->embed_batch(texts_vec, &total_tokens);
         if (batch_results.size() != num_texts) {
             RAC_LOG_ERROR(LOG_CAT, "Batch embedding returned %zu results, expected %zu",
                           batch_results.size(), num_texts);
@@ -134,7 +136,7 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         out_result->num_embeddings = num_texts;
         out_result->dimension = dim;
         out_result->processing_time_ms = 0;
-        out_result->total_tokens = 0;
+        out_result->total_tokens = static_cast<int32_t>(total_tokens);
 
         if (num_texts == 0) {
             out_result->embeddings = nullptr;

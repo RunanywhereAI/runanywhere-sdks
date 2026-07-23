@@ -23,6 +23,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { redactResourceURL } from '../Foundation/BackendContract.js';
+import { OPFSBridge, type OPFSStreamingWriter } from '../Infrastructure/OPFSBridge.js';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -256,7 +257,16 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        fsOf(m)?.unlink(path);
+        try {
+          fsOf(m)?.unlink(path);
+        } catch {
+          /* MEMFS miss is fine when the durable copy lives only in OPFS */
+        }
+        // After archive extract, commons deletes the .tar.gz. MEMFS unlink
+        // alone left corrupt/stale archives in OPFS that later 416-resumed.
+        if (path.startsWith('/opfs/')) {
+          void OPFSBridge.removeFile([m], path).catch(() => undefined);
+        }
         return RAC_OK;
       } catch {
         return RAC_ERROR_FILE_NOT_FOUND;
@@ -550,6 +560,89 @@ interface StreamingFS {
   mkdirTree?(path: string): void;
   analyzePath?(path: string): { exists: boolean };
   stat?(path: string): { size?: number };
+  writeFile?(path: string, data: Uint8Array): void;
+  readFile?(path: string, opts?: { encoding?: string }): Uint8Array;
+  unlink?(path: string): void;
+  lookupPath?(path: string): { node?: { usedBytes?: number; contents?: Uint8Array } };
+}
+
+function looksLikeArchivePath(dest: string): boolean {
+  const lower = dest.toLowerCase();
+  return lower.endsWith('.tar.gz')
+    || lower.endsWith('.tgz')
+    || lower.endsWith('.tar.bz2')
+    || lower.endsWith('.tbz2')
+    || lower.endsWith('.tar.xz')
+    || lower.endsWith('.txz')
+    || lower.endsWith('.zip')
+    || lower.endsWith('.gz');
+}
+
+/** Gzip-backed archives (includes `.tgz`, which does not contain the `.gz` substring). */
+function looksLikeGzipArchivePath(dest: string): boolean {
+  const lower = dest.toLowerCase();
+  return lower.endsWith('.tgz') || lower.endsWith('.gz');
+}
+
+function hasGzipMagic(bytes: Uint8Array | null | undefined): boolean {
+  return !!bytes && bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+}
+
+async function probeRemoteContentLength(
+  url: string,
+  signal: AbortSignal,
+): Promise<number> {
+  try {
+    const head = await fetch(url, { method: 'HEAD', signal });
+    if (!head.ok) return 0;
+    const length = Number(head.headers.get('Content-Length') ?? 0);
+    return Number.isFinite(length) && length > 0 ? length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Before commons extract/load runs inside the HTTP complete callback, OPFS-direct
+ * downloads must expose real MEMFS bytes. An empty size-stub makes libarchive
+ * report "Unrecognized archive format".
+ */
+async function materializeMemfsForComplete(
+  m: PlatformAdapterModule,
+  fs: StreamingFS,
+  dest: string,
+  byteLength: number,
+): Promise<void> {
+  const needsRealBytes = looksLikeArchivePath(dest)
+    || byteLength < OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES
+    || byteLength === 0;
+  if (!needsRealBytes) {
+    installMemfsSizeStub(fs, dest, byteLength);
+    return;
+  }
+
+  // Drop any prior empty size stub so restoreToMemfs does not short-circuit.
+  removeMemfsPath(fs, dest);
+  const restored = await OPFSBridge.restoreToMemfs(m, dest);
+  const memfsSize = memfsFileSize(fs, dest);
+  if (restored <= 0 && memfsSize <= 0) {
+    throw new Error(
+      `Failed to hydrate OPFS bytes into MEMFS before complete callback: ${dest}`,
+    );
+  }
+
+  if (looksLikeGzipArchivePath(dest)) {
+    const prefix = typeof fs.readFile === 'function'
+      ? fs.readFile(dest).subarray(0, 2)
+      : await OPFSBridge.readPrefix(dest, 2);
+    if (!hasGzipMagic(prefix)) {
+      await OPFSBridge.removeFile([m], dest);
+      removeMemfsPath(fs, dest);
+      throw new Error(
+        `Downloaded archive is not valid gzip (corrupt or incomplete): ${dest}`,
+      );
+    }
+  }
 }
 
 function streamingFsOf(m: PlatformAdapterModule): StreamingFS | null {
@@ -639,10 +732,50 @@ interface HttpDownloadArgs {
 }
 
 /**
+ * Install a MEMFS size placeholder so commons `validate_downloaded_sizes`
+ * sees the correct byte length after an OPFS-direct download. Contents are
+ * empty on purpose — the real bytes live in OPFS and hydrate on load.
+ */
+function installMemfsSizeStub(fs: StreamingFS, dest: string, size: number): void {
+  const parent = dest.slice(0, dest.lastIndexOf('/')) || '/';
+  try { fs.mkdirTree?.(parent); } catch { /* dir may already exist */ }
+  if (typeof fs.writeFile === 'function') {
+    fs.writeFile(dest, new Uint8Array(0));
+  } else {
+    const stream = fs.open(dest, 'w');
+    fs.close(stream);
+  }
+  try {
+    const node = fs.lookupPath?.(dest)?.node;
+    if (node) {
+      node.usedBytes = size;
+      if (node.contents && node.contents.length === 0) {
+        // Keep an empty backing store; size comes from usedBytes.
+      }
+    }
+  } catch {
+    // If the stub cannot be sized, leave the empty file — validation may
+    // fail closed and the caller will retry with a clearer error.
+  }
+}
+
+function removeMemfsPath(fs: StreamingFS, dest: string): void {
+  try {
+    if (fs.analyzePath && !fs.analyzePath(dest)?.exists) return;
+    fs.unlink?.(dest);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
  * Stream `url` into the MEMFS file at `dest`, reporting incremental progress.
  * Resumes from any bytes already on disk via a Range request when the server
  * honours it (HTTP 206); otherwise restarts from zero. Always finishes by
  * invoking the C complete callback (success, cancel, or error) exactly once.
+ *
+ * Large `/opfs/` downloads stream directly into Origin Private File System
+ * so multi-GB models are not refused by WASM MEMFS free-space leftovers.
  */
 async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs): Promise<void> {
   const { url, dest, progressCbPtr, completeCbPtr, cbUserData, controller } = args;
@@ -653,41 +786,107 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
   }
 
   let stream: unknown = null;
+  let opfsWriter: OPFSStreamingWriter | null = null;
+  let opfsDirect = false;
   try {
     const parent = dest.slice(0, dest.lastIndexOf('/')) || '/';
     try { fs.mkdirTree?.(parent); } catch { /* dir may already exist */ }
 
-    const existing = memfsFileSize(fs, dest);
+    const underOpfs = dest.startsWith('/opfs/') && OPFSBridge.isSupported;
+    let memfsExisting = memfsFileSize(fs, dest);
+    let opfsExisting = underOpfs ? await OPFSBridge.fileSize(dest) : 0;
+    // Prefer MEMFS resume when both exist so the Range offset matches the
+    // stream we will append to. OPFS-only partials resume via OPFS-direct.
+    let existing = memfsExisting > 0 ? memfsExisting : opfsExisting;
     const headers: Record<string, string> = {};
     if (existing > 0) headers.Range = `bytes=${existing}-`;
 
-    const response = await fetch(url, { headers, signal: controller.signal });
+    let response = await fetch(url, { headers, signal: controller.signal });
 
-    // 416 Range Not Satisfiable on a resume request means the file on disk is
-    // already at/past the requested offset — i.e. the download is complete.
-    // Report success without rewriting so a re-trigger of an already-present
-    // model is a no-op rather than a hard failure.
+    // 416 on resume is NOT always "already complete". Hugging Face often
+    // returns 416 for a bad/oversize partial; treating that as success left an
+    // empty MEMFS size-stub that libarchive rejected as "Unrecognized archive
+    // format" during Voice AI STT/TTS extraction.
     if (existing > 0 && response.status === 416) {
-      invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
-      return;
+      const localSize = Math.max(memfsExisting, opfsExisting);
+      const remoteSize = await probeRemoteContentLength(url, controller.signal);
+      let magicOk = true;
+      if (looksLikeGzipArchivePath(dest)) {
+        const prefix = memfsExisting > 0 && typeof fs.readFile === 'function'
+          ? fs.readFile(dest).subarray(0, 2)
+          : await OPFSBridge.readPrefix(dest, 2);
+        magicOk = hasGzipMagic(prefix);
+      }
+      const completeAndValid = remoteSize > 0
+        && localSize === remoteSize
+        && magicOk;
+      if (completeAndValid) {
+        await materializeMemfsForComplete(m, fs, dest, localSize);
+        invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+        // Archives stay hydrated only for the sync complete callback; free
+        // MEMFS afterward — durable bytes remain in OPFS.
+        if (underOpfs && looksLikeArchivePath(dest)) {
+          removeMemfsPath(fs, dest);
+        } else if (underOpfs && localSize >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES) {
+          removeMemfsPath(fs, dest);
+        }
+        return;
+      }
+      logger.warning(
+        `HTTP 416 on resume for '${redactResourceURL(url)}' `
+        + `(local=${localSize}, remote=${remoteSize || 'unknown'}, magicOk=${magicOk}); `
+        + 'discarding partial and restarting from byte 0',
+      );
+      if (underOpfs) {
+        await OPFSBridge.removeFile([m], dest);
+      }
+      removeMemfsPath(fs, dest);
+      memfsExisting = 0;
+      opfsExisting = 0;
+      existing = 0;
+      response = await fetch(url, { signal: controller.signal });
     }
 
-    let received = 0;
-    let position = 0;
-    if (existing > 0 && response.status === 206) {
-      // Server honoured the range — append to the partial file.
-      received = existing;
-      position = existing;
-      stream = fs.open(dest, 'r+');
+    const resuming = existing > 0 && response.status === 206;
+    if (!resuming && !response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const contentLengthHeader = Number(response.headers.get('Content-Length') ?? 0);
+    const projectedTotal = contentLengthHeader > 0
+      ? (resuming ? existing + contentLengthHeader : contentLengthHeader)
+      : 0;
+    // Large models (and OPFS-only partial resumes) stream straight to OPFS so
+    // WASM MEMFS heap leftovers cannot refuse a multi-GB download mid-write.
+    // When Content-Length is missing, still prefer OPFS — chunked CDN responses
+    // would otherwise buffer the full payload in MEMFS and fail mid-transfer.
+    opfsDirect = underOpfs
+      && (projectedTotal >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES
+        || projectedTotal === 0
+        || (memfsExisting <= 0 && opfsExisting > 0));
+
+    let received = resuming ? existing : 0;
+    let position = received;
+
+    if (opfsDirect) {
+      opfsWriter = await OPFSBridge.openStreamingWriter(dest, {
+        resumeFrom: resuming ? existing : 0,
+      });
+      if (!opfsWriter) {
+        throw new Error('OPFS streaming writer unavailable for large model download');
+      }
+      received = resuming ? opfsWriter.existingBytes : 0;
+      position = received;
     } else {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      // Fresh download (or server ignored Range) — truncate and restart.
-      stream = fs.open(dest, 'w');
+      stream = fs.open(dest, resuming && memfsExisting > 0 ? 'r+' : 'w');
+      if (underOpfs) {
+        opfsWriter = await OPFSBridge.openStreamingWriter(dest, {
+          resumeFrom: resuming ? received : 0,
+        });
+      }
     }
 
-    const contentLength = Number(response.headers.get('Content-Length') ?? 0);
-    const totalBytes = contentLength > 0 ? received + contentLength : 0;
-
+    const totalBytes = contentLengthHeader > 0 ? received + contentLengthHeader : projectedTotal;
     if (!response.body) throw new Error('response has no readable body');
     const reader = response.body.getReader();
 
@@ -697,19 +896,44 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
       const { done, value } = await reader.read();
       if (done) break;
       if (value && value.length > 0) {
-        fs.write(stream, value, 0, value.length, position);
+        if (opfsWriter) {
+          await opfsWriter.write(value);
+        }
+        if (!opfsDirect && stream) {
+          fs.write(stream, value, 0, value.length, position);
+        }
         position += value.length;
         received += value.length;
         invokeProgressCallback(m, progressCbPtr, received, totalBytes, cbUserData);
       }
     }
 
-    fs.close(stream);
-    stream = null;
+    if (stream) {
+      fs.close(stream);
+      stream = null;
+    }
+    if (opfsWriter) {
+      await opfsWriter.close();
+      opfsWriter = null;
+    }
+
+    if (opfsDirect) {
+      // Hydrate real bytes for archives / sub-threshold files so C++ extract
+      // (inside the complete callback) does not open an empty size stub.
+      await materializeMemfsForComplete(m, fs, dest, received);
+    }
     invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
+    // Free MEMFS after the sync complete callback (extract/validate done).
+    // Durable bytes remain in OPFS for later load hydration.
+    if (opfsDirect) {
+      removeMemfsPath(fs, dest);
+    }
   } catch (error) {
     if (stream) {
       try { fs.close(stream); } catch { /* noop */ }
+    }
+    if (opfsWriter) {
+      try { await opfsWriter.close(); } catch { /* noop */ }
     }
     const aborted = controller.signal.aborted
       || (error instanceof DOMException && error.name === 'AbortError');

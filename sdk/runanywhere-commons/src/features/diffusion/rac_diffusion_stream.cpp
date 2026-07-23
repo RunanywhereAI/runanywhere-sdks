@@ -1,21 +1,10 @@
 /**
  * @file rac_diffusion_stream.cpp
- * @brief Implementation of the lifecycle-owned proto-byte diffusion stream
- *        ABI declared in `rac_diffusion_stream.h`.
+ * @brief Lifecycle-owned proto-byte diffusion stream ABI.
  *
- * Mirrors `rac_llm_stream.cpp` exactly:
- *   - Per-handle CallbackSlot registry guarded by a mutex.
- *   - Session map indexed by monotonically-increasing 64-bit ids.
- *
- * MVP scope:
- *   - Callback registration and session create/stop/cancel are fully wired.
- *   - The diffusion engine emits progress/completed events via
- *     `dispatch_diffusion_stream_event()` once
- *     `rac_diffusion_proto_abi.cpp` is taught to use it (TODO
- *     follow-up).
- *   - start_proto today seeds a session — actual generation kickoff still
- *     flows through the existing `rac_diffusion_generate_with_progress_proto`
- *     ABI; SDKs can already register stream callbacks alongside that path.
+ * Registers per-handle callbacks and kicks off generation so SDKs receive
+ * STARTED → PROGRESS* → COMPLETED/ERROR events without re-implementing the
+ * orchestration loop in Swift/Kotlin/Web.
  */
 
 #include "rac/features/diffusion/rac_diffusion_stream.h"
@@ -24,33 +13,27 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
 #include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diffusion/rac_diffusion_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "diffusion_options.pb.h"
+#include "foundation/rac_proto_marshal_internal.h"
 #endif
 
 namespace {
 
-// Lift the voice_agent in_flight quiesce
-// pattern to the diffusion proto-byte dispatcher. See rac_llm_stream.cpp
-// and rac_vlm_proto_abi.cpp for the canonical reference; this guards
-// dispatch_diffusion_stream_event so destroy/teardown can spin-wait until
-// any in-flight slot.fn() returns before freeing user_data.
-//
-// Complete the voice_agent pattern by adding
-// an is_shutting_down barrier (voice_agent.cpp:569 / 1212-1221). Without it
-// a new caller could acquire the in_flight counter mid-quiesce and extend
-// the spin-wait indefinitely (and worse, dispatch into a freed engine).
-// DiffusionInFlightGuard now performs the canonical TOCTOU-safe sequence:
-// check flag, increment counter, re-check flag, and exposes admitted() so
-// entry points can early-return without dispatching.
 std::atomic<int>& diffusion_in_flight() {
     static std::atomic<int> counter{0};
     return counter;
@@ -85,13 +68,25 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-// The previous next_session_id() helper was
-// inlined into rac_diffusion_stream_start_proto, but that entry point now
-// returns RAC_ERROR_NOT_IMPLEMENTED until the diffusion engine kickoff is
-// wired into dispatch_diffusion_stream_event(). The session id allocator
-// will be reintroduced in lockstep with that wiring; keeping it removed
-// today avoids an unused-function lint and clarifies that no live session
-// ids are minted on this code path.
+/** At most one active stream session per diffusion handle. */
+std::unordered_map<rac_handle_t, uint64_t>& g_active_by_handle() {
+    static std::unordered_map<rac_handle_t, uint64_t> m;
+    return m;
+}
+
+std::atomic<uint64_t>& next_session_id() {
+    static std::atomic<uint64_t> id{1};
+    return id;
+}
+
+/** Clear session bookkeeping. Caller must hold g_mu(). */
+void erase_session_locked(uint64_t session_id, rac_handle_t handle) {
+    g_sessions().erase(session_id);
+    auto it = g_active_by_handle().find(handle);
+    if (it != g_active_by_handle().end() && it->second == session_id) {
+        g_active_by_handle().erase(it);
+    }
+}
 
 #if defined(RAC_HAVE_PROTOBUF)
 int64_t now_us() {
@@ -99,9 +94,31 @@ int64_t now_us() {
                std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
+
+void free_diffusion_options(rac_diffusion_options_t* options) {
+    if (!options)
+        return;
+    rac_free(const_cast<char*>(options->prompt));
+    rac_free(const_cast<char*>(options->negative_prompt));
+    rac_free(const_cast<uint8_t*>(options->input_image_data));
+    rac_free(const_cast<uint8_t*>(options->mask_data));
+    *options = RAC_DIFFUSION_OPTIONS_DEFAULT;
+}
 #endif
 
 }  // namespace
+
+#if defined(RAC_HAVE_PROTOBUF)
+namespace rac::diffusion {
+
+void dispatch_diffusion_stream_event(rac_handle_t handle,
+                                     runanywhere::v1::DiffusionStreamEventKind kind,
+                                     const runanywhere::v1::DiffusionProgress* progress,
+                                     const runanywhere::v1::DiffusionResult* result,
+                                     const char* error_message, int error_code);
+
+}  // namespace rac::diffusion
+#endif
 
 extern "C" {
 
@@ -127,28 +144,6 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// Public quiesce helper. Mirrors
-// rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
-// in-flight dispatch_diffusion_stream_event invocation has returned. Callers
-// freeing user_data registered via rac_diffusion_set_stream_proto_callback,
-// or tearing down the diffusion component, MUST call this after the unset to
-// avoid a use-after-free in the dispatch thread.
-//
-// Set the is_shutting_down barrier FIRST so any
-// caller that tries to enter the dispatcher after quiesce begins is rejected
-// by DiffusionInFlightGuard, then spin-wait until currently-in-flight calls
-// drain. Mirrors rac_vlm_proto_quiesce / voice_agent.cpp:569-592.
-//
-// diffusion_component.cpp calls this quiesce both at destroy AND on every
-// model swap via load_model (see diffusion_component.cpp:369). To keep
-// model-swap reuse working, clear the barrier after the drain completes. The
-// barrier+drain window is still sufficient to close the TOCTOU race because
-// any dispatcher entry that observed the false→true transition (or was about
-// to) has either been rejected (admitted_=false) or drained (counter
-// decremented). VLM (rac_vlm_proto_quiesce) now clears the barrier the same
-// way: the RN and Flutter VLM bridges invoke it as a per-stream drain after
-// every rac_vlm_stream_proto, so a sticky barrier would reject all subsequent
-// streams with RAC_ERROR_INVALID_STATE (see e2e-rn-vlm-fix note there).
 void rac_diffusion_proto_quiesce(void) {
     diffusion_proto_shutting_down().store(true, std::memory_order_release);
     while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {
@@ -173,27 +168,162 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     *out_session_id = 0;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    // Validate the request bytes early so callers still get RAC_ERROR_DECODING_ERROR
-    // for malformed inputs even though the engine kickoff is not yet wired.
     runanywhere::v1::DiffusionGenerationRequest parsed;
     if (request_proto_size > 0 &&
         !parsed.ParseFromArray(request_proto_bytes, static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
-    (void)parsed;
+    if (!parsed.has_options()) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
-    // Until the diffusion engine kickoff is wired into
-    // dispatch_diffusion_stream_event(), this entrypoint cannot honour the
-    // contract documented in rac_diffusion_stream.h ("Session started"
-    // implies STARTED/PROGRESS/COMPLETED/ERROR will be dispatched). The
-    // header explicitly reserves RAC_ERROR_NOT_IMPLEMENTED for this stub
-    // state, so we return that instead of RAC_SUCCESS to prevent SDKs from
-    // waiting forever on a session that will never emit a terminal event.
-    // The supported codegen entrypoint remains
-    // rac_diffusion_generate_with_progress_proto(); SDKs should fall back
-    // to it until the kickoff lands.
-    *out_session_id = 0;
-    return RAC_ERROR_NOT_IMPLEMENTED;
+    const uint64_t session_id = next_session_id().fetch_add(1, std::memory_order_relaxed);
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        if (g_active_by_handle().find(handle) != g_active_by_handle().end()) {
+            return RAC_ERROR_SERVICE_BUSY;
+        }
+        // StreamSession contains an atomic — assign fields in-place (no copy/move).
+        StreamSession& session = g_sessions()[session_id];
+        session.handle = handle;
+        session.request_id = parsed.request_id();
+        session.is_cancelled.store(false, std::memory_order_release);
+        g_active_by_handle()[handle] = session_id;
+    }
+    *out_session_id = session_id;
+
+    // Copy request bytes for the worker thread — the caller may free the
+    // original buffer as soon as this function returns.
+    std::vector<uint8_t> request_copy(request_proto_bytes,
+                                      request_proto_bytes + request_proto_size);
+
+    // Cover the whole worker lifetime so rac_diffusion_proto_quiesce() waits
+    // for generation to finish, not just individual event dispatches.
+    diffusion_in_flight().fetch_add(1, std::memory_order_relaxed);
+    try {
+        std::thread([handle, session_id, request_copy = std::move(request_copy)]() mutable {
+            auto in_flight_done = std::shared_ptr<void>(nullptr, [](void*) {
+                diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
+            });
+
+            runanywhere::v1::DiffusionGenerationRequest request;
+            if (!request.ParseFromArray(request_copy.data(),
+                                        static_cast<int>(request_copy.size())) ||
+                !request.has_options()) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to parse DiffusionGenerationRequest",
+                    static_cast<int>(RAC_ERROR_DECODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
+
+            rac::diffusion::dispatch_diffusion_stream_event(
+                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_STARTED, nullptr, nullptr,
+                nullptr, 0);
+
+            {
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it == g_sessions().end() ||
+                    it->second.is_cancelled.load(std::memory_order_acquire)) {
+                    erase_session_locked(session_id, handle);
+                    return;
+                }
+            }
+
+            rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
+            if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to convert DiffusionGenerationOptions",
+                    static_cast<int>(RAC_ERROR_DECODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
+
+            struct ProgressCtx {
+                rac_handle_t handle;
+                uint64_t session_id;
+            } progress_ctx{handle, session_id};
+
+            rac_diffusion_result_t raw = {};
+            const rac_result_t rc = rac_diffusion_generate_with_progress(
+                handle, &options,
+                [](const rac_diffusion_progress_t* progress, void* user_data) -> rac_bool_t {
+                    auto* ctx = static_cast<ProgressCtx*>(user_data);
+                    if (!ctx || !progress)
+                        return RAC_TRUE;
+                    {
+                        std::lock_guard<std::mutex> lock(g_mu());
+                        auto it = g_sessions().find(ctx->session_id);
+                        if (it == g_sessions().end() ||
+                            it->second.is_cancelled.load(std::memory_order_acquire)) {
+                            return RAC_FALSE;  // cancel
+                        }
+                    }
+                    runanywhere::v1::DiffusionProgress proto_progress;
+                    if (rac::foundation::rac_diffusion_progress_to_proto(progress, &proto_progress)) {
+                        rac::diffusion::dispatch_diffusion_stream_event(
+                            ctx->handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_PROGRESS,
+                            &proto_progress, nullptr, nullptr, 0);
+                    }
+                    return RAC_TRUE;
+                },
+                &progress_ctx, &raw);
+
+            free_diffusion_options(&options);
+
+            {
+                std::lock_guard<std::mutex> lock(g_mu());
+                auto it = g_sessions().find(session_id);
+                if (it == g_sessions().end() ||
+                    it->second.is_cancelled.load(std::memory_order_acquire)) {
+                    if (rc == RAC_SUCCESS)
+                        rac_diffusion_result_free(&raw);
+                    erase_session_locked(session_id, handle);
+                    return;
+                }
+            }
+
+            if (rc != RAC_SUCCESS) {
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    rac_error_message(rc), static_cast<int>(rc));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
+
+            runanywhere::v1::DiffusionResult result;
+            if (!rac::foundation::rac_diffusion_result_to_proto(&raw, &result)) {
+                rac_diffusion_result_free(&raw);
+                rac::diffusion::dispatch_diffusion_stream_event(
+                    handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+                    "failed to encode DiffusionResult",
+                    static_cast<int>(RAC_ERROR_ENCODING_ERROR));
+                std::lock_guard<std::mutex> lock(g_mu());
+                erase_session_locked(session_id, handle);
+                return;
+            }
+            rac_diffusion_result_free(&raw);
+            rac::diffusion::dispatch_diffusion_stream_event(
+                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_COMPLETED, nullptr, &result,
+                nullptr, 0);
+            std::lock_guard<std::mutex> lock(g_mu());
+            erase_session_locked(session_id, handle);
+        }).detach();
+    } catch (...) {
+        diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
+        std::lock_guard<std::mutex> lock(g_mu());
+        erase_session_locked(session_id, handle);
+        *out_session_id = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    return RAC_SUCCESS;
 #endif
 }
 
@@ -211,18 +341,19 @@ rac_result_t rac_diffusion_stream_stop_proto(uint64_t session_id) {
 rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
-    std::lock_guard<std::mutex> lock(g_mu());
-    auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end())
-        return RAC_ERROR_INVALID_ARGUMENT;
-    // Use release ordering so any writes the cancelling thread
-    // made before the store (e.g. draining session state) are visible to a
-    // consumer on another core that observes is_cancelled == true. Mirrors
-    // tool_calling_session.cpp:805/883 (cancel_requested.store release) and
-    // rac_llm_stream.cpp / rag_pipeline_graph.cpp. Readers must pair with
-    // memory_order_acquire on the load.
-    it->second.is_cancelled.store(true, std::memory_order_release);
-    g_sessions().erase(it);
+    rac_handle_t handle = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_sessions().find(session_id);
+        if (it == g_sessions().end())
+            return RAC_ERROR_INVALID_ARGUMENT;
+        it->second.is_cancelled.store(true, std::memory_order_release);
+        handle = it->second.handle;
+        g_sessions().erase(it);
+    }
+    if (handle) {
+        (void)rac_diffusion_cancel(handle);
+    }
     return RAC_SUCCESS;
 }
 
@@ -231,21 +362,11 @@ rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id) {
 #if defined(RAC_HAVE_PROTOBUF)
 namespace rac::diffusion {
 
-/**
- * @brief Internal helper invoked by the diffusion proto ABI / engine to
- *        emit progress / intermediate-image / completion / error events.
- */
 void dispatch_diffusion_stream_event(rac_handle_t handle,
                                      runanywhere::v1::DiffusionStreamEventKind kind,
                                      const runanywhere::v1::DiffusionProgress* progress,
                                      const runanywhere::v1::DiffusionResult* result,
                                      const char* error_message, int error_code) {
-    // Hold the InFlightGuard across the
-    // whole dispatch so rac_diffusion_proto_quiesce() can spin-wait on the
-    // counter before user_data is freed by a concurrent teardown thread.
-    // If the proto dispatcher is shutting down,
-    // the guard refuses admission and we must skip the slot lookup + callback
-    // invocation entirely — slot.fn / user_data may already be freed.
     rac::stream::ShutdownAwareInFlightGuard in_flight_guard(diffusion_in_flight(),
                                                             diffusion_proto_shutting_down());
     if (!in_flight_guard.admitted()) {

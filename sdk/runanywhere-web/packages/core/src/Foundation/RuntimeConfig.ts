@@ -22,6 +22,7 @@
 import { SDKLogger } from './SDKLogger.js';
 import { EventBus } from './EventBus.js';
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import { getBackendWorkerRuntimeDiagnostics } from '../runtime/BackendWorkerHost.js';
 import type {
   InferenceFramework,
   ModelCategory,
@@ -48,6 +49,35 @@ export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
  *
  */
 export type StreamingMode = 'auto' | 'worker' | 'main';
+
+/**
+ * Advisory per-module memory ceilings for the 32-bit WebAssembly address
+ * space. They are diagnostics, not reservations or hard runtime limits:
+ * model metadata and browser memory pressure remain the source of truth.
+ *
+ * Keep every limit below WASM32's 4 GiB address space so a single module has
+ * headroom for Emscripten allocations, JavaScript views, and stack growth.
+ */
+export interface RuntimeMemoryBudget {
+  readonly wasm32AddressSpaceBytes: number;
+  readonly perModuleSoftLimitBytes: Readonly<{
+    core: number;
+    llamacppCpu: number;
+    llamacppWebGPU: number;
+    onnxSherpa: number;
+  }>;
+}
+
+const gibibyte = 1024 ** 3;
+const memoryBudget: RuntimeMemoryBudget = Object.freeze({
+  wasm32AddressSpaceBytes: 4 * gibibyte,
+  perModuleSoftLimitBytes: Object.freeze({
+    core: 512 * 1024 ** 2,
+    llamacppCpu: 3 * gibibyte,
+    llamacppWebGPU: 3 * gibibyte,
+    onnxSherpa: 1536 * 1024 ** 2,
+  }),
+});
 
 /**
  * Function installed by a backend (typically the llamacpp bridge) to perform
@@ -80,6 +110,7 @@ let _streamingMode: StreamingMode = 'auto';
 let _switcher: RuntimeAccelerationSwitcher | null = null;
 let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
 let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
+let _degradedReason: string | null = null;
 
 /**
  * Public `RunAnywhere.runtime` capability object.
@@ -139,6 +170,36 @@ export const Runtime = {
   set streamingMode(mode: StreamingMode) {
     _streamingMode = mode;
   },
+
+  /**
+   * Actual execution context of the active BackendWorkerHost. Until a backend
+   * wires a worker factory and successfully completes its handshake, this
+   * remains `'main'` and existing inference continues on the main thread.
+   */
+  get executionContext(): 'main' | 'worker' {
+    return getBackendWorkerRuntimeDiagnostics().executionContext;
+  },
+
+  /** Number of outstanding RPC calls on the active backend worker. */
+  get workerQueueDepth(): number {
+    return getBackendWorkerRuntimeDiagnostics().queueDepth;
+  },
+
+  /**
+   * When the preferred BackendWorker path could not be established, explains
+   * why inference remains on the main thread (missing Worker, COI, handshake).
+   */
+  get degradedReason(): string | null {
+    return _degradedReason;
+  },
+
+  /**
+   * Advisory WASM32 memory limits for diagnostics and preflight UI. These
+   * numbers do not allocate memory or override browser/device quota checks.
+   */
+  get memoryBudget(): RuntimeMemoryBudget {
+    return memoryBudget;
+  },
 };
 
 /**
@@ -147,6 +208,11 @@ export const Runtime = {
  */
 export function setAccelerationSwitcher(fn: RuntimeAccelerationSwitcher | null): void {
   _switcher = fn;
+}
+
+/** Backend hook: record why the preferred worker inference path is unavailable. */
+export function setRuntimeDegradedReason(reason: string | null): void {
+  _degradedReason = reason;
 }
 
 /**

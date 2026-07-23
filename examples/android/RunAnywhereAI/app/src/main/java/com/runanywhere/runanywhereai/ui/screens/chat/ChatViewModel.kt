@@ -132,6 +132,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+    val thinkingSupported: Boolean
+        get() = GlobalState.model.loaded?.supports_thinking == true
+
+    val thinkingEnabled: Boolean
+        get() = thinkingSupported && !SettingsRepository.settings.disableThinking
+
+    fun toggleThinking() {
+        SettingsRepository.setDisableThinking(!SettingsRepository.settings.disableThinking)
+    }
+
     val canSend: Boolean
         get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && GlobalState.model.isLoaded
 

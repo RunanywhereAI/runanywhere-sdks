@@ -211,7 +211,7 @@ public typealias SDKEnvironment = RASDKEnvironment  // line 20
 
 `RASDKEnvironment` is the proto3-generated enum from `idl/model_types.proto`. The hand-written enum was removed; all SDK logic operates on the generated type through extensions.
 
-Cases (from proto): `.development`, `.staging`, `.production`, `.unspecified` (proto default), `UNRECOGNIZED` (proto catch-all).
+Cases (from proto): `.development`, `.production`, `.unspecified` (proto default), `UNRECOGNIZED` (proto catch-all). Staging was removed; its wire number is reserved.
 
 #### Codable conformance (lines 29–39)
 
@@ -221,15 +221,15 @@ Cases (from proto): `.development`, `.staging`, `.production`, `.unspecified` (p
 
 | Symbol | Type | Mechanism | Line |
 |---|---|---|---|
-| `deployableCases` | `static [RASDKEnvironment]` | Hardcoded array `[.development, .staging, .production]` | 47 |
-| `cEnvironment` | `rac_environment_t` | Switch to C enum constants (`RAC_ENV_DEVELOPMENT`, `RAC_ENV_STAGING`, `RAC_ENV_PRODUCTION`) | 54 |
+| `deployableCases` | `static [RASDKEnvironment]` | Hardcoded array `[.development, .production]` | 47 |
+| `cEnvironment` | `rac_environment_t` | Switch to C enum constants (`RAC_ENV_DEVELOPMENT`, `RAC_ENV_PRODUCTION`) | 54 |
 | `description` | `String` | Switch returning human-readable label | 64 |
 | `isProduction` | `Bool` | `rac_env_is_production(cEnvironment)` | 74 |
 | `isTesting` | `Bool` | `rac_env_is_testing(cEnvironment)` | 77 |
 | `requiresBackendURL` | `Bool` | `rac_env_requires_backend_url(cEnvironment)` | 80 |
 | `isCompatibleWithCurrentBuild` | `Bool` | Swift `#if DEBUG` check; production returns `false` in DEBUG builds | 86 |
 | `isDebugBuild` | `static Bool` | `#if DEBUG` flag | 102 |
-| `defaultLogLevel` | `LogLevel` | Switch: `.development` → `.debug`, `.staging` → `.info`, `.production` → `.warning` | 113 |
+| `defaultLogLevel` | `LogLevel` | Switch: `.development` → `.debug`, `.production` → `.warning` | 113 |
 | `shouldSendTelemetry` | `Bool` | `rac_env_should_send_telemetry(cEnvironment)` | 123 |
 | `useMockData` | `Bool` | `self == .development` | 126 |
 | `shouldSyncWithBackend` | `Bool` | `rac_env_should_sync_with_backend(cEnvironment)` | 129 |
@@ -1840,7 +1840,7 @@ Metadata sanitization: `sanitizeMetadata(_:)` calls `rac_log_metadata_should_red
 
 Pre-instantiated: `SDKLogger.shared` ("RunAnywhere"), `.llm`, `.stt`, `.tts`, `.download`, `.models`.
 
-Environment presets: `.development` → minLevel `.debug`; `.staging` → `.info`; `.production` → `.warning`.
+Environment presets: `.development` → minLevel `.debug`; `.production` → `.warning`.
 
 #### §9.4.2 Custom Log Destinations
 

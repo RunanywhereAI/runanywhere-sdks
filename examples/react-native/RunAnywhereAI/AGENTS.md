@@ -128,10 +128,19 @@ Both use classic `RCT_EXTERN_MODULE` bridge pattern (not NitroModules).
 
 ### Theme System
 
-Mirrors iOS Swift app design tokens exactly:
-- `colors.ts` — 36+ named constants + dark mode overrides (dark mode not yet wired to Appearance API)
-- `typography.ts` — 11 text styles matching iOS Dynamic Type sizes, Platform.select for font family
-- `spacing.ts` — semantic spacing, padding, icon sizes, button heights, border radii
+Single source of truth: `src/theme/system/` (a Material-3 style scheme consumed via
+`useTheme()`; brand values mirror `../../DESIGN_GUIDELINE.md`). The brand primary is
+RunAnywhere orange `#FF6900` in both light and dark schemes — the app previously ran a
+split dual-theme setup (legacy iOS-derived blue `#007AFF` in `src/theme/{colors,
+typography,spacing,index}.ts` next to an Android-derived `#E65500` scheme); the legacy
+files were deleted and every consumer migrated to `useTheme()`.
+- `system/colors.ts` — `brand` constants, primary tonal ramp anchored to `#FF6900`,
+  `lightScheme`/`darkScheme` semantic roles, `frameworkColors` badge hues
+- `system/typography.ts` — Material-3 type scale (Figtree UI / MapleMono code; brand
+  fonts per the design guideline are a documented follow-up)
+- `system/dimens.ts` / `system/motion.ts` — spacing, radii, motion tokens
+- `system/themedStyles.ts` — `useThemedStyles(createStyles)` helper for color-bearing
+  StyleSheets, cached per light/dark scheme
 
 ## Build System Details
 

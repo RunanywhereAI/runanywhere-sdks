@@ -16,9 +16,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../../theme/system';
 import type { ToolCallInfo } from '../../types/chat';
 
 interface ToolCallIndicatorProps {
@@ -31,19 +34,19 @@ interface ToolCallIndicatorProps {
 export const ToolCallIndicator: React.FC<ToolCallIndicatorProps> = ({
   toolCallInfo,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [showSheet, setShowSheet] = useState(false);
 
   const backgroundColor = toolCallInfo.success
-    ? Colors.primaryBlue + '1A' // 10% opacity
-    : Colors.primaryOrange + '1A';
+    ? colors.primary + '1A' // 10% opacity
+    : colors.tertiary + '1A';
 
   const borderColor = toolCallInfo.success
-    ? Colors.primaryBlue + '4D' // 30% opacity
-    : Colors.primaryOrange + '4D';
+    ? colors.primary + '4D' // 30% opacity
+    : colors.tertiary + '4D';
 
-  const iconColor = toolCallInfo.success
-    ? Colors.primaryBlue
-    : Colors.primaryOrange;
+  const iconColor = toolCallInfo.success ? colors.primary : colors.tertiary;
 
   return (
     <>
@@ -83,6 +86,8 @@ const ToolCallDetailSheet: React.FC<ToolCallDetailSheetProps> = ({
   toolCallInfo,
   onClose,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <Modal
       visible={visible}
@@ -109,17 +114,15 @@ const ToolCallDetailSheet: React.FC<ToolCallDetailSheetProps> = ({
               styles.statusSection,
               {
                 backgroundColor: toolCallInfo.success
-                  ? Colors.statusGreen + '1A'
-                  : Colors.statusRed + '1A',
+                  ? colors.success + '1A'
+                  : colors.error + '1A',
               },
             ]}
           >
             <Icon
               name={toolCallInfo.success ? 'checkmark-circle' : 'close-circle'}
               size={24}
-              color={
-                toolCallInfo.success ? Colors.statusGreen : Colors.statusRed
-              }
+              color={toolCallInfo.success ? colors.success : colors.error}
             />
             <Text style={styles.statusText}>
               {toolCallInfo.success ? 'Success' : 'Failed'}
@@ -157,14 +160,17 @@ const DetailSection: React.FC<DetailSectionProps> = ({
   title,
   content,
   isError = false,
-}) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    <Text style={[styles.sectionContent, isError && styles.errorText]}>
-      {content}
-    </Text>
-  </View>
-);
+}) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={[styles.sectionContent, isError && styles.errorText]}>
+        {content}
+      </Text>
+    </View>
+  );
+};
 
 interface CodeSectionProps {
   title: string;
@@ -172,6 +178,7 @@ interface CodeSectionProps {
 }
 
 const CodeSection: React.FC<CodeSectionProps> = ({ title, code }) => {
+  const styles = useThemedStyles(createStyles);
   // Try to pretty print JSON
   let formattedCode = code;
   try {
@@ -202,9 +209,11 @@ interface ToolCallingBadgeProps {
 export const ToolCallingBadge: React.FC<ToolCallingBadgeProps> = ({
   toolCount,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.toolCallingBadge}>
-      <Icon name="build-outline" size={12} color={Colors.primaryBlue} />
+      <Icon name="build-outline" size={12} color={colors.primary} />
       <Text style={styles.toolCallingBadgeText}>
         Tools enabled ({toolCount})
       </Text>
@@ -212,117 +221,116 @@ export const ToolCallingBadge: React.FC<ToolCallingBadgeProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  // Badge styles
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 0.5,
-    marginBottom: Spacing.small,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    // Badge styles
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 0.5,
+      marginBottom: 6,
+      alignSelf: 'flex-start',
+    },
+    badgeText: {
+      ...typography.labelSmall,
+      color: colors.onSurfaceVariant,
+    },
 
-  // Sheet styles
-  sheetContainer: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  sheetTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  closeButton: {
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Padding.padding8,
-  },
-  closeButtonText: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  sheetContent: {
-    flex: 1,
-  },
-  sheetContentContainer: {
-    padding: Padding.padding16,
-    gap: 20,
-  },
+    // Sheet styles
+    sheetContainer: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    sheetHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    sheetTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
+    closeButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    closeButtonText: {
+      ...typography.bodyLarge,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    sheetContent: {
+      flex: 1,
+    },
+    sheetContentContainer: {
+      padding: 16,
+      gap: 20,
+    },
 
-  // Status section
-  statusSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: Padding.padding16,
-    borderRadius: BorderRadius.regular,
-  },
-  statusText: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
+    // Status section
+    statusSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 16,
+      borderRadius: 8,
+    },
+    statusText: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
 
-  // Detail section
-  section: {
-    gap: Spacing.small,
-  },
-  sectionTitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  sectionContent: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  errorText: {
-    color: Colors.statusRed,
-  },
+    // Detail section
+    section: {
+      gap: 6,
+    },
+    sectionTitle: {
+      ...typography.labelMedium,
+      color: colors.onSurfaceVariant,
+    },
+    sectionContent: {
+      ...typography.bodyLarge,
+      color: colors.onSurface,
+    },
+    errorText: {
+      color: colors.error,
+    },
 
-  // Code section
-  codeContainer: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding12,
-  },
-  codeText: {
-    ...Typography.footnote,
-    fontFamily: 'Menlo',
-    color: Colors.textPrimary,
-  },
+    // Code section
+    codeContainer: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 8,
+      padding: 12,
+    },
+    codeText: {
+      ...typography.codeSmall,
+      color: colors.onSurface,
+    },
 
-  // Tool calling badge (above input)
-  toolCallingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Padding.padding8,
-    backgroundColor: Colors.primaryBlue + '1A',
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-  },
-  toolCallingBadgeText: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-    fontWeight: '500',
-  },
-});
+    // Tool calling badge (above input)
+    toolCallingBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: colors.primary + '1A',
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+    },
+    toolCallingBadgeText: {
+      ...typography.labelMedium,
+      color: colors.primary,
+    },
+  });
 
 export default ToolCallIndicator;

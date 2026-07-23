@@ -12,7 +12,6 @@ import {
   RAG,
   createRAGNativeProvider,
   createDefaultRAGConfiguration,
-  ragCreatePipeline,
   ragGetStatistics,
   ragQuery,
   setRAGProvider,
@@ -80,9 +79,14 @@ describe('VoiceAgent and RAG provider-required facades', () => {
 
   it('rejects native Web RAG persistence until a browser storage-backed provider exists', async () => {
     ModalityProtoAdapter.registerModuleCapabilities(['rag'], fakeRAGModule());
-    setRAGProvider(createRAGNativeProvider());
+    const provider = createRAGNativeProvider();
+    setRAGProvider(provider);
 
-    await expect(ragCreatePipeline(createDefaultRAGConfiguration({
+    // Exercise the native provider directly — public ragCreatePipeline may
+    // swap to composed CrossWasm when artifacts are not co-located.
+    await expect(provider.ragCreatePipeline(createDefaultRAGConfiguration({
+      embeddingModelId: 'all-minilm-l6-v2',
+      llmModelId: 'lfm2-350m-q4_k_m',
       embeddingModelPath: '/models/embed.onnx',
       llmModelPath: '/models/llm.gguf',
       persistIndex: true,

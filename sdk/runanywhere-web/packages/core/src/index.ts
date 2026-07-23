@@ -9,6 +9,15 @@
 
 export { RunAnywhere } from './Public/RunAnywhere.js';
 export type { StorageBackend } from './Public/RunAnywhere.js';
+export {
+  Diffusion,
+  generateImage,
+  generateImageStream,
+  cancelImageGeneration,
+} from './Public/Extensions/RunAnywhere+Diffusion.js';
+export type {
+  DiffusionAvailability,
+} from './Public/Extensions/RunAnywhere+Diffusion.js';
 
 export type {
   JSONSchemaDescriptor,
@@ -88,7 +97,20 @@ export type {
   RAGDocumentSummary,
   RAGEnsureReadyOptions,
   RAGPipelineState,
+  RAGProvider,
+  RAGProviderCapabilities,
 } from './Public/Extensions/RunAnywhere+RAG.js';
+export {
+  createPersistentRAGProvider,
+  registerPersistentRAGProvider,
+} from './Public/Extensions/RunAnywhere+RAG.js';
+export { Hardware } from './Public/Extensions/RunAnywhere+Hardware.js';
+export type { WebCapabilities } from './Public/Extensions/RunAnywhere+Hardware.js';
+export {
+  getStoredHfToken,
+  setHfToken,
+} from './Public/Extensions/RunAnywhere+HuggingFace.js';
+export { registerDuckDuckGoSearchTool } from './Public/Helpers/registerDuckDuckGoSearchTool.js';
 export type {
   EmbeddingsOptions,
   EmbeddingsRequest,

@@ -32,6 +32,12 @@ import {
   type LoraAdapterImportResult as ProtoLoraAdapterImportResult,
   type LoraCompatibilityResult as ProtoLoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
+import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  mustUseLlamaBackendWorker,
+} from '../runtime/BackendWorkerModelOwnership.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import {
   adapterState,
@@ -309,7 +315,21 @@ export class LoRAProtoAdapter {
     );
   }
 
-  apply(request: ProtoLoRAApplyRequest): ProtoLoRAApplyResult | null {
+  async apply(request: ProtoLoRAApplyRequest): Promise<ProtoLoRAApplyResult | null> {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (mustUseLlamaBackendWorker()) {
+      if (!host || host.diagnostics.executionContext !== 'worker') {
+        throw SDKException.backendNotAvailable(
+          'lora.apply',
+          getLlamaBackendWorkerDeadReason()
+            ?? 'BackendWorker is required for LoRA operations; main-thread fallback is disabled.',
+        );
+      }
+      const response = await host.infer('lora.apply', {
+        requestBytes: LoRAApplyRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response?.resultBytes ? LoRAApplyResult.decode(response.resultBytes) : null;
+    }
     if (!ensureExports(this.module, 'lora.apply', ['_rac_lora_apply_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
@@ -322,7 +342,21 @@ export class LoRAProtoAdapter {
     );
   }
 
-  remove(request: ProtoLoRARemoveRequest): ProtoLoRAState | null {
+  async remove(request: ProtoLoRARemoveRequest): Promise<ProtoLoRAState | null> {
+    const host = getActiveBackendWorkerHost('llamacpp');
+    if (mustUseLlamaBackendWorker()) {
+      if (!host || host.diagnostics.executionContext !== 'worker') {
+        throw SDKException.backendNotAvailable(
+          'lora.remove',
+          getLlamaBackendWorkerDeadReason()
+            ?? 'BackendWorker is required for LoRA operations; main-thread fallback is disabled.',
+        );
+      }
+      const response = await host.infer('lora.remove', {
+        requestBytes: LoRARemoveRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response?.resultBytes ? LoRAState.decode(response.resultBytes) : null;
+    }
     if (!ensureExports(this.module, 'lora.remove', ['_rac_lora_remove_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
