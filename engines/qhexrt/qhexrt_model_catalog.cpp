@@ -108,6 +108,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"parakeet_ctc_1_1b", kV75, false},
     {"canary_qwen_2_5b", kV81, false},
     {"canary_1b_flash", kV75V81, false},
+    {"canary_180m_flash", kV75, false},
     {"nemotron_asr_streaming", kV75V81, false},
     {"melotts_en", kAllSupportedArches, false},
     // V79 requires model-downloaded executable .so files, which Play disallows.
