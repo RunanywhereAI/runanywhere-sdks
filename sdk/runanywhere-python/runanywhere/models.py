@@ -242,7 +242,12 @@ class LLMModel:
 
     # -- lifecycle -----------------------------------------------------------
     def unload(self) -> None:
-        """Release the model and emit ``ModelUnloadedEvent('llm')``."""
+        """Release the model and emit ``ModelUnloadedEvent('llm')``. Idempotent — a manual
+        unload() followed by RunAnywhere.shutdown() (which also unloads tracked models) must
+        not double-free or emit a second event."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_model(self._handle)
         events.bus.emit(events.ModelUnloadedEvent(modality="llm"))
 
@@ -309,7 +314,10 @@ class VLMModel:
         return "".join(out)
 
     def unload(self) -> None:
-        """Release the model and emit ``ModelUnloadedEvent('vlm')``."""
+        """Release the model and emit ``ModelUnloadedEvent('vlm')``. Idempotent."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_vlm_model(self._handle)
         events.bus.emit(events.ModelUnloadedEvent(modality="vlm"))
 
@@ -326,7 +334,10 @@ class Embedder:
         return self._core.embed(self._handle, text)
 
     def unload(self) -> None:
-        """Release the model and emit ``ModelUnloadedEvent('embedder')``."""
+        """Release the model and emit ``ModelUnloadedEvent('embedder')``. Idempotent."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_embedding_model(self._handle)
         events.bus.emit(events.ModelUnloadedEvent(modality="embedder"))
 
@@ -349,7 +360,10 @@ class STTModel:
         return await loop.run_in_executor(None, self.transcribe, pcm16)
 
     def unload(self) -> None:
-        """Release the model and emit ``ModelUnloadedEvent('stt')``."""
+        """Release the model and emit ``ModelUnloadedEvent('stt')``. Idempotent."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_stt_model(self._handle)
         events.bus.emit(events.ModelUnloadedEvent(modality="stt"))
 
@@ -373,7 +387,10 @@ class TTSVoice:
         return await loop.run_in_executor(None, self.synthesize, text)
 
     def unload(self) -> None:
-        """Release the voice and emit ``ModelUnloadedEvent('tts')``."""
+        """Release the voice and emit ``ModelUnloadedEvent('tts')``. Idempotent."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_tts_voice(self._handle)
         events.bus.emit(events.ModelUnloadedEvent(modality="tts"))
 
@@ -403,5 +420,8 @@ class Vad:
         self._core.vad_reset(self._handle)
 
     def close(self) -> None:
-        """Release the detector."""
+        """Release the detector. Idempotent (safe to close() then have shutdown() close again)."""
+        if getattr(self, "_unloaded", False):
+            return
+        self._unloaded = True
         self._core.unload_vad(self._handle)
