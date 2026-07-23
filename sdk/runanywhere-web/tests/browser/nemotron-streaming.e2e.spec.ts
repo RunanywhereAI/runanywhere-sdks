@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import type { Page } from '@playwright/test';
 import {
+  RELEASE_E2E_ENABLED,
   ensureModelReady,
   expect,
   navigateTo,
@@ -19,7 +20,10 @@ import {
   waitForInteractive,
 } from './support/release-harness';
 
-const ENABLED = process.env.RA_RUN_NEMOTRON_E2E === '1';
+// Honors RA_RUN_FULL_E2E (via RELEASE_E2E_ENABLED) like the sibling focused
+// specs so the scheduled full-e2e lane actually exercises it, plus the
+// dedicated RA_RUN_NEMOTRON_E2E override for running it in isolation.
+const ENABLED = RELEASE_E2E_ENABLED || process.env.RA_RUN_NEMOTRON_E2E === '1';
 const MODEL = {
   id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
   query: 'Nemotron 3.5',
@@ -49,7 +53,7 @@ interface StreamRecord {
 test.describe('Nemotron 3.5 ASR Streaming 0.6B INT8 — pinned Web runtime', () => {
   test.skip(
     !ENABLED,
-    'Set RA_RUN_NEMOTRON_E2E=1 to download and infer with the 682 MB pinned bundle.',
+    'Set RA_RUN_FULL_E2E=1 or RA_RUN_NEMOTRON_E2E=1 to download and infer with the 682 MB pinned bundle.',
   );
 
   test('persists, loads, streams partials, and drains the final token on normal stop', async ({

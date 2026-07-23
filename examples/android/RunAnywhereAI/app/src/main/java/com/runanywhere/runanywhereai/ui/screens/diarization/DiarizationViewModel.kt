@@ -4,7 +4,6 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.DiarizationAudioEncoding
 import ai.runanywhere.proto.v1.DiarizationOptions
 import ai.runanywhere.proto.v1.DiarizationSegment
-import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelLoadRequest
@@ -100,24 +99,29 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
                 )
                 if (!importResult.success) {
                     error = importResult.error_message.ifEmpty { "Model import failed." }
+                    status = ""
                     return@launch
                 }
                 val modelId = importResult.model?.id
                 if (modelId.isNullOrEmpty()) {
                     error = "Imported model has no identifier; cannot load."
+                    status = ""
                     return@launch
                 }
 
                 status = "Loading model…"
+                // Framework is intentionally omitted: the SDK resolves the engine
+                // from the imported model's registry entry (ONNX Sortformer). The
+                // example must not pin an engine/framework constant (layering rule).
                 val loadResult = RunAnywhere.loadModel(
                     ModelLoadRequest(
                         model_id = modelId,
                         category = ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION,
-                        framework = InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
                     ),
                 )
                 if (!loadResult.success) {
                     error = loadResult.error_message.ifEmpty { "Model load failed." }
+                    status = ""
                     return@launch
                 }
                 loadedModelId = modelId
@@ -126,6 +130,7 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
             } catch (e: Exception) {
                 RACLog.e("$TAG: Model import/load failed", e)
                 error = "Model import/load failed: ${e.message}"
+                status = ""
             } finally {
                 isImportingModel = false
             }

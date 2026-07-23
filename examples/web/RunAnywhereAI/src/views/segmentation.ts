@@ -2,14 +2,14 @@
  * Segmentation Tab — semantic image segmentation over the canonical
  * `RunAnywhere.segment` facade (SegFormer / ADE20K-class models).
  *
- * The SegFormer weights are user-supplied and gated at the source (HuggingFace
- * gated repo + the existing HF token flow); there is no in-app license
- * acceptance step. This view therefore:
+ * No browser segmentation engine or model ships in this build yet, so the shared
+ * model sheet has nothing to offer and the run stays gated. This view is wired to
+ * the canonical facade so it lights up automatically once a browser engine
+ * registers a `.semanticSegmentation` model. Until then it:
  *
  *   1. Reports the SDK-owned lifecycle state for a loaded
- *      `.semanticSegmentation` model. The SegFormer weights are user-supplied
- *      and uncataloged, so model supply/load is delegated to the SDK's model
- *      management (the shared model sheet) rather than reimplemented here.
+ *      `.semanticSegmentation` model. Model supply/load is delegated to the SDK's
+ *      model management (the shared model sheet) rather than reimplemented here.
  *   2. Accepts a user-picked image, decodes it to tightly-packed RGBA8 pixels,
  *      and runs `RunAnywhere.segment(request)`.
  *   3. Renders the returned diagnostic mask overlaid on the source image and a
@@ -103,9 +103,11 @@ function renderView(): void {
           <li><code>segmentation model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
         </ul>
         <p class="text-secondary">
-          SegFormer weights are user-supplied and uncataloged. Supply and load them
-          through the SDK's model management (the button above), then return here to run
-          <code>RunAnywhere.segment</code>.
+          No browser segmentation engine or model ships in this build, so the picker
+          above stays empty and <code>RunAnywhere.segment</code> cannot be run here yet.
+          This flow lights up automatically once a browser engine registers a
+          <code>.semanticSegmentation</code> model; until then, run segmentation from a
+          native RunAnywhere app.
         </p>
       </div>
 

@@ -1375,6 +1375,25 @@ target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_download_orchestrator)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
+# --- test_blob_store: content-addressed de-dup store (no backend dependency) ---
+# The only download-path code that DELETES files (gc_orphans) and MOVES verified
+# model bytes (promote); its symlink/GC invariants are exercised directly here.
+# Symlink-dependent, so it is not built on Windows (create_symlink needs elevated
+# privileges / Developer Mode there) or Emscripten (OPFS has no symlinks; the
+# store is disabled and every op is a documented no-op). macOS + Linux — the
+# lanes that reliably run the always-built tests — get the coverage.
+if(NOT WIN32 AND NOT EMSCRIPTEN)
+    add_executable(test_blob_store test_blob_store.cpp)
+    target_include_directories(test_blob_store PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_blob_store PRIVATE rac_commons)
+    rac_link_archive_deps(test_blob_store)
+    target_compile_features(test_blob_store PRIVATE cxx_std_17)
+    add_test(NAME blob_store_tests COMMAND test_blob_store --run-all)
+endif()
+
 # --- Sherpa-ONNX speech tests (VAD, STT, TTS) ---
 # Engine-independence refactor: tests link rac_backend_sherpa
 # (which owns the speech ops) and rac_backend_onnx because the test setup

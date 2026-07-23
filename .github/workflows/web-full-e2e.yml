@@ -19,7 +19,7 @@ permissions:
 jobs:
   full-e2e:
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,6 +45,16 @@ jobs:
           RA_RUN_FULL_E2E: '1'
           RA_E2E_TRACE: '1'
         run: npm run test:browser:release
+      - name: NVIDIA-family focused browser journeys (LLM / VLM / speech-RAG / Nemotron streaming)
+        # Runs even if the release journey flaked so these NVIDIA-family specs
+        # (added by the capabilities PR but wired to no CI script before this)
+        # actually execute in a lane.
+        if: ${{ !cancelled() }}
+        working-directory: sdk/runanywhere-web
+        env:
+          RA_RUN_FULL_E2E: '1'
+          RA_E2E_TRACE: '1'
+        run: npm run test:browser:nvidia
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4

@@ -114,12 +114,16 @@ rac_handle_t remove_lifetime(rac_handle_t handle,
     return component;
 }
 
-rac_result_t create_component_service(const char* model_id, void*, rac_handle_t* out_service) {
-    rac_result_t rc = rac_rerank_create(model_id, out_service);
+// The lifecycle passes the resolved model PATH as the first argument (see
+// rac_lifecycle_load → mgr->create_fn(model_path, ...)); the backend uses it both
+// as its create id and as the file to load. The logical model id is tracked
+// separately by the lifecycle and reported via rac_lifecycle_get_model_id.
+rac_result_t create_component_service(const char* model_path, void*, rac_handle_t* out_service) {
+    rac_result_t rc = rac_rerank_create(model_path, out_service);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
-    rc = rac_rerank_initialize(*out_service, model_id);
+    rc = rac_rerank_initialize(*out_service, model_path);
     if (rc != RAC_SUCCESS) {
         rac_rerank_destroy(*out_service);
         *out_service = nullptr;
@@ -200,8 +204,14 @@ rac_result_t result_to_proto(const rac_rerank_result_t& source, size_t candidate
         destination->set_rank(item.rank);
     }
     out->set_processing_time_ms(source.processing_time_ms);
-    out->set_model_id(source.model_id ? source.model_id
-                                      : (fallback_model_id ? fallback_model_id : ""));
+    // Prefer the commons-known logical model id (the lifecycle-resolved id passed
+    // as fallback_model_id) over the backend-reported value: some backends (e.g.
+    // llamacpp) set rac_rerank_result_t.model_id to the resolved on-device GGUF
+    // PATH, and the proto model_id field must carry the logical id, never a
+    // filesystem path (proto contract + no device-path leakage to the app layer).
+    out->set_model_id((fallback_model_id != nullptr && fallback_model_id[0] != '\0')
+                          ? fallback_model_id
+                          : (source.model_id ? source.model_id : ""));
     return RAC_SUCCESS;
 }
 

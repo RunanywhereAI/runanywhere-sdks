@@ -72,11 +72,13 @@ final class SegmentationViewModel {
             let importResult = try await RunAnywhere.importModel(importRequest)
             guard importResult.success else {
                 error = importResult.errorMessage.isEmpty ? "Model import failed." : importResult.errorMessage
+                statusMessage = ""
                 return
             }
             let modelID = importResult.model.id
             guard !modelID.isEmpty else {
                 error = "Imported model has no identifier; cannot load."
+                statusMessage = ""
                 return
             }
 
@@ -88,6 +90,7 @@ final class SegmentationViewModel {
             let loadResult = await RunAnywhere.loadModel(loadRequest)
             guard loadResult.success else {
                 error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
+                statusMessage = ""
                 return
             }
             loadedModelName = modelID
@@ -96,6 +99,7 @@ final class SegmentationViewModel {
         } catch {
             logger.error("Segmentation model import/load failed: \(error.localizedDescription)")
             self.error = "Model import/load failed: \(error.localizedDescription)"
+            statusMessage = ""
         }
     }
 

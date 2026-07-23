@@ -633,15 +633,18 @@ int main() {
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(8000);
+        opts.set_sample_rate_hz(16000);
         CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
-              "sample_rate_hz 8000 (inclusive lower bound) is accepted");
+              "sample_rate_hz 16000 (the model's fixed rate) is accepted");
     }
     {
+        // In-range but != 16000: the mel frontend is 16 kHz-only and commons does
+        // not resample, so the boundary rate is rejected rather than silently
+        // producing wrong features/timestamps.
         runanywhere::v1::DiarizationOptions opts;
         opts.set_sample_rate_hz(48000);
-        CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
-              "sample_rate_hz 48000 (inclusive upper bound) is accepted");
+        CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
+              "in-range sample_rate_hz other than 16000 is rejected (16 kHz-only frontend)");
     }
     {
         runanywhere::v1::DiarizationOptions opts;

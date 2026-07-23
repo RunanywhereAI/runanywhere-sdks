@@ -580,13 +580,51 @@ bool is_downloadable_executable_code(const std::string& path) {
 
 }  // namespace
 
-// Recursively collect every string leaf value in `j`.
-void collect_json_strings(const nlohmann::json& j, std::vector<std::string>& out) {
+namespace {
+
+// Recursively collect every string leaf value in `j`. `depth` guards against a
+// maliciously deep manifest (the manifest URL is repo-controlled content, not
+// first-party) overflowing the stack; beyond kMaxJsonDepth the subtree is
+// ignored, which fails safe to "couldn't prune -> register the whole folder".
+// static: file-local helper, keep it out of the TU's external linkage.
+constexpr int kMaxJsonDepth = 128;
+static void collect_json_strings(const nlohmann::json& j, std::vector<std::string>& out,
+                                 int depth = 0) {
+    if (depth > kMaxJsonDepth) {
+        return;
+    }
     if (j.is_string()) {
         out.push_back(j.get<std::string>());
     } else if (j.is_array() || j.is_object()) {
-        for (const auto& v : j) collect_json_strings(v, out);
+        for (const auto& v : j) collect_json_strings(v, out, depth + 1);
     }
+}
+
+// Directory portion of a bundle-relative path ("" for a top-level file).
+std::string dirname_of(const std::string& path) {
+    const size_t slash = path.find_last_of('/');
+    return slash == std::string::npos ? std::string() : path.substr(0, slash);
+}
+
+// True when `part` is an external-data sidecar of the referenced weight `ref`: a
+// same-directory companion the loader opens by CONVENTION, not because the manifest
+// names it — most importantly an ONNX `model.onnx` whose weights live in a sibling
+// `model.onnx_data` / `model.onnx.data` (or `<stem>_data` / `<stem>.data`). Keeping
+// these prevents the pruner from silently dropping a required multi-hundred-MB data
+// file the manifest never literally names. Over-inclusion here is safe; the failure
+// it prevents (a "successful" but structurally-incomplete, unloadable download) is not.
+bool is_external_data_sidecar(const std::string& part, const std::string& ref) {
+    if (part == ref || dirname_of(part) != dirname_of(ref)) return false;
+    const std::string pb = basename_of(part);
+    const std::string rb = basename_of(ref);
+    if (pb.empty() || rb.empty()) return false;
+    if (pb == rb + "_data" || pb == rb + ".data") return true;  // model.onnx(.|_)data
+    if (rb.size() > 5 && rb.ends_with(".onnx")) {
+        const std::string stem = rb.substr(0, rb.size() - 5);
+        return pb == stem + "_data" || pb == stem + ".data" || pb == stem + ".onnx_data" ||
+               pb == stem + ".onnx.data";
+    }
+    return false;
 }
 
 // Fetch a pinned manifest and return the set of bundle-relative PATHS it references (that
@@ -596,7 +634,7 @@ void collect_json_strings(const nlohmann::json& j, std::vector<std::string>& out
 // of nesting while keeping siblings like text/weights.bin and vision/weights.bin distinct,
 // with zero per-framework schema in commons. Empty set => couldn't prune (fetch/parse failed
 // or nothing matched) => caller registers the whole folder.
-std::unordered_set<std::string> manifest_referenced_paths(
+static std::unordered_set<std::string> manifest_referenced_paths(
     const std::string& manifest_url, const std::vector<TreeFile>& bundle) {
     std::unordered_set<std::string> refs;
     rac_http_client_t* client = nullptr;
@@ -609,9 +647,14 @@ std::unordered_set<std::string> manifest_referenced_paths(
     rac_http_response_t response = {};
     const rac_result_t rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);
+    // Cap the manifest body before parsing: a manifest just names bundle files
+    // (KB-scale even for large multimodal repos), but the URL is repo-controlled,
+    // so bound the input handed to the JSON parser. Oversize -> empty body ->
+    // whole folder (fail-safe).
+    constexpr size_t kMaxManifestBytes = 16 * 1024 * 1024;
     std::string body;
     if (rc == RAC_SUCCESS && response.status == 200 && response.body_bytes != nullptr &&
-        response.body_len > 0) {
+        response.body_len > 0 && response.body_len <= kMaxManifestBytes) {
         body.assign(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
     }
     rac_http_response_free(&response);
@@ -639,12 +682,45 @@ std::unordered_set<std::string> manifest_referenced_paths(
             refs.insert(s);
             continue;
         }
+        const std::string base = basename_of(s);
         // Otherwise fall back to basename matching only when that basename is unambiguous.
-        const auto it = unique_basename_to_path.find(basename_of(s));
-        if (it != unique_basename_to_path.end()) refs.insert(it->second);
+        const auto it = unique_basename_to_path.find(base);
+        if (it != unique_basename_to_path.end()) {
+            refs.insert(it->second);
+            continue;
+        }
+        // Fail-safe: a manifest leaf whose basename names an AMBIGUOUS bundle file
+        // (the same basename under multiple folders, e.g. text/model.safetensors +
+        // vision/model.safetensors) but resolves to no exact path is unresolvable —
+        // we cannot tell which sibling shard it means. Pruning here risks dropping a
+        // required >=1 MiB shard and silently shipping an incomplete bundle, so abort
+        // pruning entirely and keep the whole folder (empty set => caller registers all).
+        if (ambiguous_basenames.count(base) > 0) {
+            return {};
+        }
+    }
+    // Fail safe toward inclusion: also keep external-data sidecars of any referenced
+    // weight even though the manifest does not name them (ONNX `model.onnx_data` and
+    // friends are loaded by convention). Without this the pruner drops the multi-hundred-
+    // MB data file and the download "succeeds" as a structurally-incomplete, unloadable
+    // model — exactly the multimodal large-model repos this feature targets.
+    if (!refs.empty()) {
+        std::unordered_set<std::string> sidecars;
+        for (const auto& f : bundle) {
+            if (refs.count(f.path) > 0) continue;
+            for (const auto& ref : refs) {
+                if (is_external_data_sidecar(f.path, ref)) {
+                    sidecars.insert(f.path);
+                    break;
+                }
+            }
+        }
+        refs.insert(sidecars.begin(), sidecars.end());
     }
     return refs;
 }
+
+}  // namespace
 
 rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
                                            const std::string& org, const std::string& repo,
@@ -778,8 +854,19 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
     };
     append(bundle[primary_index], prefix + bundle[primary_index].path);
     for (size_t i = 0; i < bundle.size(); ++i) {
-        if (i != primary_index && keep(bundle[i])) {
+        if (i == primary_index) continue;
+        if (keep(bundle[i])) {
             append(bundle[i], prefix + bundle[i].path);
+        } else {
+            // Only large, manifest-unreferenced, non-sidecar files reach here (keep()
+            // always keeps small aux/config and recognized sidecars). Log each drop so an
+            // over-prune of a weight the manifest did not literally name is diagnosable,
+            // instead of a silent, structurally-incomplete "successful" download.
+            RAC_LOG_WARNING(LOG_CAT,
+                            "Manifest prune dropped unreferenced large file under '%s': %s "
+                            "(%lld bytes)",
+                            primary_rel.c_str(), bundle[i].path.c_str(),
+                            static_cast<long long>(bundle[i].size_bytes));
         }
     }
     if (root_config && !bundle_has_top_level_config) {

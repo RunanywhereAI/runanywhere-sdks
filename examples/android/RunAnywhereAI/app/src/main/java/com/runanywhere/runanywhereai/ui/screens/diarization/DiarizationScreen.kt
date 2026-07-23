@@ -151,9 +151,9 @@ private fun modelCard(viewModel: DiarizationViewModel, onPickModel: () -> Unit) 
             )
         }
         Text(
-            "Sortformer weights are user-supplied and uncataloged. Pick the model files " +
-                "(diar_streaming_sortformer_4spk-v2.1.onnx and its config); the SDK imports and " +
-                "loads them under the speaker-diarization category.",
+            "Sortformer weights are user-supplied and uncataloged. Pick the model bundle " +
+                "(the ONNX weights and their config); the SDK imports and loads them under " +
+                "the speaker-diarization category.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

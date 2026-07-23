@@ -29,14 +29,14 @@
 namespace rac::download::blob_store {
 
 // True when the store is usable on this build/platform (native FS with
-// hardlinks). Web/OPFS builds return false and all other calls are no-ops.
+// symlinks). Web/OPFS builds return false and all other calls are no-ops.
 bool enabled();
 
 // Absolute path of the blob for `sha256_hex` (does not create anything).
 std::string blob_path(const std::string& sha256_hex);
 
 // De-dup HIT: if a verified blob for `sha256_hex` already exists (and, when
-// `expected_bytes > 0`, its size matches), hardlink it into `dest` and return
+// `expected_bytes > 0`, its size matches), symlink it into `dest` and return
 // true — the caller then SKIPS the network download entirely. Returns false when
 // the store is disabled, the hash is empty, no blob exists, or the link fails
 // (caller falls back to a normal download).
@@ -44,9 +44,10 @@ bool link_from_blob(const std::string& sha256_hex, int64_t expected_bytes,
                     const std::string& dest);
 
 // PROMOTE: after `dest` has been downloaded and sha-verified, publish it into the
-// store so future models de-dup against it. Best-effort: ensures `dest` ends up
-// sharing the store blob's inode. No-op on empty hash / disabled store / failure
-// (leaves `dest` as a valid standalone file). Safe under concurrent promotes.
+// store so future models de-dup against it. Best-effort: ensures `dest` ends up as a
+// relative symlink into the store blob. No-op on empty hash / disabled store / failure
+// (leaves `dest` as a valid standalone file). Safe under concurrent promotes WITHIN A
+// SINGLE PROCESS (the store assumes single-process access — see blob_store.cpp).
 void promote(const std::string& sha256_hex, const std::string& dest);
 
 // Garbage-collect orphaned blobs: scan the model tree for symlinks still targeting

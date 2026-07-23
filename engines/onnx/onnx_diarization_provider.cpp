@@ -59,7 +59,6 @@ using runanywhere::runtime::onnxrt::TensorInput;
 using runanywhere::runtime::onnxrt::TensorOutput;
 
 constexpr const char* kLogCategory = "Diarization.ONNX";
-constexpr const char* kModelId = "diar_streaming_sortformer_4spk-v2.1-onnx";
 constexpr const char* kModelFileName = "diar_streaming_sortformer_4spk-v2.1.onnx";
 
 // ---- Mel frontend constants (NeMo FilterbankFeatures / parakeet-rs) ----------
@@ -868,19 +867,30 @@ rac_result_t build_result(const std::vector<Segment>& segments, int64_t audio_du
     *out = {};
     out->audio_duration_ms = audio_duration_ms;
     out->processing_time_ms = processing_time_ms;
-    out->model_id = duplicate_string(kModelId);
-    if (!out->model_id) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
+    // Leave out->model_id null: commons result_to_proto fills the lifecycle-owned
+    // model id via fallback_model_id, matching the sibling ONNX segmentation
+    // provider. Pinning the internal graph name here misreports the model across
+    // SDKs and breaks the Web binding's model-id equality check.
+
+    // Sortformer emits sparse slot indices in [0, kNumSpeakers) and does NOT
+    // guarantee slot 0 is used or that the active slots are contiguous. The
+    // result ABI + commons result_to_proto require a dense speaker space (every
+    // segment's speaker_index in [0, speaker_count)). Remap the active slots to a
+    // contiguous 0..k-1 range so a clip whose active slots are e.g. {1, 2} still
+    // validates and reports an accurate speaker_count.
     std::array<bool, kNumSpeakers> present{};
     for (const auto& seg : segments) {
         if (seg.speaker >= 0 && static_cast<size_t>(seg.speaker) < kNumSpeakers) {
             present[static_cast<size_t>(seg.speaker)] = true;
         }
     }
+    std::array<int32_t, kNumSpeakers> dense_index{};
+    dense_index.fill(-1);
     int32_t speaker_count = 0;
-    for (bool p : present) {
-        speaker_count += p ? 1 : 0;
+    for (size_t s = 0; s < kNumSpeakers; ++s) {
+        if (present[s]) {
+            dense_index[s] = speaker_count++;
+        }
     }
     out->speaker_count = speaker_count;
 
@@ -893,11 +903,15 @@ rac_result_t build_result(const std::vector<Segment>& segments, int64_t audio_du
             return RAC_ERROR_OUT_OF_MEMORY;
         }
         for (size_t i = 0; i < segments.size(); ++i) {
+            const int32_t raw = segments[i].speaker;
+            const int32_t mapped =
+                (raw >= 0 && static_cast<size_t>(raw) < kNumSpeakers)
+                    ? dense_index[static_cast<size_t>(raw)]
+                    : raw;
             out->segments[i].start_ms = segments[i].start_ms;
             out->segments[i].end_ms = segments[i].end_ms;
-            out->segments[i].speaker_index = segments[i].speaker;
-            out->segments[i].speaker_id =
-                duplicate_string("speaker_" + std::to_string(segments[i].speaker));
+            out->segments[i].speaker_index = mapped;
+            out->segments[i].speaker_id = duplicate_string("speaker_" + std::to_string(mapped));
             if (!out->segments[i].speaker_id) {
                 rac_diarization_result_free(out);
                 return RAC_ERROR_OUT_OF_MEMORY;

@@ -206,9 +206,11 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
 }
 
 // True only when commons can produce a compatibility verdict for [modelId] (it
-// derives the verdict from the registry entry). Direct downloads of unregistered
-// models return false and skip the resource preflight.
-private suspend fun RunAnywhere.isModelRegistered(modelId: String): Boolean =
+// derives the verdict from the registry entry). Direct downloads/loads of
+// unregistered models return false and skip the resource preflight. Shared with
+// the load path (RunAnywhereModelLifecycle.loadModel) so both gate the preflight
+// on registry presence identically.
+internal suspend fun RunAnywhere.isModelRegistered(modelId: String): Boolean =
     getModel(ModelGetRequest(model_id = modelId)).found
 
 // Oversize-partial self-healing happens inside the commons planner

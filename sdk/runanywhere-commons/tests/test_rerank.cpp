@@ -45,16 +45,28 @@ void check(bool condition, const char* message) {
 
 // ---- Fake rerank engine (scores each candidate by its text length) ----------
 
+// Mirrors the real llamacpp reranker: create/initialize receive the resolved
+// model PATH, and the backend echoes that path back as rac_rerank_result_t
+// .model_id. This lets the round-trip below prove that commons reports the
+// LOGICAL model id (not the on-device path) in the proto.
+struct FakeRerankImpl {
+    std::string load_path;
+};
+
 rac_result_t fake_create(const char* model_id, const char* /*config*/, void** out_impl) {
     if (!model_id || !out_impl) {
         return RAC_ERROR_NULL_POINTER;
     }
-    *out_impl = new int(0xBEEF);
+    *out_impl = new FakeRerankImpl{};
     return RAC_SUCCESS;
 }
 
 rac_result_t fake_initialize(void* impl, const char* model_path) {
-    return (impl && model_path) ? RAC_SUCCESS : RAC_ERROR_NULL_POINTER;
+    if (!impl || !model_path) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    static_cast<FakeRerankImpl*>(impl)->load_path = model_path;
+    return RAC_SUCCESS;
 }
 
 rac_result_t fake_rerank(void* impl, const char* query, const rac_rerank_candidate_t* candidates,
@@ -92,7 +104,11 @@ rac_result_t fake_rerank(void* impl, const char* query, const rac_rerank_candida
         emit = top_n;
     }
 
-    out_result->model_id = strdup("fake-reranker");
+    // Echo the resolved LOAD PATH (as the llamacpp reranker does), not a clean
+    // logical id — commons must still surface the logical id in the proto.
+    const auto* fake = static_cast<const FakeRerankImpl*>(impl);
+    out_result->model_id =
+        strdup(fake->load_path.empty() ? "fake-reranker" : fake->load_path.c_str());
     out_result->processing_time_ms = 1;
     if (emit == 0) {
         return RAC_SUCCESS;
@@ -115,7 +131,7 @@ rac_result_t fake_rerank(void* impl, const char* query, const rac_rerank_candida
 
 rac_result_t fake_cleanup(void* /*impl*/) { return RAC_SUCCESS; }
 
-void fake_destroy(void* impl) { delete static_cast<int*>(impl); }
+void fake_destroy(void* impl) { delete static_cast<FakeRerankImpl*>(impl); }
 
 const rac_rerank_service_ops_t g_fake_rerank_ops = {
     /* initialize */ fake_initialize,
@@ -239,7 +255,10 @@ int main() {
                       result.items(1).score() >= result.items(2).score(),
                   "scores are monotonically non-increasing");
         }
-        check(result.model_id() == "fake-reranker", "result carries the backend model id");
+        // The backend echoed the load path ("/tmp/fake-reranker"); commons must
+        // report the LOGICAL model id ("fake-reranker"), never the device path.
+        check(result.model_id() == "fake-reranker",
+              "result carries the logical model id, not the backend-reported load path");
         std::free(data);
         rac_proto_buffer_free(&out);
     }
@@ -376,11 +395,14 @@ int main() {
     check(rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr,
           "rerank route removed after unregister");
 
-    // NOTE: RAG reranker_model_id routing (RAGConfiguration -> RAC_PRIMITIVE_RERANK
-    // at session-create) is exercised in test_rag_rerank.cpp, which links the RAG
-    // pipeline. This target intentionally does NOT link RAG (rac_rag_* symbols are
-    // absent on RAG-disabled presets such as rcli-*-release), so it must not
-    // reference rac_rag_session_create_proto here.
+    // NOTE: this target only covers the standalone rerank primitive/component via
+    // the fake engine above; it intentionally does NOT link RAG (rac_rag_* symbols
+    // are absent on RAG-disabled presets such as rcli-*-release), so it must not
+    // reference rac_rag_session_create_proto here. RAG's session-create handling of
+    // reranker_model_id — currently a fail-fast RAC_ERROR_NOT_IMPLEMENTED rejection
+    // because the query-time cross-encoder path is not yet wired — is exercised by
+    // test_rag_rerank.cpp (which links the RAG pipeline and asserts that rejection),
+    // not here.
 
     if (g_failures == 0) {
         std::fprintf(stdout, "  ok: rerank primitive wiring, routing, proto round-trip, graceful "

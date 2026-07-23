@@ -498,6 +498,22 @@ if(RAC_BUILD_TESTS)
                 set(_seg_generic_py_ok TRUE)
             endif()
         endif()
+        # CI opt-in: a lane that enables the ONNX segmentation tests can require the
+        # generic-segmentation derivation proof to actually build, so a missing
+        # python onnx/numpy fixture generator FAILS LOUDLY here instead of silently
+        # dropping the only test that distinguishes derived-from-sidecar values from
+        # SegFormer defaults. Default OFF preserves every other lane's silent skip.
+        option(RAC_REQUIRE_ONNX_SEGMENTATION_TESTS
+            "Fail configuration if the generic-segmentation ONNX derivation test cannot be built (CI opt-in against silent skips)"
+            OFF)
+        if(NOT _seg_generic_py_ok AND RAC_REQUIRE_ONNX_SEGMENTATION_TESTS)
+            message(FATAL_ERROR
+                "RAC_REQUIRE_ONNX_SEGMENTATION_TESTS=ON but the generic-segmentation "
+                "derivation test cannot be built: python3 with 'import onnx, numpy' is "
+                "unavailable to generate the ONNX fixture. Install onnx + numpy in this "
+                "lane (e.g. pip install onnx numpy) so the derivation proof runs instead "
+                "of being silently skipped.")
+        endif()
         if(_seg_generic_py_ok AND NOT TARGET test_segmentation_generic)
             set(_seg_generic_fixture_dir
                 "${CMAKE_CURRENT_BINARY_DIR}/fixtures/segmentation_generic")

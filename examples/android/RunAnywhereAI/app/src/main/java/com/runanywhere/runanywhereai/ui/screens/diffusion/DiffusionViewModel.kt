@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.diffusion
 
 import ai.runanywhere.proto.v1.DiffusionMode
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelListRequest
 import android.app.Application
 import android.graphics.Bitmap
@@ -26,12 +27,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
-/** Where the cosmos3_edge_diffusion model is in its lifecycle for this screen. */
-enum class DiffusionModelStage { UNKNOWN, NEEDS_TOKEN, NOT_DOWNLOADED, DOWNLOADING, LOADING, READY }
+/**
+ * Where the image-generation (text-to-image) model is in its lifecycle for this
+ * screen. The model is resolved from the SDK by
+ * [ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION], not by a hardcoded id.
+ *
+ * RESOLVING is the initial state while the catalog lookup is still in flight; it
+ * is distinct from UNKNOWN, which is asserted only after the lookup completes and
+ * finds no model (a confirmed "unavailable on this device").
+ */
+enum class DiffusionModelStage { RESOLVING, UNKNOWN, NEEDS_TOKEN, NOT_DOWNLOADED, DOWNLOADING, LOADING, READY }
 
 class DiffusionViewModel(application: Application) : AndroidViewModel(application) {
 
-    var stage by mutableStateOf(DiffusionModelStage.UNKNOWN)
+    var stage by mutableStateOf(DiffusionModelStage.RESOLVING)
         private set
     var downloadPercent by mutableStateOf<Int?>(null)
         private set
@@ -143,10 +152,14 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // Resolve the diffusion model from the SDK by category rather than embedding
+    // a private catalog id: the SDK's generateImage() itself resolves the loaded
+    // image-generation model via MODEL_CATEGORY_IMAGE_GENERATION, so this mirrors
+    // that and does not break when the catalog id changes.
     private suspend fun findModel(): RAModelInfo? =
         runCatching {
             RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
-                .firstOrNull { it.id == MODEL_ID }
+                .firstOrNull { it.category == ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION }
         }.getOrNull()
 
     private fun needsToken(model: RAModelInfo): Boolean =
@@ -165,9 +178,5 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
             pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
         }
         return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
-    }
-
-    private companion object {
-        const val MODEL_ID = "cosmos3_edge_diffusion"
     }
 }

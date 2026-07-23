@@ -100,6 +100,9 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "nemoguard_content_8b",
         "nemoguard_topic_8b",
         "qwen3_vl_2b_text",
+        "cosmos3_edge_text",
+        "cosmos3_edge_vlm",
+        "cosmos3_edge_diffusion",
         "internvl3_5_1b",
         "gemma4_e2b_vlm",
         "gemma4_e4b_vlm",
@@ -135,7 +138,12 @@ int test_native_catalog_owns_arch_and_auth_policy() {
     std::unordered_set<std::string> all = v75;
     all.insert(v79.begin(), v79.end());
     all.insert(v81.begin(), v81.end());
-    ASSERT_EQ(all.size(), static_cast<size_t>(52));
+    // Drive coverage off the real policy array: every catalog row supports at
+    // least one arch, so the enumerated union must equal the array length. This
+    // fails loudly if a future row (like the Cosmos3 additions) is added to the
+    // catalog without being enumerated here, instead of drifting behind a
+    // hand-copied literal.
+    ASSERT_EQ(all.size(), rac_qhexrt_catalog_model_count());
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_is_known(id.c_str()), RAC_TRUE);
         ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V75),

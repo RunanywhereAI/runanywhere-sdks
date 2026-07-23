@@ -4,9 +4,12 @@
  *
  * A reranker GGUF is a model whose context reports `LLAMA_POOLING_TYPE_RANK`: it
  * attaches a classification head that emits a single relevance score per
- * (query, document) sequence. This op formats each candidate as the reranker
- * expects — `[BOS] query [EOS] [SEP] document [EOS]` using the vocab's special
- * tokens — decodes it as an isolated sequence, and reads the score from
+ * (query, document) sequence. This op formats each candidate the way the
+ * reranker expects — mirroring llama.cpp's server `format_prompt_rerank`: if the
+ * model ships a `rerank` chat template it is filled with the {query}/{document}
+ * pair (parsing special tokens), otherwise the manual
+ * `[BOS] query [EOS] [SEP] document [EOS]` layout is built from the vocab's
+ * special tokens — decodes it as an isolated sequence, and reads the score from
  * `llama_get_embeddings_seq(ctx, 0)[0]`. Candidates are then sorted by
  * descending score and returned with their original indices + ranks.
  */
@@ -103,8 +106,11 @@ void release_model(LlamaCppRerankHandle* handle) {
     handle->model_path.clear();
 }
 
-// Tokenize without inserting special tokens; format_rerank adds BOS/EOS/SEP.
-rac_result_t tokenize_plain(const llama_vocab* vocabulary, const char* text,
+// Tokenize `text`. `add_special` is always false (BOS/EOS/SEP are added by the
+// rerank formatting below); `parse_special` controls whether special/control
+// tokens embedded in the text are parsed — true for chat-template prompts, false
+// for raw query/document text.
+rac_result_t tokenize_plain(const llama_vocab* vocabulary, const char* text, bool parse_special,
                             std::vector<llama_token>* output) {
     output->clear();
     const size_t text_length = std::strlen(text);
@@ -115,7 +121,7 @@ rac_result_t tokenize_plain(const llama_vocab* vocabulary, const char* text,
         return RAC_ERROR_TEXT_TOO_LONG;
     }
     int32_t token_count = llama_tokenize(vocabulary, text, static_cast<int32_t>(text_length),
-                                         nullptr, 0, false, false);
+                                         nullptr, 0, false, parse_special);
     if (token_count == INT32_MIN) {
         return RAC_ERROR_TEXT_TOO_LONG;
     }
@@ -127,7 +133,7 @@ rac_result_t tokenize_plain(const llama_vocab* vocabulary, const char* text,
     }
     output->resize(static_cast<size_t>(token_count));
     const int32_t written = llama_tokenize(vocabulary, text, static_cast<int32_t>(text_length),
-                                            output->data(), token_count, false, false);
+                                            output->data(), token_count, false, parse_special);
     if (written < 0 || written > token_count) {
         output->clear();
         return RAC_ERROR_INFERENCE_FAILED;
@@ -136,20 +142,44 @@ rac_result_t tokenize_plain(const llama_vocab* vocabulary, const char* text,
     return RAC_SUCCESS;
 }
 
-// Build `[BOS] query [EOS] [SEP] doc [EOS]`, truncating the document tokens if
-// the combined sequence would overflow the context window. Mirrors llama.cpp's
-// common `format_rerank` helper.
-std::vector<llama_token> format_rerank(const llama_vocab* vocab,
-                                       const std::vector<llama_token>& query,
-                                       const std::vector<llama_token>& doc, size_t max_tokens) {
-    const bool add_bos = llama_vocab_get_add_bos(vocab);
-    const bool add_eos = llama_vocab_get_add_eos(vocab);
+// In-place replace-all, used to fill {query}/{document} into a rerank chat
+// template (mirrors llama.cpp's string_replace_all).
+void replace_all(std::string& subject, const std::string& from, const std::string& to) {
+    if (from.empty()) {
+        return;
+    }
+    size_t pos = 0;
+    while ((pos = subject.find(from, pos)) != std::string::npos) {
+        subject.replace(pos, from.size(), to);
+        pos += to.size();
+    }
+}
+
+// Fallback token layout `[BOS] query [EOS] [SEP] doc [EOS]` for rerankers that do
+// NOT ship a `rerank` chat template. Mirrors the fallback branch of llama.cpp's
+// server `format_prompt_rerank`: BOS/EOS/SEP are gated on the vocab's
+// add_bos/add_eos/add_sep metadata (NOT merely on token presence), and SEP
+// substitutes for EOS when the vocab has no distinct EOS token. Any token that
+// resolves to LLAMA_TOKEN_NULL is skipped so an invalid id can never reach the
+// decode batch. The document is truncated if the combined sequence would
+// overflow the context window.
+std::vector<llama_token> format_rerank_fallback(const llama_vocab* vocab,
+                                                const std::vector<llama_token>& query,
+                                                const std::vector<llama_token>& doc,
+                                                size_t max_tokens) {
     const llama_token bos = llama_vocab_bos(vocab);
-    const llama_token eos = llama_vocab_eos(vocab);
+    llama_token eos = llama_vocab_eos(vocab);
+    if (eos == LLAMA_TOKEN_NULL) {
+        eos = llama_vocab_sep(vocab);
+    }
     const llama_token sep = llama_vocab_sep(vocab);
 
-    // Fixed cost = optional BOS + query + optional EOS + optional SEP + optional
-    // trailing EOS. Reserve room for the document from whatever remains.
+    const bool add_bos = llama_vocab_get_add_bos(vocab) && bos != LLAMA_TOKEN_NULL;
+    const bool add_eos = llama_vocab_get_add_eos(vocab) && eos != LLAMA_TOKEN_NULL;
+    const bool add_sep = llama_vocab_get_add_sep(vocab) && sep != LLAMA_TOKEN_NULL;
+
+    // Fixed cost = optional BOS + query + optional EOS (after query and after
+    // doc) + optional SEP. Reserve room for the document from whatever remains.
     size_t fixed = query.size();
     if (add_bos) {
         fixed += 1;
@@ -157,7 +187,7 @@ std::vector<llama_token> format_rerank(const llama_vocab* vocab,
     if (add_eos) {
         fixed += 2;  // one after query, one after doc
     }
-    if (sep != LLAMA_TOKEN_NULL) {
+    if (add_sep) {
         fixed += 1;
     }
     size_t doc_budget = doc.size();
@@ -176,7 +206,7 @@ std::vector<llama_token> format_rerank(const llama_vocab* vocab,
     if (add_eos) {
         result.push_back(eos);
     }
-    if (sep != LLAMA_TOKEN_NULL) {
+    if (add_sep) {
         result.push_back(sep);
     }
     result.insert(result.end(), doc.begin(), doc.begin() + static_cast<std::ptrdiff_t>(doc_budget));
@@ -184,6 +214,26 @@ std::vector<llama_token> format_rerank(const llama_vocab* vocab,
         result.push_back(eos);
     }
     return result;
+}
+
+// Template path: fill the model's `rerank` chat template with the {query}/
+// {document} pair and tokenize the whole prompt WITH special tokens, matching
+// the template branch of llama.cpp's server `format_prompt_rerank`. The prompt
+// is capped to the context window (head-kept) so the decode batch always fits.
+rac_result_t format_rerank_template(const llama_vocab* vocab, const char* rerank_template,
+                                    const char* query, const char* doc, size_t max_tokens,
+                                    std::vector<llama_token>* out) {
+    std::string prompt(rerank_template);
+    replace_all(prompt, "{query}", query != nullptr ? query : "");
+    replace_all(prompt, "{document}", doc != nullptr ? doc : "");
+    const rac_result_t rc = tokenize_plain(vocab, prompt.c_str(), /*parse_special=*/true, out);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (out->size() > max_tokens) {
+        out->resize(max_tokens);
+    }
+    return RAC_SUCCESS;
 }
 
 rac_result_t score_sequence(LlamaCppRerankHandle* handle, const std::vector<llama_token>& tokens,
@@ -361,23 +411,42 @@ rac_result_t llamacpp_rerank_rerank(void* implementation, const char* query,
     const llama_vocab* vocab = llama_model_get_vocab(handle->model);
     llama_set_n_threads(handle->context, handle->default_threads, handle->default_threads);
 
+    // Prefer the model's `rerank` chat template when present (Qwen3-Reranker and
+    // other cross-encoders ship one); otherwise fall back to the manual
+    // BOS/EOS/SEP layout. Mirrors llama.cpp's server `format_prompt_rerank`.
+    const char* rerank_template = llama_model_chat_template(handle->model, "rerank");
+
     std::vector<llama_token> query_tokens;
-    const rac_result_t query_rc = tokenize_plain(vocab, query, &query_tokens);
-    if (query_rc != RAC_SUCCESS) {
-        return query_rc;
+    if (rerank_template == nullptr) {
+        const rac_result_t query_rc =
+            tokenize_plain(vocab, query, /*parse_special=*/false, &query_tokens);
+        if (query_rc != RAC_SUCCESS) {
+            return query_rc;
+        }
     }
 
     std::vector<ScoredCandidate> scored;
     scored.reserve(candidate_count);
     for (size_t i = 0; i < candidate_count; ++i) {
         const char* text = candidates[i].text != nullptr ? candidates[i].text : "";
-        std::vector<llama_token> doc_tokens;
-        const rac_result_t doc_rc = tokenize_plain(vocab, text, &doc_tokens);
-        if (doc_rc != RAC_SUCCESS) {
-            return doc_rc;
+        std::vector<llama_token> sequence;
+        if (rerank_template != nullptr) {
+            const rac_result_t fmt_rc =
+                format_rerank_template(vocab, rerank_template, query, text,
+                                       static_cast<size_t>(handle->max_tokens), &sequence);
+            if (fmt_rc != RAC_SUCCESS) {
+                return fmt_rc;
+            }
+        } else {
+            std::vector<llama_token> doc_tokens;
+            const rac_result_t doc_rc =
+                tokenize_plain(vocab, text, /*parse_special=*/false, &doc_tokens);
+            if (doc_rc != RAC_SUCCESS) {
+                return doc_rc;
+            }
+            sequence = format_rerank_fallback(vocab, query_tokens, doc_tokens,
+                                              static_cast<size_t>(handle->max_tokens));
         }
-        const std::vector<llama_token> sequence =
-            format_rerank(vocab, query_tokens, doc_tokens, static_cast<size_t>(handle->max_tokens));
         float score = 0.0f;
         const rac_result_t score_rc = score_sequence(handle, sequence, &score);
         if (score_rc != RAC_SUCCESS) {

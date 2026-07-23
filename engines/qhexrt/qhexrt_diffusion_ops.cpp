@@ -1,13 +1,22 @@
 /**
  * @file qhexrt_diffusion_ops.cpp
- * @brief Inpainting adapter from RAC_PRIMITIVE_DIFFUSION to the QHexRT C ABI.
+ * @brief RAC_PRIMITIVE_DIFFUSION adapter to the QHexRT C ABI, covering both of
+ *        QHexRT's diffusion exports.
  *
- * QHexRT's LaMa family accepts an encoded image plus a mask path and returns raw
- * RGB8. The SDK diffusion carrier uses encoded image/mask bytes and raw RGBA
- * output, so this adapter materializes both encoded inputs in the writable model
- * directory for the duration of one request and performs the RGB-to-RGBA copy. Image
- * decoding, resizing, mask preparation, and output conversion are host work;
- * only the manifest's QNN context graph is eligible for HNPU execution.
+ * A qhexrt diffusion session serves exactly one model, and its manifest fixes
+ * which host-op it runs:
+ *   - INPAINTING (LaMa family): accepts an encoded image plus a mask path and
+ *     returns raw RGB8. The adapter materializes both encoded inputs in the
+ *     writable model directory for the duration of one request and performs the
+ *     RGB-to-RGBA copy.
+ *   - TEXT-TO-IMAGE (Cosmos3-Edge): the manifest's cosmos3_diffusion_generate
+ *     host-op runs the whole DiT UniPC denoise + tiled VAE decode with no
+ *     image/mask inputs and returns RGB.
+ *
+ * The adapter classifies the loaded model from its manifest and advertises (and
+ * dispatches) ONLY the mode that model serves. Image decoding, resizing, mask
+ * preparation, and output conversion are host work; only the manifest's QNN
+ * context graph is eligible for HNPU execution.
  */
 
 #include "qhexrt_session.h"
@@ -21,6 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -39,6 +49,35 @@ using qhexrt_engine::session_open;
 
 Session* as_session(void* impl) {
     return static_cast<Session*>(impl);
+}
+
+constexpr int kDiffusionKindInpainting = 0;
+constexpr int kDiffusionKindTextToImage = 1;
+
+// A qhexrt diffusion session serves exactly one export, fixed by its manifest:
+// Cosmos3-Edge declares the cosmos3_diffusion_generate host-op (text-to-image);
+// the LaMa family declares its inpaint graph. Sniff the manifest head for the
+// text-to-image signature so the adapter advertises and dispatches ONLY the mode
+// this model actually serves. Defaults to inpainting (the LaMa baseline) when
+// the signature is absent — the safe, pre-existing behavior. The result is
+// cached on the session; recomputation on a race is harmless (deterministic).
+int diffusion_kind(Session* session) {
+    int cached = session->diffusion_kind.load(std::memory_order_acquire);
+    if (cached >= 0)
+        return cached;
+    int kind = kDiffusionKindInpainting;
+    std::ifstream in(session->manifest_path, std::ios::binary);
+    if (in) {
+        char buf[8192];
+        in.read(buf, sizeof(buf) - 1);
+        buf[in.gcount() > 0 ? static_cast<size_t>(in.gcount()) : 0] = '\0';
+        if (std::strstr(buf, "diffusion_generate") != nullptr ||
+            std::strstr(buf, "cosmos3") != nullptr) {
+            kind = kDiffusionKindTextToImage;
+        }
+    }
+    session->diffusion_kind.store(kind, std::memory_order_release);
+    return kind;
 }
 
 bool is_supported_encoded_image(const uint8_t* data, size_t size) {
@@ -196,10 +235,18 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
     DiffusionRequestScope request(session);
     *out_result = {};
 
+    // The loaded model serves exactly one mode (see diffusion_kind). Gate BOTH
+    // branches on it so a mode-less request (DIFFUSION_MODE_UNSPECIFIED maps to
+    // TEXT_TO_IMAGE upstream) against a LaMa model is cleanly rejected instead of
+    // silently entering the Cosmos3 path with no image inputs.
+    const bool session_is_text_to_image = diffusion_kind(session) == kDiffusionKindTextToImage;
+
     // TEXT-TO-IMAGE (Cosmos3-Edge): the prompt is baked into the DiT export, so the manifest's
     // cosmos3_diffusion_generate host-op runs the whole UniPC denoise + tiled VAE decode with no image/mask
     // inputs and returns RGB into qhx_output.image. No encoded-input materialization is needed.
     if (options->mode == RAC_DIFFUSION_MODE_TEXT_TO_IMAGE) {
+        if (!session_is_text_to_image)
+            return RAC_ERROR_NOT_SUPPORTED;  // e.g. a LaMa inpaint model — no text-to-image host-op
         if (request.cancelled())
             return RAC_ERROR_CANCELLED;
         qhx_session_reset(session->sess);
@@ -209,6 +256,11 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
         inputs.text = options->prompt;  // baked prompt; passed for logging/parity, ignored by the host-op
         qhx_gen_cfg cfg;
         qhx_gen_cfg_default(&cfg);
+        cfg.seed = options->seed;  // honor the requested seed (the export uses it iff it samples noise)
+        // width/height are not part of qhx_gen_cfg: the baked Cosmos3 export
+        // decides its own output resolution, which out_result->width/height then
+        // report faithfully (via copy_rgba). The requested width/height are
+        // therefore advisory for this path.
         CancelCtx cancel_ctx{session, request.id()};
         qhx_generate_options generate_options;
         qhx_generate_options_default(&generate_options);
@@ -226,7 +278,7 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
         rac_result_t rc = copy_rgba(output, out_result);
         if (rc != RAC_SUCCESS)
             return rc;
-        out_result->seed_used = options->seed;
+        out_result->seed_used = cfg.seed;  // report the seed actually passed to the export, not an echo
         out_result->generation_time_ms =
             static_cast<int64_t>(std::llround(output.prefill_ms + output.decode_ms));
         out_result->safety_flagged = RAC_FALSE;
@@ -234,7 +286,7 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
         return RAC_SUCCESS;
     }
 
-    if (options->mode != RAC_DIFFUSION_MODE_INPAINTING)
+    if (options->mode != RAC_DIFFUSION_MODE_INPAINTING || session_is_text_to_image)
         return RAC_ERROR_NOT_SUPPORTED;
     if ((options->width > 0 && options->width != 512) ||
         (options->height > 0 && options->height != 512)) {
@@ -338,15 +390,23 @@ rac_result_t qhexrt_diffusion_get_info(void* impl, rac_diffusion_info_t* out_inf
     *out_info = {};
     out_info->is_ready = session->sess != nullptr ? RAC_TRUE : RAC_FALSE;
     out_info->current_model = session->model_ref.c_str();
-    out_info->supports_inpainting = RAC_TRUE;
-    out_info->supports_text_to_image = RAC_TRUE;
+    // Advertise only the mode this loaded model actually serves — a LaMa session
+    // reports inpainting, a Cosmos3-Edge session reports text-to-image.
+    const bool text_to_image = diffusion_kind(session) == kDiffusionKindTextToImage;
+    out_info->supports_inpainting = text_to_image ? RAC_FALSE : RAC_TRUE;
+    out_info->supports_text_to_image = text_to_image ? RAC_TRUE : RAC_FALSE;
     out_info->max_width = 512;
     out_info->max_height = 512;
     return RAC_SUCCESS;
 }
 
-uint32_t qhexrt_diffusion_get_capabilities(void*) {
-    return RAC_DIFFUSION_CAP_INPAINTING | RAC_DIFFUSION_CAP_TEXT_TO_IMAGE;
+uint32_t qhexrt_diffusion_get_capabilities(void* impl) {
+    auto* session = as_session(impl);
+    if (session == nullptr)
+        return 0;
+    // Report only the capability this loaded model serves, not both flags.
+    return diffusion_kind(session) == kDiffusionKindTextToImage ? RAC_DIFFUSION_CAP_TEXT_TO_IMAGE
+                                                                : RAC_DIFFUSION_CAP_INPAINTING;
 }
 
 rac_result_t qhexrt_diffusion_cancel(void* impl) {

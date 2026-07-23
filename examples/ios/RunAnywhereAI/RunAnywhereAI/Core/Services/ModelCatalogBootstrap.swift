@@ -491,6 +491,15 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
+        // KNOWN LIMITATION: this MLX (safetensors) Sortformer bundle is registered
+        // for catalog/UX parity, but the ONLY diarization backend in the repo is the
+        // ONNX Sortformer provider (framework .onnx) — there is no MLX diarization
+        // engine. The ONNX provider scans the model directory for a .onnx graph and
+        // fails to load an MLX weight bundle, so this row cannot actually diarize on
+        // device today. The Android example imports the .onnx graph directly and is
+        // the working reference. Replace this with the ONNX Sortformer bundle
+        // (framework .onnx) once it is hosted, or gate the demo until an MLX
+        // diarization backend exists.
         let sortformerMLXBaseURL =
             "https://huggingface.co/mlx-community/" +
             "diar_streaming_sortformer_4spk-v2.1-fp16/resolve/" +

@@ -232,11 +232,14 @@ Design rules for RAG work (do not relitigate):
   Hamming/binary-quantized scan — techniques may be borrowed from reference engines, the
   storage engine is not.
 - **RAG's default rerank is LLM-pointwise** (score fused candidates 1–5 with the existing
-  LLM handle). A dedicated cross-encoder is now available as the first-class
-  `RAC_PRIMITIVE_RERANK` primitive (`rerank_ops`, revived in plugin ABI v8): when a RAG
-  session sets `reranker_model_id`, `rac_rag_proto_abi` routes to a registered rerank
-  backend; with no `reranker_model_id` it stays LLM-pointwise (the default fusion path is
-  unchanged).
+  LLM handle) and is the only reranking path wired into the RAG query flow today. The
+  first-class `RAC_PRIMITIVE_RERANK` cross-encoder primitive (`rerank_ops`, revived in plugin
+  ABI v8) exists and is reachable standalone via `rac_rerank_*`, but it is **not yet invoked
+  from the RAG query path** — `RAGBackend`/`rag_pipeline_graph` do not score fused candidates
+  through it. Until that wiring lands, `rac_rag_proto_abi` **rejects** a `reranker_model_id`
+  at session-create with `RAC_ERROR_NOT_IMPLEMENTED` (rather than accepting it and silently
+  no-op'ing); callers wanting reranking today use `rerank_results` (LLM-pointwise). With no
+  `reranker_model_id` the default fusion path is unchanged.
 - **All RAG persistence goes through the platform adapter** file I/O
   (`file_read`/`file_write`/`file_delete`/`file_exists`, `rac_platform_adapter.h`), never
   direct `std::ofstream`/`fopen`. This is what makes persistence work on Web (OPFS) as well

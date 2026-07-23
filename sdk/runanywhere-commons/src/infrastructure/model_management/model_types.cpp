@@ -139,6 +139,7 @@ rac_inference_framework_t rac_model_category_default_framework(rac_model_categor
         case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             return RAC_FRAMEWORK_SHERPA;
         case RAC_MODEL_CATEGORY_EMBEDDING:
+        case RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION:
         case RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
             return RAC_FRAMEWORK_ONNX;
         default:

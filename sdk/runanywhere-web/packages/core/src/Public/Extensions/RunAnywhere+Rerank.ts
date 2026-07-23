@@ -46,21 +46,6 @@ function requireInitialized(): void {
   }
 }
 
-function validateRequest(request: RerankRequest): void {
-  if (!request.query) {
-    throw SDKException.validationFailed({
-      fieldPath: 'RerankRequest.query',
-      message: 'query must be a non-empty string',
-    });
-  }
-  if (!request.candidates || request.candidates.length === 0) {
-    throw SDKException.validationFailed({
-      fieldPath: 'RerankRequest.candidates',
-      message: 'candidates must contain at least one item',
-    });
-  }
-}
-
 function requireLoadedModel(): LoadedRerankModel {
   const snapshot = WebModelLifecycle.componentLifecycleSnapshot(
     SDKComponent.SDK_COMPONENT_RERANK,
@@ -129,7 +114,10 @@ async function ensureHandle(
 /** Rerank candidates against a query with the lifecycle-owned rerank model. */
 export async function rerank(request: RerankRequest): Promise<RerankResult> {
   requireInitialized();
-  validateRequest(request);
+  // Request-shape validation (empty query rejected, zero candidates accepted as a
+  // well-formed empty result) lives in commons and is enforced uniformly for all
+  // SDKs — iOS/Kotlin defer to C++ and so does Web. Do not re-invent a client-side
+  // candidate/query check here; that would fork behavior from the source of truth.
   const model = requireLoadedModel();
   const adapter = requireAdapter();
   const handle = await ensureHandle(adapter, model);

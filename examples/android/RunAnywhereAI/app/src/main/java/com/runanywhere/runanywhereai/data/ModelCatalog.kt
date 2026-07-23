@@ -235,6 +235,15 @@ internal object ModelCatalog {
         // separate so the download planner validates the exact transport size
         // and the mandatory SDK compatibility preflight requires 6 GiB of
         // currently available RAM before either download or lifecycle load.
+        //
+        // INTENTIONAL CROSS-SDK DIVERGENCE: this row is Android/rcli-only. The
+        // pinned llama.cpp fork's `nemotron` path was load/inference checked for
+        // this exact Q4_K_M artifact through rcli on macOS (not yet an on-device
+        // Android smoke). iOS deliberately withholds it (ModelCatalogBootstrap:
+        // pending an Apple-provider inference smoke) and the Web catalog omits it
+        // (its ~4.92 GB single artifact exceeds the browser WASM32 4 GiB gate).
+        // Hold or re-scope this row if the Android llama.cpp path has to clear the
+        // same on-device bar iOS requires.
         SingleFileModel(
             "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
             "NVIDIA Llama 3.1 Nemotron Nano 8B v1 Q4_K_M",

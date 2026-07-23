@@ -309,9 +309,10 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
 
     RAC_LOG_INFO(LOG_CATEGORY, "Deleted model folder");
 
-    // The deleted model's files were hardlinks into the content-addressed blob
-    // store; removing them may have orphaned shared blobs (now only referenced by
-    // the store itself). Reclaim those. No-op when the store is unused/disabled.
+    // The deleted model's files were symlinks into the content-addressed blob
+    // store (symlinks carry no refcount, hence the mark-sweep GC); removing them
+    // may have orphaned shared blobs (now only referenced by the store itself).
+    // Reclaim those. No-op when the store is unused/disabled.
     rac::download::blob_store::gc_orphans();
 
     return RAC_SUCCESS;

@@ -90,6 +90,8 @@ than adding another single-use wrapper.
 | Transcribe | `views/transcribe.ts` | `AudioCapture`, `RunAnywhere.transcribe`, `RunAnywhere.transcribeStream` |
 | Speak | `views/speak.ts` | `RunAnywhere.speak`, `RunAnywhere.stopSpeaking` |
 | VAD | `views/vad.ts` | `AudioCapture`, `RunAnywhere.streamVAD` |
+| Segmentation | `views/segmentation.ts` | `RunAnywhere.segment` (via the shared model sheet); no browser segmentation engine ships yet, so the picker stays empty and the run is gated |
+| Diarization | `views/diarization.ts` | `RunAnywhere.diarize` (via the shared model sheet); no browser diarization engine ships yet, so the picker stays empty and the run is gated |
 | Documents | `views/documents.ts` | `RunAnywhere.ragIngest`, `RunAnywhere.ragQuery`, RAG diagnostics |
 | Storage | `views/storage.ts` | `RunAnywhere.storage`, `RunAnywhere.modelRegistry`, `RunAnywhere.loadModel` |
 | Solutions | `views/solutions.ts` | `RunAnywhere.solutions` |

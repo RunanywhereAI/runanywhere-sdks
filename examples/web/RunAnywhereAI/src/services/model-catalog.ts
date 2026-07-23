@@ -258,12 +258,14 @@ const CATALOG: readonly CatalogEntry[] = [
     // PrismML fork pinned in sdk/runanywhere-commons/VERSIONS; that pin owns
     // the `nemotron` architecture loader and Q4_K_M kernels. The immutable
     // Hub revision and exact LFS byte count keep the browser memory gate
-    // deterministic. CPU is always available; WebGPU remains a runtime
-    // capability choice made by LlamaCPP.register({ acceleration: 'auto' }).
+    // deterministic. NOTE: this ~2.7 GB download plus its ~3.25 GB runtime
+    // footprint (+512 MiB headroom) exceeds the WASM32 4 GiB address space, so
+    // webModelCompatibility returns supported:false and the picker gates it —
+    // it is listed for reference/native parity, not runnable in-browser.
     id: 'nemotron-mini-4b-instruct-q4_k_m',
     name: 'NVIDIA Nemotron Mini 4B Instruct Q4_K_M',
     description:
-      'NVIDIA instruction LLM via llama.cpp (CPU, or WebGPU when the browser supports it).',
+      'NVIDIA instruction LLM (llama.cpp). Listed for reference — its memory footprint exceeds the browser WASM32 4 GiB limit, so it cannot load in-browser (use a native app).',
     category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,

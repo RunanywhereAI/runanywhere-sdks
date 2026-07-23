@@ -1729,10 +1729,11 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     }
 
     // Content-addressed de-dup: when another model already downloaded this exact
-    // content (identical sha256 from the HF LFS oid), hardlink the shared blob into
+    // content (identical sha256 from the HF LFS oid), symlink the shared blob into
     // place and skip the network entirely. Non-archive files only. A no-op on web /
     // when the store is unusable, so it falls through to a normal download. Runs
-    // BEFORE the free-space gate so a hardlink-able file is never refused for space.
+    // BEFORE the free-space gate so a de-dupable (symlinked) file is never refused for
+    // space.
     // Never de-dup a file that carries a post-download transform: its plan
     // checksum is the SOURCE (pre-transform) content, so linking a shared blob
     // by that checksum and then transforming in place would corrupt the blob and
@@ -1932,7 +1933,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     } else {
         final_path = file.destination_path;
         // Publish this verified file into the content-addressed store so future
-        // models with the same content de-dup against it (hardlink, no re-download).
+        // models with the same content de-dup against it (symlink, no re-download).
         // Skipped when it was itself a de-dup hit (already a link to the blob), and
         // for transformed files whose on-disk (final) bytes do not match their
         // plan (source) checksum — promoting those would poison the store.
@@ -2124,13 +2125,21 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
                 file.expected_bytes > 0 &&
                 file_size_or_zero(file.destination_path) == file.expected_bytes;
             if (already_complete) {
+                // Mirror the sequential tail: publish an already-on-disk file into the
+                // shared store so the de-dup surface doesn't depend on parallel vs
+                // sequential mode. Guards match the sequential promote (skip extraction /
+                // transform files and empty checksums).
+                if (!file.requires_extraction && !file.has_post_download_transform &&
+                    !file.checksum_sha256.empty()) {
+                    rac::download::blob_store::promote(file.checksum_sha256, file.destination_path);
+                }
                 update_parallel_progress(task, i, file.expected_bytes, file.expected_bytes,
                                          total_expected, true);
                 continue;
             }
 
             // Content-addressed de-dup (mirrors the sequential path): when the same
-            // content was already downloaded by another model, hardlink the shared
+            // content was already downloaded by another model, symlink the shared
             // blob in and skip the network for this part entirely.
             if (!file.requires_extraction && !file.has_post_download_transform &&
                 rac::download::blob_store::link_from_blob(
@@ -3556,6 +3565,37 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     // Resumable bytes already on disk don't need to be re-downloaded, so they
     // count toward the space we still have to find.
     int64_t required_bytes = total_storage_bytes > 0 ? total_storage_bytes : total_bytes;
+    // De-dup awareness: any planned file whose exact content already sits in the
+    // content-addressed blob store installs as a ~0-byte symlink (link_from_blob skips
+    // the network), so it consumes no new space. Subtract those from the requirement to
+    // mirror the runtime per-file gate (which skips the space check for de-duped files);
+    // otherwise the planner refuses an installable model precisely under the low-disk
+    // multimodal-sharing scenario de-dup exists for. Transformed files are excluded (the
+    // runtime never de-dups them). Fail closed when the store is disabled/unknown.
+    if (required_bytes > 0 && rac::download::blob_store::enabled()) {
+        int64_t deduped_bytes = 0;
+        for (int fi = 0; fi < result.files_size(); ++fi) {
+            const auto& planned = result.files(fi);
+            // Mirror the runtime de-dup gate exactly: link_from_blob(checksum,
+            // expected_bytes) runs only for non-extraction, non-transform files with a
+            // known source checksum + size. A blob present at that checksum & size will
+            // install as a symlink, so it consumes no new storage.
+            if (planned.requires_extraction() || planned.file().has_post_download_transform())
+                continue;
+            if (planned.checksum_sha256().empty() || planned.expected_bytes() <= 0) continue;
+            const std::string blob = rac::download::blob_store::blob_path(planned.checksum_sha256());
+            if (blob.empty()) continue;
+            std::error_code blob_ec;
+            if (fs::exists(blob, blob_ec) && !blob_ec &&
+                static_cast<int64_t>(fs::file_size(blob, blob_ec)) == planned.expected_bytes() &&
+                !blob_ec) {
+                deduped_bytes += planned.expected_bytes();
+            }
+        }
+        if (deduped_bytes > 0) {
+            required_bytes = required_bytes > deduped_bytes ? required_bytes - deduped_bytes : 0;
+        }
+    }
     if (required_bytes > 0) {
         if (resume_from > 0 && resume_from < required_bytes) {
             required_bytes -= resume_from;

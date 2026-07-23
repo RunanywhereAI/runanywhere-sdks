@@ -329,6 +329,14 @@ rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto
         *out_encoding != runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE) {
         return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
     }
+    // The Sortformer mel frontend is fixed at 16 kHz and commons does not
+    // resample. The proto advertises an 8000..48000 range (validated above), but
+    // only 16000 is actually honored — reject any other in-range rate explicitly
+    // instead of silently producing wrong mel features and timestamps with
+    // RAC_SUCCESS. (Do not advertise a validated range the engine cannot honor.)
+    if (out_options->sample_rate_hz != 16000) {
+        return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
+    }
     return RAC_SUCCESS;
 }
 

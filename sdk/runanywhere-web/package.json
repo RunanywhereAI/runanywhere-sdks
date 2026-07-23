@@ -29,6 +29,7 @@
     "test:browser": "playwright test",
     "test:browser:smoke": "playwright test tests/browser/backend-readiness.spec.ts tests/browser/hybrid-stt.spec.ts",
     "test:browser:release": "RA_RUN_FULL_E2E=1 playwright test tests/browser/release-app.e2e.spec.ts",
+    "test:browser:nvidia": "RA_RUN_FULL_E2E=1 playwright test tests/browser/llm-generate.spec.ts tests/browser/vlm-generate.spec.ts tests/browser/speech-rag-e2e.spec.ts tests/browser/nemotron-streaming.e2e.spec.ts",
     "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
     "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
   },

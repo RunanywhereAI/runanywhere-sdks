@@ -634,18 +634,21 @@ bool test_binarize_median_degenerate() {
 bool test_build_result() {
     bool ok = true;
 
-    // Two segments for the SAME speaker -> speaker_count 1; ids are stable.
+    // Two segments for the SAME sparse slot (2) -> speaker_count 1; the active
+    // slot is remapped to a dense 0-based index, so index/id are 0. model_id is
+    // left null for commons to fill with the lifecycle-owned id.
     {
         const std::vector<Segment> segments = {Segment{0, 100, 2}, Segment{200, 300, 2}};
         rac_diarization_result_t result = {};
         const rac_result_t rc = build_result(segments, 300, 5, &result);
         bool shape_ok = rc == RAC_SUCCESS && result.segment_count == 2 &&
                         result.speaker_count == 1 && result.segments != nullptr &&
-                        result.model_id != nullptr && std::string(result.model_id) == kModelId;
+                        result.model_id == nullptr;
         if (shape_ok) {
             for (size_t i = 0; i < result.segment_count; ++i) {
-                shape_ok = shape_ok && result.segments[i].speaker_id != nullptr &&
-                           std::string(result.segments[i].speaker_id) == "speaker_2";
+                shape_ok = shape_ok && result.segments[i].speaker_index == 0 &&
+                           result.segments[i].speaker_id != nullptr &&
+                           std::string(result.segments[i].speaker_id) == "speaker_0";
             }
         }
         CHECK(shape_ok,
@@ -654,15 +657,36 @@ bool test_build_result() {
         rac_diarization_result_free(&result);
     }
 
-    // Empty segments -> null array, zero counts, still a non-null model id.
+    // Non-contiguous active slots {1, 2} -> dense {0, 1}: speaker_count 2 and
+    // every speaker_index in [0, speaker_count), so commons result_to_proto no
+    // longer rejects a valid result whose active slots are not a 0-based prefix.
+    {
+        const std::vector<Segment> segments = {Segment{0, 100, 1}, Segment{100, 200, 2}};
+        rac_diarization_result_t result = {};
+        const rac_result_t rc = build_result(segments, 200, 5, &result);
+        bool dense_ok = rc == RAC_SUCCESS && result.segment_count == 2 &&
+                        result.speaker_count == 2 && result.segments != nullptr;
+        if (dense_ok) {
+            for (size_t i = 0; i < result.segment_count; ++i) {
+                dense_ok = dense_ok && result.segments[i].speaker_index >= 0 &&
+                           result.segments[i].speaker_index < result.speaker_count;
+            }
+            dense_ok = dense_ok && result.segments[0].speaker_index == 0 &&
+                       result.segments[1].speaker_index == 1;
+        }
+        CHECK(dense_ok, "build_result remaps sparse slots {1,2} -> dense {0,1}");
+        ok &= dense_ok;
+        rac_diarization_result_free(&result);
+    }
+
+    // Empty segments -> null array, zero counts, null model id (commons fills it).
     {
         rac_diarization_result_t result = {};
         const rac_result_t rc = build_result({}, 0, 0, &result);
         const bool empty_ok = rc == RAC_SUCCESS && result.segments == nullptr &&
                               result.segment_count == 0 && result.speaker_count == 0 &&
-                              result.model_id != nullptr &&
-                              std::string(result.model_id) == kModelId;
-        CHECK(empty_ok, "build_result on empty segments -> null segments + non-null model_id");
+                              result.model_id == nullptr;
+        CHECK(empty_ok, "build_result on empty segments -> null segments + null model_id");
         ok &= empty_ok;
         rac_diarization_result_free(&result);
     }

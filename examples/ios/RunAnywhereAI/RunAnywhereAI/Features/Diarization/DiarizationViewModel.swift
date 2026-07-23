@@ -69,6 +69,7 @@ final class DiarizationViewModel {
         await registry.loadModelsFromRegistry()
         guard let model = catalogModel(in: registry) else {
             error = "The Sortformer diarization model is not in the catalog."
+            statusMessage = ""
             return
         }
 
@@ -85,6 +86,7 @@ final class DiarizationViewModel {
             let loadResult = await RunAnywhere.loadModel(loadRequest)
             guard loadResult.success else {
                 error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
+                statusMessage = ""
                 return
             }
             loadedModelName = model.name
@@ -93,6 +95,7 @@ final class DiarizationViewModel {
         } catch {
             logger.error("Diarization model prepare failed: \(error.localizedDescription)")
             self.error = "Model download/load failed: \(error.localizedDescription)"
+            statusMessage = ""
         }
     }
 

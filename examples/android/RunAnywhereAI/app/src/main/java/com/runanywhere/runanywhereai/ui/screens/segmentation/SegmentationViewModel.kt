@@ -99,11 +99,13 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
                 )
                 if (!importResult.success) {
                     error = importResult.error_message.ifEmpty { "Model import failed." }
+                    status = ""
                     return@launch
                 }
                 val modelId = importResult.model?.id
                 if (modelId.isNullOrEmpty()) {
                     error = "Imported model has no identifier; cannot load."
+                    status = ""
                     return@launch
                 }
 
@@ -117,6 +119,7 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
                 )
                 if (!loadResult.success) {
                     error = loadResult.error_message.ifEmpty { "Model load failed." }
+                    status = ""
                     return@launch
                 }
                 loadedModelId = modelId
@@ -125,6 +128,7 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
             } catch (e: Exception) {
                 RACLog.e("$TAG: Model import/load failed", e)
                 error = "Model import/load failed: ${e.message}"
+                status = ""
             } finally {
                 isImportingModel = false
             }

@@ -19,6 +19,14 @@ constexpr const char* kBlobDirName = ".blobs";
 // Serializes store mutations (promote / link / GC) so a blob that is momentarily
 // unreferenced mid-promote (moved into the store before its symlink exists yet) can't
 // be swept by a concurrent gc_orphans() running from a delete path on another thread.
+//
+// SINGLE-PROCESS ONLY: this is a function-local std::mutex, so the mark-sweep-vs-promote
+// guarantee holds only WITHIN one process. The blob store assumes all downloads and GC
+// for a given base dir run in a single process; a second process (e.g. a separate
+// Android :download service) could gc_orphans() a blob another process just rename()d
+// into `.blobs` but has not yet symlinked. If a multi-process download config is ever
+// introduced, replace this with an inter-process lock (flock on a lock file under
+// `.blobs`) around promote/link/gc.
 std::mutex& store_mutex() {
     static std::mutex m;
     return m;
@@ -118,11 +126,23 @@ void promote(const std::string& sha256_hex, const std::string& dest) {
             return;
         }
         if (!make_symlink(blob, dest, ec)) {
-            // Couldn't symlink — restore the file at dest so the model still loads.
+            // Couldn't symlink — move the file back to dest (rename is cheap and needs
+            // no extra space, unlike a copy — important since de-dup runs when disk is
+            // tight) so the model still loads.
             std::error_code e2;
             fs::rename(blob, dest, e2);
-            RAC_LOG_DEBUG(kLogTag, "promote(symlink) failed for %s: %s", sha256_hex.c_str(),
-                          ec.message().c_str());
+            if (e2) {
+                // Symlink AND restore both failed: the verified bytes are stranded in
+                // the store with nothing at dest. Log so the loss is diagnosable (the
+                // post-finalize size guard fails the task and forces a clean re-fetch).
+                RAC_LOG_ERROR(kLogTag,
+                              "promote(symlink) failed for %s and restore rename failed (%s); "
+                              "verified bytes missing at dest",
+                              sha256_hex.c_str(), e2.message().c_str());
+            } else {
+                RAC_LOG_DEBUG(kLogTag, "promote(symlink) failed for %s: %s (restored dest)",
+                              sha256_hex.c_str(), ec.message().c_str());
+            }
             return;
         }
         RAC_LOG_INFO(kLogTag, "promoted content %s to shared blob store", sha256_hex.c_str());
@@ -132,9 +152,18 @@ void promote(const std::string& sha256_hex, const std::string& dest) {
     // Blob already exists (another model / concurrent download). Reclaim dest's bytes
     // by replacing this duplicate with a symlink to the shared blob.
     if (!make_symlink(blob, dest, ec)) {
-        // Restore a real file at dest from the blob so the model still loads.
+        // Restore a real file at dest from the shared blob so the model still loads.
+        // The blob is shared (other models may reference it), so copy — we cannot move
+        // it away. On a filesystem without symlink support under space pressure this
+        // copy can itself fail, leaving dest missing.
         std::error_code e2;
         fs::copy_file(blob, dest, fs::copy_options::overwrite_existing, e2);
+        if (e2) {
+            RAC_LOG_ERROR(kLogTag,
+                          "promote(symlink) failed for %s and restore copy failed (%s); "
+                          "verified bytes missing at dest",
+                          sha256_hex.c_str(), e2.message().c_str());
+        }
     }
 }
 
@@ -175,11 +204,16 @@ int64_t gc_orphans() {
         return 0;
     }
 
-    // Sweep: any blob nobody references is orphaned.
+    // Sweep: any blob nobody references is orphaned. Mirror the mark pass and use the
+    // non-throwing increment so a filesystem error mid-iteration (a blob concurrently
+    // removed, a transient IO/permission error on `.blobs`) stops the sweep gracefully
+    // instead of throwing std::filesystem_error out of gc_orphans() — which is not
+    // noexcept and runs from the model-deletion path, where an uncaught throw crashes.
     int64_t reclaimed = 0;
     ec.clear();
-    for (const auto& entry : fs::directory_iterator(dir, ec)) {
-        if (ec) break;
+    for (fs::directory_iterator it(dir, ec); !ec && it != fs::directory_iterator();
+         it.increment(ec)) {
+        const fs::directory_entry& entry = *it;
         std::error_code e2;
         if (!entry.is_regular_file(e2) || e2) continue;
         if (referenced.count(entry.path().filename().string()) > 0) continue;

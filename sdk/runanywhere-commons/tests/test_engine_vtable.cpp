@@ -174,8 +174,8 @@ const rac_engine_vtable_t k_manifest_vtable = {
     /* diffusion_ops    */ nullptr,
     /* diarization_ops  */ nullptr,
     /* segmentation_ops */ nullptr,
-    /* reserved_slot_2..9 */
-    nullptr,
+    /* rerank_ops       */ nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,
@@ -234,7 +234,7 @@ int main() {
     {
         auto vt = make_vt("abi-v6", 50, 6u);
         rac_result_t rc = rac_plugin_register(&vt);
-        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v6 plugin rejected by v7 host");
+        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v6 plugin rejected by v8 host");
         CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == nullptr, "abi: not inserted");
     }
 

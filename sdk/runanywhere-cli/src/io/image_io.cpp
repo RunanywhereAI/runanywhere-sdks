@@ -228,6 +228,16 @@ bool read_ppm(const std::string& path, RgbImage* out, std::string* error) {
         }
         return false;
     }
+    // Bound dimensions (4096 mirrors the SDK's segmentation source cap) so the
+    // `width * height * 3` below cannot overflow size_t and a pathological header
+    // cannot mint a huge RgbImage backed by a tiny buffer.
+    constexpr uint32_t kMaxPpmDimension = 4096;
+    if (width > kMaxPpmDimension || height > kMaxPpmDimension) {
+        if (error) {
+            *error = "PPM dimensions exceed the supported maximum (4096x4096) in " + path;
+        }
+        return false;
+    }
     // Exactly one whitespace byte separates the header from the pixel payload.
     ++pos;
     const size_t expected = static_cast<size_t>(width) * height * 3;

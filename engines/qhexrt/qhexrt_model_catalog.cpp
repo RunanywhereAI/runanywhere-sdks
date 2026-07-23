@@ -41,6 +41,14 @@ constexpr uint8_t kAllSupportedArches = kV75 | kV79 | kV81;
 struct ModelPolicy {
     std::string_view id;
     uint8_t arch_mask;
+    // Fail-closed gate: when true, register_for_arch_proto() skips the row until an
+    // HF token is configured, which is what drives the per-SDK "bring your own HF
+    // token" preflight UX. Every RunAnywhere-hosted QHexRT repo referenced below is
+    // currently PUBLIC, so all rows set this false. The field, its accessor
+    // (rac_qhexrt_catalog_model_requires_hf_auth), the gate at line ~345, and the
+    // downstream token-prompt UI are deliberately RETAINED for future gated models:
+    // flip a single row to true if/when a model is re-hosted behind a gated HF repo
+    // and the token preflight fires again with no other code change.
     bool requires_hf_auth;
 };
 
@@ -404,6 +412,8 @@ rac_bool_t rac_qhexrt_catalog_model_requires_hf_auth(const char* model_id) {
     const ModelPolicy* policy = find_model_policy(model_id);
     return policy != nullptr && policy->requires_hf_auth ? RAC_TRUE : RAC_FALSE;
 }
+
+size_t rac_qhexrt_catalog_model_count(void) { return std::size(kModelPolicies); }
 
 rac_result_t rac_qhexrt_catalog_register_model_proto(const uint8_t* request_bytes,
                                                      size_t request_size,

@@ -56,17 +56,25 @@ fun DiffusionScreen() {
             )
         }
 
-        // --- prompt ---
+        // --- prompt (fixed/read-only in the preview build) ---
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = RoundedCornerShape(dimens.radiusMd),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "Preview build: this Cosmos3-Edge export renders a fixed baked image and " +
+                    "ignores the prompt below. Free-form prompts arrive with the prompt-conditioned export.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(dimens.spacingMd),
+            )
+        }
         OutlinedTextField(
             value = vm.prompt,
             onValueChange = vm::onPromptChange,
-            label = { Text("Prompt") },
-            supportingText = {
-                Text(
-                    "Preview build: this Cosmos3-Edge export renders a fixed baked prompt; " +
-                        "free-form prompts arrive with the prompt-conditioned export.",
-                )
-            },
+            label = { Text("Prompt (fixed in preview build)") },
+            readOnly = true,
             singleLine = false,
             enabled = !vm.isGenerating,
             modifier = Modifier.fillMaxWidth(),
@@ -74,6 +82,9 @@ fun DiffusionScreen() {
 
         // --- action / status ---
         when (vm.stage) {
+            DiffusionModelStage.RESOLVING -> {
+                Row2 { CircularProgressIndicator(modifier = Modifier.size(20.dp)); Text("Checking availability…") }
+            }
             DiffusionModelStage.READY -> {
                 Button(
                     onClick = vm::generate,

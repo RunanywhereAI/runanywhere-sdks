@@ -89,7 +89,7 @@ class VisionHubView extends StatelessWidget {
               ),
             ),
             subtitle: Text(
-              'Create images with Stable Diffusion',
+              'Create images with on-device diffusion',
               style: TextStyle(
                 color: AppColors.textSecondary(context).withValues(alpha: 0.5),
               ),

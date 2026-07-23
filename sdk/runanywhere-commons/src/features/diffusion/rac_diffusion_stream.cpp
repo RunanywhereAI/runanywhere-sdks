@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -42,6 +43,27 @@ std::atomic<int>& diffusion_in_flight() {
 std::atomic<bool>& diffusion_proto_shutting_down() {
     static std::atomic<bool> flag{false};
     return flag;
+}
+
+std::mutex& in_flight_mu() {
+    static std::mutex m;
+    return m;
+}
+
+std::condition_variable& in_flight_cv() {
+    static std::condition_variable cv;
+    return cv;
+}
+
+// Decrement the in-flight counter and wake rac_diffusion_proto_quiesce() when it
+// reaches zero, so quiesce can block on a condition_variable instead of a
+// core-pegging busy yield-spin. The worker holds one count for its whole
+// lifetime, so the transition to zero always runs through here.
+void diffusion_in_flight_release() {
+    if (diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        std::lock_guard<std::mutex> lock(in_flight_mu());
+        in_flight_cv().notify_all();
+    }
 }
 
 struct StreamSession {
@@ -146,8 +168,35 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
 
 void rac_diffusion_proto_quiesce(void) {
     diffusion_proto_shutting_down().store(true, std::memory_order_release);
-    while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {
-        std::this_thread::yield();
+
+    // Cancel any in-flight generations so teardown (component destroy / model
+    // swap) does not block for a full 30-60s generation. Snapshot the active
+    // handles under g_mu(), mark their sessions cancelled, then route the cancel
+    // through the engine outside the lock.
+    std::vector<rac_handle_t> active_handles;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        active_handles.reserve(g_active_by_handle().size());
+        for (const auto& entry : g_active_by_handle()) {
+            auto it = g_sessions().find(entry.second);
+            if (it != g_sessions().end()) {
+                it->second.is_cancelled.store(true, std::memory_order_release);
+            }
+            active_handles.push_back(entry.first);
+        }
+    }
+    for (rac_handle_t handle : active_handles) {
+        (void)rac_diffusion_cancel(handle);
+    }
+
+    // Block until every in-flight worker/dispatch has drained, waking on the
+    // in-flight decrement rather than burning a CPU core. The bounded wait is a
+    // safety net against a missed notification.
+    {
+        std::unique_lock<std::mutex> lock(in_flight_mu());
+        while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {
+            in_flight_cv().wait_for(lock, std::chrono::milliseconds(10));
+        }
     }
     diffusion_proto_shutting_down().store(false, std::memory_order_release);
 }
@@ -177,6 +226,16 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // Reject new sessions once rac_diffusion_proto_quiesce() has begun draining
+    // (component destroy / model swap): otherwise a worker minted here could call
+    // rac_diffusion_generate_with_progress() on an engine the caller is tearing
+    // down. Paired with the check→increment→re-check below (the
+    // ShutdownAwareInFlightGuard admit protocol) to close the start-vs-quiesce
+    // TOCTOU.
+    if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
+        return RAC_ERROR_SERVICE_BUSY;
+    }
+
     const uint64_t session_id = next_session_id().fetch_add(1, std::memory_order_relaxed);
     {
         std::lock_guard<std::mutex> lock(g_mu());
@@ -198,13 +257,22 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                                       request_proto_bytes + request_proto_size);
 
     // Cover the whole worker lifetime so rac_diffusion_proto_quiesce() waits
-    // for generation to finish, not just individual event dispatches.
-    diffusion_in_flight().fetch_add(1, std::memory_order_relaxed);
+    // for generation to finish, not just individual event dispatches. Increment
+    // then re-check the shutdown flag (the ShutdownAwareInFlightGuard admit
+    // protocol) so a worker can never be admitted after quiesce observed
+    // in_flight == 0 and returned, letting the caller free/swap the engine.
+    diffusion_in_flight().fetch_add(1, std::memory_order_acq_rel);
+    if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
+        diffusion_in_flight_release();
+        std::lock_guard<std::mutex> lock(g_mu());
+        erase_session_locked(session_id, handle);
+        *out_session_id = 0;
+        return RAC_ERROR_SERVICE_BUSY;
+    }
     try {
         std::thread([handle, session_id, request_copy = std::move(request_copy)]() mutable {
-            auto in_flight_done = std::shared_ptr<void>(nullptr, [](void*) {
-                diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
-            });
+            auto in_flight_done =
+                std::shared_ptr<void>(nullptr, [](void*) { diffusion_in_flight_release(); });
 
             runanywhere::v1::DiffusionGenerationRequest request;
             if (!request.ParseFromArray(request_copy.data(),
@@ -219,10 +287,9 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                 return;
             }
 
-            rac::diffusion::dispatch_diffusion_stream_event(
-                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_STARTED, nullptr, nullptr,
-                nullptr, 0);
-
+            // Check liveness BEFORE emitting STARTED so a cancel that raced in
+            // before the worker ran (cancel_proto already delivered the terminal
+            // event) does not emit a stray STARTED after the terminal event.
             {
                 std::lock_guard<std::mutex> lock(g_mu());
                 auto it = g_sessions().find(session_id);
@@ -232,6 +299,10 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                     return;
                 }
             }
+
+            rac::diffusion::dispatch_diffusion_stream_event(
+                handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_STARTED, nullptr, nullptr,
+                nullptr, 0);
 
             rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
             if (!rac::foundation::rac_diffusion_options_from_proto(request.options(), &options)) {
@@ -316,7 +387,7 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
             erase_session_locked(session_id, handle);
         }).detach();
     } catch (...) {
-        diffusion_in_flight().fetch_sub(1, std::memory_order_relaxed);
+        diffusion_in_flight_release();
         std::lock_guard<std::mutex> lock(g_mu());
         erase_session_locked(session_id, handle);
         *out_session_id = 0;
@@ -331,10 +402,14 @@ rac_result_t rac_diffusion_stream_stop_proto(uint64_t session_id) {
     if (session_id == 0)
         return RAC_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(g_mu());
-    auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end())
+    if (g_sessions().find(session_id) == g_sessions().end())
         return RAC_ERROR_INVALID_ARGUMENT;
-    g_sessions().erase(it);
+    // Drain semantics: leave the session and its g_active_by_handle entry intact
+    // so the worker runs the in-flight generation to completion, delivers the
+    // terminal COMPLETED event, and clears bookkeeping via erase_session_locked.
+    // Pre-erasing here would strand the handle as SERVICE_BUSY and suppress the
+    // COMPLETED event. Use rac_diffusion_stream_cancel_proto for immediate
+    // teardown that frees the handle now.
     return RAC_SUCCESS;
 }
 
@@ -349,10 +424,22 @@ rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id) {
             return RAC_ERROR_INVALID_ARGUMENT;
         it->second.is_cancelled.store(true, std::memory_order_release);
         handle = it->second.handle;
-        g_sessions().erase(it);
+        // Clear g_active_by_handle synchronously (erase_session_locked, not a
+        // bare g_sessions().erase) so the handle is immediately free for a new
+        // stream. Once the session is gone the worker's checkpoints bail without
+        // emitting a second terminal event.
+        erase_session_locked(session_id, handle);
     }
     if (handle) {
         (void)rac_diffusion_cancel(handle);
+#if defined(RAC_HAVE_PROTOBUF)
+        // Deliver a terminal event so the SDK stream terminates instead of
+        // hanging waiting for a COMPLETED/ERROR the (now-erased) worker will
+        // never dispatch.
+        rac::diffusion::dispatch_diffusion_stream_event(
+            handle, runanywhere::v1::DIFFUSION_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
+            "diffusion stream cancelled", static_cast<int>(RAC_ERROR_CANCELLED));
+#endif
     }
     return RAC_SUCCESS;
 }

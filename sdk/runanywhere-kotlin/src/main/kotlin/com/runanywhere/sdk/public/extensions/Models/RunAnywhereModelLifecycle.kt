@@ -42,29 +42,49 @@ suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResul
             return@withContext modelLoadFailure(request, "SDK not initialized")
         }
 
+        // Services must be ready BEFORE the compatibility preflight: commons
+        // derives the verdict from the registry entry, which phase-2 init
+        // populates. This mirrors the download path (RunAnywhereDownload.kt),
+        // which also calls ensureServicesReady() before checkModelCompatibility().
+        // (Pre-fix this ran inside the preflight action, i.e. AFTER the registry
+        // read, so a model registered only during phase-2 could spuriously fail.)
+        try {
+            ensureServicesReady()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+
+        // Commons can only score a REGISTERED model. A model absent from the
+        // registry (a direct load, or one registered only later) has no entry to
+        // evaluate, so skip the preflight and let native load surface the real
+        // "model not found" path instead of masking it as a compatibility
+        // failure. Mirrors downloadModel's isModelRegistered guard.
+        if (!isModelRegistered(request.model_id)) {
+            return@withContext performModelLoad(request)
+        }
+
         withModelLoadCompatibilityPreflight(
             request = request,
             resultProvider = { checkModelCompatibility(request.model_id) },
         ) {
-            try {
-                ensureServicesReady()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-            }
-            val result =
-                CppBridgeModelLifecycle.load(request)
-                    ?: modelLoadFailure(
-                        request,
-                        "Native model lifecycle load proto API unavailable",
-                    )
-            if (result.success) {
-                val modelID = result.model_id.ifEmpty { request.model_id }
-                logger.info("Model load succeeded for $modelID")
-            }
-            result
+            performModelLoad(request)
         }
     }
+
+private suspend fun RunAnywhere.performModelLoad(request: RAModelLoadRequest): RAModelLoadResult {
+    val result =
+        CppBridgeModelLifecycle.load(request)
+            ?: modelLoadFailure(
+                request,
+                "Native model lifecycle load proto API unavailable",
+            )
+    if (result.success) {
+        val modelID = result.model_id.ifEmpty { request.model_id }
+        logger.info("Model load succeeded for $modelID")
+    }
+    return result
+}
 
 suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
     loadModel(
