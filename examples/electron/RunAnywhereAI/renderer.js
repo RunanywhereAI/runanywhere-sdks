@@ -413,6 +413,38 @@ async function runEmbeddings(a, b) {
   for (let i = 0; i < ea.length; i++) { dot += ea[i] * eb[i]; na += ea[i] * ea[i]; nb += eb[i] * eb[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
+// ---- RAG (Knowledge tab) ----
+// rac model-registry enums: category EMBEDDING=7 / LANGUAGE=0, framework ONNX=0 / LLAMACPP=1.
+let ragSession = null; // native session handle, created lazily on first use.
+async function ragEnsureSession() {
+  if (ragSession != null) return ragSession;
+  setStatus('preparing knowledge base…');
+  // Download (idempotent) to get on-disk paths, register them so commons' RAG can
+  // resolve the ids, then create the session over MiniLM (embed) + the chat LLM.
+  const em = await ra.downloadModel('minilm');
+  const lm = await ra.downloadModel(DEFAULT_LLM);
+  await ra.registerModel('minilm', em.primary, 7, 0);
+  await ra.registerModel(DEFAULT_LLM, lm.primary, 0, 1);
+  ragSession = await ra.ragCreateSession({
+    embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
+    topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+  });
+  return ragSession;
+}
+function ragStatsText(s) {
+  if (!s) return '';
+  return `${s.indexedDocuments} document${s.indexedDocuments === 1 ? '' : 's'} · ${s.indexedChunks} chunk${s.indexedChunks === 1 ? '' : 's'} indexed`;
+}
+function renderRagSources(chunks) {
+  const el = $('ragsources');
+  if (!chunks || !chunks.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="label" style="margin-top:16px">Sources</div>' + chunks.map((c) => {
+    const src = c.sourceDocument ? escapeHtml(c.sourceDocument) : 'document';
+    const score = typeof c.similarityScore === 'number' ? c.similarityScore.toFixed(3) : '';
+    return `<div class="ragchunk"><div class="meta"><span>${src}</span><span class="ragscore">${score}</span></div><div class="txt">${escapeHtml(c.text || '')}</div></div>`;
+  }).join('');
+}
+
 async function runVision(imagePath, onToken) {
   let caption = '';
   await ra.generateVlm(await vlm(), imagePath, 'Describe this image in one sentence.', (t) => { caption += t; onToken?.(t); });
@@ -462,6 +494,39 @@ function wireUi() {
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
   $('toolsgo').addEventListener('click', out('toolsout', async () => { const c = await runTools($('toolstext').value); return `${c.name}(${JSON.stringify(c.arguments)})`; }));
   $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
+
+  $('ragadd').addEventListener('click', async () => {
+    const text = $('ragdoc').value.trim();
+    if (!text) return;
+    $('ragadd').disabled = true;
+    try {
+      const h = await ragEnsureSession();
+      const stats = await ra.ragIngest(h, { text });
+      $('ragstats').textContent = ragStatsText(stats);
+      $('ragdoc').value = '';
+    } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
+    finally { $('ragadd').disabled = false; setStatus('ready'); }
+  });
+  $('ragclear').addEventListener('click', async () => {
+    if (ragSession == null) { $('ragstats').textContent = ''; return; }
+    try { const s = await ra.ragClear(ragSession); $('ragstats').textContent = ragStatsText(s); $('ragout').textContent = ''; renderRagSources([]); } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
+  });
+  const askRag = async () => {
+    const q = $('ragq').value.trim();
+    if (!q) return;
+    $('ragask').disabled = true; $('ragout').innerHTML = '…'; renderRagSources([]);
+    setStatus('retrieving + answering…');
+    try {
+      const h = await ragEnsureSession();
+      const res = await ra.ragQuery(h, { question: q, maxTokens: settings.maxTokens, temperature: settings.temperature });
+      // Reuse the chat's thinking-aware renderer so <think> shows collapsibly.
+      $('ragout').innerHTML = assistantHtml(res.thinkingContent ? `<think>${res.thinkingContent}</think>${res.answer}` : res.answer);
+      renderRagSources(res.retrievedChunks);
+    } catch (e) { $('ragout').textContent = 'error: ' + e.message; }
+    finally { $('ragask').disabled = false; setStatus('ready'); }
+  };
+  $('ragask').addEventListener('click', askRag);
+  $('ragq').addEventListener('keydown', (e) => { if (e.key === 'Enter') askRag(); });
 
   const vf = $('visionfile');
   vf.addEventListener('change', () => {
