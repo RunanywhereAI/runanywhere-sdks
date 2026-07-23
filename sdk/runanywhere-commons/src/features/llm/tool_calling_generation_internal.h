@@ -41,6 +41,11 @@ struct GenerationState {
     // llm_module's history normalizer, this is already current-turn-free and
     // pre-alternated, so run_generate_once forwards it as-is (no trailing pop).
     std::vector<std::string> history;
+    // Names of the tools advertised this turn (RUN-80). Used ONLY to build the
+    // QHexRT grammar spec ("toolcall_opt:<names>") when the backend supports
+    // grammar-constrained decoding; empty ⇒ no grammar attached. Non-grammar
+    // engines ignore it.
+    std::vector<std::string> tool_names;
 };
 
 struct GenerationCancelBinding {
@@ -265,6 +270,27 @@ inline bool run_generate_once(GenerationState& generation,
     }
     options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
     options.n_history = static_cast<int32_t>(history_ptrs.size());
+
+    // QHexRT grammar-constrained tool decoding (RUN-80). When the backend honors
+    // options.grammar AND a tool set is live, constrain decoding to "free chat OR
+    // exactly one [name(args)] call over the enumerated tools" (ToolCallOptional).
+    // This makes over-calling structurally impossible on QHexRT — the model can
+    // still answer in plain text; it just cannot invent or misformat a call. The
+    // spec string must outlive ops->generate (options.grammar aliases it), so it
+    // lives in this call frame. supports_grammar is false for llama.cpp/onnx/cloud
+    // (set per-framework in the lifecycle accessor), so options.grammar stays NULL
+    // there and behavior is byte-for-byte unchanged for non-grammar engines.
+    std::string grammar_spec;
+    if (ref.supports_grammar && !generation.tool_names.empty()) {
+        grammar_spec = "toolcall_opt:";
+        for (size_t i = 0; i < generation.tool_names.size(); ++i) {
+            if (i != 0) {
+                grammar_spec += ',';
+            }
+            grammar_spec += generation.tool_names[i];
+        }
+        options.grammar = grammar_spec.c_str();
+    }
 
     clear_lifecycle_llm_cancel(&ref);
 
