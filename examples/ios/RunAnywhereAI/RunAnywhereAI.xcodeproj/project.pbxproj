@@ -12,6 +12,8 @@
 		54398D222F4939A7009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D212F4939A7009D6B51 /* WidgetKit.framework */; };
 		54398D242F4939A7009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D232F4939A7009D6B51 /* SwiftUI.framework */; };
 		54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5AEA17002EAB250200337F01 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5AEA17012EAB250200337F02 /* HealthKit.framework */; platformFilter = ios; };
+		5AEA17032EAB250200337F04 /* EventKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5AEA17042EAB250200337F05 /* EventKit.framework */; };
 		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
 		58MLX00012ED16DA40058D0 /* RunAnywhereMLX in Frameworks */ = {isa = PBXBuildFile; productRef = 58MLX00002ED16DA40058D0 /* RunAnywhereMLX */; };
@@ -68,6 +70,8 @@
 
 /* Begin PBXFileReference section */
 		0C5E8414EC72B380DADD6717 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		5AEA17012EAB250200337F02 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
+		5AEA17042EAB250200337F05 /* EventKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = EventKit.framework; path = System/Library/Frameworks/EventKit.framework; sourceTree = SDKROOT; };
 		0D23254BCD6273187BD2441C /* libbz2.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		502F1BAB2C2556A11E24EA6F /* libc++.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RunAnywhereKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -165,6 +169,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5AEA17002EAB250200337F01 /* HealthKit.framework in Frameworks */,
+				5AEA17032EAB250200337F04 /* EventKit.framework in Frameworks */,
 				58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
@@ -206,6 +212,8 @@
 				0D23254BCD6273187BD2441C /* libbz2.tbd */,
 				502F1BAB2C2556A11E24EA6F /* libc++.tbd */,
 				0C5E8414EC72B380DADD6717 /* Accelerate.framework */,
+				5AEA17012EAB250200337F02 /* HealthKit.framework */,
+				5AEA17042EAB250200337F05 /* EventKit.framework */,
 				54398D212F4939A7009D6B51 /* WidgetKit.framework */,
 				54398D232F4939A7009D6B51 /* SwiftUI.framework */,
 			);
@@ -825,7 +833,9 @@
 				INFOPLIST_FILE = RunAnywhereAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -877,7 +887,9 @@
 				INFOPLIST_FILE = RunAnywhereAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

@@ -885,6 +885,9 @@ set(RAC_FEATURES_SOURCES
     # execute -> follow-up). Collapses Swift's ~100 LOC generateWithTools
     # to ~10 LOC; same loop will benefit Kotlin/RN over the same ABI.
     src/features/llm/tool_calling_run_loop.cpp
+    # TC-1: derives grammar-constrained-decoding specs (llamacpp GBNF /
+    # qhexrt kind-prefixed) from the live tool set for tool_calling_run_loop.
+    src/features/llm/tool_calling_grammar.cpp
     # Proto-byte LLM stream ABI (mirrors
     # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).

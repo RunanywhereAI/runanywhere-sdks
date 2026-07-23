@@ -187,7 +187,7 @@ message ToolCallingOptions {
     // its registered tools (per-SDK convention).
     repeated ToolDefinition tools    = 1;
 
-    reserved 2, 9, 11, 15;
+    reserved 2, 9, 11;
 
     // Whether to auto-execute tools or hand them back to the caller.
     bool   auto_execute              = 3;
@@ -211,6 +211,13 @@ message ToolCallingOptions {
 
     // Typed tool-call format. Unset lets commons select the model default.
     optional ToolCallFormatName format = 10;
+
+    // When true, one model turn may emit multiple tool-call envelopes;
+    // commons parses and executes all of them before building a single
+    // follow-up prompt. Default false preserves the historical
+    // one-call-per-turn behavior. (Reclaims the field number that
+    // originally carried this flag before it was reserved.)
+    bool parallel_tool_calls = 15;
 
     // Maximum tool calls in one conversation turn. Unset/0 = SDK default
     // (typically 5).
@@ -399,6 +406,12 @@ message ToolCallingSessionCreateRequest {
     // ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
     // cross-proto import cycle.
     repeated string history = 19;
+
+    // Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
+    // session envelope: when true, one model turn may emit multiple
+    // tool-call envelopes and commons executes all of them before one
+    // follow-up prompt. Default false = historical single-call behavior.
+    bool parallel_tool_calls = 20;
 }
 
 message ToolCallingSessionCreateResult {

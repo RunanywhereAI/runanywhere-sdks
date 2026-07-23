@@ -1342,6 +1342,7 @@ function createBaseToolCallingOptions() {
         replaceSystemPrompt: false,
         keepToolsAvailable: false,
         format: undefined,
+        parallelToolCalls: false,
         maxToolCalls: undefined,
         toolChoice: 0,
         forcedToolName: undefined,
@@ -1374,6 +1375,9 @@ exports.ToolCallingOptions = {
         }
         if (message.format !== undefined) {
             writer.uint32(80).int32(message.format);
+        }
+        if (message.parallelToolCalls !== false) {
+            writer.uint32(120).bool(message.parallelToolCalls);
         }
         if (message.maxToolCalls !== undefined) {
             writer.uint32(96).int32(message.maxToolCalls);
@@ -1455,6 +1459,13 @@ exports.ToolCallingOptions = {
                     message.format = reader.int32();
                     continue;
                 }
+                case 15: {
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.parallelToolCalls = reader.bool();
+                    continue;
+                }
                 case 12: {
                     if (tag !== 96) {
                         break;
@@ -1528,6 +1539,11 @@ exports.ToolCallingOptions = {
                     ? globalThis.Boolean(object.keep_tools_available)
                     : false,
             format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
+            parallelToolCalls: isSet(object.parallelToolCalls)
+                ? globalThis.Boolean(object.parallelToolCalls)
+                : isSet(object.parallel_tool_calls)
+                    ? globalThis.Boolean(object.parallel_tool_calls)
+                    : false,
             maxToolCalls: isSet(object.maxToolCalls)
                 ? globalThis.Number(object.maxToolCalls)
                 : isSet(object.max_tool_calls)
@@ -1581,6 +1597,9 @@ exports.ToolCallingOptions = {
         if (message.format !== undefined) {
             obj.format = toolCallFormatNameToJSON(message.format);
         }
+        if (message.parallelToolCalls !== false) {
+            obj.parallelToolCalls = message.parallelToolCalls;
+        }
         if (message.maxToolCalls !== undefined) {
             obj.maxToolCalls = Math.round(message.maxToolCalls);
         }
@@ -1611,6 +1630,7 @@ exports.ToolCallingOptions = {
         message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
         message.keepToolsAvailable = object.keepToolsAvailable ?? false;
         message.format = object.format ?? undefined;
+        message.parallelToolCalls = object.parallelToolCalls ?? false;
         message.maxToolCalls = object.maxToolCalls ?? undefined;
         message.toolChoice = object.toolChoice ?? 0;
         message.forcedToolName = object.forcedToolName ?? undefined;
@@ -2836,6 +2856,7 @@ function createBaseToolCallingSessionCreateRequest() {
         replaceSystemPrompt: false,
         requireJsonArguments: false,
         history: [],
+        parallelToolCalls: false,
     };
 }
 exports.ToolCallingSessionCreateRequest = {
@@ -2890,6 +2911,9 @@ exports.ToolCallingSessionCreateRequest = {
         }
         for (const v of message.history) {
             writer.uint32(154).string(v);
+        }
+        if (message.parallelToolCalls !== false) {
+            writer.uint32(160).bool(message.parallelToolCalls);
         }
         return writer;
     },
@@ -3019,6 +3043,13 @@ exports.ToolCallingSessionCreateRequest = {
                     message.history.push(reader.string());
                     continue;
                 }
+                case 20: {
+                    if (tag !== 160) {
+                        break;
+                    }
+                    message.parallelToolCalls = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3098,6 +3129,11 @@ exports.ToolCallingSessionCreateRequest = {
             history: globalThis.Array.isArray(object?.history)
                 ? object.history.map((e) => globalThis.String(e))
                 : [],
+            parallelToolCalls: isSet(object.parallelToolCalls)
+                ? globalThis.Boolean(object.parallelToolCalls)
+                : isSet(object.parallel_tool_calls)
+                    ? globalThis.Boolean(object.parallel_tool_calls)
+                    : false,
         };
     },
     toJSON(message) {
@@ -3153,6 +3189,9 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.history?.length) {
             obj.history = message.history;
         }
+        if (message.parallelToolCalls !== false) {
+            obj.parallelToolCalls = message.parallelToolCalls;
+        }
         return obj;
     },
     create(base) {
@@ -3177,6 +3216,7 @@ exports.ToolCallingSessionCreateRequest = {
         message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
         message.requireJsonArguments = object.requireJsonArguments ?? false;
         message.history = object.history?.map((e) => e) || [];
+        message.parallelToolCalls = object.parallelToolCalls ?? false;
         return message;
     },
 };

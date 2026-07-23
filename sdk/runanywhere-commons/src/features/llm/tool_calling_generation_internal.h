@@ -2,6 +2,7 @@
 #define RAC_FEATURES_LLM_TOOL_CALLING_GENERATION_INTERNAL_H
 
 #include <atomic>
+#include <cstring>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -41,6 +42,18 @@ struct GenerationState {
     // llm_module's history normalizer, this is already current-turn-free and
     // pre-alternated, so run_generate_once forwards it as-is (no trailing pop).
     std::vector<std::string> history;
+
+    // Grammar-constrained decoding (TC-1). Two dialects because llamacpp and
+    // qhexrt read rac_llm_options_t.grammar with incompatible conventions:
+    // llamacpp expects raw GBNF text (llamacpp_backend.cpp's
+    // llama_sampler_init_grammar); qhexrt expects a kind-prefixed spec
+    // ("json:"/"toolcall:"/"toolcall_opt:", qhexrt_llm_ops.cpp:fill_cfg).
+    // run_generate_once picks the matching dialect from the acquired
+    // LifecycleLlmRef.framework_name (INFERENCE_FRAMEWORK_LLAMA_CPP vs
+    // INFERENCE_FRAMEWORK_QHEXRT) once the engine that will actually serve
+    // this call is known. Empty = unconstrained (today's behavior).
+    std::string grammar_gbnf;
+    std::string grammar_qhexrt;
 };
 
 struct GenerationCancelBinding {
@@ -86,6 +99,18 @@ inline GenerationState generation_for_tool_step(const GenerationState& base, uin
                                                 runanywhere::v1::ToolChoiceMode tool_choice,
                                                 runanywhere::v1::ToolCallFormatName format) {
     GenerationState step = base;
+    // TC-1: the tool-call grammar built in run_loop_impl constrains the
+    // model's FIRST decision — "you must emit a valid tool call now" for
+    // REQUIRED/SPECIFIC. It must not follow the loop into later turns: once
+    // that call has run and the model is synthesizing (or optionally
+    // deciding whether to call again), forcing the same tool-call-only
+    // grammar would make it impossible to ever produce the final natural-
+    // language answer. Base carries the grammar for iteration 1 only; every
+    // later step decodes unconstrained.
+    if (iteration > 1) {
+        step.grammar_gbnf.clear();
+        step.grammar_qhexrt.clear();
+    }
     const bool forced_decision = iteration == 1 && has_tool_choice &&
                                  tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
     if (!forced_decision) {
@@ -250,6 +275,18 @@ inline bool run_generate_once(GenerationState& generation,
     options.system_prompt =
         generation.system_prompt.empty() ? nullptr : generation.system_prompt.c_str();
     options.disable_thinking = generation.disable_thinking ? RAC_TRUE : RAC_FALSE;
+
+    // Grammar dialect selection (TC-1). ref.framework_name is the model's
+    // InferenceFramework enum name (e.g. "INFERENCE_FRAMEWORK_QHEXRT" /
+    // "INFERENCE_FRAMEWORK_LLAMA_CPP") — a 1:1 proxy for which engine will
+    // actually serve this call, since qhexrt only registers for its own
+    // QNN-context framework. Default to the GBNF dialect for anything that
+    // isn't explicitly qhexrt.
+    const bool is_qhexrt = ref.framework_name != nullptr &&
+                           std::strcmp(ref.framework_name, "INFERENCE_FRAMEWORK_QHEXRT") == 0;
+    const std::string& active_grammar =
+        is_qhexrt ? generation.grammar_qhexrt : generation.grammar_gbnf;
+    options.grammar = active_grammar.empty() ? nullptr : active_grammar.c_str();
 
     // Prior conversation turns (tool_calling.proto ToolCallingSessionCreateRequest.history).
     // Already excludes the current turn and is pre-alternated [user,asst,...], so unlike

@@ -56,6 +56,19 @@ static const char* FORMAT_NAMES[] = {
     "LFM2 (Liquid)",  // RAC_TOOL_FORMAT_LFM2
 };
 
+// Shared synthesis-turn grounding rule, appended wherever tool results are
+// handed back to the model for a final answer. Small models "helpfully"
+// fabricate a plausible number when the field they need is absent from the
+// result (observed live: a sleep query whose result carried only {"date":...}
+// was answered with an invented "7 hours"). Stating the rule at the exact
+// point of use — next to the result payload — is the strongest prompt-level
+// counter available, and living in commons it protects every SDK and every
+// model family, not just one example app.
+static const char* kToolResultGroundingRule =
+    "State only values literally present in the tool result. If the result lacks the value the "
+    "user asked for (or it is empty), say that data is unavailable - never estimate, invent, or "
+    "recall a plausible number.";
+
 static int64_t next_tool_call_id() {
     static std::atomic<int64_t> next{1};
     return next.fetch_add(1, std::memory_order_relaxed);
@@ -1921,18 +1934,77 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
     const bool has_tool_call = parsed.has_tool_call == RAC_TRUE;
     result.set_has_tool_call(has_tool_call);
     result.set_remaining_text(parsed.clean_text ? parsed.clean_text : request.text());
-    if (has_tool_call) {
-        const int64_t call_number = parsed.call_id != 0 ? parsed.call_id : next_tool_call_id();
+
+    const auto append_parsed_call = [&result, &request](const rac_tool_call_t& call) {
+        const int64_t call_number = call.call_id != 0 ? call.call_id : next_tool_call_id();
         const int64_t created_at_ms = static_cast<int64_t>(std::time(nullptr)) * 1000;
         std::string call_id = "call_";
         call_id += std::to_string(call_number);
         auto* tool_call = result.add_tool_calls();
         tool_call->set_id(call_id);
-        tool_call->set_name(parsed.tool_name ? parsed.tool_name : "");
-        tool_call->set_arguments_json(parsed.arguments_json ? parsed.arguments_json : "{}");
+        tool_call->set_name(call.tool_name ? call.tool_name : "");
+        tool_call->set_arguments_json(call.arguments_json ? call.arguments_json : "{}");
         tool_call->set_type("function");
         tool_call->set_created_at_ms(created_at_ms);
         tool_call->set_raw_text(request.text());
+    };
+
+    if (has_tool_call) {
+        append_parsed_call(parsed);
+
+        // parallel_tool_calls: one model turn may emit several envelopes.
+        // The C parser extracts one envelope per invocation, so re-parse the
+        // clean text it hands back until no envelope remains. Only the caller
+        // that opted in pays this cost; the default path stays single-parse.
+        //
+        // Guardrails against a real failure mode observed with small models
+        // under AUTO (no grammar constraint): the model repeats the SAME
+        // tool call verbatim several times instead of moving on (a known
+        // small-model repetition/looping artifact, not distinct intent).
+        // Without a stop condition, harvesting every envelope in the output
+        // turns one stutter into N "legitimate" parallel calls, burns the
+        // max_tool_calls budget on duplicates, and starves the rest of the
+        // user's request. Stop harvesting the moment a call repeats the
+        // immediately-preceding (name, arguments) pair, and never harvest
+        // more than the request's own max_tool_calls budget.
+        if (request.has_options() && request.options().parallel_tool_calls()) {
+            const int32_t budget =
+                request.options().has_max_tool_calls() && request.options().max_tool_calls() > 0
+                    ? request.options().max_tool_calls()
+                    : 5;
+            std::string last_name = parsed.tool_name ? parsed.tool_name : "";
+            std::string last_args = parsed.arguments_json ? parsed.arguments_json : "{}";
+            std::string remainder = parsed.clean_text ? parsed.clean_text : "";
+            while (!remainder.empty() && result.tool_calls_size() < budget) {
+                rac_tool_call_t next{};
+                const rac_result_t next_rc =
+                    use_explicit_format
+                        ? rac_tool_call_parse_with_format(
+                              remainder.c_str(),
+                              rac_tool_call_format_from_name(
+                                  tool_format_key_from_proto(request.options().format())),
+                              &next)
+                        : rac_tool_call_parse(remainder.c_str(), &next);
+                if (next_rc != RAC_SUCCESS || next.has_tool_call != RAC_TRUE) {
+                    rac_tool_call_free(&next);
+                    break;
+                }
+                const std::string next_name = next.tool_name ? next.tool_name : "";
+                const std::string next_args = next.arguments_json ? next.arguments_json : "{}";
+                if (next_name == last_name && next_args == last_args) {
+                    // Repetition, not a second distinct call — stop here
+                    // rather than treat the stutter as further intent.
+                    rac_tool_call_free(&next);
+                    break;
+                }
+                append_parsed_call(next);
+                remainder = next.clean_text ? next.clean_text : "";
+                last_name = next_name;
+                last_args = next_args;
+                rac_tool_call_free(&next);
+            }
+            result.set_remaining_text(remainder);
+        }
     }
     result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     rac_tool_call_free(&parsed);
@@ -2087,10 +2159,11 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
             }
             followup += "\nUsing all results above, answer the original question. ";
             if (converted.options.keep_tools_available == RAC_TRUE) {
-                followup += "You may use another tool if needed.";
+                followup += "You may use another tool if needed. ";
             } else {
-                followup += "Do not emit tool calls or tool tags.";
+                followup += "Do not emit tool calls or tool tags. ";
             }
+            followup += kToolResultGroundingRule;
             prompt = dup_owned_string(followup);
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
@@ -2673,6 +2746,29 @@ extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
     return finalize_tool_validation(out_validation, errors, &args, &matched_tool_json);
 }
 
+// Today's date in UTC, formatted YYYY-MM-DD. Embedded into every tool prompt
+// (and the final web-search synthesis turn) because on-device models have no
+// notion of "now": with a 2023-era training cutoff they confidently invent
+// dates like "2024-01-01" when a tool argument or an answer needs one.
+// Grounding the prompt itself is the only fix that works across every model
+// family and every SDK — it cannot be forgotten by an app author.
+static std::string current_utc_date() {
+    const std::time_t now = std::time(nullptr);
+    std::tm utc{};
+#if defined(_WIN32)
+    if (gmtime_s(&utc, &now) != 0) {
+        return "unknown";
+    }
+#else
+    if (gmtime_r(&now, &utc) == nullptr) {
+        return "unknown";
+    }
+#endif
+    char value[11]{};
+    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
+                                                                       : std::string("unknown");
+}
+
 /**
  * @brief Generate format-specific tool calling instructions
  *
@@ -2882,7 +2978,12 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
-    prompt += "# TOOLS\n";
+    // Date grounding must precede everything else: models fill date-shaped
+    // tool arguments from training-data memory unless the true current date
+    // is right in front of them (see current_utc_date's rationale).
+    prompt += "Current date (UTC): ";
+    prompt += current_utc_date();
+    prompt += "\n\n# TOOLS\n";
     prompt += tools_json;
     prompt += "\n\n";
 
@@ -2897,6 +2998,9 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += "- Time question = call get_current_time\n";
     prompt +=
         "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
+    prompt +=
+        "- Any date argument MUST be derived from the Current date above or from a date the "
+        "user explicitly stated. NEVER guess or recall dates from memory.\n";
 
     // Format-specific tag instructions
     if (actual_format == RAC_TOOL_FORMAT_LFM2) {
@@ -3083,23 +3187,6 @@ static std::string compact_web_evidence_json(const char* tool_result_json) {
     return compact.empty() ? std::string(tool_result_json) : compact.dump();
 }
 
-static std::string current_utc_date() {
-    const std::time_t now = std::time(nullptr);
-    std::tm utc{};
-#if defined(_WIN32)
-    if (gmtime_s(&utc, &now) != 0) {
-        return "unknown";
-    }
-#else
-    if (gmtime_r(&now, &utc) == nullptr) {
-        return "unknown";
-    }
-#endif
-    char value[11]{};
-    return std::strftime(value, sizeof(value), "%Y-%m-%d", &utc) == 10 ? std::string(value)
-                                                                       : std::string("unknown");
-}
-
 extern "C" rac_result_t
 rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char* tools_prompt,
                                     const char* tool_name, const char* tool_result_json,
@@ -3157,11 +3244,13 @@ rac_tool_call_build_followup_prompt(const char* original_user_prompt, const char
 
     if (keep_tools_available != 0) {
         prompt += "Using this information, respond to the user's original question. ";
-        prompt += "You may use additional tools if needed.";
+        prompt += "You may use additional tools if needed. ";
+        prompt += kToolResultGroundingRule;
     } else if (!is_final_web_search) {
         prompt +=
             "Using this information, provide a natural response to the user's original question. ";
-        prompt += "Do not use any tool tags in your response - just respond naturally.";
+        prompt += "Do not use any tool tags in your response - just respond naturally. ";
+        prompt += kToolResultGroundingRule;
     }
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));

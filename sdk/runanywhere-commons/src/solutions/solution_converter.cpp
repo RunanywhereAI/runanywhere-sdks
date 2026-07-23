@@ -116,16 +116,18 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
 }
 
 // ---------------------------------------------------------------------------
-// AgentLoop — multi-turn tool-calling LLM loop. Modelled as a single
-// generate_text operator with auxiliary tokenise/context build. The
-// iterative loop runs inside the LLM operator's engine; the DAG just
-// frames the I/O.
+// AgentLoop — multi-turn tool-calling LLM loop. A tools-bearing config maps
+// to the dedicated `agent_loop` operator, which drives the real tool-calling
+// run loop (rac_tool_calling_run_loop_proto) so `tools` and `max_iterations`
+// are actually consumed. A tool-less config keeps the plain `generate_text`
+// operator — identical to the historical behavior.
 // ---------------------------------------------------------------------------
 void expand_agent_loop(const runanywhere::v1::AgentLoopConfig& cfg, PipelineSpec* out) {
     out->set_name("agent_loop");
 
+    const bool has_tools = cfg.tools_size() > 0;
     add_op(out, "input", "source");
-    auto* llm = add_op(out, "llm", "generate_text", cfg.llm_model_id());
+    auto* llm = add_op(out, "llm", has_tools ? "agent_loop" : "generate_text", cfg.llm_model_id());
     add_op(out, "output", "sink");
 
     if (!cfg.system_prompt().empty()) {
@@ -133,6 +135,20 @@ void expand_agent_loop(const runanywhere::v1::AgentLoopConfig& cfg, PipelineSpec
     }
     if (cfg.max_iterations() > 0) {
         (*llm->mutable_params())["max_iterations"] = std::to_string(cfg.max_iterations());
+    }
+    if (has_tools) {
+        // OperatorSpec.params is the only converter→operator channel, so the
+        // tool set travels as indexed keys mirrored by AgentLoopNode.
+        (*llm->mutable_params())["tool.count"] = std::to_string(cfg.tools_size());
+        for (int i = 0; i < cfg.tools_size(); ++i) {
+            const auto& tool = cfg.tools(i);
+            const std::string prefix = "tool." + std::to_string(i) + ".";
+            (*llm->mutable_params())[prefix + "name"] = tool.name();
+            (*llm->mutable_params())[prefix + "description"] = tool.description();
+            if (!tool.json_schema().empty()) {
+                (*llm->mutable_params())[prefix + "json_schema"] = tool.json_schema();
+            }
+        }
     }
 
     add_edge(out, "input.out", "llm.in");
