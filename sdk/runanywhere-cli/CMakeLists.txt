@@ -93,6 +93,11 @@ target_include_directories(rcli_core PUBLIC
 target_link_libraries(rcli_core PUBLIC rac_commons)
 target_compile_features(rcli_core PUBLIC cxx_std_20)
 
+# macOS battery / memory sampling in device_info.cpp (IOKit + CoreFoundation).
+if(APPLE)
+    target_link_libraries(rcli_core PUBLIC "-framework IOKit" "-framework CoreFoundation")
+endif()
+
 # Version string: single source of truth is sdk/runanywhere-commons/VERSION,
 # already read into PROJECT_VERSION by the root CMakeLists.
 target_compile_definitions(rcli_core PUBLIC

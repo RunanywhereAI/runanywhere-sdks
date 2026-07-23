@@ -49,21 +49,25 @@ namespace {
 struct ModalitySpec {
     const char* name;
     const char* default_event_type;
+    // Synthetic probe identity — blast/emit always stamp these so quality
+    // gates never see null model_id/framework on the control-plane path.
+    const char* probe_model_id;
+    const char* probe_framework;
 };
 
 constexpr ModalitySpec kModalities[] = {
-    {"llm", "llm.generation.completed"},
-    {"stt", "stt.transcription.completed"},
-    {"tts", "tts.synthesis.completed"},
-    {"vlm", "vlm.process.completed"},
-    {"rag", "rag.query.completed"},
-    {"imagegen", "imagegen.generate.completed"},
-    {"embeddings", "embeddings.embed.completed"},
-    {"vad", "vad.stopped"},
-    {"voice", "voice.turn.metrics"},
-    {"lora", "lora.attach.completed"},
-    {"model", "model.download.completed"},
-    {"system", "sdk.init.completed"},
+    {"llm", "llm.generation.completed", "probe-llm-qwen2.5-0.5b", "llamacpp"},
+    {"stt", "stt.transcription.completed", "probe-stt-whisper-tiny", "sherpa"},
+    {"tts", "tts.synthesis.completed", "probe-tts-piper", "sherpa"},
+    {"vlm", "vlm.process.completed", "probe-vlm-llava-1.5", "llamacpp"},
+    {"rag", "rag.query.completed", "probe-rag-minilm", "llamacpp"},
+    {"imagegen", "imagegen.generate.completed", "probe-imagegen-sd-turbo", "coreml"},
+    {"embeddings", "embeddings.embed.completed", "probe-embed-minilm", "onnx"},
+    {"vad", "vad.stopped", "probe-vad-silero", "onnx"},
+    {"voice", "voice.turn.metrics", "probe-voice-pipeline", "llamacpp"},
+    {"lora", "lora.attach.completed", "probe-lora-base", "llamacpp"},
+    {"model", "model.download.completed", "probe-model-qwen2.5-0.5b", "llamacpp"},
+    {"system", "sdk.init.completed", "probe-sdk-system", "llamacpp"},
 };
 
 const ModalitySpec* find_modality(const std::string& name) {
@@ -179,6 +183,9 @@ void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
         payload.event_type = event_type.c_str();
         payload.modality = spec.name;
         payload.session_id = session_id.c_str();
+        payload.model_id = spec.probe_model_id;
+        payload.model_name = spec.probe_model_id;
+        payload.framework = spec.probe_framework;
         const int64_t now_ms = rac_get_current_time_ms();
         payload.timestamp_ms = now_ms;
         payload.created_at_ms = now_ms;
@@ -196,8 +203,31 @@ void track_events(rac_telemetry_manager_t* manager, const ModalitySpec& spec,
             payload.total_tokens = (metrics.input_tokens > 0 ? metrics.input_tokens : 0) +
                                    metrics.output_tokens;
         }
+        // LLM/VLM timing probes: derive coherent values from processing_ms +
+        // output tokens so quality SQL can assert non-null TPS/TTFT/etc.
+        const bool token_modality =
+            std::string(spec.name) == "llm" || std::string(spec.name) == "vlm";
+        if (token_modality && metrics.processing_ms > 0 && metrics.output_tokens > 0) {
+            const double prompt_ms = metrics.processing_ms * 0.30;
+            const double gen_ms = metrics.processing_ms - prompt_ms;
+            payload.prompt_eval_time_ms = prompt_ms;
+            payload.generation_time_ms = gen_ms;
+            payload.time_to_first_token_ms = prompt_ms;
+            payload.tokens_per_second =
+                static_cast<double>(metrics.output_tokens) / (gen_ms / 1000.0);
+            payload.context_length = 4096;
+            payload.temperature = 0.7;
+            payload.max_tokens = metrics.output_tokens;
+        }
         if (metrics.audio_duration_ms >= 0) {
             payload.audio_duration_ms = metrics.audio_duration_ms;
+        } else if (std::string(spec.name) == "stt" && metrics.processing_ms > 0) {
+            // Default STT audio length when not specified (RTF-friendly probe).
+            payload.audio_duration_ms = metrics.processing_ms * 10.0;
+            payload.real_time_factor = 0.1;
+            payload.word_count = 12;
+            payload.confidence = 0.91;
+            payload.language = "en";
         }
         rac_telemetry_manager_track(manager, &payload);
     }

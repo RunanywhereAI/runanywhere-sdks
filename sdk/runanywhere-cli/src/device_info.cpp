@@ -18,6 +18,10 @@
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/ps/IOPowerSources.h>
+#include <IOKit/ps/IOPSKeys.h>
+#include <mach/mach.h>
 #include <sys/sysctl.h>
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -299,6 +303,96 @@ int64_t sysctl_i64(const char *key) {
   return value;
 }
 
+int64_t macos_available_memory_bytes() {
+  mach_port_t host = mach_host_self();
+  vm_statistics64_data_t stats = {};
+  mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(host, HOST_VM_INFO64,
+                        reinterpret_cast<host_info64_t>(&stats),
+                        &count) != KERN_SUCCESS) {
+    return 0;
+  }
+  const int64_t page_size = static_cast<int64_t>(sysctl_i64("hw.pagesize"));
+  if (page_size <= 0) {
+    return 0;
+  }
+  // Free + speculative pages ≈ "available" for telemetry (not wired/compressed).
+  const int64_t free_pages =
+      static_cast<int64_t>(stats.free_count) +
+      static_cast<int64_t>(stats.purgeable_count);
+  return free_pages * page_size;
+}
+
+void macos_sample_battery(DeviceInfoState &info) {
+  // Desktop Macs (Studio/Mini/iMac) have no battery → leave level=-1 (null).
+  // Laptops expose IOPowerSources; sample real capacity rather than inventing 0.
+  CFTypeRef blob = IOPSCopyPowerSourcesInfo();
+  if (blob == nullptr) {
+    return;
+  }
+  CFArrayRef list = IOPSCopyPowerSourcesList(blob);
+  if (list == nullptr) {
+    CFRelease(blob);
+    return;
+  }
+
+  const CFIndex count = CFArrayGetCount(list);
+  for (CFIndex i = 0; i < count; ++i) {
+    CFTypeRef ps = CFArrayGetValueAtIndex(list, i);
+    CFDictionaryRef desc = IOPSGetPowerSourceDescription(blob, ps);
+    if (desc == nullptr) {
+      continue;
+    }
+    auto number_for = [&](CFStringRef key) -> double {
+      const auto *num =
+          static_cast<const CFNumberRef>(CFDictionaryGetValue(desc, key));
+      if (num == nullptr) {
+        return -1.0;
+      }
+      double value = -1.0;
+      return CFNumberGetValue(num, kCFNumberDoubleType, &value) ? value : -1.0;
+    };
+
+    const double current = number_for(CFSTR(kIOPSCurrentCapacityKey));
+    const double max_cap = number_for(CFSTR(kIOPSMaxCapacityKey));
+    if (current < 0.0) {
+      continue;
+    }
+    // Capacity is usually already a percent (0–100); normalize to 0–1.
+    double level = current;
+    if (max_cap > 0.0 && max_cap != 100.0) {
+      level = (current / max_cap) * 100.0;
+    }
+    if (level > 1.0) {
+      level /= 100.0;
+    }
+    if (level < 0.0 || level > 1.0) {
+      continue;
+    }
+
+    info.battery_level = level;
+    info.form_factor = "laptop";
+
+    const auto *state = static_cast<const CFStringRef>(
+        CFDictionaryGetValue(desc, CFSTR(kIOPSPowerSourceStateKey)));
+    const auto *charging = static_cast<const CFBooleanRef>(
+        CFDictionaryGetValue(desc, CFSTR(kIOPSIsChargingKey)));
+    if (charging != nullptr && CFBooleanGetValue(charging)) {
+      info.battery_state = level >= 0.999 ? "full" : "charging";
+    } else if (state != nullptr &&
+               CFStringCompare(state, CFSTR(kIOPSACPowerValue), 0) ==
+                   kCFCompareEqualTo) {
+      info.battery_state = level >= 0.999 ? "full" : "charging";
+    } else {
+      info.battery_state = "unplugged";
+    }
+    break;
+  }
+
+  CFRelease(list);
+  CFRelease(blob);
+}
+
 void collect_device_info(DeviceInfoState &info) {
   info.platform = "macos";
 
@@ -323,7 +417,7 @@ void collect_device_info(DeviceInfoState &info) {
   }
 
   info.total_memory = sysctl_i64("hw.memsize");
-  info.available_memory = 0;
+  info.available_memory = macos_available_memory_bytes();
 
   const int64_t ncpu = sysctl_i64("hw.ncpu");
   info.core_count = ncpu > 0 ? static_cast<int32_t>(ncpu) : 1;
@@ -349,6 +443,8 @@ void collect_device_info(DeviceInfoState &info) {
 #else
   info.gpu_family = "unknown";
 #endif
+
+  macos_sample_battery(info);
 }
 
 #else // _WIN32
