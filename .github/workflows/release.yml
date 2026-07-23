@@ -42,8 +42,9 @@ env:
   # — lets environment=development run keyless with no explicit URL (see
   # rac_dev_config_get_staging_base_url). Kept in a CI secret (never in the public
   # source tree); the commons CMake substitutes it into the generated
-  # development_config.cpp when present (else a placeholder stub). No credentials,
-  # project refs, or tokens are ever embedded.
+  # development_config.cpp. validate fails closed if the secret is missing /
+  # unusable so release artifacts never ship the placeholder stub. No
+  # credentials, project refs, or tokens are ever embedded.
   STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
 
 jobs:
@@ -57,6 +58,29 @@ jobs:
       version: ${{ steps.parse.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+      - name: Require usable STAGING_BASE_URL for release bake
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          set -euo pipefail
+          # Fail closed: empty/placeholder secrets bake YOUR_STAGING_BASE_URL into
+          # development_config.cpp, which rac_dev_config_is_usable_http_url rejects —
+          # released binaries then cannot keyless-resolve a development backend.
+          if [[ -z "${STAGING_BASE_URL:-}" ]]; then
+            echo "::error::Repository secret STAGING_BASE_URL is unset or empty. Set it to the public staging backend origin (https://…) before running the release train."
+            exit 1
+          fi
+          case "${STAGING_BASE_URL}" in
+            YOUR_STAGING_BASE_URL|http://YOUR_*|https://YOUR_*|placeholder*|PLACEHOLDER*)
+              echo "::error::STAGING_BASE_URL looks like a placeholder ('${STAGING_BASE_URL}'). Set the real public staging backend origin."
+              exit 1
+              ;;
+          esac
+          if [[ ! "${STAGING_BASE_URL}" =~ ^https?://[^[:space:]]+$ ]]; then
+            echo "::error::STAGING_BASE_URL must be an http(s) origin without whitespace (got '${STAGING_BASE_URL}')."
+            exit 1
+          fi
+          echo "STAGING_BASE_URL is set and looks usable for release bake."
       - name: Parse and validate version
         id: parse
         run: |
