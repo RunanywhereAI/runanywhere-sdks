@@ -53,6 +53,12 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         out_ref->model_id = (*token)->model_id.c_str();
         out_ref->framework_name = (*token)->framework_name.c_str();
         out_ref->supports_lora = (*token)->model.supports_lora();
+        // Backend capability, gated on the framework enum: only QHexRT currently
+        // consumes rac_llm_options_t.grammar (on-device grammar-constrained
+        // decoding). Every other engine leaves this false, so the grammar attach
+        // in the tool-calling loop is a no-op for llama.cpp/onnx/cloud.
+        out_ref->supports_grammar =
+            (*token)->framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
     }
     out_ref->opaque = token.release();
     return RAC_SUCCESS;
