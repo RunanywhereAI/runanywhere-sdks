@@ -40,6 +40,7 @@ _DONE = "data: [DONE]\n\n"
 MAX_IMAGE_BYTES = 20 * 1024 * 1024  # cap decoded/fetched image bytes (DoS guard)
 _MAX_DATA_URI_CHARS = (MAX_IMAGE_BYTES // 3 + 1) * 4 + 64  # base64 input cap (pre-decode)
 DEFAULT_MAX_BODY_BYTES = 50 * 1024 * 1024  # reject larger request bodies with 413
+MAX_EMBEDDING_INPUTS = 2048  # cap the /v1/embeddings batch (matches OpenAI) — bound the lock hold
 
 
 def get_manager(request: Request) -> ModelManager:
@@ -116,8 +117,16 @@ def _chat_chunk(cid: str, model: str, delta: dict, finish: Optional[str]) -> str
 
 
 def _error_line(exc: Exception) -> str:
-    """A terminal SSE ``data:`` error line (any non-SDK exception is coerced to one)."""
-    e = exc if isinstance(exc, SDKException) else SDKException.generation_failed(str(exc))
+    """A terminal SSE ``data:`` error line for a mid-stream failure.
+
+    SDKException messages are intentional and safe to surface; any OTHER exception is coerced to
+    a GENERIC message rather than ``str(exc)`` so the streaming path does not leak raw backend
+    exception text (paths, model internals) to the client — matching the non-streaming catch-all
+    handler's no-echo posture. The exact error is still logged server-side by the caller.
+    """
+    e = exc if isinstance(exc, SDKException) else SDKException.generation_failed(
+        "internal error during generation"
+    )
     body = openai_error_body(e.message, http_status_for(e), code=int(e.code))
     return f"data: {json.dumps(body)}\n\n"
 
@@ -697,6 +706,10 @@ def create_app(
         inputs = [req.input] if isinstance(req.input, str) else list(req.input)
         if not inputs or any(not isinstance(t, str) or t == "" for t in inputs):
             raise SDKException.invalid_input("input must be a non-empty string or list of non-empty strings")
+        if len(inputs) > MAX_EMBEDDING_INPUTS:
+            # An unbounded batch would hold the per-model lock for a long time, blocking every
+            # other embeddings request (DoS). Reject oversized batches like OpenAI does.
+            raise SDKException.invalid_input(f"too many inputs (max {MAX_EMBEDDING_INPUTS})")
         model = _resolve_model_id(req.model, mgr.default_embedder, allow_arbitrary_models)
         embedder, lock = await mgr.embedder(model)
         data, total = [], 0
