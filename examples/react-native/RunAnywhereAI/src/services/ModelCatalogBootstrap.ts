@@ -10,7 +10,7 @@
 
 import { Platform } from 'react-native';
 import { RunAnywhere } from '@runanywhere/core';
-import { QHexRT } from '@runanywhere/qhexrt';
+import { QHexRT, seedNpuCatalog } from '@runanywhere/qhexrt';
 import {
   ModelCategory,
   InferenceFramework,
@@ -18,11 +18,6 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { LoraAdapterCatalogEntry } from '@runanywhere/proto-ts/lora_options';
 import { logDiagnostic } from '../utils/diagnostics';
-import {
-  NPU_BUNDLES,
-  publishNpuCatalogAcceptance,
-  toNpuRegistrationRequest,
-} from './NpuModelCatalog';
 
 // Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
@@ -33,8 +28,6 @@ export type BackendRegistrationState = {
   mlxRegistered: boolean;
   qhexrtRegistered: boolean;
 };
-
-let qhexrtBackendRegistered = false;
 
 /**
  * Register the curated model catalog for every successfully-registered
@@ -447,15 +440,13 @@ export async function registerAll(
   // =========================================================================
   // QHexRT (Hexagon NPU) bundles — logical URLs resolved natively
   // =========================================================================
-  qhexrtBackendRegistered = qhexrtRegistered;
-  if (await isNpuCatalogReady()) {
-    const result = await registerNpuBundles();
-    publishNpuCatalogAcceptance(result.registeredIds);
-  } else {
-    publishNpuCatalogAcceptance([]);
-    logDiagnostic(
-      '[App] Skipping QHexRT catalog - native backend/device unsupported'
-    );
+  if (qhexrtRegistered) {
+    try {
+      const npuCount = await seedNpuCatalog(() => QHexRT.probeNpu());
+      logDiagnostic(`[App] QHexRT NPU bundles seeded: ${npuCount}`);
+    } catch (error) {
+      logDiagnostic(`[App] NPU catalog seed failed: ${String(error)}`);
+    }
   }
 
   logDiagnostic('[App] All models registered');
@@ -481,80 +472,11 @@ async function registerLoraAdapters(): Promise<void> {
   }
 }
 
-type NpuSeedResult = Readonly<{
-  registeredIds: ReadonlySet<string>;
-  registered: number;
-  failed: number;
-  skippedNative: number;
-}>;
-
-async function isNpuCatalogReady(): Promise<boolean> {
-  if (!qhexrtBackendRegistered) return false;
-
-  try {
-    const [registered, capability] = await Promise.all([
-      QHexRT.isRegistered(),
-      QHexRT.probeNpu(),
-    ]);
-    return registered && capability.qhexrtSupported;
-  } catch (error) {
-    logDiagnostic(`[App] QHexRT readiness check failed: ${String(error)}`);
-    return false;
-  }
-}
-
-/** Register only the logical HNPU rows accepted by native QHexRT. */
-async function registerNpuBundles(): Promise<NpuSeedResult> {
-  const registeredIds = new Set<string>();
-  let registered = 0;
-  let failed = 0;
-  let skippedNative = 0;
-
-  for (const bundle of NPU_BUNDLES) {
-    try {
-      const saved = await QHexRT.registerModelForDevice(
-        toNpuRegistrationRequest(bundle)
-      );
-      if (saved) {
-        registered += 1;
-        registeredIds.add(saved.id);
-      } else {
-        skippedNative += 1;
-      }
-    } catch (error) {
-      failed += 1;
-      logDiagnostic(
-        `[App] Failed to register NPU bundle ${bundle.id}: ${String(error)}`
-      );
-    }
-  }
-
-  logDiagnostic(
-    `[App] QHexRT catalog seeded: ok=${registered} failed=${failed} ` +
-      `skippedNative=${skippedNative}`
-  );
-  return {
-    registeredIds,
-    registered,
-    failed,
-    skippedNative,
-  };
-}
-
 /**
- * Re-seed QHexRT rows after token/config changes. A generic registry refresh is
- * only meaningful when native QHexRT is still registered on a supported device.
+ * Refresh the QHexRT NPU catalog after token/config changes.
  */
 export async function refreshNpuCatalog(): Promise<boolean> {
-  if (!(await isNpuCatalogReady())) {
-    publishNpuCatalogAcceptance([]);
-    logDiagnostic(
-      '[App] Skipping QHexRT catalog refresh - native backend/device unsupported'
-    );
-    return false;
-  }
-
-  const result = await registerNpuBundles();
+  const npuCount = await seedNpuCatalog(() => QHexRT.probeNpu());
   let registryRefreshed = false;
   try {
     await RunAnywhere.refreshModelRegistry();
@@ -563,11 +485,8 @@ export async function refreshNpuCatalog(): Promise<boolean> {
     logDiagnostic(`[App] QHexRT registry refresh failed: ${String(error)}`);
   }
 
-  // Publish after the registry operation so retained pickers reload a completed
-  // catalog snapshot rather than observing an intermediate registration pass.
-  publishNpuCatalogAcceptance(result.registeredIds);
   logDiagnostic(
-    `[App] QHexRT catalog refresh completed: registryRefreshed=${registryRefreshed}`
+    `[App] QHexRT catalog refresh completed: seedCount=${npuCount} registryRefreshed=${registryRefreshed}`
   );
   return registryRefreshed;
 }

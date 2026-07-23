@@ -15,3 +15,4 @@
 library;
 
 export 'qhexrt.dart';
+export 'src/npu_catalog.dart' show seedNpuCatalog;

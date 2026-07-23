@@ -8,6 +8,8 @@ import ai.runanywhere.proto.v1.ModelCategory
 
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
+// NPU (QHexRT) bundles have moved into the SDK: see
+// sdk/runanywhere-kotlin/modules/runanywhere-core-qhexrt/.../NpuCatalog.kt.
 internal object ModelCatalog {
 
     private val LLAMA = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
@@ -373,7 +375,7 @@ internal object ModelCatalog {
         ArchiveModel(
             "smolvlm-500m-instruct-q8_0",
             "SmolVLM 500M Instruct",
-            "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+            "https://github.com/RunAnywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
             LLAMA,
             MULTIMODAL,
             600_000_000,
@@ -386,7 +388,7 @@ internal object ModelCatalog {
         ArchiveModel(
             "sherpa-onnx-whisper-tiny.en",
             "Sherpa Whisper Tiny (ONNX)",
-            "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+            "https://github.com/RunAnywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
             SHERPA,
             ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
             75_000_000,
@@ -396,7 +398,7 @@ internal object ModelCatalog {
         ArchiveModel(
             "vits-piper-en_US-lessac-medium",
             "Piper TTS (US English - Medium)",
-            "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+            "https://github.com/RunAnywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
             SHERPA,
             ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
             65_000_000,
@@ -406,7 +408,7 @@ internal object ModelCatalog {
         ArchiveModel(
             "vits-piper-en_GB-alba-medium",
             "Piper TTS (British English)",
-            "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
+            "https://github.com/RunAnywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
             SHERPA,
             ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
             65_000_000,

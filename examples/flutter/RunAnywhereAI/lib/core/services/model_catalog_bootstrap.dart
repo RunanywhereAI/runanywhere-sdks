@@ -4,7 +4,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/core/services/hf_token_store.dart';
-import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
+import 'package:runanywhere_qhexrt/runanywhere_qhexrt.dart';
 
 /// ModelCatalogBootstrap
 ///
@@ -14,6 +14,8 @@ import 'package:runanywhere_ai/core/services/qhexrt_model_catalog.dart';
 /// widget. Uses the canonical `RunAnywhere.models.*` registration APIs,
 /// including multi-file and archive-with-structure overloads. Safe to re-run
 /// on every cold launch — commons merges runtime fields on re-registration.
+/// NPU (QHexRT) bundles have moved into the SDK: see
+/// sdk/runanywhere-flutter/packages/runanywhere_qhexrt/lib/src/npu_catalog.dart.
 abstract final class ModelCatalogBootstrap {
   /// True once the catalog has been registered. Without this guard,
   /// hot-reload (or any second call) re-runs the entire registration block.
@@ -315,9 +317,13 @@ abstract final class ModelCatalogBootstrap {
     debugPrint('LoRA adapters registered');
 
     // --- QHexRT (Hexagon NPU) bundles ---------------------------------------
-    // Native QHexRT probes the device, chooses the exact Hexagon bundle, and
-    // returns the registered architecture-specific model ID.
-    await _registerNpuBundles();
+    // NPU catalog is now owned by the SDK — probe, arch-filter, register,
+    // and refresh all happen inside seedNpuCatalog().
+    try {
+      await seedNpuCatalog();
+    } catch (e) {
+      debugPrint('NPU catalog registration skipped: $e');
+    }
 
     debugPrint('All modules and models registered');
     _modulesRegistered = true;
@@ -426,20 +432,10 @@ abstract final class ModelCatalogBootstrap {
     debugPrint('Apple MLX models registered');
   }
 
-  /// Register logical HNPU rows. QHexRT's native bundle resolver chooses the
-  /// current device arch; unsupported devices or missing HF child dirs fail
-  /// registration and never appear as runnable models.
-  static Future<void> _registerNpuBundles() async {
-    final result = await QHexRTModelCatalog.registerForCurrentDevice();
-    debugPrint(
-      'QHexRT catalog registered: ok=${result.registered} '
-      'failed=${result.failed} skippedNative=${result.skippedNative}',
-    );
-  }
-
   static Future<void> refreshNpuCatalog() async {
     await _applyPersistedHfToken();
-    await _registerNpuBundles();
+    final npuCount = await seedNpuCatalog();
+    debugPrint('NPU catalog refreshed: $npuCount');
     await RunAnywhere.refreshModelRegistry();
   }
 
