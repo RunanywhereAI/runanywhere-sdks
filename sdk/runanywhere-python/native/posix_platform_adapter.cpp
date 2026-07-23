@@ -119,8 +119,21 @@ rac_result_t posix_file_delete(const char* path, void*) {
 
 fs::path secure_path(const char* key) { return fs::path(g_secure_dir) / fs::path(key); }
 
+// The secure store is a flat key -> file namespace. Reject a key that could escape the store
+// directory (a path separator, '..', or an absolute path) so secure_set/get/delete cannot
+// reach an arbitrary file. Defense in depth: the Python facade validates too.
+bool secure_key_ok(const char* key) {
+    if (!key || !*key) return false;
+    std::string k(key);
+    if (k == "." || k == "..") return false;
+    if (k.find('/') != std::string::npos || k.find('\\') != std::string::npos) return false;
+    if (fs::path(k).is_absolute()) return false;
+    return true;
+}
+
 rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
     if (!key || !out_value) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     *out_value = nullptr;
     std::error_code ec;
     fs::path p = secure_path(key);
@@ -152,6 +165,7 @@ rac_result_t posix_secure_get(const char* key, char** out_value, void*) {
 
 rac_result_t posix_secure_set(const char* key, const char* value, void*) {
     if (!key || !value) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::create_directories(fs::path(g_secure_dir), ec);
     // Restrict the store directory to the owner (0700). Best-effort: chmod may
@@ -184,6 +198,7 @@ rac_result_t posix_secure_set(const char* key, const char* value, void*) {
 
 rac_result_t posix_secure_delete(const char* key, void*) {
     if (!key) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!secure_key_ok(key)) return RAC_ERROR_INVALID_ARGUMENT;
     std::error_code ec;
     fs::remove(secure_path(key), ec);
     return RAC_SUCCESS;  // a clean miss is success
