@@ -577,9 +577,12 @@ void run_generate_loop(ToolCallingSession& session) {
         session.generation, session.iteration, session.has_tool_choice, session.tool_choice,
         session.format);
     // Grammar-constrain (QHexRT) only while a tool call is still possible this turn.
-    // After a call has run and tools are not kept available, this is a synthesis
-    // turn — leave decoding unconstrained so the final answer is free text.
-    if (!session.all_tool_calls.empty() && !session.keep_tools_available) {
+    // Drop the grammar (unconstrained decoding) when: (a) tool_choice=NONE — calls
+    // are forbidden, so a "chat OR one call" grammar must not invite one (it would
+    // be emitted then rejected); or (b) a call already ran and tools are not kept
+    // available — a synthesis turn producing free-form text.
+    if ((session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) ||
+        (!session.all_tool_calls.empty() && !session.keep_tools_available)) {
         step_generation.tool_names.clear();
     }
     rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
