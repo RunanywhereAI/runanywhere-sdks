@@ -158,6 +158,14 @@
       .bubble code { background: rgba(255,255,255,.08); padding: 1.5px 6px; border-radius: 6px; font-size: 12.8px; font-family: 'Cascadia Code','Consolas',monospace; }
       .bubble pre code { background: none; padding: 0; color: #d7e0f5; }
       .bubble a { color: var(--accent-lift); }
+      .bubble .reason { margin: 0 0 11px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.03); overflow: hidden; }
+      .bubble .reason > summary { cursor: pointer; padding: 7px 12px; font-size: 12.5px; color: var(--fg-3); user-select: none; list-style: none; }
+      .bubble .reason > summary::-webkit-details-marker { display: none; }
+      .bubble .reason[open] > summary { border-bottom: 1px solid var(--line); }
+      .bubble .reasonbody { padding: 10px 13px; font-size: 13px; line-height: 1.6; color: var(--fg-2); white-space: pre-wrap; font-family: 'Cascadia Code','Consolas',monospace; }
+      .reasontoggle { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; cursor: pointer; }
+      .reasontoggle input { margin-top: 2px; flex: 0 0 auto; }
+      .reasontoggle strong { color: var(--fg-2); }
       .bubble ul { margin: 8px 0; padding-left: 20px; } .bubble li { margin: 3px 0; }
       .empty { max-width: 540px; margin: 16vh auto 0; text-align: center; animation: pop .4s var(--ease); }
       .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 12px 40px var(--accent-glow); }
@@ -285,6 +293,7 @@
                 <div><div class="label">Temperature · <span id="settempval">0.7</span></div><input id="settemp" type="range" min="0" max="1" step="0.05" value="0.7" /></div>
                 <div><div class="label">Max tokens</div><input id="setmax" type="number" value="256" /></div>
               </div>
+              <label class="reasontoggle" style="margin-top:16px"><input id="setreason" type="checkbox" /> <span><strong>Reasoning mode</strong> — ask the model to think step by step; its reasoning shows in a collapsible block, separate from the answer.</span></label>
               <div style="margin-top:18px"><button class="btn" id="setsave">Save settings</button> <span id="setstatus" class="muted"></span></div>
             </div>
             <div class="card">
