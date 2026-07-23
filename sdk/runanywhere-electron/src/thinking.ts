@@ -10,26 +10,41 @@ export interface ThinkingSplit {
   thinking: string;
 }
 
-const CLOSED = /<(think|thinking)>([\s\S]*?)<\/\1>/i;
-const OPEN = /<(think|thinking)>/i;
+const OPEN_TAGS = ['<think>', '<thinking>'] as const;
+const CLOSE_OF: Record<string, string> = { '<think>': '</think>', '<thinking>': '</thinking>' };
+
+/** First opening think tag in `text` (linear scan — no regex backtracking). */
+function firstOpen(text: string): { index: number; tag: string } | null {
+  let index = -1;
+  let tag = '';
+  for (const t of OPEN_TAGS) {
+    const i = text.indexOf(t);
+    if (i >= 0 && (index < 0 || i < index)) { index = i; tag = t; }
+  }
+  return index < 0 ? null : { index, tag };
+}
 
 /**
  * Split `text` into `{ response, thinking }`. Extracts the first thinking block;
  * an unclosed `<think>` means the rest of the text is thinking. Never throws.
+ *
+ * Uses indexOf scanning (O(n)) rather than a regex with a backreference, which
+ * would backtrack polynomially on adversarial model output (js/polynomial-redos).
  */
 export function splitThinking(text: string): ThinkingSplit {
   if (!text) return { response: '', thinking: '' };
-  const closed = CLOSED.exec(text);
-  if (closed) {
-    const thinking = closed[2].trim();
-    const response = (text.slice(0, closed.index) + text.slice(closed.index + closed[0].length)).trim();
-    return { response, thinking };
+  const open = firstOpen(text);
+  if (!open) return { response: text.trim(), thinking: '' };
+  const afterOpen = open.index + open.tag.length;
+  const closeTag = CLOSE_OF[open.tag];
+  const close = text.indexOf(closeTag, afterOpen);
+  if (close < 0) {
+    // Unclosed tag: everything after the open is thinking.
+    return { response: text.slice(0, open.index).trim(), thinking: text.slice(afterOpen).trim() };
   }
-  const open = OPEN.exec(text);
-  if (open) {
-    return { response: text.slice(0, open.index).trim(), thinking: text.slice(open.index + open[0].length).trim() };
-  }
-  return { response: text.trim(), thinking: '' };
+  const thinking = text.slice(afterOpen, close).trim();
+  const response = (text.slice(0, open.index) + text.slice(close + closeTag.length)).trim();
+  return { response, thinking };
 }
 
 /** The answer with any thinking blocks removed (equivalent to `rac_llm_strip_thinking`). */
