@@ -463,7 +463,7 @@ private func configureDevSecureStore() throws {
 }
 
 private extension String {
-    func withModel(_ body: (CatalogEntry) async throws -> Void) async throws {
+    func withModel(_ body: @Sendable (CatalogEntry) async throws -> Void) async throws {
         guard let entry = MLXCatalog.resolve(self) else { throw CLIError.modelNotFound(self) }
         try await body(entry)
     }
