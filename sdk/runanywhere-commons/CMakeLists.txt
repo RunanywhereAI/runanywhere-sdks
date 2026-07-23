@@ -751,6 +751,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # Proto-serialised SDKComponent → [InferenceFramework] query.
     src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_orchestrator.cpp
+    src/infrastructure/download/blob_store.cpp
     # model_registry.cpp was split per SRP into five TUs (slim core + struct
     # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and
     # refresh/fetch). All five share the internal layout declared in

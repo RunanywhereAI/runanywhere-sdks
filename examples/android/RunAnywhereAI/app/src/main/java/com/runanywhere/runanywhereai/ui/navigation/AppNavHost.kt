@@ -11,6 +11,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.runanywhere.runanywhereai.ui.screens.diffusion.DiffusionScreen
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatScreen
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatViewModel
 import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkDetailScreen
@@ -80,6 +81,7 @@ fun AppNavHost(
         }
         composable<Tools> { ToolsScreen() }
         composable<Tts> { TtsScreen() }
+        composable<Diffusion> { DiffusionScreen() }
         composable<Stt> { SttScreen() }
         composable<Vad> { VadScreen() }
         composable<Vision> { entry ->

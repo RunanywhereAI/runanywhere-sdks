@@ -514,6 +514,9 @@ class NpuSuite(
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
     val minInputs: Int get() = gate.optInt("min_inputs", 1)
     val minDecodeToks: Double get() = gate.optDouble("min_decode_toks", 0.0)
+    // text-to-image (diffusion) smoke gate: minimum RGB8 population std (structure) + optional reference PSNR
+    val t2iMinStd: Double get() = gate.optDouble("min_pixel_std", 20.0)
+    val t2iMinPsnr: Double get() = gate.optDouble("min_psnr_db", 20.0)
     val minTriples: Int get() = gate.optInt("min_triples", 1)
     val expectedDimension: Int get() = gate.optInt("expected_dimension", 0)
     val minimumPairwiseMargin: Double get() = gate.optDouble("minimum_pairwise_margin", 0.0)

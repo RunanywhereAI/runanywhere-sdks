@@ -18,6 +18,7 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <unordered_set>
 
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -579,6 +580,53 @@ bool is_downloadable_executable_code(const std::string& path) {
 
 }  // namespace
 
+// Recursively collect every string leaf value in `j`.
+void collect_json_strings(const nlohmann::json& j, std::vector<std::string>& out) {
+    if (j.is_string()) {
+        out.push_back(j.get<std::string>());
+    } else if (j.is_array() || j.is_object()) {
+        for (const auto& v : j) collect_json_strings(v, out);
+    }
+}
+
+// Fetch a pinned manifest and return the set of file BASENAMES it references (that also
+// exist in `bundle`). Generic — matches any JSON string value whose basename is a bundle
+// file, so it captures a manifest's artifacts (decode/embed/lmhead/vision/DiT/vae/tokenizer)
+// regardless of nesting, with zero per-framework schema in commons. Empty set => couldn't
+// prune (fetch/parse failed or nothing matched) => caller registers the whole folder.
+std::unordered_set<std::string> manifest_referenced_basenames(
+    const std::string& manifest_url, const std::vector<TreeFile>& bundle) {
+    std::unordered_set<std::string> refs;
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS || client == nullptr) return refs;
+    rac_http_request_t request = {};
+    request.method = "GET";
+    request.url = manifest_url.c_str();
+    request.timeout_ms = kTreeRequestTimeoutMs;
+    request.follow_redirects = RAC_TRUE;
+    rac_http_response_t response = {};
+    const rac_result_t rc = rac_http_request_send(client, &request, &response);
+    rac_http_client_destroy(client);
+    std::string body;
+    if (rc == RAC_SUCCESS && response.status == 200 && response.body_bytes != nullptr &&
+        response.body_len > 0) {
+        body.assign(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
+    }
+    rac_http_response_free(&response);
+    if (body.empty()) return refs;
+    const nlohmann::json doc = nlohmann::json::parse(body, nullptr, /*allow_exceptions=*/false);
+    if (doc.is_discarded()) return refs;
+    std::unordered_set<std::string> bundle_basenames;
+    for (const auto& f : bundle) bundle_basenames.insert(basename_of(f.path));
+    std::vector<std::string> strings;
+    collect_json_strings(doc, strings);
+    for (const auto& s : strings) {
+        const std::string b = basename_of(s);
+        if (!b.empty() && bundle_basenames.count(b) > 0) refs.insert(b);
+    }
+    return refs;
+}
+
 rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
                                            const std::string& org, const std::string& repo,
                                            const std::string& subdir,
@@ -694,14 +742,34 @@ rac_result_t resolve_folder_from_tree_json(const std::string& tree_json_body,
         out->files.push_back(std::move(file));
         out->total_size_bytes += part.size_bytes;
     };
+    // Manifest-pruned download: when a specific manifest is pinned, register only the files it
+    // references (+ the manifest itself + small aux/config), so a chat manifest in a shared
+    // "understanding" repo does NOT pull the sibling vision/diffusion weights. Falls back to the
+    // whole folder when the manifest can't be fetched/parsed (referenced stays empty).
+    std::unordered_set<std::string> referenced;
+    if (!primary_rel.empty()) {
+        referenced = manifest_referenced_basenames(
+            url_base + prefix + bundle[primary_index].path, bundle);
+    }
+    constexpr int64_t kPruneMinBytes = 1 * 1024 * 1024;  // always keep tiny aux/config files
+    auto keep = [&](const TreeFile& part) {
+        if (referenced.empty()) return true;                // no prune info -> unchanged behavior
+        if (part.size_bytes < kPruneMinBytes) return true;  // small aux/config always kept
+        return referenced.count(basename_of(part.path)) > 0;
+    };
     append(bundle[primary_index], prefix + bundle[primary_index].path);
     for (size_t i = 0; i < bundle.size(); ++i) {
-        if (i != primary_index) {
+        if (i != primary_index && keep(bundle[i])) {
             append(bundle[i], prefix + bundle[i].path);
         }
     }
     if (root_config && !bundle_has_top_level_config) {
         append(*root_config, root_config->path);
+    }
+    if (!referenced.empty()) {
+        RAC_LOG_INFO(LOG_CAT, "Manifest-pruned '%s': %zu of %zu files kept (%lld bytes)",
+                     primary_rel.c_str(), out->files.size(), bundle.size(),
+                     static_cast<long long>(out->total_size_bytes));
     }
 
     out->model_id = sanitize_model_id(repo + (subdir.empty() ? "" : "-" + subdir));

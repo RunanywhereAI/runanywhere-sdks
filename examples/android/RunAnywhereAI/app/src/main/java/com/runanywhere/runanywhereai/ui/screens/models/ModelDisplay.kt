@@ -233,8 +233,14 @@ private val familyMatchers: List<FamilyMatcher> = listOf(
     matcher("qwen3-npu", "Qwen3 (On-device)", "Accelerated Qwen chat", CHAT, true, "qwen3"),
     matcher("lfm2-npu", "LFM2 (On-device)", "Accelerated Liquid chat", CHAT, true, "lfm2"),
     matcher("gemma-npu", "Gemma (On-device)", "Accelerated Google chat", CHAT, true, "gemma"),
+    // Cosmos3-Edge is one omnimodal model split into three arch-pinned NPU bundles
+    // (chat / vision-in / image-out). Give each a shared "Cosmos3-Edge" family identity
+    // so they read as one family's capabilities rather than three unrelated singletons.
+    matcher("cosmos-edge-npu", "Cosmos3-Edge (On-device)", "Accelerated omnimodal chat", CHAT, true, "cosmos3_edge"),
 
     // ── Vision, NPU (QHexRT MULTIMODAL / IMAGE_GENERATION) ──
+    matcher("cosmos-edge-vision-npu", "Cosmos3-Edge Vision (On-device)", "Accelerated image understanding", VISION, true, "cosmos3_edge_vlm"),
+    matcher("cosmos-edge-image-npu", "Cosmos3-Edge Image (On-device)", "Accelerated text-to-image", VISION, true, "cosmos3_edge_diffusion"),
     matcher("qwen3vl-npu", "Qwen3-VL (On-device)", "Accelerated vision chat", VISION, true, "qwen3_vl"),
     matcher("internvl-npu", "InternVL (On-device)", "Accelerated vision chat", VISION, true, "internvl"),
     matcher("nemotron-ocr-npu", "Nemotron OCR (On-device)", "Accelerated document OCR", VISION, true, "nemotron_ocr"),

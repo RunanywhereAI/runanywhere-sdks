@@ -195,6 +195,45 @@ rac_result_t qhexrt_diffusion_generate(void* impl, const rac_diffusion_options_t
         return RAC_ERROR_INVALID_HANDLE;
     DiffusionRequestScope request(session);
     *out_result = {};
+
+    // TEXT-TO-IMAGE (Cosmos3-Edge): the prompt is baked into the DiT export, so the manifest's
+    // cosmos3_diffusion_generate host-op runs the whole UniPC denoise + tiled VAE decode with no image/mask
+    // inputs and returns RGB into qhx_output.image. No encoded-input materialization is needed.
+    if (options->mode == RAC_DIFFUSION_MODE_TEXT_TO_IMAGE) {
+        if (request.cancelled())
+            return RAC_ERROR_CANCELLED;
+        qhx_session_reset(session->sess);
+        if (request.cancelled())
+            return RAC_ERROR_CANCELLED;
+        qhx_inputs inputs{};
+        inputs.text = options->prompt;  // baked prompt; passed for logging/parity, ignored by the host-op
+        qhx_gen_cfg cfg;
+        qhx_gen_cfg_default(&cfg);
+        CancelCtx cancel_ctx{session, request.id()};
+        qhx_generate_options generate_options;
+        qhx_generate_options_default(&generate_options);
+        generate_options.should_cancel = should_cancel_trampoline;
+        generate_options.should_cancel_user = &cancel_ctx;
+        qhx_output output{};
+        const qhx_status status = qhx_generate_ex(session->sess, &inputs, &cfg, &generate_options,
+                                                  cancel_trampoline, &cancel_ctx, &output);
+        if (cancel_ctx.cancelled || request.cancelled())
+            return RAC_ERROR_CANCELLED;
+        if (status != 0) {
+            RAC_LOG_ERROR(kLogCat, "qhx_generate_ex(text-to-image) failed: %s", qhx_status_str(status));
+            return RAC_ERROR_GENERATION_FAILED;
+        }
+        rac_result_t rc = copy_rgba(output, out_result);
+        if (rc != RAC_SUCCESS)
+            return rc;
+        out_result->seed_used = options->seed;
+        out_result->generation_time_ms =
+            static_cast<int64_t>(std::llround(output.prefill_ms + output.decode_ms));
+        out_result->safety_flagged = RAC_FALSE;
+        out_result->error_code = RAC_SUCCESS;
+        return RAC_SUCCESS;
+    }
+
     if (options->mode != RAC_DIFFUSION_MODE_INPAINTING)
         return RAC_ERROR_NOT_SUPPORTED;
     if ((options->width > 0 && options->width != 512) ||
@@ -300,13 +339,14 @@ rac_result_t qhexrt_diffusion_get_info(void* impl, rac_diffusion_info_t* out_inf
     out_info->is_ready = session->sess != nullptr ? RAC_TRUE : RAC_FALSE;
     out_info->current_model = session->model_ref.c_str();
     out_info->supports_inpainting = RAC_TRUE;
+    out_info->supports_text_to_image = RAC_TRUE;
     out_info->max_width = 512;
     out_info->max_height = 512;
     return RAC_SUCCESS;
 }
 
 uint32_t qhexrt_diffusion_get_capabilities(void*) {
-    return RAC_DIFFUSION_CAP_INPAINTING;
+    return RAC_DIFFUSION_CAP_INPAINTING | RAC_DIFFUSION_CAP_TEXT_TO_IMAGE;
 }
 
 rac_result_t qhexrt_diffusion_cancel(void* impl) {

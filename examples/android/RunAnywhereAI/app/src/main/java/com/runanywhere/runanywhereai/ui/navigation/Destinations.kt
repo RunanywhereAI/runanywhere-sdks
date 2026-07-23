@@ -44,6 +44,9 @@ data object Segmentation
 data object Diarization
 
 @Serializable
+data object Diffusion
+
+@Serializable
 data object Documents
 
 @Serializable
