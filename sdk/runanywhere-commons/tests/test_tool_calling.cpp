@@ -310,6 +310,35 @@ int test_format_name_round_trip() {
     return 0;
 }
 
+// RUN-83: lock the per-model-family tool-call FORMAT flavor. The LFM / Liquid
+// family emits the Python-style [name(args)] LFM2 tags; every other shipping
+// family — Qwen3 / Qwen3.5 / Qwen3-VL (the v81 1.7B/4B/8B/27B set) and the
+// 1-bit/ternary Bonsai models (same ChatML block) — uses the DEFAULT
+// <tool_call>{json}</tool_call> flavor. On QHexRT the tool-call GRAMMAR
+// (toolcall_opt:<names>, see the run-loop tests) is family-independent, so the
+// flavor only steers the text parser for non-grammar engines (llama.cpp/onnx).
+int test_tool_call_format_per_family() {
+    // LFM2.5 (350M / 230M): every catalogued alias resolves to LFM2.
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("lfm"), RAC_TOOL_FORMAT_LFM2);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("lfm2"), RAC_TOOL_FORMAT_LFM2);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("liquid"), RAC_TOOL_FORMAT_LFM2);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("Liquid"), RAC_TOOL_FORMAT_LFM2);
+
+    // Qwen family (v81 1.7B/4B/8B/27B) + 1-bit/ternary Bonsai → DEFAULT.
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("qwen"), RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("qwen3"), RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("bonsai"), RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name(""), RAC_TOOL_FORMAT_DEFAULT);
+
+    // Round-trip: a model emitting a given flavor is detected as that flavor.
+    ASSERT_EQ_INT(rac_tool_call_detect_format("<|tool_call_start|>[get_time()]<|tool_call_end|>"),
+                  RAC_TOOL_FORMAT_LFM2);
+    ASSERT_EQ_INT(
+        rac_tool_call_detect_format("<tool_call>{\"tool\":\"get_time\",\"arguments\":{}}</tool_call>"),
+        RAC_TOOL_FORMAT_DEFAULT);
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // 10. parse -> tool result JSON -> follow-up prompt loop
 // ---------------------------------------------------------------------------
@@ -702,6 +731,7 @@ int main(int argc, char** argv) {
         {.name = "normalize_json_unquoted_keys", .fn = test_normalize_json_unquoted_keys},
         {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
+        {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
         {.name = "tool_result_loop", .fn = test_tool_result_loop},
         {.name = "validate_tool_call_definitions", .fn = test_validate_tool_call_definitions},
         {.name = "validate_tool_call_json_definitions",
