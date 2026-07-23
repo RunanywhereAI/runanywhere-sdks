@@ -35,12 +35,6 @@ extern "C" {
 #define RAC_ENDPOINT_TELEMETRY_V2_PREFIX "/api/v2/sdk/telemetry/"
 
 // =============================================================================
-// Device Management - Development (Supabase REST API)
-// =============================================================================
-
-#define RAC_ENDPOINT_DEV_DEVICE_REGISTER "/rest/v1/sdk_devices"
-
-// =============================================================================
 // Model Management
 // =============================================================================
 

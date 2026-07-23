@@ -230,6 +230,19 @@ export const VAD = {
   streamVoiceAuto: streamVoiceActivity,
 
   /**
+   * Reset the lifecycle-loaded VAD service (clears speech-segment buffers).
+   * Handle-less form backing Swift's parameterless `RunAnywhere.resetVAD()`.
+   * No-op returning false when no VAD model is loaded through lifecycle.
+   */
+  resetVoiceAuto(): boolean {
+    if (!currentLifecycleVADModel()) return false;
+    return (
+      lifecycleVADAdapter('RunAnywhere.vad.resetVoiceAuto').resetLifecycle() !=
+      null
+    );
+  },
+
+  /**
    * Returns true when the WASM module is loaded with both the proto-byte VAD
    * exports AND the component lifecycle exports (create / destroy).
    */

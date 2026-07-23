@@ -98,6 +98,8 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
 | Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
 
+All example apps share one visual identity — brand orange `#FF6900` (the logo primary, **not** the legacy `#FF5500`), documented in `examples/DESIGN_GUIDELINE.md`. Each app hand-maintains a small theme file that mirrors that doc; see the "Design System" section in each app's `AGENTS.md`.
+
 ### Playground
 `Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
 

@@ -17,6 +17,9 @@
 #include <string>
 
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/network/rac_environment.h"
+
+typedef struct rac_telemetry_manager rac_telemetry_manager_t;
 
 namespace rcli {
 
@@ -27,7 +30,41 @@ struct GlobalOptions {
     bool quiet = false;
     bool no_progress = false;
     std::string home_override;  // --home flag
+
+    // Control-plane connection. CLI11 fills these from
+    // --base-url/--api-key/--environment with RUNANYWHERE_BASE_URL /
+    // RUNANYWHERE_API_KEY / RUNANYWHERE_ENVIRONMENT env-var fallbacks (app.cpp).
+    // development: keyless OSS → staging backend (baked URL or --base-url).
+    // production: API key + https URL.
+    std::string environment;  // dev|development|prod|production ("" → dev)
+    std::string base_url;     // development may omit (baked Staging URL)
+    std::string api_key;      // required for production; omit for keyless development
 };
+
+/**
+ * Validated control-plane connection resolved from GlobalOptions.
+ * bootstrap() threads these values into rac_state / rac_sdk_config so the
+ * commons auth, device-registration, and telemetry paths can read them.
+ */
+struct Connection {
+    rac_environment_t environment = RAC_ENV_DEVELOPMENT;
+    std::string base_url;
+    std::string api_key;
+};
+
+/**
+ * Resolve + validate the connection flags client-side (before any network
+ * call). On failure fills `error` with an actionable message and returns
+ * RAC_ERROR_INVALID_CONFIGURATION.
+ *
+ * Rules (mirrors commons rac_validate_api_key / rac_validate_base_url):
+ *   - development (default): keyless PUBLIC-org telemetry; optional --base-url
+ *     (else baked staging backend URL). No JWT.
+ *   - production: API key + https base URL required; localhost rejected.
+ *
+ * Env: RUNANYWHERE_ENVIRONMENT (also --environment).
+ */
+rac_result_t resolve_connection(const GlobalOptions& options, Connection* out, std::string* error);
 
 /** Resolved environment after bootstrap. */
 struct Bootstrapped {
@@ -45,6 +82,13 @@ rac_result_t bootstrap(const GlobalOptions& options, Bootstrapped* out);
 
 /** rac_shutdown() wrapper; safe to call when bootstrap never ran. */
 void shutdown();
+
+/**
+ * The process telemetry manager created by bootstrap() (NULL if telemetry was
+ * not initialized, e.g. no creds). Exposed for the live telemetry integration
+ * test, which overrides its HTTP callback to observe the backend's response.
+ */
+rac_telemetry_manager_t* active_telemetry_manager();
 
 }  // namespace rcli
 

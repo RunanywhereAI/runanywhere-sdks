@@ -568,6 +568,19 @@ target_compile_features(test_sdk_events_service_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_sdk_events_service_proto_abi)
 add_test(NAME sdk_events_service_proto_abi_tests COMMAND test_sdk_events_service_proto_abi)
 
+# Telemetry extraction → routing → JSON pipeline (regression guards for the
+# per-modality telemetry field bugs). Needs protobuf for the SDKEvent builders.
+add_executable(test_telemetry_extraction test_telemetry_extraction.cpp)
+target_include_directories(test_telemetry_extraction PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_telemetry_extraction PRIVATE rac_commons)
+rac_link_archive_deps(test_telemetry_extraction)
+target_compile_features(test_telemetry_extraction PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_telemetry_extraction)
+add_test(NAME telemetry_extraction_tests COMMAND test_telemetry_extraction)
+
 # --- ToolCalling generated service descriptor test --------------------------
 add_executable(test_tool_calling_service_proto_abi test_tool_calling_service_proto_abi.cpp)
 target_include_directories(test_tool_calling_service_proto_abi PRIVATE
@@ -1322,19 +1335,6 @@ if(UNIX)
     add_test(NAME http_download_tests COMMAND test_http_download)
 endif()
 
-# --- Rac_http_request_set_upsert_mode parity test ---------------
-# Pure ABI / dispatch test — registers a stub rac_http_transport_ops_t,
-# arms the upsert flag, and verifies the URL/header rewrite the SDKs rely
-# on. No sockets, so it builds on every platform.
-add_executable(test_http_upsert_mode test_http_upsert_mode.cpp)
-target_include_directories(test_http_upsert_mode PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_http_upsert_mode PRIVATE rac_commons)
-rac_link_archive_deps(test_http_upsert_mode)
-target_compile_features(test_http_upsert_mode PRIVATE cxx_std_17)
-add_test(NAME http_upsert_mode_tests COMMAND test_http_upsert_mode)
 
 # --- Rac_http_default_headers parity test ----------------------
 # Pure ABI test — verifies the canonical default-header list matches
@@ -1669,3 +1669,15 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(rac_benchmark_tests)
+
+# --- Keyless development live E2E (network; build on demand, not in ctest) ---
+# Proves environment=development with no API key and no base URL resolves the
+# baked OSS backend URL and flushes one event per modality unauthenticated.
+find_package(CURL QUIET)
+if(CURL_FOUND)
+    add_executable(test_development_keyless_live EXCLUDE_FROM_ALL test_development_keyless_live.cpp)
+    target_include_directories(test_development_keyless_live PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(test_development_keyless_live PRIVATE rac_commons CURL::libcurl Threads::Threads)
+    rac_link_archive_deps(test_development_keyless_live)
+    target_compile_features(test_development_keyless_live PRIVATE cxx_std_20)
+endif()

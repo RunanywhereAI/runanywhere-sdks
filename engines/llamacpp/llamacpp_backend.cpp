@@ -820,8 +820,10 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.finish_reason = "error";
 
     std::string generated_text;
-    int tokens_generated = 0;
+    int callback_pieces = 0;
+    int decoded_tokens = 0;
     int prompt_tokens = 0;
+    double prompt_eval_ms = 0.0;
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -830,10 +832,14 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
         request,
         [&](const std::string& token) -> bool {
             generated_text += token;
-            tokens_generated++;
+            callback_pieces++;
             return !cancel_requested_.load();
         },
-        &prompt_tokens);
+        &prompt_tokens, &prompt_eval_ms, &decoded_tokens);
+    // The streaming callback flushes buffered chunks, not one call per token, so
+    // callback_pieces under-counts. Use the decode loop's authoritative count;
+    // fall back to the piece count only if the out-param wasn't populated.
+    const int tokens_generated = decoded_tokens > 0 ? decoded_tokens : callback_pieces;
     RAC_LOG_INFO("LLM.LlamaCpp", "generate(): generate_stream returned success=%d, tokens=%d",
                  success, tokens_generated);
 
@@ -844,6 +850,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.tokens_generated = tokens_generated;
     result.prompt_tokens = prompt_tokens;
     result.inference_time_ms = duration.count();
+    result.prompt_eval_time_ms = prompt_eval_ms;
 
     if (decode_failed_) {
         result.finish_reason = "error";
@@ -988,7 +995,8 @@ int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch&
 }
 
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
-                                             TextStreamCallback callback, int* out_prompt_tokens) {
+                                             TextStreamCallback callback, int* out_prompt_tokens,
+                                             double* out_prompt_eval_ms, int* out_tokens_generated) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!is_ready_locked()) {
@@ -1099,6 +1107,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
                  prompt_tokens, n_batch);
     llama_batch batch = llama_batch_init(n_batch, 0, 1);
 
+    const auto prefill_start = std::chrono::steady_clock::now();
     for (int chunk_start = 0; chunk_start < prompt_tokens; chunk_start += n_batch) {
         batch.n_tokens = 0;
         int chunk_end = std::min(chunk_start + n_batch, prompt_tokens);
@@ -1115,6 +1124,11 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             llama_batch_free(batch);
             return false;
         }
+    }
+    if (out_prompt_eval_ms) {
+        *out_prompt_eval_ms = std::chrono::duration<double, std::milli>(
+                                  std::chrono::steady_clock::now() - prefill_start)
+                                  .count();
     }
     RAC_LOG_INFO("LLM.LlamaCpp", "generate_stream: prompt decoded successfully");
 
@@ -1165,6 +1179,9 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     // generate_from_context() via run_decode_loop().
     const int tokens_generated =
         run_decode_loop(sampler_, batch, batch.n_tokens, effective_max_tokens, callback);
+    if (out_tokens_generated != nullptr) {
+        *out_tokens_generated = tokens_generated;
+    }
 
     // TODO(streaming-tools): Emit tool_call_delta events during stream.
     // To support generateWithToolsStream for Web and RN, the generate_stream

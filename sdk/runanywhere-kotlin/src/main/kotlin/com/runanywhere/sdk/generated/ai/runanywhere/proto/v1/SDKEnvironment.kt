@@ -18,13 +18,9 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * SDK environment. Sources pre-IDL:
- *   Swift  SDKEnvironment.swift:5     (development, staging, production)
- *   Kotlin RunAnywhere.kt:47          (DEVELOPMENT, STAGING, PRODUCTION, cEnvironment)
- *   Kotlin SDKLogger.kt:159           (DEVELOPMENT, STAGING, PRODUCTION) ← duplicate
- *   Dart   sdk_environment.dart:5     (development, staging, production)
- *   RN     enums.ts:11                (Development, Staging, Production)
- *   Web    enums.ts:9                 (Development, Staging, Production)
+ * SDK environment — product surface is development + production only.
+ * Number 2 was formerly SDK_ENVIRONMENT_STAGING; reserved so wire values
+ * never shift PRODUCTION=3.
  * ---------------------------------------------------------------------------
  */
 public enum class SDKEnvironment(
@@ -34,8 +30,6 @@ public enum class SDKEnvironment(
   SDK_ENVIRONMENT_UNSPECIFIED(0),
   @RacWireStringOption("development")
   SDK_ENVIRONMENT_DEVELOPMENT(1),
-  @RacWireStringOption("staging")
-  SDK_ENVIRONMENT_STAGING(2),
   @RacWireStringOption("production")
   SDK_ENVIRONMENT_PRODUCTION(3),
   ;
@@ -54,7 +48,6 @@ public enum class SDKEnvironment(
     public fun fromValue(`value`: Int): SDKEnvironment? = when (`value`) {
       0 -> SDK_ENVIRONMENT_UNSPECIFIED
       1 -> SDK_ENVIRONMENT_DEVELOPMENT
-      2 -> SDK_ENVIRONMENT_STAGING
       3 -> SDK_ENVIRONMENT_PRODUCTION
       else -> null
     }

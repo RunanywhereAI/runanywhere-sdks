@@ -26,21 +26,13 @@ export type { LoggingConfiguration };
 
 /**
  * Environment presets — Swift parity: `RALoggingConfiguration.development /
- * .staging / .production` (SDKLogger.swift:41-66). Dev logs at debug with
+ * .production` (SDKLogger.swift:41-66). Dev logs at debug with
  * local logging on; production logs warnings only with local logging off.
  */
 export function loggingConfigurationForEnvironment(
   environment: SDKEnvironment,
 ): LoggingConfiguration {
   switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return LoggingConfigurationProto.fromPartial({
-        enableLocalLogging: true,
-        minLogLevel: LogLevel.LOG_LEVEL_INFO,
-        includeSourceLocation: false,
-        includeDeviceMetadata: true,
-        enableRemoteLogging: false,
-      });
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: false,
@@ -49,6 +41,7 @@ export function loggingConfigurationForEnvironment(
         includeDeviceMetadata: true,
         enableRemoteLogging: false,
       });
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
     default:
       return LoggingConfigurationProto.fromPartial({
         enableLocalLogging: true,

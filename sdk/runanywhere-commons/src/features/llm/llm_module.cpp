@@ -191,7 +191,8 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
                                    double tokens_per_second, bool is_streaming,
                                    double time_to_first_token_ms,
                                    rac_inference_framework_t framework, float temperature,
-                                   int32_t max_tokens, int32_t context_length) {
+                                   int32_t max_tokens, int32_t context_length,
+                                   double prompt_eval_time_ms = 0.0) {
     runanywhere::v1::GenerationEvent g;
     g.set_kind(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED);
     if (model_id)
@@ -205,6 +206,9 @@ void emit_llm_generation_completed(const char* generation_id, const char* model_
     g.set_tokens_per_second(tokens_per_second);
     g.set_is_streaming(is_streaming);
     g.set_time_to_first_token_ms(static_cast<int64_t>(time_to_first_token_ms));
+    if (prompt_eval_time_ms > 0.0) {
+        g.set_prompt_eval_time_ms(static_cast<int64_t>(prompt_eval_time_ms));
+    }
     g.set_framework(rac::events::framework_to_proto_int(framework));
     g.set_temperature(temperature);
     g.set_max_tokens(max_tokens);
@@ -699,7 +703,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         generation_id.c_str(), model_id, model_name, out_result->prompt_tokens,
         out_result->completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/false, /*time_to_first_token_ms=*/0, component->actual_framework,
-        effective_options->temperature, effective_options->max_tokens, context_length);
+        effective_options->temperature, effective_options->max_tokens, context_length,
+        /*prompt_eval_time_ms=*/static_cast<double>(out_result->prompt_eval_time_ms));
 #endif
 
     return RAC_SUCCESS;
@@ -999,6 +1004,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
             ctx.first_token_time - ctx.start_time);
         final_result.time_to_first_token_ms = ttft_duration.count();
+        final_result.prompt_eval_time_ms = ttft_duration.count();
         ttft_ms = static_cast<double>(ttft_duration.count());
     }
 
@@ -1024,7 +1030,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         generation_id.c_str(), model_id, model_name, final_result.prompt_tokens,
         final_result.completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
         /*is_streaming=*/true, ttft_ms, component->actual_framework, effective_options->temperature,
-        effective_options->max_tokens, context_length);
+        effective_options->max_tokens, context_length,
+        /*prompt_eval_time_ms=*/static_cast<double>(final_result.prompt_eval_time_ms));
 #endif
 
     // Terminal success event on the proto stream.
@@ -1246,6 +1253,12 @@ using runanywhere::v1::LLMStreamFinalResult;
 using runanywhere::v1::SDKEvent;
 using runanywhere::v1::TokenKind;
 
+// Defined below; replaces invalid UTF-8 with U+FFFD so model output is safe to
+// store in proto `string` fields (llama.cpp can cut a multibyte char at
+// max_tokens). Forward-declared so the emit helpers above its definition can
+// use it.
+std::string sanitize_utf8(const std::string& in);
+
 int64_t now_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -1300,7 +1313,7 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
                               const char* framework_name = nullptr, double tokens_per_second = 0.0,
                               double ttft_ms = 0.0, float temperature = -1.0f,
                               int32_t max_tokens = 0, int32_t context_length = 0,
-                              bool is_streaming = false) {
+                              bool is_streaming = false, double prompt_eval_time_ms = 0.0) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -1323,7 +1336,7 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
         generation->set_token(token);
     }
     if ((response != nullptr) && response[0] != '\0') {
-        generation->set_response(response);
+        generation->set_response(sanitize_utf8(response));
     }
     if ((error != nullptr) && error[0] != '\0') {
         generation->set_error(error);
@@ -1349,6 +1362,9 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
     }
     if (ttft_ms > 0.0) {
         generation->set_time_to_first_token_ms(static_cast<int64_t>(ttft_ms));
+    }
+    if (prompt_eval_time_ms > 0.0) {
+        generation->set_prompt_eval_time_ms(static_cast<int64_t>(prompt_eval_time_ms));
     }
     // temperature 0.0 is a valid (greedy) setting, so the sentinel for "unset"
     // is a negative default — emit any non-negative value.
@@ -1553,13 +1569,53 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     return options;
 }
 
+// Replace any invalid UTF-8 byte sequence with U+FFFD so the value is safe to
+// store in a proto `string` field. llama.cpp can emit an incomplete trailing
+// multibyte sequence when generation is cut at max_tokens; without this,
+// protobuf serialization of LLMGenerationResult.text fails and the whole
+// unary result is unparseable by the caller.
+std::string sanitize_utf8(const std::string& in) {
+    std::string out;
+    out.reserve(in.size());
+    const size_t n = in.size();
+    size_t i = 0;
+    auto is_cont = [&](size_t k) {
+        return k < n && (static_cast<unsigned char>(in[k]) & 0xC0) == 0x80;
+    };
+    while (i < n) {
+        const unsigned char c = static_cast<unsigned char>(in[i]);
+        size_t len = 0;
+        if (c < 0x80) {
+            len = 1;
+        } else if ((c & 0xE0) == 0xC0 && c >= 0xC2) {
+            len = 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            len = 3;
+        } else if ((c & 0xF8) == 0xF0 && c <= 0xF4) {
+            len = 4;
+        }
+        bool ok = len > 0;
+        for (size_t k = 1; ok && k < len; ++k) {
+            ok = is_cont(i + k);
+        }
+        if (ok) {
+            out.append(in, i, len);
+            i += len;
+        } else {
+            out.append("\xEF\xBF\xBD");  // U+FFFD replacement character
+            i += 1;
+        }
+    }
+    return out;
+}
+
 void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_result_t& raw,
                          const char* response, size_t response_len, const char* thinking,
                          size_t thinking_len, int32_t thinking_tokens, int32_t response_tokens,
                          int32_t requested_max_tokens, LLMGenerationResult* out) {
-    out->set_text(response ? std::string(response, response_len) : std::string());
+    out->set_text(sanitize_utf8(response ? std::string(response, response_len) : std::string()));
     if (thinking && thinking_len > 0) {
-        out->set_thinking_content(std::string(thinking, thinking_len));
+        out->set_thinking_content(sanitize_utf8(std::string(thinking, thinking_len)));
     }
     out->set_input_tokens(raw.prompt_tokens);
     out->set_tokens_generated(raw.completion_tokens);
@@ -1568,6 +1624,9 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
     out->set_generation_time_ms(static_cast<double>(raw.total_time_ms));
     if (raw.time_to_first_token_ms > 0) {
         out->set_ttft_ms(static_cast<double>(raw.time_to_first_token_ms));
+    }
+    if (raw.prompt_eval_time_ms > 0) {
+        out->set_prompt_eval_time_ms(raw.prompt_eval_time_ms);
     }
     out->set_tokens_per_second(static_cast<double>(raw.tokens_per_second));
     if ((ref.framework_name != nullptr) && ref.framework_name[0] != '\0') {
@@ -1607,13 +1666,13 @@ void set_structured_output_if_present(const char* response, LLMGenerationResult*
             auto* structured = out->mutable_structured_output_validation();
             structured->set_is_valid(true);
             structured->set_contains_json(true);
-            structured->set_raw_output(response);
+            structured->set_raw_output(sanitize_utf8(response));
             structured->set_extracted_json(validation.extracted_json);
         } else if (validation.error_message) {
             auto* structured = out->mutable_structured_output_validation();
             structured->set_is_valid(false);
             structured->set_contains_json(false);
-            structured->set_raw_output(response);
+            structured->set_raw_output(sanitize_utf8(response));
             structured->set_error_message(validation.error_message);
         }
     }
@@ -2105,7 +2164,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         raw.prompt_tokens > 0 ? raw.prompt_tokens : estimate_tokens(request.prompt().c_str()),
         ref.framework_name, static_cast<double>(raw.tokens_per_second),
         static_cast<double>(raw.time_to_first_token_ms), options.temperature, options.max_tokens,
-        lifecycle_context_length(ref), /*is_streaming=*/false);
+        lifecycle_context_length(ref), /*is_streaming=*/false,
+        /*prompt_eval_time_ms=*/static_cast<double>(raw.prompt_eval_time_ms));
 
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
@@ -2247,7 +2307,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                      : 0.0,
                                  static_cast<double>(stream_ttft), options.temperature,
                                  options.max_tokens, lifecycle_context_length(ref),
-                                 /*is_streaming=*/true);
+                                 /*is_streaming=*/true,
+                                 /*prompt_eval_time_ms=*/static_cast<double>(stream_ttft));
     }
 
     rac::llm::release_lifecycle_llm(&ref);

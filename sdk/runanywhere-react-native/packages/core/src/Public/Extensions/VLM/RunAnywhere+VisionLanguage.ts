@@ -126,14 +126,29 @@ export async function processImage(
 /**
  * Stream image processing with canonical proto stream events.
  *
- * Matches iOS: `RunAnywhere.processImageStream(_:options:)`, where
- * `options.prompt` carries the prompt text. RN exposes the native VLM stream
- * event proto as AsyncIterable.
+ * Matches iOS `RunAnywhere.processImageStream(_:options:)` and the ergonomic
+ * `processImageStream(_:prompt:options:)` overload: the prompt travels in
+ * `options.prompt`, and the prompt-first overload copies it there before
+ * streaming. RN exposes the native VLM stream event proto as AsyncIterable.
  */
-export async function processImageStream(
+export function processImageStream(
   image: VLMImage,
   options: Partial<VLMGenerationOptions>
+): Promise<AsyncIterable<VLMStreamEvent>>;
+export function processImageStream(
+  image: VLMImage,
+  prompt: string,
+  options?: Partial<VLMGenerationOptions>
+): Promise<AsyncIterable<VLMStreamEvent>>;
+export async function processImageStream(
+  image: VLMImage,
+  optionsOrPrompt: Partial<VLMGenerationOptions> | string,
+  maybeOptions?: Partial<VLMGenerationOptions>
 ): Promise<AsyncIterable<VLMStreamEvent>> {
+  const options: Partial<VLMGenerationOptions> =
+    typeof optionsOrPrompt === 'string'
+      ? { ...(maybeOptions ?? {}), prompt: optionsOrPrompt }
+      : optionsOrPrompt;
   // Swift parity: guard isInitialized (RunAnywhere+VisionLanguage.swift:56-58).
   requireInitialized();
   const native = ensureNative();

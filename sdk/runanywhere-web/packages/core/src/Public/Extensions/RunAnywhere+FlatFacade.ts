@@ -63,6 +63,7 @@ import {
   streamVoiceAgent as streamVoiceAgentImpl,
 } from './RunAnywhere+VoiceAgent.js';
 import { VisionLanguage as VisionLanguageCapability } from './RunAnywhere+VisionLanguage.js';
+import { SDKEvents } from './RunAnywhere+SDKEvents.js';
 import { Logging as LoggingCapability } from './RunAnywhere+Logging.js';
 import {
   pcm16ToFloat32 as pcm16ToFloat32Impl,
@@ -133,6 +134,17 @@ export const flatFacade = {
     category: Parameters<typeof ModelRegistryCapability.defaultFramework>[0],
   ): ReturnType<typeof ModelRegistryCapability.defaultFramework> {
     return ModelRegistryCapability.defaultFramework(category);
+  },
+
+  /**
+   * Mirrors Swift `RunAnywhere.inferModelFileRole(filename:modality:)` — the
+   * shared commons filename→role classifier, previously reachable on Web only
+   * internally via ProtoWasmBridge.
+   */
+  inferModelFileRole(
+    ...args: Parameters<typeof ModelRegistryCapability.inferModelFileRole>
+  ): ReturnType<typeof ModelRegistryCapability.inferModelFileRole> {
+    return ModelRegistryCapability.inferModelFileRole(...args);
   },
 
   /**
@@ -271,25 +283,25 @@ export const flatFacade = {
     return TTSCapability.synthesizeAuto(text, options);
   },
 
-  stopSynthesis(
-    handle: Parameters<typeof TTSCapability.stop>[0],
-  ): ReturnType<typeof TTSCapability.stop> {
-    return TTSCapability.stop(handle);
+  /**
+   * Stop in-flight synthesis on the lifecycle-loaded TTS model. Parameterless
+   * to mirror Swift `RunAnywhere.stopSynthesis()`; the handle-owning form
+   * remains on `RunAnywhere.tts.stop(handle)`.
+   */
+  stopSynthesis(): boolean {
+    return TTSCapability.stopLoaded();
   },
 
   /**
    * Stop current speech playback. Swift parity
    * (RunAnywhere+TTS.swift:133-136): stops the shared `speak()` browser
-   * playback first, then stops in-flight synthesis. The handle is optional —
-   * pass it only when using the handle-owning `RunAnywhere.tts.*` namespace.
+   * playback first, then stops in-flight synthesis on the lifecycle-loaded
+   * model. Parameterless to match Swift; the handle-owning stop stays on
+   * `RunAnywhere.tts.stop(handle)`.
    */
-  stopSpeaking(
-    handle?: Parameters<typeof TTSCapability.stop>[0],
-  ): boolean {
+  stopSpeaking(): boolean {
     stopTTSPlaybackImpl();
-    return handle !== undefined
-      ? TTSCapability.stop(handle)
-      : TTSCapability.stopLoaded();
+    return TTSCapability.stopLoaded();
   },
 
   // -------------------------------------------------------------------------
@@ -302,10 +314,13 @@ export const flatFacade = {
     return VADCapability.detectVoiceAuto(...args);
   },
 
-  resetVAD(
-    handle: Parameters<typeof VADCapability.reset>[0],
-  ): ReturnType<typeof VADCapability.reset> {
-    return VADCapability.reset(handle);
+  /**
+   * Reset the lifecycle-loaded VAD state. Parameterless to mirror Swift
+   * `RunAnywhere.resetVAD()`; the handle-owning form stays on
+   * `RunAnywhere.vad.reset(handle)`.
+   */
+  resetVAD(): ReturnType<typeof VADCapability.resetVoiceAuto> {
+    return VADCapability.resetVoiceAuto();
   },
 
   // -------------------------------------------------------------------------
@@ -341,6 +356,13 @@ export const flatFacade = {
   },
 
   ragGetDocumentCount(): ReturnType<typeof ragGetDocumentCountImpl> {
+    return ragGetDocumentCountImpl();
+  },
+
+  // Second accessor mirroring Swift's `ragDocumentCount` convenience alongside
+  // `ragGetDocumentCount()` (RunAnywhere+RAG.swift:108/139). Same underlying
+  // count; kept for cross-SDK surface parity (Kotlin/RN also expose both).
+  ragDocumentCount(): ReturnType<typeof ragGetDocumentCountImpl> {
     return ragGetDocumentCountImpl();
   },
 
@@ -485,5 +507,37 @@ export const flatFacade = {
     ...args: Parameters<typeof LoggingCapability.flushLogs>
   ): ReturnType<typeof LoggingCapability.flushLogs> {
     return LoggingCapability.flushLogs(...args);
+  },
+
+  // -------------------------------------------------------------------------
+  // Canonical SDK events — flat aliases with Swift names delegating to the
+  // `RunAnywhere.sdkEvents.*` adapter. Mirrors Swift's flat subscribeSDKEvents
+  // / publishSDKEvent / pollSDKEvent / publishSDKFailure
+  // (RunAnywhere+SDKEvents.swift). Unsubscribe is the closure returned by
+  // subscribe (Web has no id-based unsubscribe), matching React Native.
+  // -------------------------------------------------------------------------
+
+  subscribeSDKEvents(
+    ...args: Parameters<typeof SDKEvents.subscribe>
+  ): ReturnType<typeof SDKEvents.subscribe> {
+    return SDKEvents.subscribe(...args);
+  },
+
+  publishSDKEvent(
+    ...args: Parameters<typeof SDKEvents.publish>
+  ): ReturnType<typeof SDKEvents.publish> {
+    return SDKEvents.publish(...args);
+  },
+
+  pollSDKEvent(
+    ...args: Parameters<typeof SDKEvents.poll>
+  ): ReturnType<typeof SDKEvents.poll> {
+    return SDKEvents.poll(...args);
+  },
+
+  publishSDKFailure(
+    ...args: Parameters<typeof SDKEvents.publishFailure>
+  ): ReturnType<typeof SDKEvents.publishFailure> {
+    return SDKEvents.publishFailure(...args);
   },
 };

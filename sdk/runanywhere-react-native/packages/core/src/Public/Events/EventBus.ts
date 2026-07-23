@@ -32,8 +32,6 @@ const logger = new SDKLogger('EventBus');
 export type SDKEventHandler = (event: SDKEventMessage) => void;
 export type EventBusCancellable = () => void;
 
-type NativeUnsubscribe = () => Promise<void>;
-
 export class EventBus {
   private static readonly singleton = new EventBus();
 
@@ -43,7 +41,7 @@ export class EventBus {
 
   private readonly listeners = new Set<SDKEventHandler>();
   private readonly categoryListeners = new Map<EventCategory, Set<SDKEventHandler>>();
-  private nativeSubscription: Promise<NativeUnsubscribe> | null = null;
+  private nativeSubscription: Promise<number> | null = null;
 
   private constructor() {
     this.ensureNativeSubscription();

@@ -12,9 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
 import type { StorageInfo } from '@runanywhere/proto-ts/storage_types';
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../theme/system';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
@@ -37,6 +40,8 @@ function formatBytes(bytes: number): string {
 }
 
 export const StorageScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -96,7 +101,7 @@ export const StorageScreen: React.FC = () => {
           <Icon
             name="refresh"
             size={22}
-            color={isRefreshing ? Colors.textTertiary : Colors.primaryBlue}
+            color={isRefreshing ? colors.outline : colors.primary}
           />
         </TouchableOpacity>
       </View>
@@ -124,18 +129,14 @@ export const StorageScreen: React.FC = () => {
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionButton} onPress={clearCache}>
-            <Icon name="trash-outline" size={18} color={Colors.primaryOrange} />
+            <Icon name="trash-outline" size={18} color={colors.tertiary} />
             <Text style={styles.actionButtonText}>Clear Cache</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={cleanTempFiles}
           >
-            <Icon
-              name="file-tray-outline"
-              size={18}
-              color={Colors.primaryBlue}
-            />
+            <Icon name="file-tray-outline" size={18} color={colors.primary} />
             <Text style={styles.actionButtonText}>Clean Temp</Text>
           </TouchableOpacity>
         </View>
@@ -146,12 +147,17 @@ export const StorageScreen: React.FC = () => {
             <Text style={styles.emptyText}>No downloaded models.</Text>
           ) : (
             downloadedModels.map((model) => {
-              const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
+              const framework = getPrimaryFramework(
+                model,
+                DEFAULT_INFERENCE_FRAMEWORK
+              );
               const frameworkColor = getFrameworkColor(framework);
               return (
                 <View key={model.id} style={styles.modelRow}>
                   <View style={styles.modelText}>
-                    <Text style={styles.modelName}>{model.name || model.id}</Text>
+                    <Text style={styles.modelName}>
+                      {model.name || model.id}
+                    </Text>
                     <View style={styles.modelMeta}>
                       <Text style={styles.modelSize}>
                         {formatBytes(getModelDownloadSizeBytes(model))}
@@ -167,7 +173,12 @@ export const StorageScreen: React.FC = () => {
                           size={12}
                           color={frameworkColor}
                         />
-                        <Text style={[styles.backendText, { color: frameworkColor }]}>
+                        <Text
+                          style={[
+                            styles.backendText,
+                            { color: frameworkColor },
+                          ]}
+                        >
                           {RunAnywhere.formatFramework(framework)}
                         </Text>
                       </View>
@@ -177,11 +188,7 @@ export const StorageScreen: React.FC = () => {
                     style={styles.deleteButton}
                     onPress={() => deleteModel(model)}
                   >
-                    <Icon
-                      name="trash-outline"
-                      size={18}
-                      color={Colors.primaryRed}
-                    />
+                    <Icon name="trash-outline" size={18} color={colors.error} />
                   </TouchableOpacity>
                 </View>
               );
@@ -196,130 +203,134 @@ export const StorageScreen: React.FC = () => {
 const StorageRow: React.FC<{ label: string; value: string }> = ({
   label,
   value,
-}) => (
-  <View style={styles.storageRow}>
-    <Text style={styles.storageLabel}>{label}</Text>
-    <Text style={styles.storageValue}>{value}</Text>
-  </View>
-);
+}) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.storageRow}>
+      <Text style={styles.storageLabel}>{label}</Text>
+      <Text style={styles.storageValue}>{value}</Text>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    padding: Padding.padding16,
-    gap: Spacing.large,
-  },
-  sectionTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  section: {
-    borderRadius: BorderRadius.regular,
-    backgroundColor: Colors.backgroundSecondary,
-    overflow: 'hidden',
-  },
-  storageRow: {
-    minHeight: 48,
-    paddingHorizontal: Padding.padding16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  storageLabel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  storageValue: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: Spacing.medium,
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: BorderRadius.regular,
-    backgroundColor: Colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: Spacing.small,
-  },
-  actionButtonText: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    padding: Padding.padding16,
-  },
-  modelRow: {
-    minHeight: 64,
-    paddingHorizontal: Padding.padding16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  modelText: {
-    flex: 1,
-  },
-  modelMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: 4,
-  },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  modelSize: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  backendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  backendText: {
-    ...Typography.caption2,
-    fontWeight: '700',
-  },
-  deleteButton: {
-    padding: Padding.padding10,
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    title: {
+      ...typography.titleLarge,
+      color: colors.onSurface,
+    },
+    content: {
+      flex: 1,
+    },
+    contentInner: {
+      padding: 16,
+      gap: 16,
+    },
+    sectionTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
+    section: {
+      borderRadius: 8,
+      backgroundColor: colors.surfaceContainer,
+      overflow: 'hidden',
+    },
+    storageRow: {
+      minHeight: 48,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    storageLabel: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+    },
+    storageValue: {
+      ...typography.bodyLarge,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionButton: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    actionButtonText: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+    },
+    emptyText: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+      padding: 16,
+    },
+    modelRow: {
+      minHeight: 64,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    modelText: {
+      flex: 1,
+    },
+    modelMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+    },
+    modelName: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    modelSize: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+    backendBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    backendText: {
+      ...typography.labelSmall,
+      fontWeight: '700',
+    },
+    deleteButton: {
+      padding: 10,
+    },
+  });
 
 export default StorageScreen;

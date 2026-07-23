@@ -422,9 +422,8 @@ await RunAnywhere.initialize(
 
 | Environment | Description |
 |-------------|-------------|
-| `SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT` | Verbose logging, local-only, no auth required |
-| `SDKEnvironment.SDK_ENVIRONMENT_STAGING` | Testing with real services |
-| `SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION` | Minimal logging, full authentication, telemetry |
+| `SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT` | Keyless OSS mode; verbose logging; no API key |
+| `SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION` | Authenticated control plane; minimal logging; telemetry |
 
 ### Generation Options
 

@@ -202,25 +202,6 @@ function deriveModelIdFromUrl(url: string, name: string): string {
 }
 
 /**
- * Register a single-file remote model by URL. Canonical entry point that
- * mirrors Swift's `RunAnywhere.registerModel(id:name:url:framework:...)`,
- * Kotlin's `RunAnywhere.registerModel(...)`, Flutter's
- * `RunAnywhere.registerModel(...)`, and Web's `registerModelFromUrl(...)`.
- *
- * Delegates to `registerModel`, which builds a complete `ModelInfo` from the
- * caller's input and persists it through the registry's proto save path in a
- * single call.
- */
-export async function registerModelFromUrl(
-  url: string,
-  name: string,
-  framework: InferenceFramework,
-  options: Omit<RegisterModelInput, 'url' | 'name' | 'framework'> = {},
-): Promise<ModelInfo> {
-  return registerModel({ url, name, framework, ...options });
-}
-
-/**
  * Archive registration shorthand. Mirrors Swift's
  * `RunAnywhere.registerModel(archive:structure:id:name:framework:...)`
  * (`RunAnywhere+Storage.swift:72`).

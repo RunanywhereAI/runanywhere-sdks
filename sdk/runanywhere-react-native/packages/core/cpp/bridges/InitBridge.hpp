@@ -228,6 +228,43 @@ public:
      */
     bool isTablet();
 
+    /**
+     * @brief Get user-visible device name (UIDevice.name / Settings device_name)
+     * @return Device name, or empty string when unavailable
+     */
+    std::string getDeviceName();
+
+    /**
+     * @brief Get battery level as 0.0..1.0, or -1.0 when unknown
+     */
+    float getBatteryLevel();
+
+    /**
+     * @brief Get battery state: "charging", "full", "unplugged", or "" when unknown
+     */
+    std::string getBatteryState();
+
+    /**
+     * @brief Check if low power / battery saver mode is enabled
+     */
+    bool isLowPowerMode();
+
+    /**
+     * @brief Check for a Neural Engine (Apple arm64) or NPU (Android SoC family)
+     */
+    bool hasNeuralEngine();
+
+    /**
+     * @brief Resolve the performance/efficiency core split from the hardware.
+     *
+     * iOS reads sysctl hw.perflevel{0,1}.logicalcpu; Android groups cores by
+     * cpuinfo_max_freq. Outputs are only written when true is returned.
+     *
+     * @return true when the split could be determined; false → caller falls
+     *         back to its heuristic
+     */
+    bool getCoreSplit(int totalCores, int& perfCores, int& effCores);
+
     // =========================================================================
     // Configuration Getters (for HTTP requests in production mode)
     // =========================================================================
@@ -273,12 +310,12 @@ public:
      *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string
-     * @param supabaseKey Supabase API key (for dev mode, empty for prod)
+     * @param apiKey Authorization token for the request (empty for keyless)
      * @return tuple<success, statusCode, responseBody, errorMessage>
      */
     std::tuple<bool, int, std::string, std::string>
     httpPostSync(const std::string &url, const std::string &jsonBody,
-                 const std::string &supabaseKey);
+                 const std::string &apiKey);
 
   private:
     InitBridge() = default;

@@ -4,8 +4,7 @@
  */
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Typography } from '../theme/typography';
-import { Icon, type IconName, useTheme } from '../theme/system';
+import { Icon, type IconName, typography, useTheme } from '../theme/system';
 import type { TabParamList } from './navigation.types';
 import { ROUTES } from './routes';
 import ChatScreen from '../screens/ChatScreen';
@@ -33,27 +32,27 @@ export const BottomTabs: React.FC = () => {
           backgroundColor: colors.surface,
           borderTopColor: colors.outlineVariant,
         },
-        tabBarLabelStyle: { ...Typography.caption2 },
+        tabBarLabelStyle: { ...typography.labelSmall },
         tabBarIcon: ({ color, size }) => (
           <Icon name={TAB_ICONS[route.name]} size={size} color={color} />
         ),
       })}
     >
-    <Tab.Screen
-      name={ROUTES.Chat}
-      component={ChatScreen}
-      options={{ tabBarLabel: 'Chat' }}
-    />
-    <Tab.Screen
-      name={ROUTES.Voice}
-      component={VoiceAssistantScreen}
-      options={{ tabBarLabel: 'Voice' }}
-    />
-    <Tab.Screen
-      name={ROUTES.More}
-      component={MoreScreen}
-      options={{ tabBarLabel: 'More' }}
-    />
+      <Tab.Screen
+        name={ROUTES.Chat}
+        component={ChatScreen}
+        options={{ tabBarLabel: 'Chat' }}
+      />
+      <Tab.Screen
+        name={ROUTES.Voice}
+        component={VoiceAssistantScreen}
+        options={{ tabBarLabel: 'Voice' }}
+      />
+      <Tab.Screen
+        name={ROUTES.More}
+        component={MoreScreen}
+        options={{ tabBarLabel: 'More' }}
+      />
     </Tab.Navigator>
   );
 };

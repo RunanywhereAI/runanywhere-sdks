@@ -45,7 +45,7 @@ extern "C" {
  *
  * Called during SDK initialization. Sets up environment and base config.
  *
- * @param env The SDK environment (development, staging, production)
+ * @param env The SDK environment (development, production)
  * @param api_key The API key (copied internally)
  * @param base_url The base URL (copied internally)
  * @param device_id The persistent device ID (copied internally)

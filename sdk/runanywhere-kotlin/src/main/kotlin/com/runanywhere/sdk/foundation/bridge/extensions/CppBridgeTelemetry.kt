@@ -140,7 +140,6 @@ internal object CppBridgeTelemetry {
                             if (callbackLifetime !== lifetime) return
                             lifetime.scope.launch {
                                 performTelemetryHttp(
-                                    environment = lifetime.environment,
                                     path = endpoint,
                                     json = body,
                                     requiresAuth = requiresAuth,
@@ -293,22 +292,16 @@ internal object CppBridgeTelemetry {
      *
      * Skipped silently when the adapter has no usable configuration —
      * matches Swift's `CppBridge.HTTP.hasUsableConfiguration` + `isConfigured`
-     * preflight.
+     * preflight. Every environment goes through this same gate; there is no
+     * dev-only config branch (mirrors Swift after the dev-config trim).
      */
     private suspend fun performTelemetryHttp(
-        environment: SDKEnvironment,
         path: String,
         json: String,
         requiresAuth: Boolean,
     ) {
         if (telemetryHttpDisabled) {
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry $path: endpoint disabled")
-            return
-        }
-        if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
-            !CppBridgeDevConfig.hasUsableSupabaseConfig
-        ) {
-            log(CppBridgePlatformAdapter.LogLevel.WARN, "Skipping telemetry $path: no usable dev config")
             return
         }
         if (!HTTPClientAdapter.hasUsableConfiguration || !HTTPClientAdapter.isConfigured) {

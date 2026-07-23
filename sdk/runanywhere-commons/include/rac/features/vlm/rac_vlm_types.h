@@ -345,6 +345,9 @@ typedef struct rac_vlm_result {
     /** Time to first token in milliseconds */
     int64_t time_to_first_token_ms;
 
+    /** Prompt eval (multimodal prefill: image + prompt) time in milliseconds */
+    int64_t prompt_eval_time_ms;
+
     /** Time spent encoding the image in milliseconds */
     int64_t image_encode_time_ms;
 

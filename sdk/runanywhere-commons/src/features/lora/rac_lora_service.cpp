@@ -245,10 +245,40 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     publish_event(event);
 }
 
-void publish_failure(rac_result_t code, const char* operation, const char* message) {
+// Adapter file size for telemetry — read via ifstream (portable; no
+// <filesystem> dependency). Best-effort: 0 if the path can't be opened.
+int64_t adapter_file_size(const std::string& path) {
+    if (path.empty())
+        return 0;
+    std::ifstream sz(path, std::ios::binary | std::ios::ate);
+    return sz ? static_cast<int64_t>(sz.tellg()) : 0;
+}
+
+// adapter_id for telemetry attribution: prefer the catalog-linked id, else fall
+// back to the adapter file's basename (without directory or .gguf extension) so
+// the field is never blank when only a raw path was supplied.
+std::string adapter_id_for(const runanywhere::v1::LoRAAdapterConfig& config) {
+    if (!config.adapter_id().empty())
+        return config.adapter_id();
+    const std::string& path = config.adapter_path();
+    if (path.empty())
+        return std::string();
+    size_t slash = path.find_last_of("/\\");
+    std::string base = (slash == std::string::npos) ? path : path.substr(slash + 1);
+    const std::string ext = ".gguf";
+    if (base.size() > ext.size() && base.compare(base.size() - ext.size(), ext.size(), ext) == 0) {
+        base.resize(base.size() - ext.size());
+    }
+    return base;
+}
+
+void publish_failure(rac_result_t code, const char* operation, const char* message,
+                     const char* model_id = nullptr, const char* adapter_id = nullptr,
+                     int64_t adapter_size_bytes = 0) {
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED, operation,
                        (message != nullptr) && message[0] != '\0' ? message
-                                                                  : rac_error_message(code));
+                                                                  : rac_error_message(code),
+                       model_id, adapter_id, adapter_size_bytes);
     (void)rac_sdk_event_publish_failure(code, message, "llm", operation, RAC_TRUE);
 }
 
@@ -569,7 +599,7 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         mark_apply_error(&result, RAC_ERROR_INVALID_ARGUMENT,
                          "LoRAApplyRequest.adapters is required");
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.apply",
-                        "LoRAApplyRequest.adapters is required");
+                        "LoRAApplyRequest.adapters is required", base_model_id.c_str());
         rac::llm::release_lifecycle_llm(&ref);
         return copy_proto(result, out_result);
     }
@@ -580,7 +610,9 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
             auto* info = result.add_adapters();
             *info = make_info(config, false, validation.message.c_str(), validation.code);
             mark_apply_error(&result, validation.code, validation.message.c_str());
-            publish_failure(validation.code, "lora.apply", validation.message.c_str());
+            publish_failure(validation.code, "lora.apply", validation.message.c_str(),
+                            base_model_id.c_str(), adapter_id_for(config).c_str(),
+                            adapter_file_size(config.adapter_path()));
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -591,14 +623,14 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
             mark_apply_error(&result, RAC_ERROR_NOT_SUPPORTED,
                              "Backend does not support LoRA clear");
             publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.apply",
-                            "Backend does not support LoRA clear");
+                            "Backend does not support LoRA clear", base_model_id.c_str());
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
         rc = ref.ops->clear_lora(ref.impl);
         if (rc != RAC_SUCCESS) {
             mark_apply_error(&result, rc, rac_error_message(rc));
-            publish_failure(rc, "lora.apply", rac_error_message(rc));
+            publish_failure(rc, "lora.apply", rac_error_message(rc), base_model_id.c_str());
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -614,7 +646,9 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
             auto* info = result.add_adapters();
             *info = make_info(config, false, rac_error_message(rc), rc);
             mark_apply_error(&result, rc, rac_error_message(rc));
-            publish_failure(rc, "lora.apply", rac_error_message(rc));
+            publish_failure(rc, "lora.apply", rac_error_message(rc), base_model_id.c_str(),
+                            adapter_id_for(config).c_str(),
+                            adapter_file_size(config.adapter_path()));
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -623,18 +657,10 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
         track_lora_applied(backend_impl, base_model_id, applied_info);
         auto* info = result.add_adapters();
         *info = applied_info;
-        // Adapter file size for telemetry — read via ifstream (portable; no
-        // <filesystem> dependency). Best-effort: 0 if the path can't be opened.
-        int64_t adapter_size = 0;
-        {
-            std::ifstream sz(config.adapter_path(), std::ios::binary | std::ios::ate);
-            if (sz) {
-                adapter_size = static_cast<int64_t>(sz.tellg());
-            }
-        }
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
                            "lora.apply", nullptr, base_model_id.c_str(),
-                           config.adapter_id().c_str(), adapter_size);
+                           adapter_id_for(config).c_str(),
+                           adapter_file_size(config.adapter_path()));
     }
 
     result.set_success(true);

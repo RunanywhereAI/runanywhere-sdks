@@ -99,7 +99,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error, double duration_ms = 0.0,
                         int64_t embedding_dimension = 0, const char* model_id = nullptr,
-                        const char* framework = nullptr) {
+                        const char* framework = nullptr, int64_t total_tokens = 0,
+                        int64_t batch_size = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -138,6 +139,12 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (embedding_dimension > 0) {
         (*event.mutable_properties())["embedding_dimension"] = std::to_string(embedding_dimension);
+    }
+    if (total_tokens > 0) {
+        (*event.mutable_properties())["total_tokens"] = std::to_string(total_tokens);
+    }
+    if (batch_size > 0) {
+        (*event.mutable_properties())["batch_size"] = std::to_string(batch_size);
     }
     publish_event(event);
 }
@@ -251,7 +258,11 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED,
                        "embeddings.embedBatch", 1.0f, static_cast<int64_t>(texts.size()),
                        proto.vectors_size(), nullptr,
-                       static_cast<double>(result.processing_time_ms));
+                       static_cast<double>(result.processing_time_ms),
+                       static_cast<int64_t>(proto.dimension()),
+                       proto.has_model_id() ? proto.model_id().c_str() : nullptr, nullptr,
+                       static_cast<int64_t>(proto.tokens_used()),
+                       static_cast<int64_t>(texts.size()));
     rac_embeddings_result_free(&result);
     return rc;
 #endif
@@ -422,7 +433,8 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
         1.0f, static_cast<int64_t>(texts.size()), static_cast<int64_t>(result.vectors_size()),
         nullptr, static_cast<double>(now_ms() - embed_start_ms),
         raw.num_embeddings > 0 ? static_cast<int64_t>(raw.embeddings[0].dimension) : 0,
-        ref.model_id, ref.framework_name);
+        ref.model_id, ref.framework_name, static_cast<int64_t>(result.tokens_used()),
+        static_cast<int64_t>(texts.size()));
     rc = copy_proto(result, out_result);
     rac_embeddings_result_free(&raw);
     rac::lifecycle::release_lifecycle_embeddings(&ref);

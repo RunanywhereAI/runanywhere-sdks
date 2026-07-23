@@ -120,6 +120,40 @@ bool PlatformAdapter_getGPUFamily(char** outValue);
  */
 bool PlatformAdapter_isTablet(void);
 
+/**
+ * Get user-visible device name (UIDevice.currentDevice.name)
+ * @param outValue Pointer to store the result (must be freed by caller)
+ * @return true if successful
+ */
+bool PlatformAdapter_getDeviceName(char** outValue);
+
+/**
+ * Get battery level as 0.0..1.0, or -1.0 when unknown
+ */
+float PlatformAdapter_getBatteryLevel(void);
+
+/**
+ * Get battery state: "charging", "full", or "unplugged"
+ * @param outValue Pointer to store the result (must be freed by caller)
+ * @return true if successful; false when the state is unknown
+ */
+bool PlatformAdapter_getBatteryState(char** outValue);
+
+/**
+ * Check if Low Power Mode is enabled
+ */
+bool PlatformAdapter_isLowPowerMode(void);
+
+/**
+ * Performance (P) core count via sysctl hw.perflevel0.logicalcpu; -1 if unavailable
+ */
+int PlatformAdapter_getPerformanceCores(void);
+
+/**
+ * Efficiency (E) core count via sysctl hw.perflevel1.logicalcpu; -1 if unavailable
+ */
+int PlatformAdapter_getEfficiencyCores(void);
+
 // ============================================================================
 // App / Client Info
 // ============================================================================
