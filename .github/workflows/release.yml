@@ -38,14 +38,12 @@ permissions:
 
 env:
   RELEASE_VERSION: ${{ github.event.inputs.version || github.ref_name }}
-  # Neutral backend base URL baked into rac_commons at build time — lets
-  # environment=staging run keyless with no explicit URL (see
+  # Neutral public staging backend base URL baked into rac_commons at build time
+  # — lets environment=development run keyless with no explicit URL (see
   # rac_dev_config_get_staging_base_url). Kept in a CI secret (never in the public
   # source tree); the commons CMake substitutes it into the generated
-  # development_config.cpp when present (else a placeholder stub). This is a
-  # neutral vanity host (e.g. api.runanywhere.ai) — no credentials, project refs,
-  # or tokens are ever embedded. See sdk/runanywhere-commons/CMakeLists.txt
-  # (DEVELOPMENT CONFIG SOURCE).
+  # development_config.cpp when present (else a placeholder stub). No credentials,
+  # project refs, or tokens are ever embedded.
   STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
 
 jobs:

@@ -129,8 +129,6 @@ object CppBridgeSdkInit {
 
     private fun SDKEnvironment.toSdkInitEnvironment(): SdkInitEnvironment =
         when (this) {
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION
             else -> SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT
         }
 }

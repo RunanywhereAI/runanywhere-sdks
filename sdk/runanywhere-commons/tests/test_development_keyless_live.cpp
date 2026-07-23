@@ -1,16 +1,18 @@
-// Live E2E for keyless staging telemetry: init with environment=staging and
-// nothing else (no API key, no base URL — the baked dev-config staging URL
-// must resolve), emit one terminal event per modality, flush unauthenticated
-// and expect the backend to store each one under the PUBLIC org.
+// Live E2E for keyless development telemetry: init with
+// environment=development and no API key. Base URL comes from the baked
+// staging backend URL (STAGING_BASE_URL / development_config) or must be
+// set via rac_state after bake. Emit one terminal event per modality, flush
+// unauthenticated, and expect the backend to store each under the PUBLIC org.
 //
-// Network test against the real staging backend — build on demand, not part
+// Network test against the real Staging backend — build on demand, not part
 // of the ctest suite. Requires a build configured with STAGING_BASE_URL (or a
-// filled local development_config.cpp).
+// filled local development_config.cpp), or set RAC_LIVE_BASE_URL.
 
 #include <curl/curl.h>
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -25,6 +27,12 @@ namespace {
 
 int g_ok = 0;
 int g_failed = 0;
+
+int64_t now_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
 
 size_t discard_body(char*, size_t size, size_t nmemb, void*) {
     return size * nmemb;
@@ -56,33 +64,40 @@ void http_send(void*, const char* endpoint, const char* json_body, size_t json_l
 }
 
 std::string random_uuid() {
+#if defined(__linux__)
     std::ifstream f("/proc/sys/kernel/random/uuid");
     std::string uuid;
     std::getline(f, uuid);
-    return uuid;
-}
-
-int64_t now_ms() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
+    if (!uuid.empty()) {
+        return uuid;
+    }
+#endif
+    return "live-" + std::to_string(now_ms());
 }
 
 }  // namespace
 
 int main() {
-    rac_state_initialize(RAC_ENV_STAGING, "", "", "keyless-harness-device");
+    const char* override_url = std::getenv("RAC_LIVE_BASE_URL");
+    const char* base_arg = (override_url && override_url[0] != '\0') ? override_url : "";
+    rac_state_initialize(RAC_ENV_DEVELOPMENT, "", base_arg, "keyless-harness-device");
     const char* base_url = rac_state_get_base_url();
     std::printf("resolved base_url: %s\n", base_url && base_url[0] ? base_url : "<empty>");
     if (!base_url || base_url[0] == '\0') {
-        std::printf("FAIL: staging base URL did not resolve from the baked dev config\n");
+        std::printf(
+            "FAIL: development base URL did not resolve (bake STAGING_BASE_URL "
+            "or set RAC_LIVE_BASE_URL)\n");
+        return 1;
+    }
+    if (!rac_env_should_send_telemetry(RAC_ENV_DEVELOPMENT)) {
+        std::printf("FAIL: rac_env_should_send_telemetry(DEVELOPMENT) is false\n");
         return 1;
     }
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
-    rac_telemetry_manager_t* mgr =
-        rac_telemetry_manager_create(RAC_ENV_STAGING, "keyless-harness-device", "linux", "0.0.0");
+    rac_telemetry_manager_t* mgr = rac_telemetry_manager_create(
+        RAC_ENV_DEVELOPMENT, "keyless-harness-device", "linux", "0.0.0");
     rac_telemetry_manager_set_device_info(mgr, "Linux Keyless Harness", "6.12");
     rac_telemetry_manager_set_http_callback(mgr, http_send, nullptr);
 
@@ -90,15 +105,20 @@ int main() {
         const char* modality;
         const char* event_type;
     };
+    // All 12 V2 modalities.
     const Case cases[] = {
         {"llm", "llm.generation.completed"},
         {"stt", "stt.transcription.completed"},
         {"tts", "tts.synthesis.completed"},
-        {"vlm", "vlm.generation.completed"},
-        {"rag", "rag.retrieval.completed"},
-        {"imagegen", "imagegen.generation.completed"},
-        {"system", "sdk.init.completed"},
+        {"vlm", "vlm.process.completed"},
+        {"rag", "rag.query.completed"},
+        {"imagegen", "imagegen.generate.completed"},
+        {"embeddings", "embeddings.embed.completed"},
+        {"vad", "vad.stopped"},
+        {"voice", "voice.turn.metrics"},
+        {"lora", "lora.attach.completed"},
         {"model", "model.download.completed"},
+        {"system", "sdk.init.completed"},
     };
 
     for (const Case& c : cases) {
@@ -116,7 +136,7 @@ int main() {
         p.os_version = "6.12";
         p.platform = "linux";
         p.sdk_version = "0.0.0";
-        p.processing_time_ms = 123.0;
+        p.processing_time_ms = 42.5;
         p.has_processing_time_ms = RAC_TRUE;
         p.success = RAC_TRUE;
         p.has_success = RAC_TRUE;
@@ -139,5 +159,5 @@ int main() {
     curl_global_cleanup();
 
     std::printf("summary: ok=%d failed=%d\n", g_ok, g_failed);
-    return g_failed == 0 && g_ok > 0 ? 0 : 1;
+    return g_failed == 0 && g_ok >= 12 ? 0 : 1;
 }

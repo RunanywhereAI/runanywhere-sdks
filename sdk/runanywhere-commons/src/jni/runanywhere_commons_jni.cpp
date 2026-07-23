@@ -3532,7 +3532,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableHtt
  * This must be called during SDK initialization for device registration
  * to include the correct sdk_version (instead of "unknown").
  *
- * @param environment Environment (0=development, 1=staging, 2=production)
+ * @param environment Environment (0=development, 2=production; 1 reserved)
  * @param deviceId Device ID string
  * @param platform Platform string (e.g., "android")
  * @param sdkVersion SDK version string (e.g., "0.1.0")

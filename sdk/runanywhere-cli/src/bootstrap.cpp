@@ -16,6 +16,7 @@
 #include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -173,10 +174,6 @@ bool parse_environment_name(const std::string &name, rac_environment_t *out) {
     *out = RAC_ENV_DEVELOPMENT;
     return true;
   }
-  if (name == "staging") {
-    *out = RAC_ENV_STAGING;
-    return true;
-  }
   if (name == "prod" || name == "production") {
     *out = RAC_ENV_PRODUCTION;
     return true;
@@ -186,11 +183,9 @@ bool parse_environment_name(const std::string &name, rac_environment_t *out) {
 
 ::runanywhere::v1::SdkInitEnvironment
 proto_environment_from_rac(rac_environment_t env) {
-  switch (env) {
+  switch (rac_env_normalize(env)) {
   case RAC_ENV_PRODUCTION:
     return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION;
-  case RAC_ENV_STAGING:
-    return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_STAGING;
   default:
     return ::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT;
   }
@@ -212,9 +207,19 @@ void initialize_sdk_metadata(const Connection &connection) {
   // Mirror rac_sdk_init_phase1_proto's step order: runtime state first (the
   // auth / device-registration / telemetry paths read env + credentials from
   // rac_state), then the copied SDK configuration + client info.
+  // Development fills the baked staging backend URL when base_url is empty.
+  std::string effective_base_url = connection.base_url;
+  if (connection.environment == RAC_ENV_DEVELOPMENT &&
+      effective_base_url.empty()) {
+    const char *baked = rac_dev_config_get_staging_base_url();
+    if (rac_dev_config_is_usable_http_url(baked)) {
+      effective_base_url = baked;
+    }
+  }
+
   const rac_result_t state_rc = rac_state_initialize(
       connection.environment, connection.api_key.c_str(),
-      connection.base_url.c_str(), device_id[0] != '\0' ? device_id : "");
+      effective_base_url.c_str(), device_id[0] != '\0' ? device_id : "");
   if (state_rc != RAC_SUCCESS) {
     out::status_line("warning: SDK state init failed: " +
                      out::describe_result(state_rc));
@@ -223,7 +228,7 @@ void initialize_sdk_metadata(const Connection &connection) {
   rac_sdk_config_t sdk_config = {};
   sdk_config.environment = connection.environment;
   sdk_config.api_key = connection.api_key.c_str();
-  sdk_config.base_url = connection.base_url.c_str();
+  sdk_config.base_url = effective_base_url.c_str();
   sdk_config.device_id = device_id[0] != '\0' ? device_id : "";
   sdk_config.platform = desktop_platform();
   sdk_config.sdk_version = RCLI_VERSION;
@@ -340,27 +345,32 @@ void rcli_telemetry_http_callback(void *user_data, const char *endpoint,
   rac_http_response_free(&response);
 }
 
-// Runs the canonical two-phase SDK init so rcli authenticates and telemetry
-// actually flushes. Phase 1 sets environment + credentials; Phase 2
-// authenticates, registers the device, and enables the telemetry sink.
-// Connection values come from --environment/--base-url/--api-key (or their
-// RUNANYWHERE_* env fallbacks). Development mode stays fully offline.
-// Staging allows keyless clients (PUBLIC-org ingestion via baked staging URL).
+// Runs the canonical two-phase SDK init so telemetry can flush.
+// Development (keyless OSS): Phase 1 fills baked staging backend URL when
+// needed; Phase 2 skips JWT/register; telemetry POSTs anonymously → PUBLIC org.
+// Production: Phase 2 authenticates + registers with the API key.
 void initialize_telemetry_auth(const Connection &connection) {
-  if (connection.environment == RAC_ENV_DEVELOPMENT) {
-    return; // Local offline mode — no auth, no telemetry.
+  const bool keyless_dev = connection.environment == RAC_ENV_DEVELOPMENT;
+  std::string effective_base_url = connection.base_url;
+  if (keyless_dev && effective_base_url.empty()) {
+    const char *baked = rac_dev_config_get_staging_base_url();
+    if (rac_dev_config_is_usable_http_url(baked)) {
+      effective_base_url = baked;
+    }
   }
 
-  // Keyless staging is valid: the baked staging URL resolves in commons and
-  // telemetry flushes unauthenticated (PUBLIC-org ingestion).
-  const bool staging_keyless = connection.environment == RAC_ENV_STAGING;
-  if ((connection.api_key.empty() || connection.base_url.empty()) &&
-      !staging_keyless) {
+  // No remote telemetry without a base URL (baked or explicit).
+  if (effective_base_url.empty()) {
+    return;
+  }
+  // Authenticated environments still need an API key.
+  if (!keyless_dev && connection.api_key.empty()) {
     return;
   }
 
   // Enable the auth manager. NULL secure storage: tokens are not persisted
-  // across runs (fine for a CLI session); authentication still runs per run.
+  // across runs (fine for a CLI session); authentication still runs per run
+  // when Phase 2 expects a key.
   rac_auth_init(nullptr);
 
   char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
@@ -385,7 +395,7 @@ void initialize_telemetry_auth(const Connection &connection) {
   ::runanywhere::v1::SdkInitPhase1Request phase1;
   phase1.set_environment(proto_environment_from_rac(connection.environment));
   phase1.set_api_key(connection.api_key);
-  phase1.set_base_url(connection.base_url);
+  phase1.set_base_url(effective_base_url);
   if (device_id[0] != '\0') {
     phase1.set_device_id(device_id);
   }
@@ -476,30 +486,16 @@ rac_result_t resolve_connection(const GlobalOptions &options, Connection *out,
   if (!parse_environment_name(environment_name, &connection.environment)) {
     if (error) {
       *error = "invalid --environment '" + environment_name +
-               "' (expected dev, staging or prod)";
+               "' (expected development or production)";
     }
     return RAC_ERROR_INVALID_CONFIGURATION;
   }
   connection.base_url = std::move(base_url);
   connection.api_key = std::move(api_key);
 
-  if (connection.environment == RAC_ENV_DEVELOPMENT) {
-    if (!connection.api_key.empty() || !connection.base_url.empty()) {
-      if (error) {
-        *error = "development mode (the default) has no control plane; pass "
-                 "--environment staging (or prod) together with --base-url "
-                 "and --api-key (staging may omit both for keyless mode)";
-      }
-      return RAC_ERROR_INVALID_CONFIGURATION;
-    }
-    if (out) {
-      *out = connection;
-    }
-    return RAC_SUCCESS;
-  }
-
-  // Staging accepts empty api key + empty URL (baked staging URL / keyless).
-  // Production still requires a real key + https URL via commons validators.
+  // Development (keyless OSS): optional --base-url (else baked staging backend
+  // URL). API key is optional and usually omitted.
+  // Production: API key + https base URL required (validators enforce).
   const rac_validation_result_t key_rc = rac_validate_api_key(
       connection.api_key.empty() ? nullptr : connection.api_key.c_str(),
       connection.environment);

@@ -110,7 +110,8 @@ void register_auth(CLI::App& app, GlobalOptions& options) {
         "login",
         "Authenticate against the configured backend (API key → JWT), register "
         "this device and fetch model assignments. Requires --environment "
-        "staging|prod with --base-url and --api-key (or RUNANYWHERE_* env vars).");
+        "production with --base-url and --api-key (or RUNANYWHERE_* env vars). "
+        "Keyless development has no login path.");
     login_cmd->callback([&options]() {
         const int exit_code = run_auth_login(options);
         if (exit_code != 0) {

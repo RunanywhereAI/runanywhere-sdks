@@ -354,11 +354,11 @@ HttpResult control_plane_post(const std::string& endpoint, const std::string& js
 
 rac_result_t login(LoginSummary* out, std::string* error) {
     const rac_environment_t env = rac_state_get_environment();
-    if (!rac_env_requires_auth(env)) {
+    if (!rac_env_auth_expected(env, rac_state_get_api_key())) {
         if (error != nullptr) {
             *error =
-                "development mode (the default) has no control plane; pass "
-                "--environment staging (or prod) together with --base-url and --api-key";
+                "keyless development has no JWT login; use --environment production "
+                "with --base-url and --api-key";
         }
         return RAC_ERROR_INVALID_CONFIGURATION;
     }

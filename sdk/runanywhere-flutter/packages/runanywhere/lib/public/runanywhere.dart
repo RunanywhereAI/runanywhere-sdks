@@ -510,7 +510,6 @@ abstract final class RunAnywhere {
       // Keyless staging is valid: commons overrides the base URL with the
       // baked staging backend and requests go out unauthenticated
       // (PUBLIC-org ingestion). Production stays strict.
-      final isStaging = environment == SDKEnvironment.SDK_ENVIRONMENT_STAGING;
       if (!isStaging && (apiKey == null || apiKey.isEmpty)) {
         throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
@@ -674,7 +673,7 @@ abstract final class RunAnywhere {
     // whatever the app passed (baked URL, keyless).
     final effectiveBaseURL =
         DartBridgeState.instance.baseURL ?? params.baseURL.toString();
-    // Effective config from commons state, for every environment: staging
+    // Effective config from commons state (baked OSS URL fills development when empty)
     // resolves the baked keyless base URL, dev/prod use whatever the app
     // passed. There is no direct-to-datastore path — the backend is always
     // reached through this base URL. Auth stays in C++. Mirrors Swift's unified

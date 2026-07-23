@@ -2045,7 +2045,7 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     ) -> std::tuple<bool, int, std::string, std::string> {
         (void)requiresAuth;
 
-        // Effective config from commons state, for every environment: staging
+        // Effective config from commons state (baked OSS URL fills development when empty)
         // resolves the baked keyless base URL, dev/prod use whatever the app
         // passed. There is no direct-to-datastore path — the backend is always
         // reached through this base URL.

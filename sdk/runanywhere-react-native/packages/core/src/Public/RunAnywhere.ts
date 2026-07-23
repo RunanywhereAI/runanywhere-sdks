@@ -152,8 +152,6 @@ function mapSdkInitEnvironment(
   environment: SDKEnvironment
 ): SdkInitEnvironment {
   switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
@@ -165,8 +163,6 @@ function mapSdkInitEnvironment(
 
 function environmentToConfigString(environment: SDKEnvironment): string {
   switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return 'staging';
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return 'production';
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:

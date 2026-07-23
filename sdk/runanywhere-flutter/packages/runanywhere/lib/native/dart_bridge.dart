@@ -132,7 +132,7 @@ class DartBridge {
   ///
   /// Call this FIRST during SDK init. Must complete before Phase 2.
   ///
-  /// [environment] The SDK environment (development/staging/production)
+  /// [environment] The SDK environment (development/production)
   /// [apiKey] Resolved API key for production/staging, or empty in development.
   /// [baseURL] Resolved backend URL for production/staging/development.
   /// [deviceId] Platform-persisted device identifier resolved by the public
@@ -563,8 +563,6 @@ class DartBridge {
   static void _configureLogging(SDKEnvironment environment) {
     int logLevel;
     switch (environment) {
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        logLevel = RacLogLevel.info;
         break;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         logLevel = RacLogLevel.warning;
@@ -591,8 +589,6 @@ class DartBridge {
   /// Swift's `CppBridge.SdkInit.mapEnvironment`.
   static SdkInitEnvironment _toSdkInitEnvironment(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:

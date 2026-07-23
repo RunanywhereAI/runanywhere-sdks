@@ -299,7 +299,7 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
   std::string apiKey;
 
   {
-    // Effective config from commons state, for every environment: staging
+    // Effective config from commons state (baked OSS URL fills development when empty)
     // overrides whatever the app passed (baked URL, keyless), dev/prod use the
     // effective URL falling back to the SDK-initialization value. There is no
     // direct-to-datastore path — the backend is always reached through this URL.

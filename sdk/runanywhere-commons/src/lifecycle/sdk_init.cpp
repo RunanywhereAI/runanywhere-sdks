@@ -64,15 +64,8 @@ using ::runanywhere::v1::SdkInitResult;
 // -- helpers ----------------------------------------------------------------
 
 rac_environment_t to_rac_environment(SdkInitEnvironment env) {
-    switch (env) {
-        case ::runanywhere::v1::SDK_INIT_ENVIRONMENT_STAGING:
-            return RAC_ENV_STAGING;
-        case ::runanywhere::v1::SDK_INIT_ENVIRONMENT_PRODUCTION:
-            return RAC_ENV_PRODUCTION;
-        case ::runanywhere::v1::SDK_INIT_ENVIRONMENT_DEVELOPMENT:
-        default:
-            return RAC_ENV_DEVELOPMENT;
-    }
+    // DEVELOPMENT=0, PRODUCTION=2. Reserved former-staging (=1) → production.
+    return rac_env_normalize(static_cast<rac_environment_t>(static_cast<int>(env)));
 }
 
 rac_result_t serialize_result(const SdkInitResult& result, rac_proto_buffer_t* out) {
@@ -117,8 +110,8 @@ bool http_setup_applicable_for_state() {
     if (!rac_dev_config_is_usable_http_url(base_url)) {
         return false;
     }
-    // Keyless (dev / keyless-staging) is a valid HTTP setup: unauthenticated
-    // public-org ingestion. Auth-required environments need a usable API key.
+    // Keyless development is a valid HTTP setup: unauthenticated PUBLIC-org
+    // ingestion. Auth-required environments need a usable API key.
     return rac_dev_config_is_usable_credential(api_key) || !rac_env_auth_expected(env, api_key);
 }
 
@@ -318,8 +311,8 @@ rac_result_t perform_authentication(SdkInitResult* result) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
     if (!rac_env_auth_expected(env, api_key)) {
-        // Keyless staging: requests go out unauthenticated (public ingestion),
-        // there is no token to fetch
+        // Keyless development: requests go out unauthenticated (PUBLIC org),
+        // there is no token to fetch.
         result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
         result->set_has_completed_http_setup(true);
         return RAC_SUCCESS;
@@ -537,11 +530,9 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     std::string base_url = request.base_url();
     const std::string device_id = request.device_id();
 
-    // Staging is absolute: whatever the caller passed, requests go keyless to
-    // the baked staging backend (git-ignored dev config / CI secret). Builds
-    // without the baked URL keep the caller's URL as-is.
-    if (env == RAC_ENV_STAGING) {
-        api_key.clear();
+    // Development (keyless OSS): fill baked staging backend URL when empty.
+    // Staging no longer wipes keys — it is a deprecated production alias.
+    if (env == RAC_ENV_DEVELOPMENT && base_url.empty()) {
         const char* baked = rac_dev_config_get_staging_base_url();
         if (rac_dev_config_is_usable_http_url(baked)) {
             base_url = baked;
@@ -552,7 +543,8 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
         request.sdk_version().empty() ? std::string(rac_sdk_get_version()) : request.sdk_version();
 
     // Step 1: Validate inputs. Staging/production require API key + URL.
-    if (environment_requires_external_config(env)) {
+    // Development validates optionally (baked URL / keyless).
+    if (environment_requires_external_config(env) || env == RAC_ENV_DEVELOPMENT) {
         const rac_validation_result_t key_check =
             rac_validate_api_key(api_key.empty() ? nullptr : api_key.c_str(), env);
         if (key_check != RAC_VALIDATION_OK) {
@@ -673,40 +665,42 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
             append_warning(&result, warning_from_code("auth setup deferred", auth_rc));
         }
 
-        // Step 2: Register device only when a complete control-plane
-        // configuration exists. Credential-free local SDK use is not a failed
-        // registration attempt and must not emit an error-level platform log.
+        // Step 2: Register device + fetch assignments only on the JWT path.
+        // Keyless development posts PUBLIC-org telemetry without register/for-sdk.
         const rac_environment_t env = rac_state_get_environment();
-        const char* build_token =
-            request.build_token().empty() ? nullptr : request.build_token().c_str();
-        const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
-        const bool device_registered =
-            (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
-        result.set_device_registered(device_registered);
-        if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
-            dev_rc != RAC_ERROR_NOT_INITIALIZED) {
-            // Surface as a warning rather than aborting — matches Swift's
-            // "Device registration failed (non-critical)" branch.
-            append_warning(&result, warning_from_code("device registration deferred", dev_rc));
+        const char* api_key = rac_state_get_api_key();
+        if (rac_env_auth_expected(env, api_key)) {
+            const char* build_token =
+                request.build_token().empty() ? nullptr : request.build_token().c_str();
+            const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, build_token);
+            const bool device_registered =
+                (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
+            result.set_device_registered(device_registered);
+            if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE &&
+                dev_rc != RAC_ERROR_NOT_INITIALIZED) {
+                // Surface as a warning rather than aborting — matches Swift's
+                // "Device registration failed (non-critical)" branch.
+                append_warning(&result, warning_from_code("device registration deferred", dev_rc));
+            }
+
+            // Step 3: Fetch model assignments (cached).
+            rac_model_info_t** assigned_models = nullptr;
+            size_t assigned_count = 0;
+            const rac_result_t fetch_rc = rac_model_assignment_fetch(
+                request.force_refresh_assignments() ? RAC_TRUE : RAC_FALSE, &assigned_models,
+                &assigned_count);
+            if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr) {
+                result.set_linked_models_count(static_cast<uint32_t>(assigned_count));
+                rac_model_info_array_free(assigned_models, assigned_count);
+            } else if (fetch_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE && fetch_rc != RAC_SUCCESS) {
+                append_warning(&result,
+                               warning_from_code("model assignment fetch deferred", fetch_rc));
+            }
+        } else {
+            result.set_device_registered(false);
         }
     } else {
         result.set_device_registered(rac_device_manager_is_registered() == RAC_TRUE);
-    }
-
-    // Step 3: Fetch model assignments (cached). When callbacks are not wired
-    // this returns RAC_ERROR_FEATURE_NOT_AVAILABLE; we treat that as offline.
-    rac_model_info_t** assigned_models = nullptr;
-    size_t assigned_count = 0;
-    const rac_result_t fetch_rc =
-        rac_model_assignment_fetch(request.force_refresh_assignments() ? RAC_TRUE : RAC_FALSE,
-                                   &assigned_models, &assigned_count);
-    if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr) {
-        result.set_linked_models_count(static_cast<uint32_t>(assigned_count));
-        rac_model_info_array_free(assigned_models, assigned_count);
-    } else if (fetch_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE && fetch_rc != RAC_SUCCESS) {
-        // Non-fatal: cache may be empty and HTTP unavailable. Warning surface
-        // mirrors Swift's offline-mode branch.
-        append_warning(&result, warning_from_code("model assignment fetch deferred", fetch_rc));
     }
 
     // Step 4: Flush telemetry via the sink registered by the SDK.

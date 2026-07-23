@@ -303,7 +303,6 @@ class DartBridgeState {
       case 0:
         return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
       case 1:
-        return SDKEnvironment.SDK_ENVIRONMENT_STAGING;
       case 2:
         return SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
       default:

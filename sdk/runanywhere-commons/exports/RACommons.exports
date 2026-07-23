@@ -485,6 +485,7 @@ _rac_env_default_log_level
 _rac_env_description
 _rac_env_is_production
 _rac_env_is_testing
+_rac_env_normalize
 _rac_env_requires_auth
 _rac_env_requires_backend_url
 _rac_env_should_send_telemetry

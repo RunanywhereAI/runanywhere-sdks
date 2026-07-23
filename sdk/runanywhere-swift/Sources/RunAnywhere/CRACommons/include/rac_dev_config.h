@@ -31,9 +31,9 @@ extern "C" {
 /**
  * @brief Get the baked staging backend base URL
  *
- * Team builds bake the staging URL via the git-ignored development_config.cpp
- * so callers can init with environment=staging and nothing else. Open-source
- * builds keep the placeholder and must pass a base URL explicitly.
+ * Release/CI bakes the OSS backend URL (STAGING_BASE_URL secret) so keyless
+ * development can omit base_url. Open-source placeholder builds must pass a
+ * base URL explicitly (or bake STAGING_BASE_URL at compile time).
  *
  * @return URL string or placeholder (static, do not free)
  */

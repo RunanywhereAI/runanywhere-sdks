@@ -88,10 +88,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         bool discoverDownloadedModels = extractBoolValue(configJson, "discoverDownloadedModels", true);
         bool rescanLocalModels = extractBoolValue(configJson, "rescanLocalModels", true);
 
-        // Determine environment (canonical commons rac_environment_t).
+        // Product surface: development | production only.
         rac_environment_t env = RAC_ENV_PRODUCTION;
-        if (envStr == "development") env = RAC_ENV_DEVELOPMENT;
-        else if (envStr == "staging") env = RAC_ENV_STAGING;
+        if (envStr == "development" || envStr == "dev") {
+            env = RAC_ENV_DEVELOPMENT;
+        } else if (envStr == "production" || envStr == "prod") {
+            env = RAC_ENV_PRODUCTION;
+        } else {
+            setLastError("Invalid environment '" + envStr +
+                         "' (expected development or production)");
+            throw std::invalid_argument("Invalid SDK environment: " + envStr);
+        }
 
         InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
 

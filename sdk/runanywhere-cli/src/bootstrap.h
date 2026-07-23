@@ -31,14 +31,14 @@ struct GlobalOptions {
     bool no_progress = false;
     std::string home_override;  // --home flag
 
-    // Control-plane connection. Empty defaults preserve the historical
-    // offline development-mode behavior exactly. CLI11 fills these from
+    // Control-plane connection. CLI11 fills these from
     // --base-url/--api-key/--environment with RUNANYWHERE_BASE_URL /
     // RUNANYWHERE_API_KEY / RUNANYWHERE_ENVIRONMENT env-var fallbacks (app.cpp).
-    // Staging may omit key+URL (keyless / baked staging URL).
-    std::string environment;  // dev|development|staging|prod|production ("" → dev)
-    std::string base_url;     // staging may omit (baked URL); prod requires https
-    std::string api_key;      // staging may omit (keyless); prod requires ≥10 chars
+    // development: keyless OSS → staging backend (baked URL or --base-url).
+    // production: API key + https URL.
+    std::string environment;  // dev|development|prod|production ("" → dev)
+    std::string base_url;     // development may omit (baked Staging URL)
+    std::string api_key;      // required for production; omit for keyless development
 };
 
 /**
@@ -58,10 +58,9 @@ struct Connection {
  * RAC_ERROR_INVALID_CONFIGURATION.
  *
  * Rules (mirrors commons rac_validate_api_key / rac_validate_base_url):
- *   - dev (default): no credentials allowed — pass --environment staging to
- *     target a real control plane (localhost is allowed on staging).
- *   - staging: keyless OK (baked staging URL / PUBLIC-org); optional key+URL.
- *   - prod: api key + https base URL required; localhost rejected.
+ *   - development (default): keyless PUBLIC-org telemetry; optional --base-url
+ *     (else baked staging backend URL). No JWT.
+ *   - production: API key + https base URL required; localhost rejected.
  *
  * Env: RUNANYWHERE_ENVIRONMENT (also --environment).
  */

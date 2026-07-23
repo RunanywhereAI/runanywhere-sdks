@@ -335,8 +335,6 @@ class DartBridgeHTTP {
     switch (environment) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'https://dev-api.runanywhere.ai';
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 'https://staging-api.runanywhere.ai';
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'https://api.runanywhere.ai';
       default:

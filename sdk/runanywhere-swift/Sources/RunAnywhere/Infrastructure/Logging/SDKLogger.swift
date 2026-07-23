@@ -34,9 +34,10 @@ public protocol LogDestination: AnyObject, Sendable { // swiftlint:disable:this 
 
 // MARK: - RALoggingConfiguration Presets
 
-/// Environment presets for the generated `RALoggingConfiguration` proto.
+/// Logging presets for the generated `RALoggingConfiguration` proto.
 /// The struct itself is generated under `Sources/RunAnywhere/Generated/`;
-/// these factories supply the dev/staging/prod defaults.
+/// these factories supply named defaults. `.staging` is a log-level profile
+/// only — not an SDK environment.
 extension RALoggingConfiguration {
     public static var development: RALoggingConfiguration {
         var config = RALoggingConfiguration()
@@ -255,7 +256,6 @@ extension RALoggingConfiguration {
     static func forEnvironment(_ environment: SDKEnvironment) -> RALoggingConfiguration {
         switch environment {
         case .development:  return .development
-        case .staging:      return .staging
         case .production:   return .production
         default:            return .development
         }

@@ -60,41 +60,45 @@ struct SdkConfigSnapshotStorage {
 // Environment Query Functions
 // =============================================================================
 
+rac_environment_t rac_env_normalize(rac_environment_t env) {
+    // Former staging occupied numeric 1; accept it as production if seen on
+    // the wire from older clients.
+    if (static_cast<int>(env) == 1) {
+        return RAC_ENV_PRODUCTION;
+    }
+    return env;
+}
+
 bool rac_env_requires_auth(rac_environment_t env) {
-    return env != RAC_ENV_DEVELOPMENT;
+    return rac_env_normalize(env) != RAC_ENV_DEVELOPMENT;
 }
 
 bool rac_env_auth_expected(rac_environment_t env, const char* api_key) {
     if (!rac_env_requires_auth(env)) {
-        // Development authenticates when the caller supplied an explicit key.
+        // Development is keyless OSS by default (PUBLIC-org telemetry). An
+        // explicit key is honored if the caller supplies one.
         return api_key != nullptr && api_key[0] != '\0';
     }
-    // Staging accepts keyless clients — requests go out unauthenticated and
-    // the backend attributes them to the PUBLIC org. Production stays strict.
-    if (env == RAC_ENV_STAGING && (!api_key || api_key[0] == '\0')) {
-        return false;
-    }
+    // Staging is a deprecated production alias — API key required.
     return true;
 }
 
 bool rac_env_requires_backend_url(rac_environment_t env) {
-    return env != RAC_ENV_DEVELOPMENT;
+    return rac_env_normalize(env) != RAC_ENV_DEVELOPMENT;
 }
 
 bool rac_env_is_production(rac_environment_t env) {
-    return env == RAC_ENV_PRODUCTION;
+    return rac_env_normalize(env) == RAC_ENV_PRODUCTION;
 }
 
 bool rac_env_is_testing(rac_environment_t env) {
-    return env == RAC_ENV_DEVELOPMENT || env == RAC_ENV_STAGING;
+    return rac_env_normalize(env) == RAC_ENV_DEVELOPMENT;
 }
 
 rac_log_level_t rac_env_default_log_level(rac_environment_t env) {
-    switch (env) {
+    switch (rac_env_normalize(env)) {
         case RAC_ENV_DEVELOPMENT:
             return RAC_LOG_DEBUG;  // From rac_types.h: 1
-        case RAC_ENV_STAGING:
-            return RAC_LOG_INFO;  // From rac_types.h: 2
         case RAC_ENV_PRODUCTION:
             return RAC_LOG_WARNING;  // From rac_types.h: 3
         default:
@@ -103,24 +107,20 @@ rac_log_level_t rac_env_default_log_level(rac_environment_t env) {
 }
 
 bool rac_env_should_send_telemetry(rac_environment_t env) {
-    // Telemetry is sent in every environment — development flushes immediately to
-    // the local backend, staging and production batch + send with auth. This must
-    // agree with the actual send gate (rac_env_requires_auth, also !=DEVELOPMENT);
-    // returning production-only here previously contradicted that and mislabeled
-    // staging as "no telemetry" even though staging does send.
-    return env != RAC_ENV_DEVELOPMENT;
+    // Development and production both send telemetry (keyless vs authed).
+    (void)env;
+    return true;
 }
 
 bool rac_env_should_sync_with_backend(rac_environment_t env) {
-    return env != RAC_ENV_DEVELOPMENT;
+    // Keyless development skips authenticate / device register / assignments.
+    return rac_env_normalize(env) != RAC_ENV_DEVELOPMENT;
 }
 
 const char* rac_env_description(rac_environment_t env) {
-    switch (env) {
+    switch (rac_env_normalize(env)) {
         case RAC_ENV_DEVELOPMENT:
-            return "Development Environment";
-        case RAC_ENV_STAGING:
-            return "Staging Environment";
+            return "Development Environment (keyless OSS)";
         case RAC_ENV_PRODUCTION:
             return "Production Environment";
         default:
@@ -128,22 +128,12 @@ const char* rac_env_description(rac_environment_t env) {
     }
 }
 
-// In DEV mode the SDK targets an operator-
-// side DNS alias (e.g. dev.runanywhere.local). When the alias is not
-// configured locally the OS resolver burns its full default timeout
-// before the request can fail, blocking SDK init for ~30 s per cold
-// launch. Returning a short timeout here lets platform HTTP layers
-// (URLSession / Dart HttpClient / Kotlin HttpURLConnection) fail fast
-// in DEV without hurting production reliability.
+// Development posts keyless telemetry to staging backend (or an explicit
+// base URL). Use the same generous timeout as authenticated backends —
+// Staging is a real remote host, not a local DNS alias.
 int32_t rac_env_default_http_timeout_ms(rac_environment_t env) {
-    switch (env) {
-        case RAC_ENV_DEVELOPMENT:
-            return 3000;  // 3s — fail fast on unreachable dev DNS
-        case RAC_ENV_STAGING:
-        case RAC_ENV_PRODUCTION:
-        default:
-            return 30000;  // 30s — generous default for real backends
-    }
+    (void)env;
+    return 30000;
 }
 
 // =============================================================================
@@ -210,13 +200,12 @@ static bool is_localhost_host(const char* host) {
 // =============================================================================
 
 rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environment_t env) {
-    // Development never needs a key; staging accepts an empty one (keyless
-    // clients send unauthenticated requests, attributed to the PUBLIC org)
+    // Development keyless OSS: empty key is OK (PUBLIC-org telemetry).
     if (!rac_env_auth_expected(env, api_key)) {
         return RAC_VALIDATION_OK;
     }
 
-    // Production requires API key
+    // Production requires an API key.
     if (!api_key || api_key[0] == '\0') {
         return RAC_VALIDATION_API_KEY_REQUIRED;
     }
@@ -230,18 +219,33 @@ rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environmen
 }
 
 rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t env) {
-    // Development mode doesn't require URL
-    if (!rac_env_requires_backend_url(env)) {
+    env = rac_env_normalize(env);
+    // Development may omit URL when the baked staging backend URL is present.
+    if (env == RAC_ENV_DEVELOPMENT) {
+        if (!url || url[0] == '\0') {
+            if (rac_dev_config_is_usable_http_url(rac_dev_config_get_staging_base_url())) {
+                return RAC_VALIDATION_OK;
+            }
+            // No baked URL and no caller URL — still OK for purely offline use;
+            // telemetry simply has nowhere to go until a URL is configured.
+            return RAC_VALIDATION_OK;
+        }
+        char scheme[16] = {0};
+        if (!extract_url_scheme(url, scheme, sizeof(scheme))) {
+            return RAC_VALIDATION_URL_INVALID_SCHEME;
+        }
+        if (strcmp(scheme, "https") != 0 && strcmp(scheme, "http") != 0) {
+            return RAC_VALIDATION_URL_INVALID_SCHEME;
+        }
+        char host[256] = {0};
+        if (!extract_url_host(url, host, sizeof(host)) || host[0] == '\0') {
+            return RAC_VALIDATION_URL_INVALID_HOST;
+        }
         return RAC_VALIDATION_OK;
     }
 
-    // Staging/Production require URL — except staging builds carrying the
-    // baked backend URL, where an empty URL resolves to it at init
+    // Staging (deprecated alias) and production require an explicit URL.
     if (!url || url[0] == '\0') {
-        if (env == RAC_ENV_STAGING &&
-            rac_dev_config_is_usable_http_url(rac_dev_config_get_staging_base_url())) {
-            return RAC_VALIDATION_OK;
-        }
         return RAC_VALIDATION_URL_REQUIRED;
     }
 
@@ -251,16 +255,9 @@ rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t
         return RAC_VALIDATION_URL_INVALID_SCHEME;
     }
 
-    // Production requires HTTPS
-    if (env == RAC_ENV_PRODUCTION) {
-        if (strcmp(scheme, "https") != 0) {
-            return RAC_VALIDATION_URL_HTTPS_REQUIRED;
-        }
-    } else if (env == RAC_ENV_STAGING) {
-        // Staging allows HTTP or HTTPS
-        if (strcmp(scheme, "https") != 0 && strcmp(scheme, "http") != 0) {
-            return RAC_VALIDATION_URL_INVALID_SCHEME;
-        }
+    // Production and staging-alias require HTTPS (no localhost http escape hatch).
+    if (strcmp(scheme, "https") != 0) {
+        return RAC_VALIDATION_URL_HTTPS_REQUIRED;
     }
 
     // Extract and validate host
@@ -273,8 +270,8 @@ rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t
         return RAC_VALIDATION_URL_INVALID_HOST;
     }
 
-    // Production cannot use localhost/example URLs
-    if (env == RAC_ENV_PRODUCTION && is_localhost_host(host)) {
+    // Authenticated environments cannot use localhost/example URLs
+    if (is_localhost_host(host)) {
         return RAC_VALIDATION_URL_LOCALHOST_NOT_ALLOWED;
     }
 
@@ -417,12 +414,12 @@ rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config) {
         return RAC_VALIDATION_API_KEY_REQUIRED;
     }
 
-    // Staging is absolute: whatever the caller passed, requests go keyless to
-    // the baked staging backend (git-ignored dev config / CI secret). Builds
-    // without the baked URL keep the caller's URL as-is.
+    // Normalize reserved STAGING → PRODUCTION. Development (keyless OSS):
+    // fill the baked staging backend URL when the caller omitted base_url.
     rac_sdk_config_t effective = *config;
-    if (effective.environment == RAC_ENV_STAGING) {
-        effective.api_key = "";
+    effective.environment = rac_env_normalize(effective.environment);
+    if (effective.environment == RAC_ENV_DEVELOPMENT &&
+        (!effective.base_url || effective.base_url[0] == '\0')) {
         const char* baked = rac_dev_config_get_staging_base_url();
         if (rac_dev_config_is_usable_http_url(baked)) {
             effective.base_url = baked;

@@ -5,12 +5,12 @@
  * Drives the real commons telemetry pipeline end-to-end: payloads are queued
  * with rac_telemetry_manager_track, batched + serialized by commons
  * (one POST per modality to /api/v2/sdk/telemetry/{modality}), and delivered
- * through the CLI's HTTP callback over the registered curl transport with the
- * JWT from the login handshake.
+ * through the CLI's HTTP callback over the registered curl transport.
  *
- * Staging/production only (the V2 endpoints require a JWT); both commands run
- * the login handshake first, so one process does login + emit. Exits non-zero
- * when any POST fails or any tracked event never reached the backend.
+ * Development (keyless): no JWT — anonymous POST → staging backend PUBLIC org.
+ * Production: login handshake first (API key → JWT), then flush.
+ * Exits non-zero when any POST fails or any tracked event never reached the
+ * backend.
  */
 
 #include "commands/commands.h"
@@ -27,6 +27,7 @@
 
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 
@@ -218,12 +219,15 @@ bool run_telemetry_session(const GlobalOptions& options, FlushReport* report, Tr
         return false;
     }
 
-    // The V2 telemetry endpoints only accept a JWT, so emit implies login —
-    // one process performs the handshake and the flush (in-process token).
-    std::string error;
-    if (net::login(nullptr, &error) != RAC_SUCCESS) {
-        out::error_line(error);
-        return false;
+    // Authenticated environments need a JWT before flush. Keyless development
+    // posts anonymously to staging backend (PUBLIC org) — skip login.
+    const rac_environment_t sdk_env = rac_state_get_environment();
+    if (rac_env_auth_expected(sdk_env, rac_state_get_api_key())) {
+        std::string error;
+        if (net::login(nullptr, &error) != RAC_SUCCESS) {
+            out::error_line(error);
+            return false;
+        }
     }
 
     const char* device_id = rac_state_get_device_id();
@@ -368,7 +372,8 @@ int run_telemetry_blast(const GlobalOptions& options, int count, const std::stri
             received = stats.received;
             stored = stats.stored;
             skipped = stats.skipped;
-            row_ok = stats.failures == 0 && stats.received == count;
+            row_ok = stats.failures == 0 && stats.last_status == 200 &&
+                     stats.received >= count && stats.stored >= count;
             status = row_ok ? ("HTTP " + std::to_string(stats.last_status))
                             : (stats.last_error.empty()
                                    ? "HTTP " + std::to_string(stats.last_status)
@@ -418,8 +423,8 @@ void register_telemetry(CLI::App& app, GlobalOptions& options) {
     CLI::App* emit_cmd = cmd->add_subcommand(
         "emit",
         "Track N events of one modality, flush to /api/v2/sdk/telemetry/{modality} "
-        "and report the backend's accounting. Runs the auth handshake first "
-        "(staging/prod only). Exits non-zero when any POST fails.");
+        "and report the backend's accounting. Production runs the auth handshake "
+        "first; development is keyless. Exits non-zero when any POST fails.");
     auto modality = std::make_shared<std::string>();
     auto event_type = std::make_shared<std::string>();
     auto count = std::make_shared<int>(1);
@@ -466,6 +471,10 @@ void register_telemetry(CLI::App& app, GlobalOptions& options) {
                           "Session id attached to every event (default: fresh UUID)");
     blast_cmd->add_option("--processing-ms", blast_metrics->processing_ms,
                           "processing_time_ms metric for every event");
+    blast_cmd->add_option("--input-tokens", blast_metrics->input_tokens,
+                          "input_tokens metric (llm/vlm modalities)");
+    blast_cmd->add_option("--output-tokens", blast_metrics->output_tokens,
+                          "output_tokens metric (llm/vlm modalities)");
     blast_cmd->callback([&options, blast_count, blast_session, blast_metrics]() {
         const int exit_code =
             run_telemetry_blast(options, *blast_count, *blast_session, *blast_metrics);

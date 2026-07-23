@@ -59,8 +59,8 @@ object CppBridgeEnvironment {
     fun fromC(cEnv: Int): SDKEnvironment =
         when (cEnv) {
             0 -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-            1 -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
-            2 -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+            // Reserved staging slot (1) and production (2) → production.
+            1, 2 -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             else -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
         }
 

@@ -29,7 +29,7 @@ import 'package:runanywhere/generated/model_types.pbenum.dart'
 export 'package:runanywhere/generated/logging.pbenum.dart' show LogLevel;
 
 /// Per-environment [LoggingConfiguration] presets. The generated proto message
-/// cannot be `const`-constructed, so the development/staging/production presets
+/// cannot be `const`-constructed, so the development/production presets
 /// live here as factory helpers (mirrors Swift's `RALoggingConfiguration`
 /// extension in `SDKLogger.swift`).
 class LoggingConfigurations {
@@ -49,7 +49,7 @@ class LoggingConfigurations {
     includeDeviceMetadata: false,
   );
 
-  /// Staging preset — info-level logging (matches Swift).
+  /// Staging preset — info-level logging profile (not an SDK environment).
   static LoggingConfiguration get staging => LoggingConfiguration(
     enableLocalLogging: true,
     minLogLevel: LogLevel.LOG_LEVEL_INFO,
@@ -70,8 +70,6 @@ class LoggingConfigurations {
     switch (environment) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return development;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return staging;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return production;
       default:

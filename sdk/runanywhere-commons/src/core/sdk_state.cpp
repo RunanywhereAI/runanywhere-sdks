@@ -20,6 +20,7 @@
 #include "rac/core/rac_sdk_state.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
 
 // =============================================================================
 // Internal C++ State Class
@@ -47,14 +48,11 @@ class SDKState {
     rac_result_t initialize(rac_environment_t env, const char* api_key, const char* base_url,
                             const char* device_id) {
         std::lock_guard<std::mutex> lock(mutex_);
-        environment_ = env;
+        environment_ = rac_env_normalize(env);
         api_key_ = api_key ? api_key : "";
         base_url_ = base_url ? base_url : "";
-        // Staging is absolute: whatever the caller passed, requests go keyless
-        // to the baked staging backend (git-ignored dev config / CI secret).
-        // Builds without the baked URL keep the caller's URL as-is.
-        if (env == RAC_ENV_STAGING) {
-            api_key_.clear();
+        // Development (keyless OSS): fill baked staging backend URL when empty.
+        if (environment_ == RAC_ENV_DEVELOPMENT && base_url_.empty()) {
             const char* baked = rac_dev_config_get_staging_base_url();
             if (rac_dev_config_is_usable_http_url(baked)) {
                 base_url_ = baked;

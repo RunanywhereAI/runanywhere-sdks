@@ -9,15 +9,12 @@ export 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
 
 extension SDKEnvironmentExtension on SDKEnvironment {
-  /// C `rac_environment_t` value (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION).
-  /// Mirrors Swift `cEnvironment` (SDKEnvironment.swift:52-59): unknown
-  /// values map to RAC_ENV_DEVELOPMENT.
+  /// C `rac_environment_t` value (RAC_ENV_DEVELOPMENT / RAC_ENV_PRODUCTION).
+  /// Mirrors Swift `cEnvironment`: unknown values map to RAC_ENV_DEVELOPMENT.
   int get _cEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0; // RAC_ENV_DEVELOPMENT
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1; // RAC_ENV_STAGING
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2; // RAC_ENV_PRODUCTION
       default:
@@ -37,8 +34,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'Development Environment';
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 'Staging Environment';
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'Production Environment';
       default:
@@ -68,8 +63,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   bool get isCompatibleWithCurrentBuild {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return true;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         var isDebug = false;
         assert(() {
@@ -95,8 +88,6 @@ extension SDKEnvironmentExtension on SDKEnvironment {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return LogLevel.LOG_LEVEL_DEBUG;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return LogLevel.LOG_LEVEL_INFO;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return LogLevel.LOG_LEVEL_WARNING;
       default:

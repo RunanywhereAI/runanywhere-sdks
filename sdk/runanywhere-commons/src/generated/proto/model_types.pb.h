@@ -669,7 +669,6 @@ template <>
 enum SDKEnvironment : int {
   SDK_ENVIRONMENT_UNSPECIFIED = 0,
   SDK_ENVIRONMENT_DEVELOPMENT = 1,
-  SDK_ENVIRONMENT_STAGING = 2,
   SDK_ENVIRONMENT_PRODUCTION = 3,
   SDKEnvironment_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
@@ -683,7 +682,7 @@ inline constexpr SDKEnvironment SDKEnvironment_MIN =
 inline constexpr SDKEnvironment SDKEnvironment_MAX =
     static_cast<SDKEnvironment>(3);
 [[nodiscard]] inline bool SDKEnvironment_IsValid(int value) {
-  return 0 <= value && value <= 3;
+  return 0 <= value && value <= 3 && ((11u >> value) & 1) != 0;
 }
 inline constexpr int SDKEnvironment_ARRAYSIZE = 3 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL

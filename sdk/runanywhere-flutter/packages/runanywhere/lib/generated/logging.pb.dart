@@ -23,7 +23,7 @@ export 'logging.pbenum.dart';
 
 /// ---------------------------------------------------------------------------
 /// SDK logging configuration. Per-environment presets
-/// (development/staging/production) stay in each SDK as factory helpers.
+/// (development/production) stay in each SDK as factory helpers.
 /// ---------------------------------------------------------------------------
 class LoggingConfiguration extends $pb.GeneratedMessage {
   factory LoggingConfiguration({

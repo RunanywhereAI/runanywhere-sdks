@@ -19,7 +19,7 @@ export interface SDKInitOptions {
   /** API key for authentication (production/staging) */
   apiKey?: string;
 
-  /** Base URL for API requests (production: Railway endpoint) */
+  /** Base URL for API requests */
   baseURL?: string;
 
   /** SDK environment */

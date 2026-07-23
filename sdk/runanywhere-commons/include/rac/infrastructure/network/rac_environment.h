@@ -2,8 +2,8 @@
  * @file rac_environment.h
  * @brief SDK environment configuration
  *
- * Defines environment types (development, staging, production) and their
- * associated settings like authentication requirements, log levels, etc.
+ * Defines environment types (development, production) and their associated
+ * settings like authentication requirements, log levels, etc.
  * This is the canonical source of truth - platform SDKs create thin wrappers.
  */
 
@@ -27,15 +27,23 @@ extern "C" {
 /**
  * @brief SDK environment mode
  *
- * - DEVELOPMENT: Local/testing mode, no auth required, uses Supabase
- * - STAGING: Testing with real services, requires API key + URL
- * - PRODUCTION: Live environment, requires API key + HTTPS URL
+ * Product surface is two environments only:
+ * - DEVELOPMENT (0): Open-source / keyless mode. No API key. Telemetry posts
+ *   unauthenticated to the baked staging backend URL (PUBLIC org).
+ * - PRODUCTION (2): Authenticated control plane. API key → JWT; HTTPS URL.
+ *
+ * Numeric value 1 is reserved (former staging) so PRODUCTION stays at 2 for
+ * ABI/wire compatibility with shipped commons binaries.
  */
 typedef enum {
     RAC_ENV_DEVELOPMENT = 0,
-    RAC_ENV_STAGING = 1,
     RAC_ENV_PRODUCTION = 2
 } rac_environment_t;
+
+/**
+ * @brief Map legacy wire value 1 (former staging) to PRODUCTION; else identity.
+ */
+RAC_API rac_environment_t rac_env_normalize(rac_environment_t env);
 
 // Note: rac_log_level_t is defined in rac_types.h
 // We use the existing definition for consistency
@@ -52,8 +60,8 @@ typedef enum {
  */
 typedef struct {
     rac_environment_t environment;
-    const char* api_key;      // Required for staging/production
-    const char* base_url;     // Required for staging/production
+    const char* api_key;      // Required for production
+    const char* base_url;     // Required for production
     const char* device_id;    // Set by platform (Keychain UUID, etc.)
     const char* platform;     // "ios", "android", "flutter", etc.
     const char* sdk_version;  // SDK version string
@@ -79,16 +87,15 @@ typedef struct {
 /**
  * @brief Check if environment requires API authentication
  * @param env The environment to check
- * @return true for staging/production, false for development
+ * @return true for production, false for development (keyless OSS)
  */
 RAC_API bool rac_env_requires_auth(rac_environment_t env);
 
 /**
  * @brief Check whether authenticated requests are expected for this config
  *
- * Staging accepts keyless clients: with no API key configured, requests go
- * out unauthenticated and the backend attributes them to the PUBLIC org.
- * Production always expects auth; development never does.
+ * Development is keyless (PUBLIC-org telemetry) unless the caller supplies
+ * an explicit API key. Production requires a key.
  *
  * @param env The environment to check
  * @param api_key The configured API key (may be NULL or empty)
@@ -99,7 +106,8 @@ RAC_API bool rac_env_auth_expected(rac_environment_t env, const char* api_key);
 /**
  * @brief Check if environment requires a backend URL
  * @param env The environment to check
- * @return true for staging/production, false for development
+ * @return true for production; development may omit URL when the baked
+ *         OSS backend URL is present in the binary
  */
 RAC_API bool rac_env_requires_backend_url(rac_environment_t env);
 
@@ -113,28 +121,28 @@ RAC_API bool rac_env_is_production(rac_environment_t env);
 /**
  * @brief Check if environment is a testing environment
  * @param env The environment to check
- * @return true for development and staging
+ * @return true for development (non-production)
  */
 RAC_API bool rac_env_is_testing(rac_environment_t env);
 
 /**
  * @brief Get the default log level for an environment
  * @param env The environment
- * @return DEBUG for development, INFO for staging, WARNING for production
+ * @return DEBUG for development, WARNING for production
  */
 RAC_API rac_log_level_t rac_env_default_log_level(rac_environment_t env);
 
 /**
  * @brief Check if telemetry should be sent for this environment
  * @param env The environment
- * @return true only for production
+ * @return true for development (keyless PUBLIC) and production
  */
 RAC_API bool rac_env_should_send_telemetry(rac_environment_t env);
 
 /**
- * @brief Check if environment should sync with backend
+ * @brief Check if environment should sync with backend (auth/register/assignments)
  * @param env The environment
- * @return true for staging/production, false for development
+ * @return true for production, false for keyless development
  */
 RAC_API bool rac_env_should_sync_with_backend(rac_environment_t env);
 
@@ -157,7 +165,7 @@ RAC_API const char* rac_env_description(rac_environment_t env);
  * Returns a small value (3 000 ms) for `RAC_ENV_DEVELOPMENT` so the
  * device-registration / auth round-trip fails fast and the SDK can
  * proceed in offline-friendly DEV mode, and a generous value (30 000 ms)
- * for staging / production where network reliability matters more.
+ * for production where network reliability matters more.
  *
  * Platforms that own the HTTP transport (Swift URLSession, Flutter
  * Dart HttpClient, Kotlin HttpURLConnection) are encouraged to call this

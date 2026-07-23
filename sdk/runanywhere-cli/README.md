@@ -89,44 +89,50 @@ Exit codes: `0` ok · `1` runtime error · `2` usage error · `130` cancelled.
 
 ## Control plane
 
-rcli can drive any RunAnywhere control plane — including a local backend on
-`http://localhost` — with three global flags (each with an env-var fallback):
+Two SDK environments:
+
+| Who | Flags | Auth | Backend |
+|---|---|---|---|
+| OSS / no key | `--environment development` (default) | Keyless | Baked staging backend → PUBLIC org |
+| Team testing | `--environment production --base-url <https://…> --api-key $KEY` | JWT | Your team backend |
+| Customers | `--environment production --api-key $KEY` | JWT | Production backend |
 
 | Flag | Env var | Meaning |
 |---|---|---|
-| `--environment <dev\|staging\|prod>` | `RUNANYWHERE_ENVIRONMENT` | `dev` (default) is offline — no control plane. `staging` allows keyless + `http://`/localhost. `prod` requires `https://` and rejects localhost |
-| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Backend origin, e.g. `https://api.runanywhere.ai` or `http://127.0.0.1:8000` (optional on staging when the baked URL is present) |
-| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Control-plane API key (≥ 10 chars); optional on staging (keyless), required for prod |
-
-Combos are validated client-side before any network call. Passing credentials
-while in dev mode is an error. With no flags at all, every command behaves
-exactly as before (offline development mode).
+| `--environment <development\|production>` | `RUNANYWHERE_ENVIRONMENT` | `development` (default) = keyless OSS telemetry. `production` = API key + https. |
+| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Optional in development (baked staging URL in release builds). Required https for production. |
+| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Required for production (≥ 10 chars). Omit for keyless development. |
 
 ```console
-$ rcli --environment staging --base-url http://127.0.0.1:8000 --api-key $KEY auth login
-organization   293beb67-…
-device         e87d77a2-…
-token expires  2026-07-19T08:44:31Z
-device row     registered
-assignments    0 model(s)
+# OSS keyless blast → staging backend (PUBLIC org)
+# Unset ambient RUNANYWHERE_API_KEY or an invalid key will force a failed JWT login.
+$ unset RUNANYWHERE_API_KEY RUNANYWHERE_BASE_URL
+$ rcli --environment development \
+    --base-url "$STAGING_BASE_URL" \
+    telemetry blast --processing-ms 42.5
+# Release builds can omit --base-url (baked STAGING_BASE_URL).
+# CI gate: STAGING_BASE_URL=… ./scripts/ci/oss_keyless_telemetry_blast.sh
 
-$ rcli --environment staging --base-url http://127.0.0.1:8000 --api-key $KEY telemetry blast
+# Team / customer authed path
+$ rcli --environment production \
+    --base-url https://api.example.com \
+    --api-key $KEY auth login
+
+$ rcli --environment production \
+    --base-url https://api.example.com \
+    --api-key $KEY telemetry blast
 MODALITY      RESULT    STATUS      RECEIVED    STORED    SKIPPED
 llm           ok        HTTP 200    1           1         0
 …                                            (one row per modality, 12 total)
 ```
 
-- `auth login` runs the same handshake the mobile SDKs run
-  (`/api/v1/auth/sdk/authenticate` → `/api/v1/devices/register` →
-  model assignments) and exits non-zero with the server's error surfaced when
-  anything fails.
-- `telemetry emit|blast` drive the real commons telemetry pipeline: payloads
-  are batched per modality and POSTed to `/api/v2/sdk/telemetry/{modality}`
-  with the JWT from the login handshake. The V2 endpoints require a JWT, so
-  both commands log in first — one process performs login + emit (the token
-  is held in-process, not persisted). Modalities: `llm stt tts vlm rag
-  imagegen embeddings vad voice lora model system`. Exit is non-zero when any
-  POST fails or any tracked event never reached the backend.
+- `auth login` runs the authenticated handshake (`/api/v1/auth/sdk/authenticate`
+  → `/api/v1/devices/register` → model assignments). Production only.
+- `telemetry emit|blast` drive the real commons telemetry pipeline to
+  `/api/v2/sdk/telemetry/{modality}`. Development is keyless (no JWT).
+  Production logs in first. Modalities: `llm stt tts vlm rag imagegen
+  embeddings vad voice lora model system`. Exit is non-zero when any POST
+  fails or any tracked event never reached the backend.
 
 ### `rcli run` REPL
 

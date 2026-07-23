@@ -263,8 +263,6 @@ function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
   switch (env) {
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
     default:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;

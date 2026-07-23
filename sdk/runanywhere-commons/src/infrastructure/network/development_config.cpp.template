@@ -7,11 +7,12 @@
  * 2. Fill in your development values
  * 3. development_config.cpp is git-ignored, so your config won't be committed
  *
- * Only the staging backend base URL is baked here (so environment=staging can
- * run keyless with no explicit URL). CI substitutes STAGING_BASE_URL from a
- * secret; open-source builds keep the placeholder and pass a base URL
- * explicitly. No credentials, project refs, or tokens are embedded — the SDK
- * reaches the backend only through this neutral base URL.
+ * Only a neutral staging backend base URL is baked here (so
+ * environment=development can run keyless with no explicit URL). CI
+ * substitutes STAGING_BASE_URL from a secret; open-source builds keep the
+ * placeholder and pass a base URL explicitly. No credentials, project refs,
+ * or tokens are embedded — the SDK reaches the backend only through this
+ * neutral base URL.
  */
 
 #include "rac/infrastructure/network/rac_dev_config.h"
@@ -22,8 +23,9 @@
 
 namespace {
 
-// Staging backend base URL — baked into team builds so environment=staging
-// needs no explicit URL. Leave the placeholder to require an explicit URL.
+// Staging backend base URL — baked into release/CI builds so
+// environment=development needs no explicit URL. Leave the placeholder to
+// require an explicit URL for local/OSS builds without the secret.
 constexpr const char* STAGING_BASE_URL = "YOUR_STAGING_BASE_URL";
 
 }  // anonymous namespace

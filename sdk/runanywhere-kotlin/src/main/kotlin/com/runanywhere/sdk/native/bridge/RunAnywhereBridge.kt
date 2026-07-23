@@ -643,7 +643,7 @@ object RunAnywhereBridge {
 
     /**
      * Register device with backend if not already registered.
-     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param environment SDK environment (0=DEVELOPMENT, 2=PRODUCTION)
      * @param buildToken Optional build token for development mode
      */
     @JvmStatic
@@ -921,7 +921,7 @@ object RunAnywhereBridge {
      * This must be called during SDK initialization for device registration
      * to include the correct sdk_version (instead of "unknown").
      *
-     * @param environment Environment (0=development, 1=staging, 2=production)
+     * @param environment Environment (0=development, 2=production; 1 reserved)
      * @param deviceId Device ID string
      * @param platform Platform string (e.g., "android")
      * @param sdkVersion SDK version string (e.g., "0.1.0")
@@ -1454,7 +1454,7 @@ object RunAnywhereBridge {
 
     /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.
      *  Returns null on error. The 6-arg signature mirrors rac_sdk_config_t.
-     *  environment: 0 = DEVELOPMENT, 1 = STAGING, 2 = PRODUCTION. */
+     *  environment: 0 = DEVELOPMENT, 2 = PRODUCTION (1 reserved). */
     @JvmStatic external fun racAuthBuildAuthenticateRequest(
         apiKey: String,
         baseUrl: String,

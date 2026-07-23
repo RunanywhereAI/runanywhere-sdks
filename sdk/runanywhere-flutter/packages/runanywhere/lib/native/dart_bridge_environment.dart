@@ -107,8 +107,6 @@ class DartBridgeEnvironment {
       switch (environment) {
         case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
           return RacLogLevel.debug;
-        case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-          return RacLogLevel.info;
         case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
           return RacLogLevel.warning;
         default:
@@ -165,8 +163,6 @@ class DartBridgeEnvironment {
       switch (environment) {
         case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
           return 'Development Environment';
-        case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-          return 'Staging Environment';
         case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
           return 'Production Environment';
         default:
@@ -321,8 +317,6 @@ class DartBridgeEnvironment {
     switch (env) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
       default:

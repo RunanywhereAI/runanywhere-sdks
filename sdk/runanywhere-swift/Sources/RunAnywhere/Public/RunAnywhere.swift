@@ -412,7 +412,7 @@ public enum RunAnywhere {
         // Step 1: configure the Swift HTTP adapter used by callback-based
         // platform services. Auth and control-plane orchestration stay in C++.
         if await !CppBridge.HTTP.shared.isConfigured {
-            // Effective config from commons state, for every environment: staging
+            // Effective config from commons state (baked OSS URL fills development when empty)
             // resolves the baked keyless base URL, dev/prod use whatever the app
             // passed. There is no direct-to-datastore path — the backend is always
             // reached through this base URL. Auth stays in C++.

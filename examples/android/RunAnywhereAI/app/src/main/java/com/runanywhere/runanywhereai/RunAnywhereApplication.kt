@@ -103,11 +103,8 @@ class RunAnywhereApplication : Application() {
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
-        // Staging test build: keyless staging — no API key, no URL; the SDK
-        // resolves the baked staging backend URL and sends unauthenticated
-        // telemetry (PUBLIC-org ingestion). Restore the config-driven
-        // selection below to go back to production/development behavior.
-        //val environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING
+        // No API key → development (keyless OSS → baked staging backend /
+        // PUBLIC org). With key+URL → production (org-scoped JWT path).
          val environment = if (hasBackendConfig) {
              SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
          } else {

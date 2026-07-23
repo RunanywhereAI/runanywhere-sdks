@@ -80,8 +80,9 @@ struct LoginSummary {
  *   2. rac_sdk_init_phase2_proto (device registration + model-assignment
  *      fetch through the commons lifecycle orchestrator).
  *
- * Requires a staging/production environment (development mode has no control
- * plane). Idempotent within a process — a valid token short-circuits step 1.
+ * Requires production (or deprecated staging alias) with an API key.
+ * Keyless development has no JWT path — use telemetry emit/blast instead.
+ * Idempotent within a process — a valid token short-circuits step 1.
  * On failure returns a non-SUCCESS code and fills `error` with the
  * server-surfaced message (HTTP status + response body).
  */

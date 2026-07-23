@@ -1670,14 +1670,14 @@ endif()
 include(GoogleTest)
 gtest_discover_tests(rac_benchmark_tests)
 
-# --- Keyless staging live E2E (network; build on demand, not in ctest) ------
-# Proves environment=staging with no API key and no base URL resolves the
-# baked staging URL and flushes one event per modality unauthenticated.
+# --- Keyless development live E2E (network; build on demand, not in ctest) ---
+# Proves environment=development with no API key and no base URL resolves the
+# baked OSS backend URL and flushes one event per modality unauthenticated.
 find_package(CURL QUIET)
 if(CURL_FOUND)
-    add_executable(test_staging_keyless_live EXCLUDE_FROM_ALL test_staging_keyless_live.cpp)
-    target_include_directories(test_staging_keyless_live PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_link_libraries(test_staging_keyless_live PRIVATE rac_commons CURL::libcurl Threads::Threads)
-    rac_link_archive_deps(test_staging_keyless_live)
-    target_compile_features(test_staging_keyless_live PRIVATE cxx_std_17)
+    add_executable(test_development_keyless_live EXCLUDE_FROM_ALL test_development_keyless_live.cpp)
+    target_include_directories(test_development_keyless_live PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(test_development_keyless_live PRIVATE rac_commons CURL::libcurl Threads::Threads)
+    rac_link_archive_deps(test_development_keyless_live)
+    target_compile_features(test_development_keyless_live PRIVATE cxx_std_17)
 endif()
