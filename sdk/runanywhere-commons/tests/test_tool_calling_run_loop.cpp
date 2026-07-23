@@ -1507,7 +1507,118 @@ int test_disable_thinking_directive_is_engine_gated() {
         rac_proto_buffer_free(&out);
     }
 
-    // D) Universal post-hoc strip: <think> content never leaks into the answer.
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): tool_choice=NONE must attach NO grammar even on a
+// grammar backend — a "chat OR one call" grammar would invite a call the NONE
+// policy then rejects. Proves the NONE gate on the grammar path (not just the
+// prompt body).
+int test_none_attaches_no_grammar_on_grammar_backend() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Here is a direct answer."});
+
+    auto request = make_request("Answer directly.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE on grammar backend succeeds");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "NONE on grammar backend completes");
+    CHECK(result.tool_calls_size() == 0, "NONE makes no call");
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "NONE grammar-backend generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].grammar.empty(),
+              "NONE attaches NO grammar on a grammar backend (no invite-then-reject)");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): grammar constrains the DECISION turn but must be
+// dropped on a pure SYNTHESIS turn (a call ran + tools not kept) so the final
+// answer is free text; and RETAINED when tools stay available.
+int test_grammar_dropped_on_synthesis_turn() {
+    // keep_tools_available=false → grammar on turn 0, gone on synthesis turn 1.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");  // one tool: get_weather
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "decision + synthesis = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "decision turn is grammar-constrained");
+            CHECK(captures[1].grammar.empty(), "synthesis turn is unconstrained");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // keep_tools_available=true → grammar persists on the follow-up turn.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");
+        request.set_keep_tools_available(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "keep-tools decision + follow-up = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[1].grammar == "toolcall_opt:get_weather",
+                  "grammar persists on the follow-up when tools stay available");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-81: the post-hoc <think> strip is universal — thinking content never leaks
+// into the final answer regardless of engine or the disable flag.
+int test_thinking_content_stripped_from_answer() {
     if (!load_mock_llm())
         return 1;
     set_responses({"<think>secret plan</think>Visible answer."});
@@ -1557,7 +1668,10 @@ int main() {
         test_tools_present_but_unused_makes_no_call();
         test_none_suppresses_tools_and_never_calls();
         test_grammar_attached_only_for_grammar_backend();
+        test_none_attaches_no_grammar_on_grammar_backend();
+        test_grammar_dropped_on_synthesis_turn();
         test_disable_thinking_directive_is_engine_gated();
+        test_thinking_content_stripped_from_answer();
         test_max_tool_calls_capped();
         test_max_tool_calls_blocks_extra_side_effect();
         test_auto_execute_false_returns_call_without_side_effect();
