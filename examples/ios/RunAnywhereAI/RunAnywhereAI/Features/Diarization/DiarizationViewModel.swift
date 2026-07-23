@@ -45,9 +45,6 @@ final class DiarizationViewModel {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Diarization")
 
-    /// Cataloged NVIDIA Streaming Sortformer 4-speaker v2.1 FP16 (MLX).
-    private static let catalogModelID = "mlx-sortformer-4spk-v2.1-fp16"
-
     // MARK: - Model status
 
     func refreshModelStatus() {
@@ -68,7 +65,8 @@ final class DiarizationViewModel {
         let registry = ModelListViewModel.shared
         await registry.loadModelsFromRegistry()
         guard let model = catalogModel(in: registry) else {
-            error = "The Sortformer diarization model is not in the catalog."
+            error = "No speaker-diarization model is available. Import an ONNX " +
+                "Sortformer model to enable diarization."
             statusMessage = ""
             return
         }
@@ -99,9 +97,11 @@ final class DiarizationViewModel {
         }
     }
 
+    /// Pick any registered speaker-diarization model — no model-specific pin.
+    /// Mirrors the generic category-driven selection used by the other modalities
+    /// (and Android's import-your-own-`.onnx` diarization flow).
     private func catalogModel(in registry: ModelListViewModel) -> RAModelInfo? {
-        registry.availableModels.first { $0.id == Self.catalogModelID }
-            ?? registry.availableModels.first { $0.category == .speakerDiarization }
+        registry.availableModels.first { $0.category == .speakerDiarization }
     }
 
     // MARK: - Audio capture

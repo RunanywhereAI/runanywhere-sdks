@@ -491,43 +491,12 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
-        // KNOWN LIMITATION: this MLX (safetensors) Sortformer bundle is registered
-        // for catalog/UX parity, but the ONLY diarization backend in the repo is the
-        // ONNX Sortformer provider (framework .onnx) — there is no MLX diarization
-        // engine. The ONNX provider scans the model directory for a .onnx graph and
-        // fails to load an MLX weight bundle, so this row cannot actually diarize on
-        // device today. The Android example imports the .onnx graph directly and is
-        // the working reference. Replace this with the ONNX Sortformer bundle
-        // (framework .onnx) once it is hosted, or gate the demo until an MLX
-        // diarization backend exists.
-        let sortformerMLXBaseURL =
-            "https://huggingface.co/mlx-community/" +
-            "diar_streaming_sortformer_4spk-v2.1-fp16/resolve/" +
-            "e23e6404bd9859e93edbf94a740eb1c7fc58f12e"
-        await registerMultiFile(
-            id: "mlx-sortformer-4spk-v2.1-fp16",
-            name: "NVIDIA Streaming Sortformer 4-Speaker v2.1 FP16 (MLX)",
-            files: [
-                CatalogModelFile(
-                    url: "\(sortformerMLXBaseURL)/config.json",
-                    filename: "config.json",
-                    sizeBytes: 1_702,
-                    checksumSHA256:
-                        "17c9f943bed07b0593f2b8dca01e0be6a418053becc6148b01ecabdff9cbd84d"
-                ),
-                CatalogModelFile(
-                    url: "\(sortformerMLXBaseURL)/model.safetensors",
-                    filename: "model.safetensors",
-                    sizeBytes: 236_108_132,
-                    checksumSHA256:
-                        "3b60b8df29e59a8abaf8061ceeeae6e9284a68fbcd2e762c68f5e058bfceebfa"
-                )
-            ],
-            framework: .mlx,
-            modality: .speakerDiarization,
-            memoryRequirement: 600_000_000,
-            downloadSize: 236_109_834
-        )
+        // Speaker diarization is served ONLY by the generic ONNX Sortformer provider
+        // (framework .onnx) in commons — there is no MLX diarization engine. Rather
+        // than pin a model-specific MLX safetensors bundle the provider cannot load,
+        // the Diarization screen selects any registered `.speakerDiarization` model
+        // generically (matching Android's import-your-own-`.onnx` flow). No
+        // model-specific diarization catalog row is registered here.
         if mlxCatalogEnabled {
             logger.info("MLX models registered")
         } else {
