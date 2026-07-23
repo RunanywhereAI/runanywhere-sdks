@@ -114,6 +114,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 | **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) | n/a |
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) | Yes |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) | Yes |
+| **Python** (Windows/macOS/Linux) | Alpha | [pip](#python-desktop--server) | [SDK README](sdk/runanywhere-python/) | n/a |
 
 ---
 
@@ -277,6 +278,37 @@ npm install @runanywhere/web
 
 ---
 
+### Python (Desktop / Server)
+
+```python
+from runanywhere import RunAnywhere
+
+# Instantiable client + context manager; process-global native runtime underneath.
+with RunAnywhere() as ra:
+    # 1. Load a model (auto-downloads on first use)
+    llm = ra.load_llm("qwen2.5-0.5b")
+
+    # 2. Stream tokens (sync)
+    for token in llm.generate("What is the capital of France?"):
+        print(token, end="", flush=True)
+
+    # 2b. Or async
+    # async for token in llm.agenerate("..."):
+    #     ...
+
+    print(llm.generate_text("Capital of France? One word."))  # "Paris"
+```
+
+**Install via pip:**
+
+```bash
+pip install runanywhere
+```
+
+[Source code](sdk/runanywhere-python/)
+
+---
+
 ## Features
 
 | Feature | iOS | Android | Web | React Native | Flutter |
@@ -380,6 +412,7 @@ runanywhere-sdks/
 │   ├── runanywhere-web/            # Web SDK (WebAssembly / WebGPU)
 │   ├── runanywhere-react-native/   # React Native SDK
 │   ├── runanywhere-flutter/        # Flutter SDK
+│   ├── runanywhere-python/         # Python SDK (pybind11 over the C core)
 │   └── runanywhere-commons/        # Shared C/C++ core
 │
 ├── engines/                        # Pluggable inference backends

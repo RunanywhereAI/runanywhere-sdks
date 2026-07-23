@@ -411,6 +411,15 @@ for podspec in \
         "s.version          = '${NEW_VERSION}'"
 done
 
+echo ""
+echo ">> Python SDK:"
+bump_line "${REPO_ROOT}/sdk/runanywhere-python/pyproject.toml" \
+    '^version = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
+    "version = \"${NEW_VERSION}\""
+bump_line "${REPO_ROOT}/sdk/runanywhere-python/runanywhere/__init__.py" \
+    '^__version__ = "[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?"' \
+    "__version__ = \"${NEW_VERSION}\""
+
 # Release-facing current-version statements and installation examples. Replace
 # only the previous canonical suite version so unrelated tool/native versions
 # and historical changelogs remain untouched.

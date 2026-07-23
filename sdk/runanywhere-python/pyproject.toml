@@ -1,0 +1,111 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "runanywhere"
+version = "0.20.11"
+description = "RunAnywhere SDK — on-device AI inference (LLM, ASR, TTS, embeddings) with a native runtime core."
+readme = "README.md"
+requires-python = ">=3.9"
+# Custom license (RunAnywhere License 1.0, incorporating Apache-2.0). Reference the LICENSE
+# file (now copied into the SDK dir + shipped in the sdist) so its text lands in the wheel/sdist
+# METADATA. The old `{ text = "SEE LICENSE IN ../../LICENSE" }` pointed two levels outside every
+# artifact and shipped no license text at all. The classic `{ file = ... }` form is used (not a
+# PEP 639 SPDX string) for maximum build-backend compatibility.
+license = { file = "LICENSE" }
+authors = [{ name = "RunAnywhere" }]
+keywords = ["ai", "llm", "asr", "tts", "embeddings", "on-device", "inference"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: C++",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy>=1.21"]
+
+[project.optional-dependencies]
+# httpx is needed by fastapi's TestClient (tests/test_server.py); protobuf lets the hermetic
+# RAG tests (tests/test_rag.py) build proto bytes and exercise the facade. Both are test-only.
+test = ["pytest>=7", "httpx>=0.24", "protobuf>=5.29,<7"]
+# The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
+# plain `pip install runanywhere` stays numpy + stdlib only.
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.18"]
+# RAG (`runanywhere.rag` / RunAnywhere.create_rag). The native core already carries the RAG
+# pipeline; this extra just adds the protobuf runtime the facade uses to (de)serialize the
+# rac_rag_*_proto byte ABI. The generated *_pb2.py were built with protoc 5.29; protobuf's
+# cross-version runtime guarantee covers gencode V with runtime V and V+1, so we cap below 7
+# (the V+2 "poison pill") while still allowing the 5.x/6.x that grpcio and friends pull in.
+# A plain `pip install runanywhere` stays protobuf-free.
+rag = ["protobuf>=5.29,<7"]
+
+[project.scripts]
+runanywhere = "runanywhere.__main__:main"
+
+[tool.scikit-build]
+cmake.source-dir = "../.."
+cmake.version = ">=3.24"
+cmake.args = [
+    "-DRAC_BUILD_PYTHON_MODULE=ON",
+    "-DRAC_BUILD_BACKENDS=ON",
+    "-DRAC_STATIC_PLUGINS=ON",
+    "-DRAC_BUILD_SHARED=OFF",
+    "-DRAC_BUILD_PLATFORM=OFF",
+    # RAG: fold the RAG pipeline (rac_rag_*_proto) into rac_commons and build the
+    # protobuf runtime it needs. Both default ON for native builds, but pin them
+    # explicitly so the RAG bindings can never silently degrade to unavailable
+    # stubs on a default-drift. Protobuf is vendored + namespace-isolated (static),
+    # so the wheel stays self-contained — no extra sidecar to repair.
+    "-DRAC_BACKEND_RAG=ON",
+    "-DRAC_ENABLE_PROTOBUF=ON",
+]
+# Optional accelerator/engine backends are additive build-flag opt-ins (native/CMakeLists.txt
+# links + registers whatever rac_backend_<x> targets a build produces). Enable per build via
+# scikit-build config-settings, e.g.:
+#   GPU (NVIDIA):  pip install . --config-settings=cmake.define.RAC_GPU_CUDA=ON
+#   Hexagon NPU:   pip install . -C cmake.define.RAC_BACKEND_QHEXRT=ON -C cmake.define.QHEXRT_ROOT=<prebuilt tree>
+# (QHexRT requires its prebuilt archive for the target arch under QHEXRT_ROOT; on a supported
+#  NPU host it self-registers at priority 150 and load_llm/etc. auto-route to it.)
+build.targets = ["runanywhere_core"]
+# Install ONLY our module's component (native/CMakeLists tags it `python_module`), so the
+# transitive commons/llama/zlib install rules (headers, static .libs, cmake, docs) stay out
+# of the wheel — the wheel carries just _core + the pure-Python package.
+install.components = ["python_module"]
+wheel.packages = ["runanywhere"]
+wheel.install-dir = "runanywhere/_native"
+
+[tool.scikit-build.cmake.define]
+CMAKE_BUILD_TYPE = "Release"
+
+# Scope the sdist to the SDK's own sources. Without this, scikit-build-core would archive the
+# whole cmake.source-dir (the monorepo root, incl. build/ and .git) — hundreds of MB. In a
+# clean checkout runanywhere/_native/ holds only the loader + stub (the compiled _core and
+# sidecar libs are gitignored/absent), so the sdist is pure source; a local tree that has run
+# bundle_native.py will carry those binaries, which is a dev-only artifact, not a release one.
+[tool.scikit-build.sdist]
+include = [
+    "runanywhere",
+    "native",
+    "README.md",
+    "LICENSE",
+    "PACKAGING.md",
+]
+
+[tool.cibuildwheel]
+build-frontend = "build"
+# [server] so tests/test_server.py runs (fastapi/uvicorn/multipart); [test] adds pytest + httpx.
+test-extras = ["server", "test"]
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.windows]
+repair-wheel-command = "delvewheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"

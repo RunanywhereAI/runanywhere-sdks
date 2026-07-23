@@ -403,6 +403,19 @@ venv*/
 __pycache__/
 *.pyc
 
+# Python SDK build artifacts (native module + wheels are local/CI-built, never committed).
+# The compiled _core (.pyd/.so/.dylib) + sidecar libs land in runanywhere/_native/ but the
+# committed runanywhere/_native/__init__.py loader and _core.pyi stubs are kept tracked.
+*.pyd
+*.egg-info/
+sdk/runanywhere-python/wheelhouse/
+sdk/runanywhere-python/runanywhere/_native/onnxruntime*.dll
+sdk/runanywhere-python/runanywhere/_native/*onnxruntime*.so*
+sdk/runanywhere-python/runanywhere/_native/*onnxruntime*.dylib
+sdk/runanywhere-python/runanywhere/_native/*sherpa-onnx*
+sdk/runanywhere-python/runanywhere/_native/cudart64_*.dll
+sdk/runanywhere-python/runanywhere/_native/cublas*64_*.dll
+
 *.trace
 
 # Local detailed validation runs and MCP evidence
