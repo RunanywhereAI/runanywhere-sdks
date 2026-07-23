@@ -146,11 +146,15 @@ fun VoiceScreen() {
         scope.launch {
             isPreparing = true
             try {
-                // Sequential so per-component progress reads cleanly and memory stays bounded.
+                // Sequential so per-component progress reads cleanly and memory stays
+                // bounded. Best-effort: download (and load) EVERY component. A load
+                // failure on one model — e.g. a 2nd NPU model that can't co-reside with
+                // the first in the single Hexagon slot — must NOT abort downloading the
+                // remaining required models (this used to `break` here, so it stopped
+                // after the first and left the rest un-downloaded).
                 for (component in components) {
                     val model = component.model ?: continue
-                    val ok = component.viewModel.prepare(model)
-                    if (!ok && !component.optional) break
+                    component.viewModel.prepare(model)
                 }
             } finally {
                 isPreparing = false
