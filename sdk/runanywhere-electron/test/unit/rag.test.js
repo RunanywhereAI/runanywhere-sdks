@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { RagSession } = require('../../dist/rag');
+const { isSDKException, ErrorCode } = require('../../dist/errors');
 const { RAGConfiguration, RAGQueryOptions, RAGResult, RAGStatistics } = require('../../dist/proto/rag');
 
 // A fake of the low-level bridge (window.runanywhere.rag*), recording calls.
@@ -19,8 +20,13 @@ function fakeBridge() {
   };
 }
 
-test('RagSession.create requires an embedding model id', async () => {
-  await assert.rejects(() => RagSession.create(fakeBridge(), {}), /embeddingModelId is required/);
+test('RagSession.create requires an embedding model id (throws SDKException)', async () => {
+  await assert.rejects(() => RagSession.create(fakeBridge(), {}), (e) => {
+    assert.ok(isSDKException(e), 'must be an SDKException, not a bare Error');
+    assert.equal(e.code, ErrorCode.INVALID_ARGUMENT);
+    assert.match(e.message, /embeddingModelId is required/);
+    return true;
+  });
 });
 
 test('RagSession threads the native handle through ingest/query/close', async () => {
@@ -51,8 +57,9 @@ test('RagSession.close is idempotent and blocks further use', async () => {
   await s.close();
   await s.close(); // no throw, no second destroy
   assert.equal(b.calls.filter((c) => c[0] === 'destroy').length, 1);
-  await assert.rejects(() => s.ingest('x'), /closed/);
-  await assert.rejects(() => s.query('x'), /closed/);
+  const closedErr = (e) => { assert.ok(isSDKException(e), 'closed-session error is an SDKException'); assert.match(e.message, /closed/); return true; };
+  await assert.rejects(() => s.ingest('x'), closedErr);
+  await assert.rejects(() => s.query('x'), closedErr);
 });
 
 test('ingestMany ingests in order and returns the final stats', async () => {
