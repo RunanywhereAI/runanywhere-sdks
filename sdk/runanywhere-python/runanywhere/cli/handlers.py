@@ -407,8 +407,12 @@ def handle_voice(args: argparse.Namespace) -> int:
 
 # --------------------------------------------------------------------------- info
 def handle_backends(args: argparse.Namespace) -> int:
-    with _client(args) as ra:
-        backends = ra.available_backends()
+    try:
+        with _client(args) as ra:
+            backends = ra.available_backends()
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
     if args.json:
         output.emit_json({"backends": backends})
     else:
@@ -431,8 +435,12 @@ def handle_info(args: argparse.Namespace) -> int:
     from .. import __version__
 
     total, avail = _memory_info()
-    with _client(args) as ra:
-        backends = ra.available_backends()
+    try:
+        with _client(args) as ra:
+            backends = ra.available_backends()
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
     info = {"runanywhere": __version__, "platform": sys.platform, "models_dir": models_root(),
             "backends": backends, "memory_total_bytes": total, "memory_available_bytes": avail}
     if args.json:
