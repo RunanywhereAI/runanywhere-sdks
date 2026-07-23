@@ -9,13 +9,21 @@
 name: OSS keyless telemetry
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/oss-keyless-telemetry.yml"
+      - "scripts/ci/oss_keyless_telemetry_blast.sh"
+      - "sdk/runanywhere-cli/**"
+      - "sdk/runanywhere-commons/src/infrastructure/network/**"
+      - "sdk/runanywhere-commons/src/lifecycle/**"
+      - "sdk/runanywhere-commons/src/core/sdk_state.cpp"
   schedule:
-    # Daily 08:00 UTC — not on PRs/pushes (avoids burning macos runners every merge).
+    # Daily 08:00 UTC — light cadence for Staging drift.
     - cron: "0 8 * * *"
   workflow_dispatch: {}
 
 concurrency:
-  group: ${{ github.workflow }}-scheduled
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
