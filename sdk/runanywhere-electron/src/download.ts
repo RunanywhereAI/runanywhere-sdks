@@ -369,7 +369,17 @@ export function parseHfUrl(u: string): { repo: string; file?: string } | null {
   const kind = parts[2]; // tree | blob | resolve | undefined (repo root)
   if (kind === 'resolve') return null; // a /resolve/ URL is already a direct download
   if (kind === 'blob' && parts.length >= 5) {
-    return { repo, file: decodeURIComponent(parts.slice(4).join('/')) };
+    const raw = parts.slice(4).join('/');
+    // A malformed percent-escape (e.g. "%ZZ") makes decodeURIComponent throw a
+    // URIError; fall back to the raw path so resolveModel surfaces its clean
+    // "invalid model URL" message instead of a bare URIError.
+    let file: string;
+    try {
+      file = decodeURIComponent(raw);
+    } catch {
+      file = raw;
+    }
+    return { repo, file };
   }
   return { repo };
 }
