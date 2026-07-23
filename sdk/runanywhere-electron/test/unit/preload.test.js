@@ -81,7 +81,7 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   const api = exposed.runanywhere;
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
-    'ready', 'version', 'initialize', 'onEvent', 'catalog', 'modelStatus', 'downloadModel',
+    'ready', 'version', 'initialize', 'onEvent', 'splitThinking', 'catalog', 'modelStatus', 'downloadModel',
     'loadLLM', 'generate', 'generateStream', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
@@ -93,6 +93,14 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
   }
+});
+
+test('splitThinking bridge splits reasoning from the answer', { skip: SKIP }, () => {
+  const { exposed } = freshPreload();
+  assert.deepEqual(exposed.runanywhere.splitThinking('<think>ponder</think>Answer.'), {
+    thinking: 'ponder',
+    response: 'Answer.',
+  });
 });
 
 test('generateObject builds a grammar, accumulates the stream, and parses JSON', { skip: SKIP }, async () => {
