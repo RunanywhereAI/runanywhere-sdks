@@ -235,16 +235,18 @@ contextBridge.exposeInMainWorld('runanywhere', {
     send('ragCreateSession', [RAGConfiguration.encode(RAGConfiguration.fromPartial(config)).finish()]) as Promise<number>,
   ragIngest: async (handle: number, doc: RagDoc): Promise<RagStats> => {
     const bytes = RAGDocument.encode(RAGDocument.fromPartial(doc)).finish();
-    return RAGStatistics.decode(new Uint8Array((await send('ragIngest', [handle, bytes])) as Uint8Array)) as RagStats;
+    // send() already resolves a Uint8Array (a Buffer degrades to one across the
+    // MessagePort) and decode() accepts it directly — no re-wrap/copy needed.
+    return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
   },
   ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
     const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
-    return RAGResult.decode(new Uint8Array((await send('ragQuery', [handle, bytes])) as Uint8Array)) as RagResult;
+    return RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array) as RagResult;
   },
   ragStats: async (handle: number): Promise<RagStats> =>
-    RAGStatistics.decode(new Uint8Array((await send('ragStats', [handle])) as Uint8Array)) as RagStats,
+    RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,
   ragClear: async (handle: number): Promise<RagStats> =>
-    RAGStatistics.decode(new Uint8Array((await send('ragClear', [handle])) as Uint8Array)) as RagStats,
+    RAGStatistics.decode((await send('ragClear', [handle])) as Uint8Array) as RagStats,
   ragDestroySession: (handle: number): Promise<void> => send('ragDestroySession', [handle]) as Promise<void>,
 
   secureSet: (key: string, value: string) => send('secureSet', [key, value]),
