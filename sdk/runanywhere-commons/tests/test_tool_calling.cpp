@@ -707,6 +707,122 @@ int test_validate_proto_round_trip() {
 #endif
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+// Drives rac_tool_call_format_prompt_proto and returns the formatted prompt.
+std::string format_prompt_via_proto(const runanywhere::v1::ToolPromptFormatRequest& request) {
+    std::string request_bytes;
+    if (!request.SerializeToString(&request_bytes)) {
+        return {};
+    }
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    std::string out;
+    if (rac_tool_call_format_prompt_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                          request_bytes.size(), &result_bytes) == RAC_SUCCESS &&
+        result_bytes.data != nullptr) {
+        runanywhere::v1::ToolPromptFormatResult format_result;
+        if (format_result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size))) {
+            out = format_result.formatted_prompt();
+        }
+    }
+    rac_proto_buffer_free(&result_bytes);
+    return out;
+}
+
+runanywhere::v1::ToolDefinition make_named_tool(const char* name) {
+    runanywhere::v1::ToolDefinition tool;
+    tool.set_name(name);
+    tool.set_description("test tool");
+    auto* p = tool.add_parameters();
+    p->set_name("q");
+    p->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+    p->set_required(true);
+    return tool;
+}
+#endif
+
+// RUN-80 (review follow-up): tool_choice=REQUIRED appends one firm directive on
+// the initial tool-advertising turn, and ONLY there — never for AUTO/NONE nor on
+// a follow-up (tool_results present).
+int test_required_appends_firm_directive() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    const char* kFirm = "You must call exactly one tool now.";
+    const auto build = [](runanywhere::v1::ToolChoiceMode choice, bool with_result) {
+        runanywhere::v1::ToolPromptFormatRequest req;
+        req.set_user_prompt("Do the thing.");
+        auto* opt = req.mutable_options();
+        opt->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+        opt->set_tool_choice(choice);
+        *opt->add_tools() = make_named_tool("do_thing");
+        if (with_result) {
+            auto* tr = req.add_tool_results();
+            tr->set_name("do_thing");
+            tr->set_result_json("{\"ok\":true}");
+        }
+        return req;
+    };
+
+    ASSERT_TRUE(format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED, false))
+                    .find(kFirm) != std::string::npos);
+    ASSERT_TRUE(format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_AUTO, false))
+                    .find(kFirm) == std::string::npos);
+    ASSERT_TRUE(format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_NONE, false))
+                    .find(kFirm) == std::string::npos);
+    // REQUIRED follow-up turn (tool already ran) must NOT re-demand a call.
+    ASSERT_TRUE(format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED, true))
+                    .find(kFirm) == std::string::npos);
+    return 0;
+#endif
+}
+
+// RUN-80 (review follow-up): a tool_choice=NONE follow-up (tool_results present)
+// never re-advertises the tools body nor invites "use another tool", even when
+// the caller set keep_tools_available — across both the single- and multi-result
+// paths. Positive control: keep_tools_available WITHOUT NONE re-advertises.
+int test_none_followup_suppresses_tools() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    const auto build = [](runanywhere::v1::ToolChoiceMode choice, int num_results) {
+        runanywhere::v1::ToolPromptFormatRequest req;
+        req.set_user_prompt("Summarize the results.");
+        auto* opt = req.mutable_options();
+        opt->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+        opt->set_tool_choice(choice);
+        opt->set_keep_tools_available(true);
+        *opt->add_tools() = make_named_tool("do_thing");
+        for (int i = 0; i < num_results; ++i) {
+            auto* tr = req.add_tool_results();
+            tr->set_name("do_thing");
+            tr->set_result_json("{\"ok\":true}");
+        }
+        return req;
+    };
+
+    // NONE single-result follow-up: the tools body is NOT re-advertised.
+    {
+        const std::string p = format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_NONE, 1));
+        ASSERT_TRUE(p.find("# TOOLS") == std::string::npos);
+        ASSERT_TRUE(p.find("You may use another tool") == std::string::npos);
+    }
+    // NONE multi-result follow-up: same suppression + explicit "Do not emit" text.
+    {
+        const std::string p = format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_NONE, 2));
+        ASSERT_TRUE(p.find("# TOOLS") == std::string::npos);
+        ASSERT_TRUE(p.find("Do not emit tool calls") != std::string::npos);
+        ASSERT_TRUE(p.find("You may use another tool") == std::string::npos);
+    }
+    // Positive control: keep_tools_available WITHOUT NONE re-advertises the tools.
+    {
+        const std::string p = format_prompt_via_proto(build(runanywhere::v1::TOOL_CHOICE_MODE_AUTO, 1));
+        ASSERT_TRUE(p.find("# TOOLS") != std::string::npos);
+    }
+    return 0;
+#endif
+}
+
 struct TestCase {
     const char* name;
     int (*fn)();
@@ -732,6 +848,8 @@ int main(int argc, char** argv) {
         {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
         {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
+        {.name = "required_appends_firm_directive", .fn = test_required_appends_firm_directive},
+        {.name = "none_followup_suppresses_tools", .fn = test_none_followup_suppresses_tools},
         {.name = "tool_result_loop", .fn = test_tool_result_loop},
         {.name = "validate_tool_call_definitions", .fn = test_validate_tool_call_definitions},
         {.name = "validate_tool_call_json_definitions",
