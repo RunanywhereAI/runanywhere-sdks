@@ -516,19 +516,27 @@ function wireUi() {
     if (ragSession == null) { $('ragstats').textContent = ''; return; }
     try { const s = await ra.ragClear(ragSession); $('ragstats').textContent = ragStatsText(s); $('ragout').textContent = ''; renderRagSources([]); } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
   });
+  let ragQuerying = false;
   const askRag = async () => {
+    if (ragQuerying) return; // one query at a time (Enter can re-fire past the disabled button)
     const q = $('ragq').value.trim();
     if (!q) return;
-    $('ragask').disabled = true; $('ragout').innerHTML = '…'; renderRagSources([]);
+    ragQuerying = true;
+    $('ragask').disabled = true; $('ragq').value = ''; $('ragout').innerHTML = '…'; renderRagSources([]);
     setStatus('retrieving + answering…');
     try {
       const h = await ragEnsureSession();
       const res = await ra.ragQuery(h, { question: q, maxTokens: settings.maxTokens, temperature: settings.temperature });
-      // Reuse the chat's thinking-aware renderer so <think> shows collapsibly.
-      $('ragout').innerHTML = assistantHtml(res.thinkingContent ? `<think>${res.thinkingContent}</think>${res.answer}` : res.answer);
+      // Render reasoning + answer SEPARATELY (commons already split thinkingContent
+      // out) — do NOT re-wrap in <think> tags, or a literal </think> in retrieved
+      // document text would mis-split the answer into the reasoning drawer.
+      const reason = res.thinkingContent
+        ? `<details class="reason"><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(res.thinkingContent)}</div></details>`
+        : '';
+      $('ragout').innerHTML = reason + md(res.answer || '');
       renderRagSources(res.retrievedChunks);
     } catch (e) { $('ragout').textContent = 'error: ' + e.message; }
-    finally { $('ragask').disabled = false; setStatus('ready'); }
+    finally { ragQuerying = false; $('ragask').disabled = false; setStatus('ready'); }
   };
   $('ragask').addEventListener('click', askRag);
   $('ragq').addEventListener('keydown', (e) => { if (e.key === 'Enter') askRag(); });
