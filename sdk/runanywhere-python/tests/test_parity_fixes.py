@@ -66,22 +66,34 @@ def test_is_remote_source_matches_js_semantics(value, expected):
 
 
 # --------------------------------------------------------------------------
-# events.py — a listener raising BaseException must not break the emit
+# events.py — a listener raising a normal Exception is isolated, but a control-flow
+# BaseException (KeyboardInterrupt / CancelledError / SystemExit) must PROPAGATE, not be
+# silently swallowed. (A literal port of Electron's catch-all `catch {}` would have eaten
+# Ctrl-C — the Python-correct behavior catches Exception, not BaseException.)
 # --------------------------------------------------------------------------
-def test_emit_isolates_base_exception_listeners():
-    class Boom(BaseException):
-        pass
-
+def test_emit_isolates_exception_but_propagates_base():
     seen: list[object] = []
     b = EventBus()
+
+    def raises_exc(_e):
+        raise RuntimeError("boom")
+
+    b.on(raises_exc)
+    b.on(seen.append)
+    b.emit(InitializedEvent())  # a normal Exception is isolated
+    assert len(seen) == 1  # the second listener still ran
+
+    class Boom(BaseException):
+        pass
 
     def raises_base(_e):
         raise Boom()
 
-    b.on(raises_base)
-    b.on(seen.append)
-    b.emit(InitializedEvent())  # must not propagate Boom
-    assert len(seen) == 1  # the second listener still ran
+    b2 = EventBus()
+    b2.on(raises_base)
+    b2.on(seen.append)
+    with pytest.raises(Boom):
+        b2.emit(InitializedEvent())  # a BaseException is NOT swallowed — it propagates
 
 
 # --------------------------------------------------------------------------
