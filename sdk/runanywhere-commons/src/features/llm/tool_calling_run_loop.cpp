@@ -461,6 +461,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     }
     for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
+        // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
+        ctx.generation.tool_names.push_back(tool.name());
     }
     std::string tool_choice_error;
     if (!apply_explicit_tool_choice(&ctx, &tool_choice_error)) {
@@ -503,6 +505,12 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         rac_result_t rc = RAC_SUCCESS;
         auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
             ctx.generation, iteration, ctx.has_tool_choice, ctx.tool_choice, ctx.format);
+        // Grammar-constrain (QHexRT) only while the model may still call a tool this
+        // turn. Once a call has run and tools are NOT kept available, this is a pure
+        // synthesis turn — leave decoding unconstrained so the answer is free text.
+        if (final_result.tool_calls_size() > 0 && !ctx.keep_tools_available) {
+            step_generation.tool_names.clear();
+        }
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &cancel_state->active_ref_mu, &cancel_state->active_ref,
             &cancel_state->cancel_requested, &cancel_state->generation_started};
