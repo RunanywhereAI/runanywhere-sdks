@@ -53,6 +53,13 @@ class VoiceViewModel : ViewModel() {
     private var cleanupJob: Job? = null
     private var assistantTurnIndex: Int? = null
 
+    // True while the in-flight turn's transcript is an STT non-speech hallucination
+    // (e.g. "[BLANK_AUDIO]", "[wind blowing]" on silence). Such a turn's user/
+    // assistant text is kept out of the UI so an always-on session does not fill
+    // the transcript with — and appear to loop over — its own ambient noise. The
+    // SDK separately mutes the phantom reply's audio.
+    private var phantomTurn = false
+
     // NPU per-turn-swap path: a single-slot Hexagon NPU cannot hold the STT and the chat LLM at once, so
     // the shared voice-agent (which requires all components co-resident) can't run there. When both the
     // recognizer and the chat model are QHexRT we drive the turn manually — record -> transcribe (loads
@@ -156,7 +163,10 @@ class VoiceViewModel : ViewModel() {
                 state = VoiceState.TRANSCRIBING
                 withContext(Dispatchers.IO) { RunAnywhere.loadModel(RAModelLoadRequest(model_id = stt.id)) }
                 val transcript = RunAnywhere.transcribe(audio).text.trim()
-                if (transcript.isBlank()) { state = VoiceState.IDLE; return@launch }
+                // Drop blank + non-speech hallucinations ("[BLANK_AUDIO]", "[wind
+                // blowing]") so this push-to-talk NPU-swap path ignores them the
+                // same way the streaming handleEvent path does.
+                if (isNonSpeechTranscript(transcript)) { state = VoiceState.IDLE; return@launch }
                 turns += VoiceTurn(transcript, isUser = true)
                 assistantTurnIndex = null
                 // 2. Load the chat LLM (evicts Whisper) and produce the reply.
@@ -294,22 +304,29 @@ class VoiceViewModel : ViewModel() {
         }
         event.user_said?.let { userSaid ->
             val text = userSaid.text.trim()
-            if (userSaid.is_final && text.isNotBlank()) {
-                turns += VoiceTurn(text, isUser = true)
-                assistantTurnIndex = null
+            if (userSaid.is_final) {
+                // Drop phantom (non-speech hallucination) turns from the UI; the
+                // SDK mutes their audio, so the whole turn is silently ignored.
+                phantomTurn = isNonSpeechTranscript(text)
+                if (!phantomTurn && text.isNotBlank()) {
+                    turns += VoiceTurn(text, isUser = true)
+                    assistantTurnIndex = null
+                }
             }
         }
         event.agent_response_started?.let {
-            state = VoiceState.THINKING
-            ensureAssistantTurn()
+            if (!phantomTurn) {
+                state = VoiceState.THINKING
+                ensureAssistantTurn()
+            }
         }
         event.assistant_token?.let { token ->
-            if (token.text.isNotEmpty() && token.kind.isDisplayableVoiceAnswer()) {
+            if (!phantomTurn && token.text.isNotEmpty() && token.kind.isDisplayableVoiceAnswer()) {
                 state = VoiceState.THINKING
                 appendAssistantToken(token.text)
             }
         }
-        if (event.audio != null || event.agent_response_completed != null) {
+        if (!phantomTurn && (event.audio != null || event.agent_response_completed != null)) {
             state = VoiceState.SPEAKING
         }
         event.session_stopped?.let { state = VoiceState.IDLE }
@@ -361,3 +378,21 @@ class VoiceViewModel : ViewModel() {
 
 internal fun TokenKind.isDisplayableVoiceAnswer(): Boolean =
     this == TokenKind.TOKEN_KIND_ANSWER || this == TokenKind.TOKEN_KIND_UNSPECIFIED
+
+// True when the transcript carries no real speech — empty, or nothing but
+// bracketed/parenthesized non-speech tags ("[BLANK_AUDIO]", "[wind blowing]",
+// "(music)"), punctuation, or symbols. Mirrors the SDK-side guard; kept local
+// because the SDK's copy is module-internal. Real speech always leaves an
+// alphanumeric char outside any tag, so genuine utterances are never dropped.
+internal fun isNonSpeechTranscript(text: String?): Boolean {
+    if (text.isNullOrEmpty()) return true
+    var depth = 0
+    for (c in text) {
+        when (c) {
+            '[', '(', '{', '<' -> depth++
+            ']', ')', '}', '>' -> if (depth > 0) depth--
+            else -> if (depth == 0 && c.isLetterOrDigit()) return false
+        }
+    }
+    return true
+}
