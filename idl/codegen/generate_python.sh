@@ -31,8 +31,18 @@ sed -i.bak 's/^import rac_options_pb2 as/from runanywhere._proto import rac_opti
     "${OUT_DIR}/rag_pb2.py"
 rm -f "${OUT_DIR}/rag_pb2.py.bak"
 
+# Emit the repo-standard module preamble: protoc's generated modules carry a docstring but not
+# `from __future__ import annotations`. Insert it right after the module docstring (so it stays
+# the first statement, before the protobuf imports) in each generated module.
+for _f in rag_pb2.py rac_options_pb2.py; do
+    sed -i.bak '/^"""Generated protocol buffer code."""$/a from __future__ import annotations' \
+        "${OUT_DIR}/${_f}"
+    rm -f "${OUT_DIR}/${_f}.bak"
+done
+
 cat > "${OUT_DIR}/__init__.py" <<'EOF'
 """Generated protobuf modules (do not edit; run idl/codegen/generate_python.sh)."""
+from __future__ import annotations
 EOF
 
 echo "[OK] wrote ${OUT_DIR}/{rac_options_pb2.py, rag_pb2.py, __init__.py}"
