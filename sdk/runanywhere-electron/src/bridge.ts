@@ -47,6 +47,16 @@ export interface NativeAddon {
   synthesize(handle: number, text: string): { sampleRate: number; samples: Float32Array };
   unloadTtsVoice(handle: number): void;
   shutdown(): void;
+  // Model registry + RAG (proto-byte). registerModel populates commons' global
+  // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
+  // and return serialized runanywhere.v1 RAG protos as bytes.
+  registerModel(id: string, localPath: string, category?: number, framework?: number): void;
+  ragCreateSession(configProtoBytes: Uint8Array): number;
+  ragIngest(handle: number, documentProtoBytes: Uint8Array): Uint8Array;
+  ragQuery(handle: number, queryProtoBytes: Uint8Array): Uint8Array;
+  ragStats(handle: number): Uint8Array;
+  ragClear(handle: number): Uint8Array;
+  ragDestroySession(handle: number): void;
 }
 
 function resolveAddon(): NativeAddon {
