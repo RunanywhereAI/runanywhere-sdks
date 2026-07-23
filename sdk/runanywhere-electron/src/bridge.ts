@@ -52,8 +52,10 @@ export interface NativeAddon {
   // and return serialized runanywhere.v1 RAG protos as bytes.
   registerModel(id: string, localPath: string, category?: number, framework?: number): void;
   ragCreateSession(configProtoBytes: Uint8Array): number;
-  ragIngest(handle: number, documentProtoBytes: Uint8Array): Uint8Array;
-  ragQuery(handle: number, queryProtoBytes: Uint8Array): Uint8Array;
+  // ingest/query run on a worker thread (embedding / LLM generation), so they
+  // return a Promise; the utility-host dispatch awaits it.
+  ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragStats(handle: number): Uint8Array;
   ragClear(handle: number): Uint8Array;
   ragDestroySession(handle: number): void;
