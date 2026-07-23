@@ -20,7 +20,7 @@ const TOOLS = [
 ];
 
 // ---- settings + conversations + custom models (persisted via demoStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256 };
+let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -69,6 +69,31 @@ function md(text) {
   return s.replace(/(\d+)/g, (_m, i) => `<pre><code>${blocks[+i]}</code></pre>`);
 }
 
+// Split a reasoning model's <think>…</think> from its answer. Mirrors the SDK's
+// splitThinking (also on window.runanywhere.splitThinking) — inlined here for the
+// per-token streaming hot path so we don't cross the context bridge each token.
+function splitThink(text) {
+  if (!text) return { response: '', thinking: '' };
+  const closed = /<(think|thinking)>([\s\S]*?)<\/\1>/i.exec(text);
+  if (closed) return { thinking: closed[2].trim(), response: (text.slice(0, closed.index) + text.slice(closed.index + closed[0].length)).trim() };
+  const open = /<(think|thinking)>/i.exec(text);
+  if (open) return { response: text.slice(0, open.index).trim(), thinking: text.slice(open.index + open[0].length).trim() };
+  return { response: text.trim(), thinking: '' };
+}
+// Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
+// above the rendered answer. `streaming` keeps reasoning open + shows a
+// placeholder while the answer is still empty.
+function assistantHtml(raw, streaming) {
+  const { response, thinking } = splitThink(raw || '');
+  let out = '';
+  if (thinking) {
+    const open = streaming && !response ? ' open' : '';
+    out += `<details class="reason"${open}><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(thinking)}</div></details>`;
+  }
+  out += md(response || (streaming ? '…' : ''));
+  return out;
+}
+
 // ---- conversations ----
 const activeConv = () => conversations.find((c) => c.id === activeId);
 function newConversation() {
@@ -94,7 +119,7 @@ function renderSidebar() {
   }
 }
 function bubbleHtml(m) {
-  const body = m.role === 'assistant' ? md(m.content || '…') : escapeHtml(m.content);
+  const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
   const metrics = m.metrics ? `<div class="metrics">⚡ ${m.metrics.tokens} tokens · ${m.metrics.tps.toFixed(1)} tok/s · TTFT ${Math.round(m.metrics.ttft)}ms</div>` : '';
   const av = m.role === 'assistant' ? '✦' : 'U';
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
@@ -128,7 +153,11 @@ function renderChat() {
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
 }
 function buildPrompt(priorMessages, userText) {
-  let p = settings.systemPrompt + '\n\n';
+  let sys = settings.systemPrompt;
+  // Reasoning mode: ask the model to think in <think></think> first. The SDK's
+  // splitThinking (mirrored by assistantHtml) peels that back out for display.
+  if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
+  let p = sys + '\n\n';
   for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
   return p + 'User: ' + userText + '\nAssistant:';
 }
@@ -159,7 +188,7 @@ async function sendChat() {
       const h = await llm();
       await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
         if (e.isFinal) { result = e.result; }
-        else { asst.content += e.token; bubble.innerHTML = md(asst.content); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
+        else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
       });
     };
     try {
@@ -360,9 +389,10 @@ function applySettingsToUi() {
   $('setsystem').value = settings.systemPrompt;
   $('settemp').value = settings.temperature; $('settempval').textContent = settings.temperature;
   $('setmax').value = settings.maxTokens;
+  if ($('setreason')) $('setreason').checked = !!settings.reasoning;
 }
 async function saveSettings() {
-  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256 };
+  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256, reasoning: !!($('setreason') && $('setreason').checked) };
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
