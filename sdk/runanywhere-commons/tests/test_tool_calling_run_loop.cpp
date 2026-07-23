@@ -1433,6 +1433,105 @@ int test_grammar_attached_only_for_grammar_backend() {
     return 0;
 }
 
+// RUN-81: disable_thinking is enforced at generation. Engines that do NOT
+// self-suppress (llama.cpp/onnx/cloud) get the "/no_think" directive prepended;
+// QHexRT (which suppresses natively + strips the token) does NOT. The flag itself
+// always reaches the backend, and the post-hoc <think> strip stays universal.
+int test_disable_thinking_directive_is_engine_gated() {
+    const std::string kNoThink = "/no_think\n";
+
+    // A) Non-native engine (llama.cpp) + disable → flag set AND directive prepended.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        request.set_disable_thinking(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "disable+llamacpp generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].disable_thinking, "disable_thinking flag reaches the backend");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) == 0,
+                  "llama.cpp gets the /no_think directive prepended");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // B) Default (thinking on) → no flag, no directive.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "default generates once");
+        if (captures.size() == 1) {
+            CHECK(!captures[0].disable_thinking, "default leaves thinking enabled");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0, "default injects no directive");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // C) QHexRT + disable → flag set but directive SKIPPED (native suppression).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        request.set_disable_thinking(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "disable+qhexrt generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].disable_thinking, "disable_thinking flag still reaches QHexRT");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0,
+                  "QHexRT skips the /no_think directive (native suppression)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // D) Universal post-hoc strip: <think> content never leaks into the answer.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"<think>secret plan</think>Visible answer."});
+    {
+        auto request = make_request("Hi");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.text().find("secret") == std::string::npos, "thinking content stripped");
+        CHECK(result.text().find("Visible") != std::string::npos, "visible answer preserved");
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -1458,6 +1557,7 @@ int main() {
         test_tools_present_but_unused_makes_no_call();
         test_none_suppresses_tools_and_never_calls();
         test_grammar_attached_only_for_grammar_backend();
+        test_disable_thinking_directive_is_engine_gated();
         test_max_tool_calls_capped();
         test_max_tool_calls_blocks_extra_side_effect();
         test_auto_execute_false_returns_call_without_side_effect();
