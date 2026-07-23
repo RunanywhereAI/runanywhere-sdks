@@ -37,6 +37,15 @@ test('splitThinking: empty / nullish input is safe', () => {
   assert.deepEqual(splitThinking(undefined), { response: '', thinking: '' });
 });
 
+test('splitThinking handles adversarial repetitive input without backtracking (ReDoS)', () => {
+  // Would blow up a lazy-match + backreference regex; the indexOf scan is O(n).
+  const s = '<think>' + '<think>a'.repeat(100000);
+  const start = Date.now();
+  const { thinking } = splitThinking(s);
+  assert.ok(Date.now() - start < 1000, 'must not backtrack');
+  assert.ok(thinking.startsWith('<think>a'), 'unclosed block is treated as thinking');
+});
+
 test('stripThinking returns only the answer', () => {
   assert.equal(stripThinking('<think>hmm</think>Done.'), 'Done.');
   assert.equal(stripThinking('No tags here.'), 'No tags here.');
