@@ -69,6 +69,9 @@ struct GenerationCapture {
     float temperature = 0.0f;
     float top_p = 0.0f;
     bool disable_thinking = false;
+    // rac_llm_options_t.grammar as the backend saw it (RUN-80). Empty unless the
+    // loaded model's framework advertises grammar support (QHexRT).
+    std::string grammar;
     std::vector<std::string> stop_sequences;
     // Prior conversation turns the run loop threaded onto rac_llm_options_t
     // (ToolCallingSessionCreateRequest.history, field 19). Captured verbatim so
@@ -117,6 +120,7 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* o
             capture.temperature = options->temperature;
             capture.top_p = options->top_p;
             capture.disable_thinking = options->disable_thinking != RAC_FALSE;
+            capture.grammar = options->grammar ? options->grammar : "";
             for (size_t i = 0; i < options->num_stop_sequences; ++i) {
                 const char* stop = options->stop_sequences ? options->stop_sequences[i] : nullptr;
                 if (stop && stop[0] != '\0') {
@@ -222,13 +226,18 @@ std::vector<GenerationCapture> generation_captures() {
     return g_generation_captures;
 }
 
-runanywhere::v1::ModelInfo build_llm_model() {
+runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework framework =
+                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     runanywhere::v1::ModelInfo model;
     model.set_id("toolloop.llm");
     model.set_name("ToolLoop LLM");
     model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
-    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    // Framework drives the lifecycle's supports_grammar gate. A QHexRT framework
+    // with no registered qhexrt plugin still loads via the primitive fallback to
+    // the mock GENERATE_TEXT vtable, so tests can exercise the grammar path with
+    // the mock ops while loaded->framework reports QHEXRT.
+    model.set_framework(framework);
     model.set_local_path("/tmp/toolloop-test.gguf");
     model.set_is_downloaded(true);
     model.set_is_available(true);
@@ -244,7 +253,8 @@ void cleanup_environment() {
     set_responses({});
 }
 
-bool load_mock_llm() {
+bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
+                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
     if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
         return false;
@@ -254,7 +264,7 @@ bool load_mock_llm() {
     }
 
     std::vector<uint8_t> model_bytes;
-    auto model = build_llm_model();
+    auto model = build_llm_model(framework);
     if (!serialize(model, &model_bytes) ||
         rac_model_registry_register_proto(g_registry, model_bytes.data(), model_bytes.size()) !=
             RAC_SUCCESS) {
@@ -1277,6 +1287,152 @@ int test_null_arguments_return_null_pointer() {
     return 0;
 }
 
+// RUN-80: tools may be OFFERED without being NEEDED. With the neutralized prompt
+// (no "ALWAYS use the tool" bias, no hardcoded weather/math few-shot), an
+// unrelated question must NOT trigger a call — but the offered tools are still
+// advertised, and a non-grammar backend attaches no grammar.
+int test_tools_present_but_unused_makes_no_call() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+
+    auto request = make_request("What is the capital of France?");
+    *request.add_tools() = make_calculate_tool();  // weather + calculate offered
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "unused-tools turn returns success");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "unused-tools turn completes");
+    CHECK(result.tool_calls_size() == 0, "no tool call when none is needed");
+    CHECK(result.tool_results_size() == 0, "no tool result when none is needed");
+    CHECK(result.text() == "The capital of France is Paris.", "plain answer echoed");
+    CHECK(exec.invocation_count == 0, "executor not invoked");
+    CHECK(generate_calls() == 1, "single generation");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "one AUTO generation");
+    if (captures.size() == 1) {
+        CHECK(captures[0].prompt.find("get_weather") != std::string::npos,
+              "offered tools are still advertised (get_weather)");
+        CHECK(captures[0].prompt.find("calculate") != std::string::npos,
+              "offered tools are still advertised (calculate)");
+        CHECK(captures[0].prompt.find("ALWAYS use the tool") == std::string::npos,
+              "the aggressive ALWAYS-use-the-tool bias is gone");
+        CHECK(captures[0].temperature == 0.5f, "AUTO keeps caller temperature");
+        CHECK(!captures[0].disable_thinking, "AUTO leaves thinking enabled");
+        CHECK(captures[0].grammar.empty(), "non-grammar backend attaches no grammar");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: tool_choice=NONE strips every tool schema from the prompt and never
+// calls, even with multiple tools offered and a benign answer.
+int test_none_suppresses_tools_and_never_calls() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Here is a direct answer."});
+
+    auto request = make_request("Answer directly.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE with tools returns success");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "NONE completes");
+    CHECK(result.error_code() == 0, "NONE plain answer has no policy error");
+    CHECK(result.tool_calls_size() == 0, "NONE makes no tool call");
+    CHECK(exec.invocation_count == 0, "NONE never invokes executor");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "NONE generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].prompt == request.prompt(),
+              "NONE suppresses every tool schema even with two tools");
+        CHECK(captures[0].grammar.empty(), "NONE attaches no grammar");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: the QHexRT grammar enhancement is capability-gated. A grammar-capable
+// backend (framework == QHEXRT) gets options.grammar="toolcall_opt:<names>" on
+// the decision turn; every other engine (llama.cpp/onnx/cloud) gets NONE, so the
+// change is a strict no-op for them.
+int test_grammar_attached_only_for_grammar_backend() {
+    // Grammar-capable backend: expect the ToolCallOptional spec over the live tools.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "grammar backend generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather,calculate",
+                  "QHexRT gets ToolCallOptional grammar over the live tool set");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // Non-grammar backend (llama.cpp): identical request, zero grammar attached.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "non-grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "non-grammar backend generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].grammar.empty(),
+                  "non-grammar engine gets no grammar (strict no-op)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -1299,6 +1455,9 @@ int main() {
         test_specific_and_required_reject_initial_no_call();
         test_search_web_synthesis_is_current_compact_and_attributed();
         test_tool_name_mentions_do_not_force_execution();
+        test_tools_present_but_unused_makes_no_call();
+        test_none_suppresses_tools_and_never_calls();
+        test_grammar_attached_only_for_grammar_backend();
         test_max_tool_calls_capped();
         test_max_tool_calls_blocks_extra_side_effect();
         test_auto_execute_false_returns_call_without_side_effect();
