@@ -223,3 +223,40 @@ def test_download_once_dedups_concurrent_calls(monkeypatch, tmp_path):
         t.join()
     assert calls.count(dest) == 1  # only one thread actually downloaded
     assert os.path.exists(dest)  # the file is complete once every waiter returned
+
+
+def test_download_once_propagates_owner_failure(monkeypatch, tmp_path):
+    """If the owning download FAILS, every waiter must raise too — never return a path to a file
+    that was never written (one transient error must not silently become N broken model loads)."""
+    import threading
+    import time
+
+    from runanywhere import download as dl
+
+    started = threading.Event()
+
+    def failing_download(url, dest, on_progress):
+        started.set()
+        time.sleep(0.2)  # hold the slot so the other callers queue as waiters
+        raise SDKException.generation_failed("network boom")
+
+    monkeypatch.setattr(dl, "download_file", failing_download)
+    dest = str(tmp_path / "m.gguf")
+    errors: list = []
+
+    def run():
+        try:
+            dl._download_once("u", dest, None)
+        except BaseException as exc:  # noqa: BLE001 - record whatever propagated
+            errors.append(exc)
+
+    threads = [threading.Thread(target=run) for _ in range(4)]
+    threads[0].start()
+    assert started.wait(3)  # thread 0 owns the download before the others queue behind it
+    for t in threads[1:]:
+        t.start()
+    for t in threads:
+        t.join(5)
+    # Owner + 3 waiters all fail, all as SDKException (waiters wrap the owner's error).
+    assert len(errors) == 4
+    assert all(isinstance(e, SDKException) for e in errors)
