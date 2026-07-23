@@ -6,8 +6,14 @@ build-backend = "scikit_build_core.build"
 name = "runanywhere"
 version = "0.20.11"
 description = "RunAnywhere SDK — on-device AI inference (LLM, ASR, TTS, embeddings) with a native runtime core."
+readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "SEE LICENSE IN ../../LICENSE" }
+# Custom license (RunAnywhere License 1.0, incorporating Apache-2.0). Reference the LICENSE
+# file (now copied into the SDK dir + shipped in the sdist) so its text lands in the wheel/sdist
+# METADATA. The old `{ text = "SEE LICENSE IN ../../LICENSE" }` pointed two levels outside every
+# artifact and shipped no license text at all. The classic `{ file = ... }` form is used (not a
+# PEP 639 SPDX string) for maximum build-backend compatibility.
+license = { file = "LICENSE" }
 authors = [{ name = "RunAnywhere" }]
 keywords = ["ai", "llm", "asr", "tts", "embeddings", "on-device", "inference"]
 classifiers = [
@@ -84,6 +90,9 @@ CMAKE_BUILD_TYPE = "Release"
 include = [
     "runanywhere",
     "native",
+    "README.md",
+    "LICENSE",
+    "PACKAGING.md",
 ]
 
 [tool.cibuildwheel]
