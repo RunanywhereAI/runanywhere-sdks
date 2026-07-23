@@ -26,7 +26,7 @@ _FRAME = 512  # VAD frame @ 16 kHz
 
 
 # --------------------------------------------------------------------------- helpers
-def _client(args):
+def _client(args: argparse.Namespace):
     from ..client import RunAnywhere
 
     return RunAnywhere(base_dir=getattr(args, "home", None))
@@ -96,7 +96,7 @@ def _gen_opts(args) -> dict:
 
 
 # --------------------------------------------------------------------------- text
-def handle_run(args) -> int:
+def handle_run(args: argparse.Namespace) -> int:
     prompt = args.prompt
     if prompt is None and not sys.stdin.isatty():
         prompt = sys.stdin.read().strip() or None
@@ -169,7 +169,7 @@ def _repl(llm, opts, args, model) -> int:
         output.result("")
 
 
-def handle_chat(args) -> int:
+def handle_chat(args: argparse.Namespace) -> int:
     try:
         with _client(args) as ra:
             chat = ra.create_chat(ra.load_llm(args.model or DEFAULT_LLM), system=args.system)
@@ -193,7 +193,7 @@ def handle_chat(args) -> int:
 
 
 # --------------------------------------------------------------------------- models
-def handle_list(args) -> int:
+def handle_list(args: argparse.Namespace) -> int:
     status = model_status()
     rows = []
     for mid, entry in sorted(CATALOG.items()):
@@ -210,12 +210,12 @@ def handle_list(args) -> int:
     return 0
 
 
-def handle_models(args) -> int:
+def handle_models(args: argparse.Namespace) -> int:
     args.all = True
     return handle_list(args)
 
 
-def handle_pull(args) -> int:
+def handle_pull(args: argparse.Namespace) -> int:
     def on_progress(p):
         if not (args.json or args.no_progress) and output.stderr_is_tty():
             output.status_raw(f"\r{p.file} {p.percent}%   ")
@@ -234,7 +234,7 @@ def handle_pull(args) -> int:
     return 0
 
 
-def handle_show(args) -> int:
+def handle_show(args: argparse.Namespace) -> int:
     entry = CATALOG.get(args.model)
     if entry is None:
         output.error(f"model {args.model!r} not found")
@@ -251,7 +251,7 @@ def handle_show(args) -> int:
     return 0
 
 
-def handle_rm(args) -> int:
+def handle_rm(args: argparse.Namespace) -> int:
     # Confine to the models root: a model name like "../../x" must NOT delete outside it.
     root = os.path.realpath(models_root())
     directory = os.path.realpath(os.path.join(root, args.model))
@@ -279,7 +279,7 @@ def handle_rm(args) -> int:
     return 0
 
 
-def handle_embed(args) -> int:
+def handle_embed(args: argparse.Namespace) -> int:
     texts = list(args.text or [])
     if args.input:
         texts.insert(0, args.input)
@@ -305,7 +305,7 @@ def handle_embed(args) -> int:
 
 
 # --------------------------------------------------------------------------- audio
-def handle_stt(args) -> int:
+def handle_stt(args: argparse.Namespace) -> int:
     try:
         pcm = pcm16_bytes(_read_wav_16k(args.input))
         with _client(args) as ra:
@@ -320,7 +320,7 @@ def handle_stt(args) -> int:
     return 0
 
 
-def handle_tts(args) -> int:
+def handle_tts(args: argparse.Namespace) -> int:
     try:
         with _client(args) as ra:
             synth = ra.load_tts(args.voice or DEFAULT_TTS).synthesize(args.text)
@@ -338,7 +338,7 @@ def handle_tts(args) -> int:
     return 0
 
 
-def handle_vad(args) -> int:
+def handle_vad(args: argparse.Namespace) -> int:
     try:
         samples = _read_wav_16k(args.input)
         with _client(args) as ra:
@@ -371,7 +371,7 @@ def handle_vad(args) -> int:
     return 0
 
 
-def handle_voice(args) -> int:
+def handle_voice(args: argparse.Namespace) -> int:
     try:
         pcm = pcm16_bytes(_read_wav_16k(args.input))
         with _client(args) as ra:
@@ -399,7 +399,7 @@ def handle_voice(args) -> int:
 
 
 # --------------------------------------------------------------------------- info
-def handle_backends(args) -> int:
+def handle_backends(args: argparse.Namespace) -> int:
     with _client(args) as ra:
         backends = ra.available_backends()
     if args.json:
@@ -410,7 +410,7 @@ def handle_backends(args) -> int:
     return 0
 
 
-def handle_version(args) -> int:
+def handle_version(args: argparse.Namespace) -> int:
     from .. import __version__
 
     if args.json:
@@ -420,7 +420,7 @@ def handle_version(args) -> int:
     return 0
 
 
-def handle_info(args) -> int:
+def handle_info(args: argparse.Namespace) -> int:
     from .. import __version__
 
     total, avail = _memory_info()
@@ -436,7 +436,7 @@ def handle_info(args) -> int:
     return 0
 
 
-def handle_serve(args) -> int:
+def handle_serve(args: argparse.Namespace) -> int:
     try:
         from ..server import serve
     except ImportError:
