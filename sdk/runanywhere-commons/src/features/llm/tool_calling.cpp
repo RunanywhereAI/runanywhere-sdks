@@ -80,6 +80,15 @@ extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) 
     return "Unknown";
 }
 
+// Per-model-family tool-call FORMAT selector (RUN-83). The format name is carried
+// on ToolCallingOptions.format (populated per model, typically from the model
+// manifest). Family → flavor:
+//   - LFM2.5 / LiquidAI  ("lfm" | "lfm2" | "liquid")  → LFM2  [name(args)] tags
+//   - Qwen3 / Qwen3.5 / Qwen3-VL (v81 1.7B/4B/8B/27B) → DEFAULT <tool_call>{json}
+//   - Bonsai 1-bit / ternary (same ChatML block)      → DEFAULT
+//   - anything unknown / unset                        → DEFAULT
+// On QHexRT the tool-call GRAMMAR (toolcall_opt:<names>) is family-independent, so
+// this flavor only steers the text parser for non-grammar engines (llama.cpp/onnx).
 extern "C" rac_tool_call_format_t rac_tool_call_format_from_name(const char* name) {
     if (!name) {
         return RAC_TOOL_FORMAT_DEFAULT;
