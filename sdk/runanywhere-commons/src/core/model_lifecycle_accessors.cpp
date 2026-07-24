@@ -65,6 +65,16 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
 #endif
 }
 
+bool lifecycle_llm_supports_grammar() {
+    LifecycleLlmRef ref;
+    if (acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
+        return false;
+    }
+    const bool supported = ref.supports_grammar;
+    release_lifecycle_llm(&ref);
+    return supported;
+}
+
 void release_lifecycle_llm(LifecycleLlmRef* ref) {
     if (!ref || !ref->opaque) {
         return;
