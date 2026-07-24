@@ -34,7 +34,7 @@ import {
 } from './support/release-harness';
 
 const EXPECTED_ORIGIN = new URL(
-  process.env.RA_E2E_BASE_URL ?? 'http://127.0.0.1:43173',
+  process.env.RA_E2E_BASE_URL ?? 'http://localhost:43173',
 ).origin;
 const RELEASE_LOCAL_DIRECTORY = 'runanywhere-release-e2e';
 const RELEASE_LOCAL_PERMISSION_KEY = 'runanywhere-release-e2e-permission';

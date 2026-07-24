@@ -127,7 +127,7 @@ cd ../../examples/web/RunAnywhereAI
 npm run lint
 npm run typecheck
 npm run build
-npm run dev -- --host 127.0.0.1
+npm run dev
 ```
 
 ## Public Surface

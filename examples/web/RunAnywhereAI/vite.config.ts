@@ -134,7 +134,9 @@ export default defineConfig(({ command }) => {
       alias: useInstalledSDK ? [] : localSDKSourceAliases,
     },
     server: {
-      host: '127.0.0.1',
+      // Canonical URL is always http://localhost:3000 — do not advertise
+      // 127.0.0.1 (different browser origin / storage).
+      host: 'localhost',
       port: 3000,
       strictPort: true,
       headers: isolationHeaders,
@@ -146,7 +148,7 @@ export default defineConfig(({ command }) => {
       },
     },
     preview: {
-      host: '127.0.0.1',
+      host: 'localhost',
       port: 3000,
       strictPort: true,
       headers: isolationHeaders,
