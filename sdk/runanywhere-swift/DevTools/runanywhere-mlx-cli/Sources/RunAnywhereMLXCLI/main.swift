@@ -93,6 +93,31 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
+    // Microsoft Fara1.5-4B (Qwen3.5-VL computer-use agent), our MLX 4-bit
+    // conversion hosted at huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit.
+    static let fara15 = CatalogEntry(
+        id: "mlx-fara1.5-4b",
+        alias: "fara",
+        name: "Fara1.5 4B Computer-Use Agent 4-bit (MLX)",
+        category: .multimodal,
+        framework: .mlx,
+        files: [
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/model.safetensors", "model.safetensors"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/model.safetensors.index.json", "model.safetensors.index.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/tokenizer.json", "tokenizer.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/tokenizer_config.json", "tokenizer_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/vocab.json", "vocab.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/preprocessor_config.json", "preprocessor_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/processor_config.json", "processor_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/chat_template.jinja", "chat_template.jinja"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/generation_config.json", "generation_config.json"),
+        ],
+        memoryRequirement: 4_000_000_000,
+        contextLength: 4_096,
+        supportsThinking: false
+    )
+
     static let fastVLM = CatalogEntry(
         id: "mlx-fastvlm-0.5b-bf16",
         alias: "mlx-fastvlm",
@@ -326,6 +351,7 @@ private enum MLXCatalog {
         llamaLLM,
         fastVLM,
         qwen2VLM,
+        fara15,
         qwen3Embedding,
         qwen3ASR,
         glmASR,
@@ -407,6 +433,8 @@ private struct RunAnywhereMLXCLI {
                 try await runEmbedding(args)
             case "vlm":
                 try await runVLM(args)
+            case "cua":
+                try await runCUA(args)
             case "stt":
                 try await runSTT(args)
             case "tts":
@@ -436,7 +464,7 @@ private func configureDevSecureStore() throws {
 }
 
 private extension String {
-    func withModel(_ body: (CatalogEntry) async throws -> Void) async throws {
+    func withModel(_ body: @Sendable (CatalogEntry) async throws -> Void) async throws {
         guard let entry = MLXCatalog.resolve(self) else { throw CLIError.modelNotFound(self) }
         try await body(entry)
     }
@@ -717,6 +745,28 @@ private func runVLM(_ args: [String]) async throws {
         let result = try await RunAnywhere.processImage(.fromFilePath(imageURL.path), options: options)
         print("vlm\t\(result.text)")
     }
+}
+
+// Self-test for the SDK's computer-use-agent scaffold (RunAnywhere.CUA) — no
+// model needed: renders the Fara system prompt and parses a golden tool_call,
+// exercising the commons rac_cua_* path through the Swift facade.
+private func runCUA(_ args: [String]) async throws {
+    guard let prompt = RunAnywhere.CUA.systemPrompt() else {
+        throw CLIError.usage("CUA: fara profile not found")
+    }
+    print("cua.prompt\tchars=\(prompt.count)\ttools=\(prompt.contains("<tools>"))\tcomputer_use=\(prompt.contains("computer_use"))")
+
+    let golden = """
+    I will click the search box.
+    <tool_call>
+    {"name": "computer_use", "arguments": {"action": "left_click", "coordinate": [500, 382]}}
+    </tool_call>
+    """
+    guard let action = RunAnywhere.CUA.parseAction(golden, viewport: (width: 1440, height: 900)) else {
+        throw CLIError.usage("CUA: parse returned nil")
+    }
+    let coord = action.coordinate.map { "(\($0.x), \($0.y))" } ?? "nil"
+    print("cua.parse\tkind=\(action.kind)\tcoord=\(coord)\tvalid=\(action.isValid)")
 }
 
 private func runSTT(_ args: [String]) async throws {

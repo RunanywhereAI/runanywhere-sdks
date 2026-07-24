@@ -586,6 +586,9 @@ private final class MLXSession: @unchecked Sendable {
         var modelPath: String?
         var embeddingDimension = 0
         var isSynthesizing = false
+        /// Model's maximum context length (from `config.json`), read at load.
+        /// Drives the VLM image-resolution policy (`MLXVLMResolutionPolicy`).
+        var contextLength = 0
     }
 
     /// MLX's audio model protocols do not declare `Sendable`. The C++ MLX
@@ -658,12 +661,14 @@ private final class MLXSession: @unchecked Sendable {
             throw MLXRuntimeError.mlxAudioUnavailable
             #endif
         }
+        let modelContextLength = MLXModelConfig.contextLength(inDirectory: directory)
         lock.withLock {
             $0.isLoaded = true
             if resetCancellation {
                 $0.isCancelled = false
             }
             $0.modelPath = modelPath
+            $0.contextLength = modelContextLength
         }
         #endif
     }
@@ -799,10 +804,27 @@ private final class MLXSession: @unchecked Sendable {
             restoreMemoryPolicy?()
         }
 
+        // Bound the image with a model-aware, aspect-preserving resize instead
+        // of forcing a fixed 512×512 square. The old square distorted aspect
+        // ratio and destroyed the fine detail screen/document/CUA models must
+        // read (Fara hallucinated from priors); conversely a full-resolution
+        // image overflows the non-windowed Qwen3.5-VL vision attention (~34 GB
+        // for a full screenshot). `resize` — the knob the processor honors,
+        // applied before patchification — caps the patch count. See
+        // MLXVLMResolutionPolicy.
+        let contextLength = lock.withLock { $0.contextLength }
+        let nativeSize = (try? image.asCIImage().extent.size) ?? CGSize(width: 1024, height: 1024)
+        let resizeTarget = MLXVLMResolutionPolicy.targetSize(
+            forContextLength: contextLength,
+            native: nativeSize
+        )
+        mlxRuntimeLogger.debug(
+            "MLX VLM image resize=\(resizeTarget) native=\(nativeSize) contextLength=\(contextLength) model=\(modelID)"
+        )
         let session = ChatSession(
             container,
             generateParameters: parameters,
-            processing: UserInput.Processing(resize: CGSize(width: 512, height: 512))
+            processing: UserInput.Processing(resize: resizeTarget)
         )
         let events = session.streamDetails(to: prompt, images: [image])
         var metrics = MLXGenerationMetrics()

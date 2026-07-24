@@ -325,6 +325,9 @@ _rac_voice_agent_component_destroy_proto
 _rac_vlm_generate_proto
 _rac_vlm_stream_proto
 _rac_vlm_cancel_lifecycle_proto
+# Computer-use-agent (CUA) scaffold — profile prompt + action parse
+_rac_cua_system_prompt
+_rac_cua_parse_action
 _rac_embeddings_embed_batch_proto
 _rac_embeddings_embed_batch_lifecycle_proto
 _rac_embeddings_create_proto

@@ -923,6 +923,9 @@ set(RAC_FEATURES_SOURCES
     # W4: unified module — merges vlm_component.cpp + rac_vlm_proto_abi.cpp.
     src/features/vlm/vlm_module.cpp
     src/features/vlm/rac_vlm_service.cpp
+    # CUA (computer-use-agent scaffold) — profile registry, system-prompt
+    # rendering, and model-agnostic tool_call action parsing + coord scaling.
+    src/features/cua/cua.cpp
     # Diffusion
     # W4: unified module — merges diffusion_component.cpp +
     # rac_diffusion_proto_abi.cpp + Diffusion slice of
