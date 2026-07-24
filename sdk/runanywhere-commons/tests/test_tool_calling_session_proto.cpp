@@ -55,6 +55,8 @@ std::vector<std::string> g_responses;
 std::vector<std::string> g_prompts;
 // rac_llm_options_t.grammar as each generate saw it (RUN-80 grammar path).
 std::vector<std::string> g_grammars;
+// rac_llm_options_t.system_prompt as each generate saw it (RUN-80 decision-hint path).
+std::vector<std::string> g_system_prompts;
 int g_generate_calls = 0;
 
 char* dup_cstr(const char* value) {
@@ -89,6 +91,8 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* o
         g_generate_calls++;
         g_prompts.emplace_back(prompt ? prompt : "");
         g_grammars.emplace_back(options && options->grammar ? options->grammar : "");
+        g_system_prompts.emplace_back(
+            options && options->system_prompt ? options->system_prompt : "");
         if (g_responses.empty()) {
             response = "empty-response";
         } else {
@@ -163,11 +167,17 @@ void set_responses(std::vector<std::string> responses) {
     g_generate_calls = 0;
     g_prompts.clear();
     g_grammars.clear();
+    g_system_prompts.clear();
 }
 
 std::vector<std::string> generated_grammars() {
     std::lock_guard<std::mutex> lg(g_responses_mutex);
     return g_grammars;
+}
+
+std::vector<std::string> generated_system_prompts() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_system_prompts;
 }
 
 int generate_calls() {
@@ -1132,6 +1142,126 @@ int test_session_grammar_gated_on_framework() {
     return 0;
 }
 
+// RUN-80: the session path is a PARALLEL wiring of the tool-decision system hint. Prove
+// it here too: the AUTO decision generate carries the hint (any engine), preserves a
+// caller system prompt, and is withheld on NONE and on the synthesis turn.
+int test_session_decision_hint_on_auto_path() {
+    const std::string kHint = "call a tool only when the user's request genuinely requires it";
+
+    // A) AUTO decision generate carries the hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "AUTO session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "one decision generate");
+        if (systems.size() == 1) {
+            CHECK(systems[0].find(kHint) != std::string::npos,
+                  "session AUTO decision turn carries the tool-decision hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // B) Caller system prompt is preserved, hint appended after it.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        request.set_system_prompt("You are Halo, a concise assistant.");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "AUTO+sys session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "one decision generate");
+        if (systems.size() == 1) {
+            const auto caller_pos = systems[0].find("You are Halo");
+            const auto hint_pos = systems[0].find(kHint);
+            CHECK(caller_pos != std::string::npos, "caller system prompt preserved");
+            CHECK(hint_pos != std::string::npos, "hint appended");
+            CHECK(caller_pos < hint_pos, "caller content precedes the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // C) NONE → no hint (tools vetoed).
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"A direct answer."});
+    {
+        EventSink sink;
+        auto request = make_request("Answer directly.");
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "NONE session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "NONE generates once");
+        if (systems.size() == 1) {
+            CHECK(systems[0].find(kHint) == std::string::npos, "session NONE withholds the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // D) Tool call then synthesis: decision turn has the hint, synthesis turn does not.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "synthesis session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "paused on tool_call");
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev)
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 2, "decision + synthesis generations");
+        if (systems.size() == 2) {
+            CHECK(systems[0].find(kHint) != std::string::npos, "decision turn carries the hint");
+            CHECK(systems[1].find(kHint) == std::string::npos, "synthesis turn drops the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -1150,6 +1280,7 @@ int main() {
         test_none_vetoes_forced_name_in_session();
         test_none_blocks_session_call_when_validation_disabled();
         test_session_grammar_gated_on_framework();
+        test_session_decision_hint_on_auto_path();
         test_forced_target_blocks_wrong_session_call_when_validation_disabled();
         test_specific_session_target_must_be_nonempty_and_present();
         test_specific_and_required_sessions_reject_initial_no_call();
