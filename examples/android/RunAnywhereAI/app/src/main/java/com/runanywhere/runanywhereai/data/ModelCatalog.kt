@@ -93,7 +93,10 @@ internal object ModelCatalog {
         // Cosmos3-Edge is one omnimodal model shipped as TWO HNPU repos, mirroring Qwen (understanding
         // vs generation). The chat + vision rows BOTH point at the single "understanding" repo
         // (cosmos3_edge_HNPU) with different manifest leaves — like qwen3_vl_HNPU hosts text + vlm —
-        // so they share the byte-identical decoder/embed/lmhead (de-duped on device). Diffusion is the
+        // because text (split_generate) and VLM (cosmos3vl_generate) are two different device graphs.
+        // Each is its own model_id, so it downloads its own manifest-pruned bundle into its own model
+        // folder: a user who installs BOTH fetches the shared decoder/embed/lmhead weights twice. That
+        // duplication is accepted intentionally (no content-addressed de-dup layer). Diffusion is the
         // separate generation repo.
         // supportsThinking=false: the text manifest bakes a closed empty-think block for concise,
         // self-terminating replies, so the app shows the answer rather than an always-empty reasoning section.

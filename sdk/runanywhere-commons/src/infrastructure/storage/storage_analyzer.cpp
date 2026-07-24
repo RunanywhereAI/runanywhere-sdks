@@ -32,7 +32,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "infrastructure/download/blob_store.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -1315,13 +1314,6 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             remember_error(RAC_ERROR_INVALID_ARGUMENT);
         }
         rac_model_info_free(model);
-    }
-
-    // Deleting model folders removed their symlinks into the content-addressed blob
-    // store; reclaim any shared blob no surviving model still references. Run once
-    // after the whole batch (the GC mark-sweeps the model tree). No-op when disabled.
-    if (files_deleted && !request.dry_run()) {
-        rac::download::blob_store::gc_orphans();
     }
 
     if (request.dry_run()) {

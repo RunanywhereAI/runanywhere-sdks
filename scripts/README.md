@@ -17,12 +17,6 @@ These serve multiple SDKs or the whole repo, so they're grouped by **function**
 > `sdk/runanywhere-web/scripts/build-core-wasm.sh`) — see the per-SDK section below.
 > `sync-swift-headers.sh` was deleted (unused; the vendored Swift headers are hand-maintained).
 
-### `models/` — deterministic model-bundle preparation
-
-| Script | Purpose |
-|---|---|
-| `models/prepare_parakeet_ctc_sherpa.py` | Verifies the pinned OpenVoiceOS Parakeet CTC 1.1B INT8 ONNX + vocabulary, adds the three metadata fields required by Sherpa's NeMo CTC loader without deserializing the 1.11 GB graph, and emits a provenance receipt for a derived immutable bundle. It does not publish the artifact. |
-
 ### `release/` — version / packaging
 | Script | Purpose |
 |---|---|
