@@ -339,6 +339,123 @@ int test_tool_call_format_per_family() {
     return 0;
 }
 
+// RUN-80 (grammar-engage): the bare Pythonic `[name(args)]` format the QHexRT grammar
+// emits — detection is strict (no false positives on prose/markdown), parsing reuses the
+// shared Pythonic parser, and the tagged formats still take precedence.
+int test_pythonic_detect_and_parse() {
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("pythonic"), RAC_TOOL_FORMAT_PYTHONIC);
+    ASSERT_EQ_INT(rac_tool_call_format_from_name("grammar"), RAC_TOOL_FORMAT_PYTHONIC);
+
+    // Bare calls detected as PYTHONIC (leading whitespace tolerated; no-arg allowed).
+    ASSERT_EQ_INT(rac_tool_call_detect_format("[get_weather(location=\"Tokyo\")]"),
+                  RAC_TOOL_FORMAT_PYTHONIC);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("  [calculate(expression=\"45 * 12\")]"),
+                  RAC_TOOL_FORMAT_PYTHONIC);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("[get_time()]"), RAC_TOOL_FORMAT_PYTHONIC);
+
+    // Strict predicate: prose, citations, plain lists and markdown links are NOT calls.
+    ASSERT_EQ_INT(rac_tool_call_detect_format("The capital of France is Paris."),
+                  RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("See [1] and [2] for details."),
+                  RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("[a list, of, things]"), RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("[link](https://example.com)"),
+                  RAC_TOOL_FORMAT_DEFAULT);
+    // Tagged formats win (bare check runs last).
+    ASSERT_EQ_INT(rac_tool_call_detect_format("<tool_call>{}</tool_call>"),
+                  RAC_TOOL_FORMAT_DEFAULT);
+    ASSERT_EQ_INT(rac_tool_call_detect_format("<|tool_call_start|>[f()]<|tool_call_end|>"),
+                  RAC_TOOL_FORMAT_LFM2);
+
+    // Auto-detect parse of a bare call yields the tool + typed args.
+    rac_tool_call_t call;
+    rac_result_t rc = rac_tool_call_parse("[get_weather(location=\"Tokyo\")]", &call);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(call.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(call.tool_name, "get_weather");
+    ASSERT_SUBSTR(call.arguments_json, "\"location\"");
+    ASSERT_SUBSTR(call.arguments_json, "Tokyo");
+    ASSERT_EQ_INT(call.format, RAC_TOOL_FORMAT_PYTHONIC);
+    rac_tool_call_free(&call);
+
+    // No-arg bare call.
+    rac_tool_call_t call2;
+    rc = rac_tool_call_parse("[get_time()]", &call2);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(call2.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(call2.tool_name, "get_time");
+    rac_tool_call_free(&call2);
+
+    // A markdown link is not misparsed into a tool call (graceful no-call).
+    rac_tool_call_t call3;
+    rc = rac_tool_call_parse("[link](https://example.com)", &call3);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(call3.has_tool_call, RAC_FALSE);
+    rac_tool_call_free(&call3);
+    return 0;
+}
+
+// RUN-80 (grammar-engage, review follow-up): the bare parser locates the call by the
+// MATCHING ']' (quote- and nesting-aware), so trailing text, a later bracket group, or a
+// ']' inside a string arg cannot corrupt the extraction; empty string args parse.
+int test_pythonic_multibracket_and_special_args() {
+    // A later bracket group + trailing text does not hijack the call; it becomes clean_text.
+    rac_tool_call_t c1;
+    rac_result_t rc = rac_tool_call_parse("[get_weather(location=\"Tokyo\")] see also [notes]", &c1);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(c1.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(c1.tool_name, "get_weather");
+    ASSERT_SUBSTR(c1.arguments_json, "Tokyo");
+    ASSERT_TRUE(c1.clean_text != nullptr);
+    ASSERT_SUBSTR(c1.clean_text, "see also [notes]");
+    rac_tool_call_free(&c1);
+
+    // A ']' inside a quoted string arg does not close the call early.
+    rac_tool_call_t c2;
+    rc = rac_tool_call_parse("[note(text=\"a]b\")]", &c2);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(c2.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(c2.tool_name, "note");
+    ASSERT_SUBSTR(c2.arguments_json, "a]b");
+    rac_tool_call_free(&c2);
+
+    // Empty string value parses (raw value "" is non-empty, so not rejected).
+    rac_tool_call_t c3;
+    rc = rac_tool_call_parse("[echo(msg=\"\")]", &c3);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(c3.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(c3.tool_name, "echo");
+    ASSERT_SUBSTR(c3.arguments_json, "\"msg\"");
+    rac_tool_call_free(&c3);
+
+    // Trailing text after a no-arg call becomes clean_text.
+    rac_tool_call_t c4;
+    rc = rac_tool_call_parse("[get_time()] done", &c4);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(c4.has_tool_call, RAC_TRUE);
+    ASSERT_EQ_STR(c4.tool_name, "get_time");
+    ASSERT_EQ_STR(c4.clean_text, "done");
+    rac_tool_call_free(&c4);
+    return 0;
+}
+
+// RUN-80 (grammar-engage): the bare-Pythonic prompt renders `[name(args)]` guidance with
+// NO tags, so it matches what the grammar makes the model emit.
+int test_pythonic_prompt_render() {
+    char* out = nullptr;
+    const char* tools = "[{\"name\":\"get_weather\",\"description\":\"w\",\"parameters\":[]}]";
+    rac_result_t rc =
+        rac_tool_call_format_prompt_json_with_format(tools, RAC_TOOL_FORMAT_PYTHONIC, &out);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_TRUE(out != nullptr);
+    ASSERT_SUBSTR(out, "[tool_name(");
+    ASSERT_SUBSTR(out, "square brackets and NO other tags");
+    ASSERT_TRUE(strstr(out, "<tool_call>") == nullptr);
+    ASSERT_TRUE(strstr(out, "<|tool_call_start|>") == nullptr);
+    free(out);
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // 10. parse -> tool result JSON -> follow-up prompt loop
 // ---------------------------------------------------------------------------
@@ -848,6 +965,10 @@ int main(int argc, char** argv) {
         {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
         {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
         {.name = "tool_call_format_per_family", .fn = test_tool_call_format_per_family},
+        {.name = "pythonic_detect_and_parse", .fn = test_pythonic_detect_and_parse},
+        {.name = "pythonic_multibracket_and_special_args",
+         .fn = test_pythonic_multibracket_and_special_args},
+        {.name = "pythonic_prompt_render", .fn = test_pythonic_prompt_render},
         {.name = "required_appends_firm_directive", .fn = test_required_appends_firm_directive},
         {.name = "none_followup_suppresses_tools", .fn = test_none_followup_suppresses_tools},
         {.name = "tool_result_loop", .fn = test_tool_result_loop},
