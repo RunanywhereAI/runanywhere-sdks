@@ -238,6 +238,48 @@ inline bool tool_grammar_constrained_this_turn(bool none_veto, bool a_call_was_m
     return true;
 }
 
+// The device-proven system-prompt hint that stops small-model over-calling (RUN-80).
+// Given a tool set but NO decision framing, a small model (e.g. Qwen3-0.6B) emits a tool
+// call for EVERY prompt — even "what is the capital of France?". Framing the tool-use
+// decision on the SYSTEM role (not the user turn, where the tool block already lives)
+// makes the model abstain on general-knowledge asks while still calling when a tool IS
+// needed. Verified on-device (S25 / v79, qwen3-0.6b): capital-of-France / who-wrote-Hamlet
+// -> plain answer; weather-in-Tokyo / 45*12 -> get_weather / calculate. It is a universal
+// instruction (the model may still call whenever a tool is genuinely required), so it is
+// applied for EVERY engine on the AUTO tool-calling path — no engine loses capability.
+inline const char* tool_decision_system_hint() {
+    return "Tool use: call a tool only when the user's request genuinely requires it (for "
+           "example live data such as the current weather, or performing a calculation). If "
+           "you can answer from your own knowledge, reply directly in plain text and do not "
+           "call any tool.";
+}
+
+// Append the tool-decision hint to @p system_prompt, PRESERVING any caller-set content
+// (the app supplies its own system prompt; we add tool-use guidance without clobbering it —
+// device-verified that a caller system prompt alone does NOT stop over-calling, but
+// caller-prompt + this hint does). A blank base yields the bare hint (no leading newlines).
+inline void append_tool_decision_hint(std::string* system_prompt) {
+    if (!system_prompt) {
+        return;
+    }
+    if (system_prompt->empty()) {
+        *system_prompt = tool_decision_system_hint();
+    } else {
+        *system_prompt += "\n\n";
+        *system_prompt += tool_decision_system_hint();
+    }
+}
+
+// Whether this turn should carry the tool-decision hint. TRUE only on the AUTO decision
+// path where the model itself chooses whether to call: tools are live this turn (same
+// predicate as the grammar gate — @p tools_live_this_turn) AND the caller is not forcing a
+// call (@p force_a_call = tool_choice REQUIRED/SPECIFIC), where an abstention hint would
+// contradict the forced-call directive appended during prompt-build. The run loop and the
+// session both derive their append decision from this ONE predicate to stay in lockstep.
+inline bool tool_decision_hint_this_turn(bool tools_live_this_turn, bool force_a_call) {
+    return tools_live_this_turn && !force_a_call;
+}
+
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
