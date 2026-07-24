@@ -455,6 +455,8 @@ enum SDKComponent : int {
   SDK_COMPONENT_VOICE_AGENT = 9,
   SDK_COMPONENT_WAKEWORD = 10,
   SDK_COMPONENT_SPEAKER_DIARIZATION = 11,
+  SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12,
+  SDK_COMPONENT_RERANK = 13,
   SDKComponent_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   SDKComponent_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -465,11 +467,11 @@ extern const uint32_t SDKComponent_internal_data_[];
 inline constexpr SDKComponent SDKComponent_MIN =
     static_cast<SDKComponent>(0);
 inline constexpr SDKComponent SDKComponent_MAX =
-    static_cast<SDKComponent>(11);
+    static_cast<SDKComponent>(13);
 [[nodiscard]] inline bool SDKComponent_IsValid(int value) {
-  return 0 <= value && value <= 11;
+  return 0 <= value && value <= 13;
 }
-inline constexpr int SDKComponent_ARRAYSIZE = 11 + 1;
+inline constexpr int SDKComponent_ARRAYSIZE = 13 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 SDKComponent_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SDKComponent) {
@@ -484,7 +486,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& SDKComponent_Name(SDKComponent value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<SDKComponent_descriptor, 0, 11>(
+  return ::google::protobuf::internal::NameOfDenseEnum<SDKComponent_descriptor, 0, 13>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool SDKComponent_Parse(

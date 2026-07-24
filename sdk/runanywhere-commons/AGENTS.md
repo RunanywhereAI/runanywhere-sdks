@@ -93,7 +93,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Component Layer  (rac_*_component_*)                            │
 │  Owns lifecycle, emits analytics, exposes clean public API       │
-│  LLM | STT | TTS | VAD | VLM | Diffusion | Embeddings          │
+│  LLM | STT | TTS | VAD | VLM | Diffusion | Embed | Segment     │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ rac_*_create() → rac_plugin_find() → vtable dispatch
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -104,7 +104,7 @@ scripts/build-windows.bat
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Plugin Registry  (src/plugin/)                                 │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 4u)    │
+│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 8u)    │
 │  Priority order: highest-priority plugin per primitive wins, no  │
 │  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
 │  dynamic (rac_registry_load_plugin / dlopen).                    │
@@ -113,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed) | coreml (Image/Diffusion, Apple)                  │
+│  onnx (Embed+Segment) | coreml (Image/Diffusion, Apple)          │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -128,13 +128,13 @@ Every AI capability follows the same two-layer design:
 
 **Feature-family classification** — not every capability fits one mold:
 
-- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
+- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`, `segmentation`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
 - **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
 - **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
 
-### Unified Plugin ABI (v4)
+### Unified Plugin ABI (v8)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with slots for 7 primitives (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with 10 active primitive slots plus 7 reserved slots (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
@@ -145,8 +145,11 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, qhexrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
+| `RAC_PRIMITIVE_DIARIZE` | `diarization_ops` | onnx (Sortformer) |
+| `RAC_PRIMITIVE_SEGMENT` | `segmentation_ops` | onnx |
+| `RAC_PRIMITIVE_RERANK` | `rerank_ops` | llamacpp (rank-pooling GGUF) |
 
-NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, is retired — no backend implemented it — which is why the ABI is now v4.)
+NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. `RAC_PRIMITIVE_RERANK` (wire value **11**, `rerank_ops`, promoted from `reserved_slot_2` at the same binary offset) was **revived as a first-class cross-encoder reranking primitive in ABI v8**. The *original* rerank slot (wire value 6, retired in ABI v4) stays permanently retired — the revived primitive is a new wire value, not a reuse of 6.
 
 ### Platform Adapter Inversion-of-Control
 
@@ -228,9 +231,15 @@ Design rules for RAG work (do not relitigate):
 - **Keep USearch** as the dense ANN store. Do not replace it with a brute-force
   Hamming/binary-quantized scan — techniques may be borrowed from reference engines, the
   storage engine is not.
-- **Rerank is LLM-pointwise** (score fused candidates 1–5 with the existing LLM handle),
-  not a cross-encoder. The `rerank_ops` vtable slot / `RAC_PRIMITIVE_RERANK` was retired
-  in plugin ABI v4 — do not revive it for reranking.
+- **RAG's default rerank is LLM-pointwise** (score fused candidates 1–5 with the existing
+  LLM handle) and is the only reranking path wired into the RAG query flow today. The
+  first-class `RAC_PRIMITIVE_RERANK` cross-encoder primitive (`rerank_ops`, revived in plugin
+  ABI v8) exists and is reachable standalone via `rac_rerank_*`, but it is **not yet invoked
+  from the RAG query path** — `RAGBackend`/`rag_pipeline_graph` do not score fused candidates
+  through it. Until that wiring lands, `rac_rag_proto_abi` **rejects** a `reranker_model_id`
+  at session-create with `RAC_ERROR_NOT_IMPLEMENTED` (rather than accepting it and silently
+  no-op'ing); callers wanting reranking today use `rerank_results` (LLM-pointwise). With no
+  `reranker_model_id` the default fusion path is unchanged.
 - **All RAG persistence goes through the platform adapter** file I/O
   (`file_read`/`file_write`/`file_delete`/`file_exists`, `rac_platform_adapter.h`), never
   direct `std::ofstream`/`fopen`. This is what makes persistence work on Web (OPFS) as well
@@ -276,7 +285,7 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 | **llamacpp** | LLM | GGUF | llama.cpp (FetchContent) | `rac_backend_llamacpp_register()` |
 | **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
 | **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
-| **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
+| **onnx** | Segment; Embed when RAG is enabled | ONNX | `runtimes/onnxrt` Session | `rac_plugin_entry_onnx()` |
 | **qhexrt** | LLM, VLM, STT, TTS | QNN context bundle | QHexRT / Hexagon NPU | `rac_backend_qhexrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
 

@@ -134,6 +134,8 @@ export declare enum ModelCategory {
     MODEL_CATEGORY_EMBEDDING = 8,
     /** MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION - present in Swift only pre-IDL */
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
+    MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
     UNRECOGNIZED = -1
 }
 export declare function modelCategoryFromJSON(object: any): ModelCategory;
@@ -441,6 +443,32 @@ export interface ArchiveArtifact {
      */
     expectedFiles?: ExpectedModelFiles | undefined;
 }
+/**
+ * Deterministic byte-level mutations that commons applies after a source file
+ * has downloaded and passed its transport checksum. Operations execute in
+ * declaration order. The source/final contracts make the transform
+ * restart-safe and fail closed if either the downloaded input or derived
+ * artifact differs from the catalog-pinned bytes.
+ */
+export interface PostDownloadAppendBytes {
+    payload: Uint8Array;
+}
+export interface PostDownloadTransformOperation {
+    appendBytes?: PostDownloadAppendBytes | undefined;
+}
+export interface PostDownloadTransform {
+    /** The exact bytes fetched from the transport before any operation runs. */
+    sourceSizeBytes: number;
+    sourceChecksumSha256: string;
+    /**
+     * The exact bytes published at ModelFileDescriptor.local_path after all
+     * operations run. These values must match the descriptor's size_bytes and
+     * checksum_sha256, which always describe the final on-disk artifact.
+     */
+    finalSizeBytes: number;
+    finalChecksumSha256: string;
+    operations: PostDownloadTransformOperation[];
+}
 export interface ModelFileDescriptor {
     url: string;
     filename: string;
@@ -450,6 +478,8 @@ export interface ModelFileDescriptor {
      * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
      * canonical "required" flag — the documented `required` boolean from
      * newer SDK sources maps onto it (default true, mirrored in Swift).
+     * Exact final on-disk artifact size. When post_download_transform is set,
+     * transport planning uses its source_size_bytes instead.
      */
     sizeBytes?: number | undefined;
     /**
@@ -461,7 +491,17 @@ export interface ModelFileDescriptor {
     destinationPath?: string | undefined;
     role?: ModelFileRole | undefined;
     localPath?: string | undefined;
+    /**
+     * Exact final on-disk artifact checksum. When post_download_transform is
+     * set, HTTP verifies its source_checksum_sha256 before the transform.
+     */
     checksumSha256?: string | undefined;
+    /**
+     * Optional commons-owned transform applied after the source checksum has
+     * passed and before the model is marked downloaded. Native and Web
+     * consumers receive the same deterministic derived bytes.
+     */
+    postDownloadTransform?: PostDownloadTransform | undefined;
 }
 export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
@@ -966,6 +1006,9 @@ export declare const ModelInfo: MessageFns<ModelInfo>;
 export declare const ModelInfoList: MessageFns<ModelInfoList>;
 export declare const SingleFileArtifact: MessageFns<SingleFileArtifact>;
 export declare const ArchiveArtifact: MessageFns<ArchiveArtifact>;
+export declare const PostDownloadAppendBytes: MessageFns<PostDownloadAppendBytes>;
+export declare const PostDownloadTransformOperation: MessageFns<PostDownloadTransformOperation>;
+export declare const PostDownloadTransform: MessageFns<PostDownloadTransform>;
 export declare const ModelFileDescriptor: MessageFns<ModelFileDescriptor>;
 export declare const MultiFileArtifact: MessageFns<MultiFileArtifact>;
 export declare const ExpectedModelFiles: MessageFns<ExpectedModelFiles>;

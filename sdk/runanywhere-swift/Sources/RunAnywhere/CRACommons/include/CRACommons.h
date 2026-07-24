@@ -36,7 +36,7 @@
 #include "rac_sdk_state.h"
 
 // =============================================================================
-// FEATURES - LLM, STT, TTS, VAD, VLM, Diffusion, Voice Agent
+// FEATURES - LLM, STT, TTS, VAD, Diarization, VLM, Diffusion, Voice Agent
 // =============================================================================
 
 // LLM (Large Language Model)
@@ -75,6 +75,12 @@
 #include "rac_vad_energy.h"
 #include "rac_vad_service.h"
 #include "rac_vad_types.h"
+
+// Standalone Speaker Diarization
+#include "rac_diarization.h"
+
+// Semantic Image Segmentation
+#include "rac_segmentation.h"
 
 // VLM (Vision Language Model)
 #include "rac_vlm.h"

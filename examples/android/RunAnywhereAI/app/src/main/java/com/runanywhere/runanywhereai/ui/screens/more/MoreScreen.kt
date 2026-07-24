@@ -24,7 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.HybridBetaCopy
 import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
+import com.runanywhere.runanywhereai.ui.navigation.Diarization
+import com.runanywhere.runanywhereai.ui.navigation.Diffusion
 import com.runanywhere.runanywhereai.ui.navigation.Documents
+import com.runanywhere.runanywhereai.ui.navigation.Segmentation
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
@@ -56,6 +59,9 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
         AdvancedEntry("Settings", "Personalization, privacy, and account controls", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
         AdvancedEntry("Document workbench", "Inspect document Q&A setup and sources", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Documents),
         AdvancedEntry("Vision workbench", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision()),
+        AdvancedEntry("Segmentation", "Semantic image segmentation (SegFormer)", RACIcons.Outline.Stack, AdvancedGroup.ASSISTANT, Segmentation),
+        AdvancedEntry("Diarization", "Who spoke when (NVIDIA Sortformer)", RACIcons.Outline.Microphone, AdvancedGroup.SPEECH, Diarization),
+        AdvancedEntry("Image generation", "Text-to-image on the NPU (Cosmos3-Edge diffusion)", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Diffusion),
         AdvancedEntry("Read aloud", "Generate speech and preview voices", RACIcons.Outline.Robot, AdvancedGroup.SPEECH, Tts),
         AdvancedEntry("Transcription", HybridBetaCopy.TRANSCRIPTION_ENTRY_DESCRIPTION, RACIcons.Outline.Microphone, AdvancedGroup.SPEECH, Stt),
         AdvancedEntry("Voice activity", "Tune speech detection infrastructure", RACIcons.Outline.Activity, AdvancedGroup.SPEECH, Vad),

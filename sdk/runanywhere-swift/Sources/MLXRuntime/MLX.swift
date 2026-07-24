@@ -626,6 +626,7 @@ private final class MLXSession: @unchecked Sendable {
         let tokenizerLoader: any TokenizerLoader = TransformersTokenizerLoader()
         switch kind {
         case .llm:
+            await registerRunAnywhereNemotronModelType()
             let container = try await LLMModelFactory.shared.loadContainer(
                 from: directory,
                 using: tokenizerLoader
@@ -1215,7 +1216,7 @@ private enum MLXRuntimeError: LocalizedError {
         case .unsupportedAudioFormat:
             return "MLX speech inference currently accepts 16-bit mono PCM audio."
         case .unsupportedSTTModel(let hints):
-            let loaders = "Qwen3-ASR, GLM-ASR, Parakeet, Whisper, and Moonshine"
+            let loaders = "Qwen3-ASR, GLM-ASR, Parakeet, Nemotron ASR, Whisper, and Moonshine"
             return "Unsupported MLX STT model. Supported local loaders: \(loaders). " +
                 "Hints: \(hints.joined(separator: ", "))"
         case .mlxAudioUnavailable:
@@ -1405,6 +1406,10 @@ private func loadSpeechRecognitionModel(from directory: URL, modelID: String) as
     if joinedHints.contains("parakeet") ||
         joinedHints.contains("nemo.collections.asr.models") {
         return try ParakeetModel.fromDirectory(directory)
+    }
+
+    if joinedHints.contains("nemotron") && joinedHints.contains("asr") {
+        return try NemotronASRModel.fromDirectory(directory)
     }
 
     if joinedHints.contains("whisper") {

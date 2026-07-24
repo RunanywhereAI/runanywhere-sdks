@@ -16,6 +16,7 @@
 #include "common/rac_engine_unavailable.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -867,9 +868,10 @@ static const rac_engine_vtable_t g_mlx_engine_vtable = {
     /* embedding_ops    */ &g_mlx_embeddings_ops,
     /* vlm_ops          */ &g_mlx_vlm_ops,
     /* diffusion_ops    */ nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

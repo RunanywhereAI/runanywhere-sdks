@@ -137,7 +137,8 @@ class RunAnywhereApplication : Application() {
         }
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         // Re-apply the persisted HuggingFace token (Settings screen) so private
-        // model repos (e.g. gated NPU bundles) download across app restarts.
+        // model repos (e.g. gated NPU bundles) download across app restarts. Sourced only from
+        // the user-provisioned token in protected app storage — never embedded in the APK.
         SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()

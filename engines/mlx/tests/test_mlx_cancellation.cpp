@@ -15,6 +15,7 @@
 #include <mutex>
 #include <string>
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry_mlx.h"
 
 namespace {
@@ -26,6 +27,7 @@ constexpr auto kSafetyTimeout = 2s;
 
 struct FakeSession {
     std::atomic<bool> cancelled{false};
+    rac_mlx_session_kind_t kind = RAC_MLX_SESSION_KIND_LLM;
 };
 
 struct BlockingState {
@@ -79,11 +81,14 @@ bool wait_for_state(Predicate predicate) {
     return g_state.changed.wait_for(lock, kSafetyTimeout, predicate);
 }
 
-rac_result_t fake_create(rac_mlx_session_kind_t, const char*, rac_handle_t* out_handle, void*) {
+rac_result_t fake_create(rac_mlx_session_kind_t kind, const char*, rac_handle_t* out_handle,
+                         void*) {
     if (!out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
-    *out_handle = new FakeSession();
+    auto* session = new FakeSession();
+    session->kind = kind;
+    *out_handle = session;
     return RAC_SUCCESS;
 }
 
@@ -392,14 +397,18 @@ int main() {
     std::cout << "test_mlx_cancellation\n";
     check(install_callbacks(), "MLX test callbacks install");
     const auto* vtable = mlx_vtable();
-    check(vtable && vtable->llm_ops && vtable->tts_ops, "MLX LLM/TTS vtables are available");
+    check(vtable && vtable->llm_ops && vtable->tts_ops,
+          "MLX LLM/TTS vtables are available");
     if (!vtable || !vtable->llm_ops || !vtable->tts_ops) {
         return EXIT_FAILURE;
     }
+    check(rac_plugin_register(vtable) == RAC_SUCCESS,
+          "MLX vtable and attached manifest register together");
 
     test_llm_cancel_during_blocked_inference();
     test_late_interrupt_does_not_poison_successor();
     test_tts_stop_during_blocked_unary_synthesis();
+    check(rac_plugin_unregister("mlx") == RAC_SUCCESS, "MLX test registration unloads cleanly");
 
     std::cout << "  "
               << (g_failures == 0 ? "all checks passed" : "failures: " + std::to_string(g_failures))

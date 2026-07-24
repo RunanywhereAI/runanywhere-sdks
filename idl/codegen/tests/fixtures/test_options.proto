@@ -64,6 +64,13 @@ enum RacTestMode {
     ];
 }
 
+// Enum with no enum-level convenience annotations. A message default still
+// needs to import this symbol in generated TypeScript.
+enum RacTestPlainMode {
+    RAC_TEST_PLAIN_MODE_UNSPECIFIED = 0;
+    RAC_TEST_PLAIN_MODE_ENABLED = 1;
+}
+
 // ----------------------------------------------------------------------------
 // Nested message used by RacTestConfig.embedded_message_field to exercise
 // the MESSAGE type path in defaults() / validate(). No annotations: this
@@ -101,8 +108,10 @@ message RacTestConfig {
         (runanywhere.v1.rac_max)     = 65536
     ];
 
-    // FLOAT — rac_default + rac_min_float + rac_max_float.
-    float threshold_float = 4 [
+    // Optional FLOAT — mirrors the diarization threshold: rac_default plus
+    // a closed float range. Validators must reject negative, >1, and NaN
+    // values while preserving the default when the field is absent.
+    optional float threshold_float = 4 [
         (runanywhere.v1.rac_default)   = "0.5",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
@@ -132,4 +141,18 @@ message RacTestConfig {
     // defaults/validate logic for this field (generators only touch
     // annotated fields).
     RacTestNested embedded_message_field = 8;
+
+    // Exact numeric domain used by mono-only audio options: generated
+    // defaults must choose 1 and generated validators must reject both 0
+    // and 2.
+    optional int32 mono_channel_count = 9 [
+        (runanywhere.v1.rac_default) = "1",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 1
+    ];
+
+    // Exercises a same-file enum default whose enum has no accessor metadata.
+    RacTestPlainMode plain_mode_enum = 10 [
+        (runanywhere.v1.rac_default) = "RAC_TEST_PLAIN_MODE_ENABLED"
+    ];
 }

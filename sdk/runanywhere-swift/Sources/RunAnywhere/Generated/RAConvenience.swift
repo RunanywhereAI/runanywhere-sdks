@@ -69,6 +69,8 @@ extension RAModelCategory {
         case .audio: return "audio"
         case .embedding: return "embedding"
         case .voiceActivityDetection: return "voice-activity-detection"
+        case .speakerDiarization: return "speaker-diarization"
+        case .semanticSegmentation: return "semantic-segmentation"
         default: return ""
         }
     }
@@ -89,6 +91,8 @@ extension RAModelCategory {
         case "audio": return .audio
         case "embedding": return .embedding
         case "voice-activity-detection": return .voiceActivityDetection
+        case "speaker-diarization": return .speakerDiarization
+        case "semantic-segmentation": return .semanticSegmentation
         default: return nil
         }
     }
@@ -175,6 +179,57 @@ extension RAArchiveStructure {
     }
 }
 
+extension RADiarizationOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RADiarizationOptions {
+        var r = RADiarizationOptions()
+        r.sampleRateHz = 16000
+        r.channelCount = 1
+        r.encoding = .pcmF32Le
+        r.threshold = 0.5
+        return r
+    }
+}
+
+extension RADiarizationOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        let effectiveSampleRateHz = hasSampleRateHz ? sampleRateHz : 16000
+        if effectiveSampleRateHz < 8000 || effectiveSampleRateHz > 48000 {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.sample_rate_hz",
+                message: "sample_rate_hz must be in 8000...48000 (got \(effectiveSampleRateHz))"
+            )
+        }
+        let effectiveChannelCount = hasChannelCount ? channelCount : 1
+        if effectiveChannelCount < 1 || effectiveChannelCount > 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.channel_count",
+                message: "channel_count must be in 1...1 (got \(effectiveChannelCount))"
+            )
+        }
+        let effectiveThreshold = hasThreshold ? threshold : 0.5
+        if !effectiveThreshold.isFinite || effectiveThreshold < 0.0 || effectiveThreshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.threshold",
+                message: "threshold must be in 0.0...1.0 (got \(effectiveThreshold))"
+            )
+        }
+        if minimumDurationMs < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.minimum_duration_ms",
+                message: "minimum_duration_ms must be >= 0 (got \(minimumDurationMs))"
+            )
+        }
+        if mergeGapMs < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "DiarizationOptions.merge_gap_ms",
+                message: "merge_gap_ms must be >= 0 (got \(mergeGapMs))"
+            )
+        }
+    }
+}
+
 extension RAEmbeddingsConfiguration {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RAEmbeddingsConfiguration {
@@ -245,7 +300,7 @@ extension RAVADConfiguration {
                 message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
             )
         }
-        if threshold < 0.0 || threshold > 1.0 {
+        if !threshold.isFinite || threshold < 0.0 || threshold > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "VADConfiguration.threshold",
                 message: "threshold must be in 0.0...1.0 (got \(threshold))"
@@ -332,7 +387,7 @@ extension RARAGConfiguration {
             )
         }
         let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.0
-        if effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0 {
+        if !effectiveSimilarityThreshold.isFinite || effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.similarity_threshold",
                 message: "similarity_threshold must be in 0.0...1.0 (got \(effectiveSimilarityThreshold))"

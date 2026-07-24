@@ -91,6 +91,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
   case voiceAgent // = 9
   case wakeword // = 10
   case speakerDiarization // = 11
+  case semanticSegmentation // = 12
+  case rerank // = 13
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -111,6 +113,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 9: self = .voiceAgent
     case 10: self = .wakeword
     case 11: self = .speakerDiarization
+    case 12: self = .semanticSegmentation
+    case 13: self = .rerank
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -129,6 +133,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .voiceAgent: return 9
     case .wakeword: return 10
     case .speakerDiarization: return 11
+    case .semanticSegmentation: return 12
+    case .rerank: return 13
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -147,6 +153,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     .voiceAgent,
     .wakeword,
     .speakerDiarization,
+    .semanticSegmentation,
+    .rerank,
   ]
 
 }
@@ -3912,7 +3920,7 @@ public nonisolated struct RASDKEventSubscribeRequest: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASDKComponent: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0\u{1}SDK_COMPONENT_SEMANTIC_SEGMENTATION\0\u{1}SDK_COMPONENT_RERANK\0")
 }
 
 nonisolated extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {

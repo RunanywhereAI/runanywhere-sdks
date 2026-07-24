@@ -67,8 +67,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
         "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
-        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
-        "bonsai_4b_1bit",       "bonsai_8b_1bit",
+        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",    "bonsai_4b_1bit",
+        "bonsai_8b_1bit",       "nemotron_nano_8b",
     };
     const std::unordered_set<std::string> v79 = {
         "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
@@ -94,14 +94,22 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "deepseek_r1_distill_qwen_1_5b",
         "deepseek_r1_distill_qwen_7b",
         "ternary_bonsai_1_7b",
+        "bonsai_1_7b_1bit",
+        "bonsai_27b_1bit",
         "nemotron_nano_8b",
         "nemoguard_content_8b",
         "nemoguard_topic_8b",
         "qwen3_vl_2b_text",
+        "cosmos3_edge_text",
+        "cosmos3_edge_vlm",
+        "cosmos3_edge_diffusion",
         "internvl3_5_1b",
         "gemma4_e2b_vlm",
         "gemma4_e4b_vlm",
         "nemotron_nano_vl_8b",
+        "nemotron_ocr",
+        "nemotron_ocr_v1",
+        "nemotron_parse",
         "whisper_base",
         "whisper_small",
         "moonshine_base",
@@ -115,11 +123,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "kokoro_en",
         "melotts_en",
         "kitten_nano_0_8",
-        "kitten_mini_0_1",
         "kitten_mini_0_8",
         "kitten_micro_0_8",
-        "kitten_nano_0_2",
-        "kitten_nano_0_1",
         "embeddinggemma_300m",
         "nv_embedqa_1b",
         "nv_rerankqa_1b",
@@ -133,7 +138,12 @@ int test_native_catalog_owns_arch_and_auth_policy() {
     std::unordered_set<std::string> all = v75;
     all.insert(v79.begin(), v79.end());
     all.insert(v81.begin(), v81.end());
-    ASSERT_EQ(all.size(), static_cast<size_t>(51));
+    // Drive coverage off the real policy array: every catalog row supports at
+    // least one arch, so the enumerated union must equal the array length. This
+    // fails loudly if a future row (like the Cosmos3 additions) is added to the
+    // catalog without being enumerated here, instead of drifting behind a
+    // hand-copied literal.
+    ASSERT_EQ(all.size(), rac_qhexrt_catalog_model_count());
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_is_known(id.c_str()), RAC_TRUE);
         ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch(id.c_str(), RAC_QHEXRT_HEXAGON_ARCH_V75),
@@ -144,34 +154,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
                   v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
     }
 
-    const std::unordered_set<std::string> private_ids = {
-        "qwen3_0_6b",
-        "llama_embed_nemotron_8b",
-        "nv_embedcode_7b",
-        "nv_embedqa_1b",
-        "nv_rerankqa_1b",
-        "nemotron_nano_8b",
-        "nemoguard_content_8b",
-        "nemoguard_topic_8b",
-        "nemotron_nano_vl_8b",
-        "nemotron_ocr",
-        "nemotron_ocr_v1",
-        "nemotron_parse",
-        "parakeet_tdt_0_6b_v2",
-        "parakeet_tdt_0_6b_v3",
-        "parakeet_rnnt_1_1b",
-        "canary_qwen_2_5b",
-        "canary_1b_flash",
-        "nemotron_asr_streaming",
-        "kokoro_en",
-        "kitten_nano_0_8",
-        "kitten_mini_0_1",
-        "kitten_mini_0_8",
-        "kitten_micro_0_8",
-        "kitten_nano_0_2",
-        "kitten_nano_0_1",
-    };
-    ASSERT_EQ(private_ids.size(), static_cast<size_t>(25));
+    const std::unordered_set<std::string> private_ids = {};
+    ASSERT_EQ(private_ids.size(), static_cast<size_t>(0));
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
                   private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
@@ -186,6 +170,12 @@ int test_native_catalog_owns_arch_and_auth_policy() {
               RAC_FALSE);
     ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("nv_rerankqa_1b", RAC_QHEXRT_HEXAGON_ARCH_V79),
               RAC_FALSE);
+    ASSERT_EQ(
+        rac_qhexrt_catalog_model_supports_arch("nemotron_nano_8b", RAC_QHEXRT_HEXAGON_ARCH_V75),
+        RAC_TRUE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_supports_arch("nemotron_ocr", RAC_QHEXRT_HEXAGON_ARCH_V81),
+              RAC_TRUE);
+    ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth("nv_embedqa_1b"), RAC_FALSE);
     return 0;
 }
 
@@ -288,7 +278,8 @@ int test_eligible_preserves_app_definition() {
     ASSERT_EQ(saved.download_size_bytes(), request.download_size_bytes());
     ASSERT_EQ(saved.context_length(), request.context_length());
     ASSERT_EQ(saved.supports_thinking(), request.supports_thinking());
-    ASSERT_EQ(saved.description(), request.description());
+    ASSERT_TRUE(saved.has_metadata());
+    ASSERT_EQ(saved.metadata().description(), request.description());
     ASSERT_TRUE(registry_contains(id));
 
     rac_proto_buffer_free(&out);
@@ -399,7 +390,7 @@ int test_logical_hf_ref_selects_v81_before_commons_registration() {
     return 0;
 }
 
-int test_private_model_skips_network_without_token_and_registers_with_token() {
+int test_public_model_registers_without_token() {
     install_noop_adapter();
     ASSERT_EQ(rac_http_transport_register(&kFakeTransport, nullptr), RAC_SUCCESS);
     const std::string id = "qwen3_0_6b";
@@ -411,19 +402,6 @@ int test_private_model_skips_network_without_token_and_registers_with_token() {
     g_hf_request_count = 0;
     rac_proto_buffer_t out{};
     rac_bool_t registered = RAC_TRUE;
-    ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
-                  reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
-                  RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
-              RAC_SUCCESS);
-    ASSERT_EQ(registered, RAC_FALSE);
-    ASSERT_EQ(out.size, static_cast<size_t>(0));
-    ASSERT_EQ(g_hf_request_count, 0);
-    ASSERT_TRUE(!registry_contains(id));
-    rac_proto_buffer_free(&out);
-
-    rac_http_hf_token_set("test-token-never-logged");
-    ASSERT_EQ(rac_http_hf_token_is_configured(), RAC_TRUE);
-    registered = RAC_FALSE;
     ASSERT_EQ(rac::qhexrt::catalog::register_for_arch_proto(
                   reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
                   RAC_QHEXRT_HEXAGON_ARCH_V81, RAC_TRUE, &registered, &out),
@@ -485,8 +463,7 @@ int main() {
          test_public_catalog_abi_skips_stub_or_unregistered_backend},
         {"logical_hf_ref_selects_v81_before_commons_registration",
          test_logical_hf_ref_selects_v81_before_commons_registration},
-        {"private_model_skips_network_without_token_and_registers_with_token",
-         test_private_model_skips_network_without_token_and_registers_with_token},
+        {"public_model_registers_without_token", test_public_model_registers_without_token},
         {"invalid_definitions_fail_closed", test_invalid_definitions_fail_closed},
 #endif
     };

@@ -5,10 +5,31 @@ import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.PostDownloadAppendBytes
+import ai.runanywhere.proto.v1.PostDownloadTransform
+import ai.runanywhere.proto.v1.PostDownloadTransformOperation
+import okio.ByteString.Companion.decodeHex
 
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
 internal object ModelCatalog {
+
+    private const val PARAKEET_CTC_METADATA_HEX =
+        "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c696e675f666163746f72120138721d0a0e6e6f726d616c697a655f74797065120b7065725f66656174757265"
+
+    private val parakeetCtcTransform =
+        PostDownloadTransform(
+            source_size_bytes = 1_110_014_069,
+            source_checksum_sha256 = "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d",
+            final_size_bytes = 1_110_014_145,
+            final_checksum_sha256 = "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+            operations =
+                listOf(
+                    PostDownloadTransformOperation(
+                        append_bytes = PostDownloadAppendBytes(payload = PARAKEET_CTC_METADATA_HEX.decodeHex()),
+                    ),
+                ),
+        )
 
     private val LLAMA = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
     private val SHERPA = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
@@ -64,10 +85,24 @@ internal object ModelCatalog {
         SingleFileModel("llama_embed_nemotron_8b", "Llama Embed Nemotron 8B (HNPU)", "https://huggingface.co/runanywhere/llama_embed_nemotron_8b_HNPU", QHEXRT, EMBEDDING, 8_079_101_598L),
         SingleFileModel("nv_embedcode_7b", "NV-EmbedCode 7B (HNPU)", "https://huggingface.co/runanywhere/nv_embedcode_7b_HNPU", QHEXRT, EMBEDDING, 7_276_868_122L),
         SingleFileModel("nv_embedqa_1b", "NV-EmbedQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_embedqa_1b_HNPU", QHEXRT, EMBEDDING, 2_493_026_133L),
+        SingleFileModel("nemotron_3_embed_1b", "Nemotron-3-Embed 1B (HNPU)", "https://huggingface.co/runanywhere/nemotron_3_embed_1b_HNPU/nemotron-3-embed-1b.json", QHEXRT, EMBEDDING, 2_302_290_226L),
         SingleFileModel("nv_rerankqa_1b", "NV-RerankQA 1B (HNPU)", "https://huggingface.co/runanywhere/nv_rerankqa_1b_HNPU", QHEXRT, EMBEDDING, 2_494_254_905L),
         SingleFileModel("deepseek_r1_distill_qwen_1_5b", "DeepSeek R1 Distill Qwen 1.5B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU/DeepSeek-R1-Distill-Qwen-1.5B.json", QHEXRT, LANGUAGE, 6_211_227_068L, supportsThinking = true),
         SingleFileModel("deepseek_r1_distill_qwen_7b", "DeepSeek R1 Distill Qwen 7B (HNPU)", "https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU/DeepSeek-R1-Distill-Qwen-7B.json", QHEXRT, LANGUAGE, 8_210_665_301L, supportsThinking = true),
         SingleFileModel("nemotron_nano_8b", "Llama 3.1 Nemotron Nano 8B (HNPU)", "https://huggingface.co/runanywhere/nemotron_nano_8b_HNPU/nemotron-nano-8b.json", QHEXRT, LANGUAGE, 8_609_694_487L),
+        // Cosmos3-Edge is one omnimodal model shipped as TWO HNPU repos, mirroring Qwen (understanding
+        // vs generation). The chat + vision rows BOTH point at the single "understanding" repo
+        // (cosmos3_edge_HNPU) with different manifest leaves — like qwen3_vl_HNPU hosts text + vlm —
+        // because text (split_generate) and VLM (cosmos3vl_generate) are two different device graphs.
+        // Each is its own model_id, so it downloads its own manifest-pruned bundle into its own model
+        // folder: a user who installs BOTH fetches the shared decoder/embed/lmhead weights twice. That
+        // duplication is accepted intentionally (no content-addressed de-dup layer). Diffusion is the
+        // separate generation repo.
+        // supportsThinking=false: the text manifest bakes a closed empty-think block for concise,
+        // self-terminating replies, so the app shows the answer rather than an always-empty reasoning section.
+        SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/v81/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = false),
+        SingleFileModel("cosmos3_edge_vlm", "Cosmos3-Edge Vision (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/v81/cosmos3-edge-vlm.json", QHEXRT, MULTIMODAL, 3505000000L, contextLength = 2_048),
+        SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Image (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_image_HNPU/v81/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
         SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
         SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L),
         SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 2_364_667_194L, contextLength = 512),
@@ -94,10 +129,12 @@ internal object ModelCatalog {
         SingleFileModel("parakeet_tdt_0_6b_v2", "Parakeet TDT 0.6B v2 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v2_HNPU/parakeet-tdt-0.6b-v2.json", QHEXRT, STT, 1_280_063_837L),
         SingleFileModel("parakeet_tdt_0_6b_v3", "Parakeet TDT 0.6B v3 (HNPU)", "https://huggingface.co/runanywhere/parakeet_tdt_0.6b_v3_HNPU/parakeet-tdt-0.6b.json", QHEXRT, STT, 1_317_902_802L),
         SingleFileModel("parakeet_rnnt_1_1b", "Parakeet RNNT 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_rnnt_1.1b_HNPU/parakeet-rnnt-1.1b.json", QHEXRT, STT, 2_211_659_923L),
+        SingleFileModel("parakeet_ctc_1_1b", "Parakeet CTC 1.1B (HNPU)", "https://huggingface.co/runanywhere/parakeet_ctc_1.1b_HNPU/parakeet-ctc-1.1b.json", QHEXRT, STT, 2_179_021_370L),
         // The V81 product bundle is the complete ASR pipeline. Pin the manifest
         // path explicitly so the downloader does not depend on repository-root layout.
         SingleFileModel("canary_qwen_2_5b", "Canary Qwen 2.5B (HNPU)", "https://huggingface.co/runanywhere/canary_qwen_2.5b_HNPU/v81/canary-qwen-2.5b.json", QHEXRT, STT, 5_491_333_979L),
         SingleFileModel("canary_1b_flash", "Canary-1B-flash (HNPU)", "https://huggingface.co/runanywhere/canary_1b_flash_HNPU/canary-1b-flash.json", QHEXRT, STT, 1_835_592_227L),
+        SingleFileModel("canary_180m_flash", "Canary 180M Flash (HNPU)", "https://huggingface.co/runanywhere/canary_180m_flash_HNPU/canary-180m-flash.json", QHEXRT, STT, 401_629_133L),
         SingleFileModel("nemotron_asr_streaming", "Nemotron ASR Streaming 0.6B (HNPU)", "https://huggingface.co/runanywhere/nemotron_asr_streaming_HNPU/nemotron-3.5-asr-streaming-0.6b.json", QHEXRT, STT, 1_361_283_432L),
         SingleFileModel("melotts_en", "MeloTTS EN (HNPU)", "https://huggingface.co/runanywhere/melotts_en_HNPU/melotts-en.json", QHEXRT, TTS, 120_439_053L),
         SingleFileModel("kokoro_en", "Kokoro-82M EN (HNPU)", "https://huggingface.co/runanywhere/kokoro_en_HNPU/kokoro-en.json", QHEXRT, TTS, 470_739_484L),
@@ -186,6 +223,42 @@ internal object ModelCatalog {
             LANGUAGE,
             2_800_000_000,
             supportsThinking = true
+        ),
+        // Exact P0 NVIDIA checkpoint. The pinned llama.cpp fork has native
+        // `nemotron` support; this exact Q4_K_M artifact was load/inference
+        // checked through rcli on macOS before being exposed in the catalog.
+        SingleFileModel(
+            "nemotron-mini-4b-instruct-q4_k_m",
+            "NVIDIA Nemotron Mini 4B Instruct Q4_K_M",
+            "https://huggingface.co/bartowski/Nemotron-Mini-4B-Instruct-GGUF/resolve/fb49cde090c86092d89905bea2ffc41c23c2615e/Nemotron-Mini-4B-Instruct-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            2_697_387_072,
+            contextLength = 4_096
+        ),
+        // Exact P0 NVIDIA Nano checkpoint. The file itself is 4.92 GB, while
+        // llama.cpp also needs KV/cache/compute headroom. Keep those two facts
+        // separate so the download planner validates the exact transport size
+        // and the mandatory SDK compatibility preflight requires 6 GiB of
+        // currently available RAM before either download or lifecycle load.
+        //
+        // INTENTIONAL CROSS-SDK DIVERGENCE: this row is Android/rcli-only. The
+        // pinned llama.cpp fork's `nemotron` path was load/inference checked for
+        // this exact Q4_K_M artifact through rcli on macOS (not yet an on-device
+        // Android smoke). iOS deliberately withholds it (ModelCatalogBootstrap:
+        // pending an Apple-provider inference smoke) and the Web catalog omits it
+        // (its ~4.92 GB single artifact exceeds the browser WASM32 4 GiB gate).
+        // Hold or re-scope this row if the Android llama.cpp path has to clear the
+        // same on-device bar iOS requires.
+        SingleFileModel(
+            "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
+            "NVIDIA Llama 3.1 Nemotron Nano 8B v1 Q4_K_M",
+            "https://huggingface.co/bartowski/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/6f3d46cfbc39ce7a1bec89654305515d904e8102/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            memoryBytes = 6L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 4_920_736_864L,
+            contextLength = 4_096,
         ),
         // Bonsai family at TRUE 1-bit (Q1_0, ~1.125 bit/wt) on CPU via llama.cpp — the same GGUF
         // that runs on the NPU (bonsai_{4b,8b,27b}_1bit, QHEXRT). Requires a llama.cpp build with
@@ -393,6 +466,73 @@ internal object ModelCatalog {
             TAR_GZ,
             ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY
         ),
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-0.6b-v2-int8",
+            "NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            661_190_513,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx", "encoder.int8.onnx", 652_184_296),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx", "decoder.int8.onnx", 7_257_753),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx", "joiner.int8.onnx", 1_739_080),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/tokens.txt", "tokens.txt", 9_384),
+            ),
+        ),
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+            "NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            670_478_772,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx", "encoder.int8.onnx", 652_184_281),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx", "decoder.int8.onnx", 11_845_275),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx", "joiner.int8.onnx", 6_355_277),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt", "tokens.txt", 93_939),
+            ),
+        ),
+        // This upstream ONNX is otherwise loadable but lacks three metadata
+        // entries required by Sherpa. Commons verifies the source bytes, then
+        // appends the exact reviewed 76-byte payload before publishing the
+        // final artifact. Runtime RAM is based on the observed Android PSS
+        // (~1,760,875 KB), not the smaller aggregate download size.
+        MultiFileModel(
+            "sherpa-nemo-parakeet-ctc-1.1b-int8",
+            "NVIDIA Parakeet CTC 1.1B INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            memoryBytes = 2L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 1_110_024_519,
+            files =
+                listOf(
+                    ModelFile(
+                        "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx",
+                        "model.int8.onnx",
+                        1_110_014_145,
+                        "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
+                        parakeetCtcTransform,
+                    ),
+                    ModelFile(
+                        "https://huggingface.co/OpenVoiceOS/nvidia-parakeet-ctc-1.1b-onnx/resolve/3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt",
+                        "tokens.txt",
+                        10_374,
+                        "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921",
+                    ),
+                ),
+        ),
+        MultiFileModel(
+            "sherpa-nemo-canary-180m-flash-int8",
+            "NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            207_170_046,
+            files = listOf(
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx", "encoder.int8.onnx", 132_678_643),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx", "decoder.int8.onnx", 74_437_848),
+                ModelFile("https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt", "tokens.txt", 53_555),
+            ),
+        ),
         ArchiveModel(
             "vits-piper-en_US-lessac-medium",
             "Piper TTS (US English - Medium)",
@@ -416,6 +556,44 @@ internal object ModelCatalog {
     )
 
     private val misc = listOf(
+        // Exact P0 NVIDIA embedding checkpoint. This pinned GGUF passed a real
+        // RunAnywhere llama.cpp embedding-ops smoke on macOS (2048 dimensions,
+        // finite L2-normalized output) before being exposed cross-platform.
+        SingleFileModel(
+            "nemotron-3-embed-1b-q4_k_m",
+            "NVIDIA Nemotron 3 Embed 1B Q4_K_M",
+            "https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/nemotron-3-embed-1b-q4_k_m.gguf",
+            LLAMA,
+            EMBEDDING,
+            749_352_096,
+        ),
+        // Exact P0 Llama Nemotron Embed v2 checkpoint. This pinned GGUF also
+        // passed the real RunAnywhere llama.cpp embedding-ops smoke on macOS
+        // (2048 dimensions, finite L2-normalized output).
+        SingleFileModel(
+            "llama-nemotron-embed-1b-v2-q4_k_m",
+            "NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M",
+            "https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/llama-nemotron-embed-1B-v2-Q4_K_M.gguf",
+            LLAMA,
+            EMBEDDING,
+            807_690_624,
+        ),
+        // NVIDIA Llama Embed Nemotron 8B — the only NVIDIA embedder with a
+        // portable GGUF that was previously catalogued HNPU-only. Llama-family
+        // bidirectional embedder; runs through the llama.cpp embedding path like
+        // the two 1B rows above. The 4.63 GB Q4_K_M file exceeds the WASM 4 GiB
+        // heap so it is intentionally Web-excluded; on mobile the download
+        // transport size is kept separate from a mandatory 6 GiB available-RAM
+        // preflight (mirrors the Nano-8B gate).
+        SingleFileModel(
+            "llama-embed-nemotron-8b-q4_k_m",
+            "NVIDIA Llama Embed Nemotron 8B Q4_K_M",
+            "https://huggingface.co/mradermacher/llama-embed-nemotron-8b-GGUF/resolve/e7ae3cbae4f7693bbd75ec959bf293f39e1f2e25/llama-embed-nemotron-8b.Q4_K_M.gguf",
+            LLAMA,
+            EMBEDDING,
+            memoryBytes = 6L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 4_625_233_184L,
+        ),
         SingleFileModel(
             "silero-vad",
             "Silero VAD",

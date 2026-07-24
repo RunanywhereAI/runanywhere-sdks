@@ -1,0 +1,103 @@
+// RunAnywhere IDL — standalone speaker-diarization types.
+//
+// Diarization is an executable capability in its own right: it identifies
+// who spoke when without producing a transcript or reducing the result to
+// voice activity. It therefore has a dedicated lifecycle/category/primitive
+// instead of flowing through STT, VAD, or the legacy generic AUDIO category.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "errors.proto";
+import "rac_options.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "DiarizationProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Raw PCM encodings accepted at the SDK boundary. Commons validates complete
+// sample frames and normalizes either representation to float samples before
+// dispatching to an engine.
+enum DiarizationAudioEncoding {
+    DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0;
+    DIARIZATION_AUDIO_ENCODING_PCM_F32_LE  = 1;
+    DIARIZATION_AUDIO_ENCODING_PCM_S16_LE  = 2;
+}
+
+message DiarizationOptions {
+    optional int32 sample_rate_hz = 1 [
+        (runanywhere.v1.rac_default) = "16000",
+        (runanywhere.v1.rac_min) = 8000,
+        (runanywhere.v1.rac_max) = 48000
+    ];
+    optional int32 channel_count = 2 [
+        (runanywhere.v1.rac_default) = "1",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 1
+    ];
+    optional DiarizationAudioEncoding encoding = 3 [
+        (runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"
+    ];
+    optional float threshold = 4 [
+        (runanywhere.v1.rac_default) = "0.5",
+        (runanywhere.v1.rac_min_float) = 0,
+        (runanywhere.v1.rac_max_float) = 1
+    ];
+    int64 minimum_duration_ms = 5 [(runanywhere.v1.rac_min) = 0];
+    int64 merge_gap_ms = 6 [(runanywhere.v1.rac_min) = 0];
+}
+
+message DiarizationRequest {
+    bytes audio_data = 1;
+    optional DiarizationOptions options = 2;
+}
+
+message DiarizationSegment {
+    int64 start_ms = 1;
+    int64 end_ms = 2;
+    int32 speaker_index = 3;
+    string speaker_id = 4;
+}
+
+message DiarizationResult {
+    repeated DiarizationSegment segments = 1;
+    int32 speaker_count = 2;
+    int64 audio_duration_ms = 3;
+    int64 processing_time_ms = 4;
+    string model_id = 5;
+}
+
+enum DiarizationStreamEventKind {
+    DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    DIARIZATION_STREAM_EVENT_KIND_STARTED     = 1;
+    DIARIZATION_STREAM_EVENT_KIND_UPDATE      = 2;
+    DIARIZATION_STREAM_EVENT_KIND_FINAL       = 3;
+    DIARIZATION_STREAM_EVENT_KIND_ERROR       = 4;
+}
+
+// UPDATE and FINAL carry a complete snapshot of the session hypothesis, not a
+// delta. Speaker indices/IDs are stable only within one offline call or stream
+// session. Segments belonging to different speakers may overlap.
+message DiarizationStreamEvent {
+    uint64 session_id = 1;
+    uint64 seq = 2;
+    int64 timestamp_us = 3;
+    DiarizationStreamEventKind kind = 4;
+    optional DiarizationResult result = 5;
+    optional SDKError error = 6;
+}
+
+// Logical capability contract. Native SDKs use the proto-byte C ABI; this
+// declaration keeps generated API documentation and future transports aligned.
+// For Stream, each client message is one audio feed and closing the client side
+// requests the final snapshot; transport cancellation cancels the session.
+service Diarization {
+    rpc Diarize(DiarizationRequest) returns (DiarizationResult);
+    rpc Stream(stream DiarizationRequest) returns (stream DiarizationStreamEvent);
+}

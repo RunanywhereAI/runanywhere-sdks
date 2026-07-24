@@ -42,6 +42,8 @@ extern "C" {
  *   - A new primitive lands in `rac_primitive.h`.
  *   - Any existing per-domain ops struct (llm_service_ops etc.) grows or
  *     shrinks.
+ *   - Any request, options, or result struct passed through a per-domain ops
+ *     function changes layout.
  *
  * Do NOT bump for additive metadata (new flags in `capability_flags`).
  *
@@ -78,8 +80,16 @@ extern "C" {
  *   5u — rac_llm_options_t grew across the engine service boundary. Engines
  *                 compiled against v4 may read a shorter options layout, so
  *                 they are rejected at register time until rebuilt.
+ *   6u — rac_embeddings_options_t gained explicit long-input policy and batch
+ *                 size fields. Engines compiled against v5 expect the shorter
+ *                 layout and are rejected at register time until rebuilt.
+ *   7u — promoted reserved primitive wire/slot 9 to standalone speaker
+ *                 diarization (`RAC_PRIMITIVE_DIARIZE` / `diarization_ops`)
+ *                 and wire/slot 10 to semantic segmentation
+ *                 (`RAC_PRIMITIVE_SEGMENT` / `segmentation_ops`). Engines
+ *                 compiled against v6 are rejected until rebuilt.
  */
-#define RAC_PLUGIN_API_VERSION 5u
+#define RAC_PLUGIN_API_VERSION 7u
 
 /* ===========================================================================
  * Plugin entry-point signature

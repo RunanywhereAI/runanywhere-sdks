@@ -15,6 +15,13 @@
 #include "features/rag/rag_rerank.h"
 #include "features/rag/vector_store_usearch.h"
 
+#ifdef RAC_HAVE_PROTOBUF
+#include "rac/core/rac_error.h"
+#include "rac/features/rag/rac_rag.h"
+
+#include "rag.pb.h"
+#endif
+
 using runanywhere::rag::parse_rerank_scores;
 using runanywhere::rag::reorder_by_scores;
 using runanywhere::rag::SearchResult;
@@ -113,6 +120,33 @@ int main() {
         reorder_by_scores(r, {5});
         CHECK(ids_of(r) == std::vector<std::string>({"A", "B"}), "length mismatch = no-op");
     }
+
+#ifdef RAC_HAVE_PROTOBUF
+    // --- RAG session-create rejects a dedicated reranker_model_id ---
+    // The cross-encoder reranker (reranker_model_id -> RAC_PRIMITIVE_RERANK) is
+    // not yet invoked from the RAG query path, so rac_rag_session_create_proto
+    // fails fast with RAC_ERROR_NOT_IMPLEMENTED rather than accepting the config
+    // and silently no-op'ing (which would mislead callers into thinking a
+    // cross-encoder is active). The LLM-pointwise path (rerank_results) exercised
+    // above is unaffected. This is the RAG-gated coverage of the reranker branch
+    // that test_rerank.cpp deliberately cannot host (that target does not link RAG).
+    {
+        runanywhere::v1::RAGConfiguration cfg;
+        cfg.set_embedding_model_id("embed-model");   // non-empty so we reach the reranker branch
+        cfg.set_reranker_model_id("dedicated-reranker");
+        const std::string bytes = cfg.SerializeAsString();
+
+        rac_handle_t session = nullptr;
+        const rac_result_t rc = rac_rag_session_create_proto(
+            reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &session);
+        CHECK(rc == RAC_ERROR_NOT_IMPLEMENTED,
+              "reranker_model_id at session-create -> NOT_IMPLEMENTED (query-time wiring pending)");
+        CHECK(session == nullptr, "a rejected reranker request yields no RAG session handle");
+        if (session != nullptr) {
+            rac_rag_session_destroy_proto(session);
+        }
+    }
+#endif  // RAC_HAVE_PROTOBUF
 
     std::fprintf(stdout, "=== %d checks, %d failures ===\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -43,6 +43,20 @@ internal object PhysicalMemoryProbe {
     fun totalPhysicalMemoryMB(): Long = totalPhysicalMemoryBytes() / (1024L * 1024L)
 
     /**
+     * Return RAM currently available to the OS, in bytes.
+     *
+     * Android's `ActivityManager.MemoryInfo.availMem` is the authoritative
+     * source. `/proc/meminfo`'s `MemAvailable` is the context-free fallback.
+     * The final total/2 fallback mirrors the device-info bridge and remains
+     * conservative on a plain JVM where neither Android source exists.
+     */
+    fun availablePhysicalMemoryBytes(): Long {
+        activityManagerMemoryField("availMem")?.takeIf { it > 0L }?.let { return it }
+        procMemInfoBytes("MemAvailable:")?.takeIf { it > 0L }?.let { return it }
+        return totalPhysicalMemoryBytes() / 2L
+    }
+
+    /**
      * Android path — uses reflection so this code compiles on desktop JVM.
      * Acquires the current Application context via `ActivityThread` and calls
      * `ActivityManager.getMemoryInfo`.
@@ -51,6 +65,10 @@ internal object PhysicalMemoryProbe {
      * (e.g. context not yet initialised).
      */
     private fun activityManagerTotalMem(): Long? {
+        return activityManagerMemoryField("totalMem")
+    }
+
+    private fun activityManagerMemoryField(fieldName: String): Long? {
         return try {
             val contextClass = Class.forName("android.content.Context")
             val activityService =
@@ -70,7 +88,7 @@ internal object PhysicalMemoryProbe {
                 .getMethod("getMemoryInfo", memInfoClass)
                 .invoke(activityManager, memInfo)
 
-            memInfoClass.getField("totalMem").getLong(memInfo)
+            memInfoClass.getField(fieldName).getLong(memInfo)
         } catch (_: Throwable) {
             null
         }
@@ -84,12 +102,16 @@ internal object PhysicalMemoryProbe {
      * Darwin where /proc does not exist).
      */
     private fun procMemInfoTotalBytes(): Long? {
+        return procMemInfoBytes("MemTotal:")
+    }
+
+    private fun procMemInfoBytes(fieldName: String): Long? {
         return try {
             val file = File("/proc/meminfo")
             if (!file.exists()) return null
             file.useLines { lines ->
                 lines
-                    .firstOrNull { it.startsWith("MemTotal:") }
+                    .firstOrNull { it.startsWith(fieldName) }
                     ?.split(Regex("\\s+"))
                     ?.getOrNull(1)
                     ?.toLongOrNull()

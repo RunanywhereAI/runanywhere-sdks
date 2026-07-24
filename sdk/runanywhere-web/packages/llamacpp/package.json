@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/web-llamacpp",
   "version": "0.20.11",
-  "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM/VLM inference",
+  "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM, embeddings, and VLM inference",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -39,6 +39,7 @@
     "llm",
     "vlm",
     "llamacpp",
+    "embeddings",
     "wasm",
     "webgpu",
     "on-device",

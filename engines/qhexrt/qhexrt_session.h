@@ -37,6 +37,14 @@ struct Session {
     RequestCancellation diffusion_requests;
     std::string model_ref;
     std::string scratch_dir;
+    // Resolved manifest file (session_open). Used by the diffusion adapter to
+    // classify which host-op — LaMa inpaint vs Cosmos3 text-to-image — this
+    // session actually serves, so it advertises only that mode.
+    std::string manifest_path;
+    // Cached diffusion classification: -1 = unresolved, 0 = inpainting,
+    // 1 = text-to-image. Lazily derived from manifest_path; deterministic, so a
+    // benign race just recomputes the same value.
+    std::atomic<int> diffusion_kind{-1};
 };
 
 // Acquire the process runtime, load `manifest_path`, create a session.

@@ -24,5 +24,6 @@ val SDKComponent.displayName: String
             SDKComponent.SDK_COMPONENT_RAG -> "Retrieval-Augmented Generation"
             SDKComponent.SDK_COMPONENT_WAKEWORD -> "Wake Word"
             SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION -> "Speaker Diarization"
+            SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION -> "Semantic Segmentation"
             else -> "Unknown"
         }

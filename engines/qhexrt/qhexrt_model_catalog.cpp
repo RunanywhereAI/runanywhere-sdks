@@ -41,6 +41,14 @@ constexpr uint8_t kAllSupportedArches = kV75 | kV79 | kV81;
 struct ModelPolicy {
     std::string_view id;
     uint8_t arch_mask;
+    // Fail-closed gate: when true, register_for_arch_proto() skips the row until an
+    // HF token is configured, which is what drives the per-SDK "bring your own HF
+    // token" preflight UX. Every RunAnywhere-hosted QHexRT repo referenced below is
+    // currently PUBLIC, so all rows set this false. The field, its accessor
+    // (rac_qhexrt_catalog_model_requires_hf_auth), the gate at line ~345, and the
+    // downstream token-prompt UI are deliberately RETAINED for future gated models:
+    // flip a single row to true if/when a model is re-hosted behind a gated HF repo
+    // and the token preflight fires again with no other code change.
     bool requires_hf_auth;
 };
 
@@ -53,7 +61,7 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
-    {"qwen3_0_6b", kV75V81, true},
+    {"qwen3_0_6b", kV75V81, false},
     {"llama3_2_1b", kV79V81, false},
     {"ternary_bonsai_1_7b", kV75V81, false},
     {"bonsai_1_7b_1bit", kV81, false},
@@ -66,42 +74,48 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"gemma3n_e4b", kV81, false},
     {"gemma4_e2b", kV79V81, false},
     {"gemma4_e4b", kV81, false},
-    {"llama_embed_nemotron_8b", kV81, true},
-    {"nv_embedcode_7b", kV81, true},
-    {"nv_embedqa_1b", kV75V81, true},
-    {"nv_rerankqa_1b", kV75V81, true},
+    {"llama_embed_nemotron_8b", kV81, false},
+    {"nv_embedcode_7b", kV81, false},
+    {"nv_embedqa_1b", kV75V81, false},
+    {"nemotron_3_embed_1b", kV75, false},
+    {"nv_rerankqa_1b", kV75V81, false},
     {"deepseek_r1_distill_qwen_1_5b", kV79V81, false},
     {"deepseek_r1_distill_qwen_7b", kV81, false},
-    {"nemotron_nano_8b", kV81, true},
-    {"nemoguard_content_8b", kV81, true},
-    {"nemoguard_topic_8b", kV81, true},
+    {"nemotron_nano_8b", kV75V81, false},
+    {"nemoguard_content_8b", kV81, false},
+    {"nemoguard_topic_8b", kV81, false},
     {"qwen3_vl_2b_text", kV81, false},
     {"qwen3_vl", kV75V79, false},
+    {"cosmos3_edge_text", kV81, false},   // Cosmos3-Edge reasoning/text AR path (sharded fp16 decode, split_generate); v81 device-validated greedy-exact
+    {"cosmos3_edge_vlm", kV81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v81 device-validated
+    {"cosmos3_edge_diffusion", kV81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v81
     {"internvl3_5_1b", kAllSupportedArches, false},
     {"gemma4_e2b_vlm", kV79V81, false},
     {"gemma4_e4b_vlm", kV81, false},
-    {"nemotron_nano_vl_8b", kV81, true},
+    {"nemotron_nano_vl_8b", kV81, false},
     {"lama_dilated", kV79V81, false},
-    {"nemotron_ocr", kV75, true},
-    {"nemotron_ocr_v1", kV75, true},
-    {"nemotron_parse", kV75, true},
+    {"nemotron_ocr", kV75V81, false},
+    {"nemotron_ocr_v1", kV75V81, false},
+    {"nemotron_parse", kV75V81, false},
     {"siglip2_base", kAllSupportedArches, false},
     {"whisper_base", kAllSupportedArches, false},
     {"whisper_small", kAllSupportedArches, false},
     {"moonshine_tiny", kAllSupportedArches, false},
     {"moonshine_base", kAllSupportedArches, false},
-    {"parakeet_tdt_0_6b_v2", kV75V81, true},
-    {"parakeet_tdt_0_6b_v3", kV75V81, true},
-    {"parakeet_rnnt_1_1b", kV75V81, true},
-    {"canary_qwen_2_5b", kV81, true},
-    {"canary_1b_flash", kV75V81, true},
-    {"nemotron_asr_streaming", kV75V81, true},
+    {"parakeet_tdt_0_6b_v2", kV75V81, false},
+    {"parakeet_tdt_0_6b_v3", kV75V81, false},
+    {"parakeet_rnnt_1_1b", kV75V81, false},
+    {"parakeet_ctc_1_1b", kV75, false},
+    {"canary_qwen_2_5b", kV81, false},
+    {"canary_1b_flash", kV75V81, false},
+    {"canary_180m_flash", kV75, false},
+    {"nemotron_asr_streaming", kV75V81, false},
     {"melotts_en", kAllSupportedArches, false},
     // V79 requires model-downloaded executable .so files, which Play disallows.
-    {"kokoro_en", kV75V81, true},
-    {"kitten_nano_0_8", kV75V81, true},
-    {"kitten_mini_0_8", kV75V81, true},
-    {"kitten_micro_0_8", kV75V81, true},
+    {"kokoro_en", kV75V81, false},
+    {"kitten_nano_0_8", kV75V81, false},
+    {"kitten_mini_0_8", kV81, false},
+    {"kitten_micro_0_8", kV81, false},
 };
 
 const ModelPolicy* find_model_policy(std::string_view model_id) {
@@ -401,6 +415,8 @@ rac_bool_t rac_qhexrt_catalog_model_requires_hf_auth(const char* model_id) {
     const ModelPolicy* policy = find_model_policy(model_id);
     return policy != nullptr && policy->requires_hf_auth ? RAC_TRUE : RAC_FALSE;
 }
+
+size_t rac_qhexrt_catalog_model_count(void) { return std::size(kModelPolicies); }
 
 rac_result_t rac_qhexrt_catalog_register_model_proto(const uint8_t* request_bytes,
                                                      size_t request_size,

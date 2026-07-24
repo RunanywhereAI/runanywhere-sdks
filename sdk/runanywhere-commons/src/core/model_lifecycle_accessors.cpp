@@ -379,4 +379,44 @@ void release_lifecycle_diffusion(LifecycleDiffusionRef* ref) {
 #endif
 }
 
+rac_result_t acquire_lifecycle_diarization(LifecycleDiarizationRef* out_ref) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    if (out_ref)
+        *out_ref = {};
+    return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
+#else
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION, out_ref,
+                             &LoadedModel::diarization_ops);
+#endif
+}
+
+void release_lifecycle_diarization(LifecycleDiarizationRef* ref) {
+#if defined(RAC_HAVE_PROTOBUF)
+    release_component(ref);
+#else
+    if (ref)
+        *ref = {};
+#endif
+}
+
+rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    if (out_ref)
+        *out_ref = {};
+    return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
+#else
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION, out_ref,
+                             &LoadedModel::segmentation_ops);
+#endif
+}
+
+void release_lifecycle_segmentation(LifecycleSegmentationRef* ref) {
+#if defined(RAC_HAVE_PROTOBUF)
+    release_component(ref);
+#else
+    if (ref)
+        *ref = {};
+#endif
+}
+
 }  // namespace rac::lifecycle

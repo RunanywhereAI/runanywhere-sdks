@@ -1,9 +1,15 @@
-import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
+import { SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { tryRunanywhereModule, type EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
 
 const logger = new SDKLogger('HuggingFace');
-const HF_TOKEN_STORAGE_KEY = 'rac_sdk_plaintext_hf_token';
+
+// Session-only, in-memory holder for the Hugging Face token. A token is a
+// secret and must never be persisted to browser storage (localStorage /
+// IndexedDB / OPFS): those are readable by same-origin scripts/XSS and linger
+// in the browser profile. The token lives only for the current page session
+// and must be re-entered after a reload.
+let sessionHfToken: string | null = null;
 
 interface HfTokenModule extends EmscriptenRunanywhereModule {
   _rac_http_hf_token_set?(tokenPtr: number): number;
@@ -12,10 +18,10 @@ interface HfTokenModule extends EmscriptenRunanywhereModule {
 /**
  * Configure the Hugging Face token used by native download requests.
  *
- * Current Web artifacts may not include `_rac_http_hf_token_set`. In that
- * case the browser fallback is localStorage under the explicitly plaintext
- * PlatformAdapter storage namespace; it is supplied to a rebuilt artifact
- * during its next platform initialization.
+ * The token is held in memory for the current session only and is never
+ * persisted to browser storage. Current Web artifacts may not include
+ * `_rac_http_hf_token_set`; the in-memory value is re-applied to a rebuilt
+ * artifact during its next platform initialization.
  */
 export function setHfToken(token: string | null): void {
   const normalized = token?.trim() || null;
@@ -38,29 +44,12 @@ export function setHfToken(token: string | null): void {
       if (ptr) module._free(ptr);
     }
   } else {
-    logger.debug('Native Hugging Face token export unavailable; using browser plaintext storage fallback.');
+    logger.debug('Native Hugging Face token export unavailable; using session-only in-memory storage.');
   }
 
-  try {
-    if (typeof localStorage !== 'undefined') {
-      if (normalized) localStorage.setItem(HF_TOKEN_STORAGE_KEY, normalized);
-      else localStorage.removeItem(HF_TOKEN_STORAGE_KEY);
-    }
-  } catch (error) {
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
-      `Failed to persist Hugging Face token: ${error instanceof Error ? error.message : String(error)}`,
-      'setHfToken',
-    );
-  }
+  sessionHfToken = normalized;
 }
 
 export function getStoredHfToken(): string | null {
-  try {
-    return typeof localStorage === 'undefined'
-      ? null
-      : localStorage.getItem(HF_TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
+  return sessionHfToken;
 }

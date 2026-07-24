@@ -41,7 +41,14 @@ public extension RunAnywhere {
             result.errorMessage = "SDK not initialized"
             return result
         }
-        return CppBridge.ModelLifecycle.unload(request)
+        let result = CppBridge.ModelLifecycle.unload(request)
+        if result.success {
+            await CppBridge.Diarization.shared.reconcileCanonicalUnload(
+                request: request,
+                result: result
+            )
+        }
+        return result
     }
 
     static func currentModel(_ request: RACurrentModelRequest = RACurrentModelRequest()) -> RACurrentModelResult {

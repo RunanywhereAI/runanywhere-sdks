@@ -78,6 +78,21 @@ import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywher
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD.js';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader.js';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
+import { segment as segmentImpl } from './Extensions/RunAnywhere+Segmentation.js';
+import type {
+  SegmentationRequest,
+  SegmentationResult,
+} from '@runanywhere/proto-ts/segmentation';
+import { diarize as diarizeImpl } from './Extensions/RunAnywhere+Diarization.js';
+import type {
+  DiarizationRequest,
+  DiarizationResult,
+} from '@runanywhere/proto-ts/diarization';
+import { rerank as rerankImpl } from './Extensions/RunAnywhere+Rerank.js';
+import type {
+  RerankRequest,
+  RerankResult,
+} from '@runanywhere/proto-ts/rerank';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
 import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
@@ -1602,6 +1617,37 @@ export const RunAnywhere = {
   // =========================================================================
 
   ...flatFacade,
+
+  /**
+   * Segment an image with the lifecycle-owned semantic-segmentation model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async segment(request: SegmentationRequest): Promise<SegmentationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return segmentImpl(request);
+  },
+
+  /**
+   * Diarize raw audio with the lifecycle-owned speaker-diarization model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async diarize(request: DiarizationRequest): Promise<DiarizationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return diarizeImpl(request);
+  },
+
+  /**
+   * Rerank candidates against a query with the lifecycle-owned cross-encoder
+   * rerank model. The caller must register and load the rerank model through
+   * the generic model lifecycle first; this verb never downloads or silently
+   * swaps models.
+   */
+  async rerank(request: RerankRequest): Promise<RerankResult> {
+    await RunAnywhere.ensureServicesReady();
+    return rerankImpl(request);
+  },
 
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],

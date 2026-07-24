@@ -73,6 +73,13 @@ RAC_API rac_bool_t rac_qhexrt_catalog_model_supports_arch(const char* model_id,
 RAC_API rac_bool_t rac_qhexrt_catalog_model_requires_hf_auth(const char* model_id);
 
 /**
+ * Return the total number of rows in QHexRT's native product catalog. Lets
+ * tests assert their enumerated coverage against the real policy array instead
+ * of a hand-copied literal, so a new catalog row cannot silently go unverified.
+ */
+RAC_API size_t rac_qhexrt_catalog_model_count(void);
+
+/**
  * Register a QHexRT catalog definition only when it is eligible on this
  * device. The request is an existing serialized
  * runanywhere.v1.RegisterModelFromUrlRequest. It carries a stable native

@@ -171,6 +171,15 @@ abstract final class QHexRTModelCatalog {
       contextLength: 1024,
     ),
     QHexRTCatalogModel(
+      id: 'bonsai_1_7b_1bit',
+      name: 'Bonsai-1.7B 1-bit (HNPU, fully-on-NPU)',
+      url:
+          'https://huggingface.co/runanywhere/bonsai_1_7b_1bit_HNPU/bonsai-1.7b-1bit-1024.json',
+      category: _language,
+      memoryBytes: 902000000,
+      contextLength: 1024,
+    ),
+    QHexRTCatalogModel(
       id: 'bonsai_4b_1bit',
       name: 'Bonsai-4B 1-bit (HNPU)',
       url:

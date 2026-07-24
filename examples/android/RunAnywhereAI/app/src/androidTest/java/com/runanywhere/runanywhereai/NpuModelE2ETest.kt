@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai
 
+import ai.runanywhere.proto.v1.DiffusionGenerationOptions
+import ai.runanywhere.proto.v1.DiffusionMode
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
@@ -23,6 +25,7 @@ import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.fromFilePath
+import com.runanywhere.sdk.public.extensions.generateImage
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.inpaint
 import com.runanywhere.sdk.public.extensions.importModel
@@ -383,7 +386,9 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
                     ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model, suite)
-                    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> runInpaint(report, model, suite, outDir)
+                    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION ->
+                        if (suite?.metric == "t2i_reference_smoke") runTextToImage(report, suite, outDir)
+                        else runInpaint(report, model, suite, outDir)
                     else -> throw AssertionError("unsupported NPU modality: ${model.category}")
                 }
 
@@ -823,6 +828,104 @@ class NpuModelE2ETest {
                     .put("unmasked_within_one_lsb", round6(minimumUnmaskedWithinOne))
             }
         }
+    }
+
+    // ------------------------------------------------------ TEXT-TO-IMAGE ----
+    // Cosmos3-Edge diffusion: the SDK generateImage(TEXT_TO_IMAGE) path drives the on-NPU
+    // cosmos3_diffusion_generate host-op (UniPC denoise over the 4-shard DiT + tiled VAE). The prompt is baked
+    // into the DiT export, so the generation is deterministic; the gate is a smoke gate (correct raw-RGBA
+    // shape + non-degenerate structure) with an optional PSNR report vs a shipped reference image.
+    private suspend fun runTextToImage(report: RunReport, suite: NpuSuite, outDir: File?) {
+        require(suite.metric == "t2i_reference_smoke") { "unsupported t2i suite metric ${suite.metric}" }
+        val cases = suite.cases.filter { it.text != null }
+        require(cases.isNotEmpty()) { "t2i suite has no prompt cases" }
+        require(cases.size >= suite.minInputs) {
+            "t2i suite has ${cases.size} cases, requires at least ${suite.minInputs}"
+        }
+        report.gate("t2i_min_inputs", cases.size >= suite.minInputs)
+        recordExecutedCases(report, cases)
+        report.put("parity_metric", suite.metric)
+
+        var passed = 0
+        var totalLatencyMs = 0.0
+        var minStd = Double.POSITIVE_INFINITY
+        var minPsnr = Double.POSITIVE_INFINITY
+        for ((index, case) in cases.withIndex()) {
+            val expectedWidth = case.expectedWidth.takeIf { it > 0 } ?: 256
+            val expectedHeight = case.expectedHeight.takeIf { it > 0 } ?: 256
+            val started = System.currentTimeMillis()
+            val result =
+                withTimeout(INFER_TIMEOUT_MS) {
+                    RunAnywhere.generateImage(
+                        options =
+                            DiffusionGenerationOptions(
+                                prompt = case.text!!,
+                                width = expectedWidth,
+                                height = expectedHeight,
+                                mode = DiffusionMode.DIFFUSION_MODE_TEXT_TO_IMAGE,
+                            ),
+                    )
+                }
+            val wallMs = (System.currentTimeMillis() - started).toDouble()
+            val latencyMs = result.total_time_ms.takeIf { it > 0 }?.toDouble() ?: wallMs
+            totalLatencyMs += latencyMs
+            val rgba = result.image_data.toByteArray()
+            val shapeOk =
+                result.width == expectedWidth && result.height == expectedHeight &&
+                    rgba.size == expectedWidth * expectedHeight * 4
+            val mediaOk = result.image_media_type == "image/raw-rgba"
+            val candidateRgb = if (shapeOk) rgbaToRgb(rgba) else ByteArray(0)
+            // structure: population std of RGB8 pixels (a degenerate flat/blank image fails)
+            val std =
+                if (candidateRgb.isEmpty()) 0.0
+                else {
+                    var s = 0.0
+                    var s2 = 0.0
+                    for (b in candidateRgb) { val v = (b.toInt() and 0xff).toDouble(); s += v; s2 += v * v }
+                    val n = candidateRgb.size.toDouble()
+                    kotlin.math.sqrt(maxOf(0.0, s2 / n - (s / n) * (s / n)))
+                }
+            // optional parity vs a shipped reference
+            var psnr = Double.NaN
+            case.referenceImageAsset?.let { refName ->
+                if (shapeOk) {
+                    val ref = decodeRgb(testAsset(refName), expectedWidth, expectedHeight)
+                    var mse = 0.0
+                    for (i in candidateRgb.indices) {
+                        val d = (candidateRgb[i].toInt() and 0xff) - (ref[i].toInt() and 0xff)
+                        mse += (d * d).toDouble()
+                    }
+                    mse /= candidateRgb.size.toDouble()
+                    psnr = if (mse <= 0.0) 99.0 else 10.0 * kotlin.math.log10(255.0 * 255.0 / mse)
+                    minPsnr = minOf(minPsnr, psnr)
+                }
+            }
+            minStd = minOf(minStd, std)
+            val pass =
+                shapeOk && mediaOk && std >= suite.t2iMinStd &&
+                    (psnr.isNaN() || psnr >= suite.t2iMinPsnr)
+            if (pass) passed++
+            report.addSample(
+                JSONObject()
+                    .put("idx", index)
+                    .put("id", case.id)
+                    .put("input", case.text)
+                    .put("output", "${result.width}x${result.height}:${rgba.size}bytes")
+                    .put("image_media_type", result.image_media_type ?: JSONObject.NULL)
+                    .put("pixel_std", round2(std))
+                    .put("psnr_db", if (psnr.isNaN()) JSONObject.NULL else round2(psnr))
+                    .put("latency_ms", round2(latencyMs))
+                    .put("metric", "t2i:std${if (case.referenceImageAsset != null) "+psnr" else ""}")
+                    .put("pass", pass),
+            )
+            report.gate("t2i_case_$index", pass)
+        }
+        val passFrac = passed.toDouble() / cases.size
+        report.gate("t2i_pass_fraction", passFrac >= suite.passFrac)
+        report.put("t2i_pass_fraction", round2(passFrac))
+            .put("t2i_min_pixel_std", round2(minStd))
+            .put("t2i_min_psnr_db", if (minPsnr.isInfinite()) JSONObject.NULL else round2(minPsnr))
+            .put("t2i_mean_latency_ms", round2(totalLatencyMs / cases.size))
     }
 
     // ---------------------------------------------------------------- STT ----

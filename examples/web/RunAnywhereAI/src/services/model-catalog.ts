@@ -25,6 +25,8 @@
  *   - lfm2-1.2b-tool-q4_k_m / -q8_0 (~0.8-1.4 GB memory)
  *   - qwen3-1.7b-q4_k_m             (~1.2 GB memory; qwen3-0.6b covers thinking demo)
  *   - llama-3.2-3b-instruct-q4_k_m  (~2.0 GB memory)
+ *   - llama-3.1-nemotron-nano-8b-q4_k_m (~4.92 GB file; exceeds the 4 GiB
+ *     WASM32 address space before runtime/KV-cache allocation)
  *   - qwen2-vl-2b-instruct-q4_k_m   (VLM, ~1.8 GB memory; Qwen2-VL also needs
  *     the CPU-WASM fallback on WebGPU — see AGENTS.md "Web Qwen2-VL WebGPU
  *     workaround")
@@ -251,6 +253,103 @@ const CATALOG: readonly CatalogEntry[] = [
     contextLength: 4096,
     supportsThinking: true,
   },
+  {
+    // Exact P0 NVIDIA checkpoint. Both Web llama.cpp variants use the
+    // PrismML fork pinned in sdk/runanywhere-commons/VERSIONS; that pin owns
+    // the `nemotron` architecture loader and Q4_K_M kernels. The immutable
+    // Hub revision and exact LFS byte count keep the browser memory gate
+    // deterministic. NOTE: this ~2.7 GB download plus its ~3.25 GB runtime
+    // footprint (+512 MiB headroom) exceeds the WASM32 4 GiB address space, so
+    // webModelCompatibility returns supported:false and the picker gates it —
+    // it is listed for reference/native parity, not runnable in-browser.
+    id: 'nemotron-mini-4b-instruct-q4_k_m',
+    name: 'NVIDIA Nemotron Mini 4B Instruct Q4_K_M',
+    description:
+      'NVIDIA instruction LLM (llama.cpp). Listed for reference — its memory footprint exceeds the browser WASM32 4 GiB limit, so it cannot load in-browser (use a native app).',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/bartowski/Nemotron-Mini-4B-Instruct-GGUF/resolve/fb49cde090c86092d89905bea2ffc41c23c2615e/Nemotron-Mini-4B-Instruct-Q4_K_M.gguf',
+    downloadSizeBytes: 2_697_387_072,
+    memoryRequiredBytes: 3_250_000_000,
+    contextLength: 4096,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit (custom Q1_0 quant, qwen3_5
+    // GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS. Unlike the 27B sibling below, this
+    // size comfortably clears the WASM 4 GB heap gate with runtime/KV
+    // headroom to spare, so it's a normal, fully-usable in-browser entry.
+    id: 'bonsai-1.7b-q1_0',
+    name: 'Bonsai-1.7B 1-bit Q1_0',
+    description: 'PrismML 1-bit 1.7B LLM. Small enough to run comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B-Q1_0.gguf',
+    downloadSizeBytes: 248_302_272,
+    memoryRequiredBytes: 350_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-4b-q1_0',
+    name: 'Bonsai-4B 1-bit Q1_0',
+    description: 'PrismML 1-bit 4B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-4B-gguf/resolve/main/Bonsai-4B-Q1_0.gguf',
+    downloadSizeBytes: 572_270_624,
+    memoryRequiredBytes: 700_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // PrismML Bonsai family at 1.125-bit — see the 1.7B entry above for the
+    // fork/quant details. Also clears the WASM heap gate comfortably.
+    id: 'bonsai-8b-q1_0',
+    name: 'Bonsai-8B 1-bit Q1_0',
+    description: 'PrismML 1-bit 8B LLM. Runs comfortably in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B-Q1_0.gguf',
+    downloadSizeBytes: 1_158_654_496,
+    memoryRequiredBytes: 1_400_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
+  {
+    // EXPERIMENTAL: PrismML Bonsai-27B at 1.125-bit (custom Q1_0 quant,
+    // qwen3_5 GatedDeltaNet arch). Needs the PrismML llama.cpp fork pinned in
+    // sdk/runanywhere-commons/VERSIONS. At ~3.8 GB the artifact sits at the
+    // WASM 4 GB heap ceiling and cannot leave the minimum runtime/KV-cache
+    // headroom required by this llama.cpp path. The catalog keeps the entry
+    // visible for cross-platform discovery, while `webModelCompatibility`
+    // prevents Web download/load and points users to a native app. PrismML's own browser demo
+    // ("Bonsai 27B WebGPU Kernels" HF Space) uses a separate custom kernel
+    // stack, not this WASM llama.cpp path.
+    id: 'bonsai-27b-q1_0',
+    name: 'Bonsai-27B 1-bit Q1_0 (Experimental)',
+    description:
+      'PrismML 1-bit 27B LLM. ~3.8 GB download at the WASM heap limit — likely to run out of memory in-browser.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/prism-ml/Bonsai-27B-gguf/resolve/main/Bonsai-27B-Q1_0.gguf',
+    downloadSizeBytes: 3_803_452_480,
+    memoryRequiredBytes: 4_000_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
 
   // ---------- Multimodal (VLM) ----------
   {
@@ -357,6 +456,77 @@ const CATALOG: readonly CatalogEntry[] = [
     memoryRequiredBytes: 180_000_000,
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
+  {
+    id: 'sherpa-nemo-parakeet-tdt-0.6b-v2-int8',
+    name: 'NVIDIA Parakeet TDT 0.6B v2 INT8 (Sherpa-ONNX)',
+    description: 'Exact NVIDIA Parakeet TDT v2 offline transducer bundle.',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx',
+    downloadSizeBytes: 661_190_513,
+    memoryRequiredBytes: 850_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 652_184_296 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 7_257_753 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 1_739_080 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/1ab9323565ddb038682214b292f588070a538ce2/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 9_384 },
+    ],
+  },
+  {
+    id: 'sherpa-nemo-parakeet-tdt-0.6b-v3-int8',
+    name: 'NVIDIA Parakeet TDT 0.6B v3 INT8 (Sherpa-ONNX)',
+    description: 'Exact NVIDIA Parakeet TDT v3 offline transducer bundle.',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx',
+    downloadSizeBytes: 670_478_772,
+    memoryRequiredBytes: 860_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 652_184_281 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 11_845_275 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 6_355_277 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 93_939 },
+    ],
+  },
+  {
+    id: 'sherpa-nemo-canary-180m-flash-int8',
+    name: 'NVIDIA Canary 180M Flash INT8 (Sherpa-ONNX)',
+    description: 'Exact multilingual Canary offline ASR bundle (en/es/de/fr).',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx',
+    downloadSizeBytes: 207_170_046,
+    memoryRequiredBytes: 300_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 132_678_643 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 74_437_848 },
+      { url: 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-canary-180m-flash-en-es-de-fr-int8/resolve/9077164e0d3dd1d5353743e89ceaa1d3a770838c/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 53_555 },
+    ],
+  },
+  {
+    id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
+    name: 'NVIDIA Nemotron 3.5 ASR Streaming 0.6B INT8 (Sherpa-ONNX)',
+    description: 'Exact multilingual 560 ms streaming transducer bundle with per-stream language prompting.',
+    category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx',
+    downloadSizeBytes: 682_215_356,
+    memoryRequiredBytes: 900_000_000,
+    files: [
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/encoder.int8.onnx', filename: 'encoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL, sizeBytes: 657_601_403 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/decoder.int8.onnx', filename: 'decoder.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 14_978_075 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/joiner.int8.onnx', filename: 'joiner.int8.onnx', role: ModelFileRole.MODEL_FILE_ROLE_COMPANION, sizeBytes: 9_504_438 },
+      { url: 'https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11/resolve/ab43d895f5985b1bbab8b6eac8607fcdc05343f3/tokens.txt', filename: 'tokens.txt', role: ModelFileRole.MODEL_FILE_ROLE_TOKENIZER, sizeBytes: 131_440 },
+    ],
+  },
 
   // ---------- Speech Synthesis (TTS) ----------
   {
@@ -408,6 +578,37 @@ const CATALOG: readonly CatalogEntry[] = [
   },
 
   // ---------- Embeddings / RAG ----------
+  {
+    // Exact P0 NVIDIA checkpoint. The shared llama.cpp plugin exposes the
+    // embedding primitive for this GGUF and reports its native 2048-vector
+    // output. Pin the validated revision and LFS byte count so the Web
+    // download, WASM32 gate, and lifecycle route cannot drift with `main`.
+    id: 'nemotron-3-embed-1b-q4_k_m',
+    name: 'NVIDIA Nemotron 3 Embed 1B Q4_K_M',
+    description: 'NVIDIA 2048-dimensional text embeddings via llama.cpp.',
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/zenmagnets/Nemotron-3-Embed-1B-Q4_K_M-GGUF/resolve/06df1fde6f7009c91f6cc3cd520081921929a678/nemotron-3-embed-1b-q4_k_m.gguf',
+    downloadSizeBytes: 749_352_096,
+    memoryRequiredBytes: 1_000_000_000,
+  },
+  {
+    // Exact P0 NVIDIA checkpoint. Shared llama.cpp embedding ops produced a
+    // finite, normalized 2048-vector from this artifact. Keep the exact Hub
+    // revision and LFS byte count aligned with that runtime evidence.
+    id: 'llama-nemotron-embed-1b-v2-q4_k_m',
+    name: 'NVIDIA Llama Nemotron Embed 1B v2 Q4_K_M',
+    description: 'NVIDIA 2048-dimensional text embeddings via llama.cpp.',
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/mykor/llama-nemotron-embed-1b-v2-GGUF/resolve/bf7c9832b1d76f86777379e58b7b74805ee58006/llama-nemotron-embed-1B-v2-Q4_K_M.gguf',
+    downloadSizeBytes: 807_690_624,
+    memoryRequiredBytes: 1_100_000_000,
+  },
   {
     // iOS parity: ModelCatalogBootstrap.swift:227-237
     id: 'all-minilm-l6-v2',
@@ -548,14 +749,18 @@ export function webSizeCompatibility(
   memoryRequiredBytes: number,
   context: WebCompatibilityContext = {},
 ): WebModelCompatibility {
-  const modelBytes = Math.max(downloadSizeBytes, memoryRequiredBytes);
-  if (modelBytes + MINIMUM_WASM_RUNTIME_HEADROOM_BYTES <= WASM32_ADDRESS_SPACE_BYTES) {
+  // Emscripten stages the artifact in MEMFS and llama.cpp deliberately uses
+  // use_mmap=false, so the staged bytes coexist with the loaded model/runtime
+  // allocation. Treating these as alternatives (`max`) can admit a model that
+  // cannot fit once loading starts.
+  const simultaneousBytes = downloadSizeBytes + memoryRequiredBytes;
+  if (simultaneousBytes + MINIMUM_WASM_RUNTIME_HEADROOM_BYTES <= WASM32_ADDRESS_SPACE_BYTES) {
     return { supported: true };
   }
 
   const remainingMiB = Math.max(
     0,
-    Math.round((WASM32_ADDRESS_SPACE_BYTES - modelBytes) / (1024 * 1024)),
+    Math.round((WASM32_ADDRESS_SPACE_BYTES - simultaneousBytes) / (1024 * 1024)),
   );
   const sizeGb = (downloadSizeBytes / 1_000_000_000).toFixed(3);
   const webgpuNote = context.hasWebGPU

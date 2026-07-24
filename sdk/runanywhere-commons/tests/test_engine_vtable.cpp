@@ -15,6 +15,7 @@
  */
 
 #include <cassert>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 
@@ -25,6 +26,22 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
+
+// ABI v7 promoted two pointers (diarization + segmentation) and v8 promoted a
+// third (rerank_ops, from reserved_slot_2) — all from the existing reserve,
+// without changing the 17-pointer primitive/reserve tail or the total vtable
+// size.
+static_assert((sizeof(rac_engine_vtable_t) - offsetof(rac_engine_vtable_t, llm_ops)) /
+                  sizeof(void*) ==
+              17);
+static_assert(offsetof(rac_engine_vtable_t, diarization_ops) ==
+              offsetof(rac_engine_vtable_t, diffusion_ops) + sizeof(void*));
+static_assert(offsetof(rac_engine_vtable_t, segmentation_ops) ==
+              offsetof(rac_engine_vtable_t, diarization_ops) + sizeof(void*));
+static_assert(offsetof(rac_engine_vtable_t, rerank_ops) ==
+              offsetof(rac_engine_vtable_t, segmentation_ops) + sizeof(void*));
+static_assert(offsetof(rac_engine_vtable_t, reserved_slot_3) ==
+              offsetof(rac_engine_vtable_t, rerank_ops) + sizeof(void*));
 
 static_assert(RAC_MODEL_FORMAT_ID_UNSPECIFIED ==
               static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_UNSPECIFIED));
@@ -155,9 +172,10 @@ const rac_engine_vtable_t k_manifest_vtable = {
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
+    /* rerank_ops       */ nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,
@@ -214,9 +232,9 @@ int main() {
 
     // (2) ABI mismatch
     {
-        auto vt = make_vt("abi-bad", 50, RAC_PLUGIN_API_VERSION + 99);
+        auto vt = make_vt("abi-v6", 50, 6u);
         rac_result_t rc = rac_plugin_register(&vt);
-        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: mismatch rejected");
+        CHECK(rc == RAC_ERROR_ABI_VERSION_MISMATCH, "abi: v6 plugin rejected by v8 host");
         CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == nullptr, "abi: not inserted");
     }
 
@@ -240,13 +258,32 @@ int main() {
         rac_plugin_unregister("null-slot");
     }
 
-    // (5) unregister nonexistent
+    // (5) v7 slot resolution — diarization/segmentation ops resolve and names are stable
+    {
+        const int diarization_sentinel = 9;
+        const int segmentation_sentinel = 10;
+        rac_engine_vtable_t vt{};
+        vt.diarization_ops = reinterpret_cast<const struct rac_diarization_service_ops*>(
+            &diarization_sentinel);
+        vt.segmentation_ops = reinterpret_cast<const struct rac_segmentation_service_ops*>(
+            &segmentation_sentinel);
+        CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_DIARIZE) == &diarization_sentinel,
+              "v7: DIARIZE resolves diarization_ops");
+        CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_SEGMENT) == &segmentation_sentinel,
+              "v7: SEGMENT resolves segmentation_ops");
+        CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_DIARIZE), "diarize") == 0,
+              "v7: DIARIZE name is stable");
+        CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_SEGMENT), "segment") == 0,
+              "v7: SEGMENT name is stable");
+    }
+
+    // (6) unregister nonexistent
     {
         rac_result_t rc = rac_plugin_unregister("does-not-exist");
         CHECK(rc == RAC_ERROR_NOT_FOUND, "unreg-missing: returns NOT_FOUND");
     }
 
-    // (6) duplicate-name: lower priority rejected
+    // (7) duplicate-name: lower priority rejected
     {
         auto hi = make_vt("dup", 100);
         rac_plugin_register(&hi);
@@ -257,7 +294,7 @@ int main() {
         rac_plugin_unregister("dup");
     }
 
-    // (7) duplicate-name: equal-or-higher priority promotes
+    // (8) duplicate-name: equal-or-higher priority promotes
     {
         auto lo = make_vt("prom", 10);
         rac_plugin_register(&lo);
@@ -268,7 +305,7 @@ int main() {
         rac_plugin_unregister("prom");
     }
 
-    // (8) priority order — higher wins across distinct names
+    // (9) priority order — higher wins across distinct names
     {
         auto a = make_vt("a", 10);
         auto b = make_vt("b", 100);
@@ -290,7 +327,7 @@ int main() {
         rac_plugin_unregister("c");
     }
 
-    // (9) declarative manifest attaches to the vtable and is published only
+    // (10) declarative manifest attaches to the vtable and is published only
     //     after plugin registration accepts the vtable.
     {
         CHECK(rac_engine_availability_name(RAC_ENGINE_AVAILABILITY_PUBLIC) != nullptr,
@@ -319,7 +356,7 @@ int main() {
               "manifest: unregister removes manifest");
     }
 
-    // (10) static registration — validate RAC_STATIC_PLUGIN_REGISTER expands
+    // (11) static registration — validate RAC_STATIC_PLUGIN_REGISTER expands
     //     to a no-op at compile time for C TUs (can only use in C++ TUs).
     //     Here we just re-verify rac_plugin_count reads back to 0 after all
     //     tests clean up.

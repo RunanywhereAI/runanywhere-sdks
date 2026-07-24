@@ -127,6 +127,8 @@ enum ModelCategory {
     MODEL_CATEGORY_AUDIO                    = 7  [(runanywhere.v1.rac_wire_string) = "audio"];
     MODEL_CATEGORY_EMBEDDING                = 8  [(runanywhere.v1.rac_wire_string) = "embedding"];
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
+    MODEL_CATEGORY_SPEAKER_DIARIZATION      = 10 [(runanywhere.v1.rac_wire_string) = "speaker-diarization"];
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +412,34 @@ message ArchiveArtifact {
     optional ExpectedModelFiles expected_files = 5;
 }
 
+// Deterministic byte-level mutations that commons applies after a source file
+// has downloaded and passed its transport checksum. Operations execute in
+// declaration order. The source/final contracts make the transform
+// restart-safe and fail closed if either the downloaded input or derived
+// artifact differs from the catalog-pinned bytes.
+message PostDownloadAppendBytes {
+    bytes payload = 1;
+}
+
+message PostDownloadTransformOperation {
+    oneof operation {
+        PostDownloadAppendBytes append_bytes = 1;
+    }
+}
+
+message PostDownloadTransform {
+    // The exact bytes fetched from the transport before any operation runs.
+    int64  source_size_bytes       = 1;
+    string source_checksum_sha256  = 2;
+
+    // The exact bytes published at ModelFileDescriptor.local_path after all
+    // operations run. These values must match the descriptor's size_bytes and
+    // checksum_sha256, which always describe the final on-disk artifact.
+    int64  final_size_bytes        = 3;
+    string final_checksum_sha256   = 4;
+    repeated PostDownloadTransformOperation operations = 5;
+}
+
 message ModelFileDescriptor {
     string url         = 1;
     string filename    = 2;
@@ -419,6 +449,8 @@ message ModelFileDescriptor {
     // Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
     // canonical "required" flag — the documented `required` boolean from
     // newer SDK sources maps onto it (default true, mirrored in Swift).
+    // Exact final on-disk artifact size. When post_download_transform is set,
+    // transport planning uses its source_size_bytes instead.
     optional int64  size_bytes = 4;
 
     reserved 5;
@@ -430,7 +462,14 @@ message ModelFileDescriptor {
     optional string        destination_path = 7;
     optional ModelFileRole role             = 8;
     optional string        local_path       = 9;
+    // Exact final on-disk artifact checksum. When post_download_transform is
+    // set, HTTP verifies its source_checksum_sha256 before the transform.
     optional string        checksum_sha256  = 10;
+
+    // Optional commons-owned transform applied after the source checksum has
+    // passed and before the model is marked downloaded. Native and Web
+    // consumers receive the same deterministic derived bytes.
+    optional PostDownloadTransform post_download_transform = 11;
 }
 
 message MultiFileArtifact {

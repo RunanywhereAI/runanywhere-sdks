@@ -399,6 +399,7 @@ Session* session_open(const char* manifest_path) {
         return nullptr;
     }
     s->model_ref = manifest_path;
+    s->manifest_path = manifest;
     s->scratch_dir = fs::path(manifest).parent_path().generic_string();
     // artifacts_dir = NULL -> manifest-relative paths resolve against its own dir.
     s->model = qhx_model_load(rt, manifest.c_str(), nullptr);

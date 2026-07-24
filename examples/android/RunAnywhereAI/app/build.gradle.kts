@@ -61,6 +61,14 @@ val releaseKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("KEY_ALIAS")
 val releaseKeyPassword = System.getenv("KEY_PASSWORD")
 val expectedUploadCertSha256 = System.getenv("UPLOAD_CERT_SHA256")?.trim().orEmpty()
+val e2eApplicationIdSuffix = providers.environmentVariable("RUNANYWHERE_E2E_APPLICATION_ID_SUFFIX")
+    .orNull?.trim().orEmpty()
+require(
+    e2eApplicationIdSuffix.isBlank() ||
+        Regex("(?:\\.[A-Za-z][A-Za-z0-9_]*)+").matches(e2eApplicationIdSuffix)
+) {
+    "RUNANYWHERE_E2E_APPLICATION_ID_SUFFIX must be blank or dot-prefixed identifier segments"
+}
 val releaseSigningValues = listOf(releaseKeystorePath, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword)
 val hasReleaseSigning = releaseSigningValues.all { !it.isNullOrBlank() }
 require(hasReleaseSigning || releaseSigningValues.all { it.isNullOrBlank() }) {
@@ -116,6 +124,9 @@ android {
 
     buildTypes {
         debug {
+            if (e2eApplicationIdSuffix.isNotEmpty()) {
+                applicationIdSuffix = e2eApplicationIdSuffix
+            }
             // Keep emulator development available for the shared example app.
             // QHexRT remains unavailable on x86_64; the SDK falls back to CPU backends.
             ndk {
@@ -148,6 +159,13 @@ android {
             pickFirsts += "**/libc++_shared.so"
             pickFirsts += "**/libomp.so"
             pickFirsts += "**/librac_commons.so"
+            // Extract native libs to a real nativeLibraryDir. The QNN HTP FastRPC
+            // loader resolves the per-arch DSP skel (libQnnHtpV81Skel.so) as a
+            // filesystem file via ADSP_LIBRARY_PATH; with the default
+            // extractNativeLibs=false the skels stay inside base.apk and the cDSP
+            // cannot open them (contextCreateFromBinary -> 0x36b1). Extracting them
+            // gives the qhexrt engine's dladdr fallback a real skel directory.
+            useLegacyPackaging = true
         }
     }
 }

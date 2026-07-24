@@ -15,6 +15,11 @@
 // is what motivated
 // this schema. Every SDK consumes generated output; nothing is hand-written.
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -368,6 +373,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
 
   /// present in Swift only pre-IDL
   case voiceActivityDetection // = 9
+  case speakerDiarization // = 10
+  case semanticSegmentation // = 11
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -386,6 +393,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case 7: self = .audio
     case 8: self = .embedding
     case 9: self = .voiceActivityDetection
+    case 10: self = .speakerDiarization
+    case 11: self = .semanticSegmentation
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -402,6 +411,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case .audio: return 7
     case .embedding: return 8
     case .voiceActivityDetection: return 9
+    case .speakerDiarization: return 10
+    case .semanticSegmentation: return 11
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -418,6 +429,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     .audio,
     .embedding,
     .voiceActivityDetection,
+    .speakerDiarization,
+    .semanticSegmentation,
   ]
 
 }
@@ -1410,6 +1423,72 @@ public nonisolated struct RAArchiveArtifact: Sendable {
   fileprivate var _expectedFiles: RAExpectedModelFiles? = nil
 }
 
+/// Deterministic byte-level mutations that commons applies after a source file
+/// has downloaded and passed its transport checksum. Operations execute in
+/// declaration order. The source/final contracts make the transform
+/// restart-safe and fail closed if either the downloaded input or derived
+/// artifact differs from the catalog-pinned bytes.
+public nonisolated struct RAPostDownloadAppendBytes: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var payload: Data = Data()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct RAPostDownloadTransformOperation: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var operation: RAPostDownloadTransformOperation.OneOf_Operation? = nil
+
+  public var appendBytes: RAPostDownloadAppendBytes {
+    get {
+      if case .appendBytes(let v)? = operation {return v}
+      return RAPostDownloadAppendBytes()
+    }
+    set {operation = .appendBytes(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum OneOf_Operation: Equatable, Sendable {
+    case appendBytes(RAPostDownloadAppendBytes)
+
+  }
+
+  public init() {}
+}
+
+public nonisolated struct RAPostDownloadTransform: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// The exact bytes fetched from the transport before any operation runs.
+  public var sourceSizeBytes: Int64 = 0
+
+  public var sourceChecksumSha256: String = String()
+
+  /// The exact bytes published at ModelFileDescriptor.local_path after all
+  /// operations run. These values must match the descriptor's size_bytes and
+  /// checksum_sha256, which always describe the final on-disk artifact.
+  public var finalSizeBytes: Int64 = 0
+
+  public var finalChecksumSha256: String = String()
+
+  public var operations: [RAPostDownloadTransformOperation] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct RAModelFileDescriptor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1425,6 +1504,8 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
   /// canonical "required" flag — the documented `required` boolean from
   /// newer SDK sources maps onto it (default true, mirrored in Swift).
+  /// Exact final on-disk artifact size. When post_download_transform is set,
+  /// transport planning uses its source_size_bytes instead.
   public var sizeBytes: Int64 {
     get {_sizeBytes ?? 0}
     set {_sizeBytes = newValue}
@@ -1473,6 +1554,8 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   /// Clears the value of `localPath`. Subsequent reads from it will return its default value.
   public mutating func clearLocalPath() {self._localPath = nil}
 
+  /// Exact final on-disk artifact checksum. When post_download_transform is
+  /// set, HTTP verifies its source_checksum_sha256 before the transform.
   public var checksumSha256: String {
     get {_checksumSha256 ?? String()}
     set {_checksumSha256 = newValue}
@@ -1481,6 +1564,18 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   public var hasChecksumSha256: Bool {self._checksumSha256 != nil}
   /// Clears the value of `checksumSha256`. Subsequent reads from it will return its default value.
   public mutating func clearChecksumSha256() {self._checksumSha256 = nil}
+
+  /// Optional commons-owned transform applied after the source checksum has
+  /// passed and before the model is marked downloaded. Native and Web
+  /// consumers receive the same deterministic derived bytes.
+  public var postDownloadTransform: RAPostDownloadTransform {
+    get {_postDownloadTransform ?? RAPostDownloadTransform()}
+    set {_postDownloadTransform = newValue}
+  }
+  /// Returns true if `postDownloadTransform` has been explicitly set.
+  public var hasPostDownloadTransform: Bool {self._postDownloadTransform != nil}
+  /// Clears the value of `postDownloadTransform`. Subsequent reads from it will return its default value.
+  public mutating func clearPostDownloadTransform() {self._postDownloadTransform = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1492,6 +1587,7 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   fileprivate var _role: RAModelFileRole? = nil
   fileprivate var _localPath: String? = nil
   fileprivate var _checksumSha256: String? = nil
+  fileprivate var _postDownloadTransform: RAPostDownloadTransform? = nil
 }
 
 public nonisolated struct RAMultiFileArtifact: Sendable {
@@ -2899,7 +2995,7 @@ nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0\u{1}MODEL_CATEGORY_SPEAKER_DIARIZATION\0\u{1}MODEL_CATEGORY_SEMANTIC_SEGMENTATION\0")
 }
 
 nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
@@ -3516,9 +3612,135 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
+nonisolated extension RAPostDownloadAppendBytes: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PostDownloadAppendBytes"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}payload\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.payload.isEmpty {
+      try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAPostDownloadAppendBytes, rhs: RAPostDownloadAppendBytes) -> Bool {
+    if lhs.payload != rhs.payload {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RAPostDownloadTransformOperation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PostDownloadTransformOperation"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}append_bytes\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: RAPostDownloadAppendBytes?
+        var hadOneofValue = false
+        if let current = self.operation {
+          hadOneofValue = true
+          if case .appendBytes(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.operation = .appendBytes(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if case .appendBytes(let v)? = self.operation {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAPostDownloadTransformOperation, rhs: RAPostDownloadTransformOperation) -> Bool {
+    if lhs.operation != rhs.operation {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RAPostDownloadTransform: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PostDownloadTransform"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}source_size_bytes\0\u{3}source_checksum_sha256\0\u{3}final_size_bytes\0\u{3}final_checksum_sha256\0\u{1}operations\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.sourceSizeBytes) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sourceChecksumSha256) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.finalSizeBytes) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.finalChecksumSha256) }()
+      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.operations) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.sourceSizeBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.sourceSizeBytes, fieldNumber: 1)
+    }
+    if !self.sourceChecksumSha256.isEmpty {
+      try visitor.visitSingularStringField(value: self.sourceChecksumSha256, fieldNumber: 2)
+    }
+    if self.finalSizeBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.finalSizeBytes, fieldNumber: 3)
+    }
+    if !self.finalChecksumSha256.isEmpty {
+      try visitor.visitSingularStringField(value: self.finalChecksumSha256, fieldNumber: 4)
+    }
+    if !self.operations.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.operations, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAPostDownloadTransform, rhs: RAPostDownloadTransform) -> Bool {
+    if lhs.sourceSizeBytes != rhs.sourceSizeBytes {return false}
+    if lhs.sourceChecksumSha256 != rhs.sourceChecksumSha256 {return false}
+    if lhs.finalSizeBytes != rhs.finalSizeBytes {return false}
+    if lhs.finalChecksumSha256 != rhs.finalChecksumSha256 {return false}
+    if lhs.operations != rhs.operations {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{c}\u{5}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{3}post_download_transform\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3535,6 +3757,7 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
       case 8: try { try decoder.decodeSingularEnumField(value: &self._role) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self._localPath) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._checksumSha256) }()
+      case 11: try { try decoder.decodeSingularMessageField(value: &self._postDownloadTransform) }()
       default: break
       }
     }
@@ -3572,6 +3795,9 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._checksumSha256 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 10)
     } }()
+    try { if let v = self._postDownloadTransform {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3585,6 +3811,7 @@ nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobu
     if lhs._role != rhs._role {return false}
     if lhs._localPath != rhs._localPath {return false}
     if lhs._checksumSha256 != rhs._checksumSha256 {return false}
+    if lhs._postDownloadTransform != rhs._postDownloadTransform {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

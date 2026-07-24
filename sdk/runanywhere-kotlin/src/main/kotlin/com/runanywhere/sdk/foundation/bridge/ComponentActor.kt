@@ -249,5 +249,7 @@ private val SDKComponent.label: String
             SDKComponent.SDK_COMPONENT_EMBEDDINGS -> "Embeddings"
             SDKComponent.SDK_COMPONENT_WAKEWORD -> "Wakeword"
             SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION -> "SpeakerDiarization"
+            SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION -> "SemanticSegmentation"
+            SDKComponent.SDK_COMPONENT_RERANK -> "Rerank"
             SDKComponent.SDK_COMPONENT_UNSPECIFIED -> "UnknownComponent"
         }

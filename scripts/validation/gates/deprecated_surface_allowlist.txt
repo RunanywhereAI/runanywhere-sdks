@@ -18,6 +18,7 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/CloudSttProvider.swift|swift:json-bridge
@@ -59,6 +60,9 @@ sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h|cpp:json-para
 sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/segmentation/rac_segmentation_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/diarization/rac_diarization_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/rerank/rac_rerank_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/plugin/rac_onnxrt_runtime_ep.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api
