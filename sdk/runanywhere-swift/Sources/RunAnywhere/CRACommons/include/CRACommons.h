@@ -83,6 +83,9 @@
 #include "rac_vlm_service.h"
 #include "rac_vlm_types.h"
 
+// CUA (Computer-Use-Agent scaffold)
+#include "rac_cua.h"
+
 // Diffusion (Image Generation)
 #include "rac_diffusion.h"
 #include "rac_diffusion_model_registry.h"

@@ -433,6 +433,8 @@ private struct RunAnywhereMLXCLI {
                 try await runEmbedding(args)
             case "vlm":
                 try await runVLM(args)
+            case "cua":
+                try await runCUA(args)
             case "stt":
                 try await runSTT(args)
             case "tts":
@@ -743,6 +745,28 @@ private func runVLM(_ args: [String]) async throws {
         let result = try await RunAnywhere.processImage(.fromFilePath(imageURL.path), options: options)
         print("vlm\t\(result.text)")
     }
+}
+
+// Self-test for the SDK's computer-use-agent scaffold (RunAnywhere.CUA) — no
+// model needed: renders the Fara system prompt and parses a golden tool_call,
+// exercising the commons rac_cua_* path through the Swift facade.
+private func runCUA(_ args: [String]) async throws {
+    guard let prompt = RunAnywhere.CUA.systemPrompt() else {
+        throw CLIError.usage("CUA: fara profile not found")
+    }
+    print("cua.prompt\tchars=\(prompt.count)\ttools=\(prompt.contains("<tools>"))\tcomputer_use=\(prompt.contains("computer_use"))")
+
+    let golden = """
+    I will click the search box.
+    <tool_call>
+    {"name": "computer_use", "arguments": {"action": "left_click", "coordinate": [500, 382]}}
+    </tool_call>
+    """
+    guard let action = RunAnywhere.CUA.parseAction(golden, viewport: (width: 1440, height: 900)) else {
+        throw CLIError.usage("CUA: parse returned nil")
+    }
+    let coord = action.coordinate.map { "(\($0.x), \($0.y))" } ?? "nil"
+    print("cua.parse\tkind=\(action.kind)\tcoord=\(coord)\tvalid=\(action.isValid)")
 }
 
 private func runSTT(_ args: [String]) async throws {
