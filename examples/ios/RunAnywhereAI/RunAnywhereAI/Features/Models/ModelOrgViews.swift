@@ -1,22 +1,21 @@
 //
-//  ModelFamilyViews.swift
+//  ModelOrgViews.swift
 //  RunAnywhereAI
 //
-//  The family-first browsing experience: a clean row card per model family and
-//  a detail view that highlights the best variant for the device, with every
-//  variant showing its clean name, download size, and a subtle backend pill.
+//  Organisation-first browsing: one card per publisher (NVIDIA, Meta, …)
+//  and a detail list of every model that org ships in the current modality.
 //
 
 import SwiftUI
 import RunAnywhere
 
-/// One clean, tappable card representing a whole model family in the browse list.
-struct ModelFamilyRow: View {
-    let family: ModelFamily
+/// One clean, tappable card representing an organisation in the browse list.
+struct ModelOrgRow: View {
+    let group: ModelOrgGroup
 
     var body: some View {
         HStack(spacing: AppSpacing.mediumLarge) {
-            Image(systemName: family.category.consumerCapabilityIcon)
+            Image(systemName: group.org.systemImage)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(AppColors.primaryAccent)
                 .frame(width: AppSpacing.iconMedium, height: AppSpacing.iconMedium)
@@ -24,20 +23,22 @@ struct ModelFamilyRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge))
 
             VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                Text(family.displayName)
+                Text(group.displayName)
                     .font(AppTypography.subheadlineSemibold)
                     .foregroundColor(AppColors.textPrimary)
 
-                Text(family.tagline)
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-                    .lineLimit(1)
-
                 HStack(spacing: AppSpacing.xSmall) {
-                    if let tag = family.headlineTag {
-                        ConsumerBadge(badge: tag)
+                    if group.hasNpuVariant {
+                        Text("NPU")
+                            .font(AppTypography.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(AppColors.primaryAccent)
+                            .padding(.horizontal, AppSpacing.small)
+                            .padding(.vertical, AppSpacing.xxSmall)
+                            .background(AppColors.primaryAccent.opacity(0.12))
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                     }
-                    if family.hasReadyVariant {
+                    if group.hasReadyVariant {
                         Label("Installed", systemImage: "checkmark.circle.fill")
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.statusGreen)
@@ -46,21 +47,17 @@ struct ModelFamilyRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .trailing, spacing: AppSpacing.xxSmall) {
-                Text("\(family.optionCount) option\(family.optionCount == 1 ? "" : "s")")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textSecondary)
-            }
+            Text("\(group.optionCount) model\(group.optionCount == 1 ? "" : "s")")
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
         }
         .padding(.vertical, AppSpacing.smallMedium)
         .contentShape(Rectangle())
     }
 }
 
-/// A disabled, informational family row for a modality that isn't downloadable
-/// yet (e.g. Apple CoreML image generation). Matches the family-row styling but
-/// carries a "Coming soon" pill and no action.
-struct ComingSoonFamilyRow: View {
+/// Informational row for a modality that isn't downloadable yet.
+struct ComingSoonOrgRow: View {
     let title: String
     let tagline: String
     let systemImage: String
@@ -99,13 +96,10 @@ struct ComingSoonFamilyRow: View {
     }
 }
 
-/// One variant of a model family: clean human name, download size, subtle
+/// One model of an organisation: clean human name, download size, subtle
 /// backend pill, ≤2 consumer tags, and the feel descriptor as secondary text.
-/// The single row design shared by the family detail and the selection sheet.
 struct ModelVariantRow: View {
     let variant: RAModelInfo
-    /// Feel descriptor ("Smaller · faster") shown as secondary text, never as
-    /// the only identifier. Nil hides the line.
     var feelDescriptor: String?
     var highlight: String?
     let availabilityReason: String?
@@ -113,9 +107,6 @@ struct ModelVariantRow: View {
     let isLoadingModel: Bool
     let handlers: ModelActionHandlers
 
-    /// Tags shown below the metadata row. When a relative feel descriptor is
-    /// present ("Balanced", "Smaller · faster"), skip the feel badge so the
-    /// same signal is not shown twice.
     private var displayTags: [ModelCapabilityBadge] {
         feelDescriptor != nil ? variant.consumerCapabilityTags : variant.consumerTags
     }
@@ -192,28 +183,23 @@ struct ModelVariantRow: View {
     }
 }
 
-/// Family detail: highlights the best-fit variant for the device up top, with
-/// every other option listed directly below — each with full name, size, and
-/// backend so variants are always distinguishable.
-struct ModelFamilyDetailView: View {
-    let family: ModelFamily
+/// Org detail: recommended best-fit up top, every other model below.
+struct ModelOrgDetailView: View {
+    let group: ModelOrgGroup
     let tier: HardwareTier
     let selectedModelID: String?
     let isLoadingModel: Bool
     let availabilityReason: (RAModelInfo) -> String?
     let handlers: ModelActionHandlers
 
-    /// Best variant for this device: the largest that fits the tier budget,
-    /// else the smallest available. `variants` are pre-sorted small → large and
-    /// guaranteed non-empty by `ModelFamilyCatalog`.
     private var bestVariant: RAModelInfo {
-        family.variants.last {
+        group.models.last {
             $0.consumerSizeBytes <= tier.memoryBudgetBytes && $0.consumerSizeBytes > 0
-        } ?? family.variants[0]
+        } ?? group.models[0]
     }
 
     private var otherVariants: [RAModelInfo] {
-        family.variants.filter { $0.id != bestVariant.id }
+        group.models.filter { $0.id != bestVariant.id }
     }
 
     var body: some View {
@@ -223,7 +209,7 @@ struct ModelFamilyDetailView: View {
             } header: {
                 Text("Recommended")
             } footer: {
-                Text(family.tagline)
+                Text("Models from \(group.displayName)")
                     .font(AppTypography.caption)
             }
 
@@ -233,25 +219,25 @@ struct ModelFamilyDetailView: View {
                         row(for: variant, highlight: nil)
                     }
                 } header: {
-                    Text("All Options")
+                    Text("All models")
                 } footer: {
                     Text("Larger options are smarter but use more memory and storage.")
                         .font(AppTypography.caption)
                 }
             }
         }
-        .navigationTitle(family.displayName)
+        .navigationTitle(group.displayName)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 
     private func row(for variant: RAModelInfo, highlight: String?) -> some View {
-        let position = family.variants.firstIndex { $0.id == variant.id } ?? 0
+        let position = group.models.firstIndex { $0.id == variant.id } ?? 0
         return ModelVariantRow(
             variant: variant,
-            feelDescriptor: family.variants.count > 1
-                ? variant.variantFeelLabel(position: position, count: family.variants.count)
+            feelDescriptor: group.models.count > 1
+                ? variant.variantFeelLabel(position: position, count: group.models.count)
                 : nil,
             highlight: highlight,
             availabilityReason: availabilityReason(variant),

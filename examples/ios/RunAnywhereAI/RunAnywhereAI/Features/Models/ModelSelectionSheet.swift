@@ -164,10 +164,10 @@ struct ModelSelectionSheet: View {
         return pick
     }
 
-    /// Families over all scoped candidates. The recommended pick stays in its
-    /// family too, so every family detail shows its complete variant list.
-    private var browseFamilies: [ModelFamily] {
-        ModelFamilyCatalog.families(from: filteredModels)
+    /// Organisations over all scoped candidates. The recommended pick stays in
+    /// its org too, so every org detail shows its complete model list.
+    private var browseOrgs: [ModelOrgGroup] {
+        ModelOrgCatalog.groups(from: filteredModels)
     }
 
     private var handlers: ModelActionHandlers {
@@ -186,7 +186,7 @@ struct ModelSelectionSheet: View {
                     searchSection
                     addFromHuggingFaceSection
                     recommendedSection
-                    familiesSection
+                    orgsSection
                 }
                 if isLoadingModel {
                     LoadingModelOverlay(loadingProgress: loadingProgress)
@@ -307,34 +307,58 @@ struct ModelSelectionSheet: View {
         }
     }
 
-    @ViewBuilder private var familiesSection: some View {
-        if browseFamilies.isEmpty {
+    @ViewBuilder private var orgsSection: some View {
+        if browseOrgs.isEmpty {
             Section {
                 emptyStateView
             } header: {
                 Text("Browse Models")
             }
         } else {
-            Section {
-                ForEach(browseFamilies) { family in
-                    NavigationLink {
-                        ModelFamilyDetailView(
-                            family: family,
-                            tier: hardwareTier,
-                            selectedModelID: selectedModel?.id,
-                            isLoadingModel: isLoadingModel,
-                            availabilityReason: unavailableReason(for:),
-                            handlers: handlers
-                        )
-                    } label: {
-                        ModelFamilyRow(family: family)
+            let ready = browseOrgs.filter { $0.hasReadyVariant }
+            let rest = browseOrgs.filter { !$0.hasReadyVariant }
+            if !ready.isEmpty {
+                Section {
+                    ForEach(ready) { group in
+                        NavigationLink {
+                            ModelOrgDetailView(
+                                group: group,
+                                tier: hardwareTier,
+                                selectedModelID: selectedModel?.id,
+                                isLoadingModel: isLoadingModel,
+                                availabilityReason: unavailableReason(for:),
+                                handlers: handlers
+                            )
+                        } label: {
+                            ModelOrgRow(group: group)
+                        }
                     }
+                } header: {
+                    Text("On this device")
                 }
-            } header: {
-                Text("Browse Models")
-            } footer: {
-                Text("Pick a family, then choose the size that fits. Tap Use to switch models.")
-                    .font(AppTypography.caption)
+            }
+            if !rest.isEmpty {
+                Section {
+                    ForEach(rest) { group in
+                        NavigationLink {
+                            ModelOrgDetailView(
+                                group: group,
+                                tier: hardwareTier,
+                                selectedModelID: selectedModel?.id,
+                                isLoadingModel: isLoadingModel,
+                                availabilityReason: unavailableReason(for:),
+                                handlers: handlers
+                            )
+                        } label: {
+                            ModelOrgRow(group: group)
+                        }
+                    }
+                } header: {
+                    Text(ready.isEmpty ? "All organisations" : "More organisations")
+                } footer: {
+                    Text("Pick an organisation, then choose the model that fits. Tap Use to switch.")
+                        .font(AppTypography.caption)
+                }
             }
         }
     }
