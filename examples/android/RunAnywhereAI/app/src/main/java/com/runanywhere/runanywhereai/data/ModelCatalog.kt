@@ -345,6 +345,19 @@ internal object ModelCatalog {
             ),
         ),
         MultiFileModel(
+            "fara1.5-4b-q4_k_m", "Fara1.5 4B Computer-Use Agent Q4_K_M", LLAMA, MULTIMODAL, 3_300_000_000,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf",
+                    "Fara1.5-4B-Q4_K_M.gguf"
+                ),
+                ModelFile(
+                    "https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf",
+                    "mmproj-Fara1.5-4B-f16.gguf"
+                ),
+            ),
+        ),
+        MultiFileModel(
             "gemma-4-e2b-it-q8_0", "Gemma 4 E2B IT Q8_0 (Experimental)", LLAMA, MULTIMODAL, 3_000_000_000,
             files = listOf(
                 ModelFile(

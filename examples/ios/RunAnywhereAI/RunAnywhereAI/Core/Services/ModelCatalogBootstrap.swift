@@ -407,6 +407,19 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_800_000_000
         )
         await registerMultiFile(
+            id: "fara1.5-4b-q4_k_m",
+            name: "Fara1.5 4B Computer-Use Agent Q4_K_M",
+            files: [
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf",
+                 "Fara1.5-4B-Q4_K_M.gguf"),
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf",
+                 "mmproj-Fara1.5-4B-f16.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 3_300_000_000
+        )
+        await registerMultiFile(
             id: "gemma-4-e2b-it-q8_0",
             name: "Gemma 4 E2B IT Q8_0 (Experimental)",
             files: [
