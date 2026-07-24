@@ -192,13 +192,13 @@ private fun RAModelInfo.notableTag(): ConsumerTag? {
     return null
 }
 
-// Tool-oriented chat models: LiquidAI "tool" builds and every NVIDIA family are
-// trained/tuned for function calling. Maker comes from the taxonomy, never a local
+// Tool-oriented chat models: LiquidAI "tool" builds and every NVIDIA model are
+// trained/tuned for function calling. Org comes from the taxonomy, never a local
 // string match.
 private fun RAModelInfo.isToolCallingModel(): Boolean =
-    "tool" in "$id $name".lowercase() || maker() == ModelMaker.NVIDIA
+    "tool" in "$id $name".lowercase() || org() == ModelOrg.NVIDIA
 
-// Friendly variant label used inside a family's variant list — "Smaller · faster" vs
+// Friendly size/feel label on each model row — "Smaller · faster" vs
 // "Larger · smarter" — instead of quant strings. Ordered by footprint upstream.
 fun RAModelInfo.variantFeelLabel(): String = when (feel()) {
     ModelFeel.FAST -> "Smaller · faster"
