@@ -125,6 +125,11 @@ rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                  (void*)service->ops->generate, service->impl);
     RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: calling backend generate...");
 
+    // TODO(RUN-81): framework identity is not threaded through this legacy generic
+    // C-API path (only a service vtable is in scope), so we cannot skip the
+    // directive for engines that suppress thinking natively. Keep injecting — the
+    // safe default: QHexRT harmlessly strips a redundant "/no_think"; llama.cpp
+    // needs it. The SDK/proto hot paths ARE framework-gated (llm_module.cpp).
     const std::string effective_prompt =
         rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
     rac_result_t result =

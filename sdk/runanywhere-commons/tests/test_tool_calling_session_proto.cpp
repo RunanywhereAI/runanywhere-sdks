@@ -53,6 +53,10 @@ struct MockLlm {
 std::mutex g_responses_mutex;
 std::vector<std::string> g_responses;
 std::vector<std::string> g_prompts;
+// rac_llm_options_t.grammar as each generate saw it (RUN-80 grammar path).
+std::vector<std::string> g_grammars;
+// rac_llm_options_t.system_prompt as each generate saw it (RUN-80 decision-hint path).
+std::vector<std::string> g_system_prompts;
 int g_generate_calls = 0;
 
 char* dup_cstr(const char* value) {
@@ -77,7 +81,7 @@ rac_result_t mock_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t*,
+rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* options,
                            rac_llm_result_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -86,6 +90,9 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t*,
         std::lock_guard<std::mutex> lg(g_responses_mutex);
         g_generate_calls++;
         g_prompts.emplace_back(prompt ? prompt : "");
+        g_grammars.emplace_back(options && options->grammar ? options->grammar : "");
+        g_system_prompts.emplace_back(
+            options && options->system_prompt ? options->system_prompt : "");
         if (g_responses.empty()) {
             response = "empty-response";
         } else {
@@ -159,6 +166,18 @@ void set_responses(std::vector<std::string> responses) {
     g_responses = std::move(responses);
     g_generate_calls = 0;
     g_prompts.clear();
+    g_grammars.clear();
+    g_system_prompts.clear();
+}
+
+std::vector<std::string> generated_grammars() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_grammars;
+}
+
+std::vector<std::string> generated_system_prompts() {
+    std::lock_guard<std::mutex> lg(g_responses_mutex);
+    return g_system_prompts;
 }
 
 int generate_calls() {
@@ -171,13 +190,17 @@ std::vector<std::string> generated_prompts() {
     return g_prompts;
 }
 
-runanywhere::v1::ModelInfo build_llm_model() {
+runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework framework =
+                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     runanywhere::v1::ModelInfo model;
     model.set_id("toolsession.llm");
     model.set_name("ToolSession LLM");
     model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
-    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    // A QHexRT framework with no registered qhexrt plugin still loads via the
+    // primitive fallback to the mock GENERATE_TEXT vtable, so the session grammar
+    // path can be exercised with the mock ops (supports_grammar=true).
+    model.set_framework(framework);
     model.set_local_path("/tmp/toolsession-test.gguf");
     model.set_is_downloaded(true);
     model.set_is_available(true);
@@ -193,7 +216,8 @@ void cleanup_environment() {
     set_responses({});
 }
 
-bool load_mock_llm() {
+bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
+                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
     if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
         return false;
@@ -203,7 +227,7 @@ bool load_mock_llm() {
     }
 
     std::vector<uint8_t> model_bytes;
-    auto model = build_llm_model();
+    auto model = build_llm_model(framework);
     if (!serialize(model, &model_bytes) ||
         rac_model_registry_register_proto(g_registry, model_bytes.data(), model_bytes.size()) !=
             RAC_SUCCESS) {
@@ -1004,6 +1028,293 @@ int test_destroy_clears_state() {
     return 0;
 }
 
+// RUN-80 (review follow-up): the session path is a PARALLEL grammar wiring to the
+// run loop. Prove the capability gate here too: a QHexRT-framework session's
+// decision generate is constrained with "toolcall_opt:<names>", while a
+// non-grammar engine gets none.
+int test_session_grammar_gated_on_framework() {
+    // Grammar backend (QHexRT): decision generate is grammar-constrained.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "grammar-backend session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "one decision generate");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0] == "toolcall_opt:get_weather,calculate",
+                  "session decision turn is grammar-constrained on QHexRT");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // Non-grammar backend (llama.cpp): no grammar attached.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "non-grammar session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "one generate");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0].empty(), "non-grammar session gets no grammar");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // QHexRT + tool_choice=NONE: no grammar attached (calls are forbidden).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"A direct answer."});
+    {
+        EventSink sink;
+        auto request = make_request("Answer directly.");
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "NONE session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "NONE generates once");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0].empty(), "session NONE attaches no grammar");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // QHexRT tool-call then synthesis: decision turn constrained, synthesis not.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo?");  // one tool: get_weather
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "synthesis session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "paused on tool_call");
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev)
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 2, "decision + synthesis generations");
+        if (grammars.size() == 2) {
+            CHECK(grammars[0] == "toolcall_opt:get_weather", "session decision turn constrained");
+            CHECK(grammars[1].empty(), "session synthesis turn unconstrained");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: the session path is a PARALLEL wiring of the tool-decision system hint. Prove
+// it here too: the AUTO decision generate carries the hint (any engine), preserves a
+// caller system prompt, and is withheld on NONE and on the synthesis turn.
+int test_session_decision_hint_on_auto_path() {
+    const std::string kHint = "call a tool only when the user's request genuinely requires it";
+
+    // A) AUTO decision generate carries the hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "AUTO session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "one decision generate");
+        if (systems.size() == 1) {
+            CHECK(systems[0].find(kHint) != std::string::npos,
+                  "session AUTO decision turn carries the tool-decision hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // B) Caller system prompt is preserved, hint appended after it.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        EventSink sink;
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        request.set_system_prompt("You are Halo, a concise assistant.");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "AUTO+sys session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "one decision generate");
+        if (systems.size() == 1) {
+            const auto caller_pos = systems[0].find("You are Halo");
+            const auto hint_pos = systems[0].find(kHint);
+            CHECK(caller_pos != std::string::npos, "caller system prompt preserved");
+            CHECK(hint_pos != std::string::npos, "hint appended");
+            CHECK(caller_pos < hint_pos, "caller content precedes the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // C) NONE → no hint (tools vetoed).
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"A direct answer."});
+    {
+        EventSink sink;
+        auto request = make_request("Answer directly.");
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "NONE session create");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 1, "NONE generates once");
+        if (systems.size() == 1) {
+            CHECK(systems[0].find(kHint) == std::string::npos, "session NONE withholds the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // D) Tool call then synthesis: decision turn has the hint, synthesis turn does not.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "synthesis session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "paused on tool_call");
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev)
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto systems = generated_system_prompts();
+        CHECK(systems.size() == 2, "decision + synthesis generations");
+        if (systems.size() == 2) {
+            CHECK(systems[0].find(kHint) != std::string::npos, "decision turn carries the hint");
+            CHECK(systems[1].find(kHint) == std::string::npos, "synthesis turn drops the hint");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (grammar-engage): the SESSION path builds + parses bare-Pythonic on a grammar
+// backend across turns. With keep_tools_available, the follow-up prompt must ALSO render
+// bare `[name(args)]` (not <tool_call>), and a bare reply must parse into a call.
+int test_session_grammar_keep_tools_bare_pythonic() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"([get_weather(location="Tokyo")])",
+        R"([get_weather(location="Osaka")])",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo then Osaka?");
+        request.set_keep_tools_available(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "keep-tools grammar session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "first bare [name(args)] reply parsed on the session path");
+        if (tool_ev) {
+            CHECK(tool_ev->tool_call().name() == "get_weather", "parsed the get_weather call");
+        }
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev) {
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        }
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto prompts = generated_prompts();
+        CHECK(prompts.size() >= 2, "decision + keep-tools follow-up prompts");
+        if (prompts.size() >= 2) {
+            CHECK(prompts[0].find("[tool_name(") != std::string::npos,
+                  "session decision prompt is bare-Pythonic");
+            CHECK(prompts[1].find("[tool_name(") != std::string::npos,
+                  "session keep-tools follow-up prompt is bare-Pythonic");
+            CHECK(prompts[1].find("<tool_call>") == std::string::npos,
+                  "session follow-up carries no <tool_call> tag");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -1021,6 +1332,9 @@ int main() {
         test_forced_tool_name_only_promotes_session_to_specific();
         test_none_vetoes_forced_name_in_session();
         test_none_blocks_session_call_when_validation_disabled();
+        test_session_grammar_gated_on_framework();
+        test_session_decision_hint_on_auto_path();
+        test_session_grammar_keep_tools_bare_pythonic();
         test_forced_target_blocks_wrong_session_call_when_validation_disabled();
         test_specific_session_target_must_be_nonempty_and_present();
         test_specific_and_required_sessions_reject_initial_no_call();

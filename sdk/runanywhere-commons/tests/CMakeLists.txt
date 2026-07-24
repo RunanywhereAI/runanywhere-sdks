@@ -260,6 +260,8 @@ add_executable(test_llm_thinking test_llm_thinking.cpp)
 target_include_directories(test_llm_thinking PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    # RUN-81: reach the src-internal llm_thinking_directive_internal.h header.
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
 )
 target_link_libraries(test_llm_thinking PRIVATE rac_commons)
 rac_link_archive_deps(test_llm_thinking)

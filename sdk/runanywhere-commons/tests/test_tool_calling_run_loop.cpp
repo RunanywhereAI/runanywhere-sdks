@@ -69,6 +69,12 @@ struct GenerationCapture {
     float temperature = 0.0f;
     float top_p = 0.0f;
     bool disable_thinking = false;
+    // rac_llm_options_t.grammar as the backend saw it (RUN-80). Empty unless the
+    // loaded model's framework advertises grammar support (QHexRT).
+    std::string grammar;
+    // rac_llm_options_t.system_prompt as the backend saw it (RUN-80). Carries the
+    // tool-decision hint appended on the AUTO decision path (empty when unset).
+    std::string system_prompt;
     std::vector<std::string> stop_sequences;
     // Prior conversation turns the run loop threaded onto rac_llm_options_t
     // (ToolCallingSessionCreateRequest.history, field 19). Captured verbatim so
@@ -117,6 +123,8 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* o
             capture.temperature = options->temperature;
             capture.top_p = options->top_p;
             capture.disable_thinking = options->disable_thinking != RAC_FALSE;
+            capture.grammar = options->grammar ? options->grammar : "";
+            capture.system_prompt = options->system_prompt ? options->system_prompt : "";
             for (size_t i = 0; i < options->num_stop_sequences; ++i) {
                 const char* stop = options->stop_sequences ? options->stop_sequences[i] : nullptr;
                 if (stop && stop[0] != '\0') {
@@ -222,13 +230,18 @@ std::vector<GenerationCapture> generation_captures() {
     return g_generation_captures;
 }
 
-runanywhere::v1::ModelInfo build_llm_model() {
+runanywhere::v1::ModelInfo build_llm_model(runanywhere::v1::InferenceFramework framework =
+                                               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     runanywhere::v1::ModelInfo model;
     model.set_id("toolloop.llm");
     model.set_name("ToolLoop LLM");
     model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
-    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    // Framework drives the lifecycle's supports_grammar gate. A QHexRT framework
+    // with no registered qhexrt plugin still loads via the primitive fallback to
+    // the mock GENERATE_TEXT vtable, so tests can exercise the grammar path with
+    // the mock ops while loaded->framework reports QHEXRT.
+    model.set_framework(framework);
     model.set_local_path("/tmp/toolloop-test.gguf");
     model.set_is_downloaded(true);
     model.set_is_available(true);
@@ -244,7 +257,8 @@ void cleanup_environment() {
     set_responses({});
 }
 
-bool load_mock_llm() {
+bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
+                       runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
     if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
         return false;
@@ -254,7 +268,7 @@ bool load_mock_llm() {
     }
 
     std::vector<uint8_t> model_bytes;
-    auto model = build_llm_model();
+    auto model = build_llm_model(framework);
     if (!serialize(model, &model_bytes) ||
         rac_model_registry_register_proto(g_registry, model_bytes.data(), model_bytes.size()) !=
             RAC_SUCCESS) {
@@ -1277,9 +1291,736 @@ int test_null_arguments_return_null_pointer() {
     return 0;
 }
 
+// RUN-80: tools may be OFFERED without being NEEDED. With the neutralized prompt
+// (no "ALWAYS use the tool" bias, no hardcoded weather/math few-shot), an
+// unrelated question must NOT trigger a call — but the offered tools are still
+// advertised, and a non-grammar backend attaches no grammar.
+int test_tools_present_but_unused_makes_no_call() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+
+    auto request = make_request("What is the capital of France?");
+    *request.add_tools() = make_calculate_tool();  // weather + calculate offered
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "unused-tools turn returns success");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "unused-tools turn completes");
+    CHECK(result.tool_calls_size() == 0, "no tool call when none is needed");
+    CHECK(result.tool_results_size() == 0, "no tool result when none is needed");
+    CHECK(result.text() == "The capital of France is Paris.", "plain answer echoed");
+    CHECK(exec.invocation_count == 0, "executor not invoked");
+    CHECK(generate_calls() == 1, "single generation");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "one AUTO generation");
+    if (captures.size() == 1) {
+        CHECK(captures[0].prompt.find("get_weather") != std::string::npos,
+              "offered tools are still advertised (get_weather)");
+        CHECK(captures[0].prompt.find("calculate") != std::string::npos,
+              "offered tools are still advertised (calculate)");
+        CHECK(captures[0].prompt.find("ALWAYS use the tool") == std::string::npos,
+              "the aggressive ALWAYS-use-the-tool bias is gone");
+        CHECK(captures[0].temperature == 0.5f, "AUTO keeps caller temperature");
+        CHECK(!captures[0].disable_thinking, "AUTO leaves thinking enabled");
+        CHECK(captures[0].grammar.empty(), "non-grammar backend attaches no grammar");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: tool_choice=NONE strips every tool schema from the prompt and never
+// calls, even with multiple tools offered and a benign answer.
+int test_none_suppresses_tools_and_never_calls() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Here is a direct answer."});
+
+    auto request = make_request("Answer directly.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE with tools returns success");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "NONE completes");
+    CHECK(result.error_code() == 0, "NONE plain answer has no policy error");
+    CHECK(result.tool_calls_size() == 0, "NONE makes no tool call");
+    CHECK(exec.invocation_count == 0, "NONE never invokes executor");
+
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "NONE generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].prompt == request.prompt(),
+              "NONE suppresses every tool schema even with two tools");
+        CHECK(captures[0].grammar.empty(), "NONE attaches no grammar");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: the QHexRT grammar enhancement is capability-gated. A grammar-capable
+// backend (framework == QHEXRT) gets options.grammar="toolcall_opt:<names>" on
+// the decision turn; every other engine (llama.cpp/onnx/cloud) gets NONE, so the
+// change is a strict no-op for them.
+int test_grammar_attached_only_for_grammar_backend() {
+    // Grammar-capable backend: expect the ToolCallOptional spec over the live tools.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "grammar backend generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather,calculate",
+                  "QHexRT gets ToolCallOptional grammar over the live tool set");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // Non-grammar backend (llama.cpp): identical request, zero grammar attached.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({"Paris is the capital of France."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "non-grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "non-grammar backend generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].grammar.empty(),
+                  "non-grammar engine gets no grammar (strict no-op)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-81: disable_thinking is enforced at generation. Engines that do NOT
+// self-suppress (llama.cpp/onnx/cloud) get the "/no_think" directive prepended;
+// QHexRT (which suppresses natively + strips the token) does NOT. The flag itself
+// always reaches the backend, and the post-hoc <think> strip stays universal.
+int test_disable_thinking_directive_is_engine_gated() {
+    const std::string kNoThink = "/no_think\n";
+
+    // A) Non-native engine (llama.cpp) + disable → flag set AND directive prepended.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        request.set_disable_thinking(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "disable+llamacpp generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].disable_thinking, "disable_thinking flag reaches the backend");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) == 0,
+                  "llama.cpp gets the /no_think directive prepended");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // B) Default (thinking on) → no flag, no directive.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "default generates once");
+        if (captures.size() == 1) {
+            CHECK(!captures[0].disable_thinking, "default leaves thinking enabled");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0, "default injects no directive");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // C) QHexRT + disable → flag set but directive SKIPPED (native suppression).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Plain answer."});
+    {
+        auto request = make_request("Hi");
+        request.set_disable_thinking(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "disable+qhexrt generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].disable_thinking, "disable_thinking flag still reaches QHexRT");
+            CHECK(captures[0].prompt.rfind(kNoThink, 0) != 0,
+                  "QHexRT skips the /no_think directive (native suppression)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): tool_choice=NONE must attach NO grammar even on a
+// grammar backend — a "chat OR one call" grammar would invite a call the NONE
+// policy then rejects. Proves the NONE gate on the grammar path (not just the
+// prompt body).
+int test_none_attaches_no_grammar_on_grammar_backend() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"Here is a direct answer."});
+
+    auto request = make_request("Answer directly.");
+    *request.add_tools() = make_calculate_tool();
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_SUCCESS, "NONE on grammar backend succeeds");
+
+    runanywhere::v1::ToolCallingResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    CHECK(result.is_complete(), "NONE on grammar backend completes");
+    CHECK(result.tool_calls_size() == 0, "NONE makes no call");
+    const auto captures = generation_captures();
+    CHECK(captures.size() == 1, "NONE grammar-backend generates once");
+    if (captures.size() == 1) {
+        CHECK(captures[0].grammar.empty(),
+              "NONE attaches NO grammar on a grammar backend (no invite-then-reject)");
+    }
+
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): grammar constrains the DECISION turn but must be
+// dropped on a pure SYNTHESIS turn (a call ran + tools not kept) so the final
+// answer is free text; and RETAINED when tools stay available.
+int test_grammar_dropped_on_synthesis_turn() {
+    // keep_tools_available=false → grammar on turn 0, gone on synthesis turn 1.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");  // one tool: get_weather
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "decision + synthesis = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "decision turn is grammar-constrained");
+            CHECK(captures[1].grammar.empty(), "synthesis turn is unconstrained");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // keep_tools_available=true → grammar persists on the follow-up turn.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");
+        request.set_keep_tools_available(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "keep-tools decision + follow-up = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[1].grammar == "toolcall_opt:get_weather",
+                  "grammar persists on the follow-up when tools stay available");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80: the tool-decision system hint (device-proven to stop small-model over-calling)
+// is appended on the AUTO decision path for EVERY engine (a universal abstention
+// instruction, not a QHexRT quirk), PRESERVES any caller system prompt, and is withheld
+// when a call is forced (REQUIRED/SPECIFIC), tools are vetoed (NONE), or on a pure
+// synthesis turn. Framework is irrelevant here, so the default (llama.cpp) mock is used.
+int test_tool_decision_hint_gated_on_auto_path() {
+    const std::string kHint = "call a tool only when the user's request genuinely requires it";
+
+    // A) AUTO + tools, no caller system prompt → hint is the whole system prompt.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "AUTO turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "AUTO generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].system_prompt.find(kHint) != std::string::npos,
+                  "AUTO path carries the tool-decision hint");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // B) AUTO + tools + caller system prompt → caller content preserved, hint appended after.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        request.set_system_prompt("You are Halo, a concise assistant.");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "AUTO+sys turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "AUTO+sys generates once");
+        if (captures.size() == 1) {
+            const auto caller_pos = captures[0].system_prompt.find("You are Halo");
+            const auto hint_pos = captures[0].system_prompt.find(kHint);
+            CHECK(caller_pos != std::string::npos, "caller system prompt is preserved");
+            CHECK(hint_pos != std::string::npos, "tool-decision hint is appended");
+            CHECK(caller_pos < hint_pos, "caller content precedes the appended hint");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // C) NONE → tools suppressed, no hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Here is a direct answer."});
+    {
+        auto request = make_request("Answer directly.");
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "NONE turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "NONE generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].system_prompt.find(kHint) == std::string::npos,
+                  "NONE withholds the tool-decision hint (tools suppressed)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // D) REQUIRED → a call is forced, so the abstention hint is withheld on the decision turn.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"I decided not to call a tool."});
+    {
+        auto request = make_request("A tool call is mandatory.", /*max_tool_calls=*/1);
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "REQUIRED turn returns a result");
+        const auto captures = generation_captures();
+        CHECK(captures.size() >= 1, "REQUIRED generates at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].system_prompt.find(kHint) == std::string::npos,
+                  "REQUIRED withholds the abstention hint (a call is forced)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // E) Synthesis turn (a call ran, tools not kept) → the follow-up turn has no hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "decision + synthesis = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[0].system_prompt.find(kHint) != std::string::npos,
+                  "decision turn carries the hint");
+            CHECK(captures[1].system_prompt.find(kHint) == std::string::npos,
+                  "synthesis turn drops the hint (no tool decision to make)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-81: the post-hoc <think> strip is universal — thinking content never leaks
+// into the final answer regardless of engine or the disable flag.
+int test_thinking_content_stripped_from_answer() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"<think>secret plan</think>Visible answer."});
+    {
+        auto request = make_request("Hi");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.text().find("secret") == std::string::npos, "thinking content stripped");
+        CHECK(result.text().find("Visible") != std::string::npos, "visible answer preserved");
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
+
+// RUN-80 (grammar-engage): on a grammar backend (QHexRT) the tool prompt is BUILT in the
+// bare-Pythonic `[name(args)]` format the toolcall_opt grammar enforces, and a bare reply
+// PARSES back into a tool call — so the grammar actually engages end-to-end. Non-grammar
+// engines are byte-for-byte unchanged (DEFAULT `<tool_call>` build + parse). A plain-text
+// reply on a grammar backend abstains (no tool call).
+int test_grammar_backend_bare_pythonic_end_to_end() {
+    // QHexRT: bare-Pythonic prompt + a bare [name(args)] reply parses.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[get_weather(location=\"Tokyo\")]", "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "grammar backend generated at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("[tool_name(") != std::string::npos,
+                  "grammar backend builds a bare-Pythonic prompt");
+            CHECK(captures[0].prompt.find("<tool_call>") == std::string::npos,
+                  "grammar backend prompt carries no <tool_call> tag");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "bare [name(args)] reply parsed into a tool call");
+        if (result.tool_calls_size() >= 1) {
+            CHECK(result.tool_calls(0).name() == "get_weather", "parsed the get_weather call");
+            CHECK(result.tool_calls(0).arguments_json().find("Tokyo") != std::string::npos,
+                  "parsed the Tokyo argument");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // llama.cpp: DEFAULT <tool_call> prompt + reply, unchanged.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+                   "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "non-grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "non-grammar backend generated at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("<tool_call>") != std::string::npos,
+                  "non-grammar backend keeps the DEFAULT <tool_call> prompt");
+            CHECK(captures[0].prompt.find("[tool_name(") == std::string::npos,
+                  "non-grammar backend does NOT get the bare-Pythonic prompt");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "default <tool_call> reply still parsed");
+        rac_proto_buffer_free(&out);
+    }
+
+    // QHexRT abstains: a plain-text reply yields no tool call (grammar allows free chat).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend abstain turn succeeds");
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() == 0, "plain-text reply on grammar backend = no call");
+        CHECK(result.text() == "The capital of France is Paris.", "abstention text preserved");
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): tool_choice=SPECIFIC must narrow the QHexRT grammar spec to
+// the ONE forced tool, so the grammar can only emit `[<forced>(...)]` (or free text) rather
+// than a different tool the SPECIFIC policy would then reject.
+int test_specific_narrows_grammar_spec() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)"});
+    {
+        auto request = make_request("Weather?");  // tools: get_weather ...
+        *request.add_tools() = make_calculate_tool();  // ... + calculate
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+        request.set_forced_tool_name("get_weather");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":1})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "SPECIFIC grammar backend generated");
+        if (!captures.empty()) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "SPECIFIC narrows the grammar spec to the forced tool only (not calculate)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): tool_choice=REQUIRED with ZERO tools advertised can never be
+// satisfied — reject it up front (INVALID_ARGUMENT, no generation) instead of prompting
+// "you must call a tool" and failing downstream.
+int test_required_with_no_tools_rejected() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"unused"});
+    runanywhere::v1::ToolCallingSessionCreateRequest request;  // deliberately NO tools
+    request.set_prompt("Do something.");
+    request.set_max_tokens(64);
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "REQUIRED with no tools is rejected up front");
+    CHECK(generate_calls() == 0, "no generation attempted for REQUIRED + no tools");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): REQUIRED on a grammar backend composes all three features —
+// the prompt is bare-Pythonic, carries the firm "must call" directive, the grammar is
+// attached, and a bare [name(args)] reply parses.
+int test_required_on_grammar_backend() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[get_weather(location=\"Tokyo\")]", "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather?");  // one tool: get_weather
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "REQUIRED grammar turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "REQUIRED grammar backend generated");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("[tool_name(") != std::string::npos,
+                  "REQUIRED grammar prompt is bare-Pythonic");
+            CHECK(captures[0].prompt.find("You must call exactly one tool now") != std::string::npos,
+                  "REQUIRED grammar prompt carries the firm directive");
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "REQUIRED grammar backend attaches the grammar spec");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "bare reply parsed under REQUIRED+grammar");
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): a bare [unknown_tool()] reply on a grammar backend still passes
+// through commons validation, which rejects the unknown tool (VALIDATION_FAILED, executor
+// never invoked) — the grammar constrains syntax; commons still checks the tool exists.
+int test_grammar_backend_rejects_unknown_bare_call() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[unknown_tool()]"});
+    {
+        auto request = make_request("do a thing");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "run_loop returns success (failed result inside)");
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED,
+              "unknown bare tool rejected as VALIDATION_FAILED");
+        CHECK(exec.invocation_count == 0, "executor NOT invoked for an unknown bare tool");
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
 
 int main() {
     try {
@@ -1299,6 +2040,19 @@ int main() {
         test_specific_and_required_reject_initial_no_call();
         test_search_web_synthesis_is_current_compact_and_attributed();
         test_tool_name_mentions_do_not_force_execution();
+        test_tools_present_but_unused_makes_no_call();
+        test_none_suppresses_tools_and_never_calls();
+        test_grammar_attached_only_for_grammar_backend();
+        test_none_attaches_no_grammar_on_grammar_backend();
+        test_grammar_dropped_on_synthesis_turn();
+        test_grammar_backend_bare_pythonic_end_to_end();
+        test_specific_narrows_grammar_spec();
+        test_required_with_no_tools_rejected();
+        test_required_on_grammar_backend();
+        test_grammar_backend_rejects_unknown_bare_call();
+        test_tool_decision_hint_gated_on_auto_path();
+        test_disable_thinking_directive_is_engine_gated();
+        test_thinking_content_stripped_from_answer();
         test_max_tool_calls_capped();
         test_max_tool_calls_blocks_extra_side_effect();
         test_auto_execute_false_returns_call_without_side_effect();
