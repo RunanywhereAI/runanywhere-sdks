@@ -93,9 +93,8 @@ private enum MLXCatalog {
         supportsThinking: false
     )
 
-    // Microsoft Fara1.5-4B (Qwen3.5-VL computer-use agent), converted to MLX 4-bit.
-    // URLs point at the source repo for reference; the local test loads the
-    // already-converted+placed weights from the SDK MLX model dir.
+    // Microsoft Fara1.5-4B (Qwen3.5-VL computer-use agent), our MLX 4-bit
+    // conversion hosted at huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit.
     static let fara15 = CatalogEntry(
         id: "mlx-fara1.5-4b",
         alias: "fara",
@@ -103,16 +102,16 @@ private enum MLXCatalog {
         category: .multimodal,
         framework: .mlx,
         files: [
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/config.json", "config.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/model.safetensors", "model.safetensors"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/model.safetensors.index.json", "model.safetensors.index.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/tokenizer.json", "tokenizer.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/tokenizer_config.json", "tokenizer_config.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/vocab.json", "vocab.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/preprocessor_config.json", "preprocessor_config.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/processor_config.json", "processor_config.json"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/chat_template.jinja", "chat_template.jinja"),
-            .init("https://huggingface.co/microsoft/Fara1.5-4B/resolve/main/generation_config.json", "generation_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/config.json", "config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/model.safetensors", "model.safetensors"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/model.safetensors.index.json", "model.safetensors.index.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/tokenizer.json", "tokenizer.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/tokenizer_config.json", "tokenizer_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/vocab.json", "vocab.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/preprocessor_config.json", "preprocessor_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/processor_config.json", "processor_config.json"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/chat_template.jinja", "chat_template.jinja"),
+            .init("https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit/resolve/main/generation_config.json", "generation_config.json"),
         ],
         memoryRequirement: 4_000_000_000,
         contextLength: 4_096,

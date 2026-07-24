@@ -328,6 +328,14 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
+        await registerLLM(
+            id: "mlx-fara1.5-4b",
+            name: "MLX Fara1.5 4B Computer-Use Agent 4bit",
+            url: "https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit",
+            framework: .mlx,
+            modality: .multimodal,
+            memoryRequirement: 4_000_000_000
+        )
         if mlxCatalogEnabled {
             logger.info("MLX models registered")
         } else {
