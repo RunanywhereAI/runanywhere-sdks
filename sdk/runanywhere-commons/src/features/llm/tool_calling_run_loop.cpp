@@ -505,13 +505,28 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         rac_result_t rc = RAC_SUCCESS;
         auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
             ctx.generation, iteration, ctx.has_tool_choice, ctx.tool_choice, ctx.format);
-        // Grammar-constrain (QHexRT) only while the model may still call a tool this
-        // turn; otherwise drop the grammar so decoding is unconstrained. The shared
-        // predicate keeps this in lockstep with the session path.
-        if (!rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+        // Tools are "live" this turn when the model may still call one: not vetoed by
+        // tool_choice=NONE and not a pure post-call synthesis turn. Drives BOTH the QHexRT
+        // grammar gate and the tool-decision system hint below; the shared predicate keeps
+        // this in lockstep with the session path.
+        const bool tools_live_this_turn =
+            rac::llm::tool_calling::tool_grammar_constrained_this_turn(
                 ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
-                final_result.tool_calls_size() > 0, ctx.keep_tools_available)) {
+                final_result.tool_calls_size() > 0, ctx.keep_tools_available);
+        if (!tools_live_this_turn) {
             step_generation.tool_names.clear();
+        }
+        // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
+        // "only call when genuinely needed" hint to the system prompt so a small model
+        // answers general-knowledge asks directly instead of always emitting a call.
+        // Skipped when the caller forces a call (REQUIRED/SPECIFIC).
+        const bool force_a_call =
+            ctx.has_tool_choice &&
+            (ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED ||
+             ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+        if (rac::llm::tool_calling::tool_decision_hint_this_turn(tools_live_this_turn,
+                                                                 force_a_call)) {
+            rac::llm::tool_calling::append_tool_decision_hint(&step_generation.system_prompt);
         }
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
             &cancel_state->active_ref_mu, &cancel_state->active_ref,
