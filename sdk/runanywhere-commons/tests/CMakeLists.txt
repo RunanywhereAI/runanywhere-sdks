@@ -109,6 +109,18 @@ rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
 
+# CUA (computer-use-agent) scaffold: profile prompt + tool_call parse + coord
+# scale. Pure-C++ helper, no backend dependency.
+add_executable(test_cua test_cua.cpp)
+target_include_directories(test_cua PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_cua PRIVATE rac_commons)
+rac_link_archive_deps(test_cua)
+target_compile_features(test_cua PRIVATE cxx_std_17)
+add_test(NAME cua_tests COMMAND test_cua --run-all)
+
 # --- Desktop platform adapter tests ---------------------------------
 # POSIX adapter slots + 0600 secure store + curl transport registration +
 # the model-paths base-dir dedup rule. Only meaningful when the desktop
