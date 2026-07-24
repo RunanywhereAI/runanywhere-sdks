@@ -251,6 +251,16 @@ internal object ModelCatalog {
         // Hold or re-scope this row if the Android llama.cpp path has to clear the
         // same on-device bar iOS requires.
         SingleFileModel(
+            "llama-3.1-nemotron-nano-4b-v1.1-q4_k_m",
+            "NVIDIA Llama 3.1 Nemotron Nano 4B v1.1 Q4_K_M",
+            "https://huggingface.co/bartowski/nvidia_Llama-3.1-Nemotron-Nano-4B-v1.1-GGUF/resolve/4eb0ffaec9b21a411cf4fa39df2fba0b7a972e11/nvidia_Llama-3.1-Nemotron-Nano-4B-v1.1-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            memoryBytes = 4L * 1_024L * 1_024L * 1_024L,
+            downloadBytes = 2_778_285_600L,
+            contextLength = 4_096,
+        ),
+        SingleFileModel(
             "llama-3.1-nemotron-nano-8b-v1-q4_k_m",
             "NVIDIA Llama 3.1 Nemotron Nano 8B v1 Q4_K_M",
             "https://huggingface.co/bartowski/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-GGUF/resolve/6f3d46cfbc39ce7a1bec89654305515d904e8102/nvidia_Llama-3.1-Nemotron-Nano-8B-v1-Q4_K_M.gguf",
@@ -518,6 +528,56 @@ internal object ModelCatalog {
                         "tokens.txt",
                         10_374,
                         "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921",
+                    ),
+                ),
+        ),
+        // Official sherpa-onnx exports of the NVIDIA NeMo parakeet-tdt_ctc
+        // checkpoints. Unlike the 1.1B row above these already carry the
+        // model_type/vocab_size/normalize_type/subsampling_factor metadata
+        // Sherpa reads, so they need no post-download transform. Only the CTC
+        // branch is exported, so the single `model[.int8].onnx` + `tokens.txt`
+        // layout routes through the backend's NeMo CTC path.
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-ctc-110m-en-int8",
+            "NVIDIA Parakeet TDT-CTC 110M EN (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            memoryBytes = 1_024L * 1_024L * 1_024L,
+            downloadBytes = 458_170_974,
+            files =
+                listOf(
+                    ModelFile(
+                        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/model.onnx",
+                        "model.onnx",
+                        458_161_021,
+                        "936806cf3dd0db5aba53f8c7410bb5632d7a8ad6b2c51009f5e4fc0890ec76bf",
+                    ),
+                    ModelFile(
+                        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000/resolve/3af92f152d32c836acabf38f4c993bc96b80eb2d/tokens.txt",
+                        "tokens.txt",
+                        9_953,
+                    ),
+                ),
+        ),
+        MultiFileModel(
+            "sherpa-nemo-parakeet-tdt-ctc-0.6b-ja-int8",
+            "NVIDIA Parakeet TDT-CTC 0.6B Japanese INT8 (Sherpa-ONNX)",
+            SHERPA,
+            STT,
+            memoryBytes = 1_536L * 1_024L * 1_024L,
+            downloadBytes = 655_571_161,
+            files =
+                listOf(
+                    ModelFile(
+                        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/model.int8.onnx",
+                        "model.int8.onnx",
+                        655_542_604,
+                        "3addd00ef5bd1742078389e540b77394e4a508bdf2f4c9ad1b4a76d93e76598e",
+                    ),
+                    ModelFile(
+                        "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/tokens.txt",
+                        "tokens.txt",
+                        28_557,
                     ),
                 ),
         ),
