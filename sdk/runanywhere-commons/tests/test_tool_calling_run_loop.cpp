@@ -1893,6 +1893,64 @@ int test_grammar_backend_bare_pythonic_end_to_end() {
     return 0;
 }
 
+// RUN-80 (review follow-up): tool_choice=SPECIFIC must narrow the QHexRT grammar spec to
+// the ONE forced tool, so the grammar can only emit `[<forced>(...)]` (or free text) rather
+// than a different tool the SPECIFIC policy would then reject.
+int test_specific_narrows_grammar_spec() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)"});
+    {
+        auto request = make_request("Weather?");  // tools: get_weather ...
+        *request.add_tools() = make_calculate_tool();  // ... + calculate
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+        request.set_forced_tool_name("get_weather");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":1})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "SPECIFIC grammar backend generated");
+        if (!captures.empty()) {
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "SPECIFIC narrows the grammar spec to the forced tool only (not calculate)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): tool_choice=REQUIRED with ZERO tools advertised can never be
+// satisfied — reject it up front (INVALID_ARGUMENT, no generation) instead of prompting
+// "you must call a tool" and failing downstream.
+int test_required_with_no_tools_rejected() {
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"unused"});
+    runanywhere::v1::ToolCallingSessionCreateRequest request;  // deliberately NO tools
+    request.set_prompt("Do something.");
+    request.set_max_tokens(64);
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+    std::vector<uint8_t> bytes;
+    serialize(request, &bytes);
+    ExecutorState exec;
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "REQUIRED with no tools is rejected up front");
+    CHECK(generate_calls() == 0, "no generation attempted for REQUIRED + no tools");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
 int main() {
     try {
         std::fprintf(stdout, "test_tool_calling_run_loop\n");
@@ -1917,6 +1975,8 @@ int main() {
         test_none_attaches_no_grammar_on_grammar_backend();
         test_grammar_dropped_on_synthesis_turn();
         test_grammar_backend_bare_pythonic_end_to_end();
+        test_specific_narrows_grammar_spec();
+        test_required_with_no_tools_rejected();
         test_tool_decision_hint_gated_on_auto_path();
         test_disable_thinking_directive_is_engine_gated();
         test_thinking_content_stripped_from_answer();
