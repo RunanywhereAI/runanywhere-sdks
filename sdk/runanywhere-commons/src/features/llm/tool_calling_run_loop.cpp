@@ -151,6 +151,19 @@ bool apply_explicit_tool_choice(LoopContext* ctx, std::string* out_error) {
         return true;
     }
 
+    // REQUIRED demands a call, but with no tools advertised none is possible — reject the
+    // contradictory request up front rather than emit a "you must call a tool" prompt that
+    // deterministically fails downstream (SPECIFIC with no tools is caught below by the
+    // target-not-present check).
+    if (ctx->has_tool_choice &&
+        ctx->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED &&
+        ctx->tool_options.tools_size() == 0 && ctx->forced_tool_name.empty()) {
+        if (out_error) {
+            *out_error = "tool_choice=REQUIRED requires at least one tool";
+        }
+        return false;
+    }
+
     // A non-empty forced name is itself an explicit SPECIFIC choice, even
     // when callers omit tool_choice (or accidentally leave it AUTO/REQUIRED).
     if (!ctx->forced_tool_name.empty()) {
@@ -538,6 +551,14 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                 final_result.tool_calls_size() > 0, ctx.keep_tools_available);
         if (!tools_live_this_turn) {
             step_generation.tool_names.clear();
+        } else if (ctx.has_tool_choice &&
+                   ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+                   !ctx.forced_tool_name.empty()) {
+            // tool_choice=SPECIFIC: narrow the QHexRT grammar spec to the ONE forced tool so
+            // the grammar can only emit `[<forced>(...)]` (or free text). Without this the
+            // spec still lists every tool and the model could emit a different call that the
+            // SPECIFIC policy then rejects instead of being structurally prevented (RUN-80).
+            step_generation.tool_names = {ctx.forced_tool_name};
         }
         // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
         // "only call when genuinely needed" hint to the system prompt so a small model
