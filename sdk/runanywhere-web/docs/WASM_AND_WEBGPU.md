@@ -39,7 +39,8 @@ Native mobile uses CoreML / NNAPI / Metal **from the same C++** via different EP
 | Backend | WASM artifact | Accelerator |
 |---------|---------------|-------------|
 | LLM/VLM | `racommons-llamacpp` + `-webgpu` | WebGPU (ggml) when available |
-| Speech / ONNX emb / RAG | `racommons-onnx-sherpa` (+ `-webgpu` twin) | CPU (+ threads); real ORT WebGPU EP still a spike |
+| Speech / ONNX emb / RAG | `racommons-onnx-sherpa` + `-webgpu` twin | ORT WebGPU EP when probe succeeds; else CPU (+ threads). Same BackendWorker for speech + embeddings. |
 | Diffusion / seg / diar | — | No browser engine yet |
 
-Inspect live status: `RunAnywhere.runtime.modalities`.
+Inspect live status: `RunAnywhere.runtime.modalities` / `RunAnywhere.runtime.speech`.
+Release and vendor details: [ONNX_WEBGPU.md](./ONNX_WEBGPU.md).

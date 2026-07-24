@@ -9,7 +9,7 @@ The Web SDK is a Swift-aligned TypeScript facade over the RACommons C/C++ core. 
 - `@runanywhere/web/internal`: broader core-internal implementation exports; neither applications nor backend packages may depend on this entrypoint.
 - `@runanywhere/web/browser`: browser-only helpers such as audio capture/playback, video capture, and capability detection.
 - `@runanywhere/web-llamacpp`: LLM + GGUF text embeddings + VLM + LoRA + tool-calling + structured-output backend. Ships **two execution-mode variants**: `racommons-llamacpp.{js,wasm}` (CPU) and `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU + Asyncify). Both carry the unified llama.cpp vtable; model-framework routing lets its embedding primitive coexist with ONNX.
-- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` (CPU/pthread) and optionally `racommons-onnx-sherpa-webgpu.{js,wasm}` — registers two vtables (`onnx`, `sherpa`) because they share ONNX Runtime. Speech acceleration is **separate** from LLM WebGPU (`ONNX.register({ acceleration, threads })`, `RunAnywhere.runtime.speech`). Fail-closed BackendWorker by default in browsers. See `docs/SPIKE_ONNX_WEBGPU.md`.
+- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` (CPU/pthread) and `racommons-onnx-sherpa-webgpu.{js,wasm}` (ORT WebGPU EP) — registers two vtables (`onnx`, `sherpa`) because they share ONNX Runtime. Speech acceleration is **separate** from LLM WebGPU (`ONNX.register({ acceleration, threads })`, `RunAnywhere.runtime.speech`). Fail-closed BackendWorker by default in browsers. See `docs/ONNX_WEBGPU.md`.
 
 Keep app code on the root `RunAnywhere` facade. Backend packages integrate only through `@runanywhere/web/backend`; browser apps may import UI/device helpers from `@runanywhere/web/browser`.
 
@@ -113,7 +113,8 @@ npm run build:wasm -- --llamacpp         # packages/llamacpp/wasm/racommons-llam
 npm run build:wasm -- --webgpu           # packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}
 npm run build:wasm -- --onnx             # packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}
 npm run build:wasm -- --onnx-webgpu      # packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}
-npm run build:wasm:all                    # core + llama CPU/WebGPU + onnx CPU (add --onnx-webgpu separately)
+npm run build:wasm:all                    # core + llama CPU/WebGPU + onnx CPU/WebGPU
+npm run vendor:wasm:speech                # CPU ORT + WebGPU ORT + Sherpa (required before release)
 npm run build:wasm:debug
 npm run clean:wasm                       # remove all WASM build dirs and generated glue/binaries
 npm run build:wasm:clean
@@ -170,7 +171,7 @@ sdk/runanywhere-web/
 ├── scripts/
 │   └── package-sdk.sh
 ├── wasm/
-│   ├── CMakeLists.txt        # 4 artifacts: core / llama CPU / llama WebGPU / ONNX
+│   ├── CMakeLists.txt        # 5 artifacts: core / llama CPU|WebGPU / onnx CPU|WebGPU
 │   └── scripts/build.sh
 └── packages/
     ├── core/

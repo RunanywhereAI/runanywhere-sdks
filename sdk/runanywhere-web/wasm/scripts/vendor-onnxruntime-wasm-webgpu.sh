@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
-# Vendor ONNX Runtime WASM static archive WITH WebGPU EP into a separate tree:
+# Canonical vendor: ONNX Runtime WASM WITH WebGPU EP (separate from CPU).
+#
+# Stages:
 #   sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/
+#     lib/libonnxruntime.a
+#     include/...
+#     .rac-wasm-provenance   (must include threads=on + webgpu=on)
+#     .rac-webgpu-link-hints (Dawn emdawn JS libs for the final link)
 #
-# Does NOT touch the CPU archive at onnxruntime-wasm/ (provenance preserved).
+# Does NOT touch onnxruntime-wasm/ (CPU twin). Use vendor-onnxruntime-wasm.sh
+# for that tree. Release docs: sdk/runanywhere-web/docs/ONNX_WEBGPU.md
 #
-# Usage:
-#   source sdk/runanywhere-web/emsdk/emsdk_env.sh   # Emscripten 6.0.2
-#   ./sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm-webgpu.sh
-#
+# Usage (from repo root, after emsdk_env.sh):
+#   npm --prefix sdk/runanywhere-web run vendor:wasm:onnxruntime-webgpu
+#   # or: ./sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm-webgpu.sh
 # Then:
-#   npm run build:wasm -- --onnx-webgpu --clean
+#   npm --prefix sdk/runanywhere-web run build:wasm -- --onnx-webgpu --clean
+#
+# Check-only (used by build.sh before linking):
+#   RAC_WASM_PROVENANCE_CHECK_ONLY=1 ./vendor-onnxruntime-wasm-webgpu.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -240,24 +249,56 @@ write_provenance() {
 }
 
 write_dawn_link_hints() {
-  mkdir -p "$(dirname "${DAWN_HINT_FILE}")"
+  # Stage emdawn JS into the vendor tree so --onnx-webgpu linking does not
+  # depend on the ORT source build directory (safe to delete after vendor).
+  local staged_dir="${DEST_DIR}/emdawn"
   local gen_dir="${ORT_BUILD_DIR}/_deps/dawn-build/gen/src/emdawnwebgpu"
   local js_lib cpp_src externs
   js_lib="$(find "${ORT_BUILD_DIR}" -type f -path '*/emdawnwebgpu/pkg/webgpu/src/library_webgpu.js' 2>/dev/null | head -n 1 || true)"
   cpp_src="$(find "${ORT_BUILD_DIR}" -type f -path '*/emdawnwebgpu/pkg/webgpu/src/webgpu.cpp' 2>/dev/null | head -n 1 || true)"
   externs="$(find "${ORT_BUILD_DIR}" -type f -path '*/emdawnwebgpu/pkg/webgpu/src/webgpu-externs.js' 2>/dev/null | head -n 1 || true)"
+
+  mkdir -p "${staged_dir}" "$(dirname "${DAWN_HINT_FILE}")"
+  local req
+  for req in \
+    "${gen_dir}/library_webgpu_enum_tables.js" \
+    "${gen_dir}/library_webgpu_generated_sig_info.js" \
+    "${gen_dir}/library_webgpu_generated_struct_info.js" \
+    "${js_lib}"
+  do
+    if [ -z "${req}" ] || [ ! -f "${req}" ]; then
+      echo "ERROR: missing Dawn emdawn input for staging: ${req:-<empty>}" >&2
+      exit 1
+    fi
+    cp "${req}" "${staged_dir}/$(basename "${req}")"
+  done
+  if [ -n "${externs}" ] && [ -f "${externs}" ]; then
+    cp "${externs}" "${staged_dir}/$(basename "${externs}")"
+  fi
+  if [ -n "${cpp_src}" ] && [ -f "${cpp_src}" ]; then
+    cp "${cpp_src}" "${staged_dir}/$(basename "${cpp_src}")"
+  fi
+
   {
-    echo "# Paths discovered after ORT WebGPU vendor — used by wasm link."
+    echo "# Staged under ${staged_dir} (ORT build dir is optional after vendor)."
     echo "# Order matters: enum → sig → struct → library_webgpu.js (Dawn CMakeLists)."
     echo "ORT_BUILD_DIR=${ORT_BUILD_DIR}"
-    echo "EMDAWN_LIBRARY_WEBGPU_ENUM_TABLES=${gen_dir}/library_webgpu_enum_tables.js"
-    echo "EMDAWN_LIBRARY_WEBGPU_SIG_INFO=${gen_dir}/library_webgpu_generated_sig_info.js"
-    echo "EMDAWN_LIBRARY_WEBGPU_STRUCT_INFO=${gen_dir}/library_webgpu_generated_struct_info.js"
-    echo "EMDAWN_LIBRARY_WEBGPU_JS=${js_lib}"
-    echo "EMDAWN_WEBGPU_EXTERNS=${externs}"
-    echo "EMDAWN_WEBGPU_CPP=${cpp_src}"
+    echo "EMDAWN_LIBRARY_WEBGPU_ENUM_TABLES=${staged_dir}/library_webgpu_enum_tables.js"
+    echo "EMDAWN_LIBRARY_WEBGPU_SIG_INFO=${staged_dir}/library_webgpu_generated_sig_info.js"
+    echo "EMDAWN_LIBRARY_WEBGPU_STRUCT_INFO=${staged_dir}/library_webgpu_generated_struct_info.js"
+    echo "EMDAWN_LIBRARY_WEBGPU_JS=${staged_dir}/library_webgpu.js"
+    if [ -f "${staged_dir}/webgpu-externs.js" ]; then
+      echo "EMDAWN_WEBGPU_EXTERNS=${staged_dir}/webgpu-externs.js"
+    else
+      echo "EMDAWN_WEBGPU_EXTERNS="
+    fi
+    if [ -f "${staged_dir}/webgpu.cpp" ]; then
+      echo "EMDAWN_WEBGPU_CPP=${staged_dir}/webgpu.cpp"
+    else
+      echo "EMDAWN_WEBGPU_CPP="
+    fi
   } > "${DAWN_HINT_FILE}"
-  echo "Wrote Dawn link hints: ${DAWN_HINT_FILE}"
+  echo "Wrote Dawn link hints (staged): ${DAWN_HINT_FILE}"
 }
 
 require_canonical_emscripten() {

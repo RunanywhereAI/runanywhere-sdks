@@ -16,7 +16,7 @@ and the CPU llama.cpp and ONNX/Sherpa artifacts.
 | Backend | Artifact(s) | Acceleration today |
 |---------|-------------|--------------------|
 | llama.cpp (LLM/VLM) | `racommons-llamacpp` + `racommons-llamacpp-webgpu` | WebGPU-first in BackendWorker when `shader-f16` is available |
-| ONNX/Sherpa (STT/TTS/VAD) | `racommons-onnx-sherpa` (+ optional `-webgpu` twin) | CPU WASM (+ configurable threads). WebGPU speech requires ORT WebGPU EP; see [SPIKE_ONNX_WEBGPU.md](./SPIKE_ONNX_WEBGPU.md) |
+| ONNX/Sherpa (STT/TTS/VAD) | `racommons-onnx-sherpa` + `-webgpu` twin | ORT WebGPU when probe succeeds, else CPU (+ threads). See [ONNX_WEBGPU.md](./ONNX_WEBGPU.md). |
 
 `RunAnywhere.runtime.active` / `setAcceleration` are **LLM-scoped**. Speech
 diagnostics live on `RunAnywhere.runtime.speech` and the
@@ -66,5 +66,4 @@ only when the ORT WebGPU EP append probe succeeds — never merely because a
 `-webgpu` WASM twin was present.
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for server headers, static assets, CSP,
-and memory/download guidance. See [SPEECH_THREAD_BENCHMARKS.md](./SPEECH_THREAD_BENCHMARKS.md)
-for multi-thread soak guidance.
+and memory/download guidance. Speech vendor/release: [ONNX_WEBGPU.md](./ONNX_WEBGPU.md).

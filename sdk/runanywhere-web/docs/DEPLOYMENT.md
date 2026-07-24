@@ -21,7 +21,7 @@ CORP-compatible. Verify `crossOriginIsolated === true` in production.
 
 Serve `.wasm` files as `Content-Type: application/wasm`. Serve the canonical
 Emscripten glue alongside each binary and exclude both extensions from SPA
-rewrites. The currently published deployment payload is four pairs (eight
+rewrites. The currently published deployment payload is five pairs (ten
 files):
 
 ```text
@@ -29,12 +29,15 @@ racommons.{js,wasm}
 racommons-llamacpp.{js,wasm}
 racommons-llamacpp-webgpu.{js,wasm}
 racommons-onnx-sherpa.{js,wasm}
+racommons-onnx-sherpa-webgpu.{js,wasm}
 ```
 
-Diffusion is workspace-only and intentionally excluded from production
-packaging until it ships a WASM artifact. A missing or HTML-rewritten canonical
-asset can make pthread initialization appear to hang; fail the deployment
-verification rather than silently continuing.
+Speech WebGPU (`racommons-onnx-sherpa-webgpu`) is required for releases that
+claim GPU speech/embeddings; see [ONNX_WEBGPU.md](./ONNX_WEBGPU.md). Diffusion
+is workspace-only and intentionally excluded from production packaging until
+it ships a WASM artifact. A missing or HTML-rewritten canonical asset can make
+pthread initialization appear to hang; fail the deployment verification rather
+than silently continuing.
 
 ## Content Security Policy
 

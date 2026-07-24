@@ -187,14 +187,20 @@ npm run build:wasm -- --core
 npm run build:wasm -- --llamacpp
 npm run build:wasm -- --webgpu
 npm run build:wasm -- --onnx
+npm run build:wasm -- --onnx-webgpu
 
-# Or all four native artifacts
+# Or all five native artifacts (core + llama CPU/WebGPU + onnx CPU/WebGPU)
 npm run build:wasm:all
+
+# Speech ORT archives (CPU + WebGPU) + Sherpa — required before onnx builds
+npm run vendor:wasm:speech
 ```
 
 The WASM build scripts fail if required vendored static archives or canonical
 outputs are missing. Use the version-pinned vendor scripts under
-`wasm/scripts/`; do not replace release inputs with silent stubs.
+`wasm/scripts/` (`vendor-onnxruntime-wasm.sh` and
+`vendor-onnxruntime-wasm-webgpu.sh`); do not replace release inputs with silent
+stubs. Speech WebGPU release checklist: [docs/ONNX_WEBGPU.md](./docs/ONNX_WEBGPU.md).
 
 ## Quality and release gates
 
