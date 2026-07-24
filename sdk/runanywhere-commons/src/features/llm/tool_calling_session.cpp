@@ -32,6 +32,7 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -100,6 +101,10 @@ struct ToolCallingSession {
     bool require_json_arguments = false;
     bool keep_tools_available = false;
     bool validate_calls = true;
+    // Backend consumes rac_llm_options_t.grammar (QHexRT). Probed once at session
+    // create; when true the tool prompt is built AND parsed in the bare-Pythonic
+    // `[name(args)]` format the toolcall_opt grammar enforces (RUN-80).
+    bool grammar_backend = false;
 
     rac::llm::tool_calling::GenerationState generation;
     rac::llm::tool_calling::GenerationTelemetryAgg telemetry;
@@ -438,8 +443,14 @@ std::string build_initial_prompt(const ToolCallingSession& session) {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_format_prompt_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    // Grammar backends build in the bare-Pythonic format (RUN-80); see run-loop path.
+    rac_result_t rc = session.grammar_backend
+                          ? rac_tool_call_format_prompt_grammar_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out)
+                          : rac_tool_call_format_prompt_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return {};
@@ -471,8 +482,14 @@ std::string build_followup_prompt(const ToolCallingSession& session, bool keep_t
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_format_prompt_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    // Grammar backends build in the bare-Pythonic format (RUN-80); see run-loop path.
+    rac_result_t rc = session.grammar_backend
+                          ? rac_tool_call_format_prompt_grammar_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out)
+                          : rac_tool_call_format_prompt_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return {};
@@ -493,6 +510,11 @@ bool parse_tool_call_from_output(const ToolCallingSession& session, const std::s
     request.set_text(llm_output);
     auto* options = request.mutable_options();
     *options = build_options_snapshot(session);
+    // Grammar backends emit bare `[name(args)]` (no format tag) — drop the format hint so
+    // the parser auto-detects it (bare call -> Pythonic parser; plain text -> no call).
+    if (session.grammar_backend) {
+        options->clear_format();
+    }
 
     const size_t req_size = request.ByteSizeLong();
     std::vector<uint8_t> req_bytes(req_size);
@@ -794,6 +816,10 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
     session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
                           ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
                           : request.format();
+    // Probe grammar capability once (cheap acquire/release): grammar backends build +
+    // parse the tool prompt in the bare-Pythonic format the QHexRT grammar enforces.
+    // Non-grammar engines keep the declared format — a strict no-op for them (RUN-80).
+    session->grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     session->max_tool_calls =
         request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
     session->auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
