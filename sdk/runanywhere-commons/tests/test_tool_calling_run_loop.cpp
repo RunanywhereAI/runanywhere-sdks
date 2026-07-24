@@ -72,6 +72,9 @@ struct GenerationCapture {
     // rac_llm_options_t.grammar as the backend saw it (RUN-80). Empty unless the
     // loaded model's framework advertises grammar support (QHexRT).
     std::string grammar;
+    // rac_llm_options_t.system_prompt as the backend saw it (RUN-80). Carries the
+    // tool-decision hint appended on the AUTO decision path (empty when unset).
+    std::string system_prompt;
     std::vector<std::string> stop_sequences;
     // Prior conversation turns the run loop threaded onto rac_llm_options_t
     // (ToolCallingSessionCreateRequest.history, field 19). Captured verbatim so
@@ -121,6 +124,7 @@ rac_result_t mock_generate(void*, const char* prompt, const rac_llm_options_t* o
             capture.top_p = options->top_p;
             capture.disable_thinking = options->disable_thinking != RAC_FALSE;
             capture.grammar = options->grammar ? options->grammar : "";
+            capture.system_prompt = options->system_prompt ? options->system_prompt : "";
             for (size_t i = 0; i < options->num_stop_sequences; ++i) {
                 const char* stop = options->stop_sequences ? options->stop_sequences[i] : nullptr;
                 if (stop && stop[0] != '\0') {
@@ -1616,6 +1620,144 @@ int test_grammar_dropped_on_synthesis_turn() {
     return 0;
 }
 
+// RUN-80: the tool-decision system hint (device-proven to stop small-model over-calling)
+// is appended on the AUTO decision path for EVERY engine (a universal abstention
+// instruction, not a QHexRT quirk), PRESERVES any caller system prompt, and is withheld
+// when a call is forced (REQUIRED/SPECIFIC), tools are vetoed (NONE), or on a pure
+// synthesis turn. Framework is irrelevant here, so the default (llama.cpp) mock is used.
+int test_tool_decision_hint_gated_on_auto_path() {
+    const std::string kHint = "call a tool only when the user's request genuinely requires it";
+
+    // A) AUTO + tools, no caller system prompt → hint is the whole system prompt.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "AUTO turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "AUTO generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].system_prompt.find(kHint) != std::string::npos,
+                  "AUTO path carries the tool-decision hint");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // B) AUTO + tools + caller system prompt → caller content preserved, hint appended after.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        *request.add_tools() = make_calculate_tool();
+        request.set_system_prompt("You are Halo, a concise assistant.");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "AUTO+sys turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "AUTO+sys generates once");
+        if (captures.size() == 1) {
+            const auto caller_pos = captures[0].system_prompt.find("You are Halo");
+            const auto hint_pos = captures[0].system_prompt.find(kHint);
+            CHECK(caller_pos != std::string::npos, "caller system prompt is preserved");
+            CHECK(hint_pos != std::string::npos, "tool-decision hint is appended");
+            CHECK(caller_pos < hint_pos, "caller content precedes the appended hint");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // C) NONE → tools suppressed, no hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"Here is a direct answer."});
+    {
+        auto request = make_request("Answer directly.");
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "NONE turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 1, "NONE generates once");
+        if (captures.size() == 1) {
+            CHECK(captures[0].system_prompt.find(kHint) == std::string::npos,
+                  "NONE withholds the tool-decision hint (tools suppressed)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // D) REQUIRED → a call is forced, so the abstention hint is withheld on the decision turn.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({"I decided not to call a tool."});
+    {
+        auto request = make_request("A tool call is mandatory.", /*max_tool_calls=*/1);
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "REQUIRED turn returns a result");
+        const auto captures = generation_captures();
+        CHECK(captures.size() >= 1, "REQUIRED generates at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].system_prompt.find(kHint) == std::string::npos,
+                  "REQUIRED withholds the abstention hint (a call is forced)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // E) Synthesis turn (a call ran, tools not kept) → the follow-up turn has no hint.
+    if (!load_mock_llm())
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        (void)run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        const auto captures = generation_captures();
+        CHECK(captures.size() == 2, "decision + synthesis = two generations");
+        if (captures.size() == 2) {
+            CHECK(captures[0].system_prompt.find(kHint) != std::string::npos,
+                  "decision turn carries the hint");
+            CHECK(captures[1].system_prompt.find(kHint) == std::string::npos,
+                  "synthesis turn drops the hint (no tool decision to make)");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 // RUN-81: the post-hoc <think> strip is universal — thinking content never leaks
 // into the final answer regardless of engine or the disable flag.
 int test_thinking_content_stripped_from_answer() {
@@ -1670,6 +1812,7 @@ int main() {
         test_grammar_attached_only_for_grammar_backend();
         test_none_attaches_no_grammar_on_grammar_backend();
         test_grammar_dropped_on_synthesis_turn();
+        test_tool_decision_hint_gated_on_auto_path();
         test_disable_thinking_directive_is_engine_gated();
         test_thinking_content_stripped_from_answer();
         test_max_tool_calls_capped();
