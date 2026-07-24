@@ -1262,6 +1262,59 @@ int test_session_decision_hint_on_auto_path() {
     return 0;
 }
 
+// RUN-80 (grammar-engage): the SESSION path builds + parses bare-Pythonic on a grammar
+// backend across turns. With keep_tools_available, the follow-up prompt must ALSO render
+// bare `[name(args)]` (not <tool_call>), and a bare reply must parse into a call.
+int test_session_grammar_keep_tools_bare_pythonic() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"([get_weather(location="Tokyo")])",
+        R"([get_weather(location="Osaka")])",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo then Osaka?");
+        request.set_keep_tools_available(true);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "keep-tools grammar session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "first bare [name(args)] reply parsed on the session path");
+        if (tool_ev) {
+            CHECK(tool_ev->tool_call().name() == "get_weather", "parsed the get_weather call");
+        }
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev) {
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        }
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto prompts = generated_prompts();
+        CHECK(prompts.size() >= 2, "decision + keep-tools follow-up prompts");
+        if (prompts.size() >= 2) {
+            CHECK(prompts[0].find("[tool_name(") != std::string::npos,
+                  "session decision prompt is bare-Pythonic");
+            CHECK(prompts[1].find("[tool_name(") != std::string::npos,
+                  "session keep-tools follow-up prompt is bare-Pythonic");
+            CHECK(prompts[1].find("<tool_call>") == std::string::npos,
+                  "session follow-up carries no <tool_call> tag");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -1281,6 +1334,7 @@ int main() {
         test_none_blocks_session_call_when_validation_disabled();
         test_session_grammar_gated_on_framework();
         test_session_decision_hint_on_auto_path();
+        test_session_grammar_keep_tools_bare_pythonic();
         test_forced_target_blocks_wrong_session_call_when_validation_disabled();
         test_specific_session_target_must_be_nonempty_and_present();
         test_specific_and_required_sessions_reject_initial_no_call();
