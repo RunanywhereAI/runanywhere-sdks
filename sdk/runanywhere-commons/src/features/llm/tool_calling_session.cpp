@@ -173,6 +173,17 @@ bool apply_explicit_tool_choice(ToolCallingSession* session, std::string* out_er
         return true;
     }
 
+    // REQUIRED with no tools advertised can never be satisfied — reject up front rather
+    // than emit a "you must call a tool" prompt that fails downstream (mirrors run-loop).
+    if (session->has_tool_choice &&
+        session->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED &&
+        session->tool_options.tools_size() == 0 && session->forced_tool_name.empty()) {
+        if (out_error) {
+            *out_error = "tool_choice=REQUIRED requires at least one tool";
+        }
+        return false;
+    }
+
     if (!session->forced_tool_name.empty()) {
         session->has_tool_choice = true;
         session->tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC;
@@ -607,6 +618,13 @@ void run_generate_loop(ToolCallingSession& session) {
         !session.all_tool_calls.empty(), session.keep_tools_available);
     if (!tools_live_this_turn) {
         step_generation.tool_names.clear();
+    } else if (session.has_tool_choice &&
+               session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+               !session.forced_tool_name.empty()) {
+        // tool_choice=SPECIFIC: narrow the QHexRT grammar spec to the ONE forced tool so the
+        // grammar can only emit `[<forced>(...)]` (or free text), rather than letting the
+        // model pick a tool the SPECIFIC policy then rejects (see the run-loop path). RUN-80.
+        step_generation.tool_names = {session.forced_tool_name};
     }
     // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
     // "only call when genuinely needed" hint to the system prompt (see the run-loop path).
