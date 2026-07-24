@@ -23,6 +23,11 @@ struct LifecycleLlmRef {
 rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref);
 void release_lifecycle_llm(LifecycleLlmRef* ref);
 
+// Cheap capability probe used BEFORE a generation (e.g. at tool-loop entry, to pick the
+// prompt format): true iff the currently-loaded LLM's framework honors grammar-constrained
+// decoding (QHexRT). Acquires + releases the lifecycle ref internally; false if none loaded.
+bool lifecycle_llm_supports_grammar();
+
 void clear_lifecycle_llm_cancel(LifecycleLlmRef* ref);
 void request_lifecycle_llm_cancel(LifecycleLlmRef* ref);
 bool lifecycle_llm_cancel_requested(const LifecycleLlmRef* ref);
