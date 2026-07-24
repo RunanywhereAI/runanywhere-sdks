@@ -506,12 +506,11 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
             ctx.generation, iteration, ctx.has_tool_choice, ctx.tool_choice, ctx.format);
         // Grammar-constrain (QHexRT) only while the model may still call a tool this
-        // turn. Drop the grammar (unconstrained decoding) when: (a) tool_choice=NONE
-        // — calls are forbidden, so a "chat OR one call" grammar must not invite one
-        // (it would be emitted then rejected); or (b) a call already ran and tools
-        // are not kept available — a pure synthesis turn producing free-form text.
-        if ((ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) ||
-            (final_result.tool_calls_size() > 0 && !ctx.keep_tools_available)) {
+        // turn; otherwise drop the grammar so decoding is unconstrained. The shared
+        // predicate keeps this in lockstep with the session path.
+        if (!rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+                ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
+                final_result.tool_calls_size() > 0, ctx.keep_tools_available)) {
             step_generation.tool_names.clear();
         }
         rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
