@@ -221,6 +221,23 @@ struct ToolLoopTelemetryScope {
     ~ToolLoopTelemetryScope() { publish_tool_loop_telemetry(agg); }
 };
 
+// Whether this turn's decoding should be grammar-constrained to the live tool set
+// (QHexRT). Returns false — leave decoding unconstrained — when tool calls are
+// forbidden this turn (@p none_veto = tool_choice==NONE) or this is a pure
+// synthesis turn (@p a_call_was_made and tools are not kept available). The run
+// loop and the session are parallel implementations, so both derive their
+// tool_names-clearing decision from this ONE predicate to stay in lockstep.
+inline bool tool_grammar_constrained_this_turn(bool none_veto, bool a_call_was_made,
+                                               bool keep_tools_available) {
+    if (none_veto) {
+        return false;
+    }
+    if (a_call_was_made && !keep_tools_available) {
+        return false;
+    }
+    return true;
+}
+
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
