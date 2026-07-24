@@ -1951,6 +1951,77 @@ int test_required_with_no_tools_rejected() {
     return 0;
 }
 
+// RUN-80 (review follow-up): REQUIRED on a grammar backend composes all three features —
+// the prompt is bare-Pythonic, carries the firm "must call" directive, the grammar is
+// attached, and a bare [name(args)] reply parses.
+int test_required_on_grammar_backend() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[get_weather(location=\"Tokyo\")]", "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather?");  // one tool: get_weather
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "REQUIRED grammar turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "REQUIRED grammar backend generated");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("[tool_name(") != std::string::npos,
+                  "REQUIRED grammar prompt is bare-Pythonic");
+            CHECK(captures[0].prompt.find("You must call exactly one tool now") != std::string::npos,
+                  "REQUIRED grammar prompt carries the firm directive");
+            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+                  "REQUIRED grammar backend attaches the grammar spec");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "bare reply parsed under REQUIRED+grammar");
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
+
+// RUN-80 (review follow-up): a bare [unknown_tool()] reply on a grammar backend still passes
+// through commons validation, which rejects the unknown tool (VALIDATION_FAILED, executor
+// never invoked) — the grammar constrains syntax; commons still checks the tool exists.
+int test_grammar_backend_rejects_unknown_bare_call() {
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[unknown_tool()]"});
+    {
+        auto request = make_request("do a thing");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "run_loop returns success (failed result inside)");
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.error_code() == RAC_ERROR_VALIDATION_FAILED,
+              "unknown bare tool rejected as VALIDATION_FAILED");
+        CHECK(exec.invocation_count == 0, "executor NOT invoked for an unknown bare tool");
+        rac_proto_buffer_free(&out);
+    }
+    cleanup_environment();
+    return 0;
+}
+
 int main() {
     try {
         std::fprintf(stdout, "test_tool_calling_run_loop\n");
@@ -1977,6 +2048,8 @@ int main() {
         test_grammar_backend_bare_pythonic_end_to_end();
         test_specific_narrows_grammar_spec();
         test_required_with_no_tools_rejected();
+        test_required_on_grammar_backend();
+        test_grammar_backend_rejects_unknown_bare_call();
         test_tool_decision_hint_gated_on_auto_path();
         test_disable_thinking_directive_is_engine_gated();
         test_thinking_content_stripped_from_answer();
