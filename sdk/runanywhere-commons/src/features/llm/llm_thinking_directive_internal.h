@@ -62,8 +62,9 @@ inline std::string apply_no_think_directive(const std::string& prompt,
 /**
  * Backwards-compatible overload for call sites that do not have the framework
  * identity in scope (e.g. the legacy generic C-API path). Framework unknown ⇒
- * inject (the safe default: better a redundant token on a native engine than a
- * missing one on llama.cpp).
+ * inject (the safe default: a redundant "/no_think" on QHexRT — which suppresses
+ * thinking natively — is harmlessly stripped, whereas a MISSING one on
+ * llama.cpp/onnx would leave thinking on despite disable_thinking).
  */
 inline std::string apply_no_think_directive(const std::string& prompt,
                                             rac_bool_t disable_thinking) {
