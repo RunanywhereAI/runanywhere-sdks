@@ -538,48 +538,26 @@ TestResult test_nvidia_sherpa_catalog() {
     return result;
   }
 
-  const std::string base_url = "https://huggingface.co/OpenVoiceOS/"
-                               "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
-                               "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/";
+  const std::string base_url =
+      "https://huggingface.co/runanywhere/"
+      "sherpa-onnx-nemo-parakeet-ctc-1.1b-int8/resolve/"
+      "48a549f552774db3cd09dd1548f3d1a2b37bc7c5/";
   const rcli::catalog::CatalogFile &model = parakeet_ctc->files[0];
   const rcli::catalog::CatalogFile &tokens = parakeet_ctc->files[1];
   if (std::string(model.url) != base_url + "model.int8.onnx" ||
       std::string(model.filename) != "model.int8.onnx" || !model.required ||
       model.size_bytes != 1110014145LL || model.checksum_sha256 == nullptr ||
       std::string(model.checksum_sha256) !=
-          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
-      model.append_bytes_transform == nullptr) {
-    result.details = "Parakeet CTC final model descriptor is not exact";
+          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98") {
+    result.details = "Parakeet CTC model descriptor is not exact";
     return result;
   }
-  const rcli::catalog::CatalogAppendBytesTransform &transform =
-      *model.append_bytes_transform;
-  std::string payload_hex;
-  constexpr char kHexDigits[] = "0123456789abcdef";
-  for (size_t i = 0; i < transform.payload_size; ++i) {
-    const auto byte = static_cast<unsigned char>(transform.payload[i]);
-    payload_hex.push_back(kHexDigits[byte >> 4]);
-    payload_hex.push_back(kHexDigits[byte & 0x0f]);
-  }
-  if (transform.source_size_bytes != 1110014069LL ||
-      transform.source_checksum_sha256 == nullptr ||
-      std::string(transform.source_checksum_sha256) !=
-          "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d" ||
-      transform.payload_size != 76 ||
-      payload_hex !=
-          "72120a0a766f6361625f73697a6512043130323572170a1273756273616d706c"
-          "696e675f666163746f72120138721d0a0e6e6f726d616c697a655f7479706512"
-          "0b7065725f66656174757265") {
-    result.details = "Parakeet CTC source transform is not exact";
-    return result;
-  }
-  if (std::string(tokens.url) != base_url + "vocab.txt" ||
+  if (std::string(tokens.url) != base_url + "tokens.txt" ||
       std::string(tokens.filename) != "tokens.txt" || !tokens.required ||
       tokens.size_bytes != 10374LL || tokens.checksum_sha256 == nullptr ||
       std::string(tokens.checksum_sha256) !=
-          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921" ||
-      tokens.append_bytes_transform != nullptr) {
-    result.details = "Parakeet CTC vocabulary rename/checksum is not exact";
+          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921") {
+    result.details = "Parakeet CTC tokens descriptor is not exact";
     return result;
   }
 
@@ -880,56 +858,31 @@ TestResult test_mlx_catalog_registration() {
   }
   if (registered_model == nullptr || registered_tokens == nullptr ||
       registered_model->url() !=
-          "https://huggingface.co/OpenVoiceOS/"
-          "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
-          "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx" ||
+          "https://huggingface.co/runanywhere/"
+          "sherpa-onnx-nemo-parakeet-ctc-1.1b-int8/resolve/"
+          "48a549f552774db3cd09dd1548f3d1a2b37bc7c5/model.int8.onnx" ||
       !registered_model->has_size_bytes() ||
       registered_model->size_bytes() != 1110014145LL ||
       !registered_model->has_checksum_sha256() ||
       registered_model->checksum_sha256() !=
           "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
-      !registered_model->has_post_download_transform() ||
       !parakeet_ctc.has_memory_required_bytes() ||
       parakeet_ctc.memory_required_bytes() != 2147483648LL) {
     result.details =
-        "registered Parakeet CTC final descriptor tuple is incomplete";
-    return result;
-  }
-  const auto &registered_transform =
-      registered_model->post_download_transform();
-  const rcli::catalog::CatalogEntry *catalog_entry =
-      rcli::catalog::find("sherpa-nemo-parakeet-ctc-1.1b-int8");
-  const auto *catalog_transform =
-      catalog_entry == nullptr ? nullptr
-                               : catalog_entry->files[0].append_bytes_transform;
-  if (catalog_transform == nullptr ||
-      registered_transform.source_size_bytes() != 1110014069LL ||
-      registered_transform.source_checksum_sha256() !=
-          "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d" ||
-      registered_transform.final_size_bytes() != 1110014145LL ||
-      registered_transform.final_checksum_sha256() !=
-          "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98" ||
-      registered_transform.operations_size() != 1 ||
-      !registered_transform.operations(0).has_append_bytes() ||
-      registered_transform.operations(0).append_bytes().payload() !=
-          std::string(catalog_transform->payload,
-                      catalog_transform->payload_size)) {
-    result.details =
-        "registered Parakeet CTC source transform tuple is incomplete";
+        "registered Parakeet CTC model descriptor tuple is incomplete";
     return result;
   }
   if (registered_tokens->url() !=
-          "https://huggingface.co/OpenVoiceOS/"
-          "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
-          "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt" ||
+          "https://huggingface.co/runanywhere/"
+          "sherpa-onnx-nemo-parakeet-ctc-1.1b-int8/resolve/"
+          "48a549f552774db3cd09dd1548f3d1a2b37bc7c5/tokens.txt" ||
       !registered_tokens->has_size_bytes() ||
       registered_tokens->size_bytes() != 10374LL ||
       !registered_tokens->has_checksum_sha256() ||
       registered_tokens->checksum_sha256() !=
-          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921" ||
-      registered_tokens->has_post_download_transform()) {
+          "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921") {
     result.details =
-        "registered Parakeet CTC token rename/checksum is incomplete";
+        "registered Parakeet CTC tokens descriptor tuple is incomplete";
     return result;
   }
 

@@ -106,34 +106,19 @@ constexpr CatalogFile kSherpaCanary180MFiles[] = {
      "tokens.txt", true, 53555LL},
 };
 
-constexpr char kSherpaParakeetCtcMetadata[] = {
-    0x72, 0x12, 0x0a, 0x0a, 0x76, 0x6f, 0x63, 0x61, 0x62, 0x5f, 0x73,
-    0x69, 0x7a, 0x65, 0x12, 0x04, 0x31, 0x30, 0x32, 0x35, 0x72, 0x17,
-    0x0a, 0x12, 0x73, 0x75, 0x62, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x69,
-    0x6e, 0x67, 0x5f, 0x66, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x12, 0x01,
-    0x38, 0x72, 0x1d, 0x0a, 0x0e, 0x6e, 0x6f, 0x72, 0x6d, 0x61, 0x6c,
-    0x69, 0x7a, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x12, 0x0b, 0x70,
-    0x65, 0x72, 0x5f, 0x66, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65,
-};
-static_assert(sizeof(kSherpaParakeetCtcMetadata) == 76);
-
-constexpr CatalogAppendBytesTransform kSherpaParakeetCtcTransform = {
-    1110014069LL,
-    "a16056c0a0d8df38c7b57cb019062df116e9e565203c6f25d6ea0c0c1122c84d",
-    kSherpaParakeetCtcMetadata,
-    sizeof(kSherpaParakeetCtcMetadata),
-};
-
+// The upstream OpenVoiceOS export omits three metadata_props entries Sherpa
+// requires, so it cannot be loaded as published. This repo is that export with
+// the entries added; provenance and a reproduction script live in its model
+// card.
 constexpr CatalogFile kSherpaParakeetCtcFiles[] = {
-    {"https://huggingface.co/OpenVoiceOS/"
-     "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
-     "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/model.int8.onnx",
+    {"https://huggingface.co/runanywhere/"
+     "sherpa-onnx-nemo-parakeet-ctc-1.1b-int8/resolve/"
+     "48a549f552774db3cd09dd1548f3d1a2b37bc7c5/model.int8.onnx",
      "model.int8.onnx", true, 1110014145LL,
-     "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98",
-     &kSherpaParakeetCtcTransform},
-    {"https://huggingface.co/OpenVoiceOS/"
-     "nvidia-parakeet-ctc-1.1b-onnx/resolve/"
-     "3ca664a2f106622d599052b4e4ecee5fdfc7e2e5/vocab.txt",
+     "62f73c17a5301c048c7273cf24ef1cd0c3621d3625c5415fbafe5633d7bf2f98"},
+    {"https://huggingface.co/runanywhere/"
+     "sherpa-onnx-nemo-parakeet-ctc-1.1b-int8/resolve/"
+     "48a549f552774db3cd09dd1548f3d1a2b37bc7c5/tokens.txt",
      "tokens.txt", true, 10374LL,
      "ed16e1a4e3a3aa379138c0b1888e5d49f993c9d512b2be4d46e90a87afd54921"},
 };
@@ -1026,22 +1011,6 @@ rac_result_t register_entry(const CatalogEntry &entry) {
       }
       if (entry.files[i].checksum_sha256 != nullptr) {
         file->set_checksum_sha256(entry.files[i].checksum_sha256);
-      }
-      if (entry.files[i].append_bytes_transform != nullptr &&
-          entry.files[i].size_bytes > 0 &&
-          entry.files[i].checksum_sha256 != nullptr) {
-        const CatalogAppendBytesTransform &source =
-            *entry.files[i].append_bytes_transform;
-        v1::PostDownloadTransform *transform =
-            file->mutable_post_download_transform();
-        transform->set_source_size_bytes(source.source_size_bytes);
-        transform->set_source_checksum_sha256(source.source_checksum_sha256);
-        transform->set_final_size_bytes(entry.files[i].size_bytes);
-        transform->set_final_checksum_sha256(entry.files[i].checksum_sha256);
-        v1::PostDownloadTransformOperation *operation =
-            transform->add_operations();
-        operation->mutable_append_bytes()->set_payload(
-            std::string(source.payload, source.payload_size));
       }
     }
     const std::string bytes = proto::serialize(request);

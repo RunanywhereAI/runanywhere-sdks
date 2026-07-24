@@ -47,8 +47,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
-#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -58,7 +56,6 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
-#include "infrastructure/download/post_download_transform_internal.h"
 #include "infrastructure/model_management/model_manifest_internal.h"
 #include "infrastructure/rac_path_safety_internal.h"
 
@@ -87,259 +84,6 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
-#endif
-
-#ifdef RAC_HAVE_PROTOBUF
-namespace rac::download {
-namespace {
-
-namespace rav1 = ::runanywhere::v1;
-
-void set_transform_error(std::string* out_error, const std::string& message) {
-    if (out_error) {
-        *out_error = message;
-    }
-}
-
-bool is_lowercase_sha256(const std::string& value) {
-    if (value.size() != 64) {
-        return false;
-    }
-    return std::all_of(value.begin(), value.end(),
-                       [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
-}
-
-bool collect_append_suffix(const rav1::PostDownloadTransform& transform, std::string* out_suffix,
-                           std::string* out_error) {
-    if (!out_suffix) {
-        set_transform_error(out_error, "post-download transform suffix output is required");
-        return false;
-    }
-    out_suffix->clear();
-    for (int i = 0; i < transform.operations_size(); ++i) {
-        const auto& operation = transform.operations(i);
-        if (operation.operation_case() != rav1::PostDownloadTransformOperation::kAppendBytes) {
-            set_transform_error(out_error, "post-download transform contains an unset operation");
-            return false;
-        }
-        const std::string& payload = operation.append_bytes().payload();
-        if (payload.empty()) {
-            set_transform_error(out_error,
-                                "post-download append operation payload must not be empty");
-            return false;
-        }
-        if (payload.size() > static_cast<size_t>(std::numeric_limits<int64_t>::max()) ||
-            out_suffix->size() >
-                static_cast<size_t>(std::numeric_limits<int64_t>::max()) - payload.size()) {
-            set_transform_error(out_error, "post-download append payload is too large");
-            return false;
-        }
-        out_suffix->append(payload);
-    }
-    return true;
-}
-
-bool hash_file_prefix(const std::string& path, int64_t byte_count, std::string* out_hash,
-                      std::string* out_error) {
-    if (!out_hash || byte_count < 0 ||
-        byte_count > static_cast<int64_t>(std::numeric_limits<std::streamoff>::max())) {
-        set_transform_error(out_error, "post-download hash byte count is invalid");
-        return false;
-    }
-
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        set_transform_error(out_error, "failed to open post-download transform file");
-        return false;
-    }
-
-    runanywhere::sha256_ctx hasher;
-    runanywhere::sha256_init(&hasher);
-    // Worker threads on Apple platforms have a 512 KiB default stack. Keep
-    // the streaming buffer comfortably below that bound; the real 1.11 GB
-    // Parakeet graph is still hashed incrementally with constant memory.
-    std::array<uint8_t, 64 * 1024> buffer{};
-    int64_t remaining = byte_count;
-    while (remaining > 0) {
-        const auto wanted = static_cast<std::streamsize>(
-            std::min<int64_t>(remaining, static_cast<int64_t>(buffer.size())));
-        input.read(reinterpret_cast<char*>(buffer.data()), wanted);
-        const std::streamsize read = input.gcount();
-        if (read <= 0) {
-            set_transform_error(out_error,
-                                "post-download transform file ended before its declared size");
-            return false;
-        }
-        runanywhere::sha256_update(&hasher, buffer.data(), static_cast<size_t>(read));
-        remaining -= static_cast<int64_t>(read);
-    }
-
-    uint8_t digest[32];
-    runanywhere::sha256_final(&hasher, digest);
-    *out_hash = runanywhere::bytes_to_hex(digest, sizeof(digest));
-    return true;
-}
-
-}  // namespace
-
-bool validate_post_download_transform(const rav1::PostDownloadTransform& transform,
-                                      std::string* out_error) {
-    if (out_error) {
-        out_error->clear();
-    }
-    if (transform.source_size_bytes() <= 0 ||
-        transform.source_size_bytes() >
-            static_cast<int64_t>(std::numeric_limits<std::streamoff>::max())) {
-        set_transform_error(out_error,
-                            "post-download transform source_size_bytes must be positive");
-        return false;
-    }
-    if (transform.final_size_bytes() <= transform.source_size_bytes() ||
-        transform.final_size_bytes() >
-            static_cast<int64_t>(std::numeric_limits<std::streamoff>::max())) {
-        set_transform_error(
-            out_error, "post-download transform final_size_bytes must exceed source_size_bytes");
-        return false;
-    }
-    if (!is_lowercase_sha256(transform.source_checksum_sha256())) {
-        set_transform_error(
-            out_error,
-            "post-download transform source_checksum_sha256 must be 64 lowercase hex bytes");
-        return false;
-    }
-    if (!is_lowercase_sha256(transform.final_checksum_sha256())) {
-        set_transform_error(
-            out_error,
-            "post-download transform final_checksum_sha256 must be 64 lowercase hex bytes");
-        return false;
-    }
-    if (transform.operations_size() == 0) {
-        set_transform_error(out_error, "post-download transform requires at least one operation");
-        return false;
-    }
-
-    std::string suffix;
-    if (!collect_append_suffix(transform, &suffix, out_error)) {
-        return false;
-    }
-    const int64_t expected_append_bytes =
-        transform.final_size_bytes() - transform.source_size_bytes();
-    if (static_cast<int64_t>(suffix.size()) != expected_append_bytes) {
-        set_transform_error(out_error,
-                            "post-download append bytes do not match the declared final size");
-        return false;
-    }
-    return true;
-}
-
-bool apply_post_download_transform(const std::string& path,
-                                   const rav1::PostDownloadTransform& transform,
-                                   post_download_transform_outcome* out_outcome,
-                                   std::string* out_error) {
-    if (out_error) {
-        out_error->clear();
-    }
-    if (path.empty()) {
-        set_transform_error(out_error, "post-download transform path is required");
-        return false;
-    }
-    if (!validate_post_download_transform(transform, out_error)) {
-        return false;
-    }
-
-    std::error_code size_error;
-    const uintmax_t raw_size = std::filesystem::file_size(path, size_error);
-    if (size_error || raw_size > static_cast<uintmax_t>(std::numeric_limits<int64_t>::max())) {
-        set_transform_error(out_error, "failed to read post-download transform file size");
-        return false;
-    }
-    const int64_t actual_size = static_cast<int64_t>(raw_size);
-
-    if (actual_size == transform.final_size_bytes()) {
-        std::string final_hash;
-        if (!hash_file_prefix(path, actual_size, &final_hash, out_error)) {
-            return false;
-        }
-        if (final_hash != transform.final_checksum_sha256()) {
-            set_transform_error(out_error, "post-download final SHA-256 mismatch");
-            return false;
-        }
-        if (out_outcome) {
-            *out_outcome = post_download_transform_outcome::kAlreadyFinal;
-        }
-        return true;
-    }
-
-    if (actual_size < transform.source_size_bytes() || actual_size > transform.final_size_bytes()) {
-        set_transform_error(out_error, "post-download transform source/final size mismatch");
-        return false;
-    }
-
-    std::string source_hash;
-    if (!hash_file_prefix(path, transform.source_size_bytes(), &source_hash, out_error)) {
-        return false;
-    }
-    if (source_hash != transform.source_checksum_sha256()) {
-        set_transform_error(out_error, "post-download source SHA-256 mismatch");
-        return false;
-    }
-
-    std::string suffix;
-    if (!collect_append_suffix(transform, &suffix, out_error)) {
-        return false;
-    }
-    const int64_t existing_suffix_bytes = actual_size - transform.source_size_bytes();
-    if (existing_suffix_bytes > 0) {
-        std::ifstream input(path, std::ios::binary);
-        input.seekg(static_cast<std::streamoff>(transform.source_size_bytes()));
-        std::string existing_suffix(static_cast<size_t>(existing_suffix_bytes), '\0');
-        input.read(existing_suffix.data(), static_cast<std::streamsize>(existing_suffix.size()));
-        if (input.gcount() != static_cast<std::streamsize>(existing_suffix.size()) ||
-            !std::equal(existing_suffix.begin(), existing_suffix.end(), suffix.begin())) {
-            set_transform_error(out_error, "post-download partial append suffix mismatch");
-            return false;
-        }
-    }
-
-    const size_t append_offset = static_cast<size_t>(existing_suffix_bytes);
-    std::ofstream output(path, std::ios::binary | std::ios::app);
-    if (!output) {
-        set_transform_error(out_error, "failed to open post-download transform file for append");
-        return false;
-    }
-    output.write(suffix.data() + append_offset,
-                 static_cast<std::streamsize>(suffix.size() - append_offset));
-    output.flush();
-    if (!output) {
-        set_transform_error(out_error, "failed to append post-download transform bytes");
-        return false;
-    }
-    output.close();
-
-    const uintmax_t final_size = std::filesystem::file_size(path, size_error);
-    if (size_error || final_size != static_cast<uintmax_t>(transform.final_size_bytes())) {
-        set_transform_error(out_error, "post-download transformed file size mismatch");
-        return false;
-    }
-
-    std::string final_hash;
-    if (!hash_file_prefix(path, transform.final_size_bytes(), &final_hash, out_error)) {
-        return false;
-    }
-    if (final_hash != transform.final_checksum_sha256()) {
-        set_transform_error(out_error, "post-download final SHA-256 mismatch");
-        return false;
-    }
-
-    if (out_outcome) {
-        *out_outcome = existing_suffix_bytes == 0
-                           ? post_download_transform_outcome::kApplied
-                           : post_download_transform_outcome::kRecoveredPartial;
-    }
-    return true;
-}
-
-}  // namespace rac::download
 #endif
 
 static const char* LOG_TAG = "DownloadOrchestrator";
@@ -676,8 +420,6 @@ struct proto_plan_file {
     int64_t expected_bytes = 0;
     bool requires_extraction = false;
     bool is_resume_candidate = false;
-    bool has_post_download_transform = false;
-    rav1::PostDownloadTransform post_download_transform;
 };
 
 struct proto_download_task {
@@ -987,62 +729,10 @@ std::string make_resume_token(const std::string& task_id, const std::string& mod
 }
 
 std::string transport_checksum_from_descriptor(const rav1::ModelFileDescriptor& file) {
-    // ModelFileDescriptor checksum is the published, final artifact checksum.
-    // A transformed file has a distinct source checksum for the HTTP transfer.
-    if (file.has_post_download_transform() &&
-        !file.post_download_transform().source_checksum_sha256().empty()) {
-        return file.post_download_transform().source_checksum_sha256();
-    }
     if (file.has_checksum_sha256() && !file.checksum_sha256().empty()) {
         return file.checksum_sha256();
     }
     return "";
-}
-
-bool validate_planned_transform_contract(const rav1::DownloadFilePlan& planned,
-                                         std::string* out_error) {
-    const auto& descriptor = planned.file();
-    if (!descriptor.has_post_download_transform()) {
-        return true;
-    }
-
-    const auto& transform = descriptor.post_download_transform();
-    if (!rac::download::validate_post_download_transform(transform, out_error)) {
-        return false;
-    }
-    if (planned.requires_extraction()) {
-        if (out_error) {
-            *out_error = "post-download transforms cannot target archives";
-        }
-        return false;
-    }
-    if (!descriptor.has_size_bytes() || descriptor.size_bytes() != transform.final_size_bytes()) {
-        if (out_error) {
-            *out_error = "post-download transform final size does not match the file descriptor";
-        }
-        return false;
-    }
-    if (!descriptor.has_checksum_sha256() || descriptor.checksum_sha256().empty() ||
-        descriptor.checksum_sha256() != transform.final_checksum_sha256()) {
-        if (out_error) {
-            *out_error =
-                "post-download transform final checksum does not match the file descriptor";
-        }
-        return false;
-    }
-    if (planned.expected_bytes() != transform.source_size_bytes()) {
-        if (out_error) {
-            *out_error = "post-download transform source size does not match the download plan";
-        }
-        return false;
-    }
-    if (planned.checksum_sha256() != transform.source_checksum_sha256()) {
-        if (out_error) {
-            *out_error = "post-download transform source checksum does not match the download plan";
-        }
-        return false;
-    }
-    return true;
 }
 
 rac_inference_framework_t proto_framework_to_c(rav1::InferenceFramework framework) {
@@ -1718,9 +1408,7 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     // size exactly, skip the network and fall through to extraction/finalize.
     const int64_t existing_final_bytes = file_size_or_zero(file.destination_path);
     const bool already_complete =
-        file.has_post_download_transform
-            ? existing_final_bytes > 0
-            : (file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes);
+        file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes;
     if (already_complete) {
         RAC_LOG_INFO(LOG_TAG,
                      "File %zu (%s) already complete on disk (%lld bytes) — skipping fetch", i,
@@ -1728,17 +1416,12 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     }
 
     // Runtime free-space safety net. The planner gate runs once up front, but
-    // free space can shrink between this file's planning and execution. For a
-    // transformed file, reserve through the FINAL artifact size even though
-    // expected_bytes/progress intentionally count only HTTP source bytes.
-    const int64_t planned_storage_bytes = file.has_post_download_transform
-                                              ? file.post_download_transform.final_size_bytes()
-                                              : file.expected_bytes;
-    if (planned_storage_bytes > 0) {
+    // free space can shrink between this file's planning and execution.
+    if (file.expected_bytes > 0) {
         const int64_t bytes_already_on_disk =
-            already_complete ? std::min(existing_final_bytes, planned_storage_bytes)
+            already_complete ? std::min(existing_final_bytes, file.expected_bytes)
                              : static_cast<int64_t>(file_resume_from);
-        const int64_t still_needed = planned_storage_bytes - bytes_already_on_disk;
+        const int64_t still_needed = file.expected_bytes - bytes_already_on_disk;
         if (still_needed > 0) {
             int64_t available = filesystem_available_bytes(file.destination_path);
             const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
@@ -1828,42 +1511,6 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             emit_progress(task);
             return plan_file_step::STOP;
         }
-    }
-
-    if (file.has_post_download_transform) {
-        const int64_t validated_bytes =
-            total_expected > 0 ? completed_before_file + file.expected_bytes : 0;
-        set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_VALIDATING,
-                          validated_bytes, total_expected, static_cast<int32_t>(i),
-                          file.storage_key, "", "");
-        emit_progress(task);
-
-        std::string transform_error;
-        rac::download::post_download_transform_outcome transform_outcome;
-        const bool transform_ok =
-            !file.requires_extraction && rac::download::apply_post_download_transform(
-                                             file.destination_path, file.post_download_transform,
-                                             &transform_outcome, &transform_error);
-        if (!transform_ok) {
-            if (transform_error.empty()) {
-                transform_error = file.requires_extraction
-                                      ? "post-download transforms cannot target archives"
-                                      : "post-download transform failed";
-            }
-            // Any existing destination caused this attempt to skip the
-            // transport. Remove bytes that failed the source/final contract so
-            // the next retry performs a clean fetch instead of entering a
-            // permanent skip-then-fail loop.
-            delete_file(file.destination_path.c_str());
-            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_VALIDATING,
-                              validated_bytes, total_expected, static_cast<int32_t>(i),
-                              file.storage_key, "", transform_error);
-            mark_task_stopped(task);
-            emit_progress(task);
-            return plan_file_step::STOP;
-        }
-        RAC_LOG_INFO(LOG_TAG, "Post-download transform verified for file %zu (%s), outcome=%d", i,
-                     file.storage_key.c_str(), static_cast<int>(transform_outcome));
     }
 
     if (file.requires_extraction) {
@@ -2030,7 +1677,7 @@ bool can_download_files_in_parallel(const std::shared_ptr<proto_download_task>& 
         return false;
     }
     for (const auto& file : task->files) {
-        if (file.requires_extraction || file.has_post_download_transform) {
+        if (file.requires_extraction) {
             return false;
         }
     }
@@ -2490,41 +2137,6 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
         return;
     }
 
-    if (file.has_post_download_transform) {
-        const int64_t validated_bytes =
-            drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0;
-        set_task_progress(task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_VALIDATING,
-                          validated_bytes, drv->total_expected, static_cast<int32_t>(i),
-                          file.storage_key, "", "");
-        emit_progress(task);
-
-        std::string transform_error;
-        rac::download::post_download_transform_outcome transform_outcome;
-        const bool transform_ok =
-            !file.requires_extraction && rac::download::apply_post_download_transform(
-                                             file.destination_path, file.post_download_transform,
-                                             &transform_outcome, &transform_error);
-        if (!transform_ok) {
-            if (transform_error.empty()) {
-                transform_error = file.requires_extraction
-                                      ? "post-download transforms cannot target archives"
-                                      : "post-download transform failed";
-            }
-            // Match the native retry contract: a transform-invalid final path
-            // must not make every later attempt skip the transport forever.
-            delete_file(file.destination_path.c_str());
-            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_VALIDATING,
-                              validated_bytes, drv->total_expected, static_cast<int32_t>(i),
-                              file.storage_key, "", transform_error);
-            mark_task_stopped(task);
-            emit_progress(task);
-            web_download_finish(drv);
-            return;
-        }
-        RAC_LOG_INFO(LOG_TAG, "Post-download transform verified for file %zu (%s), outcome=%d", i,
-                     file.storage_key.c_str(), static_cast<int>(transform_outcome));
-    }
-
     // Success: extract (if archive) and advance the cumulative counter — mirrors
     // the post-download tail of process_plan_file.
     if (file.requires_extraction) {
@@ -2609,9 +2221,7 @@ void web_download_start_file(web_download_driver* drv) {
     // fetch and run the success tail directly (extraction + advance).
     const int64_t existing_final_bytes = file_size_or_zero(file.destination_path);
     const bool already_complete =
-        file.has_post_download_transform
-            ? existing_final_bytes > 0
-            : (file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes);
+        file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes;
     if (already_complete) {
         web_download_on_complete(RAC_SUCCESS, file.destination_path.c_str(), drv);
         return;
@@ -3006,10 +2616,6 @@ std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& pla
         file.requires_extraction = input.requires_extraction();
         file.is_resume_candidate = input.is_resume_candidate();
         file.filename = input.file().filename();
-        if (input.file().has_post_download_transform()) {
-            file.has_post_download_transform = true;
-            file.post_download_transform = input.file().post_download_transform();
-        }
         if (!file.filename.empty() && !is_safe_path_segment(file.filename)) {
             RAC_LOG_WARNING(LOG_TAG,
                             "Replacing unsafe plan filename '%s' with URL-derived basename "
@@ -3272,8 +2878,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     }
 
     // Network/progress accounting is the exact transport byte count. Storage
-    // planning is separate because a deterministic post-download transform may
-    // publish a larger final artifact than the source fetched over HTTP.
+    // planning is tracked separately because an archive's declared extracted
+    // total can exceed the bytes fetched over HTTP.
     int64_t total_bytes = 0;
     int64_t total_storage_bytes = 0;
     bool all_sizes_known = true;
@@ -3315,40 +2921,7 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
                 rac_archive_type_from_path(url.c_str(), &archive_type) == RAC_TRUE;
             any_extraction = any_extraction || requires_extraction;
 
-            // Descriptor metadata always describes the published final file.
-            // The plan below switches to the source tuple only for transport.
             int64_t expected_bytes = file.has_size_bytes() ? file.size_bytes() : 0;
-            int64_t storage_bytes = expected_bytes;
-            if (file.has_post_download_transform()) {
-                std::string transform_error;
-                const auto& transform = file.post_download_transform();
-                if (requires_extraction) {
-                    result.set_can_start(false);
-                    result.set_error_message("post-download transforms cannot target archives");
-                    return serialize_proto_to_buffer(result, out_result);
-                }
-                if (!rac::download::validate_post_download_transform(transform, &transform_error)) {
-                    result.set_can_start(false);
-                    result.set_error_message(transform_error);
-                    return serialize_proto_to_buffer(result, out_result);
-                }
-                if (!file.has_size_bytes() || file.size_bytes() != transform.final_size_bytes()) {
-                    result.set_can_start(false);
-                    result.set_error_message(
-                        "post-download transform final size does not match the file descriptor");
-                    return serialize_proto_to_buffer(result, out_result);
-                }
-                if (!file.has_checksum_sha256() || file.checksum_sha256().empty() ||
-                    file.checksum_sha256() != transform.final_checksum_sha256()) {
-                    result.set_can_start(false);
-                    result.set_error_message(
-                        "post-download transform final checksum does not match the file "
-                        "descriptor");
-                    return serialize_proto_to_buffer(result, out_result);
-                }
-                expected_bytes = transform.source_size_bytes();
-                storage_bytes = transform.final_size_bytes();
-            }
             if (expected_bytes <= 0 && !requires_extraction) {
                 // Multi-file NPU/VLM bundles register without per-file sizes.
                 // Probe the server (HEAD → Content-Length) so the pre-flight
@@ -3361,12 +2934,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
                     head_auth_denied = true;
                 }
             }
-            if (!file.has_post_download_transform()) {
-                storage_bytes = expected_bytes;
-            }
             if (expected_bytes > 0) {
                 total_bytes += expected_bytes;
-                total_storage_bytes += storage_bytes;
+                total_storage_bytes += expected_bytes;
             } else {
                 all_sizes_known = false;
                 if (!requires_extraction) {
@@ -3627,14 +3197,6 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         result.set_accepted(false);
         result.set_error_message("start request requires a startable plan");
         return serialize_proto_to_buffer(result, out_result);
-    }
-    for (const auto& planned : request.plan().files()) {
-        std::string transform_error;
-        if (!validate_planned_transform_contract(planned, &transform_error)) {
-            result.set_accepted(false);
-            result.set_error_message(transform_error);
-            return serialize_proto_to_buffer(result, out_result);
-        }
     }
     if (rac_http_transport_is_registered() == RAC_FALSE) {
         result.set_accepted(false);

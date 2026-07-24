@@ -57,8 +57,7 @@ public class ModelFileDescriptor(
    * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
    * canonical "required" flag — the documented `required` boolean from
    * newer SDK sources maps onto it (default true, mirrored in Swift).
-   * Exact final on-disk artifact size. When post_download_transform is set,
-   * transport planning uses its source_size_bytes instead.
+   * Exact on-disk artifact size, verified after download.
    */
   @field:WireField(
     tag = 4,
@@ -100,8 +99,7 @@ public class ModelFileDescriptor(
   )
   public val local_path: String? = null,
   /**
-   * Exact final on-disk artifact checksum. When post_download_transform is
-   * set, HTTP verifies its source_checksum_sha256 before the transform.
+   * Exact on-disk artifact checksum, verified after download.
    */
   @field:WireField(
     tag = 10,
@@ -110,18 +108,6 @@ public class ModelFileDescriptor(
     schemaIndex = 8,
   )
   public val checksum_sha256: String? = null,
-  /**
-   * Optional commons-owned transform applied after the source checksum has
-   * passed and before the model is marked downloaded. Native and Web
-   * consumers receive the same deterministic derived bytes.
-   */
-  @field:WireField(
-    tag = 11,
-    adapter = "ai.runanywhere.proto.v1.PostDownloadTransform#ADAPTER",
-    jsonName = "postDownloadTransform",
-    schemaIndex = 9,
-  )
-  public val post_download_transform: PostDownloadTransform? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelFileDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -143,7 +129,6 @@ public class ModelFileDescriptor(
     if (role != other.role) return false
     if (local_path != other.local_path) return false
     if (checksum_sha256 != other.checksum_sha256) return false
-    if (post_download_transform != other.post_download_transform) return false
     return true
   }
 
@@ -160,7 +145,6 @@ public class ModelFileDescriptor(
       result = result * 37 + (role?.hashCode() ?: 0)
       result = result * 37 + (local_path?.hashCode() ?: 0)
       result = result * 37 + (checksum_sha256?.hashCode() ?: 0)
-      result = result * 37 + (post_download_transform?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -177,7 +161,6 @@ public class ModelFileDescriptor(
     if (role != null) result += """role=$role"""
     if (local_path != null) result += """local_path=${sanitize(local_path)}"""
     if (checksum_sha256 != null) result += """checksum_sha256=${sanitize(checksum_sha256)}"""
-    if (post_download_transform != null) result += """post_download_transform=$post_download_transform"""
     return result.joinToString(prefix = "ModelFileDescriptor{", separator = ", ", postfix = "}")
   }
 
@@ -191,9 +174,8 @@ public class ModelFileDescriptor(
     role: ModelFileRole? = this.role,
     local_path: String? = this.local_path,
     checksum_sha256: String? = this.checksum_sha256,
-    post_download_transform: PostDownloadTransform? = this.post_download_transform,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, relative_path, destination_path, role, local_path, checksum_sha256, post_download_transform, unknownFields)
+  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, relative_path, destination_path, role, local_path, checksum_sha256, unknownFields)
 
   public companion object {
     @JvmField
@@ -223,7 +205,6 @@ public class ModelFileDescriptor(
         size += ModelFileRole.ADAPTER.encodedSizeWithTag(8, value.role)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.local_path)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.checksum_sha256)
-        size += PostDownloadTransform.ADAPTER.encodedSizeWithTag(11, value.post_download_transform)
         return size
       }
 
@@ -243,13 +224,11 @@ public class ModelFileDescriptor(
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
-        PostDownloadTransform.ADAPTER.encodeWithTag(writer, 11, value.post_download_transform)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelFileDescriptor) {
         writer.writeBytes(value.unknownFields)
-        PostDownloadTransform.ADAPTER.encodeWithTag(writer, 11, value.post_download_transform)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
@@ -277,7 +256,6 @@ public class ModelFileDescriptor(
         var role: ModelFileRole? = null
         var local_path: String? = null
         var checksum_sha256: String? = null
-        var post_download_transform: PostDownloadTransform? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
@@ -293,7 +271,6 @@ public class ModelFileDescriptor(
             }
             9 -> local_path = ProtoAdapter.STRING.decode(reader)
             10 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
-            11 -> post_download_transform = PostDownloadTransform.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -307,13 +284,11 @@ public class ModelFileDescriptor(
           role = role,
           local_path = local_path,
           checksum_sha256 = checksum_sha256,
-          post_download_transform = post_download_transform,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelFileDescriptor): ModelFileDescriptor = value.copy(
-        post_download_transform = value.post_download_transform?.let(PostDownloadTransform.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }
