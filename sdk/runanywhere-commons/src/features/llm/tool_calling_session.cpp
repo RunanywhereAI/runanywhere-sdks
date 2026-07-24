@@ -576,13 +576,22 @@ void run_generate_loop(ToolCallingSession& session) {
     auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
         session.generation, session.iteration, session.has_tool_choice, session.tool_choice,
         session.format);
-    // Grammar-constrain (QHexRT) only while a tool call is still possible this turn;
-    // otherwise drop the grammar. The shared predicate keeps this in lockstep with
-    // the run-loop path.
-    if (!rac::llm::tool_calling::tool_grammar_constrained_this_turn(
-            session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
-            !session.all_tool_calls.empty(), session.keep_tools_available)) {
+    // Tools are "live" this turn when a call is still possible: not vetoed by
+    // tool_choice=NONE and not a pure post-call synthesis turn. Drives BOTH the QHexRT
+    // grammar gate and the tool-decision system hint below; the shared predicate keeps
+    // this in lockstep with the run-loop path.
+    const bool tools_live_this_turn = rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+        session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
+        !session.all_tool_calls.empty(), session.keep_tools_available);
+    if (!tools_live_this_turn) {
         step_generation.tool_names.clear();
+    }
+    // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
+    // "only call when genuinely needed" hint to the system prompt (see the run-loop path).
+    // Skipped when the caller forces a call (REQUIRED/SPECIFIC).
+    if (rac::llm::tool_calling::tool_decision_hint_this_turn(tools_live_this_turn,
+                                                             tool_choice_requires_call(session))) {
+        rac::llm::tool_calling::append_tool_decision_hint(&step_generation.system_prompt);
     }
     rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
         &session.active_ref_mu, &session.active_ref, &session.cancel_requested,
