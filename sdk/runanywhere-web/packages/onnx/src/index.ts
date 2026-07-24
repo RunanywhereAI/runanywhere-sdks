@@ -25,7 +25,7 @@
  */
 
 export { ONNX, autoRegister } from './ONNX.js';
-export type { ONNXRegisterOptions } from './ONNX.js';
+export type { ONNXRegisterOptions, ONNXAccelerationMode } from './ONNX.js';
 export { onnxStatus } from './ONNXStatus.js';
 export type {
   BackendModalitySupport,

@@ -472,12 +472,32 @@ async function startRuntime(
     await withTimeout(
       'registering the ONNX/Sherpa backend',
       120_000,
+      // WebGPU-first for speech when browser + ORT EP probe succeed; else CPU.
       ONNX.register({
+        acceleration: 'auto',
+        threads: 2,
         requireBackendWorker: true,
         preferBackendWorker: true,
       }),
     );
-    appLogger.info('[RunAnywhere] onnx/sherpa backend registered');
+    const speech = RunAnywhere.runtime.speech;
+    appLogger.info(
+      '[RunAnywhere] onnx/sherpa backend registered:',
+      `accel=${ONNX.accelerationMode}`,
+      `threads=${ONNX.threads}`,
+      `speechContext=${speech.executionContext}`,
+      ONNX.accelerationMode === 'webgpu'
+        ? '(ORT WebGPU EP active)'
+        : `(CPU — ${ONNX.lastFallbackReason ?? 'WebGPU unavailable or ORT EP probe failed'}; embeddings share this path)`,
+    );
+    // Expose for browser diagnostics (accel badge / CDP).
+    (globalThis as { __RUNANYWHERE_ONNX_DIAG__?: unknown }).__RUNANYWHERE_ONNX_DIAG__ = {
+      accelerationMode: ONNX.accelerationMode,
+      threads: ONNX.threads,
+      lastFallbackReason: ONNX.lastFallbackReason,
+      diagnostics: ONNX.lastWorkerDiagnostics,
+      speech,
+    };
     // Hybrid cloud STT is optional: the current artifact may omit the cloud
     // engine, and credentials are supplied separately through Cloud.register().
     // Never let this capability probe make local ONNX/Sherpa unavailable.
@@ -553,6 +573,13 @@ async function startRuntime(
   unsubscribeAccelerationBadge?.();
   unsubscribeAccelerationBadge = RunAnywhere.events.on('sdk.accelerationMode', ({ mode }) => {
     showAccelerationBadge(mode);
+  });
+  RunAnywhere.events.on('sdk.speechAcceleration', () => {
+    showAccelerationBadge(
+      RunAnywhere.runtime.active === 'webgpu' || RunAnywhere.runtime.active === 'cpu'
+        ? RunAnywhere.runtime.active
+        : activeAcceleration,
+    );
   });
 }
 
@@ -738,17 +765,34 @@ async function refreshSDKCatalogs(): Promise<void> {
 }
 
 /**
- * Display a small floating badge indicating acceleration + worker execution.
+ * Multi-modality badge: LLM + Speech (+ note that full matrix is on
+ * RunAnywhere.runtime.modalities). WebGPU on the LLM line does not imply
+ * speech GPU.
  */
-function showAccelerationBadge(mode: string): void {
+function showAccelerationBadge(llmMode: string): void {
   document.getElementById('accel-badge')?.remove();
   const badge = document.createElement('div');
   badge.id = 'accel-badge';
-  const isGPU = mode === 'webgpu';
-  const exec = RunAnywhere.runtime.executionContext === 'worker' ? 'worker' : 'main';
-  badge.textContent = `${isGPU ? 'WebGPU' : 'CPU'} · ${exec}`;
-  badge.title = `acceleration=${mode}; executionContext=${exec}`;
-  badge.className = `accel-badge ${isGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
+  const mods = RunAnywhere.runtime.modalities;
+  const llmGPU = llmMode === 'webgpu' || mods.llm.acceleration === 'webgpu';
+  const speech = RunAnywhere.runtime.speech;
+  const speechAccel = speech.acceleration === 'webgpu' ? 'WebGPU' : 'CPU';
+  const speechGPU = speech.acceleration === 'webgpu';
+  const fmt = (id: keyof typeof mods) => {
+    const m = mods[id];
+    const accel = m.acceleration === 'webgpu' ? 'WebGPU' : m.acceleration === 'cpu' ? 'CPU' : '—';
+    return `${m.label}: ${m.status === 'unavailable' ? 'n/a' : `${accel} · ${m.status}`}`;
+  };
+  badge.innerHTML =
+    `<span class="accel-badge__line">${fmt('llm')}</span>`
+    + `<span class="accel-badge__line">${fmt('stt').replace('STT', 'Speech')}`
+    + `${speech.threads > 1 ? ` ×${speech.threads}` : ''}</span>`
+    + `<span class="accel-badge__line">${fmt('embeddings')}</span>`;
+  badge.title = Object.entries(mods)
+    .map(([id, m]) => `${id}=${m.status}/${m.acceleration ?? 'none'}${m.note ? ` (${m.note})` : ''}`)
+    .join('\n');
+  badge.className =
+    `accel-badge ${llmGPU || speechGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
   document.body.appendChild(badge);
 }
 

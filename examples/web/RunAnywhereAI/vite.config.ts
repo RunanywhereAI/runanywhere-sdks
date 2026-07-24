@@ -62,13 +62,15 @@ const localSDKSourceAliases = [
  *   - `racommons.{js,wasm}` (commons core, owned by `@runanywhere/web`)
  *   - `racommons-llamacpp.{js,wasm}` (CPU LLM backend)
  *   - `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU LLM backend)
- *   - `racommons-onnx-sherpa.{js,wasm}` (STT/TTS/VAD via Sherpa-ONNX)
+ *   - `racommons-onnx-sherpa.{js,wasm}` (STT/TTS/VAD via Sherpa-ONNX CPU)
+ *   - `racommons-onnx-sherpa-webgpu.{js,wasm}` (speech WebGPU EP path twin)
  */
 const wasmArtifacts = [
   { directory: coreWasmDir, baseName: 'racommons' },
   { directory: llamacppWasmDir, baseName: 'racommons-llamacpp' },
   { directory: llamacppWasmDir, baseName: 'racommons-llamacpp-webgpu' },
   { directory: onnxWasmDir, baseName: 'racommons-onnx-sherpa' },
+  { directory: onnxWasmDir, baseName: 'racommons-onnx-sherpa-webgpu' },
 ] as const;
 
 function copyWasmPlugin(requireCompleteArtifacts: boolean): Plugin {

@@ -112,6 +112,8 @@ export class RerankProtoAdapter {
     handle: number,
     request: ProtoRerankRequest,
   ): Promise<ProtoRerankResult | null> {
+    // Handle-scoped ABI runs on the main llama bridge heap (worker RPC for
+    // rerank is not wired yet). See RunAnywhere.runtime.modalities.rerank.
     if (!ensureExports(this.module, 'rerank.rerank', ['_rac_rerank_component_rerank_proto'])) {
       return null;
     }

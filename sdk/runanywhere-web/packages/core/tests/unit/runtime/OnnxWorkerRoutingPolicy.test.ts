@@ -8,6 +8,10 @@ import {
 } from '../../../src/runtime/BackendWorkerHost';
 import type * as BackendWorkerHostModule from '../../../src/runtime/BackendWorkerHost.js';
 import {
+  clearModelOwnedByBackendWorker,
+  setOnnxBackendWorkerRequired,
+} from '../../../src/runtime/BackendWorkerModelOwnership';
+import {
   EmbeddingsRequest,
   EmbeddingsResult,
 } from '@runanywhere/proto-ts/embeddings_options';
@@ -35,6 +39,8 @@ function fakeOnnxHost(inferResult: Uint8Array): BackendWorkerHost {
 describe('ONNX worker routing policy', () => {
   afterEach(() => {
     vi.mocked(getActiveBackendWorkerHost).mockReset();
+    setOnnxBackendWorkerRequired(false);
+    clearModelOwnedByBackendWorker(undefined, 'onnx');
   });
 
   it('routes embeddings.embed through the onnx BackendWorker', async () => {
@@ -61,6 +67,31 @@ describe('ONNX worker routing policy', () => {
     expect(result?.vectors?.[0]?.values).toHaveLength(2);
   });
 
+  it('routes GGUF embeddings through the llamacpp BackendWorker', async () => {
+    const resultBytes = EmbeddingsResult.encode(
+      EmbeddingsResult.fromPartial({
+        vectors: [{ values: [0.3, 0.4], dimension: 2 }],
+        dimension: 2,
+      }),
+    ).finish();
+    const host = fakeOnnxHost(resultBytes);
+    vi.mocked(getActiveBackendWorkerHost).mockImplementation((id) => (
+      id === 'llamacpp' ? host : null
+    ));
+
+    const adapter = new EmbeddingsProtoAdapter({} as never, 'llamacpp');
+    const result = await adapter.embedBatchLifecycle(
+      EmbeddingsRequest.fromPartial({ texts: ['hello'] }),
+    );
+
+    expect(getActiveBackendWorkerHost).toHaveBeenCalledWith('llamacpp');
+    expect(host.infer).toHaveBeenCalledWith(
+      'embeddings.embed',
+      expect.objectContaining({ requestBytes: expect.any(Uint8Array) }),
+    );
+    expect(result?.dimension).toBe(2);
+  });
+
   it('routes stt.transcribe through the onnx BackendWorker', async () => {
     const resultBytes = STTOutput.encode(
       STTOutput.fromPartial({ text: 'hello' }),
@@ -80,5 +111,15 @@ describe('ONNX worker routing policy', () => {
       expect.objectContaining({ requestBytes: expect.any(Uint8Array) }),
     );
     expect(result?.text).toBe('hello');
+  });
+
+  it('fail-closes stt.transcribe when ONNX BackendWorker is required but unavailable', async () => {
+    setOnnxBackendWorkerRequired(true);
+    vi.mocked(getActiveBackendWorkerHost).mockReturnValue(null);
+
+    const adapter = new STTProtoAdapter({} as never);
+    await expect(
+      adapter.transcribeLifecycle(new Uint8Array([1, 2, 3]), {} as never),
+    ).rejects.toThrow(/stt\.transcribeLifecycle|ONNX BackendWorker|Main-thread fallback is disabled/);
   });
 });

@@ -823,11 +823,13 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
       if (completeAndValid) {
         await materializeMemfsForComplete(m, fs, dest, localSize);
         invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
-        // Archives stay hydrated only for the sync complete callback; free
-        // MEMFS afterward — durable bytes remain in OPFS.
+        // Archives are extracted inside the complete callback — free the
+        // hydrated archive bytes afterward. Non-archive OPFS-direct downloads
+        // install an empty MEMFS size stub that MUST remain until
+        // validate_downloaded_sizes runs in web_download_finalize_all (after
+        // every multi-file part finishes). Removing the stub here made the
+        // guard see 0 bytes for large files like Nemotron encoder.int8.onnx.
         if (underOpfs && looksLikeArchivePath(dest)) {
-          removeMemfsPath(fs, dest);
-        } else if (underOpfs && localSize >= OPFSBridge.DIRECT_DOWNLOAD_THRESHOLD_BYTES) {
           removeMemfsPath(fs, dest);
         }
         return;
@@ -920,12 +922,15 @@ async function runHttpDownload(m: PlatformAdapterModule, args: HttpDownloadArgs)
     if (opfsDirect) {
       // Hydrate real bytes for archives / sub-threshold files so C++ extract
       // (inside the complete callback) does not open an empty size stub.
+      // Large non-archives get an empty MEMFS size stub (usedBytes=size) so
+      // commons validate_downloaded_sizes can see the correct length.
       await materializeMemfsForComplete(m, fs, dest, received);
     }
     invokeCompleteCallback(m, completeCbPtr, RAC_OK, dest, cbUserData);
-    // Free MEMFS after the sync complete callback (extract/validate done).
-    // Durable bytes remain in OPFS for later load hydration.
-    if (opfsDirect) {
+    // Only drop MEMFS for archives (extract already ran inside complete).
+    // Keep OPFS-direct size stubs — finalize's post-download size guard runs
+    // AFTER all multi-file parts complete, and C++ file_size only sees MEMFS.
+    if (opfsDirect && looksLikeArchivePath(dest)) {
       removeMemfsPath(fs, dest);
     }
   } catch (error) {

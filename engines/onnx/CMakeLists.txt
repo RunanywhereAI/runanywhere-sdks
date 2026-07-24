@@ -56,15 +56,19 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 # Drop libonnxruntime.a under
 # sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/ to enable.
 if(EMSCRIPTEN)
-    set(RAC_ONNX_WASM_RUNTIME_DIR
-        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    if(NOT DEFINED RAC_ONNX_WASM_RUNTIME_DIR OR RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
+        set(RAC_ONNX_WASM_RUNTIME_DIR
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
+            CACHE PATH "Vendored ONNX Runtime WASM root (CPU or WebGPU)" FORCE)
+    endif()
     if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
         message(STATUS "RAC_BACKEND_ONNX: no WASM ORT archive at "
                        "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a; "
                        "disabling ONNX backend")
         set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
     else()
-        message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive; "
+        message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive at "
+                       "${RAC_ONNX_WASM_RUNTIME_DIR}; "
                        "building ONNX backend for Emscripten")
     endif()
 endif()

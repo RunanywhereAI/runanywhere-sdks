@@ -8,7 +8,12 @@ import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import { callEmscriptenAsyncNumber } from '../runtime/EmscriptenAsync.js';
 import { getModuleForFramework } from '../runtime/EmscriptenModule.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import {
+  mustUseLlamaBackendWorker,
+  mustUseOnnxBackendWorker,
+} from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { SDKException } from '../Foundation/SDKException.js';
 import {
   adapterState,
   ensureExports,
@@ -93,19 +98,36 @@ export class EmbeddingsProtoAdapter {
   async embedBatchLifecycle(
     request: ProtoEmbeddingsRequest,
   ): Promise<ProtoEmbeddingsResult | null> {
-    // Embeddings run in the ONNX/Sherpa BackendWorker, but a llama.cpp-bound
-    // adapter must never dispatch into the ONNX worker's WASM heap: it owns a
-    // separate plugin registry and would run the wrong model (or none). For a
-    // llama.cpp-bound adapter, skip the ONNX worker and run the lifecycle call
-    // in the llama.cpp WASM this adapter is bound to.
-    const host = this.framework === 'llamacpp'
-      ? null
-      : getActiveBackendWorkerHost('onnx');
-    if (host?.diagnostics.executionContext === 'worker') {
-      const response = await host.infer('embeddings.embed', {
-        requestBytes: EmbeddingsRequest.encode(request).finish(),
-      }) as { resultBytes?: Uint8Array };
-      return response?.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
+    // Route to the BackendWorker that owns this framework's WASM heap.
+    // llama.cpp GGUF embeddings → llamacpp worker; ONNX → onnx worker.
+    if (this.framework === 'llamacpp') {
+      const llamaHost = getActiveBackendWorkerHost('llamacpp');
+      if (llamaHost?.diagnostics.executionContext === 'worker') {
+        const response = await llamaHost.infer('embeddings.embed', {
+          requestBytes: EmbeddingsRequest.encode(request).finish(),
+        }) as { resultBytes?: Uint8Array };
+        return response?.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
+      }
+      if (mustUseLlamaBackendWorker()) {
+        throw SDKException.backendNotAvailable(
+          'embeddings.embedBatchLifecycle',
+          'Llama BackendWorker is required for GGUF embeddings; main-thread fallback is disabled.',
+        );
+      }
+    } else {
+      const onnxHost = getActiveBackendWorkerHost('onnx');
+      if (onnxHost?.diagnostics.executionContext === 'worker') {
+        const response = await onnxHost.infer('embeddings.embed', {
+          requestBytes: EmbeddingsRequest.encode(request).finish(),
+        }) as { resultBytes?: Uint8Array };
+        return response?.resultBytes ? EmbeddingsResult.decode(response.resultBytes) : null;
+      }
+      if (mustUseOnnxBackendWorker()) {
+        throw SDKException.backendNotAvailable(
+          'embeddings.embedBatchLifecycle',
+          'ONNX BackendWorker is required for ONNX embeddings; main-thread fallback is disabled.',
+        );
+      }
     }
     if (!ensureExports(this.module, 'embeddings.embedBatchLifecycle', [
       '_rac_embeddings_embed_batch_lifecycle_proto',

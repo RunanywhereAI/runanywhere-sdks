@@ -25,6 +25,7 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cerrno>
 #include <cmath>
@@ -33,6 +34,8 @@
 #include <cstring>
 #include <functional>  // for std::hash (short espeak symlink name)
 #include <limits>
+#include <mutex>
+#include <string>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -50,7 +53,55 @@
 #define SHERPA_CONF_LOG(...) ((void)0)
 #endif
 
+#if defined(__EMSCRIPTEN__)
+// Default 2 threads on Web: pthread pool exists for ORT/Sherpa ABI; recognizer
+// compute was historically forced to 1. Apps can raise via rac_sherpa_set_wasm_compute.
+namespace {
+std::atomic<int32_t> g_wasm_num_threads{2};
+std::mutex g_wasm_provider_mu;
+#if defined(RAC_WASM_ONNX_WEBGPU)
+std::string g_wasm_provider{"webgpu"};
+#else
+std::string g_wasm_provider{"cpu"};
+#endif
+}  // namespace
+
+extern "C" int rac_sherpa_set_wasm_compute(int32_t num_threads, const char* provider) {
+    if (num_threads > 0) {
+        g_wasm_num_threads.store(std::min(num_threads, 8), std::memory_order_relaxed);
+    }
+    if (provider != nullptr && provider[0] != '\0') {
+        std::lock_guard<std::mutex> lock(g_wasm_provider_mu);
+        if (std::strcmp(provider, "webgpu") == 0 || std::strcmp(provider, "cpu") == 0) {
+            g_wasm_provider = provider;
+        }
+    }
+    return 0;
+}
+#endif
+
 namespace runanywhere {
+namespace {
+
+int32_t resolve_sherpa_num_threads() {
+#if defined(__EMSCRIPTEN__)
+    const int32_t n = g_wasm_num_threads.load(std::memory_order_relaxed);
+    return n > 0 ? std::min(n, 8) : 1;
+#else
+    return 2;
+#endif
+}
+
+std::string resolve_sherpa_provider() {
+#if defined(__EMSCRIPTEN__)
+    std::lock_guard<std::mutex> lock(g_wasm_provider_mu);
+    return g_wasm_provider;
+#else
+    return "cpu";
+#endif
+}
+
+}  // namespace
 
 // =============================================================================
 // SherpaBackend Implementation
@@ -550,21 +601,16 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     }
 
     recognizer_config.model_config.tokens = tokens_path_.c_str();
-#if defined(__EMSCRIPTEN__)
-    // The Web artifact is pthread/shared-memory enabled because Sherpa and ORT
-    // must share one atomics ABI. Keep the recognizer's compute count at one:
-    // the validated global pool remains available for runtime plumbing while
-    // compact Whisper avoids per-session thread scheduling overhead.
-    recognizer_config.model_config.num_threads = 1;
-#else
-    recognizer_config.model_config.num_threads = 2;
-#endif
+    // Web: pthread/shared-memory enabled for ORT+Sherpa atomics ABI. Thread
+    // count is configurable (default 2); see rac_sherpa_set_wasm_compute.
+    recognizer_config.model_config.num_threads = resolve_sherpa_num_threads();
     // Sherpa routes its debug dump through stderr, which browsers expose as a
     // console error even for a valid configuration. RACommons already logs
     // the resolved paths and typed creation failures; keep upstream debug
     // disabled so successful model loads do not emit false error diagnostics.
     recognizer_config.model_config.debug = 0;
-    recognizer_config.model_config.provider = "cpu";
+    const std::string provider = resolve_sherpa_provider();
+    recognizer_config.model_config.provider = provider.c_str();
 
     recognizer_config.model_config.modeling_unit = "cjkchar";
     recognizer_config.model_config.bpe_vocab = "";
@@ -649,12 +695,9 @@ bool SherpaSTT::build_online_recognizer_locked() {
     recognizer_config.model_config.transducer.decoder = decoder_path_.c_str();
     recognizer_config.model_config.transducer.joiner = joiner_path_.c_str();
     recognizer_config.model_config.tokens = tokens_path_.c_str();
-#if defined(__EMSCRIPTEN__)
-    recognizer_config.model_config.num_threads = 1;
-#else
-    recognizer_config.model_config.num_threads = 2;
-#endif
-    recognizer_config.model_config.provider = "cpu";
+    recognizer_config.model_config.num_threads = resolve_sherpa_num_threads();
+    const std::string provider = resolve_sherpa_provider();
+    recognizer_config.model_config.provider = provider.c_str();
     recognizer_config.model_config.debug = 0;
     // Sherpa auto-detects NeMo transducers from the decoder graph contract.
     // An explicit model_type would bypass that model-family detection.
@@ -1952,14 +1995,9 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
     tts_config.model.vits.noise_scale_w = 0.8f;
     tts_config.model.vits.length_scale = 1.0f;
 
-    tts_config.model.provider = "cpu";
-#if defined(__EMSCRIPTEN__)
-    // The Web artifact has a shared-memory pthread pool for ABI compatibility,
-    // but one ORT compute thread avoids pool overhead for this compact voice.
-    tts_config.model.num_threads = 1;
-#else
-    tts_config.model.num_threads = 2;
-#endif
+    const std::string tts_provider = resolve_sherpa_provider();
+    tts_config.model.provider = tts_provider.c_str();
+    tts_config.model.num_threads = resolve_sherpa_num_threads();
     tts_config.model.debug = 0;
 
     RAC_LOG_INFO("Sherpa.TTS", "Creating SherpaOnnxOfflineTts (VITS/Piper)...");
@@ -2269,9 +2307,15 @@ void SherpaVAD::fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig& out) con
     // window (e.g. 32 ms @ 16 kHz) gets the canonical 512-sample window.
     out.silero_vad.window_size = derive_sherpa_vad_window_size(config_);
     out.sample_rate = config_.sample_rate > 0 ? config_.sample_rate : 16000;
-    out.num_threads = 1;
+    out.num_threads = resolve_sherpa_num_threads();
     out.debug = 0;
-    out.provider = "cpu";
+    // Provider string must outlive the Sherpa create call that consumes `out`.
+    // fill_* is only used with an immediate CreateVoiceActivityDetector, and
+    // "cpu"/"webgpu" are stable literals from resolve — keep a process-local
+    // copy for the C API's const char* lifetime.
+    static thread_local std::string vad_provider;
+    vad_provider = resolve_sherpa_provider();
+    out.provider = vad_provider.c_str();
 }
 #endif
 

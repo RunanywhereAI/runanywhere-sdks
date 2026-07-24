@@ -69,6 +69,12 @@ export interface SDKEventMap {
   // SDK lifecycle
   'sdk.initialized': { environment: SDKEnvironment };
   'sdk.accelerationMode': { mode: string };
+  /** Speech (ONNX/Sherpa) compute mode — separate from LLM WebGPU/CPU. */
+  'sdk.speechAcceleration': {
+    acceleration: string;
+    threads: number;
+    executionContext: string;
+  };
 
   // Model management
   'model.registered': { count: number };

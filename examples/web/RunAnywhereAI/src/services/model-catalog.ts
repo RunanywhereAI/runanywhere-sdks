@@ -512,7 +512,10 @@ const CATALOG: readonly CatalogEntry[] = [
   {
     id: 'sherpa-nemotron-3.5-asr-streaming-0.6b-560ms-int8',
     name: 'NVIDIA Nemotron 3.5 ASR Streaming 0.6B INT8 (Sherpa-ONNX)',
-    description: 'Exact multilingual 560 ms streaming transducer bundle with per-stream language prompting.',
+    description:
+      'Exact multilingual 560 ms streaming transducer (~682 MB download). '
+      + 'Runs on CPU WASM in the browser (Speech: CPU · worker); large online '
+      + 'transducers are slower than Whisper Tiny / Canary on Web.',
     category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,

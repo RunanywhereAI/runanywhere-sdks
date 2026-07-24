@@ -675,6 +675,17 @@ runBackendWorker(workerScope, {
       );
       return { ok: true };
     }
+    if (kind === 'embeddings.embed') {
+      const body = payload as LlamaBackendWorkerInferPayload;
+      if (!body?.requestBytes) throw new Error('embeddings.embed requires requestBytes');
+      return {
+        resultBytes: await callUnaryProto(
+          runtime.requireModule(),
+          'rac_embeddings_embed_batch_lifecycle_proto',
+          body.requestBytes,
+        ),
+      };
+    }
     if (kind !== 'llm.generate' && kind !== 'vlm.generate') {
       throw new Error(`Unsupported infer kind: ${kind}`);
     }

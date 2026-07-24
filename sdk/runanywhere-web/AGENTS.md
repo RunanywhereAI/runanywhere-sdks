@@ -9,7 +9,7 @@ The Web SDK is a Swift-aligned TypeScript facade over the RACommons C/C++ core. 
 - `@runanywhere/web/internal`: broader core-internal implementation exports; neither applications nor backend packages may depend on this entrypoint.
 - `@runanywhere/web/browser`: browser-only helpers such as audio capture/playback, video capture, and capability detection.
 - `@runanywhere/web-llamacpp`: LLM + GGUF text embeddings + VLM + LoRA + tool-calling + structured-output backend. Ships **two execution-mode variants**: `racommons-llamacpp.{js,wasm}` (CPU) and `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU + Asyncify). Both carry the unified llama.cpp vtable; model-framework routing lets its embedding primitive coexist with ONNX.
-- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` — one WASM that registers two vtables (`onnx`, `sherpa`) bundled because they share ONNX Runtime. It owns the native ONNX RAG WASM/session path; core can also compose llama.cpp embeddings with llama.cpp generation.
+- `@runanywhere/web-onnx`: ONNX embeddings + STT + TTS + VAD backend backed by `racommons-onnx-sherpa.{js,wasm}` (CPU/pthread) and optionally `racommons-onnx-sherpa-webgpu.{js,wasm}` — registers two vtables (`onnx`, `sherpa`) because they share ONNX Runtime. Speech acceleration is **separate** from LLM WebGPU (`ONNX.register({ acceleration, threads })`, `RunAnywhere.runtime.speech`). Fail-closed BackendWorker by default in browsers. See `docs/SPIKE_ONNX_WEBGPU.md`.
 
 Keep app code on the root `RunAnywhere` facade. Backend packages integrate only through `@runanywhere/web/backend`; browser apps may import UI/device helpers from `@runanywhere/web/browser`.
 
@@ -112,7 +112,8 @@ npm run build:wasm -- --core             # packages/core/wasm/racommons.{js,wasm
 npm run build:wasm -- --llamacpp         # packages/llamacpp/wasm/racommons-llamacpp.{js,wasm} (CPU)
 npm run build:wasm -- --webgpu           # packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}
 npm run build:wasm -- --onnx             # packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}
-npm run build:wasm:all                    # all four artifacts (CPU and WebGPU use separate configs)
+npm run build:wasm -- --onnx-webgpu      # packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}
+npm run build:wasm:all                    # core + llama CPU/WebGPU + onnx CPU (add --onnx-webgpu separately)
 npm run build:wasm:debug
 npm run clean:wasm                       # remove all WASM build dirs and generated glue/binaries
 npm run build:wasm:clean
@@ -187,7 +188,7 @@ sdk/runanywhere-web/
     └── onnx/
         ├── src/ONNX.ts
         ├── src/Foundation/SherpaONNXBridge.ts
-        └── wasm/              # racommons-onnx-sherpa.{js,wasm}
+        └── wasm/              # racommons-onnx-sherpa.{js,wasm} (+ optional -webgpu twin)
 ```
 
 There is no longer a `packages/onnx/wasm/sherpa/` standalone artifact, and no `StandaloneSherpa*` provider in `packages/onnx/src/Foundation/`. The proto-byte STT/TTS/VAD path through `racommons-onnx-sherpa.wasm` is the only Sherpa surface.
@@ -241,6 +242,7 @@ Expected publish-time artifacts:
 - `packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}`
 - `packages/onnx/dist/**`
 - `packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}`
+- `packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}`
 - `../shared/proto-ts/dist/**`
 
 `packages/onnx` must not publish `wasm/sherpa/**` (the directory no longer exists).
