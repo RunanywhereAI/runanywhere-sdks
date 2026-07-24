@@ -1068,6 +1068,66 @@ int test_session_grammar_gated_on_framework() {
         rac_tool_calling_session_destroy_proto(handle);
     }
 
+    // QHexRT + tool_choice=NONE: no grammar attached (calls are forbidden).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"A direct answer."});
+    {
+        EventSink sink;
+        auto request = make_request("Answer directly.");
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        const rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "NONE session create");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 1, "NONE generates once");
+        if (grammars.size() == 1) {
+            CHECK(grammars[0].empty(), "session NONE attaches no grammar");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
+    // QHexRT tool-call then synthesis: decision turn constrained, synthesis not.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+        "The weather in Tokyo is sunny.",
+    });
+    {
+        EventSink sink;
+        auto request = make_request("Weather in Tokyo?");  // one tool: get_weather
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        uint64_t handle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            bytes.data(), bytes.size(), sink_callback, &sink, capture_session_handle, &handle);
+        CHECK(rc == RAC_SUCCESS, "synthesis session create");
+        using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
+        const auto* tool_ev = sink.find_first(EvCase::kToolCall);
+        CHECK(tool_ev != nullptr, "paused on tool_call");
+        runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
+        step.set_session_handle(handle);
+        if (tool_ev)
+            step.set_tool_call_id(tool_ev->tool_call().id());
+        step.set_result_json(R"({"temp":25})");
+        std::vector<uint8_t> step_bytes;
+        serialize(step, &step_bytes);
+        rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
+        CHECK(rc == RAC_SUCCESS, "step_with_result ok");
+        const auto grammars = generated_grammars();
+        CHECK(grammars.size() == 2, "decision + synthesis generations");
+        if (grammars.size() == 2) {
+            CHECK(grammars[0] == "toolcall_opt:get_weather", "session decision turn constrained");
+            CHECK(grammars[1].empty(), "session synthesis turn unconstrained");
+        }
+        rac_tool_calling_session_destroy_proto(handle);
+    }
+
     cleanup_environment();
     return 0;
 }
