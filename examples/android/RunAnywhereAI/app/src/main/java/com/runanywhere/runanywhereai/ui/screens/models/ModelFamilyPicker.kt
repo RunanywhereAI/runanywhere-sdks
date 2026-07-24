@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,16 +29,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ai.runanywhere.proto.v1.ModelCategory
+import androidx.compose.ui.unit.sp
+import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -51,38 +48,33 @@ data class FamilyGroup(
     val variants: List<RAModelInfo>,
 ) {
     val optionCount: Int get() = variants.size
-    val hasNpuVariant: Boolean get() = family.key.endsWith("-npu")
 
-    // Category of the primary (lead) variant — drives the category-based family sort.
-    val category: ModelCategory get() = variants.first().category
+    val maker: ModelMaker get() = family.maker
 
-    // True when any variant is already downloaded or built in — ready families sort first.
+    // True when the family has an NPU build, which is what earns the accelerated badge.
+    // A family spans backends, so this is a property of the variants, not of the name.
+    val hasNpuVariant: Boolean
+        get() = variants.any { it.framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT }
+
+    // Capability bucket of the lead variant — drives the bucket-based family sort.
+    val bucket: ModelCategoryBucket get() = variants.first().categoryBucket()
+
+    // True when any variant is already downloaded or built in — the picker lifts these
+    // into its "On this device" section.
     val hasReadyVariant: Boolean get() = variants.any { it.isBuiltIn || it.isDownloadedOnDisk }
 
-    // The single cleanest tag shown on the collapsed family card: prefer a notable
-    // capability from the lead variant, else the lead variant's feel word.
+    // The single cleanest tag on the collapsed family card. The picker is scoped to one
+    // modality, so a MODALITY tag would say the same word on every card — prefer a real
+    // capability from the lead variant and fall back to its feel word.
     val headlineTag: ConsumerTag?
         get() = variants.firstOrNull()?.consumerTags()?.let { tags ->
-            tags.firstOrNull { it.kind == ConsumerTagKind.CAPABILITY } ?: tags.firstOrNull()
+            tags.firstOrNull { it.kind == ConsumerTagKind.CAPABILITY }
+                ?: tags.firstOrNull { it.kind == ConsumerTagKind.FEEL }
         }
 }
 
-// Chat → vision → voice → documents → other. Mirrors iOS ModelFamilyCatalog.categoryRank.
-private fun ModelCategory.familyRank(): Int = when (this) {
-    ModelCategory.MODEL_CATEGORY_LANGUAGE -> 0
-    ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-    ModelCategory.MODEL_CATEGORY_VISION,
-    ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> 1
-    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    ModelCategory.MODEL_CATEGORY_AUDIO,
-    ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> 2
-    ModelCategory.MODEL_CATEGORY_EMBEDDING -> 3
-    else -> 4
-}
-
 // Groups models into families, ordering variants smaller → larger and families by
-// category (chat → vision → voice → docs → other), then ready-first, then name.
+// capability bucket, then maker, then name — so a maker's families always sit together.
 fun List<RAModelInfo>.toFamilyGroups(): List<FamilyGroup> =
     groupBy { it.family().key }
         .map { (_, models) ->
@@ -90,8 +82,8 @@ fun List<RAModelInfo>.toFamilyGroups(): List<FamilyGroup> =
             FamilyGroup(family, models.sortedBy { it.effectiveBytes() })
         }
         .sortedWith(
-            compareBy<FamilyGroup> { it.category.familyRank() }
-                .thenByDescending { it.hasReadyVariant }
+            compareBy<FamilyGroup> { it.bucket.ordinal }
+                .thenBy { it.maker.ordinal }
                 .thenBy { it.family.title.lowercase() },
         )
 
@@ -124,9 +116,9 @@ fun FamilyCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = group.variants.first().brand().icon,
+                    imageVector = group.maker.brand.icon,
                     contentDescription = null,
-                    tint = group.variants.first().brand().color,
+                    tint = group.maker.brand.color,
                     modifier = Modifier.size(dimens.iconLg),
                 )
                 Spacer(Modifier.width(dimens.spacingMd))
@@ -134,6 +126,17 @@ fun FamilyCard(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
                 ) {
+                    // The maker line is what makes the taxonomy visible: every card says
+                    // who built the family before it says what the family is called.
+                    Text(
+                        group.maker.displayName.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
+                        color = group.maker.brand.color,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         group.family.title,
                         style = MaterialTheme.typography.bodyLarge,
@@ -145,14 +148,26 @@ fun FamilyCard(
                         group.family.tagline,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                        group.headlineTag?.let { TagPill(it.label, MaterialTheme.colorScheme.primary) }
-                        val optionsLabel = if (group.optionCount == 1) "1 option" else "${group.optionCount} options"
-                        TagPill(optionsLabel, MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (readyCount > 0) TagPill("$readyCount ready", primaryGreen)
+                    // Three pills at most: what it is good at, whether it runs on the NPU,
+                    // and how many builds are on hand. Any more and the row wraps to mush.
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                        verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                    ) {
+                        group.headlineTag?.let { ModelPill(it.label, it.kind.pillColor()) }
+                        if (group.hasNpuVariant) {
+                            ModelPill("NPU", ModelPillColors.Capability, icon = RACIcons.Outline.Cpu)
+                        }
+                        if (readyCount > 0) {
+                            ModelPill("$readyCount ready", ModelPillColors.Availability)
+                        } else {
+                            val optionsLabel =
+                                if (group.optionCount == 1) "1 option" else "${group.optionCount} options"
+                            ModelPill(optionsLabel, ModelPillColors.Neutral)
+                        }
                     }
                 }
                 Spacer(Modifier.width(dimens.spacingSm))
@@ -246,14 +261,20 @@ private fun VariantRow(
                 )
                 BackendBadge(framework = variant.framework, compact = true)
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
-                if (isRecommended) TagPill("Recommended", primaryGreen)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
+                if (isRecommended) ModelPill("Recommended", ModelPillColors.Availability)
                 variant.consumerTags()
                     .filter { it.kind == ConsumerTagKind.CAPABILITY }
-                    .forEach { TagPill(it.label, MaterialTheme.colorScheme.primary) }
+                    .forEach { ModelPill(it.label, it.kind.pillColor()) }
                 if (variant.requiresHfAuth()) {
                     val hasToken = SettingsRepository.settings.hfToken.isNotBlank()
-                    TagPill("Private", if (hasToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                    ModelPill(
+                        "Private",
+                        if (hasToken) ModelPillColors.Capability else ModelPillColors.Warning,
+                    )
                 }
             }
             if (isBusy && progressPercent != null) {
@@ -291,9 +312,9 @@ private fun VariantAction(
     onCancel: (() -> Unit)? = null,
 ) {
     when {
-        isCurrent -> TagPill("Loaded", primaryGreen)
+        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
         isBusy -> VariantProgressAction(onCancel)
-        isReady -> TagPill("Use", primaryGreen)
+        isReady -> ModelPill("Use", ModelPillColors.Availability)
         else -> {
             val dimens = LocalDimens.current
             val needsToken = variant.requiresHfAuth() && SettingsRepository.settings.hfToken.isBlank()
@@ -340,25 +361,5 @@ private fun VariantProgressAction(onCancel: (() -> Unit)?) {
                 modifier = Modifier.size(12.dp),
             )
         }
-    }
-}
-
-@Composable
-private fun TagPill(text: String, color: Color) {
-    val dimens = LocalDimens.current
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(dimens.radiusSm))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
