@@ -278,18 +278,33 @@ private fun PickerBody(
         return
     }
 
-    families.forEach { group ->
-        FamilyCard(
-            group = group,
-            viewModel = viewModel,
-            state = state,
-            onSelect = onSelect,
-            onDownload = onDownload,
-            onDelete = onDelete,
-            modifier = Modifier.padding(horizontal = dimens.spacingLg),
-            // Auto-expand single-family search results so variants are visible immediately.
-            initiallyExpanded = isSearching && families.size <= 2,
-        )
+    // Families you can use right now come first under their own heading; everything else
+    // follows in maker order. Two headings is all the structure this list needs — one per
+    // maker would out-number the cards they introduce.
+    val (installed, downloadable) = families.partition { it.hasReadyVariant }
+    val sections = buildList {
+        if (installed.isNotEmpty()) add("On this device" to installed)
+        if (downloadable.isNotEmpty()) {
+            add((if (installed.isEmpty()) "All families" else "More families") to downloadable)
+        }
+    }
+
+    sections.forEachIndexed { index, (label, groups) ->
+        if (index > 0) Spacer(Modifier.height(dimens.spacingSm))
+        SectionLabel(label)
+        groups.forEach { group ->
+            FamilyCard(
+                group = group,
+                viewModel = viewModel,
+                state = state,
+                onSelect = onSelect,
+                onDownload = onDownload,
+                onDelete = onDelete,
+                modifier = Modifier.padding(horizontal = dimens.spacingLg),
+                // Auto-expand single-family search results so variants show immediately.
+                initiallyExpanded = isSearching && families.size <= 2,
+            )
+        }
     }
 }
 
