@@ -14,6 +14,10 @@
 #include <cstring>
 #include <string>
 
+#if defined(RAC_HAVE_PROTOBUF)
+#include "cua.pb.h"
+#endif
+
 namespace {
 
 // The Fara1.5 (Qwen3.5-VL computer_use) system prompt, verbatim from
@@ -291,4 +295,46 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
         copy_bounded(out->text, sizeof(out->text), json_string(body, text_key));
     }
     return 0;
+}
+
+extern "C" rac_result_t rac_cua_parse_action_proto(const char* profile_id,
+                                                   const char* model_output, uint32_t viewport_w,
+                                                   uint32_t viewport_h, rac_proto_buffer_t* out) {
+    if (out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)profile_id;
+    (void)model_output;
+    (void)viewport_w;
+    (void)viewport_h;
+    return rac_proto_buffer_set_error(out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    // Reuse the struct parser so parse/scale logic lives in exactly one place;
+    // the proto is a faithful projection of rac_cua_action_t. The C enum values
+    // match runanywhere.v1.CuaActionType one-for-one (see rac_cua.h / cua.proto).
+    rac_cua_action_t action;
+    if (rac_cua_parse_action(profile_id, model_output, viewport_w, viewport_h, &action) != 0) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_INVALID_ARGUMENT, "unknown CUA profile");
+    }
+
+    runanywhere::v1::CuaAction proto;
+    proto.set_type(static_cast<runanywhere::v1::CuaActionType>(action.type));
+    proto.set_coordinate_valid(action.has_coordinate != 0);
+    proto.set_x(action.x);
+    proto.set_y(action.y);
+    proto.set_scroll_pixels(action.scroll_pixels);
+    proto.set_wait_seconds(action.wait_seconds);
+    proto.set_text(action.text);
+    proto.set_reasoning(action.reasoning);
+    proto.set_parse_ok(action.parse_ok != 0);
+
+    std::string bytes;
+    if (!proto.SerializeToString(&bytes)) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize CuaAction");
+    }
+    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), out);
+#endif
 }

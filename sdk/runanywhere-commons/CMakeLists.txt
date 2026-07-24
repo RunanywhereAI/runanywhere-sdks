@@ -1403,6 +1403,9 @@ set(_RAC_PROTO_GENERATED_SOURCES
     # imported by codegen post-processors and several option protos. Required
     # at link time by every .pb.cc that imports rac_options.proto.
     ${_RAC_PROTO_GEN_DIR}/rac_options.pb.cc
+    # Computer-Use-Agent action wire type (CuaAction / CuaActionType) — the
+    # proto-byte variant serialized by rac_cua_parse_action_proto.
+    ${_RAC_PROTO_GEN_DIR}/cua.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

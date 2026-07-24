@@ -15,6 +15,10 @@
 
 #include "rac/features/cua/rac_cua.h"
 
+#if defined(RAC_HAVE_PROTOBUF)
+#include "cua.pb.h"
+#endif
+
 namespace {
 
 TestResult run_fara_prompt_has_schema() {
@@ -90,6 +94,47 @@ TestResult run_malformed_not_ok() {
     return TEST_PASS();
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+// The proto-byte variant is a faithful projection of the struct parse: same
+// golden output, decoded from the wire CuaAction each SDK will see.
+TestResult run_proto_roundtrip_golden() {
+    const char* out =
+        "I will click on the search box.\n"
+        "<tool_call>\n"
+        "{\"name\": \"computer_use\", \"arguments\": {\"action\": \"left_click\", "
+        "\"coordinate\": [500, 382]}}\n"
+        "</tool_call>";
+    rac_proto_buffer_t buf;
+    rac_proto_buffer_init(&buf);
+    rac_result_t rc = rac_cua_parse_action_proto(RAC_CUA_PROFILE_FARA, out, 1440, 900, &buf);
+    ASSERT_EQ(static_cast<int>(rc), static_cast<int>(RAC_SUCCESS), "proto parse returns success");
+    ASSERT_TRUE(buf.data != nullptr && buf.size > 0, "proto buffer carries bytes");
+
+    runanywhere::v1::CuaAction action;
+    ASSERT_TRUE(action.ParseFromArray(buf.data, static_cast<int>(buf.size)), "decode CuaAction");
+    ASSERT_EQ(static_cast<int>(action.type()),
+              static_cast<int>(runanywhere::v1::CUA_ACTION_TYPE_LEFT_CLICK), "type = left_click");
+    ASSERT_TRUE(action.coordinate_valid(), "has coordinate");
+    ASSERT_EQ(action.x(), 720, "x = 500 * 1440/1000 = 720");
+    ASSERT_EQ(action.y(), 344, "y = 382 * 900/1000 = 344");
+    ASSERT_TRUE(action.parse_ok(), "parse_ok true");
+    ASSERT_TRUE(action.reasoning().find("search box") != std::string::npos, "reasoning captured");
+    rac_proto_buffer_free(&buf);
+    return TEST_PASS();
+}
+
+TestResult run_proto_unknown_profile_error() {
+    rac_proto_buffer_t buf;
+    rac_proto_buffer_init(&buf);
+    rac_result_t rc = rac_cua_parse_action_proto("does-not-exist", "<tool_call>{}</tool_call>",
+                                                 100, 100, &buf);
+    ASSERT_TRUE(rc != RAC_SUCCESS, "unknown profile must fail");
+    ASSERT_TRUE(buf.data == nullptr, "error buffer carries no data");
+    rac_proto_buffer_free(&buf);
+    return TEST_PASS();
+}
+#endif
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -100,5 +145,9 @@ int main(int argc, char** argv) {
     suite.add("type_action_text", run_type_action_text);
     suite.add("terminate_answer", run_terminate_answer);
     suite.add("malformed_not_ok", run_malformed_not_ok);
+#if defined(RAC_HAVE_PROTOBUF)
+    suite.add("proto_roundtrip_golden", run_proto_roundtrip_golden);
+    suite.add("proto_unknown_profile_error", run_proto_unknown_profile_error);
+#endif
     return suite.run(argc, argv);
 }

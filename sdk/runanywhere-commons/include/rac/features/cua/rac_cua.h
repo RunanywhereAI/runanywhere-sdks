@@ -15,9 +15,12 @@
  * capture, executes the returned action (tap/type/scroll), and owns the agent
  * loop — none of the prompt/parse/coordinate knowledge leaks into the app.
  *
- * Classification (see docs/CPP_PROTO_OWNERSHIP.md): struct API, `internal`
- * today; a proto-byte `CuaAction` variant is a planned follow-up once the IDL
- * toolchain is wired.
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): the fixed-struct variant
+ * (`rac_cua_parse_action`) remains for zero-copy in-process use; the canonical
+ * cross-SDK variant is `rac_cua_parse_action_proto`, which serializes a
+ * `runanywhere.v1.CuaAction` so every platform SDK decodes ONE generated type
+ * instead of hand-mirroring the C struct — matching every other modality's
+ * proto-byte bridging.
  */
 
 #ifndef RAC_CUA_H
@@ -25,6 +28,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+#include "rac/foundation/rac_proto_buffer.h"  // rac_proto_buffer_t + rac_result_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,6 +99,21 @@ int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t d
 int rac_cua_parse_action(const char* profile_id, const char* model_output,
                          uint32_t viewport_w, uint32_t viewport_h,
                          rac_cua_action_t* out_action);
+
+/**
+ * Proto-byte variant of `rac_cua_parse_action` — the canonical cross-SDK entry
+ * point. Parses `model_output` for `profile_id`, rescales coordinates to
+ * `viewport_w` x `viewport_h`, and serializes the result as a
+ * `runanywhere.v1.CuaAction` into `out` (owned bytes; release with
+ * `rac_proto_buffer_free`). Every platform SDK decodes the one generated
+ * `CuaAction` type instead of hand-mirroring `rac_cua_action_t`. Returns
+ * RAC_SUCCESS on a recognized profile (inspect the decoded `parse_ok` for
+ * whether a valid tool_call was found), RAC_ERROR_INVALID_ARGUMENT for an
+ * unknown profile, or an error buffer if protobuf is unavailable.
+ */
+rac_result_t rac_cua_parse_action_proto(const char* profile_id, const char* model_output,
+                                        uint32_t viewport_w, uint32_t viewport_h,
+                                        rac_proto_buffer_t* out);
 
 #ifdef __cplusplus
 }

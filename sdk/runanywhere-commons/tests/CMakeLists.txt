@@ -118,6 +118,7 @@ target_include_directories(test_cua PRIVATE
 )
 target_link_libraries(test_cua PRIVATE rac_commons)
 rac_link_archive_deps(test_cua)
+rac_test_define_have_protobuf(test_cua)  # decode CuaAction in the proto round-trip test
 target_compile_features(test_cua PRIVATE cxx_std_17)
 add_test(NAME cua_tests COMMAND test_cua --run-all)
 
