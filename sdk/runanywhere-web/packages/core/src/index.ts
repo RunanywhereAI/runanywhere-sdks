@@ -49,6 +49,14 @@ export type {
 export type {
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage.js';
+// Computer-Use Agent scaffold (cross-SDK parity with Swift RunAnywhere.CUA).
+// Stateless, model-agnostic profile ABI surfaced via `RunAnywhere.CUA.*`.
+export { CUA, CuaActionKind } from './Public/Extensions/RunAnywhere+CUA.js';
+export type {
+  CuaAction,
+  CuaCoordinate,
+  CuaDisplaySize,
+} from './Public/Extensions/RunAnywhere+CUA.js';
 // Hybrid STT router (cross-SDK parity with Kotlin RACRouter / Swift
 // HybridSTTRouter). Per-request offline(sherpa)↔online(cloud) dispatch;
 // commons owns all routing. Public API surfaces via `RunAnywhere.hybrid.*`.

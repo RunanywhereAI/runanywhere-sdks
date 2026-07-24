@@ -106,6 +106,7 @@ import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
     show ProtoInferenceFrameworkCppBridge;
+import 'package:runanywhere/public/capabilities/runanywhere_cua.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
@@ -907,6 +908,12 @@ abstract final class RunAnywhere {
   /// cloud plugin registration. Mirrors Kotlin `RACRouter` /
   /// Swift `HybridSTTRouter`. STT-only today.
   static RunAnywhereHybrid get hybrid => RunAnywhereHybrid.shared;
+
+  /// Computer-Use-Agent (CUA) scaffold — stateless, model-agnostic
+  /// `systemPrompt` + `parseAction` over a model *profile* (Fara1.5 built in).
+  /// Pair with [vlm] for inference; the app owns screenshot capture, executing
+  /// the action, and the agent loop. Mirrors Swift `RunAnywhere.CUA`.
+  static RunAnywhereCUA get cua => RunAnywhereCUA.shared;
 
   // -- Flat aliases for cross-SDK portability (canonical §0 — RN/Web/Swift use
   //    flat method names; Flutter additionally exposes them so portable

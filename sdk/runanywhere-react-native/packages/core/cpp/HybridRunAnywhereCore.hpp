@@ -381,6 +381,21 @@ public:
   vlmCancelProto() override;
 
   // ============================================================================
+  // Computer-Use Agent (CUA) — profile-driven prompt/parse scaffold.
+  // Stateless, sync thunks to rac_cua_system_prompt / rac_cua_parse_action
+  // (pure CPU string work, safe on the JS thread). Mirrors Swift RunAnywhere.CUA
+  // and the sync model-type lookups above. Implemented in
+  // HybridRunAnywhereCore+CUA.cpp.
+  // ============================================================================
+
+  std::string cuaSystemPrompt(const std::string &profileId, double displayWidth,
+                              double displayHeight) override;
+  CuaActionNative cuaParseAction(const std::string &profileId,
+                                 const std::string &modelOutput,
+                                 double viewportWidth,
+                                 double viewportHeight) override;
+
+  // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)
   // Uses commons lifecycle-owned diffusion proto ABI
   // (rac_diffusion_generate_lifecycle_proto).

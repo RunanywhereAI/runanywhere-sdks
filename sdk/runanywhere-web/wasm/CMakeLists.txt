@@ -402,6 +402,22 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_proto_buffer_status"
     "_rac_wasm_offsetof_proto_buffer_error_message"
 
+    # Computer-Use Agent (CUA) — stateless profile-driven system-prompt +
+    # action-parse ABI (pairs with rac_vlm_*). The functions plus the
+    # rac_cua_action_t sizeof/offset helpers the TS CUA facade reads back.
+    "_rac_cua_system_prompt"
+    "_rac_cua_parse_action"
+    "_rac_wasm_sizeof_cua_action"
+    "_rac_wasm_offsetof_cua_action_type"
+    "_rac_wasm_offsetof_cua_action_has_coordinate"
+    "_rac_wasm_offsetof_cua_action_x"
+    "_rac_wasm_offsetof_cua_action_y"
+    "_rac_wasm_offsetof_cua_action_scroll_pixels"
+    "_rac_wasm_offsetof_cua_action_wait_seconds"
+    "_rac_wasm_offsetof_cua_action_text"
+    "_rac_wasm_offsetof_cua_action_reasoning"
+    "_rac_wasm_offsetof_cua_action_parse_ok"
+
     # Canonical rac_result_t -> SDKError proto mapping. Lets
     # SDKException route error construction through the shared commons helper
     # rac_result_to_proto_error instead of the local TypeScript category table.

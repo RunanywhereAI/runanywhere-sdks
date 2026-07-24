@@ -28,6 +28,36 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
  */
 
 /**
+ * Flat JNI-boundary DTO for one parsed Computer-Use-Agent action. Mirrors the
+ * C `rac_cua_action_t` struct field-for-field so the native
+ * [RunAnywhereBridge.racCuaParseAction] thunk can construct it directly via
+ * JNI (the reverse of the [RacDirectoryEntry] read pattern). The public
+ * `RunAnywhere.CUA` facade maps this into the structured `CuaAction` value
+ * type — consumers never see this DTO.
+ *
+ * @property type action-type ordinal matching `rac_cua_action_type_t`.
+ * @property hasCoordinate 1 when [x]/[y] are valid.
+ * @property x viewport-scaled x pixel.
+ * @property y viewport-scaled y pixel.
+ * @property scrollPixels scroll amount for scroll/hscroll (+up / -down).
+ * @property waitSeconds seconds to wait (WAIT action).
+ * @property text primary string argument, interpreted by [type].
+ * @property reasoning chain-of-thought emitted before the tool call, if any.
+ * @property parseOk 1 when a valid tool call was found.
+ */
+data class RacCuaAction(
+    @JvmField val type: Int,
+    @JvmField val hasCoordinate: Int,
+    @JvmField val x: Int,
+    @JvmField val y: Int,
+    @JvmField val scrollPixels: Int,
+    @JvmField val waitSeconds: Double,
+    @JvmField val text: String,
+    @JvmField val reasoning: String,
+    @JvmField val parseOk: Int,
+)
+
+/**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
  * This object maps directly to the JNI functions in runanywhere_commons_jni.cpp.
@@ -1314,6 +1344,41 @@ object RunAnywhereBridge {
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racLoraAdapterImportProto(requestProto: ByteArray): ByteArray?
+
+    // COMPUTER-USE AGENT (CUA) SCAFFOLD (rac/features/cua/rac_cua.h)
+    //
+    // Stateless, profile-driven bridge that turns a VLM into a drivable
+    // computer-use agent without baking any single model into the SDK.
+    // Mirrors Swift's `RunAnywhere.CUA` facade (RunAnywhere+CUA.swift), which
+    // calls `rac_cua_system_prompt` / `rac_cua_parse_action` directly. The
+    // parse thunk marshals the flat C `rac_cua_action_t` into [RacCuaAction],
+    // which the public facade maps into the structured `CuaAction` value type.
+
+    /**
+     * Render `profileId`'s system prompt for a declared coordinate space
+     * (`displayW` x `displayH`; pass the profile's native space, e.g.
+     * 1000x1000 for Fara). Forwards to `rac_cua_system_prompt`.
+     *
+     * @return the prompt string, or null for an unknown profile.
+     */
+    @JvmStatic
+    external fun racCuaSystemPrompt(profileId: String, displayW: Int, displayH: Int): String?
+
+    /**
+     * Parse a CUA model's raw output into a [RacCuaAction] DTO, rescaling
+     * coordinates from the profile's model space to the caller's viewport.
+     * Forwards to `rac_cua_parse_action`.
+     *
+     * @return a populated [RacCuaAction] (inspect `parseOk` for whether a
+     *         valid tool call was found), or null for an unknown profile.
+     */
+    @JvmStatic
+    external fun racCuaParseAction(
+        profileId: String,
+        modelOutput: String,
+        viewportW: Int,
+        viewportH: Int,
+    ): RacCuaAction?
 
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     //

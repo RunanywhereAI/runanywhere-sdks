@@ -76,6 +76,20 @@ export {
 // VLMImage factory helpers — mirror Swift RAVLMImage+Helpers.swift.
 export { VLMImages } from './Public/Extensions/VLM/VLMImage+Helpers';
 
+// Computer-Use Agent (CUA) — mirror Swift RunAnywhere+CUA.swift.
+export {
+  cua,
+  systemPrompt as cuaSystemPrompt,
+  parseAction as cuaParseAction,
+  CuaActionKind,
+  FARA_PROFILE,
+} from './Public/Extensions/CUA/RunAnywhere+CUA';
+export type {
+  CuaAction,
+  CuaCoordinate,
+  CuaDisplaySize,
+} from './Public/Extensions/CUA/RunAnywhere+CUA';
+
 // Embedding vector math helpers — mirror Swift EmbeddingsProto+Helpers.swift.
 export {
   cosineSimilarity,

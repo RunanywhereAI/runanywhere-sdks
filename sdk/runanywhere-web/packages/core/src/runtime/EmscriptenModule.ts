@@ -643,6 +643,55 @@ export interface EmscriptenRunanywhereModule {
   _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
 
   // -----------------------------------------------------------------------------
+  // Computer-Use Agent (CUA) — `rac/features/cua/rac_cua.h`
+  // -----------------------------------------------------------------------------
+  // Stateless, model-agnostic profile ABI (pairs with rac_vlm_*). `profileId`
+  // and `modelOutput` are NUL-terminated C strings the caller writes into the
+  // heap; `out` for parse is a caller-allocated `rac_cua_action_t` read back
+  // via the sizeof/offset helpers below.
+
+  /**
+   * `int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
+   *    uint32_t display_h, char* out, size_t out_size);`
+   *
+   * Returns the full length excluding NUL (>= out_size means truncated), or -1
+   * for an unknown profile. Pass `out=0, out_size=0` to size the buffer first.
+   */
+  _rac_cua_system_prompt?(
+    profileIdPtr: number,
+    displayW: number,
+    displayH: number,
+    outPtr: number,
+    outSize: number,
+  ): number;
+
+  /**
+   * `int rac_cua_parse_action(const char* profile_id, const char* model_output,
+   *    uint32_t viewport_w, uint32_t viewport_h, rac_cua_action_t* out);`
+   *
+   * Returns 0 on a recognized profile (inspect the struct's `parse_ok` field),
+   * or -1 for an unknown profile / NULL args.
+   */
+  _rac_cua_parse_action?(
+    profileIdPtr: number,
+    modelOutputPtr: number,
+    viewportW: number,
+    viewportH: number,
+    outActionPtr: number,
+  ): number;
+
+  _rac_wasm_sizeof_cua_action?(): number;
+  _rac_wasm_offsetof_cua_action_type?(): number;
+  _rac_wasm_offsetof_cua_action_has_coordinate?(): number;
+  _rac_wasm_offsetof_cua_action_x?(): number;
+  _rac_wasm_offsetof_cua_action_y?(): number;
+  _rac_wasm_offsetof_cua_action_scroll_pixels?(): number;
+  _rac_wasm_offsetof_cua_action_wait_seconds?(): number;
+  _rac_wasm_offsetof_cua_action_text?(): number;
+  _rac_wasm_offsetof_cua_action_reasoning?(): number;
+  _rac_wasm_offsetof_cua_action_parse_ok?(): number;
+
+  // -----------------------------------------------------------------------------
   // Storage analyzer proto-byte ABI
   // -----------------------------------------------------------------------------
   _rac_storage_analyzer_create?(callbacksPtr: number, outHandlePtr: number): number;

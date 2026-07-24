@@ -38,6 +38,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.extensions.CUA.CUA as CuaNamespace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -192,6 +193,13 @@ object RunAnywhere {
     )
 
     private val logger = SDKLogger("RunAnywhere")
+
+    /**
+     * Computer-use-agent scaffold namespace. Mirrors Swift's
+     * `RunAnywhere.CUA`. Stateless and model-agnostic — pair it with the VLM
+     * inference APIs. See [com.runanywhere.sdk.public.extensions.CUA.CUA].
+     */
+    val CUA = CuaNamespace
 
     /**
      * Persisted init params from the most recent [initialize] call. Mirrors

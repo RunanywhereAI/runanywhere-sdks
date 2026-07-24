@@ -1,0 +1,172 @@
+/**
+ * RunAnywhere+CUA.ts
+ *
+ * Computer-Use Agent (CUA) extension for the RunAnywhere core SDK.
+ *
+ * Turns a VLM into a drivable computer-use agent WITHOUT baking any single
+ * model into the SDK. A CUA *profile* (data) describes how a family of models
+ * is driven: its system prompt, output format, and coordinate convention. The
+ * API is model-AGNOSTIC — callers pass a `profile`; `fara` (Microsoft Fara1.5 /
+ * Qwen3.5-VL `computer_use`, a fixed 1000x1000 coordinate space) ships built
+ * in. Adding another CUA model is a new profile in commons, not new API.
+ *
+ * This layer is stateless and I/O-free (no model handle, no inference): it
+ * pairs with the `processImage` / `processImageStream` VLM calls. The app owns
+ * screenshot capture, executing the returned action (tap/type/scroll), and the
+ * agent loop — none of the prompt/parse/coordinate knowledge leaks into it.
+ *
+ * Mirrors the Swift `RunAnywhere.CUA` facade (RunAnywhere+CUA.swift), backed by
+ * the RN core Nitro bridge over commons `rac_cua_system_prompt` and
+ * `rac_cua_parse_action`. Both calls are synchronous — pure CPU string work
+ * with no init dependency (matching the Swift facade).
+ */
+
+import {
+  requireNativeModule,
+  isNativeModuleAvailable,
+} from '../../../native';
+
+/**
+ * Built-in profile for Microsoft Fara1.5 / Qwen3.5-VL `computer_use`
+ * (a fixed 1000x1000 model coordinate space). Matches `RAC_CUA_PROFILE_FARA`.
+ */
+export const FARA_PROFILE = 'fara';
+
+/**
+ * The action a CUA model wants to perform. Raw values match the commons
+ * `rac_cua_action_type_t` enum (and Swift `CuaAction.Kind`).
+ */
+export enum CuaActionKind {
+  Unknown = 0,
+  LeftClick = 1,
+  RightClick = 2,
+  DoubleClick = 3,
+  TripleClick = 4,
+  MouseMove = 5,
+  LeftClickDrag = 6,
+  Type = 7,
+  Key = 8,
+  Scroll = 9,
+  HScroll = 10,
+  VisitURL = 11,
+  HistoryBack = 12,
+  WebSearch = 13,
+  ReadPageAnswer = 14,
+  PauseMemorize = 15,
+  AskUser = 16,
+  Wait = 17,
+  Terminate = 18,
+}
+
+/** A viewport-scaled pixel coordinate. */
+export interface CuaCoordinate {
+  x: number;
+  y: number;
+}
+
+/**
+ * A computer-use-agent action parsed from a model's output, with coordinates
+ * already scaled to the caller's viewport. Model-agnostic. Mirrors the Swift
+ * `CuaAction` struct.
+ */
+export interface CuaAction {
+  /** The action the model wants to perform. */
+  kind: CuaActionKind;
+  /** Viewport-scaled pixel coordinate (for click / move / drag), else undefined. */
+  coordinate?: CuaCoordinate;
+  /**
+   * Primary string argument, interpreted by `kind`: Type→text, VisitURL→url,
+   * WebSearch→query, Terminate→answer, AskUser/ReadPageAnswer→question,
+   * PauseMemorize→fact, Key→space-joined keys.
+   */
+  text: string;
+  /** Chain-of-thought the model emitted before the tool call, if any. */
+  reasoning: string;
+  /** Scroll amount for Scroll/HScroll (+up / -down). */
+  scrollPixels: number;
+  /** Seconds to wait for the `Wait` action. */
+  waitSeconds: number;
+  /** Whether a valid tool call was found. */
+  isValid: boolean;
+}
+
+/** A width/height coordinate space (model display or app viewport). */
+export interface CuaDisplaySize {
+  width: number;
+  height: number;
+}
+
+/** The profile's native coordinate space for `fara` (1000x1000). */
+const DEFAULT_DISPLAY: CuaDisplaySize = { width: 1000, height: 1000 };
+
+/**
+ * The system prompt (identity + `computer_use` tool schema) for a profile,
+ * rendered at a declared coordinate space (pass the profile's native space,
+ * e.g. 1000x1000 for Fara). Returns `null` for an unknown profile.
+ *
+ * Matches Swift `RunAnywhere.CUA.systemPrompt(profile:display:)`.
+ */
+export function systemPrompt(options?: {
+  profile?: string;
+  display?: CuaDisplaySize;
+}): string | null {
+  if (!isNativeModuleAvailable()) {
+    return null;
+  }
+  const profile = options?.profile ?? FARA_PROFILE;
+  const display = options?.display ?? DEFAULT_DISPLAY;
+  const prompt = requireNativeModule().cuaSystemPrompt(
+    profile,
+    display.width,
+    display.height
+  );
+  // Commons returns an empty string for an unknown profile (rc <= 0).
+  return prompt.length > 0 ? prompt : null;
+}
+
+/**
+ * Parse a model's raw output into a `CuaAction`, rescaling coordinates from the
+ * profile's model space to `viewport`. Returns `null` for an unknown profile;
+ * `CuaAction.isValid` is false when no valid tool call was found.
+ *
+ * Matches Swift `RunAnywhere.CUA.parseAction(_:profile:viewport:)`.
+ */
+export function parseAction(
+  modelOutput: string,
+  options: { viewport: CuaDisplaySize; profile?: string }
+): CuaAction | null {
+  if (!isNativeModuleAvailable()) {
+    return null;
+  }
+  const profile = options.profile ?? FARA_PROFILE;
+  const raw = requireNativeModule().cuaParseAction(
+    profile,
+    modelOutput,
+    options.viewport.width,
+    options.viewport.height
+  );
+  // Unknown profile → null (Swift returns nil).
+  if (!raw.profileKnown) {
+    return null;
+  }
+  return {
+    kind: raw.kind as CuaActionKind,
+    coordinate: raw.hasCoordinate ? { x: raw.x, y: raw.y } : undefined,
+    text: raw.text,
+    reasoning: raw.reasoning,
+    scrollPixels: raw.scrollPixels,
+    waitSeconds: raw.waitSeconds,
+    isValid: raw.isValid,
+  };
+}
+
+/**
+ * Computer-use-agent namespace — mirrors the Swift `RunAnywhere.CUA` surface.
+ * Exposed as `RunAnywhere.cua`.
+ */
+export const cua = {
+  /** Built-in profile id for Fara1.5 / Qwen3.5-VL `computer_use`. */
+  faraProfile: FARA_PROFILE,
+  systemPrompt,
+  parseAction,
+};

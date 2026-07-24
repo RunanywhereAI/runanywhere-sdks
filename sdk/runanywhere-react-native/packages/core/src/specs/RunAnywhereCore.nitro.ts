@@ -33,6 +33,38 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * - @runanywhere/mlx for Apple MLX inference
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
+
+/**
+ * Flat, boundary-safe projection of the commons `rac_cua_action_t` struct
+ * (see `rac/features/cua/rac_cua.h`). Nitro marshals this as a plain struct
+ * (no proto exists for CUA — the C ABI is a struct, mirrored here field for
+ * field). The public `CuaAction` facade type re-shapes these fields into an
+ * enum `kind` + optional `coordinate`. Coordinates are already viewport-scaled
+ * by commons.
+ */
+export interface CuaActionNative {
+  /** True when `profileId` is a recognized profile (C ABI returned 0). */
+  profileKnown: boolean;
+  /** Raw `rac_cua_action_type_t` value (0 = unknown … 17 = terminate). */
+  kind: number;
+  /** True when `x`/`y` are valid (click / move / drag actions). */
+  hasCoordinate: boolean;
+  /** Viewport-scaled X pixel (valid only when `hasCoordinate`). */
+  x: number;
+  /** Viewport-scaled Y pixel (valid only when `hasCoordinate`). */
+  y: number;
+  /** Scroll amount for scroll/hscroll (+up / -down). */
+  scrollPixels: number;
+  /** Seconds to wait for the `wait` action. */
+  waitSeconds: number;
+  /** Primary string argument, interpreted by `kind` (text/url/query/…). */
+  text: string;
+  /** Chain-of-thought the model emitted before the tool call, if any. */
+  reasoning: string;
+  /** True when a valid tool call was parsed (`parse_ok`). */
+  isValid: boolean;
+}
+
 export interface RunAnywhereCore extends HybridObject<{
   ios: 'c++';
   android: 'c++';
@@ -869,6 +901,41 @@ export interface RunAnywhereCore extends HybridObject<{
    * Cancel ongoing VLM generation through commons cancellation ABI.
    */
   vlmCancelProto(): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // Computer-Use Agent (CUA) — profile-driven prompt/parse scaffold.
+  // Stateless, I/O-free (no model handle): pairs with the VLM inference calls
+  // above. Backed by rac_cua_system_prompt / rac_cua_parse_action. Pure CPU
+  // string work, so both are synchronous (mirrors Swift's sync RunAnywhere.CUA
+  // and the sync framework/model-role lookups above). "fara" is the only
+  // built-in profile today; adding models is a new commons profile, not new API.
+  // ============================================================================
+
+  /**
+   * Render `profileId`'s system prompt for a declared coordinate space
+   * (`displayWidth` x `displayHeight`). Returns the full prompt string, or an
+   * empty string when the profile is unknown. Backed by
+   * `rac_cua_system_prompt`.
+   */
+  cuaSystemPrompt(
+    profileId: string,
+    displayWidth: number,
+    displayHeight: number
+  ): string;
+
+  /**
+   * Parse a CUA model's raw output into a `CuaActionNative`, rescaling
+   * coordinates from the profile's model space to `viewportWidth` x
+   * `viewportHeight`. `profileKnown` is false for an unknown profile; `isValid`
+   * is false when no valid tool call was found. Backed by
+   * `rac_cua_parse_action`.
+   */
+  cuaParseAction(
+    profileId: string,
+    modelOutput: string,
+    viewportWidth: number,
+    viewportHeight: number
+  ): CuaActionNative;
 
   // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)

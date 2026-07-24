@@ -17,6 +17,8 @@ export 'foundation/logging/sdk_logger.dart';
 // 0.20.10 (`RunAnywhere+Diffusion.swift`), so Flutter re-exposes the matching
 // surface. On non-Apple platforms the capability fails closed with a clear
 // unsupported SDKException.
+export 'public/capabilities/runanywhere_cua.dart'
+    show CuaAction, CuaActionKind, RunAnywhereCUA;
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'

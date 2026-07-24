@@ -54,6 +54,7 @@ import {
 import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig.js';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions.js';
+import { CUA as CUACapability } from './Extensions/RunAnywhere+CUA.js';
 import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings.js';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA.js';
 import {
@@ -1512,6 +1513,15 @@ export const RunAnywhere = {
   // =========================================================================
 
   solutions: SolutionsCapability,
+
+  // =========================================================================
+  // Computer-Use Agent namespace
+  // =========================================================================
+
+  /** Computer-use-agent scaffold — `RunAnywhere.CUA.systemPrompt(...)` /
+   * `RunAnywhere.CUA.parseAction(...)`. Stateless & model-agnostic; pairs with
+   * `processImage`/`processImageStream`. Mirrors Swift's `RunAnywhere.CUA`. */
+  CUA: CUACapability,
 
   // =========================================================================
   // Namespace extensions — proto-byte adapter facades.

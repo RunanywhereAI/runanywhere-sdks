@@ -70,6 +70,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/features/cua/rac_cua.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -7931,4 +7932,102 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformUnregister(J
         return static_cast<jint>(plugin_result);
     }
     return static_cast<jint>(backend_result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Computer-Use Agent (CUA) scaffold (rac_cua.h)
+//
+// Stateless profile-driven bridge. Mirrors the iOS `RunAnywhere.CUA` facade
+// (RunAnywhere+CUA.swift), which calls `rac_cua_system_prompt` /
+// `rac_cua_parse_action` directly. The parse thunk marshals the flat
+// `rac_cua_action_t` struct into the Kotlin JNI DTO `RacCuaAction` (same
+// field-by-field pattern as RacDirectoryEntry, in reverse), which the
+// public facade maps into the structured `CuaAction` value type.
+// =============================================================================
+
+// Renders the profile system prompt for a declared coordinate space. Returns
+// the prompt string, or null for an unknown profile (rac returns -1).
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaSystemPrompt(
+    JNIEnv* env, jclass clazz, jstring profileId, jint displayW, jint displayH) {
+    (void)clazz;
+    if (profileId == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+
+    // Capacity query: pass a NULL buffer to learn the full length (mirrors the
+    // Swift facade's two-call pattern).
+    int needed = rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                                       static_cast<uint32_t>(displayH), nullptr, 0);
+    if (needed <= 0) {
+        return nullptr;
+    }
+
+    std::vector<char> buffer(static_cast<size_t>(needed) + 1, '\0');
+    rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                          static_cast<uint32_t>(displayH), buffer.data(), buffer.size());
+    return env->NewStringUTF(buffer.data());
+}
+
+// Parses a CUA model's raw output into a RacCuaAction DTO, rescaling
+// coordinates to the caller's viewport. Returns null for an unknown profile
+// (rac returns -1); the DTO's parseOk flag distinguishes "no tool call found".
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaParseAction(
+    JNIEnv* env, jclass clazz, jstring profileId, jstring modelOutput, jint viewportW,
+    jint viewportH) {
+    (void)clazz;
+    if (profileId == nullptr || modelOutput == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+    std::string output = getCString(env, modelOutput);
+
+    rac_cua_action_t action;
+    std::memset(&action, 0, sizeof(action));
+    int rc = rac_cua_parse_action(profile.c_str(), output.c_str(),
+                                  static_cast<uint32_t>(viewportW),
+                                  static_cast<uint32_t>(viewportH), &action);
+    if (rc != 0) {
+        return nullptr;
+    }
+
+    jclass dtoClass = env->FindClass("com/runanywhere/sdk/native/bridge/RacCuaAction");
+    if (dtoClass == nullptr) {
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+        return nullptr;
+    }
+    // Constructor mirrors rac_cua_action_t field order:
+    // (type, hasCoordinate, x, y, scrollPixels, waitSeconds, text, reasoning, parseOk).
+    jmethodID ctor = env->GetMethodID(
+        dtoClass, "<init>", "(IIIIIDLjava/lang/String;Ljava/lang/String;I)V");
+    if (ctor == nullptr) {
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(dtoClass);
+        return nullptr;
+    }
+
+    // The fixed C char arrays are guaranteed NUL-terminated by commons.
+    jstring jText = env->NewStringUTF(action.text);
+    jstring jReasoning = env->NewStringUTF(action.reasoning);
+
+    jobject dto = env->NewObject(
+        dtoClass, ctor, static_cast<jint>(action.type), static_cast<jint>(action.has_coordinate),
+        static_cast<jint>(action.x), static_cast<jint>(action.y),
+        static_cast<jint>(action.scroll_pixels), static_cast<jdouble>(action.wait_seconds), jText,
+        jReasoning, static_cast<jint>(action.parse_ok));
+
+    if (jText != nullptr) {
+        env->DeleteLocalRef(jText);
+    }
+    if (jReasoning != nullptr) {
+        env->DeleteLocalRef(jReasoning);
+    }
+    env->DeleteLocalRef(dtoClass);
+    return dto;
 }
