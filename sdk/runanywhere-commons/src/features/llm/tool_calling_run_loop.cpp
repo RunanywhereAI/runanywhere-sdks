@@ -35,6 +35,7 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -115,6 +116,10 @@ struct LoopContext {
     bool require_json_arguments = false;
     bool keep_tools_available = false;
     bool validate_calls = true;
+    // Backend consumes rac_llm_options_t.grammar (QHexRT). Probed once at loop entry.
+    // When true, the tool-call prompt is built AND parsed in the bare-Pythonic
+    // `[name(args)]` format the toolcall_opt grammar enforces (RUN-80).
+    bool grammar_backend = false;
     rac::llm::tool_calling::GenerationState generation;
 
     // request-level tool_choice / forced_tool_name overrides.
@@ -252,8 +257,16 @@ std::string format_prompt_proto(const LoopContext& ctx,
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_format_prompt_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    // Grammar backends (QHexRT) build the tool prompt in the bare-Pythonic `[name(args)]`
+    // format the toolcall_opt grammar enforces; every other engine keeps its declared
+    // format (byte-for-byte unchanged). RUN-80.
+    rac_result_t rc = ctx.grammar_backend
+                          ? rac_tool_call_format_prompt_grammar_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out)
+                          : rac_tool_call_format_prompt_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out);
     std::string formatted;
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
         runanywhere::v1::ToolPromptFormatResult result;
@@ -271,6 +284,12 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
     runanywhere::v1::ToolParseRequest request;
     request.set_text(llm_output);
     *request.mutable_options() = build_options_snapshot(ctx);
+    // Grammar backends emit bare `[name(args)]` (no format tag), so drop the explicit
+    // format hint and let the parser auto-detect it — detect_format routes a bare call to
+    // the Pythonic parser, and a plain-text abstention to no-call. RUN-80.
+    if (ctx.grammar_backend) {
+        request.mutable_options()->clear_format();
+    }
 
     std::vector<uint8_t> req_bytes;
     if (!serialize(request, &req_bytes)) {
@@ -416,6 +435,10 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     ctx.format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
                      ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
                      : request.format();
+    // Probe grammar capability once up front (cheap acquire/release) so the prompt can
+    // be built in the bare-Pythonic format the QHexRT grammar enforces. Non-grammar
+    // engines keep the caller's declared format — a strict no-op for them (RUN-80).
+    ctx.grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     ctx.max_tool_calls =
         request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
     ctx.auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
