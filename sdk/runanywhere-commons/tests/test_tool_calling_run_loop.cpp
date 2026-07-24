@@ -1789,6 +1789,110 @@ int test_thinking_content_stripped_from_answer() {
 
 }  // namespace
 
+// RUN-80 (grammar-engage): on a grammar backend (QHexRT) the tool prompt is BUILT in the
+// bare-Pythonic `[name(args)]` format the toolcall_opt grammar enforces, and a bare reply
+// PARSES back into a tool call — so the grammar actually engages end-to-end. Non-grammar
+// engines are byte-for-byte unchanged (DEFAULT `<tool_call>` build + parse). A plain-text
+// reply on a grammar backend abstains (no tool call).
+int test_grammar_backend_bare_pythonic_end_to_end() {
+    // QHexRT: bare-Pythonic prompt + a bare [name(args)] reply parses.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"[get_weather(location=\"Tokyo\")]", "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "grammar backend generated at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("[tool_name(") != std::string::npos,
+                  "grammar backend builds a bare-Pythonic prompt");
+            CHECK(captures[0].prompt.find("<tool_call>") == std::string::npos,
+                  "grammar backend prompt carries no <tool_call> tag");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "bare [name(args)] reply parsed into a tool call");
+        if (result.tool_calls_size() >= 1) {
+            CHECK(result.tool_calls(0).name() == "get_weather", "parsed the get_weather call");
+            CHECK(result.tool_calls(0).arguments_json().find("Tokyo") != std::string::npos,
+                  "parsed the Tokyo argument");
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    // llama.cpp: DEFAULT <tool_call> prompt + reply, unchanged.
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP))
+        return 1;
+    set_responses({R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
+                   "The weather in Tokyo is sunny."});
+    {
+        auto request = make_request("Weather in Tokyo?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        {
+            std::lock_guard<std::mutex> lg(exec.mu);
+            exec.result_jsons.emplace_back(R"({"temp":25})");
+        }
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "non-grammar backend turn succeeds");
+        const auto captures = generation_captures();
+        CHECK(!captures.empty(), "non-grammar backend generated at least once");
+        if (!captures.empty()) {
+            CHECK(captures[0].prompt.find("<tool_call>") != std::string::npos,
+                  "non-grammar backend keeps the DEFAULT <tool_call> prompt");
+            CHECK(captures[0].prompt.find("[tool_name(") == std::string::npos,
+                  "non-grammar backend does NOT get the bare-Pythonic prompt");
+        }
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() >= 1, "default <tool_call> reply still parsed");
+        rac_proto_buffer_free(&out);
+    }
+
+    // QHexRT abstains: a plain-text reply yields no tool call (grammar allows free chat).
+    if (!load_mock_llm(runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT))
+        return 1;
+    set_responses({"The capital of France is Paris."});
+    {
+        auto request = make_request("What is the capital of France?");
+        std::vector<uint8_t> bytes;
+        serialize(request, &bytes);
+        ExecutorState exec;
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        const rac_result_t rc = run_loop(bytes.data(), bytes.size(), executor_callback, &exec, &out);
+        CHECK(rc == RAC_SUCCESS, "grammar backend abstain turn succeeds");
+        runanywhere::v1::ToolCallingResult result;
+        if (out.data && out.size > 0) {
+            (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+        }
+        CHECK(result.tool_calls_size() == 0, "plain-text reply on grammar backend = no call");
+        CHECK(result.text() == "The capital of France is Paris.", "abstention text preserved");
+        rac_proto_buffer_free(&out);
+    }
+
+    cleanup_environment();
+    return 0;
+}
+
 int main() {
     try {
         std::fprintf(stdout, "test_tool_calling_run_loop\n");
@@ -1812,6 +1916,7 @@ int main() {
         test_grammar_attached_only_for_grammar_backend();
         test_none_attaches_no_grammar_on_grammar_backend();
         test_grammar_dropped_on_synthesis_turn();
+        test_grammar_backend_bare_pythonic_end_to_end();
         test_tool_decision_hint_gated_on_auto_path();
         test_disable_thinking_directive_is_engine_gated();
         test_thinking_content_stripped_from_answer();
