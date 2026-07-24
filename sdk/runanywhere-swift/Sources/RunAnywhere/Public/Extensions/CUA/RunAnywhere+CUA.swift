@@ -62,34 +62,35 @@ extension RunAnywhere {
         /// from the profile's model space to `viewport`. Returns nil for an
         /// unknown profile; `CuaAction.isValid` is false when no tool call was
         /// found.
+        ///
+        /// Decodes the canonical `runanywhere.v1.CuaAction` proto that commons
+        /// serializes — the same proto-byte bridging every other modality uses,
+        /// so there is no hand-mirrored C struct to keep in sync.
         public static func parseAction(
             _ modelOutput: String,
             profile: String = faraProfile,
             viewport: (width: Int, height: Int)
         ) -> CuaAction? {
-            var action = rac_cua_action_t()
+            var buffer = rac_proto_buffer_t()
+            defer { rac_proto_buffer_free(&buffer) }
             let rc = modelOutput.withCString { output in
-                rac_cua_parse_action(profile, output, UInt32(viewport.width), UInt32(viewport.height), &action)
+                rac_cua_parse_action_proto(
+                    profile, output, UInt32(viewport.width), UInt32(viewport.height), &buffer)
             }
-            guard rc == 0 else { return nil }
-            let coordinate = action.has_coordinate != 0 ? (x: Int(action.x), y: Int(action.y)) : nil
+            guard rc == RAC_SUCCESS, let data = buffer.data, buffer.size > 0,
+                  let proto = try? RACuaAction(serializedBytes: Data(bytes: data, count: buffer.size))
+            else { return nil }
+
+            let coordinate = proto.coordinateValid ? (x: Int(proto.x), y: Int(proto.y)) : nil
             return CuaAction(
-                kind: CuaAction.Kind(rawValue: Int(action.type.rawValue)) ?? .unknown,
+                kind: CuaAction.Kind(rawValue: proto.type.rawValue) ?? .unknown,
                 coordinate: coordinate,
-                text: fixedCString(action.text),
-                reasoning: fixedCString(action.reasoning),
-                scrollPixels: Int(action.scroll_pixels),
-                waitSeconds: action.wait_seconds,
-                isValid: action.parse_ok != 0
+                text: proto.text,
+                reasoning: proto.reasoning,
+                scrollPixels: Int(proto.scrollPixels),
+                waitSeconds: proto.waitSeconds,
+                isValid: proto.parseOk
             )
         }
-    }
-}
-
-/// Read a NUL-terminated C string out of a fixed-size C `char` array tuple.
-private func fixedCString<T>(_ tuple: T) -> String {
-    withUnsafeBytes(of: tuple) { raw in
-        guard let base = raw.baseAddress else { return "" }
-        return String(cString: base.assumingMemoryBound(to: CChar.self))
     }
 }

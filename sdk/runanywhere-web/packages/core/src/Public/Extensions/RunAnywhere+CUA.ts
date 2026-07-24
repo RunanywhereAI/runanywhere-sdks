@@ -11,22 +11,26 @@
  * `processImage`/`processImageStream` for inference; the app owns screenshot
  * capture, executing the returned action, and the agent loop. All prompt /
  * parse / coordinate knowledge stays in commons behind the `rac_cua_*` C ABI;
- * this facade only marshals strings and the `rac_cua_action_t` struct across
- * the WASM boundary via the compiler-derived sizeof/offset helpers.
+ * this facade marshals strings across the WASM boundary and decodes the
+ * canonical `runanywhere.v1.CuaAction` proto commons serializes — the same
+ * proto-byte bridging every other modality uses.
  */
+
+import { CuaAction as CuaActionProto } from '@runanywhere/proto-ts/cua';
 
 import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../../runtime/ProtoWasm.js';
 import { SDKException } from '../../Foundation/SDKException.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
 
 /**
  * The action a CUA model wants to perform. Numeric values match the commons
- * `rac_cua_action_type_t` enum ordering (rac_cua.h) one-for-one, so a raw
- * struct read maps directly onto this union. There is no generated
- * `@runanywhere/proto-ts` enum for CUA yet (the proto-byte `CuaAction` variant
- * is a planned commons follow-up), so this is the canonical local type.
+ * `rac_cua_action_type_t` enum (rac_cua.h) and the generated
+ * `@runanywhere/proto-ts/cua` `CuaActionType` one-for-one — this is the public,
+ * Swift-shaped local type the decoded proto maps onto.
  */
 export enum CuaActionKind {
   Unknown = 0,
@@ -97,6 +101,8 @@ const REBUILD_HINT =
   'Rebuild the WASM artifact from wasm/src/wasm_exports.cpp (npm run build:wasm) ' +
   'so the rac_cua_* exports are linked.';
 
+const logger = new SDKLogger('CUA');
+
 /**
  * Resolve the module that carries the stateless CUA exports. They are compiled
  * into commons, so every backend WASM (and the commons-only artifact) exports
@@ -118,17 +124,6 @@ function allocCString(module: EmscriptenRunanywhereModule, value: string): numbe
   const ptr = module._malloc(size);
   module.stringToUTF8(value, ptr, size);
   return ptr;
-}
-
-/** Read a required offset helper or throw a rebuild hint. */
-function offset(
-  fn: (() => number) | undefined,
-  name: string,
-): number {
-  if (typeof fn !== 'function') {
-    throw new SDKException(-1, `WASM module missing ${name}. ${REBUILD_HINT}`);
-  }
-  return fn();
 }
 
 /**
@@ -183,49 +178,26 @@ export const CUA = {
     viewport: CuaDisplaySize,
   ): CuaAction | null {
     const module = requireModule();
-    const parseFn = module._rac_cua_parse_action;
+    const parseFn = module._rac_cua_parse_action_proto;
     if (typeof parseFn !== 'function') {
-      throw new SDKException(-1, `WASM module missing _rac_cua_parse_action. ${REBUILD_HINT}`);
+      throw new SDKException(-1, `WASM module missing _rac_cua_parse_action_proto. ${REBUILD_HINT}`);
     }
-
-    const structSize = offset(module._rac_wasm_sizeof_cua_action, '_rac_wasm_sizeof_cua_action');
-    const offType = offset(module._rac_wasm_offsetof_cua_action_type, '_rac_wasm_offsetof_cua_action_type');
-    const offHasCoord = offset(
-      module._rac_wasm_offsetof_cua_action_has_coordinate,
-      '_rac_wasm_offsetof_cua_action_has_coordinate',
-    );
-    const offX = offset(module._rac_wasm_offsetof_cua_action_x, '_rac_wasm_offsetof_cua_action_x');
-    const offY = offset(module._rac_wasm_offsetof_cua_action_y, '_rac_wasm_offsetof_cua_action_y');
-    const offScroll = offset(
-      module._rac_wasm_offsetof_cua_action_scroll_pixels,
-      '_rac_wasm_offsetof_cua_action_scroll_pixels',
-    );
-    const offWait = offset(
-      module._rac_wasm_offsetof_cua_action_wait_seconds,
-      '_rac_wasm_offsetof_cua_action_wait_seconds',
-    );
-    const offText = offset(module._rac_wasm_offsetof_cua_action_text, '_rac_wasm_offsetof_cua_action_text');
-    const offReasoning = offset(
-      module._rac_wasm_offsetof_cua_action_reasoning,
-      '_rac_wasm_offsetof_cua_action_reasoning',
-    );
-    const offParseOk = offset(
-      module._rac_wasm_offsetof_cua_action_parse_ok,
-      '_rac_wasm_offsetof_cua_action_parse_ok',
-    );
 
     const profilePtr = allocCString(module, profile);
     const outputPtr = allocCString(module, modelOutput);
-    const actionPtr = module._malloc(structSize);
     try {
-      // Zero-init the struct so unread padding never leaks stale heap bytes.
-      for (let i = 0; i < structSize; i++) module.setValue(actionPtr + i, 0, 'i8');
+      const bridge = new ProtoWasmBridge(module as unknown as ProtoWasmModule, logger);
+      const bytes = bridge.readResultProto(
+        (outBufferPtr) =>
+          parseFn(profilePtr, outputPtr, viewport.width, viewport.height, outBufferPtr),
+        'rac_cua_parse_action_proto',
+      );
+      // null → unknown profile (or missing exports) → Swift nil parity. An empty
+      // (but non-null) buffer decodes to a CuaAction with parseOk = false.
+      if (!bytes) return null;
 
-      const rc = parseFn(profilePtr, outputPtr, viewport.width, viewport.height, actionPtr);
-      if (rc !== 0) return null; // unknown profile / NULL args
-
-      const rawType = module.getValue(actionPtr + offType, 'i32');
-      const hasCoordinate = module.getValue(actionPtr + offHasCoord, 'i32') !== 0;
+      const proto = CuaActionProto.decode(bytes);
+      const rawType = proto.type as number;
       const kind =
         rawType >= CuaActionKind.Unknown && rawType <= CuaActionKind.Terminate
           ? (rawType as CuaActionKind)
@@ -233,20 +205,14 @@ export const CUA = {
 
       return {
         kind,
-        coordinate: hasCoordinate
-          ? {
-              x: module.getValue(actionPtr + offX, 'i32'),
-              y: module.getValue(actionPtr + offY, 'i32'),
-            }
-          : null,
-        text: module.UTF8ToString(actionPtr + offText),
-        reasoning: module.UTF8ToString(actionPtr + offReasoning),
-        scrollPixels: module.getValue(actionPtr + offScroll, 'i32'),
-        waitSeconds: module.getValue(actionPtr + offWait, 'double'),
-        isValid: module.getValue(actionPtr + offParseOk, 'i32') !== 0,
+        coordinate: proto.coordinateValid ? { x: proto.x, y: proto.y } : null,
+        text: proto.text,
+        reasoning: proto.reasoning,
+        scrollPixels: proto.scrollPixels,
+        waitSeconds: proto.waitSeconds,
+        isValid: proto.parseOk,
       };
     } finally {
-      module._free(actionPtr);
       module._free(outputPtr);
       module._free(profilePtr);
     }

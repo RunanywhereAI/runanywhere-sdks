@@ -6,19 +6,22 @@
  * Thin, stateless sync thunks to the commons CUA scaffold
  * (`rac/features/cua/rac_cua.h`):
  *   - cuaSystemPrompt  → rac_cua_system_prompt
- *   - cuaParseAction   → rac_cua_parse_action
+ *   - cuaParseAction   → rac_cua_parse_action_proto
  *
- * No model handle, no I/O, no proto — pure CPU string work that pairs with the
- * VLM inference calls. Mirrors the Swift `RunAnywhere.CUA` facade
- * (RunAnywhere+CUA.swift), which marshals the same `rac_cua_action_t` struct.
- * The `rac_cua_action_t` fields are projected onto the Nitro `CuaActionNative`
- * struct; the TypeScript facade re-shapes them into the public `CuaAction`
- * (enum `kind` + optional `coordinate`).
+ * No model handle, no I/O — pure CPU string work that pairs with the VLM
+ * inference calls. Mirrors the Swift `RunAnywhere.CUA` facade
+ * (RunAnywhere+CUA.swift). `cuaParseAction` returns the serialized
+ * `runanywhere.v1.CuaAction` proto bytes (the same proto-byte bridging every
+ * other modality uses); the TypeScript facade decodes them into the public
+ * `CuaAction` (enum `kind` + optional `coordinate`). An unknown profile throws,
+ * which the TS facade maps to `null`.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "rac/features/cua/rac_cua.h"
 
 #include <cstdint>
+#include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace margelo::nitro::runanywhere {
@@ -43,36 +46,29 @@ std::string HybridRunAnywhereCore::cuaSystemPrompt(const std::string &profileId,
   return std::string(buffer.data());
 }
 
-CuaActionNative HybridRunAnywhereCore::cuaParseAction(
+std::shared_ptr<ArrayBuffer> HybridRunAnywhereCore::cuaParseAction(
     const std::string &profileId, const std::string &modelOutput,
     double viewportWidth, double viewportHeight) {
-  rac_cua_action_t action{};
-  const int rc = rac_cua_parse_action(
+  rac_proto_buffer_t buffer{};
+  const rac_result_t rc = rac_cua_parse_action_proto(
       profileId.c_str(), modelOutput.c_str(),
       static_cast<uint32_t>(viewportWidth),
-      static_cast<uint32_t>(viewportHeight), &action);
+      static_cast<uint32_t>(viewportHeight), &buffer);
 
-  // rc != 0 → unknown profile / NULL args. Return a struct flagged as such;
-  // the TS facade maps `profileKnown == false` to `null` (Swift returns nil).
-  if (rc != 0) {
-    return CuaActionNative(/*profileKnown*/ false, /*kind*/ 0.0,
-                           /*hasCoordinate*/ false, /*x*/ 0.0, /*y*/ 0.0,
-                           /*scrollPixels*/ 0.0, /*waitSeconds*/ 0.0,
-                           /*text*/ std::string(), /*reasoning*/ std::string(),
-                           /*isValid*/ false);
+  // rc != RAC_SUCCESS → unknown profile / NULL args. Throw; the TS facade
+  // catches and returns null (Swift returns nil).
+  if (rc != RAC_SUCCESS) {
+    rac_proto_buffer_free(&buffer);
+    throw std::runtime_error("rac_cua_parse_action_proto: unknown CUA profile");
   }
 
-  return CuaActionNative(
-      /*profileKnown*/ true,
-      /*kind*/ static_cast<double>(action.type),
-      /*hasCoordinate*/ action.has_coordinate != 0,
-      /*x*/ static_cast<double>(action.x),
-      /*y*/ static_cast<double>(action.y),
-      /*scrollPixels*/ static_cast<double>(action.scroll_pixels),
-      /*waitSeconds*/ action.wait_seconds,
-      /*text*/ std::string(action.text),
-      /*reasoning*/ std::string(action.reasoning),
-      /*isValid*/ action.parse_ok != 0);
+  // Success — possibly empty bytes for a valid profile with no tool_call, which
+  // decodes to a CuaAction with parse_ok = false.
+  auto result = (buffer.data != nullptr && buffer.size > 0)
+                    ? ArrayBuffer::copy(buffer.data, buffer.size)
+                    : ArrayBuffer::allocate(0);
+  rac_proto_buffer_free(&buffer);
+  return result;
 }
 
 } // namespace margelo::nitro::runanywhere

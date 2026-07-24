@@ -17,9 +17,13 @@
  *
  * Mirrors the Swift `RunAnywhere.CUA` facade (RunAnywhere+CUA.swift), backed by
  * the RN core Nitro bridge over commons `rac_cua_system_prompt` and
- * `rac_cua_parse_action`. Both calls are synchronous — pure CPU string work
- * with no init dependency (matching the Swift facade).
+ * `rac_cua_parse_action_proto`. `parseAction` decodes the canonical
+ * `runanywhere.v1.CuaAction` proto the bridge returns — the same proto-byte
+ * bridging every other modality uses. Both calls are synchronous — pure CPU
+ * string work with no init dependency (matching the Swift facade).
  */
+
+import { CuaAction as CuaActionProto } from '@runanywhere/proto-ts/cua';
 
 import {
   requireNativeModule,
@@ -139,24 +143,27 @@ export function parseAction(
     return null;
   }
   const profile = options.profile ?? FARA_PROFILE;
-  const raw = requireNativeModule().cuaParseAction(
-    profile,
-    modelOutput,
-    options.viewport.width,
-    options.viewport.height
-  );
-  // Unknown profile → null (Swift returns nil).
-  if (!raw.profileKnown) {
+  let bytes: ArrayBuffer;
+  try {
+    bytes = requireNativeModule().cuaParseAction(
+      profile,
+      modelOutput,
+      options.viewport.width,
+      options.viewport.height
+    );
+  } catch {
+    // Unknown profile → the native bridge throws → null (Swift returns nil).
     return null;
   }
+  const proto = CuaActionProto.decode(new Uint8Array(bytes));
   return {
-    kind: raw.kind as CuaActionKind,
-    coordinate: raw.hasCoordinate ? { x: raw.x, y: raw.y } : undefined,
-    text: raw.text,
-    reasoning: raw.reasoning,
-    scrollPixels: raw.scrollPixels,
-    waitSeconds: raw.waitSeconds,
-    isValid: raw.isValid,
+    kind: (proto.type as number) as CuaActionKind,
+    coordinate: proto.coordinateValid ? { x: proto.x, y: proto.y } : undefined,
+    text: proto.text,
+    reasoning: proto.reasoning,
+    scrollPixels: proto.scrollPixels,
+    waitSeconds: proto.waitSeconds,
+    isValid: proto.parseOk,
   };
 }
 

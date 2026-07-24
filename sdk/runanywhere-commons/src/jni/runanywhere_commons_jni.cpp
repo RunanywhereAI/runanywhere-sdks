@@ -7970,10 +7970,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaSystemPrompt(
     return env->NewStringUTF(buffer.data());
 }
 
-// Parses a CUA model's raw output into a RacCuaAction DTO, rescaling
-// coordinates to the caller's viewport. Returns null for an unknown profile
-// (rac returns -1); the DTO's parseOk flag distinguishes "no tool call found".
-extern "C" JNIEXPORT jobject JNICALL
+// Parses a CUA model's raw output into a serialized runanywhere.v1.CuaAction,
+// rescaling coordinates to the caller's viewport. Returns null for an unknown
+// profile; the decoded parse_ok flag distinguishes "no tool call found". The
+// Kotlin facade decodes the proto with Wire — no hand-mirrored struct DTO.
+extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaParseAction(
     JNIEnv* env, jclass clazz, jstring profileId, jstring modelOutput, jint viewportW,
     jint viewportH) {
@@ -7984,50 +7985,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaParseAction(
     std::string profile = getCString(env, profileId);
     std::string output = getCString(env, modelOutput);
 
-    rac_cua_action_t action;
-    std::memset(&action, 0, sizeof(action));
-    int rc = rac_cua_parse_action(profile.c_str(), output.c_str(),
-                                  static_cast<uint32_t>(viewportW),
-                                  static_cast<uint32_t>(viewportH), &action);
-    if (rc != 0) {
+    rac_proto_buffer_t buffer = {};
+    rac_result_t rc = rac_cua_parse_action_proto(profile.c_str(), output.c_str(),
+                                                 static_cast<uint32_t>(viewportW),
+                                                 static_cast<uint32_t>(viewportH), &buffer);
+    if (RAC_FAILED(rc)) {
+        // Unknown profile — return null (Swift parity) rather than throwing.
+        rac_proto_buffer_free(&buffer);
         return nullptr;
     }
-
-    jclass dtoClass = env->FindClass("com/runanywhere/sdk/native/bridge/RacCuaAction");
-    if (dtoClass == nullptr) {
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-        }
-        return nullptr;
-    }
-    // Constructor mirrors rac_cua_action_t field order:
-    // (type, hasCoordinate, x, y, scrollPixels, waitSeconds, text, reasoning, parseOk).
-    jmethodID ctor = env->GetMethodID(
-        dtoClass, "<init>", "(IIIIIDLjava/lang/String;Ljava/lang/String;I)V");
-    if (ctor == nullptr) {
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-        }
-        env->DeleteLocalRef(dtoClass);
-        return nullptr;
-    }
-
-    // The fixed C char arrays are guaranteed NUL-terminated by commons.
-    jstring jText = env->NewStringUTF(action.text);
-    jstring jReasoning = env->NewStringUTF(action.reasoning);
-
-    jobject dto = env->NewObject(
-        dtoClass, ctor, static_cast<jint>(action.type), static_cast<jint>(action.has_coordinate),
-        static_cast<jint>(action.x), static_cast<jint>(action.y),
-        static_cast<jint>(action.scroll_pixels), static_cast<jdouble>(action.wait_seconds), jText,
-        jReasoning, static_cast<jint>(action.parse_ok));
-
-    if (jText != nullptr) {
-        env->DeleteLocalRef(jText);
-    }
-    if (jReasoning != nullptr) {
-        env->DeleteLocalRef(jReasoning);
-    }
-    env->DeleteLocalRef(dtoClass);
-    return dto;
+    return makeProtoBufferByteArray(env, &buffer, "racCuaParseAction");
 }

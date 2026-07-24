@@ -939,47 +939,15 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_error_message(void) {
 }
 
 // =============================================================================
-// COMPUTER-USE AGENT (CUA) STRUCT HELPERS
+// COMPUTER-USE AGENT (CUA)
 //
-// rac_cua_parse_action writes a flat POD rac_cua_action_t into a caller-
-// allocated struct. Expose sizeof + every field offset so the TypeScript CUA
-// facade reads the result back without hard-coding wasm32 layout (same rule as
-// every other struct helper above). The rac_cua_system_prompt /
-// rac_cua_parse_action functions themselves are stateless commons exports (no
-// model handle — they pair with rac_vlm_*) and are listed in
-// RAC_EXPORTED_FUNCTIONS_BASE.
+// rac_cua_parse_action_proto serializes a runanywhere.v1.CuaAction into a
+// rac_proto_buffer_t, so the TypeScript CUA facade decodes it through the shared
+// proto-buffer helpers above — the same proto-byte bridging every other modality
+// uses. No struct sizeof/offset helpers are needed. rac_cua_system_prompt /
+// rac_cua_parse_action_proto are stateless commons exports (no model handle —
+// they pair with rac_vlm_*) listed in RAC_EXPORTED_FUNCTIONS_BASE.
 // =============================================================================
-
-EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_cua_action(void) {
-  return (int)sizeof(rac_cua_action_t);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_type(void) {
-  return (int)offsetof(rac_cua_action_t, type);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_has_coordinate(void) {
-  return (int)offsetof(rac_cua_action_t, has_coordinate);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_x(void) {
-  return (int)offsetof(rac_cua_action_t, x);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_y(void) {
-  return (int)offsetof(rac_cua_action_t, y);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_scroll_pixels(void) {
-  return (int)offsetof(rac_cua_action_t, scroll_pixels);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_wait_seconds(void) {
-  return (int)offsetof(rac_cua_action_t, wait_seconds);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_text(void) {
-  return (int)offsetof(rac_cua_action_t, text);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_reasoning(void) {
-  return (int)offsetof(rac_cua_action_t, reasoning);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_cua_action_parse_ok(void) {
-  return (int)offsetof(rac_cua_action_t, parse_ok);
-}
 
 // =============================================================================
 // FILE MANAGER WRAPPERS (clearCache / cleanTempFiles)

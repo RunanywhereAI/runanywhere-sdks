@@ -12,14 +12,16 @@
  * agent loop.
  *
  * Mirrors Swift RunAnywhere+CUA.swift exactly (iOS is the source of truth). The
- * facade calls `rac_cua_system_prompt` / `rac_cua_parse_action` through the JNI
- * bridge and maps the flat `RacCuaAction` DTO into the structured [CuaAction]
- * value type. Reached as `RunAnywhere.CUA.*`.
+ * facade calls `rac_cua_system_prompt` for the prompt and `rac_cua_parse_action_proto`
+ * for parsing through the JNI bridge, decoding the returned
+ * `runanywhere.v1.CuaAction` proto (Wire) into the structured [CuaAction] value
+ * type — the same proto-byte bridging every other modality uses. Reached as
+ * `RunAnywhere.CUA.*`.
  */
 
 package com.runanywhere.sdk.public.extensions.CUA
 
-import com.runanywhere.sdk.native.bridge.RacCuaAction
+import ai.runanywhere.proto.v1.CuaAction as CuaActionProto
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -87,16 +89,16 @@ data class CuaAction(
     }
 
     companion object {
-        /** Build a [CuaAction] from the flat JNI-boundary [RacCuaAction] DTO. */
-        internal fun from(dto: RacCuaAction): CuaAction =
+        /** Build a [CuaAction] from the decoded `runanywhere.v1.CuaAction` proto. */
+        internal fun from(proto: CuaActionProto): CuaAction =
             CuaAction(
-                kind = Kind.fromRawValue(dto.type),
-                coordinate = if (dto.hasCoordinate != 0) Coordinate(dto.x, dto.y) else null,
-                text = dto.text,
-                reasoning = dto.reasoning,
-                scrollPixels = dto.scrollPixels,
-                waitSeconds = dto.waitSeconds,
-                isValid = dto.parseOk != 0,
+                kind = Kind.fromRawValue(proto.type.value),
+                coordinate = if (proto.coordinate_valid) Coordinate(proto.x, proto.y) else null,
+                text = proto.text,
+                reasoning = proto.reasoning,
+                scrollPixels = proto.scroll_pixels,
+                waitSeconds = proto.wait_seconds,
+                isValid = proto.parse_ok,
             )
     }
 }
@@ -148,13 +150,13 @@ object CUA {
         viewport: CuaDisplay,
     ): CuaAction? {
         if (!RunAnywhereBridge.ensureNativeLibraryLoaded()) return null
-        val dto =
+        val bytes =
             RunAnywhereBridge.racCuaParseAction(
                 profile,
                 modelOutput,
                 viewport.width,
                 viewport.height,
             ) ?: return null
-        return CuaAction.from(dto)
+        return CuaAction.from(CuaActionProto.ADAPTER.decode(bytes))
     }
 }

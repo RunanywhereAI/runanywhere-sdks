@@ -123,6 +123,8 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("vlmProcessProto", &HybridRunAnywhereCoreSpec::vlmProcessProto);
       prototype.registerHybridMethod("vlmProcessStreamProto", &HybridRunAnywhereCoreSpec::vlmProcessStreamProto);
       prototype.registerHybridMethod("vlmCancelProto", &HybridRunAnywhereCoreSpec::vlmCancelProto);
+      prototype.registerHybridMethod("cuaSystemPrompt", &HybridRunAnywhereCoreSpec::cuaSystemPrompt);
+      prototype.registerHybridMethod("cuaParseAction", &HybridRunAnywhereCoreSpec::cuaParseAction);
       prototype.registerHybridMethod("diffusionGenerateLifecycleProto", &HybridRunAnywhereCoreSpec::diffusionGenerateLifecycleProto);
       prototype.registerHybridMethod("getPersistentDeviceUUID", &HybridRunAnywhereCoreSpec::getPersistentDeviceUUID);
       prototype.registerHybridMethod("flushTelemetry", &HybridRunAnywhereCoreSpec::flushTelemetry);
