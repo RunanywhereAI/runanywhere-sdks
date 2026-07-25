@@ -110,4 +110,14 @@ echo "▶ C++ proto codegen"
 echo "▶ Shared TS AsyncIterable streams"
 "${SCRIPT_DIR}/generate_streams.sh"
 
+# Python protobuf for the RAG surface (optional — needs grpcio-tools). Soft-skip
+# when the package is missing so a non-Python developer environment still
+# completes the upstream codegen; CI installs grpcio-tools and fails on drift.
+echo "▶ Python proto codegen (RAG)"
+if python3 -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
+    "${SCRIPT_DIR}/generate_python.sh"
+else
+    echo "warning: grpcio-tools not installed; skipping generate_python.sh" >&2
+fi
+
 echo "✓ All proto codegen complete."
