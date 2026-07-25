@@ -306,6 +306,10 @@ jobs:
     # clean interpreter, and runs the hermetic suite. ubuntu-22.04 keeps the manylinux tag low
     # (glibc 2.35) for a broadly-installable wheel.
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.12']
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
@@ -316,7 +320,7 @@ jobs:
           platform: linux
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
       - name: Build tools (patchelf is required by auditwheel)
         run: |
           sudo apt-get update -q
