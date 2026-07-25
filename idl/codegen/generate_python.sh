@@ -21,7 +21,24 @@ IDL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUT_DIR="$(cd "${IDL_DIR}/.." && pwd)/sdk/runanywhere-python/runanywhere/_proto"
 
 mkdir -p "${OUT_DIR}"
-python -m grpc_tools.protoc \
+# Prefer python3 (CI installs grpcio-tools into the python3 environment). Fall
+# back to python only when python3 is absent (some local pyenv/venv layouts).
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+  else
+    echo "error: python3/python not found — install Python and grpcio-tools" >&2
+    exit 1
+  fi
+fi
+if ! "${PYTHON_BIN}" -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
+  echo "error: ${PYTHON_BIN} is missing grpc_tools.protoc — run: ${PYTHON_BIN} -m pip install 'grpcio-tools==1.71.*'" >&2
+  exit 1
+fi
+"${PYTHON_BIN}" -m grpc_tools.protoc \
     --proto_path="${IDL_DIR}" \
     --python_out="${OUT_DIR}" \
     rac_options.proto rag.proto

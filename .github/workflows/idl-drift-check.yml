@@ -177,9 +177,10 @@ jobs:
             exit 1
           fi
           python3 -m pip install --upgrade --break-system-packages "protobuf>=${PYTHON_PROTOBUF_VERSION},<7" pyyaml
-          # generate_python.sh uses `python -m grpc_tools.protoc`. Pin to the
+          # generate_python.sh prefers python3 -m grpc_tools.protoc. Pin to the
           # same major line documented in idl/codegen/generate_python.sh.
           python3 -m pip install --upgrade --break-system-packages 'grpcio-tools==1.71.*'
+          python3 -c 'import grpc_tools.protoc'  # fail loud if the install landed elsewhere
 
       - name: Dump toolchain versions (debug)
         run: |

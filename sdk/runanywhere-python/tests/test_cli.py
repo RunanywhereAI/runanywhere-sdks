@@ -206,7 +206,7 @@ def test_stt_bad_input_path_is_error(fake_client, capsys):
 
 
 def test_stt_malformed_wav_is_clean_error(fake_client, capsys, tmp_path):
-    # A non-RIFF / non-16-bit WAV makes decode_wav raise ValueError; it must surface as a
+    # A non-RIFF / non-16-bit WAV makes decode_wav raise SDKException; it must surface as a
     # clean `error:` + exit 1, NOT an uncaught traceback.
     bad = tmp_path / "bad.wav"
     bad.write_bytes(b"not a riff wave file at all")
