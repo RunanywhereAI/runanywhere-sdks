@@ -27,7 +27,7 @@ artifacts.
    delvewheel/auditwheel/delocate).
 4. **Validate the release boundary** — `python scripts/validate_public_packages.py --dist dist
    --expected-version <VERSION>` (asserts: `_core` + sidecar libs present in the right dir per
-   platform, no host-path leaks in binaries, the sdist has sources only, version matches).
+   platform, no host-path leaks in text/metadata members, the sdist has sources only, version matches).
 5. **`twine check dist/*`** — long-description + metadata render.
 6. **Fresh-venv install of each wheel** and smoke it:
    - base: `pip install <wheel>` → `import runanywhere` (no fastapi/protobuf), `runanywhere version`,

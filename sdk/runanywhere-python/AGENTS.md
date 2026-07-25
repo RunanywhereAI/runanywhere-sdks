@@ -78,7 +78,7 @@ each test so ordering never leaks between tests.
 
 ## Package Structure
 
-```
+```text
 sdk/runanywhere-python/
 ├── pyproject.toml            # scikit-build-core build config + project metadata
 ├── native/                   # the pybind11 extension source (compiled → _core)
@@ -128,7 +128,7 @@ itself with `pytest.importorskip("fastapi")`.
 
 ### Layered design
 
-```
+```text
 Public API (runanywhere.__init__ re-exports)
     ↓
 RunAnywhere client (client.py — instantiable, ref-counts the shared core)

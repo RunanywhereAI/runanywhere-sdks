@@ -409,6 +409,8 @@ __pycache__/
 *.pyd
 *.egg-info/
 sdk/runanywhere-python/wheelhouse/
+sdk/runanywhere-python/runanywhere/_native/_core*.so
+sdk/runanywhere-python/runanywhere/_native/_core*.dylib
 sdk/runanywhere-python/runanywhere/_native/onnxruntime*.dll
 sdk/runanywhere-python/runanywhere/_native/*onnxruntime*.so*
 sdk/runanywhere-python/runanywhere/_native/*onnxruntime*.dylib

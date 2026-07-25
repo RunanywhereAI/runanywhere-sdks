@@ -34,7 +34,7 @@ dependencies = ["numpy>=1.21"]
 test = ["pytest>=7", "httpx>=0.24", "protobuf>=5.29,<7"]
 # The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
 # plain `pip install runanywhere` stays numpy + stdlib only.
-server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.18"]
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.32"]
 # RAG (`runanywhere.rag` / RunAnywhere.create_rag). The native core already carries the RAG
 # pipeline; this extra just adds the protobuf runtime the facade uses to (de)serialize the
 # rac_rag_*_proto byte ABI. The generated *_pb2.py were built with protoc 5.29; protobuf's
@@ -68,8 +68,8 @@ cmake.args = [
 # scikit-build config-settings, e.g.:
 #   GPU (NVIDIA):  pip install . --config-settings=cmake.define.RAC_GPU_CUDA=ON
 #   Hexagon NPU:   pip install . -C cmake.define.RAC_BACKEND_QHEXRT=ON -C cmake.define.QHEXRT_ROOT=<prebuilt tree>
-# (QHexRT requires its prebuilt archive for the target arch under QHEXRT_ROOT; on a supported
-#  NPU host it self-registers at priority 150 and load_llm/etc. auto-route to it.)
+# (QHexRT is Android/Snapdragon-only today. Without an Android + private archive build the
+#  plugin registers as a not-routable shell. Windows Snapdragon ARM64 HNPU is not enabled yet.)
 build.targets = ["runanywhere_core"]
 # Install ONLY our module's component (native/CMakeLists tags it `python_module`), so the
 # transitive commons/llama/zlib install rules (headers, static .libs, cmake, docs) stay out
