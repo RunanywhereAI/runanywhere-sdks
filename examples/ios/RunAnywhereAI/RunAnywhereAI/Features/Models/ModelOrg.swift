@@ -99,7 +99,7 @@ enum ModelOrgCatalog {
     private static let rules: [OrgRule] = [
         OrgRule(org: .nvidia, patterns: [
             "nemotron", "nemoguard", "cosmos", "canary", "parakeet",
-            "nv_embed", "nv-embed", "nv_rerank", "nvidia",
+            "nv_embed", "nv-embed", "nv_rerank", "nvidia", "sortformer",
         ]),
         OrgRule(org: .deepseek, patterns: ["deepseek"]),
         OrgRule(org: .prism, patterns: ["bonsai"]),
@@ -114,6 +114,7 @@ enum ModelOrgCatalog {
         OrgRule(org: .openSource, patterns: [
             "internvl", "lama_dilated", "moonshine", "melo", "kokoro",
             "kitten", "piper", "silero", "minilm", "soprano", "pocket-tts", "glm-asr",
+            "segformer",
         ]),
     ]
 

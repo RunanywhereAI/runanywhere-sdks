@@ -4,8 +4,8 @@
 //
 //  Semantic image segmentation over the canonical `RunAnywhere.segment` facade.
 //
-//  This view model is pure platform plumbing: it converts a picked image to
-//  packed RGBA8 pixels, drives the SDK model lifecycle, and calls
+//  This view model is pure platform plumbing: it loads a catalog SegFormer
+//  model, converts a picked image to packed RGBA8 pixels, and calls
 //  `RunAnywhere.segment`. All inference and model routing live in the SDK /
 //  C++ commons.
 //
@@ -23,7 +23,7 @@ final class SegmentationViewModel {
     // Model lifecycle
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
-    private(set) var isImportingModel = false
+    private(set) var isProcessing = false
 
     // Image input
     private(set) var sourceImage: UIImage?
@@ -48,59 +48,35 @@ final class SegmentationViewModel {
     func refreshModelStatus() {
         var request = RACurrentModelRequest()
         request.category = .semanticSegmentation
-        isModelLoaded = RunAnywhere.currentModel(request).found
+        let current = RunAnywhere.currentModel(request)
+        isModelLoaded = current.found
+        if current.found {
+            let name = current.model.name
+            loadedModelName = name.isEmpty ? (current.modelID.isEmpty ? nil : current.modelID) : name
+        }
     }
 
-    // MARK: - Model supply (user-supplied, uncataloged)
+    // MARK: - Model supply (catalog Get → Use)
 
-    /// Import a user-supplied SegFormer model directory and load it under the
-    /// `.semanticSegmentation` category through the canonical SDK lifecycle.
-    func importAndLoadModel(from url: URL) async {
-        isImportingModel = true
+    /// Load a model chosen from `ModelSelectionSheet`.
+    func loadModelFromSelection(_ model: RAModelInfo) async {
+        isProcessing = true
         error = nil
-        statusMessage = "Importing model…"
-        defer { isImportingModel = false }
+        statusMessage = "Loading model…"
+        defer { isProcessing = false }
 
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-
-        do {
-            var importRequest = RAModelImportRequest()
-            importRequest.sourcePath = url.path
-            importRequest.copyIntoManagedStorage = true
-            importRequest.validateBeforeRegister = false
-            let importResult = try await RunAnywhere.importModel(importRequest)
-            guard importResult.success else {
-                error = importResult.errorMessage.isEmpty ? "Model import failed." : importResult.errorMessage
-                statusMessage = ""
-                return
-            }
-            let modelID = importResult.model.id
-            guard !modelID.isEmpty else {
-                error = "Imported model has no identifier; cannot load."
-                statusMessage = ""
-                return
-            }
-
-            statusMessage = "Loading model…"
-            var loadRequest = RAModelLoadRequest()
-            loadRequest.modelID = modelID
-            loadRequest.category = .semanticSegmentation
-            loadRequest.framework = .onnx
-            let loadResult = await RunAnywhere.loadModel(loadRequest)
-            guard loadResult.success else {
-                error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
-                statusMessage = ""
-                return
-            }
-            loadedModelName = modelID
-            isModelLoaded = true
-            statusMessage = "Model loaded: \(modelID)."
-        } catch {
-            logger.error("Segmentation model import/load failed: \(error.localizedDescription)")
-            self.error = "Model import/load failed: \(error.localizedDescription)"
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .semanticSegmentation
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
             statusMessage = ""
+            return
         }
+        loadedModelName = model.name.isEmpty ? model.id : model.name
+        isModelLoaded = true
+        statusMessage = "Model loaded: \(loadedModelName ?? model.id)."
     }
 
     // MARK: - Image input
@@ -161,10 +137,6 @@ final class SegmentationViewModel {
             logger.error("Segmentation failed: \(error.localizedDescription)")
             self.error = "Segmentation failed: \(error.localizedDescription)"
         }
-    }
-
-    func reportError(_ message: String) {
-        error = message
     }
 
     // MARK: - Pixel helpers

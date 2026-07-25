@@ -491,12 +491,9 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 4_000_000_000
         )
-        // Speaker diarization is served ONLY by the generic ONNX Sortformer provider
-        // (framework .onnx) in commons — there is no MLX diarization engine. Rather
-        // than pin a model-specific MLX safetensors bundle the provider cannot load,
-        // the Diarization screen selects any registered `.speakerDiarization` model
-        // generically (matching Android's import-your-own-`.onnx` flow). No
-        // model-specific diarization catalog row is registered here.
+        // Speaker diarization / semantic segmentation catalog rows are registered
+        // under `#if canImport(ONNXRuntime)` below (ONNX Sortformer + SegFormer).
+        // There is no MLX diarization/segmentation engine.
         if mlxCatalogEnabled {
             logger.info("MLX models registered")
         } else {
@@ -1132,7 +1129,62 @@ enum ModelCatalogBootstrap {
             // valid ~2.3 MB download.
             memoryRequirement: 2_327_524
         )
-        logger.info("Sherpa STT/TTS + Silero VAD models registered")
+
+        // --- Speaker diarization (NVIDIA Sortformer, ONNX) --------------------
+        // Canonical filename required by engines/onnx/onnx_diarization_provider.cpp.
+        // ~469 MiB single-file download — progress can sit near the end for a
+        // while on slow networks. sizeBytes feeds the post-finalize size guard.
+        await registerMultiFile(
+            id: "diar-streaming-sortformer-4spk-v2.1",
+            name: "NVIDIA Streaming Sortformer 4spk v2.1 (ONNX)",
+            files: [
+                .init(
+                    url: "https://huggingface.co/cgus/diar_streaming_sortformer_4spk-v2.1-onnx/resolve/main/diar_streaming_sortformer_4spk-v2.1.onnx",
+                    filename: "diar_streaming_sortformer_4spk-v2.1.onnx",
+                    sizeBytes: 492_242_946
+                )
+            ],
+            framework: .onnx,
+            modality: .speakerDiarization,
+            memoryRequirement: 492_242_946,
+            downloadSize: 492_242_946
+        )
+
+        // --- Semantic segmentation (SegFormer B0 ADE20K, ONNX) ----------------
+        // Provider expects model.onnx + config.json + preprocessor_config.json
+        // at the model root (engines/onnx/onnx_segmentation_provider.cpp).
+        // Pin the Xenova commit so sizes stay stable; per-file sizeBytes match
+        // Content-Length (under-declaring the aggregate previously made the
+        // Get progress bar stall near the end while configs finished).
+        let segformerBaseURL =
+            "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+            "d3e5499fa8701ff0453ca940a8dfeae39b2f1504"
+        await registerMultiFile(
+            id: "segformer-b0-ade20k",
+            name: "SegFormer B0 ADE20K (ONNX)",
+            files: [
+                .init(
+                    url: "\(segformerBaseURL)/onnx/model.onnx",
+                    filename: "model.onnx",
+                    sizeBytes: 15_335_446
+                ),
+                .init(
+                    url: "\(segformerBaseURL)/config.json",
+                    filename: "config.json",
+                    sizeBytes: 6_957
+                ),
+                .init(
+                    url: "\(segformerBaseURL)/preprocessor_config.json",
+                    filename: "preprocessor_config.json",
+                    sizeBytes: 373
+                )
+            ],
+            framework: .onnx,
+            modality: .semanticSegmentation,
+            memoryRequirement: 15_342_776,
+            downloadSize: 15_342_776
+        )
+        logger.info("Sherpa STT/TTS + Silero VAD + Sortformer + SegFormer models registered")
         #endif
 
         #if canImport(ONNXRuntime)

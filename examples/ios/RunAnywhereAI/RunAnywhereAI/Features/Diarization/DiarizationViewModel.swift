@@ -4,10 +4,10 @@
 //
 //  Standalone speaker diarization over the canonical `RunAnywhere.diarize` facade.
 //
-//  This view model is pure platform plumbing: it downloads + loads the cataloged
-//  Sortformer model through the SDK lifecycle, captures microphone audio, and
-//  calls `RunAnywhere.diarize`. All inference and model routing live in the SDK
-//  / C++ commons.
+//  This view model is pure platform plumbing: it loads a catalog Sortformer
+//  model through the SDK lifecycle, captures microphone audio, and calls
+//  `RunAnywhere.diarize`. All inference and model routing live in the SDK /
+//  C++ commons.
 //
 
 import Combine
@@ -22,7 +22,7 @@ final class DiarizationViewModel {
     // Model lifecycle
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
-    private(set) var isPreparingModel = false
+    private(set) var isProcessing = false
 
     // Audio capture
     private(set) var isRecording = false
@@ -50,58 +50,34 @@ final class DiarizationViewModel {
     func refreshModelStatus() {
         var request = RACurrentModelRequest()
         request.category = .speakerDiarization
-        isModelLoaded = RunAnywhere.currentModel(request).found
+        let current = RunAnywhere.currentModel(request)
+        isModelLoaded = current.found
+        if current.found, !current.model.name.isEmpty {
+            loadedModelName = current.model.name
+        }
     }
 
-    // MARK: - Model supply (cataloged, downloaded on demand)
+    // MARK: - Model supply (catalog Get → Use)
 
-    /// Download (if needed) and load the cataloged Sortformer model under the
-    /// `.speakerDiarization` category through the canonical SDK lifecycle.
-    func prepareModel() async {
-        isPreparingModel = true
+    /// Load a model chosen from `ModelSelectionSheet`.
+    func loadModelFromSelection(_ model: RAModelInfo) async {
+        isProcessing = true
         error = nil
-        defer { isPreparingModel = false }
+        statusMessage = "Loading model…"
+        defer { isProcessing = false }
 
-        let registry = ModelListViewModel.shared
-        await registry.loadModelsFromRegistry()
-        guard let model = catalogModel(in: registry) else {
-            error = "No speaker-diarization model is available. Import an ONNX " +
-                "Sortformer model to enable diarization."
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .speakerDiarization
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
             statusMessage = ""
             return
         }
-
-        do {
-            if !model.isBuiltIn, model.localPathURL == nil {
-                statusMessage = "Downloading model…"
-                try await registry.downloadModel(model)
-            }
-
-            statusMessage = "Loading model…"
-            var loadRequest = RAModelLoadRequest()
-            loadRequest.modelID = model.id
-            loadRequest.category = .speakerDiarization
-            let loadResult = await RunAnywhere.loadModel(loadRequest)
-            guard loadResult.success else {
-                error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
-                statusMessage = ""
-                return
-            }
-            loadedModelName = model.name
-            isModelLoaded = true
-            statusMessage = "Model loaded: \(model.name)."
-        } catch {
-            logger.error("Diarization model prepare failed: \(error.localizedDescription)")
-            self.error = "Model download/load failed: \(error.localizedDescription)"
-            statusMessage = ""
-        }
-    }
-
-    /// Pick any registered speaker-diarization model — no model-specific pin.
-    /// Mirrors the generic category-driven selection used by the other modalities
-    /// (and Android's import-your-own-`.onnx` diarization flow).
-    private func catalogModel(in registry: ModelListViewModel) -> RAModelInfo? {
-        registry.availableModels.first { $0.category == .speakerDiarization }
+        loadedModelName = model.name.isEmpty ? model.id : model.name
+        isModelLoaded = true
+        statusMessage = "Model loaded: \(loadedModelName ?? model.id)."
     }
 
     // MARK: - Audio capture

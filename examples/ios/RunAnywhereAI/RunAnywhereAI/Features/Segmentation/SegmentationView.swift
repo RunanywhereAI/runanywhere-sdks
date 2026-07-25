@@ -3,7 +3,7 @@
 //  RunAnywhereAI
 //
 //  UI for semantic image segmentation (SegFormer) over `RunAnywhere.segment`.
-//  Pure SwiftUI: model supply, image picker, and mask rendering — no inference
+//  Pure SwiftUI: model picker, image picker, and mask rendering — no inference
 //  or model logic lives here.
 //
 
@@ -11,36 +11,77 @@
 import SwiftUI
 import PhotosUI
 import UIKit
-import UniformTypeIdentifiers
 
 struct SegmentationView: View {
     @State private var viewModel = SegmentationViewModel()
     @State private var photoItem: PhotosPickerItem?
-    @State private var showingModelImporter = false
+    @State private var showModelPicker = false
+
+    private var hasModelSelected: Bool {
+        viewModel.isModelLoaded
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                modelCard
-                imageCard
-                if !viewModel.classSummaries.isEmpty {
-                    resultCard
+        NavigationView {
+            ZStack {
+                if hasModelSelected {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
+                            modelStatusCard
+                            imageCard
+                            if !viewModel.classSummaries.isEmpty {
+                                resultCard
+                            }
+                            if let error = viewModel.error {
+                                errorBanner(error)
+                            }
+                            if !viewModel.statusMessage.isEmpty {
+                                Text(viewModel.statusMessage)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                        .padding(AppSpacing.mediumLarge)
+                    }
+                } else {
+                    Spacer()
                 }
-                if let error = viewModel.error {
-                    errorBanner(error)
-                }
-                if !viewModel.statusMessage.isEmpty {
-                    Text(viewModel.statusMessage)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
+
+                if !hasModelSelected && !viewModel.isProcessing {
+                    ModelRequiredOverlay(modality: .segmentation) {
+                        showModelPicker = true
+                    }
                 }
             }
-            .padding(AppSpacing.mediumLarge)
+            .navigationTitle(hasModelSelected ? "Segmentation" : "")
+            #if os(iOS)
+            .navigationBarTitleDisplayModeCompat(.inline)
+            .navigationBarHidden(!hasModelSelected)
+            #endif
+            .toolbar {
+                if hasModelSelected {
+                    #if os(iOS)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        modelButton
+                    }
+                    #else
+                    ToolbarItem(placement: .automatic) {
+                        modelButton
+                    }
+                    #endif
+                }
+            }
         }
-        .navigationTitle("Segmentation")
         #if os(iOS)
-        .navigationBarTitleDisplayModeCompat(.inline)
+        .navigationViewStyle(.stack)
         #endif
+        .adaptiveSheet(isPresented: $showModelPicker) {
+            ModelSelectionSheet(context: .segmentation) { model in
+                Task {
+                    await viewModel.loadModelFromSelection(model)
+                }
+            }
+        }
         .task { viewModel.refreshModelStatus() }
         .onChange(of: photoItem) { _, newValue in
             guard let newValue else { return }
@@ -51,48 +92,47 @@ struct SegmentationView: View {
                 }
             }
         }
-        .fileImporter(
-            isPresented: $showingModelImporter,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    Task { await viewModel.importAndLoadModel(from: url) }
-                }
-            case .failure(let failure):
-                viewModel.reportError("Could not open the model: \(failure.localizedDescription)")
-            }
-        }
     }
 
     // MARK: - Model
 
-    private var modelCard: some View {
+    private var modelButton: some View {
+        Button {
+            showModelPicker = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "cube")
+                    .font(AppTypography.system14)
+                if let modelName = viewModel.loadedModelName {
+                    Text(modelName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                } else {
+                    Text("Select Model")
+                        .font(.caption)
+                }
+            }
+        }
+    }
+
+    private var modelStatusCard: some View {
         card {
             HStack {
                 Text("Model")
                     .font(AppTypography.subheadlineMedium)
                     .foregroundColor(AppColors.textPrimary)
                 Spacer()
-                statusPill(ok: viewModel.isModelLoaded,
-                           text: viewModel.isModelLoaded ? "loaded" : "not loaded")
+                statusPill(ok: viewModel.isModelLoaded, text: "loaded")
             }
-            Text("SegFormer weights are user-supplied and uncataloged. Pick the model folder (model.onnx + config.json + preprocessor_config.json + runanywhere-segmentation.json); the SDK imports and loads it under the semantic-segmentation category.")
+            if let name = viewModel.loadedModelName {
+                Text(name)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            Text("SegFormer B0 ADE20K (ONNX) — download from the catalog, then Use.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.textSecondary)
-            Button {
-                showingModelImporter = true
-            } label: {
-                if viewModel.isImportingModel {
-                    ProgressView()
-                } else {
-                    Text(viewModel.isModelLoaded ? "Change model folder…" : "Choose model folder…")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.isImportingModel)
         }
     }
 

@@ -3,9 +3,8 @@
 //  RunAnywhereAI
 //
 //  UI for standalone speaker diarization (NVIDIA Sortformer) over
-//  `RunAnywhere.diarize`. Pure SwiftUI: cataloged-model download + load,
-//  microphone capture, and a speaker-segment list — no inference or model
-//  logic lives here.
+//  `RunAnywhere.diarize`. Pure SwiftUI: model picker, microphone capture, and a
+//  speaker-segment list — no inference or model logic lives here.
 //
 
 #if canImport(UIKit)
@@ -13,60 +12,116 @@ import SwiftUI
 
 struct DiarizationView: View {
     @State private var viewModel = DiarizationViewModel()
+    @State private var showModelPicker = false
+
+    private var hasModelSelected: Bool {
+        viewModel.isModelLoaded
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                modelCard
-                audioCard
-                if !viewModel.segments.isEmpty {
-                    resultCard
+        NavigationView {
+            ZStack {
+                if hasModelSelected {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
+                            modelStatusCard
+                            audioCard
+                            if !viewModel.segments.isEmpty {
+                                resultCard
+                            }
+                            if let error = viewModel.error {
+                                errorBanner(error)
+                            }
+                            if !viewModel.statusMessage.isEmpty {
+                                Text(viewModel.statusMessage)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                        }
+                        .padding(AppSpacing.mediumLarge)
+                    }
+                } else {
+                    Spacer()
                 }
-                if let error = viewModel.error {
-                    errorBanner(error)
-                }
-                if !viewModel.statusMessage.isEmpty {
-                    Text(viewModel.statusMessage)
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
+
+                if !hasModelSelected && !viewModel.isProcessing {
+                    ModelRequiredOverlay(modality: .diarization) {
+                        showModelPicker = true
+                    }
                 }
             }
-            .padding(AppSpacing.mediumLarge)
+            .navigationTitle(hasModelSelected ? "Diarization" : "")
+            #if os(iOS)
+            .navigationBarTitleDisplayModeCompat(.inline)
+            .navigationBarHidden(!hasModelSelected)
+            #endif
+            .toolbar {
+                if hasModelSelected {
+                    #if os(iOS)
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        modelButton
+                    }
+                    #else
+                    ToolbarItem(placement: .automatic) {
+                        modelButton
+                    }
+                    #endif
+                }
+            }
         }
-        .navigationTitle("Diarization")
         #if os(iOS)
-        .navigationBarTitleDisplayModeCompat(.inline)
+        .navigationViewStyle(.stack)
         #endif
+        .adaptiveSheet(isPresented: $showModelPicker) {
+            ModelSelectionSheet(context: .diarization) { model in
+                Task {
+                    await viewModel.loadModelFromSelection(model)
+                }
+            }
+        }
         .task { viewModel.refreshModelStatus() }
         .onDisappear { viewModel.cleanup() }
     }
 
     // MARK: - Model
 
-    private var modelCard: some View {
+    private var modelButton: some View {
+        Button {
+            showModelPicker = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "cube")
+                    .font(AppTypography.system14)
+                if let modelName = viewModel.loadedModelName {
+                    Text(modelName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                } else {
+                    Text("Select Model")
+                        .font(.caption)
+                }
+            }
+        }
+    }
+
+    private var modelStatusCard: some View {
         card {
             HStack {
                 Text("Model")
                     .font(AppTypography.subheadlineMedium)
                     .foregroundColor(AppColors.textPrimary)
                 Spacer()
-                statusPill(ok: viewModel.isModelLoaded,
-                           text: viewModel.isModelLoaded ? "loaded" : "not loaded")
+                statusPill(ok: viewModel.isModelLoaded, text: "loaded")
             }
-            Text("The cataloged NVIDIA Streaming Sortformer 4-speaker v2.1 (MLX) model is downloaded and loaded through the SDK under the speaker-diarization category.")
+            if let name = viewModel.loadedModelName {
+                Text(name)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            Text("NVIDIA Sortformer (ONNX) — ~470 MB catalog download.")
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.textSecondary)
-            Button {
-                Task { await viewModel.prepareModel() }
-            } label: {
-                if viewModel.isPreparingModel {
-                    ProgressView()
-                } else {
-                    Text(viewModel.isModelLoaded ? "Reload model" : "Download & load model")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.isPreparingModel)
         }
     }
 

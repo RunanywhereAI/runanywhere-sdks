@@ -33,6 +33,22 @@ final class ModelOrgCatalogTests: XCTestCase {
         XCTAssertEqual(groups.first { $0.org == .nvidia }?.optionCount, 2)
     }
 
+    func testSortformerResolvesToNvidiaAndSegFormerToOpenSource() {
+        let sortformer = makeModel(
+            id: "diar-streaming-sortformer-4spk-v2.1",
+            name: "NVIDIA Streaming Sortformer 4spk v2.1 (ONNX)",
+            category: .speakerDiarization
+        )
+        let segformer = makeModel(
+            id: "segformer-b0-ade20k",
+            name: "SegFormer B0 ADE20K (ONNX)",
+            category: .semanticSegmentation
+        )
+
+        XCTAssertEqual(ModelOrgCatalog.org(for: sortformer), .nvidia)
+        XCTAssertEqual(ModelOrgCatalog.org(for: segformer), .openSource)
+    }
+
     func testGroupsOrderFollowsOrgDeclaration() {
         let models = [
             makeModel(id: "all-minilm-l6-v2", name: "MiniLM"),
