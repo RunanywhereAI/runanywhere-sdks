@@ -31,6 +31,7 @@ export {
 export {
   setAccelerationSwitcher,
   setActiveAccelerationMode,
+  setSpeechAccelerationMode,
   setModelLoadFailureRecovery,
   setModelLoadPreparation,
   setRuntimeDegradedReason,
@@ -39,6 +40,10 @@ export type {
   RuntimeModelLoadContext,
   RuntimeModelLoadFailureContext,
   RuntimeModelLoadRequest,
+  SpeechRuntimeDiagnostics,
+  ModalityRuntimeEntry,
+  ModalityRuntimeId,
+  ModalityRuntimeStatus,
 } from './Foundation/RuntimeConfig.js';
 
 // @internal Stage 3 worker bootstrap contract. Backends may opt in from
@@ -61,6 +66,10 @@ export type { BackendWorkerBackendId } from './runtime/BackendWorkerProtocol.js'
 export {
   setLlamaBackendWorkerRequired,
   clearLlamaBackendWorkerDead,
+  setOnnxBackendWorkerRequired,
+  clearOnnxBackendWorkerDead,
+  markOnnxBackendWorkerDead,
+  mustUseOnnxBackendWorker,
 } from './runtime/BackendWorkerModelOwnership.js';
 export { runBackendWorker } from './runtime/BackendWorker.js';
 export type {

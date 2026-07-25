@@ -47,6 +47,7 @@ option(RAC_WASM_LLAMACPP    "Build the llama.cpp Web SDK WASM target (LLM + VLM)
 option(RAC_WASM_ONNX        "Build the ONNX + Sherpa Web SDK WASM target" OFF)
 option(RAC_WASM_WEBGPU      "Also emit the WebGPU variant of the llama.cpp target" OFF)
 option(RAC_WASM_WEBGPU_JSPI "Use experimental JSPI instead of stable Asyncify for WebGPU" OFF)
+option(RAC_WASM_ONNX_WEBGPU "Emit racommons-onnx-sherpa-webgpu (ORT WebGPU EP path)" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -707,6 +708,35 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vad_stream_stop_proto"
     "_rac_vad_stream_cancel_proto"
 
+    # Standalone speaker diarization service, lifecycle component and
+    # persistent proto stream session.
+    "_rac_diarization_create"
+    "_rac_diarization_initialize"
+    "_rac_diarization_diarize"
+    "_rac_diarization_cleanup"
+    "_rac_diarization_destroy"
+    "_rac_diarization_result_free"
+    "_rac_diarization_stream_create"
+    "_rac_diarization_stream_feed_audio_chunk"
+    "_rac_diarization_stream_destroy"
+    "_rac_diarization_component_create"
+    "_rac_diarization_component_is_loaded"
+    "_rac_diarization_component_get_model_id"
+    "_rac_diarization_component_load_model"
+    "_rac_diarization_component_unload"
+    "_rac_diarization_component_get_state"
+    "_rac_diarization_component_get_metrics"
+    "_rac_diarization_component_destroy"
+    "_rac_diarization_component_diarize_proto"
+    "_rac_diarization_diarize_lifecycle_proto"
+    "_rac_diarization_set_stream_proto_callback"
+    "_rac_diarization_unset_stream_proto_callback"
+    "_rac_diarization_proto_quiesce"
+    "_rac_diarization_stream_start_proto"
+    "_rac_diarization_stream_feed_audio_proto"
+    "_rac_diarization_stream_stop_proto"
+    "_rac_diarization_stream_cancel_proto"
+
     # Voice Agent
     "_rac_audio_pipeline_state_name"
     "_rac_audio_pipeline_can_activate_microphone"
@@ -848,6 +878,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_embed_batch_proto"
     "_rac_embeddings_embed_batch_lifecycle_proto"
     "_rac_embeddings_result_free"
+
+    # Lifecycle-owned semantic segmentation. The symbol is in commons; the
+    # ONNX bundle claims the capability and supplies the provider at runtime.
+    "_rac_segmentation_segment_lifecycle_proto"
 
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
@@ -1008,6 +1042,8 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
 )
 
 set(RAC_EXPORTED_FUNCTIONS_ONNX
+    # Browser env-var support (setenv/getenv) for provider configuration.
+    "_setenv"
     # Lifecycle-owned STT. These handle-less exports resolve the model loaded
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
     "_rac_stt_transcribe_lifecycle_proto"
@@ -1032,6 +1068,11 @@ set(RAC_EXPORTED_FUNCTIONS_ONNX
 set(RAC_EXPORTED_FUNCTIONS_SHERPA
     "_rac_backend_sherpa_register"
     "_rac_backend_sherpa_unregister"
+    "_rac_sherpa_set_wasm_compute"
+    "_rac_onnxrt_set_wasm_thread_counts"
+    "_rac_onnxrt_probe_webgpu_ep"
+    "_rac_onnxrt_activate_preferred_wasm_ep"
+    "_rac_onnxrt_last_webgpu_probe_error"
 )
 
 # cloud engine registration — the ONLINE side of the hybrid STT router.
@@ -1461,16 +1502,116 @@ if(RAC_WASM_ONNX)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
     endif()
 
-    rac_wasm_add_target(
-        NAME racommons_onnx_wasm
-        OUTPUT_NAME racommons-onnx-sherpa
-        OUTPUT_DIR "${_ONNX_OUTPUT_DIR}"
-        EXPORT_NAME createRACommonsONNXModule
-        LINK_LIBRARIES ${_onnx_libs}
-        EXPORTED_FUNCTIONS ${_onnx_exports}
-        COMPILE_DEFS RAC_WASM_ONNX=1
-    )
-    list(APPEND _targets_built "racommons_onnx_wasm -> packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}")
+    if(NOT RAC_WASM_ONNX_WEBGPU)
+        rac_wasm_add_target(
+            NAME racommons_onnx_wasm
+            OUTPUT_NAME racommons-onnx-sherpa
+            OUTPUT_DIR "${_ONNX_OUTPUT_DIR}"
+            EXPORT_NAME createRACommonsONNXModule
+            LINK_LIBRARIES ${_onnx_libs}
+            EXPORTED_FUNCTIONS ${_onnx_exports}
+            COMPILE_DEFS RAC_WASM_ONNX=1
+        )
+        list(APPEND _targets_built "racommons_onnx_wasm -> packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}")
+    else()
+        # WebGPU speech twin: pthreads (Sherpa/ORT atomics ABI) + Asyncify
+        # for Dawn/emdawn waits. Links the separate onnxruntime-wasm-webgpu
+        # archive (see -DRAC_ONNX_WASM_RUNTIME_DIR from build.sh).
+        #
+        # Dawn's library_webgpu.js requires the generated enum/sig/struct
+        # libraries FIRST (see dawn src/emdawnwebgpu/CMakeLists.txt). Passing
+        # only library_webgpu.js fails with __HAVE_EMDAWNWEBGPU_* undefined.
+        set(_onnx_webgpu_extra_link "")
+        set(_ort_webgpu_hints
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/.rac-webgpu-link-hints")
+        set(_emdawn_enum "")
+        set(_emdawn_sig "")
+        set(_emdawn_struct "")
+        set(_emdawn_js "")
+        set(_emdawn_externs "")
+        if(EXISTS "${_ort_webgpu_hints}")
+            file(STRINGS "${_ort_webgpu_hints}" _hint_lines)
+            foreach(_line IN LISTS _hint_lines)
+                if(_line MATCHES "^EMDAWN_LIBRARY_WEBGPU_ENUM_TABLES=(.+)$")
+                    set(_emdawn_enum "${CMAKE_MATCH_1}")
+                elseif(_line MATCHES "^EMDAWN_LIBRARY_WEBGPU_SIG_INFO=(.+)$")
+                    set(_emdawn_sig "${CMAKE_MATCH_1}")
+                elseif(_line MATCHES "^EMDAWN_LIBRARY_WEBGPU_STRUCT_INFO=(.+)$")
+                    set(_emdawn_struct "${CMAKE_MATCH_1}")
+                elseif(_line MATCHES "^EMDAWN_LIBRARY_WEBGPU_JS=(.+)$")
+                    set(_emdawn_js "${CMAKE_MATCH_1}")
+                elseif(_line MATCHES "^EMDAWN_WEBGPU_EXTERNS=(.+)$")
+                    set(_emdawn_externs "${CMAKE_MATCH_1}")
+                endif()
+            endforeach()
+        endif()
+        # Fallback: staged copies under the WebGPU ORT vendor tree (preferred),
+        # then the ORT Dawn build dir if still present.
+        set(_emdawn_staged
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/emdawn")
+        if(_emdawn_js STREQUAL "" OR NOT EXISTS "${_emdawn_js}")
+            set(_emdawn_js "${_emdawn_staged}/library_webgpu.js")
+        endif()
+        if(_emdawn_js STREQUAL "" OR NOT EXISTS "${_emdawn_js}")
+            set(_emdawn_js
+                "${CMAKE_SOURCE_DIR}/sdk/runanywhere-web/wasm/third_party/onnxruntime/build/MacOS-webgpu/Release/_deps/dawn-src/third_party/emdawnwebgpu/pkg/webgpu/src/library_webgpu.js")
+        endif()
+        get_filename_component(_emdawn_gen_dir
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-web/wasm/third_party/onnxruntime/build/MacOS-webgpu/Release/_deps/dawn-build/gen/src/emdawnwebgpu"
+            ABSOLUTE)
+        if(_emdawn_enum STREQUAL "" OR NOT EXISTS "${_emdawn_enum}")
+            set(_emdawn_enum "${_emdawn_staged}/library_webgpu_enum_tables.js")
+        endif()
+        if(_emdawn_enum STREQUAL "" OR NOT EXISTS "${_emdawn_enum}")
+            set(_emdawn_enum "${_emdawn_gen_dir}/library_webgpu_enum_tables.js")
+        endif()
+        if(_emdawn_sig STREQUAL "" OR NOT EXISTS "${_emdawn_sig}")
+            set(_emdawn_sig "${_emdawn_staged}/library_webgpu_generated_sig_info.js")
+        endif()
+        if(_emdawn_sig STREQUAL "" OR NOT EXISTS "${_emdawn_sig}")
+            set(_emdawn_sig "${_emdawn_gen_dir}/library_webgpu_generated_sig_info.js")
+        endif()
+        if(_emdawn_struct STREQUAL "" OR NOT EXISTS "${_emdawn_struct}")
+            set(_emdawn_struct "${_emdawn_staged}/library_webgpu_generated_struct_info.js")
+        endif()
+        if(_emdawn_struct STREQUAL "" OR NOT EXISTS "${_emdawn_struct}")
+            set(_emdawn_struct "${_emdawn_gen_dir}/library_webgpu_generated_struct_info.js")
+        endif()
+        foreach(_req IN ITEMS _emdawn_enum _emdawn_sig _emdawn_struct _emdawn_js)
+            if(NOT EXISTS "${${_req}}")
+                message(FATAL_ERROR
+                    "RAC_WASM_ONNX_WEBGPU requires Dawn emdawn JS libs; missing ${${_req}}. "
+                    "Re-run vendor-onnxruntime-wasm-webgpu.sh so .rac-webgpu-link-hints is populated.")
+            endif()
+        endforeach()
+        list(APPEND _onnx_webgpu_extra_link
+            "--js-library=${_emdawn_enum}"
+            "--js-library=${_emdawn_sig}"
+            "--js-library=${_emdawn_struct}"
+            "--js-library=${_emdawn_js}"
+        )
+        if(EXISTS "${_emdawn_externs}")
+            list(APPEND _onnx_webgpu_extra_link
+                "--closure-args=--externs=${_emdawn_externs}"
+            )
+        endif()
+        message(STATUS "ONNX WebGPU emdawn JS libs: ${_emdawn_enum}; ${_emdawn_sig}; ${_emdawn_struct}; ${_emdawn_js}")
+        rac_wasm_add_target(
+            NAME racommons_onnx_webgpu_wasm
+            OUTPUT_NAME racommons-onnx-sherpa-webgpu
+            OUTPUT_DIR "${_ONNX_OUTPUT_DIR}"
+            EXPORT_NAME createRACommonsONNXWebGPUModule
+            ENABLE_WEBGPU ON
+            LINK_LIBRARIES ${_onnx_libs}
+            EXPORTED_FUNCTIONS ${_onnx_exports}
+            # RAC_ONNXRT_EP_WEBGPU_ENABLED is set on rac_runtime_onnxrt itself
+            # (see runtimes/onnxrt/CMakeLists.txt) — do not redefine the enum
+            # name RAC_ONNXRT_EP_WEBGPU as a macro here.
+            COMPILE_DEFS RAC_WASM_ONNX=1 RAC_WASM_ONNX_WEBGPU=1
+            EXTRA_LINK_FLAGS ${_onnx_webgpu_extra_link}
+        )
+        list(APPEND _targets_built "racommons_onnx_webgpu_wasm -> packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}")
+    endif()
 endif()
 
 if(NOT _targets_built)

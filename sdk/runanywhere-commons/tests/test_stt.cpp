@@ -354,6 +354,67 @@ static TestResult test_transcribe_sine() {
     return result;
 }
 
+static TestResult test_transcribe_fixture() {
+    TestResult result;
+    result.test_name = "transcribe_fixture";
+
+    const std::string audio_path = test_config::get_stt_audio_path();
+    if (audio_path.empty()) {
+        result.passed = true;
+        result.details = "SKIPPED - set RAC_TEST_STT_AUDIO for real-model inference";
+        return result;
+    }
+    if (!setup()) {
+        result.details = "setup() failed";
+        return result;
+    }
+
+    const std::string model_path = test_config::get_stt_model_path();
+    if (!test_config::require_model(model_path, result.test_name, result)) {
+        teardown();
+        return result;
+    }
+    WavFile wav;
+    if (!read_wav(audio_path, wav) || wav.samples.empty()) {
+        result.details = "failed to read PCM16 fixture: " + audio_path;
+        teardown();
+        return result;
+    }
+    std::vector<float> samples(wav.samples.size());
+    std::transform(wav.samples.begin(), wav.samples.end(), samples.begin(),
+                   [](int16_t value) { return static_cast<float>(value) / 32768.0f; });
+
+    rac_handle_t handle = RAC_INVALID_HANDLE;
+    rac_result_t rc =
+        rac_stt_sherpa_create(model_path.c_str(), &RAC_STT_SHERPA_CONFIG_DEFAULT, &handle);
+    if (rc != RAC_SUCCESS) {
+        result.details = "rac_stt_sherpa_create failed: " + std::to_string(rc);
+        teardown();
+        return result;
+    }
+
+    rac_stt_options_t options{};
+    options.sample_rate = static_cast<int32_t>(wav.sample_rate);
+    rac_stt_result_t stt_result{};
+    rc = rac_stt_sherpa_transcribe(handle, samples.data(), samples.size(), &options, &stt_result);
+    const std::string transcript = stt_result.text ? stt_result.text : "";
+    const std::string expected = test_config::get_stt_expected_text();
+    result.passed = rc == RAC_SUCCESS && !transcript.empty() &&
+                    (expected.empty() || contains_ci(transcript, expected));
+    result.details = "rc=" + std::to_string(rc) + ", transcript=\"" + transcript + "\"";
+    if (!expected.empty()) {
+        result.details += ", expected substring=\"" + expected + "\"";
+    }
+
+    if (stt_result.text)
+        rac_free(stt_result.text);
+    if (stt_result.detected_language)
+        rac_free(stt_result.detected_language);
+    rac_stt_sherpa_destroy(handle);
+    teardown();
+    return result;
+}
+
 static TestResult test_supports_streaming() {
     TestResult result;
     result.test_name = "supports_streaming";
@@ -821,6 +882,7 @@ int main(int argc, char** argv) {
         {"create_invalid_path", test_create_invalid_path},
         {"transcribe_silence", test_transcribe_silence},
         {"transcribe_sine", test_transcribe_sine},
+        {"transcribe_fixture", test_transcribe_fixture},
         {"supports_streaming", test_supports_streaming},
         {"streaming_workflow", test_streaming_workflow},
         {"transcribe_tts_hello", test_transcribe_tts_hello},

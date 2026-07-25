@@ -1,0 +1,63 @@
+// RunAnywhere IDL - reranking (cross-encoder relevance scoring) types.
+//
+// A reranker scores each candidate document/passage against a query and returns
+// the candidates re-ordered by relevance. Mirrors the shape of
+// segmentation.proto: a request (query + repeated candidates), a result
+// (repeated scored items), and a service lifecycle rpc.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "RerankProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// A single candidate document/passage to be scored against the query. The id is
+// caller-supplied and echoed back on the scored item so callers can correlate
+// results with their own records without relying on ordering.
+message RerankCandidate {
+    string id = 1;
+    string text = 2;
+}
+
+message RerankOptions {
+    // When > 0, only the top_n highest-scoring candidates are returned (every
+    // candidate is still scored). 0 = return all candidates, ranked.
+    uint32 top_n = 1;
+}
+
+message RerankRequest {
+    string query = 1;
+    repeated RerankCandidate candidates = 2;
+    optional RerankOptions options = 3;
+}
+
+message RerankScoredItem {
+    // Echo of RerankCandidate.id for correlation.
+    string id = 1;
+    // Raw relevance score from the reranker (higher = more relevant). Not
+    // normalized to a fixed range; comparable only within one result set.
+    float score = 2;
+    // Index of this candidate in the original RerankRequest.candidates list.
+    uint32 original_index = 3;
+    // 0-based position after sorting by score descending (0 = most relevant).
+    uint32 rank = 4;
+}
+
+message RerankResult {
+    // Sorted by score descending. When RerankOptions.top_n > 0, truncated to the
+    // top_n most relevant items.
+    repeated RerankScoredItem items = 1;
+    int64 processing_time_ms = 2;
+    string model_id = 3;
+}
+
+service Reranking {
+    rpc Rerank(RerankRequest) returns (RerankResult);
+}

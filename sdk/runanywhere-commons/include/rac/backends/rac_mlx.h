@@ -15,6 +15,7 @@
 #if __has_include("rac/core/rac_error.h")
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -22,6 +23,7 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 #else
 #include "rac_embeddings_service.h"
+#include "rac_diarization_service.h"
 #include "rac_error.h"
 #include "rac_llm_service.h"
 #include "rac_stt_service.h"
@@ -46,6 +48,7 @@ typedef int32_t rac_mlx_session_kind_t;
 #define RAC_MLX_SESSION_KIND_LLM 4
 #define RAC_MLX_SESSION_KIND_VLM 5
 #define RAC_MLX_SESSION_KIND_EMBEDDINGS 8
+#define RAC_MLX_SESSION_KIND_DIARIZATION 11
 
 typedef rac_result_t (*rac_mlx_create_fn)(rac_mlx_session_kind_t kind, const char* model_id,
                                           rac_handle_t* out_handle, void* user_data);
@@ -109,6 +112,24 @@ typedef rac_result_t (*rac_mlx_tts_stop_fn)(rac_handle_t handle, void* user_data
 typedef rac_result_t (*rac_mlx_tts_info_fn)(rac_handle_t handle, rac_tts_info_t* out_info,
                                             void* user_data);
 
+typedef rac_result_t (*rac_mlx_diarize_fn)(rac_handle_t handle, const float* samples,
+                                           size_t sample_count,
+                                           const rac_diarization_options_t* options,
+                                           rac_diarization_result_t* out_result,
+                                           void* user_data);
+
+typedef rac_result_t (*rac_mlx_diarization_stream_create_fn)(
+    rac_handle_t handle, const rac_diarization_options_t* options,
+    rac_handle_t* out_stream_handle, void* user_data);
+
+typedef rac_result_t (*rac_mlx_diarization_stream_feed_fn)(
+    rac_handle_t handle, rac_handle_t stream_handle, const float* samples, size_t sample_count,
+    rac_diarization_stream_callback_t callback, void* callback_user_data, void* user_data);
+
+typedef rac_result_t (*rac_mlx_diarization_stream_destroy_fn)(rac_handle_t handle,
+                                                              rac_handle_t stream_handle,
+                                                              void* user_data);
+
 typedef rac_result_t (*rac_mlx_cancel_fn)(rac_handle_t handle, void* user_data);
 typedef rac_result_t (*rac_mlx_cleanup_fn)(rac_handle_t handle, void* user_data);
 typedef void (*rac_mlx_destroy_fn)(rac_handle_t handle, void* user_data);
@@ -130,6 +151,10 @@ typedef struct rac_mlx_callbacks {
     rac_mlx_tts_synthesize_stream_fn tts_synthesize_stream;
     rac_mlx_tts_stop_fn tts_stop;
     rac_mlx_tts_info_fn tts_info;
+    rac_mlx_diarize_fn diarize;
+    rac_mlx_diarization_stream_create_fn diarization_stream_create;
+    rac_mlx_diarization_stream_feed_fn diarization_stream_feed;
+    rac_mlx_diarization_stream_destroy_fn diarization_stream_destroy;
     rac_mlx_cancel_fn cancel;
     rac_mlx_cleanup_fn cleanup;
     rac_mlx_destroy_fn destroy;

@@ -132,8 +132,46 @@ expect_literal "sdk/runanywhere-commons/VERSIONS" "PROJECT_VERSION=${VERSION}"
 expect_literal "AGENTS.md" \
   "**Current version**: \`${VERSION}\` (canonical source: \`sdk/runanywhere-commons/VERSION\`)"
 
-expect_literal "Package.swift" "let sdkVersion = \"${VERSION}\""
-expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${VERSION}\")"
+# SwiftPM consumers resolve prebuilt XCFrameworks from a GitHub release. During
+# release preparation, the canonical SDK train can temporarily be ahead of the
+# latest published Apple archives. Package.swift records that state explicitly
+# so external consumers stay on an available release instead of resolving a
+# non-existent v${VERSION} asset. All SwiftPM manifests must use the same pin.
+SPM_VERSION="$(awk -F'"' '/^let sdkVersion = "/ { print $2; exit }' "${REPO_ROOT}/Package.swift")"
+SPM_TEMP_PIN=0
+if [ -z "${SPM_VERSION}" ]; then
+  echo "[FAIL] Package.swift: missing sdkVersion pin" >&2
+  FAILURES=$((FAILURES + 1))
+elif [ "${SPM_VERSION}" = "${VERSION}" ]; then
+  echo "[OK] SwiftPM manifests use canonical release version ${VERSION}"
+else
+  SPM_TEMP_MARKER="TEMP: pin to ${SPM_VERSION} until the v${VERSION} GitHub release assets are published."
+  if grep -Fq -- "${SPM_TEMP_MARKER}" "${REPO_ROOT}/Package.swift"; then
+    SPM_TEMP_PIN=1
+    echo "[OK] SwiftPM manifests temporarily pin ${SPM_VERSION} until v${VERSION} assets are published"
+  else
+    echo "[FAIL] Package.swift: sdkVersion ${SPM_VERSION} differs from canonical ${VERSION} without an explicit unpublished-assets pin" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+fi
+
+expect_spm_version() {
+  local file="$1"
+  if grep -Fq -- "let sdkVersion = \"${VERSION}\"" "${REPO_ROOT}/${file}"; then
+    return
+  fi
+  if [ "${SPM_TEMP_PIN}" -eq 1 ] && grep -Fq -- "let sdkVersion = \"${SPM_VERSION}\"" "${REPO_ROOT}/${file}"; then
+    return
+  fi
+  echo "[FAIL] ${file}: expected SwiftPM sdkVersion ${VERSION}" >&2
+  FAILURES=$((FAILURES + 1))
+}
+
+if [ "${SPM_TEMP_PIN}" -eq 1 ]; then
+  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${SPM_VERSION}\")"
+else
+  expect_literal "Package.swift" ".package(url: \"https://github.com/RunanywhereAI/runanywhere-sdks\", from: \"${VERSION}\")"
+fi
 expect_exact_file "sdk/runanywhere-swift/VERSION" "${VERSION}"
 expect_literal "sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift" \
   "public static let sdkVersion = \"${VERSION}\""
@@ -303,7 +341,7 @@ for package_manifest in \
   sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere/Package.swift \
   sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp/Package.swift \
   sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx/Package.swift; do
-  expect_literal "${package_manifest}" "let sdkVersion = \"${VERSION}\""
+  expect_spm_version "${package_manifest}"
 done
 
 for release_doc in \

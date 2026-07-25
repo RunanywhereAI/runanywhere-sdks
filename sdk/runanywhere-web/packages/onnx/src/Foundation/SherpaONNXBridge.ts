@@ -272,7 +272,7 @@ export class SherpaONNXBridge {
       this._bridgeOwnedInit = true;
       completeNativePhase1ForModule(this._module);
 
-      // Claim speech + embedding + RAG. The dedicated racommons-onnx-sherpa
+      // Claim speech + embedding + semantic segmentation + RAG. The dedicated racommons-onnx-sherpa
       // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
       // export list — see `RAC_EXPORTED_FUNCTIONS_BASE` in
       // sdk/runanywhere-web/wasm/CMakeLists.txt) and the 6 `_rac_rag_*_proto`
@@ -288,6 +288,8 @@ export class SherpaONNXBridge {
         'vad',
         'voice-agent',
         'embedding',
+        'segmentation',
+        'diarization',
         'rag',
       ];
       registerWasmModule(capabilities, this._module, ['onnx', 'sherpa'], {

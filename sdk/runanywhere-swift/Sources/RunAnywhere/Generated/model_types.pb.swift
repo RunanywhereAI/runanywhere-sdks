@@ -368,6 +368,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
 
   /// present in Swift only pre-IDL
   case voiceActivityDetection // = 9
+  case speakerDiarization // = 10
+  case semanticSegmentation // = 11
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -386,6 +388,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case 7: self = .audio
     case 8: self = .embedding
     case 9: self = .voiceActivityDetection
+    case 10: self = .speakerDiarization
+    case 11: self = .semanticSegmentation
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -402,6 +406,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     case .audio: return 7
     case .embedding: return 8
     case .voiceActivityDetection: return 9
+    case .speakerDiarization: return 10
+    case .semanticSegmentation: return 11
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -418,6 +424,8 @@ public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
     .audio,
     .embedding,
     .voiceActivityDetection,
+    .speakerDiarization,
+    .semanticSegmentation,
   ]
 
 }
@@ -1425,6 +1433,7 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
   /// canonical "required" flag — the documented `required` boolean from
   /// newer SDK sources maps onto it (default true, mirrored in Swift).
+  /// Exact on-disk artifact size, verified after download.
   public var sizeBytes: Int64 {
     get {_sizeBytes ?? 0}
     set {_sizeBytes = newValue}
@@ -1473,6 +1482,7 @@ public nonisolated struct RAModelFileDescriptor: Sendable {
   /// Clears the value of `localPath`. Subsequent reads from it will return its default value.
   public mutating func clearLocalPath() {self._localPath = nil}
 
+  /// Exact on-disk artifact checksum, verified after download.
   public var checksumSha256: String {
     get {_checksumSha256 ?? String()}
     set {_checksumSha256 = newValue}
@@ -2899,7 +2909,7 @@ nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0\u{1}MODEL_CATEGORY_SPEAKER_DIARIZATION\0\u{1}MODEL_CATEGORY_SEMANTIC_SEGMENTATION\0")
 }
 
 nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
@@ -3518,7 +3528,7 @@ nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{c}\u{5}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{c}\u{5}\u{1}\u{c}\u{b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

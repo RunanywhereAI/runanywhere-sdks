@@ -7,6 +7,7 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <mutex>
 #include <new>
@@ -18,6 +19,23 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_onnxrt_runtime_ep.h"
 #include "rac/plugin/rac_runtime_registry.h"
+
+#if defined(__wasm__) && defined(__EMSCRIPTEN_PTHREADS__)
+namespace {
+std::atomic<int32_t> g_wasm_intra_op_threads{2};
+std::atomic<int32_t> g_wasm_inter_op_threads{1};
+}  // namespace
+
+extern "C" int rac_onnxrt_set_wasm_thread_counts(int32_t intra_op, int32_t inter_op) {
+    if (intra_op > 0) {
+        g_wasm_intra_op_threads.store(std::min(intra_op, 8), std::memory_order_relaxed);
+    }
+    if (inter_op > 0) {
+        g_wasm_inter_op_threads.store(std::min(inter_op, 8), std::memory_order_relaxed);
+    }
+    return 0;
+}
+#endif
 
 namespace runanywhere {
 namespace runtime {
@@ -56,8 +74,8 @@ struct SharedOrt {
         /* Threaded ONNX Runtime WASM deliberately defaults sessions to the
          * environment's global pools. Pair that session policy with a global-
          * pool environment; ORT rejects a plain CreateEnv at session creation.
-         * A single worker-free 1/1 configuration also avoids background WASM
-         * pthread aborts, matching ORT's own threaded-WASM wrapper. */
+         * Thread counts are configurable via rac_onnxrt_set_wasm_thread_counts
+         * (must be called before first SharedOrt use). Default 2/1. */
         OrtThreadingOptions* threading_options = nullptr;
         OrtStatus* status = api->CreateThreadingOptions(&threading_options);
         if (status != nullptr) {
@@ -65,9 +83,11 @@ struct SharedOrt {
             return;
         }
 
-        status = api->SetGlobalIntraOpNumThreads(threading_options, 1);
+        const int32_t intra = g_wasm_intra_op_threads.load(std::memory_order_relaxed);
+        const int32_t inter = g_wasm_inter_op_threads.load(std::memory_order_relaxed);
+        status = api->SetGlobalIntraOpNumThreads(threading_options, intra > 0 ? intra : 1);
         if (status == nullptr) {
-            status = api->SetGlobalInterOpNumThreads(threading_options, 1);
+            status = api->SetGlobalInterOpNumThreads(threading_options, inter > 0 ? inter : 1);
         }
         if (status == nullptr) {
             status = api->CreateEnvWithGlobalThreadPools(
@@ -165,7 +185,7 @@ bool ep_is_compiled_in(rac_onnxrt_ep_type_t type) {
         case RAC_ONNXRT_EP_QNN:
             return true;
 #endif
-#if defined(RAC_ONNXRT_EP_WEBGPU)
+#if defined(RAC_ONNXRT_EP_WEBGPU_ENABLED)
         case RAC_ONNXRT_EP_WEBGPU:
             return true;
 #endif
@@ -239,11 +259,25 @@ rac_result_t apply_active_ep(const OrtApi* api, OrtSessionOptions* session_optio
             return RAC_SUCCESS;
         }
 #endif
-        /* CUDA / DirectML / NNAPI / QNN / WebGPU are SKELETON stubs for now.
-         * Activation is accepted (see `rac_onnxrt_runtime_enable_execution_
-         * provider` below which gates on `ep_is_compiled_in`), but the ORT
-         * append path isn't wired yet — fall through to CPU and warn. A
-         * follow-up gap row per EP will bring real linkage. */
+#if defined(RAC_ONNXRT_EP_WEBGPU_ENABLED)
+        case RAC_ONNXRT_EP_WEBGPU: {
+            /* Prefer the named-provider append so we do not require a specialized
+             * WebGPU factory header in every ORT pin. When the EP is not linked
+             * into the static WASM archive, ORT fails the append and we fall
+             * back to CPU with a warning. */
+            OrtStatus* status =
+                api->SessionOptionsAppendExecutionProvider(session_options, "WebGPU", nullptr, nullptr, 0);
+            if (status != nullptr) {
+                std::string msg = api->GetErrorMessage(status);
+                api->ReleaseStatus(status);
+                RAC_LOG_WARNING("Runtime.ONNXRT",
+                                "WebGPU EP append failed: %s — falling back to CPU", msg.c_str());
+                return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+            }
+            return RAC_SUCCESS;
+        }
+#endif
+        /* CUDA / DirectML / NNAPI / QNN remain SKELETON stubs until linkage. */
         default:
             RAC_LOG_WARNING("Runtime.ONNXRT", "EP '%s' stub — running on CPU until linkage lands",
                             ep_short_name(active));
@@ -363,7 +397,7 @@ const rac_device_class_t k_supported_devices[] = {
      * runs on. */
     RAC_DEVICE_CLASS_GPU,
 #endif
-#if defined(RAC_ONNXRT_EP_WEBGPU)
+#if defined(RAC_ONNXRT_EP_WEBGPU_ENABLED)
     RAC_DEVICE_CLASS_WEB_GPU,
 #endif
 };
@@ -714,6 +748,112 @@ const char* runtime_version() {
     return ort.api_base ? ort.api_base->GetVersionString() : "unknown";
 }
 
+namespace {
+std::string g_last_webgpu_probe_error;
+
+void set_webgpu_probe_error(std::string message) {
+    g_last_webgpu_probe_error = std::move(message);
+}
+
+bool try_append_webgpu_ep(const SharedOrt& ort, const char* provider_name) {
+    OrtSessionOptions* session_options = nullptr;
+    OrtStatus* status = ort.api->CreateSessionOptions(&session_options);
+    if (status != nullptr) {
+        set_webgpu_probe_error(std::string("CreateSessionOptions failed: ")
+                               + ort.api->GetErrorMessage(status));
+        ort.api->ReleaseStatus(status);
+        return false;
+    }
+
+    status = ort.api->SessionOptionsAppendExecutionProvider(session_options, provider_name, nullptr,
+                                                            nullptr, 0);
+    ort.api->ReleaseSessionOptions(session_options);
+    if (status != nullptr) {
+        set_webgpu_probe_error(std::string("AppendExecutionProvider(\"")
+                               + provider_name + "\") failed: "
+                               + ort.api->GetErrorMessage(status));
+        ort.api->ReleaseStatus(status);
+        return false;
+    }
+    set_webgpu_probe_error({});
+    return true;
+}
+
+/** True when GetAvailableProviders lists a WebGPU EP name. */
+bool webgpu_listed_in_available_providers(const SharedOrt& ort) {
+    char** providers = nullptr;
+    int len = 0;
+    OrtStatus* status = ort.api->GetAvailableProviders(&providers, &len);
+    if (status != nullptr) {
+        set_webgpu_probe_error(std::string("GetAvailableProviders failed: ")
+                               + ort.api->GetErrorMessage(status));
+        ort.api->ReleaseStatus(status);
+        return false;
+    }
+    bool found = false;
+    for (int i = 0; i < len; ++i) {
+        if (providers[i] == nullptr)
+            continue;
+        if (std::strcmp(providers[i], "WebGPU") == 0
+            || std::strcmp(providers[i], "WebGpuExecutionProvider") == 0) {
+            found = true;
+            break;
+        }
+    }
+    ort.api->ReleaseAvailableProviders(providers, len);
+    if (!found) {
+        set_webgpu_probe_error("WebGPU not listed in OrtGetAvailableProviders");
+    }
+    return found;
+}
+}  // namespace
+
+/** True only when ORT accepts AppendExecutionProvider("WebGPU"). */
+int probe_webgpu_ep() {
+#if !defined(RAC_ONNXRT_EP_WEBGPU_ENABLED)
+    set_webgpu_probe_error("RAC_ONNXRT_EP_WEBGPU_ENABLED not compiled into this artifact");
+    return 0;
+#else
+    SharedOrt& ort = shared_ort();
+    if (!ort.ready() || ort.api == nullptr) {
+        set_webgpu_probe_error(
+            ort.init_error.empty() ? "SharedOrt not ready (OrtApi/Env missing)"
+                                   : ("SharedOrt init failed: " + ort.init_error));
+        return 0;
+    }
+
+    // Prefer the short name from the C API docs; also try the long factory name.
+    if (try_append_webgpu_ep(ort, "WebGPU"))
+        return 1;
+    const std::string first_error = g_last_webgpu_probe_error;
+    if (try_append_webgpu_ep(ort, "WebGpuExecutionProvider"))
+        return 1;
+
+    // Soft signal: EP is linked even if device creation failed during Append.
+    // Keep the Append error as the primary message.
+    if (webgpu_listed_in_available_providers(ort) && !first_error.empty()) {
+        set_webgpu_probe_error(first_error + " (WebGPU is listed in available providers)");
+    } else if (!first_error.empty()) {
+        set_webgpu_probe_error(first_error);
+    }
+    return 0;
+#endif
+}
+
+/** Prefer WebGPU when requested and the probe succeeds; else CPU. */
+int activate_preferred_wasm_ep(int prefer_webgpu) {
+    if (prefer_webgpu != 0 && probe_webgpu_ep() != 0) {
+        ep_state().set(RAC_ONNXRT_EP_WEBGPU, nullptr);
+        return 1;
+    }
+    ep_state().set(RAC_ONNXRT_EP_CPU, nullptr);
+    return 0;
+}
+
+const char* last_webgpu_probe_error() {
+    return g_last_webgpu_probe_error.c_str();
+}
+
 }  // namespace onnxrt
 }  // namespace runtime
 }  // namespace runanywhere
@@ -876,6 +1016,18 @@ extern "C" RAC_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t t
 extern "C" RAC_API rac_device_class_t
 rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type) {
     return runanywhere::runtime::onnxrt::ep_info(type).device_class;
+}
+
+extern "C" RAC_API int rac_onnxrt_probe_webgpu_ep(void) {
+    return runanywhere::runtime::onnxrt::probe_webgpu_ep();
+}
+
+extern "C" RAC_API int rac_onnxrt_activate_preferred_wasm_ep(int prefer_webgpu) {
+    return runanywhere::runtime::onnxrt::activate_preferred_wasm_ep(prefer_webgpu);
+}
+
+extern "C" RAC_API const char* rac_onnxrt_last_webgpu_probe_error(void) {
+    return runanywhere::runtime::onnxrt::last_webgpu_probe_error();
 }
 
 RAC_STATIC_RUNTIME_REGISTER(onnxrt);

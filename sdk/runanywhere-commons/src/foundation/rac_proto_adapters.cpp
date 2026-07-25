@@ -899,7 +899,50 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
     if (!out)
         return false;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+
+    switch (in.normalize_mode()) {
+        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
+            out->normalize =
+                in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_NONE:
+            out->normalize = RAC_EMBEDDINGS_NORMALIZE_NONE;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_L2:
+            out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
+            break;
+        default:
+            return false;
+    }
+
+    switch (in.pooling()) {
+        case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED:
+            out->pooling = -1;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_MEAN:
+            out->pooling = RAC_EMBEDDINGS_POOLING_MEAN;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_CLS:
+            out->pooling = RAC_EMBEDDINGS_POOLING_CLS;
+            break;
+        case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_LAST:
+            out->pooling = RAC_EMBEDDINGS_POOLING_LAST;
+            break;
+        default:
+            return false;
+    }
+
+    if (in.n_threads() < 0) {
+        return false;
+    }
+    out->n_threads = in.n_threads();
+    out->truncate = in.has_truncate() ? (in.truncate() ? 1 : 0) : -1;
+    if (in.has_batch_size()) {
+        if (in.batch_size() <= 0 || in.batch_size() > RAC_EMBEDDINGS_MAX_BATCH_SIZE) {
+            return false;
+        }
+        out->batch_size = in.batch_size();
+    }
     return true;
 }
 

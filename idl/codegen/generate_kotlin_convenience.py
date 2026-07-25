@@ -298,7 +298,7 @@ def _emit_message_validate(
         min_f = get_double_option(field.options, RAC_MIN_FLOAT_FIELD_NUM)
         max_f = get_double_option(field.options, RAC_MAX_FLOAT_FIELD_NUM)
         if (min_f is not None or max_f is not None) and field.type in FLOAT_TYPES:
-            parts = []
+            parts = [f"!{kt_field}.isFinite()"]
             if min_f is not None:
                 parts.append(f"{kt_field} < {min_f}")
             if max_f is not None:

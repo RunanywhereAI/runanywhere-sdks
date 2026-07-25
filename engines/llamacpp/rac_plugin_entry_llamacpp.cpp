@@ -3,9 +3,10 @@
  * @brief Unified-ABI entry point for the llama.cpp engine.
  *
  * Exposes `rac_plugin_entry_llamacpp()` returning a `const
- * rac_engine_vtable_t*` with BOTH `llm_ops` and `vlm_ops` slots filled —
- * llama.cpp is one engine that supports text generation (LLM) and
- * vision-language (VLM) as two modalities of the same backend.
+ * rac_engine_vtable_t*` with `llm_ops`, `embedding_ops`, `vlm_ops`, and
+ * `rerank_ops` filled — llama.cpp is one engine that supports text generation,
+ * text embeddings, vision-language inference, and cross-encoder reranking
+ * (rank-pooling GGUFs) as modalities of the same backend.
  *
  * Per the v3 ABI principle ("each backend publishes a single
  * `rac_engine_vtable_t`"), this is the SOLE llama.cpp plugin entry. The
@@ -18,22 +19,28 @@
  * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
+#include <cstddef>
+#include <mutex>
+
 #include "rac/core/rac_error.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/rerank/rac_rerank_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#include <cstddef>
-#include <mutex>
-
 extern "C" {
 
 /* Defined in rac_backend_llamacpp_register.cpp. */
 extern const rac_llm_service_ops_t g_llamacpp_ops;
+/* Defined in rac_embeddings_llamacpp.cpp. */
+extern const rac_embeddings_service_ops_t g_llamacpp_embeddings_ops;
 /* Defined in rac_llamacpp_vlm_ops.cpp. */
 extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
+/* Defined in rac_rerank_llamacpp.cpp. */
+extern const rac_rerank_service_ops_t g_llamacpp_rerank_ops;
 
 rac_result_t rac_llamacpp_cpu_runtime_register(void);
 void rac_llamacpp_cpu_runtime_unregister(void);
@@ -99,10 +106,13 @@ static const uint32_t k_llamacpp_formats[] = {
     RAC_MODEL_FORMAT_ID_BIN,
 };
 
-/* This single plugin serves both text generation and VLM primitives. */
+/* This single plugin serves text generation, embeddings, VLM, and reranking
+ * (rank-pooling GGUFs) primitives. */
 static const rac_primitive_t k_llamacpp_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT,
+    RAC_PRIMITIVE_EMBED,
     RAC_PRIMITIVE_VLM,
+    RAC_PRIMITIVE_RERANK,
 };
 
 static const rac_engine_manifest_t k_llamacpp_manifest = {
@@ -138,14 +148,14 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* stt_ops          */ nullptr,
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
-    /* embedding_ops    */ nullptr,
+    /* embedding_ops    */ &g_llamacpp_embeddings_ops,
     /* vlm_ops          */ &g_llamacpp_vlm_ops,
     /* diffusion_ops    */ nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
+    /* rerank_ops       */ &g_llamacpp_rerank_ops,
 
-    /* reserved_slot_0..9 */
-    nullptr,
-    nullptr,
-    nullptr,
+    /* reserved_slot_3..9 */
     nullptr,
     nullptr,
     nullptr,

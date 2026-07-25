@@ -127,6 +127,8 @@ enum ModelCategory {
     MODEL_CATEGORY_AUDIO                    = 7  [(runanywhere.v1.rac_wire_string) = "audio"];
     MODEL_CATEGORY_EMBEDDING                = 8  [(runanywhere.v1.rac_wire_string) = "embedding"];
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
+    MODEL_CATEGORY_SPEAKER_DIARIZATION      = 10 [(runanywhere.v1.rac_wire_string) = "speaker-diarization"];
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION    = 11 [(runanywhere.v1.rac_wire_string) = "semantic-segmentation"];
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +421,7 @@ message ModelFileDescriptor {
     // Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
     // canonical "required" flag — the documented `required` boolean from
     // newer SDK sources maps onto it (default true, mirrored in Swift).
+    // Exact on-disk artifact size, verified after download.
     optional int64  size_bytes = 4;
 
     reserved 5;
@@ -430,7 +433,13 @@ message ModelFileDescriptor {
     optional string        destination_path = 7;
     optional ModelFileRole role             = 8;
     optional string        local_path       = 9;
+    // Exact on-disk artifact checksum, verified after download.
     optional string        checksum_sha256  = 10;
+
+    // 11 held PostDownloadTransform, a commons-owned byte-append step that
+    // patched a model missing metadata its runtime required. The artifact is
+    // now published pre-patched, so catalogs declare plain pinned downloads.
+    reserved 11;
 }
 
 message MultiFileArtifact {

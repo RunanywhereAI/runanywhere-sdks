@@ -49,9 +49,12 @@ let package = Package(
                 .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks", condition: .when(platforms: [.iOS])),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
-                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks", condition: .when(platforms: [.iOS])),     // LLM
-                .product(name: "RunAnywhereMLX", package: "runanywhere-sdks"),          // Apple MLX LLM/VLM
+                // All native backend XCFrameworks now carry macOS arm64 slices,
+                // so the shared example exposes the same portable providers on
+                // iOS and macOS instead of compiling them out on Mac.
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
+                .product(name: "RunAnywhereMLX", package: "runanywhere-sdks"),
             ],
             path: "RunAnywhereAI",
             exclude: [

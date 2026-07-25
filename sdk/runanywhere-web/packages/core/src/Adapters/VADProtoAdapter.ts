@@ -19,6 +19,7 @@ import {
 } from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../Foundation/SDKException.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
+import { mustUseOnnxBackendWorker } from '../runtime/BackendWorkerModelOwnership.js';
 import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { readWasmUint64 } from '../runtime/WasmInt64.js';
 import {
@@ -31,6 +32,19 @@ import {
   type ModalityProtoModule,
   type ProtoEventHandler,
 } from './ProtoAdapterTypes.js';
+
+function requireLiveOnnxWorkerOrMain(operation: string) {
+  const host = getActiveBackendWorkerHost('onnx');
+  if (host?.diagnostics.executionContext === 'worker') return host;
+  if (mustUseOnnxBackendWorker()) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      'ONNX BackendWorker is required for speech (or owns loaded models); '
+        + 'reload after recovering the worker. Main-thread fallback is disabled.',
+    );
+  }
+  return null;
+}
 
 export class VADProtoAdapter {
   static tryDefault(): VADProtoAdapter | null {
@@ -110,8 +124,8 @@ export class VADProtoAdapter {
       options,
       metadata: {},
     });
-    const host = getActiveBackendWorkerHost('onnx');
-    if (host?.diagnostics.executionContext === 'worker') {
+    const host = requireLiveOnnxWorkerOrMain('vad.processLifecycle');
+    if (host) {
       const response = await host.infer('vad.process', {
         requestBytes: VADProcessRequest.encode(request).finish(),
       });
@@ -206,12 +220,30 @@ export class VADProtoAdapter {
    * Feed a browser Float32 PCM iterable through one native VAD stream
    * session. The component/model handle is owned by the caller; this method
    * owns only the callback and native stream-session lifetime.
+   *
+   * When the ONNX BackendWorker owns speech models, streaming uses per-chunk
+   * `vad.process` RPCs (same heap as loaded Silero) instead of main-thread
+   * stream callbacks.
    */
   stream(
     handle: number,
     audio: AsyncIterable<Float32Array>,
     options: ProtoVADOptions,
   ): AsyncIterable<ProtoVADResult> {
+    const workerHost = requireLiveOnnxWorkerOrMain('vad.stream');
+    if (workerHost) {
+      const processLifecycle = this.processLifecycle.bind(this);
+      return {
+        async *[Symbol.asyncIterator](): AsyncGenerator<ProtoVADResult> {
+          for await (const chunk of audio) {
+            if (!chunk.length) continue;
+            const result = await processLifecycle(chunk, options);
+            if (result) yield result;
+          }
+        },
+      };
+    }
+
     const module = this.module;
     const required = [
       '_rac_vad_set_stream_proto_callback',

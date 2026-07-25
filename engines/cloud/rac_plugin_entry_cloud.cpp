@@ -88,9 +88,10 @@ static const rac_engine_vtable_t g_cloud_engine_vtable = {
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

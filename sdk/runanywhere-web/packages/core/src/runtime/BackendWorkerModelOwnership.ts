@@ -18,6 +18,10 @@ let llamaWorkerRequired = false;
 let llamaWorkerDeadReason: string | null = null;
 /** Llama model ids owned at the last crash — used to reload after CPU fallback. */
 let lastLlamaOwnedModelIds: string[] = [];
+/** When true, STT/TTS/VAD must not fall back to main-thread ONNX WASM. */
+let onnxWorkerRequired = false;
+/** Sticky failure after a required ONNX worker crash until a successful re-init. */
+let onnxWorkerDeadReason: string | null = null;
 
 export function setLlamaBackendWorkerRequired(required: boolean): void {
   llamaWorkerRequired = required;
@@ -26,6 +30,15 @@ export function setLlamaBackendWorkerRequired(required: boolean): void {
 
 export function isLlamaBackendWorkerRequired(): boolean {
   return llamaWorkerRequired;
+}
+
+export function setOnnxBackendWorkerRequired(required: boolean): void {
+  onnxWorkerRequired = required;
+  if (!required) onnxWorkerDeadReason = null;
+}
+
+export function isOnnxBackendWorkerRequired(): boolean {
+  return onnxWorkerRequired;
 }
 
 export function markLlamaBackendWorkerDead(reason: string): void {
@@ -38,6 +51,30 @@ export function markLlamaBackendWorkerDead(reason: string): void {
   for (const [id, model] of workerOwnedModels) {
     if (model.backendId === 'llamacpp') workerOwnedModels.delete(id);
   }
+}
+
+export function markOnnxBackendWorkerDead(reason: string): void {
+  onnxWorkerDeadReason = reason;
+  for (const [id, model] of workerOwnedModels) {
+    if (model.backendId === 'onnx') workerOwnedModels.delete(id);
+  }
+}
+
+export function clearOnnxBackendWorkerDead(): void {
+  onnxWorkerDeadReason = null;
+}
+
+export function getOnnxBackendWorkerDeadReason(): string | null {
+  return onnxWorkerDeadReason;
+}
+
+/** True when speech must use the ONNX worker or throw (no main-thread fallback). */
+export function mustUseOnnxBackendWorker(): boolean {
+  return (
+    onnxWorkerRequired
+    || hasBackendWorkerOwnedModels('onnx')
+    || onnxWorkerDeadReason != null
+  );
 }
 
 /** Consume llama model ids that were loaded when the worker last crashed. */
@@ -71,10 +108,11 @@ export function markModelOwnedByBackendWorker(
   backendId: 'llamacpp' | 'onnx' = 'llamacpp',
 ): void {
   if (!modelId) return;
-  // Only a successful Llama reload clears the sticky crash flag. Loading an
-  // unrelated ONNX speech model must not re-enable main-thread Llama fallback.
+  // Only a successful reload of the same backend clears its sticky crash flag.
   if (backendId === 'llamacpp') {
     llamaWorkerDeadReason = null;
+  } else if (backendId === 'onnx') {
+    onnxWorkerDeadReason = null;
   }
   workerOwnedModels.set(modelId, {
     modelId,

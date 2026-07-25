@@ -397,7 +397,8 @@ object CppBridge {
             // Step 1.
             if (!HTTPClientAdapter.isConfigured) {
                 val effectiveBaseUrl =
-                    RunAnywhereBridge.racStateGetBaseUrl()
+                    RunAnywhereBridge
+                        .racStateGetBaseUrl()
                         ?.takeIf { it.isNotEmpty() }
                         ?: CppBridgeTelemetry.getBaseUrl()
                 val apiKey = CppBridgeTelemetry.getApiKey()
