@@ -93,6 +93,16 @@ fun InferenceFramework.filterLabel(): String = when (this) {
     else -> shortLabel()
 }
 
+// MODEL_CATEGORY_IMAGE_GENERATION spans both text-to-image and image-to-image (LaMa
+// inpainting), and RAModelInfo carries no diffusion-mode field, so category alone cannot
+// tell them apart. Surfaces that generate an image FROM A PROMPT must filter on this;
+// matching the bare category silently resolves to an inpainting model whenever the
+// text-to-image row is unavailable, which then fails at generate with NOT_SUPPORTED.
+private val textToImageModelIds = setOf("cosmos3_edge_diffusion")
+
+fun RAModelInfo.servesTextToImage(): Boolean =
+    category == ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION && id in textToImageModelIds
+
 fun RAModelInfo.requiresHfAuth(): Boolean {
     val tags = metadata?.tags.orEmpty().map { it.lowercase() }
     return (framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&

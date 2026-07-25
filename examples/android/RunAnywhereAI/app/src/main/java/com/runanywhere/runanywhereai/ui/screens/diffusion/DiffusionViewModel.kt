@@ -12,6 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.screens.models.requiresHfAuth
+import com.runanywhere.runanywhereai.ui.screens.models.servesTextToImage
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
@@ -30,7 +31,8 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * Where the image-generation (text-to-image) model is in its lifecycle for this
  * screen. The model is resolved from the SDK by
- * [ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION], not by a hardcoded id.
+ * [ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION] narrowed to the text-to-image
+ * rows, since that category also covers inpainting models.
  *
  * RESOLVING is the initial state while the catalog lookup is still in flight; it
  * is distinct from UNKNOWN, which is asserted only after the lookup completes and
@@ -152,14 +154,12 @@ class DiffusionViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Resolve the diffusion model from the SDK by category rather than embedding
-    // a private catalog id: the SDK's generateImage() itself resolves the loaded
-    // image-generation model via MODEL_CATEGORY_IMAGE_GENERATION, so this mirrors
-    // that and does not break when the catalog id changes.
+    // Text-to-image only: MODEL_CATEGORY_IMAGE_GENERATION also covers inpainting, so a bare
+    // category match resolves to LaMa whenever the text-to-image row is unregistered.
     private suspend fun findModel(): RAModelInfo? =
         runCatching {
             RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
-                .firstOrNull { it.category == ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION }
+                .firstOrNull { it.servesTextToImage() }
         }.getOrNull()
 
     private fun needsToken(model: RAModelInfo): Boolean =

@@ -213,6 +213,13 @@ qhx_runtime* runtime_acquire() {
     return g_rt;
 }
 
+// Live sessions sharing the process runtime, including the caller's own pending
+// acquire. Used to explain a model-load failure caused by DSP capacity limits.
+std::size_t live_session_count() {
+    std::lock_guard<std::mutex> lock(g_rt_mutex);
+    return g_rt_refs;
+}
+
 void runtime_release() {
     std::lock_guard<std::mutex> lock(g_rt_mutex);
     if (g_rt_refs == 0) {
@@ -404,7 +411,20 @@ Session* session_open(const char* manifest_path) {
     // artifacts_dir = NULL -> manifest-relative paths resolve against its own dir.
     s->model = qhx_model_load(rt, manifest.c_str(), nullptr);
     if (s->model == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "qhx_model_load failed: %s", manifest.c_str());
+        // The count includes this pending session, so >1 means another model is already
+        // resident. The HTP exposes a small number of protection domains with a per-PD
+        // context ceiling, so loading a second large model typically dies here with
+        // QnnDsp "Failed to find available PD" — say so instead of a bare load failure.
+        const std::size_t live = live_session_count();
+        if (live > 1) {
+            RAC_LOG_ERROR(LOG_CAT,
+                          "qhx_model_load failed: %s — %zu NPU model(s) already resident; the "
+                          "DSP is likely out of protection-domain/context capacity. Unload the "
+                          "other model, or run one of them on a non-NPU backend.",
+                          manifest.c_str(), live - 1);
+        } else {
+            RAC_LOG_ERROR(LOG_CAT, "qhx_model_load failed: %s", manifest.c_str());
+        }
         delete s;
         runtime_release();
         return nullptr;

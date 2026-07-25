@@ -122,8 +122,8 @@ private fun modelCard(viewModel: SegmentationViewModel, onPickModel: () -> Unit)
             )
         }
         Text(
-            "SegFormer weights are user-supplied and uncataloged. Pick the model files " +
-                "(model.onnx, config.json, preprocessor_config.json, runanywhere-segmentation.json); " +
+            "Segmentation weights are user-supplied and uncataloged. Pick the model files " +
+                "(model.onnx, config.json, preprocessor_config.json); " +
                 "the SDK imports and loads them under the semantic-segmentation category.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
