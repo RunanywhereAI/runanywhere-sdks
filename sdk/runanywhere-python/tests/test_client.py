@@ -60,24 +60,26 @@ class FakeCore:
         self._next_handle += 1
         return h
 
-    def load_model(self, path: str, id: object = None, name: object = None) -> int:
-        self._record("load_model", path, id, name)
+    def load_model(self, path: str, model_id: object = None, name: object = None) -> int:
+        self._record("load_model", path, model_id, name)
         return self._handle()
 
-    def load_vlm_model(self, path: str, mmproj: str, id: object = None, name: object = None) -> int:
-        self._record("load_vlm_model", path, mmproj, id, name)
+    def load_vlm_model(
+        self, path: str, mmproj: str, model_id: object = None, name: object = None
+    ) -> int:
+        self._record("load_vlm_model", path, mmproj, model_id, name)
         return self._handle()
 
     def load_embedding_model(self, path: str) -> int:
         self._record("load_embedding_model", path)
         return self._handle()
 
-    def load_stt_model(self, path: str, id: object = None, name: object = None) -> int:
-        self._record("load_stt_model", path, id, name)
+    def load_stt_model(self, path: str, model_id: object = None, name: object = None) -> int:
+        self._record("load_stt_model", path, model_id, name)
         return self._handle()
 
-    def load_tts_voice(self, path: str, id: object = None, name: object = None) -> int:
-        self._record("load_tts_voice", path, id, name)
+    def load_tts_voice(self, path: str, model_id: object = None, name: object = None) -> int:
+        self._record("load_tts_voice", path, model_id, name)
         return self._handle()
 
     def create_vad(self, threshold: object = None) -> int:
@@ -186,7 +188,7 @@ def test_initialize_passes_secure_and_base_dirs(fake_core: FakeCore, tmp_path) -
     secure = str(tmp_path / "vault")
     ra = RunAnywhere(base_dir=base, secure_dir=secure)
     ra.initialize()
-    method, args = next(c for c in fake_core.calls if c[0] == "initialize")
+    _, args = next(c for c in fake_core.calls if c[0] == "initialize")
     assert args == (secure, base)
     ra.shutdown()
 
@@ -203,7 +205,7 @@ def test_load_llm_local_path_calls_core_and_returns_llmmodel(
 
     assert isinstance(model, LLMModel)
     assert fake_core.count("load_model") == 1
-    method, args = next(c for c in fake_core.calls if c[0] == "load_model")
+    _, args = next(c for c in fake_core.calls if c[0] == "load_model")
     # Primary path is forwarded; id/name default to None.
     assert args[0] == str(model_path)
     assert args[1] is None and args[2] is None

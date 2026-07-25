@@ -514,9 +514,9 @@ def test_primitive_defined_once():
             },
         }
     )
-    string_defs = [l for l in g.split("\n") if l.split("::=")[0].strip() == "string"]
+    string_defs = [line for line in g.split("\n") if line.split("::=")[0].strip() == "string"]
     assert len(string_defs) == 1
-    ws_defs = [l for l in g.split("\n") if l.split("::=")[0].strip() == "ws"]
+    ws_defs = [line for line in g.split("\n") if line.split("::=")[0].strip() == "ws"]
     assert len(ws_defs) == 1
     assert_closed(g)
 

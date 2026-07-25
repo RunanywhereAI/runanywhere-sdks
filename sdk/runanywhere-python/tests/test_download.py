@@ -200,7 +200,6 @@ def test_models_root_shape():
 def test_download_once_dedups_concurrent_calls(monkeypatch, tmp_path):
     """Concurrent _download_once for one dest: exactly one real download; waiters return after it
     finishes (never handing back a path to a not-yet-written file)."""
-    import os
     import threading
     import time
 
@@ -216,13 +215,21 @@ def test_download_once_dedups_concurrent_calls(monkeypatch, tmp_path):
 
     monkeypatch.setattr(dl, "download_file", slow_download)
     dest = str(tmp_path / "m.gguf")
-    threads = [threading.Thread(target=dl._download_once, args=("u", dest, None)) for _ in range(4)]
+    completed: list[bool] = []
+
+    def run() -> None:
+        dl._download_once("u", dest, None)
+        # Assert completion from THIS waiter — join() alone can hide early returns.
+        with open(dest) as f:
+            completed.append(f.read() == "done")
+
+    threads = [threading.Thread(target=run) for _ in range(4)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
     assert calls.count(dest) == 1  # only one thread actually downloaded
-    assert os.path.exists(dest)  # the file is complete once every waiter returned
+    assert completed == [True] * len(threads)
 
 
 def test_download_once_propagates_owner_failure(monkeypatch, tmp_path):

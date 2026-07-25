@@ -13,6 +13,7 @@ from runanywhere.audio import (
     pcm16_to_float32,
     rms,
 )
+from runanywhere.errors import SDKException
 
 
 def test_float32_pcm16_round_trip_within_tolerance() -> None:
@@ -76,10 +77,10 @@ def test_downsample_rejects_nonpositive_rates() -> None:
     for args in ((0, 16000), (16000, 0), (-1, 16000), (16000, -1)):
         try:
             downsample(x, *args)
-        except ValueError:
+        except SDKException:
             pass
         else:  # pragma: no cover
-            raise AssertionError(f"expected ValueError for rates {args}")
+            raise AssertionError(f"expected SDKException for rates {args}")
 
 
 def test_rms_of_known_signal() -> None:
@@ -129,10 +130,10 @@ def test_decode_wav_round_trip() -> None:
 def test_decode_wav_rejects_non_riff() -> None:
     try:
         decode_wav(b"NOPE" + b"\x00" * 40)
-    except ValueError:
+    except SDKException:
         pass
     else:  # pragma: no cover
-        raise AssertionError("expected ValueError for non-RIFF input")
+        raise AssertionError("expected SDKException for non-RIFF input")
 
 
 def test_decode_wav_downmixes_stereo() -> None:

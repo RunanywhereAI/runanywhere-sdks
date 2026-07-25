@@ -20,7 +20,7 @@ import pytest  # noqa: E402
 
 from conftest import _NATIVE_AVAILABLE, model_ready, requires_model, requires_native  # noqa: E402
 
-from runanywhere import RunAnywhere, SDKException  # noqa: E402
+from runanywhere import ErrorCode, RunAnywhere, SDKException  # noqa: E402
 
 LLM_ID = "qwen2.5-0.5b"
 _VOICE_MODELS = ("whisper-tiny", LLM_ID, "piper-lessac")
@@ -94,8 +94,9 @@ def test_single_in_flight_guard_blocks_concurrent_generate() -> None:
         live = llm.generate("Count to a hundred slowly.", max_tokens=128)
         next(live)  # start it -> acquires the per-model guard (held until close/exhaust)
         try:
-            with pytest.raises(SDKException):
+            with pytest.raises(SDKException) as error:
                 list(llm.generate("A concurrent prompt.", max_tokens=8))
+            assert error.value.code == ErrorCode.INVALID_STATE
         finally:
             live.close()  # release the guard; stop the worker
         # After releasing, a fresh generation works again.
@@ -116,5 +117,6 @@ def test_generate_after_unload_fails_cleanly() -> None:
         llm = ra.load_llm(LLM_ID)
         assert isinstance(llm.generate_text("Hi.", max_tokens=4), str)
         llm.unload()
-        with pytest.raises(Exception):  # invalid handle -> SDKException/RuntimeError, not a segfault
+        with pytest.raises(SDKException) as error:
             list(llm.generate("Should fail after unload.", max_tokens=4))
+        assert error.value.code == ErrorCode.INVALID_STATE
