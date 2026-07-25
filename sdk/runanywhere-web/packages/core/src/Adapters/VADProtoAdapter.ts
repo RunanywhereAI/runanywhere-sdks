@@ -232,12 +232,12 @@ export class VADProtoAdapter {
   ): AsyncIterable<ProtoVADResult> {
     const workerHost = requireLiveOnnxWorkerOrMain('vad.stream');
     if (workerHost) {
-      const self = this;
+      const processLifecycle = this.processLifecycle.bind(this);
       return {
         async *[Symbol.asyncIterator](): AsyncGenerator<ProtoVADResult> {
           for await (const chunk of audio) {
             if (!chunk.length) continue;
-            const result = await self.processLifecycle(chunk, options);
+            const result = await processLifecycle(chunk, options);
             if (result) yield result;
           }
         },
