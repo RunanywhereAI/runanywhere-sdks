@@ -435,6 +435,39 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
 
 namespace {
 
+struct StreamBridgeContext {
+    rac_handle_t handle;
+    runanywhere::v1::STTLanguage language;
+    uint64_t session_id;
+};
+
+void dispatch_stream_result(const char* text, rac_bool_t is_final, void* opaque) {
+    auto* context = static_cast<StreamBridgeContext*>(opaque);
+    runanywhere::v1::STTPartialResult partial;
+    if (text) {
+        partial.set_text(text);
+    }
+    partial.set_is_final(is_final == RAC_TRUE);
+    partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+    partial.set_language(context->language);
+
+    if (is_final == RAC_TRUE) {
+        runanywhere::v1::STTOutput final_output;
+        if (text) {
+            final_output.set_text(text);
+        }
+        final_output.set_language(context->language);
+        rac::stt::dispatch_stt_stream_event(
+            context->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
+            /*error_message=*/nullptr, /*error_code=*/0, context->session_id);
+    } else {
+        rac::stt::dispatch_stt_stream_event(
+            context->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
+            /*final_output=*/nullptr, /*error_message=*/nullptr, /*error_code=*/0,
+            context->session_id);
+    }
+}
+
 rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64_t session_id,
                                            const std::string& audio,
                                            const rac_stt_options_t& options) {
@@ -442,43 +475,12 @@ rac_result_t transcribe_fallback_utterance(rac_handle_t component_handle, uint64
         return RAC_SUCCESS;
     }
 
-    struct BridgeCtx {
-        rac_handle_t handle;
-        runanywhere::v1::STTLanguage language;
-        uint64_t session_id;
-    } ctx{.handle = component_handle,
-          .language = stt_language_from_code(options.language),
-          .session_id = session_id};
-
-    auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
-        auto* c = static_cast<BridgeCtx*>(opaque);
-        runanywhere::v1::STTPartialResult partial;
-        if (partial_text) {
-            partial.set_text(partial_text);
-        }
-        partial.set_is_final(is_final == RAC_TRUE);
-        partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-        partial.set_language(c->language);
-
-        if (is_final == RAC_TRUE) {
-            runanywhere::v1::STTOutput final_output;
-            if (partial_text) {
-                final_output.set_text(partial_text);
-            }
-            final_output.set_language(c->language);
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
-                /*error_message=*/nullptr, /*error_code=*/0, c->session_id);
-        } else {
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
-                /*final_output=*/nullptr, /*error_message=*/nullptr, /*error_code=*/0,
-                c->session_id);
-        }
-    };
+    StreamBridgeContext context{.handle = component_handle,
+                                .language = stt_language_from_code(options.language),
+                                .session_id = session_id};
 
     const rac_result_t rc = rac_stt_component_transcribe_stream(
-        component_handle, audio.data(), audio.size(), &options, bridge, &ctx);
+        component_handle, audio.data(), audio.size(), &options, dispatch_stream_result, &context);
     if (rc != RAC_SUCCESS) {
         rac::stt::dispatch_stt_stream_event(component_handle,
                                             runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
@@ -544,9 +546,10 @@ void publish_session_summary(const SessionCleanupSnapshot& snapshot,
 }
 
 // Called only by the thread that atomically claimed cleanup after all feeds and
-// callback dispatches quiesced. A normal stop may flush the fallback utterance
-// while the session remains addressable; re-entrant stop/cancel cleanup cannot
-// emit after the initiating callback returns, so it skips that optional flush.
+// callback dispatches quiesced. A normal stop flushes either the buffered
+// one-shot utterance or the persistent provider while the session remains
+// addressable. Re-entrant stop/cancel cleanup cannot emit after the initiating
+// callback returns, so it skips that optional flush.
 rac_result_t finalize_terminated_session(uint64_t session_id,
                                          const std::shared_ptr<StreamOperationState>& state,
                                          bool allow_stop_flush) {
@@ -584,16 +587,21 @@ rac_result_t finalize_terminated_session(uint64_t session_id,
                 (void)feed_fallback_utterance(session, nullptr, 0, true, &snapshot.final_utterance);
             }
         }
-        if (!snapshot.final_utterance.empty()) {
-            stop_flush_hook = g_stop_flush_admission_test_hook();
-            stop_flush_hook_user_data = g_stop_flush_admission_test_user_data();
-        }
     }
 
     {
         std::lock_guard<std::mutex> operation_lock(state->mutex);
         snapshot.backend_stream_handle = state->backend_stream_handle;
         state->backend_stream_handle = nullptr;
+    }
+
+    const bool has_persistent_stop_candidate =
+        allow_stop_flush && termination == SessionTermination::kStop &&
+        !backend_stream_unsupported && snapshot.component_handle && snapshot.backend_stream_handle;
+    if (!snapshot.final_utterance.empty() || has_persistent_stop_candidate) {
+        std::lock_guard<std::mutex> lock(g_mu());
+        stop_flush_hook = g_stop_flush_admission_test_hook();
+        stop_flush_hook_user_data = g_stop_flush_admission_test_user_data();
     }
 
     if (stop_flush_hook) {
@@ -603,18 +611,20 @@ rac_result_t finalize_terminated_session(uint64_t session_id,
     // A concurrent cancel that wins before this admission drops the pending
     // fallback utterance. Once admitted, the provider call is treated like any
     // other already-accepted work and cancellation waits for it to drain.
-    bool run_stop_flush = false;
-    if (!snapshot.final_utterance.empty()) {
+    bool run_fallback_stop_flush = false;
+    bool run_persistent_stop_flush = false;
+    if (!snapshot.final_utterance.empty() || has_persistent_stop_candidate) {
         std::lock_guard<std::mutex> operation_lock(state->mutex);
         if (state->termination == SessionTermination::kStop && !state->drop_events) {
-            run_stop_flush = true;
+            run_fallback_stop_flush = !snapshot.final_utterance.empty();
+            run_persistent_stop_flush = has_persistent_stop_candidate;
         } else {
             snapshot.final_utterance.clear();
         }
     }
 
     rac_result_t flush_rc = RAC_SUCCESS;
-    if (run_stop_flush) {
+    if (run_fallback_stop_flush) {
         rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
         options.language = snapshot.language.empty() ? nullptr : snapshot.language.c_str();
         options.detect_language = snapshot.detect_language ? RAC_TRUE : RAC_FALSE;
@@ -627,6 +637,22 @@ rac_result_t finalize_terminated_session(uint64_t session_id,
         StopDrainDispatchScope drain_scope(session_id);
         flush_rc = transcribe_fallback_utterance(snapshot.component_handle, session_id,
                                                  snapshot.final_utterance, options);
+    } else if (run_persistent_stop_flush) {
+        StreamBridgeContext context{
+            .handle = snapshot.component_handle,
+            .language = stt_language_from_code(
+                snapshot.language.empty() ? nullptr : snapshot.language.c_str()),
+            .session_id = session_id};
+        StopDrainDispatchScope drain_scope(session_id);
+        flush_rc = rac_stt_component_stream_feed_audio_chunk(
+            snapshot.component_handle, snapshot.backend_stream_handle,
+            /*samples=*/nullptr, /*count=*/0, dispatch_stream_result, &context);
+        if (flush_rc != RAC_SUCCESS) {
+            rac::stt::dispatch_stt_stream_event(
+                snapshot.component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                /*partial=*/nullptr, /*final_output=*/nullptr, "STT streaming finalization failed",
+                flush_rc, session_id);
+        }
     }
 
     // Close the dispatch gate before erasing the session or destroying its
@@ -1317,41 +1343,13 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             std::vector<int16_t> aligned_samples(count);
             std::memcpy(aligned_samples.data(), audio_bytes, audio_size);
 
-            struct BridgeCtxStream {
-                rac_handle_t handle;
-                runanywhere::v1::STTLanguage language;
-                uint64_t session_id;
-            } ctx{.handle = component_handle,
-                  .language = stt_language_from_code(options.language),
-                  .session_id = session_id};
-
-            auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
-                auto* c = static_cast<BridgeCtxStream*>(opaque);
-                runanywhere::v1::STTPartialResult partial;
-                if (partial_text)
-                    partial.set_text(partial_text);
-                partial.set_is_final(is_final == RAC_TRUE);
-                partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-                partial.set_language(c->language);
-                if (is_final == RAC_TRUE) {
-                    runanywhere::v1::STTOutput final_output;
-                    if (partial_text)
-                        final_output.set_text(partial_text);
-                    final_output.set_language(c->language);
-                    rac::stt::dispatch_stt_stream_event(
-                        c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial,
-                        &final_output, /*error_message=*/nullptr, /*error_code=*/0, c->session_id);
-                } else {
-                    rac::stt::dispatch_stt_stream_event(
-                        c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
-                        /*final_output=*/nullptr, /*error_message=*/nullptr,
-                        /*error_code=*/0, c->session_id);
-                }
-            };
+            StreamBridgeContext context{.handle = component_handle,
+                                        .language = stt_language_from_code(options.language),
+                                        .session_id = session_id};
 
             rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
-                component_handle, backend_stream_handle, aligned_samples.data(), count, bridge,
-                &ctx);
+                component_handle, backend_stream_handle, aligned_samples.data(), count,
+                dispatch_stream_result, &context);
             if (feed_rc != RAC_SUCCESS) {
                 rac::stt::dispatch_stt_stream_event(
                     component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,

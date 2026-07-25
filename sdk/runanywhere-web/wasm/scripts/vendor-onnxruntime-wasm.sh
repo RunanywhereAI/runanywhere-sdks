@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+# Canonical vendor: ONNX Runtime WASM CPU (pthread) archive.
+#
+# Stages:
+#   sdk/runanywhere-commons/third_party/onnxruntime-wasm/
+#     lib/libonnxruntime.a
+#     include/...
+#     .rac-wasm-provenance   (must include threads=on; no webgpu=on)
+#
+# WebGPU ORT is a SEPARATE tree — do not pass --use_webgpu here.
+# Use vendor-onnxruntime-wasm-webgpu.sh → onnxruntime-wasm-webgpu/
+# Release docs: sdk/runanywhere-web/docs/ONNX_WEBGPU.md
+#
+# Usage:
+#   npm --prefix sdk/runanywhere-web run vendor:wasm:onnxruntime
+# Then:
+#   npm --prefix sdk/runanywhere-web run build:wasm -- --onnx --clean
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

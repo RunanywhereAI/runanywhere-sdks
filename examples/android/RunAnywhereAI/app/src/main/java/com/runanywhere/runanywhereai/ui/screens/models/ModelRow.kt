@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,15 +24,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
-import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -92,7 +88,7 @@ fun ModelRow(
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             ) {
                 if (highlightLabel != null) {
-                    Pill(highlightLabel, MaterialTheme.colorScheme.primary, icon = RACIcons.Filled.Bolt)
+                    ModelPill(highlightLabel, ModelPillColors.Capability, icon = RACIcons.Filled.Bolt)
                 }
                 Text(
                     model.displayTitle(),
@@ -120,12 +116,12 @@ fun ModelRow(
                 ) {
                     // At most two clean tags (feel + one notable capability).
                     model.consumerTags().forEach { tag ->
-                        Pill(tag.label, tag.kind.color())
+                        ModelPill(tag.label, tag.kind.pillColor())
                     }
                     if (model.requiresHfAuth()) {
-                        Pill(
+                        ModelPill(
                             "Private",
-                            if (hasHfToken) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            if (hasHfToken) ModelPillColors.Capability else ModelPillColors.Warning,
                         )
                     }
                 }
@@ -156,13 +152,6 @@ fun ModelRow(
     }
 }
 
-// Palette mapping for consumer tag kinds — keeps pill colors consistent app-wide.
-@Composable
-private fun ConsumerTagKind.color(): Color = when (this) {
-    ConsumerTagKind.FEEL -> MaterialTheme.colorScheme.tertiary
-    ConsumerTagKind.CAPABILITY -> MaterialTheme.colorScheme.primary
-}
-
 @Composable
 private fun TrailingAction(
     isCurrent: Boolean,
@@ -173,9 +162,9 @@ private fun TrailingAction(
     onCancel: (() -> Unit)? = null,
 ) {
     when {
-        isCurrent -> Pill("Loaded", primaryGreen)
+        isCurrent -> ModelPill("Loaded", ModelPillColors.Availability)
         isBusy -> DownloadProgressAction(onCancel)
-        isReady -> Pill("Use", primaryGreen)
+        isReady -> ModelPill("Use", ModelPillColors.Availability)
         else -> DownloadChip(model = model, onDownload = onDownload)
     }
 }
@@ -231,35 +220,4 @@ private fun DownloadChip(model: RAModelInfo, onDownload: () -> Unit) {
             )
         },
     )
-}
-
-@Composable
-private fun Pill(
-    text: String,
-    color: Color,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    onClick: (() -> Unit)? = null,
-) {
-    val dimens = LocalDimens.current
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(dimens.radiusSm))
-            .background(color.copy(alpha = 0.12f))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = dimens.spacingSm, vertical = dimens.spacingXs),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(dimens.spacingXs))
-        }
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
 }

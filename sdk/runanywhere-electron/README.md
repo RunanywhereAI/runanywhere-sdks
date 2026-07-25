@@ -2,9 +2,11 @@
 
 On-device **LLM / VLM / STT / TTS / embeddings** for Electron & Node — a native
 N-API addon over the RunAnywhere `rac_*` C ABI and llama.cpp / ONNX Runtime /
-sherpa-onnx. Windows-first (x64, arm64-ready); the QHexRT NPU backend seam is
-kept open for later. Inference runs in an isolated Electron **utility process**,
-streaming to the renderer over a `MessagePort`.
+sherpa-onnx. Windows-first (x64, arm64-ready). Linked backends are selected at
+CMake time (llamacpp / onnx / sherpa by default); the QHexRT NPU backend seam
+is kept open for later and is **not** claimed as a working Windows NPU path.
+Inference runs in an isolated Electron **utility process**, streaming to the
+renderer over a `MessagePort`.
 
 > Status: MVP. All five modalities, structured output, tool calling, multi-turn
 > chat, model download/catalog, a voice pipeline, and audio I/O are implemented
@@ -166,8 +168,9 @@ const speaking = vad.detect(float32Frame); // 16 kHz mono float samples
 vad.close();
 ```
 
-Errors are thrown as `SDKException` (`.code` / `.category` / `.recoverySuggestion`),
-uniform across the RunAnywhere SDKs.
+Errors are thrown as `SDKException` (`.code` / `.category` / `.recoverySuggestion` /
+`.cAbiCode`), uniform across the RunAnywhere SDKs. Native `rac_result_t` failures
+(e.g. `load_model failed: -111`) are mapped via `raiseForRac` / `asSDKException`.
 
 ## Model catalog
 

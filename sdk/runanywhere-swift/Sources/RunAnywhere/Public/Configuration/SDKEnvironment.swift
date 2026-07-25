@@ -214,8 +214,6 @@ public struct SDKInitParams: Sendable {
             throw SDKException(code: .validationFailed, message: message, category: .internal)
         }
 
-
-
         logger.info("URL validated for \(environment.description): \(baseURL.absoluteString)")
     }
 }

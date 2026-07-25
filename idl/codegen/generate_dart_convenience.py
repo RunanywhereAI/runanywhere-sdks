@@ -500,6 +500,41 @@ def _emit_message_validate(
     """Emit ``extension <Msg>Validate on <Msg> { void validate() }`` when at
     least one field carries a validation annotation."""
     checks: list[str] = []
+    emitted_effective_values: set[str] = set()
+
+    def value_expression(
+        field: descriptor_pb2.FieldDescriptorProto, dart_name: str,
+    ) -> str:
+        """Return the effective value of an explicit-optional scalar."""
+        if not field.proto3_optional:
+            return dart_name
+        default_str = _get_string_opt(field.options, RAC_DEFAULT_FIELD_NUM)
+        if default_str is None:
+            return dart_name
+        wants64 = [False]
+        literal = _dart_default_literal(field, default_str, wants64)
+        if literal is None:
+            return dart_name
+        if wants64[0]:
+            int64_used[0] = True
+        effective_name = f"effective{dart_name[0].upper()}{dart_name[1:]}"
+        if effective_name not in emitted_effective_values:
+            has_name = f"has{dart_name[0].upper()}{dart_name[1:]}"
+            checks.append(
+                f"    final {effective_name} = {has_name}() ? {dart_name} : {literal};"
+            )
+            emitted_effective_values.add(effective_name)
+        return effective_name
+
+    def optional_presence_guard(
+        field: descriptor_pb2.FieldDescriptorProto, dart_name: str,
+    ) -> str | None:
+        if not field.proto3_optional:
+            return None
+        if _get_string_opt(field.options, RAC_DEFAULT_FIELD_NUM) is not None:
+            return None
+        return f"has{dart_name[0].upper()}{dart_name[1:]}()"
+
     for field in msg_desc.field:
         if field.label == LABEL_REPEATED:
             continue
@@ -525,6 +560,8 @@ def _emit_message_validate(
         min_int = _get_int32_opt(field.options, RAC_MIN_FIELD_NUM)
         max_int = _get_int32_opt(field.options, RAC_MAX_FIELD_NUM)
         if (min_int is not None or max_int is not None) and field.type in _INTEGER_TYPES:
+            value_expr = value_expression(field, dart_name)
+            presence_guard = optional_presence_guard(field, dart_name)
             is64 = field.type in _INT64_TYPES
             if is64:
                 int64_used[0] = True
@@ -532,10 +569,12 @@ def _emit_message_validate(
                 return f"Int64({v})" if is64 else str(v)
             parts: list[str] = []
             if min_int is not None:
-                parts.append(f"{dart_name} < {lit(min_int)}")
+                parts.append(f"{value_expr} < {lit(min_int)}")
             if max_int is not None:
-                parts.append(f"{dart_name} > {lit(max_int)}")
+                parts.append(f"{value_expr} > {lit(max_int)}")
             cond = " || ".join(parts)
+            if presence_guard is not None:
+                cond = f"{presence_guard} && ({cond})"
             if min_int is not None and max_int is not None:
                 range_desc = f"{min_int}...{max_int}"
             elif min_int is not None:
@@ -546,7 +585,7 @@ def _emit_message_validate(
             msg_prefix = _escape_dart_string(f"{field.name} must be {range_phrase} (got ")
             checks.append(f"    if ({cond}) {{")
             checks.append("      throw SDKException.validationFailed(")
-            checks.append(f"        '{msg_prefix}${dart_name})',")
+            checks.append(f"        '{msg_prefix}${value_expr})',")
             checks.append(f"        fieldPath: '{field_path_escaped}',")
             checks.append("      );")
             checks.append("    }")
@@ -554,12 +593,16 @@ def _emit_message_validate(
         min_f = _get_double_opt(field.options, RAC_MIN_FLOAT_FIELD_NUM)
         max_f = _get_double_opt(field.options, RAC_MAX_FLOAT_FIELD_NUM)
         if (min_f is not None or max_f is not None) and field.type in _FLOAT_TYPES:
-            parts = []
+            value_expr = value_expression(field, dart_name)
+            presence_guard = optional_presence_guard(field, dart_name)
+            parts = [f"!{value_expr}.isFinite"]
             if min_f is not None:
-                parts.append(f"{dart_name} < {min_f}")
+                parts.append(f"{value_expr} < {min_f}")
             if max_f is not None:
-                parts.append(f"{dart_name} > {max_f}")
+                parts.append(f"{value_expr} > {max_f}")
             cond = " || ".join(parts)
+            if presence_guard is not None:
+                cond = f"{presence_guard} && ({cond})"
             if min_f is not None and max_f is not None:
                 range_desc = f"{min_f}...{max_f}"
             elif min_f is not None:
@@ -570,7 +613,7 @@ def _emit_message_validate(
             msg_prefix = _escape_dart_string(f"{field.name} must be {range_phrase} (got ")
             checks.append(f"    if ({cond}) {{")
             checks.append("      throw SDKException.validationFailed(")
-            checks.append(f"        '{msg_prefix}${dart_name})',")
+            checks.append(f"        '{msg_prefix}${value_expr})',")
             checks.append(f"        fieldPath: '{field_path_escaped}',")
             checks.append("      );")
             checks.append("    }")

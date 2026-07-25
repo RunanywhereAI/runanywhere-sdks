@@ -34,6 +34,7 @@ enum class STTModelType {
     PARAFORMER = 3,
     NEMO_CTC = 4,
     CUSTOM = 5,
+    CANARY = 6,
 };
 
 struct WordTiming {

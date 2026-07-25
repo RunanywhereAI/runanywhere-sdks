@@ -1,11 +1,12 @@
 # @runanywhere/web-llamacpp
 
 The independent llama.cpp backend for the RunAnywhere Web SDK. It provides
-LLM, VLM, LoRA, tool calling, and structured-output capabilities through
-the public `RunAnywhere` facade.
+LLM, GGUF text embeddings, VLM, LoRA, tool calling, and structured-output
+capabilities through the public `RunAnywhere` facade.
 
-Web embeddings are provided by `@runanywhere/web-onnx`; the core package
-composes those embeddings with llama.cpp generation for cross-WASM RAG.
+`@runanywhere/web-onnx` remains an alternate embeddings provider and owns the
+native ONNX RAG WASM/session path. Framework-aware routing lets ONNX and llama.cpp
+embedding models coexist without registration-order coupling.
 
 This browser package integrates with core only through
 `@runanywhere/web/backend`; it does not depend on the ONNX backend or core's
@@ -37,6 +38,7 @@ for await (const token of stream.stream) renderToken(token);
 ## Capabilities
 
 - LLM generation and cancellation.
+- GGUF text embeddings through the shared embeddings facade.
 - VLM image/video-frame inference through llama.cpp mtmd.
 - LoRA adapter registration and application.
 - Tool calling and JSON-schema structured output.

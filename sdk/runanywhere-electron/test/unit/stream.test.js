@@ -122,11 +122,14 @@ test('immediate rejection with no tokens -> throws', async () => {
 });
 
 test('rejection can carry a non-Error value', async () => {
+  const { isSDKException } = require('../../dist/errors');
   const iter = toAsyncIterable(() => Promise.reject('string-error'));
   await assert.rejects(
     () => iter.next(),
     (thrown) => {
-      assert.equal(thrown, 'string-error');
+      // Coerced to SDKException so consumers always see the house error type.
+      assert.ok(isSDKException(thrown));
+      assert.equal(thrown.message, 'string-error');
       return true;
     }
   );

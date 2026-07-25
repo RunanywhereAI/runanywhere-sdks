@@ -15,7 +15,7 @@ There are exactly three publishable Web SDK packages:
 | Package | Responsibility | Native artifacts |
 | --- | --- | --- |
 | `@runanywhere/web` | Backend-neutral initialization, lifecycle, generated types, model registry, downloads, OPFS storage, events, routing, and browser helpers | `racommons.{js,wasm}` |
-| `@runanywhere/web-llamacpp` | llama.cpp LLM, VLM, LoRA, tool calling, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
+| `@runanywhere/web-llamacpp` | llama.cpp LLM, GGUF embeddings, VLM, LoRA, tools, and structured output | CPU and WebGPU/Asyncify `racommons-llamacpp` variants |
 | `@runanywhere/web-onnx` | ONNX Runtime embeddings plus Sherpa-ONNX STT, TTS, and VAD | `racommons-onnx-sherpa.{js,wasm}` |
 
 `@runanywhere/web/browser`, `@runanywhere/web/backend`, and
@@ -37,7 +37,7 @@ Install core plus only the backends the application needs:
 # Full SDK
 npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
 
-# LLM and VLM only
+# LLM, GGUF embeddings, and VLM only
 npm install @runanywhere/web @runanywhere/web-llamacpp
 
 # Speech and ONNX embeddings only
@@ -187,14 +187,20 @@ npm run build:wasm -- --core
 npm run build:wasm -- --llamacpp
 npm run build:wasm -- --webgpu
 npm run build:wasm -- --onnx
+npm run build:wasm -- --onnx-webgpu
 
-# Or all four native artifacts
+# Or all five native artifacts (core + llama CPU/WebGPU + onnx CPU/WebGPU)
 npm run build:wasm:all
+
+# Speech ORT archives (CPU + WebGPU) + Sherpa — required before onnx builds
+npm run vendor:wasm:speech
 ```
 
 The WASM build scripts fail if required vendored static archives or canonical
 outputs are missing. Use the version-pinned vendor scripts under
-`wasm/scripts/`; do not replace release inputs with silent stubs.
+`wasm/scripts/` (`vendor-onnxruntime-wasm.sh` and
+`vendor-onnxruntime-wasm-webgpu.sh`); do not replace release inputs with silent
+stubs. Speech WebGPU release checklist: [docs/ONNX_WEBGPU.md](./docs/ONNX_WEBGPU.md).
 
 ## Quality and release gates
 
@@ -266,7 +272,7 @@ npm ci
 npm run lint
 npm run typecheck
 npm run build
-npm run dev -- --host 127.0.0.1
+npm run dev
 ```
 
 The example is the browser validation application for all supported modalities.
