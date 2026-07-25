@@ -728,29 +728,67 @@ async function generateStreaming(
   }
 
   let receivedThinking = false;
+  let sawAnyToken = false;
+  const firstTokenTimeoutMs = 120_000;
+  const firstTokenTimer = window.setTimeout(() => {
+    if (sawAnyToken || !isGenerating) return;
+    try {
+      stream.cancel();
+    } catch {
+      /* ignore */
+    }
+  }, firstTokenTimeoutMs);
+
   const result = await RunAnywhere.textGeneration.aggregateStream(
     prompt,
     stream,
     (answer) => {
+      sawAnyToken = true;
+      window.clearTimeout(firstTokenTimer);
       assistantMsg.content = answer;
       renderLastMessage(messagesEl, assistantMsg);
     },
     (thinking) => {
+      sawAnyToken = true;
+      window.clearTimeout(firstTokenTimer);
       receivedThinking = true;
       assistantMsg.thinking = thinking;
       renderLastMessage(messagesEl, assistantMsg);
     },
-  );
+  ).finally(() => {
+    window.clearTimeout(firstTokenTimer);
+  });
 
-  assistantMsg.thinking = result.thinkingContent?.trim()
-    || (receivedThinking ? assistantMsg.thinking : undefined);
+  if (!sawAnyToken && !result.text.trim() && !result.thinkingContent?.trim()) {
+    assistantMsg.thinking = undefined;
+    assistantMsg.content = result.finishReason === 'cancelled'
+      ? 'Cancelled — no tokens arrived before the first-token timeout or stop.'
+      : 'No tokens arrived within 2 minutes. The model may still be loading '
+        + 'into WebGPU, or generation stalled. Try Stop, reload the model, or switch to a smaller model.';
+    renderLastMessage(messagesEl, assistantMsg, false);
+    return;
+  }
+
+  const thinkingText = result.thinkingContent?.trim()
+    || (receivedThinking ? assistantMsg.thinking?.trim() : undefined);
+  assistantMsg.thinking = thinkingText || undefined;
   assistantMsg.content = result.text.trim();
   if (!assistantMsg.content) {
-    assistantMsg.content = result.finishReason === 'cancelled'
-      ? 'Cancelled.'
-      : result.finishReason === 'length'
-        ? 'The response limit was reached before a final answer. Increase Max tokens in Settings or turn off thinking, then try again.'
-        : 'The model finished without producing a final answer. Try again or turn off thinking.';
+    if (result.finishReason === 'cancelled') {
+      assistantMsg.content = 'Cancelled.';
+    } else if (result.finishReason === 'length') {
+      assistantMsg.content = 'The response limit was reached before a final answer. '
+        + 'Increase Max tokens in Settings or turn off thinking, then try again.';
+    } else if (thinkingText) {
+      // Reasoning models (especially heavily quantized ones) sometimes emit their
+      // entire reply inside the thinking channel and never close the block, so the
+      // answer channel arrives empty. Surface the reasoning as the answer rather
+      // than a dead-end error — the response is right there.
+      assistantMsg.content = thinkingText;
+      assistantMsg.thinking = undefined;
+    } else {
+      assistantMsg.content = 'The model finished without producing a final answer. Try again or turn off thinking.';
+    }
   }
   // Generation is terminal now, even though onSend's persistence cleanup is
   // still pending. Collapse reasoning immediately so the final answer below

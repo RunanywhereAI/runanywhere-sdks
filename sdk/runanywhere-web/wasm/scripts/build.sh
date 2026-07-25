@@ -14,6 +14,7 @@ set -euo pipefail
 #   --llamacpp    packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}    (LLM + VLM)
 #   --webgpu      packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm} (variant of llamacpp)
 #   --onnx        packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}     (STT/TTS/VAD)
+#   --onnx-webgpu packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}
 #
 # Common options:
 #   --debug      Debug build with assertions and safe heap
@@ -44,6 +45,7 @@ DEBUG="OFF"
 BUILD_CORE="OFF"
 LLAMACPP="OFF"
 ONNX="OFF"
+ONNX_WEBGPU="OFF"
 WEBGPU="OFF"
 RAG="OFF"
 ONNX_REQUESTED="OFF"
@@ -99,6 +101,13 @@ while [[ $# -gt 0 ]]; do
             LLAMACPP="ON"  # WebGPU accelerates llama.cpp
             shift
             ;;
+        --onnx-webgpu)
+            ONNX="ON"
+            ONNX_WEBGPU="ON"
+            ONNX_REQUESTED="ON"
+            RAG="ON"
+            shift
+            ;;
         --all-backends)
             # Build every per-package target in sequence. We just set the flags
             # here; the dispatcher loop below iterates and calls cmake for each.
@@ -121,6 +130,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --llamacpp       Build packages/llamacpp/wasm/racommons-llamacpp (LLM + VLM)"
             echo "  --webgpu         Build packages/llamacpp/wasm/racommons-llamacpp-webgpu (variant of llamacpp)"
             echo "  --onnx           Build packages/onnx/wasm/racommons-onnx-sherpa (STT/TTS/VAD)"
+            echo "  --onnx-webgpu    Build packages/onnx/wasm/racommons-onnx-sherpa-webgpu (speech WebGPU EP path)"
             echo "  --all-backends   Build core + llamacpp (CPU) + onnx"
             echo ""
             echo "Options:"
@@ -170,41 +180,59 @@ if [ "${ACTIVE_EMSCRIPTEN_VERSION}" != "${EMSCRIPTEN_VERSION}" ]; then
 fi
 
 ORT_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+ORT_WEBGPU_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/lib/libonnxruntime.a"
+ORT_WASM_RUNTIME_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
+ORT_WEBGPU_WASM_RUNTIME_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu"
 SHERPA_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
 ORT_WASM_PROVENANCE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/.rac-wasm-provenance"
+ORT_WEBGPU_WASM_PROVENANCE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm-webgpu/.rac-wasm-provenance"
 SHERPA_WASM_PROVENANCE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.rac-wasm-provenance"
 
 # ONNX target needs the ORT WASM archive. Standalone --rag (without --onnx)
 # does NOT — the RAG OBJECT library depends only on USearch + nlohmann_json
 # and the rac_embeddings_service vtable, both already in librac_commons.
 if [ "$ONNX" = "ON" ]; then
-    if [ ! -f "${ORT_WASM_ARCHIVE}" ]; then
-        echo "ERROR: Web ONNX requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+    _ort_archive="${ORT_WASM_ARCHIVE}"
+    _ort_provenance="${ORT_WASM_PROVENANCE}"
+    _ort_vendor_script="${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh"
+    _ort_label="onnxruntime-wasm"
+    if [ "$ONNX_WEBGPU" = "ON" ]; then
+        _ort_archive="${ORT_WEBGPU_WASM_ARCHIVE}"
+        _ort_provenance="${ORT_WEBGPU_WASM_PROVENANCE}"
+        _ort_vendor_script="${SCRIPT_DIR}/vendor-onnxruntime-wasm-webgpu.sh"
+        _ort_label="onnxruntime-wasm-webgpu"
+    fi
+    if [ ! -f "${_ort_archive}" ]; then
+        echo "ERROR: Web ONNX requires ${_ort_archive}"
         echo "       Build or vendor ONNX Runtime WASM static archives first:"
-        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        echo "       ${_ort_vendor_script}"
         exit 1
     fi
-    if ! grep -Fqx "threads=on" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
-        echo "ERROR: Web ONNX requires a provenance-verified pthread ONNX Runtime archive."
-        echo "       Re-vendor the matched speech runtime before linking:"
-        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+    if ! grep -Fqx "threads=on" "${_ort_provenance}" 2>/dev/null; then
+        echo "ERROR: Web ONNX requires a provenance-verified pthread ONNX Runtime archive (${_ort_label})."
+        echo "       Re-vendor before linking: ${_ort_vendor_script}"
         exit 1
     fi
-    if ! grep -Fqx "protobuf_namespace=google::rac_ort_protobuf" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
+    if [ "$ONNX_WEBGPU" = "ON" ] && ! grep -Fqx "webgpu=on" "${_ort_provenance}" 2>/dev/null; then
+        echo "ERROR: --onnx-webgpu requires an ORT archive built with --use_webgpu (webgpu=on provenance)."
+        echo "       Re-vendor: ${_ort_vendor_script}"
+        exit 1
+    fi
+    if ! grep -Fqx "protobuf_namespace=google::rac_ort_protobuf" "${_ort_provenance}" 2>/dev/null; then
         echo "ERROR: Web ONNX requires an ORT archive with its protobuf21 C++ namespace shaded."
         echo "       Re-vendor ORT before linking it with RACommons protobuf v35:"
-        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        echo "       ${_ort_vendor_script}"
         exit 1
     fi
-    if ! grep -Fqx "absl_em_js_symbol=rac_ort_have_offset_converter" "${ORT_WASM_PROVENANCE}" 2>/dev/null; then
+    if ! grep -Fqx "absl_em_js_symbol=rac_ort_have_offset_converter" "${_ort_provenance}" 2>/dev/null; then
         echo "ERROR: Web ONNX requires ORT's private Abseil EM_JS helper to be shaded."
         echo "       Re-vendor ORT before linking it with RACommons Abseil:"
-        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
+        echo "       ${_ort_vendor_script}"
         exit 1
     fi
     if ! RAC_WASM_PROVENANCE_CHECK_ONLY=1 \
-         "${SCRIPT_DIR}/vendor-onnxruntime-wasm.sh" >/dev/null; then
-        echo "ERROR: Web ONNX rejected the ORT archive: provenance or protobuf symbol audit failed."
+         "${_ort_vendor_script}" >/dev/null; then
+        echo "ERROR: Web ONNX rejected the ${_ort_label} archive: provenance or symbol audit failed."
         echo "       Rebuild it with the canonical vendor script before linking."
         exit 1
     fi
@@ -242,7 +270,8 @@ fi
 #   $5 -- "ON"/"OFF" for RAC_WASM_BUILD_CORE
 #   $6 -- "ON"/"OFF" for RAC_WASM_LLAMACPP
 #   $7 -- "ON"/"OFF" for RAC_WASM_ONNX
-#   $8 -- "ON"/"OFF" for RAC_WASM_WEBGPU
+#   $8 -- "ON"/"OFF" for RAC_WASM_WEBGPU (llama)
+#   $9 -- "ON"/"OFF" for RAC_WASM_ONNX_WEBGPU (speech)
 build_target() {
     local label="$1"
     local target_name="$2"
@@ -252,6 +281,7 @@ build_target() {
     local wasm_llamacpp="$6"
     local wasm_onnx="$7"
     local wasm_webgpu="$8"
+    local wasm_onnx_webgpu="${9:-OFF}"
 
     local build_dir="${WASM_DIR}/build-${label}"
 
@@ -283,6 +313,7 @@ build_target() {
     echo "  RAC_WASM_LLAMACPP    = ${wasm_llamacpp}"
     echo "  RAC_WASM_ONNX        = ${wasm_onnx}"
     echo "  RAC_WASM_WEBGPU      = ${wasm_webgpu}"
+    echo "  RAC_WASM_ONNX_WEBGPU = ${wasm_onnx_webgpu}"
     echo "======================================"
 
     if [ "$CLEAN" = true ]; then
@@ -328,6 +359,11 @@ build_target() {
     # Voice Agent and RAG YAMLs. Compile the real protobuf-backed runtime;
     # OFF links rac_solution_stub.cpp and guarantees both visible buttons
     # fail with RAC_ERROR_FEATURE_NOT_AVAILABLE.
+    local ort_runtime_dir="${ORT_WASM_RUNTIME_DIR}"
+    if [ "${wasm_onnx_webgpu}" = "ON" ]; then
+        ort_runtime_dir="${ORT_WEBGPU_WASM_RUNTIME_DIR}"
+    fi
+
     emcmake cmake \
         -B "${build_dir}" \
         -S "${REPO_ROOT}" \
@@ -347,6 +383,8 @@ build_target() {
         -DRAC_WASM_ONNX="${wasm_onnx}" \
         -DRAC_RUNTIME_ONNXRT="${wasm_onnx}" \
         -DRAC_WASM_WEBGPU="${wasm_webgpu}" \
+        -DRAC_WASM_ONNX_WEBGPU="${wasm_onnx_webgpu}" \
+        -DRAC_ONNX_WASM_RUNTIME_DIR="${ort_runtime_dir}" \
         -DRAC_WASM_WEBGPU_JSPI=OFF \
         -DRAC_BACKEND_RAG="${RAG}" \
         -DRAC_WASM_RAG_STANDALONE="${RAG}" \
@@ -483,7 +521,8 @@ echo " Targets:"
 [ "$BUILD_CORE" = "ON" ]   && echo "  - core"
 [ "$LLAMACPP" = "ON" ]     && [ "$WEBGPU" = "OFF" ] && echo "  - llamacpp (CPU)"
 [ "$WEBGPU" = "ON" ]       && echo "  - llamacpp-webgpu"
-[ "$ONNX" = "ON" ]         && echo "  - onnx-sherpa"
+[ "$ONNX" = "ON" ] && [ "$ONNX_WEBGPU" = "OFF" ] && echo "  - onnx-sherpa"
+[ "$ONNX_WEBGPU" = "ON" ]  && echo "  - onnx-sherpa-webgpu"
 echo "======================================"
 
 # Dispatch each requested target individually. Each gets its own configure
@@ -517,13 +556,22 @@ if [ "$WEBGPU" = "ON" ]; then
         "OFF" "ON" "OFF" "ON"
 fi
 
-if [ "$ONNX" = "ON" ]; then
+if [ "$ONNX" = "ON" ] && [ "$ONNX_WEBGPU" = "OFF" ]; then
     build_target \
         "onnx" \
         "racommons_onnx_wasm" \
         "racommons-onnx-sherpa" \
         "${WASM_DIR}/../packages/onnx/wasm" \
-        "OFF" "OFF" "ON" "OFF"
+        "OFF" "OFF" "ON" "OFF" "OFF"
+fi
+
+if [ "$ONNX_WEBGPU" = "ON" ]; then
+    build_target \
+        "onnx-webgpu" \
+        "racommons_onnx_webgpu_wasm" \
+        "racommons-onnx-sherpa-webgpu" \
+        "${WASM_DIR}/../packages/onnx/wasm" \
+        "OFF" "OFF" "ON" "OFF" "ON"
 fi
 
 echo ""

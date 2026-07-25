@@ -72,6 +72,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
@@ -111,6 +112,17 @@ std::string human_size(int64_t bytes) {
 // not exist yet, so walk up to the nearest existing ancestor. Returns -1 when
 // it cannot be determined (e.g. WASM/MEMFS), so callers can skip the gate.
 int64_t filesystem_available_bytes(const std::string& path) {
+#if defined(__EMSCRIPTEN__)
+    // MEMFS `fs::space` reports WASM-heap leftovers (often ~1–2 GB), not the
+    // browser Origin Private File System quota. Trusting that figure falsely
+    // refuses multi-GB model downloads even when OPFS has tens of GB free.
+    // The Web SDK passes `available_storage_bytes` from
+    // `navigator.storage.estimate()`; when it does not, treat free space as
+    // unknown so the EMSCRIPTEN fail-open path (require_free_space=false)
+    // applies instead of a misleading MEMFS comparison.
+    (void)path;
+    return -1;
+#else
     std::error_code ec;
     fs::path probe(path);
     while (!probe.empty()) {
@@ -131,6 +143,7 @@ int64_t filesystem_available_bytes(const std::string& path) {
     if (si.available > static_cast<uintmax_t>(INT64_MAX))
         return INT64_MAX;
     return static_cast<int64_t>(si.available);
+#endif
 }
 
 // Synchronous HTTP HEAD to learn a remote file's Content-Length. Returns the
@@ -715,7 +728,7 @@ std::string make_resume_token(const std::string& task_id, const std::string& mod
     return identity.empty() ? std::string() : ("racdl:" + identity);
 }
 
-std::string checksum_from_descriptor(const rav1::ModelFileDescriptor& file) {
+std::string transport_checksum_from_descriptor(const rav1::ModelFileDescriptor& file) {
     if (file.has_checksum_sha256() && !file.checksum_sha256().empty()) {
         return file.checksum_sha256();
     }
@@ -1330,14 +1343,12 @@ rac_http_download_status_t execute_stream_with_retry(rac_http_download_request_t
         // ".part" sidecar so we never re-download the completed prefix.
         if (attempt > 0) {
             int64_t on_disk = partial_size_or_zero(dest_path);
-            req.resume_from_byte =
-                on_disk > 0 ? static_cast<uint64_t>(on_disk) : base_resume_from;
+            req.resume_from_byte = on_disk > 0 ? static_cast<uint64_t>(on_disk) : base_resume_from;
         }
         http_status = 0;
         status = rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
 
-        const bool transient =
-            status == RAC_HTTP_DL_NETWORK_ERROR || status == RAC_HTTP_DL_TIMEOUT;
+        const bool transient = status == RAC_HTTP_DL_NETWORK_ERROR || status == RAC_HTTP_DL_TIMEOUT;
         if (!transient || stop_requested()) {
             break;
         }
@@ -1395,46 +1406,47 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
     // draw HTTP 416 from range-aware servers, failing a download whose bytes
     // are already correct. When the on-disk size matches the plan's expected
     // size exactly, skip the network and fall through to extraction/finalize.
+    const int64_t existing_final_bytes = file_size_or_zero(file.destination_path);
     const bool already_complete =
-        file.expected_bytes > 0 && file_size_or_zero(file.destination_path) == file.expected_bytes;
+        file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes;
     if (already_complete) {
         RAC_LOG_INFO(LOG_TAG,
                      "File %zu (%s) already complete on disk (%lld bytes) — skipping fetch", i,
-                     file.storage_key.c_str(), static_cast<long long>(file.expected_bytes));
+                     file.storage_key.c_str(), static_cast<long long>(existing_final_bytes));
+    }
+
+    // Runtime free-space safety net. The planner gate runs once up front, but
+    // free space can shrink between this file's planning and execution.
+    if (file.expected_bytes > 0) {
+        const int64_t bytes_already_on_disk =
+            already_complete ? std::min(existing_final_bytes, file.expected_bytes)
+                             : static_cast<int64_t>(file_resume_from);
+        const int64_t still_needed = file.expected_bytes - bytes_already_on_disk;
+        if (still_needed > 0) {
+            int64_t available = filesystem_available_bytes(file.destination_path);
+            const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
+            if (available >= 0 && available < still_needed + margin) {
+                std::string error =
+                    "Not enough storage to finish downloading this model: " + file.filename +
+                    " needs about " + human_size(still_needed) + " more but only " +
+                    human_size(available) + " is free. Free up space and try again.";
+                int64_t partial =
+                    completed_before_file + partial_size_or_zero(file.destination_path);
+                {
+                    std::lock_guard<std::mutex> lock(task->mutex);
+                    task->last_partial_bytes = partial;
+                }
+                set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
+                                  rav1::DOWNLOAD_STAGE_DOWNLOADING, partial, total_expected,
+                                  static_cast<int32_t>(i), file.storage_key, "", error);
+                mark_task_stopped(task);
+                emit_progress(task);
+                return plan_file_step::STOP;
+            }
+        }
     }
 
     if (!already_complete) {
-        // Runtime free-space safety net. The planner gate runs once up front,
-        // but free space can shrink between planning and this file's turn (other
-        // downloads, the bytes already written by earlier files in this bundle),
-        // and the planner can't size files the server won't HEAD. Refuse before
-        // streaming so we never fill the disk and strand a half-written model.
-        if (file.expected_bytes > 0) {
-            int64_t still_needed = file.expected_bytes - static_cast<int64_t>(file_resume_from);
-            if (still_needed > 0) {
-                int64_t available = filesystem_available_bytes(file.destination_path);
-                const int64_t margin = 32LL * 1024 * 1024;  // 32 MiB headroom
-                if (available >= 0 && available < still_needed + margin) {
-                    std::string error =
-                        "Not enough storage to finish downloading this model: " + file.filename +
-                        " needs about " + human_size(still_needed) + " more but only " +
-                        human_size(available) + " is free. Free up space and try again.";
-                    int64_t partial =
-                        completed_before_file + partial_size_or_zero(file.destination_path);
-                    {
-                        std::lock_guard<std::mutex> lock(task->mutex);
-                        task->last_partial_bytes = partial;
-                    }
-                    set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
-                                      rav1::DOWNLOAD_STAGE_DOWNLOADING, partial, total_expected,
-                                      static_cast<int32_t>(i), file.storage_key, "", error);
-                    mark_task_stopped(task);
-                    emit_progress(task);
-                    return plan_file_step::STOP;
-                }
-            }
-        }
-
         proto_download_callback_ctx cb_ctx;
         cb_ctx.task = task;
         cb_ctx.file_index = static_cast<int>(i);
@@ -1518,6 +1530,9 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Drop the unreadable archive so the next retry re-downloads
+            // instead of re-opening a corrupt OPFS/MEMFS stub.
+            delete_file(file.destination_path.c_str());
             set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                               total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
                               total_expected, static_cast<int32_t>(i), file.storage_key, "",
@@ -2138,6 +2153,9 @@ void web_download_on_complete(rac_result_t result, const char* /*downloaded_path
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
+            // Corrupt/incomplete OPFS archives must not stick around for the
+            // next Voice AI setup retry (web 416 path previously kept them).
+            delete_file(file.destination_path.c_str());
             set_task_progress(
                 task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
                 drv->total_expected > 0 ? drv->completed_before_file + file.expected_bytes : 0,
@@ -2201,8 +2219,9 @@ void web_download_start_file(web_download_driver* drv) {
 
     // A previous attempt may already have landed this file completely; skip the
     // fetch and run the success tail directly (extraction + advance).
+    const int64_t existing_final_bytes = file_size_or_zero(file.destination_path);
     const bool already_complete =
-        file.expected_bytes > 0 && file_size_or_zero(file.destination_path) == file.expected_bytes;
+        file.expected_bytes > 0 && existing_final_bytes == file.expected_bytes;
     if (already_complete) {
         web_download_on_complete(RAC_SUCCESS, file.destination_path.c_str(), drv);
         return;
@@ -2858,7 +2877,11 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         return serialize_proto_to_buffer(result, out_result);
     }
 
+    // Network/progress accounting is the exact transport byte count. Storage
+    // planning is tracked separately because an archive's declared extracted
+    // total can exceed the bytes fetched over HTTP.
     int64_t total_bytes = 0;
+    int64_t total_storage_bytes = 0;
     bool all_sizes_known = true;
     // Set when a NON-archive file's size cannot be resolved (no catalog size and
     // the HEAD probe failed). Archive members are intentionally left unsized
@@ -2913,13 +2936,14 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             }
             if (expected_bytes > 0) {
                 total_bytes += expected_bytes;
+                total_storage_bytes += expected_bytes;
             } else {
                 all_sizes_known = false;
                 if (!requires_extraction) {
                     unsized_nonarchive_file = true;
                 }
             }
-            std::string checksum = checksum_from_descriptor(file);
+            std::string checksum = transport_checksum_from_descriptor(file);
             if (request.verify_checksums() && checksum.empty()) {
                 result.add_warnings(
                     "checksum verification requested but a file checksum is missing");
@@ -2993,6 +3017,7 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         if (expected_bytes > 0) {
             descriptor.set_size_bytes(expected_bytes);
             total_bytes += expected_bytes;
+            total_storage_bytes += expected_bytes;
         } else {
             all_sizes_known = false;
             if (needs_extraction == RAC_FALSE) {
@@ -3014,8 +3039,27 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     }
 
     if (!all_sizes_known) {
-        total_bytes = 0;
-        result.add_warnings("one or more file sizes are unknown");
+        // A curated multi-file registration can carry an exact aggregate
+        // download_size_bytes even when an older persisted descriptor has no
+        // per-file size. Treat that aggregate as the storage-planning bound
+        // when every known descriptor fits inside it and leaves a positive
+        // byte budget for the unknown files. This keeps planning
+        // deterministic when a transient HEAD request omits Content-Length,
+        // while preserving per-file expected_bytes == 0 (and therefore never
+        // applying a made-up per-file size/checksum guard).
+        const int64_t declared_total_bytes = model.download_size_bytes();
+        if (declared_total_bytes > total_bytes) {
+            total_bytes = declared_total_bytes;
+            total_storage_bytes = std::max(total_storage_bytes, declared_total_bytes);
+            unsized_nonarchive_file = false;
+            result.add_warnings(
+                "one or more per-file sizes are unknown; using model download_size_bytes for "
+                "storage planning");
+        } else {
+            total_bytes = 0;
+            total_storage_bytes = 0;
+            result.add_warnings("one or more file sizes are unknown");
+        }
     }
 
     int64_t resume_from = 0;
@@ -3039,7 +3083,7 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
 
     // Resumable bytes already on disk don't need to be re-downloaded, so they
     // count toward the space we still have to find.
-    int64_t required_bytes = total_bytes;
+    int64_t required_bytes = total_storage_bytes > 0 ? total_storage_bytes : total_bytes;
     if (required_bytes > 0) {
         if (resume_from > 0 && resume_from < required_bytes) {
             required_bytes -= resume_from;

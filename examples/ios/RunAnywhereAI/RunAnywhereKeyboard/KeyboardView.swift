@@ -3,7 +3,7 @@
 //  RunAnywhereKeyboard
 //
 //  SwiftUI keyboard UI — implements the 5-state WisprFlow-style UX.
-//  Branded with RunAnywhere color palette (#FF5500 primary accent).
+//  Branded with RunAnywhere color palette (#FF6900 primary accent).
 //
 //  State machine (driven by SharedDataBridge.sessionState):
 //    idle        → full keyboard + "Run" button in toolbar
@@ -20,7 +20,7 @@ import Combine
 // MARK: - Brand Colors (keyboard extension can't import main target)
 
 private enum Brand {
-    static let accent      = Color(.sRGB, red: 1.0, green: 0.333, blue: 0.0)    // #FF5500
+    static let accent      = Color(.sRGB, red: 1.0, green: 0.412, blue: 0.0)    // #FF6900
     static let accentDark  = Color(.sRGB, red: 0.902, green: 0.271, blue: 0.0)  // #E64500
     static let green       = Color(.sRGB, red: 0.063, green: 0.725, blue: 0.506) // #10B981
     static let darkSurface = Color(white: 0.18)   // key background

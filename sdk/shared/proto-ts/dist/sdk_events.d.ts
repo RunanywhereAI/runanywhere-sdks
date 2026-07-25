@@ -33,6 +33,8 @@ export declare enum SDKComponent {
     SDK_COMPONENT_VOICE_AGENT = 9,
     SDK_COMPONENT_WAKEWORD = 10,
     SDK_COMPONENT_SPEAKER_DIARIZATION = 11,
+    SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12,
+    SDK_COMPONENT_RERANK = 13,
     UNRECOGNIZED = -1
 }
 export declare function sDKComponentFromJSON(object: any): SDKComponent;
@@ -702,6 +704,8 @@ export interface GenerationEvent {
     durationMs: number;
     /** InferenceFramework enum int */
     framework: number;
+    /** prompt eval (prefill) duration */
+    promptEvalTimeMs: number;
 }
 /**
  * ---------------------------------------------------------------------------

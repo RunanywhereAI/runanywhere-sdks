@@ -938,33 +938,6 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_proto_buffer_error_message(void) {
 }
 
 // =============================================================================
-// DEV CONFIG WRAPPERS
-//
-// Expose development configuration values (Supabase URL/key, build token)
-// so that the TypeScript HTTP layer can use them for dev-mode telemetry.
-// =============================================================================
-
-EMSCRIPTEN_KEEPALIVE
-int rac_wasm_dev_config_is_available(void) {
-  return rac_dev_config_is_available() ? 1 : 0;
-}
-
-EMSCRIPTEN_KEEPALIVE
-const char *rac_wasm_dev_config_get_supabase_url(void) {
-  return rac_dev_config_get_supabase_url();
-}
-
-EMSCRIPTEN_KEEPALIVE
-const char *rac_wasm_dev_config_get_supabase_key(void) {
-  return rac_dev_config_get_supabase_key();
-}
-
-EMSCRIPTEN_KEEPALIVE
-const char *rac_wasm_dev_config_get_build_token(void) {
-  return rac_dev_config_get_build_token();
-}
-
-// =============================================================================
 // FILE MANAGER WRAPPERS (clearCache / cleanTempFiles)
 //
 // Web has no rac_file_callbacks_t bridge (the platform-adapter file slots are

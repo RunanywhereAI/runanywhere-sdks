@@ -25,6 +25,10 @@ import {
   RunAnywhere,
   ModelCategory,
 } from '@runanywhere/web';
+import {
+  ensureDownloadStorageReady,
+  LARGE_DOWNLOAD_BYTES,
+} from '@runanywhere/web/browser';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
@@ -43,7 +47,7 @@ import {
   modalityEmoji,
   cleanModelName,
   consumerTags,
-  modelFamily,
+  modelOrg,
   modelCapability,
   variantSizeFeel,
   type ConsumerTag,
@@ -114,7 +118,7 @@ let searchQuery = '';
 
 // Which family cards are expanded to reveal their variants (keyed by family
 // key). Reset whenever the sheet is opened so it always starts collapsed.
-const expandedFamilies = new Set<string>();
+const expandedOrgs = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Public API — wiring into the chat view
@@ -366,7 +370,7 @@ export async function ensureModelReady(modelId: string): Promise<boolean> {
 function renderSheet(): void {
   const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   searchQuery = '';
-  expandedFamilies.clear();
+  expandedOrgs.clear();
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
@@ -425,11 +429,15 @@ function renderSheet(): void {
   // the async capability probe resolves.
   void ensureCapabilities().then(() => {
     if (modalEl) {
+      if (catalogRegistered) hydrateRowStatesFromRegistry();
       renderBanner();
       renderRows();
     }
   });
 
+  // Always re-read the registry when opening the sheet so OPFS-hydrated
+  // downloads (or loads from other tabs) are not stuck on "Download".
+  if (catalogRegistered) hydrateRowStatesFromRegistry();
   renderBanner();
   renderRows();
 }
@@ -530,13 +538,13 @@ function bindRowActions(host: HTMLElement): void {
   });
 }
 
-/** Wire family-card expand toggles. */
+/** Wire org-card expand toggles. */
 function bindFamilyInteractions(host: HTMLElement): void {
   host.querySelectorAll('[data-family-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
       const key = (el as HTMLElement).dataset.familyToggle!;
-      if (expandedFamilies.has(key)) expandedFamilies.delete(key);
-      else expandedFamilies.add(key);
+      if (expandedOrgs.has(key)) expandedOrgs.delete(key);
+      else expandedOrgs.add(key);
       renderRows();
     });
   });
@@ -656,16 +664,32 @@ function recommendedShell(cardsHtml: string, companionRows: string): string {
   `;
 }
 
-/** Group the remaining catalog into consumer-facing family cards. */
+/** Group the remaining catalog into organisation cards. */
 function renderFamilySection(entries: readonly CatalogEntry[], hasRecommended: boolean): string {
   if (entries.length === 0) return '';
 
-  const families = groupByFamily(entries);
-  if (families.length === 0) return '';
+  const orgs = groupByOrg(entries);
+  if (orgs.length === 0) return '';
 
-  const heading = hasRecommended ? 'Browse all models' : 'All models';
-  const cards = families.map((family) => renderFamilyCard(family)).join('');
+  const ready = orgs.filter((org) =>
+    org.entries.some((entry) => ['downloaded', 'loaded'].includes(stateOf(entry.id).status)));
+  const rest = orgs.filter((org) => !ready.includes(org));
 
+  const sections: string[] = [];
+  if (ready.length > 0) {
+    sections.push(renderOrgSection('On this device', ready));
+  }
+  if (rest.length > 0) {
+    const heading = ready.length === 0
+      ? (hasRecommended ? 'All organisations' : 'All organisations')
+      : 'More organisations';
+    sections.push(renderOrgSection(heading, rest));
+  }
+  return sections.join('');
+}
+
+function renderOrgSection(heading: string, orgs: OrgGroup[]): string {
+  const cards = orgs.map((org) => renderOrgCard(org)).join('');
   return `
     <div class="model-section">
       <div class="model-section__title">${escapeHtml(heading)}</div>
@@ -674,73 +698,79 @@ function renderFamilySection(entries: readonly CatalogEntry[], hasRecommended: b
   `;
 }
 
-interface FamilyGroup {
+interface OrgGroup {
   key: string;
   name: string;
-  tagline: string;
   entries: CatalogEntry[];
 }
 
-/** Bucket entries by family, preserving catalog order within each family. */
-function groupByFamily(entries: readonly CatalogEntry[]): FamilyGroup[] {
-  const groups = new Map<string, FamilyGroup>();
+/** Bucket entries by organisation, preserving matcher declaration order. */
+function groupByOrg(entries: readonly CatalogEntry[]): OrgGroup[] {
+  const groups = new Map<string, OrgGroup>();
+  const order: string[] = [];
   for (const entry of entries) {
-    const family = modelFamily(entry);
-    const existing = groups.get(family.key);
+    const org = modelOrg(entry);
+    const existing = groups.get(org.key);
     if (existing) {
       existing.entries.push(entry);
     } else {
-      groups.set(family.key, {
-        key: family.key,
-        name: family.name,
-        tagline: family.tagline,
+      groups.set(org.key, {
+        key: org.key,
+        name: org.name,
         entries: [entry],
       });
+      order.push(org.key);
     }
   }
-  return [...groups.values()];
+  // Sort models within each org smaller → larger (by advertised bytes).
+  for (const group of groups.values()) {
+    group.entries.sort((a, b) => modelDisplaySizeBytes(a) - modelDisplaySizeBytes(b));
+  }
+  return order.map((key) => groups.get(key)!);
 }
 
 /**
- * A rounded family card: name, one-liner, the family's cleanest tag, and the
- * option count. Tapping toggles an expanded list of variants. When a variant is
- * loaded/downloaded the card reflects that with a subtle status dot.
+ * A rounded org card: publisher name, NPU/ready status, and model count.
+ * Tapping toggles an expanded list of models.
  */
-function renderFamilyCard(family: FamilyGroup): string {
-  // Searching is a direct lookup, so surface matching variants immediately
-  // instead of hiding exact results behind a second family-card click.
-  const expanded = expandedFamilies.has(family.key) || searchQuery.trim().length > 0;
-  const options = family.entries.length;
-  const representative = pickRepresentative(family.entries);
-  const tag = consumerTags(representative)[0];
-  const activeEntry = family.entries.find((entry) => stateOf(entry.id).status === 'loaded');
-  const onDevice = family.entries.some((entry) =>
+function renderOrgCard(org: OrgGroup): string {
+  const expanded = expandedOrgs.has(org.key) || searchQuery.trim().length > 0;
+  const options = org.entries.length;
+  const representative = pickRepresentative(org.entries);
+  const activeEntry = org.entries.find((entry) => stateOf(entry.id).status === 'loaded');
+  const onDevice = org.entries.some((entry) =>
     ['downloaded', 'loaded'].includes(stateOf(entry.id).status));
+  const hasNpu = org.entries.some((entry) =>
+    formatFramework(entry.framework).toLowerCase().includes('npu')
+    || `${entry.id} ${entry.name}`.toLowerCase().includes('hnpu'));
 
   const statusPill = activeEntry
     ? '<span class="family-card__status family-card__status--active">Active</span>'
     : onDevice
       ? '<span class="family-card__status">On device</span>'
       : '';
+  const npuPill = hasNpu
+    ? '<span class="tag-pill tag-pill--capability">NPU</span>'
+    : '';
 
   const variants = expanded
-    ? `<div class="family-variants">${renderFamilyVariants(family)}</div>`
+    ? `<div class="family-variants">${renderOrgVariants(org)}</div>`
     : '';
 
   return `
-    <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(family.key)}">
-      <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(family.key)}" aria-expanded="${expanded}">
+    <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(org.key)}">
+      <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(org.key)}" aria-expanded="${expanded}">
         <div class="model-logo family-card__logo">${modalityEmoji(representative.category)}</div>
         <div class="family-card__body">
           <div class="family-card__name-row">
-            <span class="family-card__name">${escapeHtml(family.name)}</span>
-            ${tag ? renderTagPill(tag) : ''}
+            <span class="family-card__name">${escapeHtml(org.name)}</span>
+            ${npuPill}
             ${statusPill}
           </div>
-          <div class="family-card__tagline">${escapeHtml(family.tagline)}</div>
+          <div class="family-card__tagline">${options} ${options === 1 ? 'model' : 'models'}</div>
         </div>
         <div class="family-card__aside">
-          <span class="family-card__count">${options} ${options === 1 ? 'option' : 'options'}</span>
+          <span class="family-card__count">${options} ${options === 1 ? 'model' : 'models'}</span>
           <svg class="family-card__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -751,14 +781,10 @@ function renderFamilyCard(family: FamilyGroup): string {
   `;
 }
 
-/**
- * Render a family's variants once expanded. The best-for-device variant is
- * auto-flagged; each row shows the clean model name, download size, a subtle
- * backend pill, and the friendly size feel — never quant strings.
- */
-function renderFamilyVariants(family: FamilyGroup): string {
-  const best = bestVariantForDevice(family.entries);
-  return family.entries
+/** Render an org's models once expanded. */
+function renderOrgVariants(org: OrgGroup): string {
+  const best = bestVariantForDevice(org.entries);
+  return org.entries
     .map((entry) => renderVariantRow(entry, entry.id === best?.id))
     .join('');
 }
@@ -833,24 +859,24 @@ function stateOf(id: string): RowState {
 }
 
 /**
- * Match against friendly, consumer-facing signals only — model name, family
- * name/tagline, size feel, and consumer tags. Deliberately excludes quant
- * strings and inference backend names.
+ * Match against friendly, consumer-facing signals only — model name, org
+ * name, size feel, and consumer tags. Deliberately excludes quant strings
+ * and inference backend names.
  */
 function matchesSearch(entry: CatalogEntry, query: string): boolean {
   if (!query) return true;
-  const family = modelFamily(entry);
-  const haystack = [
+  const org = modelOrg(entry);
+  const normalize = (value: string): string => value.toLowerCase().replace(/[-_./]+/g, ' ');
+  const haystack = normalize([
+    entry.id,
     entry.name,
     entry.description,
-    family.name,
-    family.tagline,
+    org.name,
     variantSizeFeel(entry),
     ...consumerTags(entry).map((tag) => tag.label),
-  ]
-    .join(' ')
-    .toLowerCase();
-  return haystack.includes(query);
+  ].join(' '));
+  const needle = normalize(query).trim();
+  return needle.length === 0 || haystack.includes(needle);
 }
 
 /** Render a rich recommended card with a single clean tag row. */
@@ -920,8 +946,14 @@ function renderModelRow(entry: CatalogEntry, state: RowState): string {
   `;
 }
 
+function compatibilityFor(entry: CatalogEntry) {
+  return webModelCompatibility(entry, {
+    hasWebGPU: capabilitiesCache?.hasWebGPU,
+  });
+}
+
 function renderCompatibilityReason(entry: CatalogEntry): string {
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (compatibility.supported) return '';
   const reference = compatibility.reference
     ? ` <a href="${escapeHtml(compatibility.reference.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(compatibility.reference.label)} &nearr;</a>`
@@ -931,9 +963,9 @@ function renderCompatibilityReason(entry: CatalogEntry): string {
 
 function actionButton(entry: CatalogEntry, state: RowState): string {
   const safeModelId = escapeHtml(entry.id);
-  const compatibility = webModelCompatibility(entry);
+  const compatibility = compatibilityFor(entry);
   if (!compatibility.supported && state.status !== 'loaded') {
-    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>Unavailable in this app</button>`;
+    return `<button type="button" class="model-action-btn model-action-btn--unavailable" data-model-id="${safeModelId}" data-compatibility-code="${compatibility.code}" aria-describedby="model-compatibility-${safeModelId}" disabled>${escapeHtml(compatibility.actionLabel)}</button>`;
   }
   switch (state.status) {
     case 'registered':
@@ -978,25 +1010,78 @@ async function handleAction(action: ModelAction, modelId: string): Promise<void>
 async function startDownload(modelId: string): Promise<void> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return;
     }
   }
+
+  let model = RunAnywhere.getModel(modelId);
+  if (!model && entry) {
+    // Catalog UI can outlive a partial registry wipe (backend re-register).
+    // Re-seed the declarative entry before failing the Download click.
+    try {
+      const { registerModelCatalog } = await import('../services/model-catalog');
+      registerModelCatalog();
+      model = RunAnywhere.getModel(modelId);
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!model) {
+    showToast(`Model ${modelId} not found in registry`, 'warning');
+    return;
+  }
+
+  const requiredBytes = entry
+    ? modelDisplaySizeBytes(entry)
+    : (() => {
+      const parsed = Number(model.downloadSizeBytes ?? 0);
+      return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    })();
+
+  // First async step after the Download click — request persist() while the
+  // user gesture is still active, then verify origin quota.
+  const storage = await ensureDownloadStorageReady({ requiredBytes });
+  if (requiredBytes > 0 && !storage.sufficient) {
+    const fallbackMessage = RunAnywhere.storage.isLocalStorageSupported
+      ? 'Free space or open Storage → Choose Storage Folder.'
+      : 'Please free up space in your browser.';
+    showToast(
+      `Not enough browser storage for this model (need ${formatBytes(requiredBytes)}, `
+        + `${formatBytes(storage.availableBytes)} free). ${fallbackMessage}`,
+      'warning',
+      6000,
+    );
+    return;
+  }
+
+  // Large downloads use browser OPFS by default. Do not open the OS folder
+  // picker here — it steals the Download click and is easy to dismiss while
+  // the download continues anyway. Only mention Choose Storage Folder when
+  // the browser supports that path and no durable folder is already active.
+  if (
+    requiredBytes >= LARGE_DOWNLOAD_BYTES
+    && !storage.persisted
+    && !RunAnywhere.storage.isLocalStorageReady
+    && RunAnywhere.storage.isLocalStorageSupported
+  ) {
+    showToast(
+      'Storing this model in browser OPFS. For a durable disk folder, open Storage → Choose Storage Folder.',
+      'info',
+      5000,
+    );
+  }
+
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const model = RunAnywhere.getModel(modelId);
-    if (!model) {
-      throw new Error(`Model ${modelId} not found in registry`);
-    }
-
     const progress = await RunAnywhere.downloadModel({
       modelId,
       model,
       allowMeteredNetwork: true,
-      resumeExisting: false,
+      resumeExisting: true,
       verifyChecksums: false,
       validateExistingBytes: false,
       updateRegistryOnCompletion: true,
@@ -1017,7 +1102,7 @@ async function startDownload(modelId: string): Promise<void> {
 async function loadModel(modelId: string): Promise<boolean> {
   const entry = getCatalog().find((candidate) => candidate.id === modelId);
   if (entry) {
-    const compatibility = webModelCompatibility(entry);
+    const compatibility = compatibilityFor(entry);
     if (!compatibility.supported) {
       showToast(compatibility.reason, 'warning');
       return false;
@@ -1114,9 +1199,35 @@ function applyProgress(modelId: string, progress: DownloadProgress): void {
 // State + toolbar updates
 // ---------------------------------------------------------------------------
 
+/** Patch progress UI in place so download ticks do not rebuild the whole sheet. */
+function updateDownloadProgressInPlace(modelId: string, progress: number): boolean {
+  const host = document.getElementById('model-sheet-list');
+  if (!host) return false;
+
+  const row = host.querySelector(`[data-model-id="${CSS.escape(modelId)}"]`);
+  if (!row) return false;
+
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+  const progressBtn = row.querySelector('.model-action-btn--progress');
+  if (progressBtn) progressBtn.textContent = `${pct}%`;
+
+  const fill = row.querySelector('.progress-fill') as HTMLElement | null;
+  if (fill) {
+    fill.style.width = `${pct}%`;
+    return true;
+  }
+  return progressBtn !== null;
+}
+
 function setRow(modelId: string, state: RowState): void {
+  const previous = rowStates.get(modelId);
   rowStates.set(modelId, state);
-  if (modalEl) renderRows();
+  if (modalEl) {
+    const progressOnly = previous?.status === 'downloading'
+      && state.status === 'downloading'
+      && updateDownloadProgressInPlace(modelId, state.progress);
+    if (!progressOnly) renderRows();
+  }
   refreshToolbarLabel();
   refreshOverlayVisibility();
   for (const listener of listeners) {

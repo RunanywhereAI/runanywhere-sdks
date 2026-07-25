@@ -18,9 +18,9 @@ test('two-phase init exposes ready-state and emits lifecycle + telemetry events'
 
     // Phase 1 (synchronous).
     assert.equal(RunAnywhere.isInitialized, false);
-    RunAnywhere.initialize({ environment: 'staging' });
+    RunAnywhere.initialize({ environment: 'development' });
     assert.equal(RunAnywhere.isInitialized, true);
-    assert.equal(RunAnywhere.environment, 'staging');
+    assert.equal(RunAnywhere.environment, 'development');
     assert.ok(seen.includes('initialized'), 'initialized event fired');
 
     // Phase 2 (background services) — awaitable + idempotent.

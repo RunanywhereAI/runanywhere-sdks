@@ -2,6 +2,7 @@
 // Promise) into a lazily-consumed AsyncIterable of tokens. Kept separate from
 // bridge.ts (which force-loads the native addon on import) so this pure adapter
 // can be used and unit-tested without the .node present.
+import { asSDKException } from './errors';
 
 /** Aggregate metrics for a completed generation (mirrors the other SDKs' result). */
 export interface LLMGenerationResult {
@@ -97,7 +98,7 @@ export function toAsyncIterable(
     async next(): Promise<IteratorResult<string>> {
       for (;;) {
         if (queue.length) return { value: queue.shift() as string, done: false };
-        if (err) throw err;
+        if (err) throw asSDKException(err);
         if (done) return { value: undefined as unknown as string, done: true };
         await new Promise<void>((r) => {
           wake = r;

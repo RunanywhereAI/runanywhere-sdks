@@ -2469,7 +2469,7 @@ class RacBindings {
   /// `rac_env_is_production(rac_environment_t)` — true only for production.
   final RacEnvPredicateDart? rac_env_is_production;
 
-  /// `rac_env_is_testing(rac_environment_t)` — true for development/staging.
+  /// `rac_env_is_testing(rac_environment_t)` — true for development (non-production).
   final RacEnvPredicateDart? rac_env_is_testing;
 
   /// `rac_env_requires_auth(rac_environment_t)` — true for non-development.

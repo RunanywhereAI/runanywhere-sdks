@@ -4,8 +4,8 @@
  *
  * Compiled into TWO shared libraries:
  *   - librunanywhere_test_plugin.so    (good ABI, accepted by registry)
- *   - librunanywhere_test_plugin_bad_abi.so  (forced ABI = host + 99,
- *     rejected by registry as proof of the version handshake)
+ *   - librunanywhere_test_plugin_bad_abi.so  (forced ABI = v6, rejected by
+ *     the v7 registry as proof of the version handshake)
  *
  * Both define the entry symbol `rac_plugin_entry_test_plugin` so the
  * `entry_symbol_from_path()` heuristic in `plugin_loader.cpp` resolves
@@ -29,9 +29,8 @@ static const int k_test_plugin_sentinel = 0xCAFEBABE;
 #ifndef RAC_TEST_PLUGIN_FORCE_BAD_ABI
 #define RAC_TEST_PLUGIN_ABI_VERSION RAC_PLUGIN_API_VERSION
 #else
-/* Compile-time toggle to force ABI mismatch — used by the abi-mismatch
- * test fixture build. */
-#define RAC_TEST_PLUGIN_ABI_VERSION (RAC_PLUGIN_API_VERSION + 99u)
+/* Compile-time toggle to exercise rejection of the immediately preceding ABI. */
+#define RAC_TEST_PLUGIN_ABI_VERSION 6u
 #endif
 
 static const rac_engine_vtable_t g_test_plugin_vtable = {
@@ -57,9 +56,9 @@ static const rac_engine_vtable_t g_test_plugin_vtable = {
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    /* reserved_slot_0..9 */
-    nullptr,
-    nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

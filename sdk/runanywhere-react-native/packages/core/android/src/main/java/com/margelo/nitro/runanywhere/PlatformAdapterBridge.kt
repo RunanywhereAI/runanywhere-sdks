@@ -11,9 +11,14 @@
 package com.margelo.nitro.runanywhere
 
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import com.margelo.nitro.NitroModules
 import java.io.File
@@ -283,6 +288,119 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun getDeviceModel(): String {
         return android.os.Build.MODEL
+    }
+
+    /**
+     * Get user-visible device name (Settings.Global.DEVICE_NAME on API 25+,
+     * falling back to bluetooth_name, then "MANUFACTURER MODEL").
+     */
+    @JvmStatic
+    fun getDeviceName(): String {
+        val context = applicationContext()
+        if (context != null) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+                    Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { return it }
+                }
+                Settings.Secure.getString(context.contentResolver, "bluetooth_name")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { return it }
+            } catch (e: Exception) {
+                Log.w(TAG, "getDeviceName failed: ${e.message}")
+            }
+        }
+        return "${Build.MANUFACTURER} ${Build.MODEL}"
+    }
+
+    /**
+     * Get battery level as 0.0..1.0, or -1.0 when unknown
+     */
+    @JvmStatic
+    fun getBatteryLevel(): Float {
+        val context = applicationContext() ?: return -1.0f
+        return try {
+            val batteryManager =
+                context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                    ?: return -1.0f
+            val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            if (level in 0..100) level / 100.0f else -1.0f
+        } catch (e: Exception) {
+            Log.w(TAG, "getBatteryLevel failed: ${e.message}")
+            -1.0f
+        }
+    }
+
+    /**
+     * Get battery state: "charging", "full", "unplugged", or "" when unknown
+     */
+    @JvmStatic
+    fun getBatteryState(): String {
+        val context = applicationContext() ?: return ""
+        return try {
+            val intent = context.registerReceiver(
+                null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            ) ?: return ""
+            when (
+                intent.getIntExtra(
+                    BatteryManager.EXTRA_STATUS,
+                    BatteryManager.BATTERY_STATUS_UNKNOWN,
+                )
+            ) {
+                BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+                BatteryManager.BATTERY_STATUS_FULL -> "full"
+                BatteryManager.BATTERY_STATUS_DISCHARGING,
+                BatteryManager.BATTERY_STATUS_NOT_CHARGING,
+                -> "unplugged"
+                else -> ""
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getBatteryState failed: ${e.message}")
+            ""
+        }
+    }
+
+    /**
+     * Check if battery saver (low power mode) is enabled
+     */
+    @JvmStatic
+    fun isLowPowerMode(): Boolean {
+        val context = applicationContext() ?: return false
+        return try {
+            val powerManager =
+                context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            powerManager?.isPowerSaveMode ?: false
+        } catch (e: Exception) {
+            Log.w(TAG, "isLowPowerMode failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Check if the SoC ships a dedicated NPU/DSP usable through NNAPI.
+     * Mirrors HybridRunAnywhereDeviceInfo.hasNPU().
+     */
+    @JvmStatic
+    fun hasNPU(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+            return false
+        }
+        val hardware = Build.HARDWARE.lowercase()
+        val soc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Build.SOC_MODEL.lowercase()
+        } else {
+            ""
+        }
+        return listOf(
+            "qcom",
+            "exynos",
+            "tensor",
+            "kirin",
+            "dimensity",
+            "mtk",
+        ).any { hardware.contains(it) || soc.contains(it) }
     }
 
     /**

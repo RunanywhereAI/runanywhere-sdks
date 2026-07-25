@@ -12,11 +12,10 @@
  *
  * `Cloud.registerBackend()` folds the cloud engine plugin into the
  * WASM module's plugin registry by calling `rac_backend_cloud_register`
- * (the mirror of ONNX.register() / LlamaCPP.register()). On WASM the cloud
- * engine is its own static library that must be linked + exported — see
- * HybridWasmModule.ts BUILD DELTA. The call is tolerated-when-absent so a host
- * whose WASM lacks the engine still boots (a later transcribe surfaces a clear
- * backendNotAvailable instead).
+ * (the mirror of ONNX.register() / LlamaCPP.register()). The Web build exports
+ * this from hybrid-capable targets. The call remains tolerated-when-absent so
+ * a host with an older or capability-incomplete artifact still boots (a later
+ * transcribe surfaces a clear backendNotAvailable instead).
  *
  * HTTP under WASM: the cloud engine does its HTTP through the commons
  * `rac_http_client`, which on Emscripten routes through the registered
@@ -110,8 +109,8 @@ export const Cloud = {
    * Register the cloud backend plugin with the WASM module's registry.
    * Idempotent; safe to call multiple times. Returns true when the engine is
    * routable (registered now or already), false when the WASM build does not
-   * export `rac_backend_cloud_register` (the engine isn't linked — see
-   * HybridWasmModule.ts BUILD DELTA).
+   * export `rac_backend_cloud_register` (the engine is absent from that
+   * artifact).
    *
    * The cloud plugin serves RAC_PRIMITIVE_TRANSCRIBE; once registered the
    * hybrid router can route the ONLINE side via engine hint "cloud".
@@ -127,7 +126,7 @@ export const Cloud = {
       logger.warning(
         'WASM module does not export _rac_backend_cloud_register; the ' +
           'cloud engine is not linked into this build. Cloud STT routing ' +
-          'will be unavailable. See HybridWasmModule.ts BUILD DELTA (item C).',
+          'will be unavailable. Rebuild a hybrid-capable Web WASM artifact.',
       );
       return false;
     }

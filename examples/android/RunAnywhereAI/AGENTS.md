@@ -31,3 +31,13 @@ Private QHexRT device and Play-release orchestration lives in the sibling checko
 
 After editing these scripts, run `bash -n scripts/*.sh`,
 `bash scripts/sync-solutions-yamls.sh --check`, `scripts/smoke.sh`, and `git diff --check`.
+
+## Design System
+
+Brand primary is RunAnywhere orange **#FF6900** (the logo color) — see the canonical
+`../../DESIGN_GUIDELINE.md`. Theming is 100% Jetpack Compose Material 3:
+`app/src/main/java/com/runanywhere/runanywhereai/ui/theme/Color.kt` (`BrandOrange =
+0xFFFF6900` + the `Primary*` tonal ramp around the #FF6900 hue) and `Theme.kt`
+(`lightColorScheme`/`darkColorScheme`, no dynamic color so the brand is guaranteed).
+`res/values/colors.xml` holds only structural black/white. When changing brand colors,
+edit `Color.kt` and keep it in sync with the guideline.

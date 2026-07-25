@@ -223,9 +223,10 @@ static const rac_engine_vtable_t g_coreml_engine_vtable = {
 #else
     nullptr,
 #endif
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

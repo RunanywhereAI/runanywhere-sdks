@@ -1468,6 +1468,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     const double decode_ms = ms(t_end - t_after_prep).count();
     out_result->total_time_ms = static_cast<int64_t>(total_ms);
     out_result->image_encode_time_ms = static_cast<int64_t>(ms(t_after_prep - t_start).count());
+    out_result->prompt_eval_time_ms = static_cast<int64_t>(ms(t_after_prep - t_start).count());
     out_result->time_to_first_token_ms = static_cast<int64_t>(ms(t_first_token - t_start).count());
     out_result->tokens_per_second =
         decode_ms > 0.0 ? static_cast<float>(tokens_generated / (decode_ms / 1000.0)) : 0.0f;

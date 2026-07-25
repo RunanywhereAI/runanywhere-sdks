@@ -1,7 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { RagSession } = require('../../dist/rag');
+const {
+  RagSession,
+  createRagSessionFromCatalog,
+  frameworkForModelPath,
+  RagModelCategory,
+  RagInferenceFramework,
+} = require('../../dist/rag');
 const { isSDKException, ErrorCode } = require('../../dist/errors');
 const { RAGConfiguration, RAGQueryOptions, RAGResult, RAGStatistics } = require('../../dist/proto/rag');
 
@@ -17,6 +23,25 @@ function fakeBridge() {
     ragStats: async (h) => { calls.push(['stats', h]); return stats; },
     ragClear: async (h) => { calls.push(['clear', h]); return { ...stats, indexedDocuments: 0, indexedChunks: 0 }; },
     ragDestroySession: async (h) => { calls.push(['destroy', h]); },
+  };
+}
+
+function fakeCatalogBridge() {
+  const calls = [];
+  return {
+    calls,
+    downloadModel: async (id) => {
+      calls.push(['download', id]);
+      const primary = id === 'minilm' ? '/models/minilm.onnx' : `/models/${id}.gguf`;
+      return { id, primary };
+    },
+    registerModel: async (id, localPath, category, framework) => {
+      calls.push(['register', id, localPath, category, framework]);
+    },
+    ragCreateSession: async (config) => {
+      calls.push(['create', config]);
+      return 11;
+    },
   };
 }
 
@@ -103,4 +128,50 @@ test('RAGStatistics round-trips through the codec', () => {
   );
   assert.equal(s.indexedDocuments, 2);
   assert.equal(s.indexedChunks, 9);
+});
+
+test('frameworkForModelPath maps onnx→Onnx and gguf→LlamaCpp', () => {
+  assert.equal(frameworkForModelPath('/m/minilm.onnx'), RagInferenceFramework.Onnx);
+  assert.equal(frameworkForModelPath('/m/minilm.ort'), RagInferenceFramework.Onnx);
+  assert.equal(frameworkForModelPath('/m/qwen.gguf'), RagInferenceFramework.LlamaCpp);
+  assert.equal(frameworkForModelPath('/m/unknown.bin'), RagInferenceFramework.LlamaCpp);
+});
+
+test('createRagSessionFromCatalog downloads, registers with typed enums, then creates', async () => {
+  const b = fakeCatalogBridge();
+  const handle = await createRagSessionFromCatalog(b, {
+    embeddingModelId: 'minilm',
+    llmModelId: 'qwen2.5-0.5b',
+    topK: 3,
+  });
+  assert.equal(handle, 11);
+  assert.deepEqual(b.calls, [
+    ['download', 'minilm'],
+    ['register', 'minilm', '/models/minilm.onnx', RagModelCategory.Embedding, RagInferenceFramework.Onnx],
+    ['download', 'qwen2.5-0.5b'],
+    ['register', 'qwen2.5-0.5b', '/models/qwen2.5-0.5b.gguf', RagModelCategory.Language, RagInferenceFramework.LlamaCpp],
+    ['create', { embeddingModelId: 'minilm', llmModelId: 'qwen2.5-0.5b', topK: 3 }],
+  ]);
+});
+
+test('createRagSessionFromCatalog requires embeddingModelId', async () => {
+  await assert.rejects(() => createRagSessionFromCatalog(fakeCatalogBridge(), {}), (e) => {
+    assert.ok(isSDKException(e));
+    assert.equal(e.code, ErrorCode.INVALID_ARGUMENT);
+    return true;
+  });
+});
+
+test('RagSession.createFromCatalog returns a live session handle', async () => {
+  const catalog = fakeCatalogBridge();
+  const low = fakeBridge();
+  const bridge = {
+    ...low,
+    downloadModel: catalog.downloadModel,
+    registerModel: catalog.registerModel,
+    ragCreateSession: catalog.ragCreateSession,
+  };
+  const s = await RagSession.createFromCatalog(bridge, { embeddingModelId: 'minilm' });
+  assert.equal(s.handle, 11);
+  assert.ok(catalog.calls.some((c) => c[0] === 'register'));
 });

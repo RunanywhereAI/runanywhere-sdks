@@ -306,7 +306,7 @@ export async function transcribe(
       'Loaded WASM module does not export rac_stt_transcribe_lifecycle_proto.',
     );
   }
-  const result = adapter.transcribeLifecycle(
+  const result = await adapter.transcribeLifecycle(
     coerceAudio(audio),
     defaultSTTOptions(options),
   );

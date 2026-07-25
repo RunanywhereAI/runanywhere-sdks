@@ -50,6 +50,19 @@ keep each view focused on DOM state and user-flow orchestration.
   toggle, treat a download as inference success, or silently label a failed
   backend/model as ready.
 
+## Design System
+
+Brand primary is `#FF6900` (the logo orange), with the brand gradient
+`linear-gradient(135deg, #FF6900, #FB2C36)`. The canonical palette, typography,
+and contrast rules live in `../../DESIGN_GUIDELINE.md`; this app hand-maintains
+its mirror of those values as CSS custom properties in
+`src/styles/design-system.css` (the single token layer — `commons.css` and
+`components.css` consume the variables). Light/dark theming works via
+`:root[data-theme="light"|"dark"]` for the explicit toggle plus
+`@media (prefers-color-scheme: light)` when no explicit choice was made. Do not
+reintroduce the legacy `#FF5500`/`#E65500` orange or hardcode brand hexes in
+views — use the tokens.
+
 ## Commands
 
 Run from `examples/web/RunAnywhereAI/`.
@@ -64,7 +77,7 @@ missing browser APIs; WebGPU remains optional and falls back to the CPU backend.
 npm run lint
 npm run typecheck
 npm run build
-npm run dev -- --host 127.0.0.1
+npm run dev   # http://localhost:3000 (COOP/COEP enabled)
 ```
 
 Production Vercel releases use `npm run release:deploy`. No Vercel secrets,
@@ -90,6 +103,8 @@ than adding another single-use wrapper.
 | Transcribe | `views/transcribe.ts` | `AudioCapture`, `RunAnywhere.transcribe`, `RunAnywhere.transcribeStream` |
 | Speak | `views/speak.ts` | `RunAnywhere.speak`, `RunAnywhere.stopSpeaking` |
 | VAD | `views/vad.ts` | `AudioCapture`, `RunAnywhere.streamVAD` |
+| Segmentation | `views/segmentation.ts` | `RunAnywhere.segment` (via the shared model sheet); no browser segmentation engine ships yet, so the picker stays empty and the run is gated |
+| Diarization | `views/diarization.ts` | `RunAnywhere.diarize` (via the shared model sheet); no browser diarization engine ships yet, so the picker stays empty and the run is gated |
 | Documents | `views/documents.ts` | `RunAnywhere.ragIngest`, `RunAnywhere.ragQuery`, RAG diagnostics |
 | Storage | `views/storage.ts` | `RunAnywhere.storage`, `RunAnywhere.modelRegistry`, `RunAnywhere.loadModel` |
 | Solutions | `views/solutions.ts` | `RunAnywhere.solutions` |
@@ -118,6 +133,22 @@ example, `racommons.js`). The WebGPU/Asyncify release artifact is intentionally
 non-threaded, but its canonical glue is still required. Production output must
 therefore contain and serve all four canonical JS/WASM pairs with JavaScript
 and `application/wasm` MIME types.
+
+## Boot and availability rules
+
+- Boot in this order: `RunAnywhere.initialize()` → llama.cpp/ONNX backend
+  registration → `completeServicesInitialization()` (Phase 2) → model catalog
+  registration/hydration. Production identity continues asynchronously and must
+  not block local interactive readiness; its state remains in the readiness
+  snapshot.
+- `BackendWorkerHost` is currently a Worker-runtime scaffold. Until a backend
+  supplies a worker factory and completes its handshake, inference uses the
+  supported main-thread fallback.
+- Diffusion is a core `@runanywhere/web` facade. Do not show it as available until a browser engine registers the `diffusion` capability
+  or add it to packaging until it has a production WASM artifact.
+- Register hybrid Cloud STT with `Cloud.registerBackend()` after
+  `ONNX.register()`. Cloud failure is optional and must leave local
+  ONNX/Sherpa speech capability truthful and independently available.
 
 ## Validation Standard
 

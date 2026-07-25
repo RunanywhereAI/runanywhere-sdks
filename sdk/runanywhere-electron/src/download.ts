@@ -305,9 +305,10 @@ function httpText(url: string): Promise<{ headers: http.IncomingHttpHeaders; bod
 
 // List every file path in a HuggingFace repo, following the tree API's
 // `Link: rel="next"` pagination so a GGUF beyond the first page is still found.
-async function hfFiles(repo: string): Promise<string[]> {
+async function hfFiles(repo: string, revision = 'main'): Promise<string[]> {
   const out: string[] = [];
-  let url: string | undefined = `https://huggingface.co/api/models/${repo}/tree/main?recursive=1`;
+  const rev = encodeURIComponent(revision || 'main');
+  let url: string | undefined = `https://huggingface.co/api/models/${repo}/tree/${rev}?recursive=1`;
   for (let page = 0; url && page < 20; page++) {
     const { headers, body } = await httpText(url);
     let tree: unknown;
@@ -350,10 +351,18 @@ function ggufShardSet(picked: string, files: string[]): string[] {
  * (`owner/repo` or `owner/repo:file.gguf`, GGUF + any mmproj auto-resolved,
  * split GGUFs downloaded whole), or a local file path.
  */
-// Recognize a HuggingFace *web* URL and map it to a repo (+ optional file) so it
+/** Structured HuggingFace page reference (repo + optional file/revision). */
+export interface HfRef {
+  repo: string;
+  file?: string;
+  /** Git revision from `/blob/<rev>/…` or `/tree/<rev>` (defaults to `main` when omitted). */
+  revision?: string;
+}
+
+// Recognize a HuggingFace *web* URL and map it to a repo (+ optional file/revision) so it
 // resolves as a repo instead of being downloaded as a raw file. Returns null for
 // non-HF URLs and for `/resolve/` URLs (those are already direct file downloads).
-export function parseHfUrl(u: string): { repo: string; file?: string } | null {
+export function parseHfUrl(u: string): HfRef | null {
   if (!RE_URL.test(u)) return null;
   let url: URL;
   try {
@@ -369,6 +378,7 @@ export function parseHfUrl(u: string): { repo: string; file?: string } | null {
   const kind = parts[2]; // tree | blob | resolve | undefined (repo root)
   if (kind === 'resolve') return null; // a /resolve/ URL is already a direct download
   if (kind === 'blob' && parts.length >= 5) {
+    const revision = parts[3];
     const raw = parts.slice(4).join('/');
     // A malformed percent-escape (e.g. "%ZZ") makes decodeURIComponent throw a
     // URIError; fall back to the raw path so resolveModel surfaces its clean
@@ -379,7 +389,10 @@ export function parseHfUrl(u: string): { repo: string; file?: string } | null {
     } catch {
       file = raw;
     }
-    return { repo, file };
+    return { repo, file, revision };
+  }
+  if (kind === 'tree' && parts.length >= 4) {
+    return { repo, revision: parts[3] };
   }
   return { repo };
 }
@@ -393,8 +406,14 @@ export async function resolveModel(
     // repo — NOT a raw download (fetching the repo's HTML index page was the bug
     // when a user pasted the browser URL instead of `owner/repo`). A `/resolve/`
     // URL or any non-HF URL still falls through to the direct-download branch.
+    // Preserve `/blob/<revision>/` and `/tree/<revision>` so listing + download
+    // hit that revision and the cache id does not collide with `main`.
+    let hfRevision = 'main';
     const hf = parseHfUrl(idOrPath);
-    if (hf) idOrPath = hf.file ? `${hf.repo}:${hf.file}` : hf.repo;
+    if (hf) {
+      if (hf.revision) hfRevision = hf.revision;
+      idOrPath = hf.file ? `${hf.repo}:${hf.file}` : hf.repo;
+    }
 
     // Direct URL to a model file.
     if (RE_URL.test(idOrPath)) {
@@ -419,18 +438,22 @@ export async function resolveModel(
       const ci = idOrPath.indexOf(':'); // split on the FIRST colon only
       const repo = ci >= 0 ? idOrPath.slice(0, ci) : idOrPath;
       const explicit = ci >= 0 ? idOrPath.slice(ci + 1) : undefined;
-      const files = await hfFiles(repo);
+      const revision = hfRevision || 'main';
+      const files = await hfFiles(repo, revision);
       const picked = explicit || pickGguf(files);
       if (!picked) throw new Error(`no GGUF file found in HuggingFace repo ${repo}`);
       const shards = ggufShardSet(picked, files);
       const mmproj = explicit ? undefined : pickMmproj(files);
-      const cid = 'hf-' + sanitizeId(repo) + '-' + shortHash(idOrPath);
+      const cid = 'hf-' + sanitizeId(repo) + '-' + shortHash(`${idOrPath}@${revision}`);
       const dir = path.join(opts.dir ?? modelsRoot(), cid);
       fs.mkdirSync(dir, { recursive: true });
       const shardNames = new Set(shards.map((g) => path.basename(g)));
+      const revSeg = encodeURIComponent(revision);
       for (const g of shards) {
         const d = path.join(dir, path.basename(g));
-        if (!fs.existsSync(d)) await downloadOnce(`https://huggingface.co/${repo}/resolve/main/${g}`, d, opts.onProgress);
+        if (!fs.existsSync(d)) {
+          await downloadOnce(`https://huggingface.co/${repo}/resolve/${revSeg}/${g}`, d, opts.onProgress);
+        }
       }
       let mmprojPath: string | undefined;
       if (mmproj) {
@@ -441,7 +464,11 @@ export async function resolveModel(
         const mmName = path.basename(mmproj);
         mmprojPath = path.join(dir, shardNames.has(mmName) ? 'mmproj-' + mmName : mmName);
         if (!fs.existsSync(mmprojPath)) {
-          await downloadOnce(`https://huggingface.co/${repo}/resolve/main/${mmproj}`, mmprojPath, opts.onProgress);
+          await downloadOnce(
+            `https://huggingface.co/${repo}/resolve/${revSeg}/${mmproj}`,
+            mmprojPath,
+            opts.onProgress
+          );
         }
       }
       return { id: cid, type: 'path', dir, primary: path.join(dir, path.basename(shards[0])), mmproj: mmprojPath };

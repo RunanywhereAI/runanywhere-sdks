@@ -54,9 +54,9 @@ export interface InitOptions {
   secureDir?: string;
   /** Base dir for model storage / RunAnywhere home. */
   baseDir?: string;
-  /** API key for the (future) RunAnywhere backend — stored for Phase 2 services. */
+  /** Reserved for a future cloud backend; currently unused (Phase 2 is a local no-op). */
   apiKey?: string;
-  /** Backend base URL — stored for Phase 2 services. */
+  /** Reserved for a future cloud backend; currently unused (Phase 2 is a local no-op). */
   baseURL?: string;
   /** Deployment environment (default: production). */
   environment?: Environment;
@@ -284,9 +284,9 @@ export const RunAnywhere = {
   /**
    * Bring the runtime up. Two-phase, mirroring the other SDKs: Phase 1 (this
    * call) is synchronous — platform adapter + engine registration + secure store
-   * — after which models can load and inference can run. Phase 2 (background
-   * services) is kicked off non-blocking; await `completeServicesInitialization()`
-   * if you need it. Idempotent.
+   * — after which models can load and inference can run. Phase 2 is kicked off
+   * non-blocking via `completeServicesInitialization()` (currently a local-only
+   * no-op — no network auth). Idempotent.
    */
   initialize(opts: InitOptions = {}): void {
     if (initialized) return;
@@ -301,16 +301,16 @@ export const RunAnywhere = {
   },
 
   /**
-   * Phase 2: bring up background services. Local-only for now (marks services
-   * ready + emits `servicesReady`); this is the seam where real backend auth /
-   * device registration / telemetry upload will attach (using opts.apiKey /
-   * opts.baseURL). Idempotent — concurrent callers share one run.
+   * Phase 2 seam (parity with other SDKs). Local-only no-op today: marks
+   * services ready and emits `servicesReady`. Does not authenticate, register
+   * the device, or talk to a backend — `apiKey` / `baseURL` are ignored until
+   * a future cloud path lands. Idempotent — concurrent callers share one run.
    */
   async completeServicesInitialization(): Promise<void> {
     if (!initialized) return;
     if (servicesPromise) return servicesPromise;
     servicesPromise = (async () => {
-      // TODO(services): backend auth + device registration + telemetry upload.
+      // Local-only no-op. Future: backend auth + device registration + telemetry.
       servicesReady = true;
       bus.emit({ type: 'servicesReady' });
     })();

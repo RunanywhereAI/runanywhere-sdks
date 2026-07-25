@@ -217,49 +217,6 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
-// REQUEST OPTIONS — UPSERT MODE
-// =============================================================================
-
-/**
- * @brief Configures a request for Supabase-style upsert mode.
- *
- * When the request is later submitted via `rac_http_request_send`,
- * `rac_http_request_stream`, or `rac_http_request_resume`, the HTTP
- * client will transparently:
- *   - append `?on_conflict=<on_conflict_field>` (or
- *     `&on_conflict=<on_conflict_field>` if the URL already carries a
- *     query string) to the request URL, and
- *   - emit the header
- *     `Prefer: resolution=merge-duplicates,return=representation`
- *     in addition to any headers already attached to the request.
- *
- * This lets platform SDKs route Supabase device-registration upserts
- * through the standard `rac_http_request_*` ABI without hard-coding the
- * Supabase wire protocol on each platform. Pair with the SDK's
- * higher-level error handling to treat HTTP 409 as a benign "already
- * registered" outcome where appropriate.
- *
- * `on_conflict_field` is copied internally; the caller may free the
- * string immediately after this call returns. Passing
- * `on_conflict_field == NULL` clears any previously-set upsert mode for
- * this request pointer.
- *
- * The flag is keyed by the `rac_http_request_t*` pointer for the
- * duration of one dispatch — the next `rac_http_request_send/stream/
- * resume` consumes (and clears) it. Re-arm before each request if
- * upsert behavior is required for multiple submissions of the same
- * struct.
- *
- * @param req Non-NULL request descriptor.
- * @param on_conflict_field Column name used as the conflict key
- *        (e.g. "device_id"); may be NULL to disable upsert mode.
- * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if
- *         `req == NULL`, RAC_ERROR_OUT_OF_MEMORY on allocation failure.
- */
-RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
-                                                      const char* on_conflict_field);
-
-// =============================================================================
 // CANONICAL DEFAULT HEADERS
 // =============================================================================
 

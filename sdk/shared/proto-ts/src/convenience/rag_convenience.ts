@@ -35,7 +35,7 @@ export const validateRAGConfiguration = (m: RAGConfiguration): void => {
       message: `top_k must be >= 1 (got ${m.topK})`,
     });
   }
-  if (m.similarityThreshold !== undefined && (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
+  if (m.similarityThreshold !== undefined && (!Number.isFinite(m.similarityThreshold) || m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
     throw new ValidationError({
       fieldPath: 'RAGConfiguration.similarity_threshold',
       message: `similarity_threshold must be in 0.0...1.0 (got ${m.similarityThreshold})`,

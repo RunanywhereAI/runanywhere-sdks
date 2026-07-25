@@ -5,8 +5,12 @@ endif()
 # EXISTS-gated disable under Emscripten: only force OFF when no vendored
 # ONNX Runtime WASM static archive is available. Mirrors engines/onnx gate.
 if(EMSCRIPTEN)
-    set(_rac_onnxrt_wasm_dir
-        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    if(DEFINED RAC_ONNX_WASM_RUNTIME_DIR AND NOT RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
+        set(_rac_onnxrt_wasm_dir "${RAC_ONNX_WASM_RUNTIME_DIR}")
+    else()
+        set(_rac_onnxrt_wasm_dir
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    endif()
     if(NOT EXISTS "${_rac_onnxrt_wasm_dir}/lib/libonnxruntime.a")
         set(_rac_runtime_onnxrt_default OFF)
     endif()
@@ -40,6 +44,13 @@ target_include_directories(rac_runtime_onnxrt PRIVATE
 
 target_link_libraries(rac_runtime_onnxrt PUBLIC
     onnxruntime
+    # The onnxrt registrar (RAC_STATIC_RUNTIME_REGISTER) calls
+    # rac_runtime_register / rac_runtime_get_by_id, which are defined in
+    # rac_commons. Declare that dependency so every consumer links rac_commons
+    # AFTER this archive; GNU ld's strict left-to-right static resolution
+    # otherwise leaves those symbols undefined when a target pulls onnxrt only
+    # transitively (e.g. the rcli-linux release link of test_plugin_entry_onnx).
+    rac_commons
 )
 
 target_compile_definitions(rac_runtime_onnxrt PUBLIC RAC_HAS_ONNX)
@@ -53,6 +64,10 @@ endif()
 # header; otherwise the EP stays a stub that returns CAPABILITY_UNSUPPORTED to
 # callers. Keeping this granular lets us ship the CoreML EP where present and
 # land CUDA / DirectML / NNAPI / QNN in follow-up rows without ABI churn.
+#
+# IMPORTANT: never define RAC_ONNXRT_EP_<NAME> as a compile macro — those
+# identifiers are enum values in rac_onnxrt_runtime_ep.h. Use *_ENABLED flags
+# (see RAC_ONNXRT_EP_COREML_ENABLED / RAC_ONNXRT_EP_WEBGPU_ENABLED).
 if(APPLE)
     # The official iOS archive contains CoreML, but Sherpa's fully-static
     # macOS ONNX Runtime inventory may be CPU-only even though it includes the
@@ -77,5 +92,38 @@ if(APPLE)
         unset(_rac_onnxrt_symbols)
     else()
         message(STATUS "ONNX Runtime CoreML EP: artifact not inspectable; CPU fallback only")
+    endif()
+endif()
+
+# WebGPU EP (Emscripten): enable when the selected ORT archive contains the EP
+# (onnxruntime-wasm-webgpu) or when the wasm twin flag is set. COMPILE_DEFS on
+# the final .js/.wasm executable do NOT propagate into this static library —
+# the define must land here so probe_webgpu_ep() is not compiled as a stub.
+if(EMSCRIPTEN)
+    set(_rac_onnxrt_webgpu_ep OFF)
+    if(RAC_WASM_ONNX_WEBGPU)
+        set(_rac_onnxrt_webgpu_ep ON)
+    else()
+        get_target_property(_rac_onnxrt_wg_location onnxruntime IMPORTED_LOCATION)
+        if(_rac_onnxrt_wg_location AND EXISTS "${_rac_onnxrt_wg_location}" AND CMAKE_NM)
+            execute_process(
+                COMMAND "${CMAKE_NM}" -gU "${_rac_onnxrt_wg_location}"
+                RESULT_VARIABLE _rac_onnxrt_wg_nm_result
+                OUTPUT_VARIABLE _rac_onnxrt_wg_symbols
+                ERROR_QUIET
+            )
+            if(_rac_onnxrt_wg_nm_result EQUAL 0 AND
+               _rac_onnxrt_wg_symbols MATCHES "WebGpuExecutionProvider")
+                set(_rac_onnxrt_webgpu_ep ON)
+            endif()
+            unset(_rac_onnxrt_wg_symbols)
+        endif()
+    endif()
+    if(_rac_onnxrt_webgpu_ep)
+        target_compile_definitions(rac_runtime_onnxrt PRIVATE
+            RAC_ONNXRT_EP_WEBGPU_ENABLED)
+        message(STATUS "ONNX Runtime WebGPU EP: enabled for Emscripten artifact")
+    else()
+        message(STATUS "ONNX Runtime WebGPU EP: unavailable in selected artifact; CPU fallback only")
     endif()
 endif()

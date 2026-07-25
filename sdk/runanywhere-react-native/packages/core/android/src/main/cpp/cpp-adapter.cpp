@@ -21,6 +21,11 @@ jmethodID g_secureGetMethod = nullptr;
 jmethodID g_secureDeleteMethod = nullptr;
 jmethodID g_getModelBaseDirectoryMethod = nullptr;
 jmethodID g_getDeviceModelMethod = nullptr;
+jmethodID g_getDeviceNameMethod = nullptr;
+jmethodID g_getBatteryLevelMethod = nullptr;
+jmethodID g_getBatteryStateMethod = nullptr;
+jmethodID g_isLowPowerModeMethod = nullptr;
+jmethodID g_hasNPUMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
 jmethodID g_getTotalMemoryMethod = nullptr;
@@ -63,6 +68,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
                                  "(Ljava/lang/String;)Z");
       g_getModelBaseDirectoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getModelBaseDirectory", "()Ljava/lang/String;");
       g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
+      g_getDeviceNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceName", "()Ljava/lang/String;");
+      g_getBatteryLevelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getBatteryLevel", "()F");
+      g_getBatteryStateMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getBatteryState", "()Ljava/lang/String;");
+      g_isLowPowerModeMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isLowPowerMode", "()Z");
+      g_hasNPUMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "hasNPU", "()Z");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
       g_getTotalMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getTotalMemory", "()J");
@@ -89,6 +99,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       if (g_secureSetMethod && g_secureGetMethod && g_secureDeleteMethod &&
           g_getModelBaseDirectoryMethod && g_fileListDirectoryMethod &&
           g_isNonEmptyDirectoryMethod && g_getDeviceModelMethod &&
+          g_getDeviceNameMethod && g_getBatteryLevelMethod &&
+          g_getBatteryStateMethod && g_isLowPowerModeMethod && g_hasNPUMethod &&
           g_getOSVersionMethod && g_getChipNameMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod &&
           g_getCoreCountMethod && g_getArchitectureMethod &&

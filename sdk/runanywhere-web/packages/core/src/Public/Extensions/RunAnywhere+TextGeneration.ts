@@ -38,6 +38,10 @@ import type { LLMStreamingResult } from '../../types/index.js';
 import { AsyncQueue } from '../../Foundation/AsyncQueue.js';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
+import {
+  getLlamaBackendWorkerDeadReason,
+  mustUseLlamaBackendWorker,
+} from '../../runtime/BackendWorkerModelOwnership.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
@@ -102,7 +106,12 @@ function buildLLMGenerateRequest(
   });
   return {
     prompt,
-    emitThoughts: options.thinkingPattern != null,
+    // Emit typed thinking events unless the caller explicitly disabled
+    // thinking. `thinkingPattern` remains an additional opt-in for custom
+    // delimiters; disableThinking is the commons no-think directive.
+    emitThoughts: options.disableThinking === true
+      ? false
+      : (options.thinkingPattern != null || options.disableThinking === false),
     requestId: '',
     modelId: '',
     conversationId: conversationId ?? '',
@@ -266,9 +275,14 @@ function finalLLMResult(
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
   const toolCalls = final?.toolCalls?.length ? final.toolCalls : streamedToolCalls;
+  const thinkingContent = final?.thinkingContent || thinkingText || undefined;
+  // Thinking-only / length-truncated replies must still settle with observable
+  // text so UI consumers never remain stuck on an empty answer channel.
+  const answerText = (final?.text ?? fullText).trim();
+  const text = answerText || thinkingContent || '';
   return {
-    text: final?.text ?? fullText,
-    thinkingContent: final?.thinkingContent || thinkingText || undefined,
+    text,
+    thinkingContent: answerText ? thinkingContent : undefined,
     inputTokens,
     tokensGenerated,
     modelUsed: '',
@@ -532,6 +546,17 @@ export function extractStructuredOutput(
   text: string,
   schema: JSONSchemaDescriptor,
 ): StructuredOutputResult {
+  // This facade is synchronous, whereas BackendWorker RPC is intentionally
+  // asynchronous. Do not invoke the main-thread structured-output ABI when
+  // the LLM (and therefore its commons heap) belongs to the Llama worker.
+  // A future async facade can route `structured.parse` to that worker.
+  if (mustUseLlamaBackendWorker()) {
+    throw SDKException.backendNotAvailable(
+      'extractStructuredOutput',
+      getLlamaBackendWorkerDeadReason()
+        ?? 'Structured-output parsing requires the Llama BackendWorker, but this synchronous API cannot perform worker RPC. Use a main-thread model or an async worker-aware structured-output API.',
+    );
+  }
   const adapter = StructuredOutputProtoAdapter.tryDefault();
   if (adapter?.supportsProtoParse()) {
     const result = adapter.parse({

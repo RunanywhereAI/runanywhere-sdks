@@ -304,12 +304,6 @@ private func telemetryHttpCallback(
 
 private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool) async {
     let logger = SDKLogger(category: "CppBridge.Telemetry")
-    let environment = CppBridge.Telemetry.environment
-
-    if environment == .development && !CppBridge.DevConfig.hasUsableSupabaseConfig {
-        logger.debug("Skipping telemetry/device registration: no usable config")
-        return
-    }
 
     let hasUsableConfiguration = await CppBridge.HTTP.hasUsableConfiguration
     guard hasUsableConfiguration else {

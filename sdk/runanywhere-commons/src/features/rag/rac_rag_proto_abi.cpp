@@ -38,6 +38,8 @@
 #include "rac/features/rag/rac_rag.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
@@ -97,7 +99,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         const char* error, double duration_ms = 0.0, const char* model_id = nullptr,
                         int64_t top_k = 0, double retrieval_time_ms = 0.0,
                         const char* embedding_model = nullptr,
-                        rac_result_t error_code = RAC_SUCCESS, int reranker_used = -1) {
+                        rac_result_t error_code = RAC_SUCCESS, int reranker_used = -1,
+                        int64_t query_token_count = 0, int64_t context_tokens = 0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -146,6 +149,12 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     }
     if (reranker_used >= 0) {
         (*event.mutable_properties())["reranker_used"] = reranker_used != 0 ? "1" : "0";
+    }
+    if (query_token_count > 0) {
+        (*event.mutable_properties())["query_token_count"] = std::to_string(query_token_count);
+    }
+    if (context_tokens > 0) {
+        (*event.mutable_properties())["context_tokens"] = std::to_string(context_tokens);
     }
     publish_event(event);
 }
@@ -515,12 +524,21 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     const int64_t effective_top_k =
         overrides.retrieval_top_k > 0 ? static_cast<int64_t>(overrides.retrieval_top_k)
                                       : static_cast<int64_t>(s->retrieval_top_k);
+    // Token counts use the same ~4-chars-per-token heuristic the RAG pipeline uses
+    // for its context budget (rag_pipeline_graph.cpp kCharsPerToken=4); there is no
+    // separate tokenizer at this ABI layer. query_token_count = the question;
+    // context_tokens = the assembled retrieved context passed to the LLM.
+    constexpr int64_t kCharsPerToken = 4;
+    const int64_t query_token_count = static_cast<int64_t>(question.size()) / kCharsPerToken;
+    const int64_t context_tokens =
+        static_cast<int64_t>(proto.context_used().size()) / kCharsPerToken;
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
                        "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
                        s->llm_model_id.empty() ? s->embedding_model_id.c_str()
                                                : s->llm_model_id.c_str(),
                        effective_top_k, retrieval_ms, s->embedding_model_id.c_str(),
-                       /*error_code=*/RAC_SUCCESS, /*reranker_used=*/s->rerank ? 1 : 0);
+                       /*error_code=*/RAC_SUCCESS, /*reranker_used=*/s->rerank ? 1 : 0,
+                       query_token_count, context_tokens);
     rac_llm_result_free(&llm_result);
     return RAC_SUCCESS;
 }
@@ -584,15 +602,20 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // rerank_results enables LLM-pointwise reranking of fused candidates, run
-    // by rag_pipeline_graph using the session's LLM handle. reranker_model_id
-    // (a dedicated cross-encoder) is not yet supported — reject only that.
+    // rerank_results enables LLM-pointwise reranking of fused candidates, run by
+    // rag_pipeline_graph using the session's LLM handle — that path is fully
+    // wired. A dedicated cross-encoder (reranker_model_id → RAC_PRIMITIVE_RERANK)
+    // is NOT yet invoked at query time: RAGBackend/rag_pipeline_graph does not
+    // score fused candidates through the rerank primitive. Accepting the config
+    // and silently ignoring it would mislead callers into believing cross-encoder
+    // reranking is active, so reject it up front with an actionable error until
+    // the query-time wiring lands.
     if (proto.has_reranker_model_id() && !proto.reranker_model_id().empty()) {
         const char* msg =
-            "reranker_model_id (dedicated cross-encoder) is not yet supported; use rerank_results "
-            "to enable LLM-pointwise reranking with the session LLM";
-        publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+            "reranker_model_id (dedicated cross-encoder reranking) is not yet supported by the "
+            "RAG query path; use rerank_results for LLM-pointwise reranking with the session LLM";
+        publish_failure(RAC_ERROR_NOT_IMPLEMENTED, "rag.sessionCreate", msg);
+        return RAC_ERROR_NOT_IMPLEMENTED;
     }
 
     std::string err_message;

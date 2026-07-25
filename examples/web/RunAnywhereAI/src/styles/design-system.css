@@ -1,8 +1,10 @@
 /* =============================================================================
  * RunAnywhere AI - Design System
- * Shared brand language with the iOS/Android example apps:
- *   brand        #FF5500  (accent fills, dark-surface primary)
- *   brandStrong  #E65500  (interactive tone on light surfaces, hover)
+ * Brand palette per examples/DESIGN_GUIDELINE.md (../../../DESIGN_GUIDELINE.md),
+ * shared with the iOS/Android/Flutter/RN example apps:
+ *   brand        #FF6900  (logo orange — accent fills, dark-surface primary)
+ *   brandStrong  #E65E00  (interactive tone on light surfaces, hover)
+ *   gradient     linear-gradient(135deg, #FF6900, #FB2C36)  (the logo gradient)
  * Surfaces are warm neutrals (not slate) to match the Android example's
  * Material palette and read as a consumer chat product.
  * Theming: dark is the :root default; light applies via
@@ -18,11 +20,11 @@
   color-scheme: dark;
 
   /* ---- Primary Accent Colors ---- */
-  --color-primary: #FF5500;
-  --color-primary-strong: #E65500;
-  --color-primary-hover: #E65500;
-  --color-primary-light: rgba(255, 85, 0, 0.12);
-  --color-primary-medium: rgba(255, 85, 0, 0.22);
+  --color-primary: #FF6900;
+  --color-primary-strong: #E65E00;
+  --color-primary-hover: #E65E00;
+  --color-primary-light: rgba(255, 105, 0, 0.12);
+  --color-primary-medium: rgba(255, 105, 0, 0.22);
   --color-blue: #3B82F6;
   --color-green: #10B981;
   --color-red: #EF4444;
@@ -47,18 +49,18 @@
   --bg-input: #201F1D;
 
   /* ---- Message Bubble Colors ---- */
-  --bubble-user-start: #FF5500;
-  --bubble-user-end: #E64500;
+  --bubble-user-start: #FF6900;
+  --bubble-user-end: #FB2C36;
   --bubble-assistant-start: #292725;
   --bubble-assistant-end: #2E2B29;
 
   /* ---- Thinking Mode Colors ---- */
-  --thinking-bg: rgba(255, 85, 0, 0.08);
-  --thinking-border: rgba(255, 85, 0, 0.18);
+  --thinking-bg: rgba(255, 105, 0, 0.08);
+  --thinking-border: rgba(255, 105, 0, 0.18);
   --thinking-content-bg: #292725;
 
   /* ---- Badge Colors ---- */
-  --badge-primary: rgba(255, 85, 0, 0.2);
+  --badge-primary: rgba(255, 105, 0, 0.2);
   --badge-blue: rgba(59, 130, 246, 0.2);
   --badge-green: rgba(16, 185, 129, 0.2);
   --badge-purple: rgba(139, 92, 246, 0.2);
@@ -68,7 +70,7 @@
 
   /* ---- Status Colors ---- */
   --status-green: #10B981;
-  --status-orange: #FF5500;
+  --status-orange: #FF6900;
   --status-red: #EF4444;
   --status-gray: #757069;
   --status-blue: #3B82F6;
@@ -83,7 +85,7 @@
   /* ---- Shadow Colors & Elevation ---- */
   --shadow-default: rgba(0, 0, 0, 0.25);
   --shadow-medium: rgba(0, 0, 0, 0.35);
-  --shadow-accent: rgba(255, 85, 0, 0.22);
+  --shadow-accent: rgba(255, 105, 0, 0.22);
   --elevation-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
   --elevation-md: 0 4px 16px rgba(0, 0, 0, 0.24);
   --elevation-lg: 0 12px 40px rgba(0, 0, 0, 0.34);
@@ -94,7 +96,7 @@
   --overlay-dark: rgba(0, 0, 0, 0.7);
 
   /* ---- Focus Ring ---- */
-  --focus-ring: 0 0 0 3px rgba(255, 85, 0, 0.35);
+  --focus-ring: 0 0 0 3px rgba(255, 105, 0, 0.35);
 
   /* ---- Typography ---- */
   --font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
@@ -190,7 +192,7 @@
   --bg-elevated: #FFFFFF;
   --bg-input: #F6F4F1;
 
-  --color-primary-hover: #CC4B00;
+  --color-primary-hover: #CC5400;
   --bubble-assistant-start: #EFECE8;
   --bubble-assistant-end: #F4F1ED;
 
@@ -228,7 +230,7 @@
     --bg-elevated: #FFFFFF;
     --bg-input: #F6F4F1;
 
-    --color-primary-hover: #CC4B00;
+    --color-primary-hover: #CC5400;
     --bubble-assistant-start: #EFECE8;
     --bubble-assistant-end: #F4F1ED;
 

@@ -555,7 +555,7 @@ def _emit_message_validate(
             checks.append("  }")
 
         if (min_f is not None or max_f is not None) and field.type in _FLOAT_TYPES:
-            parts = []
+            parts = [f"!Number.isFinite(m.{ts_field})"]
             if min_f is not None:
                 parts.append(f"m.{ts_field} < {min_f}")
             if max_f is not None:
@@ -693,9 +693,11 @@ def _process_file(
     if not blocks:
         return None
 
-    # Drop any cross-file enum import that turned out to live in our own
-    # file (e.g. message and its enum are both top-level in the same proto).
-    imports_from_other.pop(base, None)
+    # Enum defaults are collected by owner file. When the enum lives beside
+    # the message, promote it into the local generated-module import instead
+    # of dropping it (an unannotated enum has no accessor block to add the
+    # import independently).
+    imports_from_self.update(imports_from_other.pop(base, set()))
 
     return GeneratedFile(
         base_name=base,

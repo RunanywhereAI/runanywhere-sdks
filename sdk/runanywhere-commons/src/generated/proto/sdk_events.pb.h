@@ -455,6 +455,8 @@ enum SDKComponent : int {
   SDK_COMPONENT_VOICE_AGENT = 9,
   SDK_COMPONENT_WAKEWORD = 10,
   SDK_COMPONENT_SPEAKER_DIARIZATION = 11,
+  SDK_COMPONENT_SEMANTIC_SEGMENTATION = 12,
+  SDK_COMPONENT_RERANK = 13,
   SDKComponent_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   SDKComponent_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -465,11 +467,11 @@ extern const uint32_t SDKComponent_internal_data_[];
 inline constexpr SDKComponent SDKComponent_MIN =
     static_cast<SDKComponent>(0);
 inline constexpr SDKComponent SDKComponent_MAX =
-    static_cast<SDKComponent>(11);
+    static_cast<SDKComponent>(13);
 [[nodiscard]] inline bool SDKComponent_IsValid(int value) {
-  return 0 <= value && value <= 11;
+  return 0 <= value && value <= 13;
 }
-inline constexpr int SDKComponent_ARRAYSIZE = 11 + 1;
+inline constexpr int SDKComponent_ARRAYSIZE = 13 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 SDKComponent_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SDKComponent) {
@@ -484,7 +486,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& SDKComponent_Name(SDKComponent value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<SDKComponent_descriptor, 0, 11>(
+  return ::google::protobuf::internal::NameOfDenseEnum<SDKComponent_descriptor, 0, 13>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool SDKComponent_Parse(
@@ -4639,6 +4641,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     kMaxTokensFieldNumber = 29,
     kContextLengthFieldNumber = 30,
     kDurationMsFieldNumber = 32,
+    kPromptEvalTimeMsFieldNumber = 34,
     kFrameworkFieldNumber = 33,
   };
   // string session_id = 2;
@@ -5046,6 +5049,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
   void _internal_set_duration_ms(double value);
 
   public:
+  // int64 prompt_eval_time_ms = 34;
+  void clear_prompt_eval_time_ms() ;
+  [[nodiscard]] ::int64_t prompt_eval_time_ms() const;
+  void set_prompt_eval_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_prompt_eval_time_ms() const;
+  void _internal_set_prompt_eval_time_ms(::int64_t value);
+
+  public:
   // int32 framework = 33;
   void clear_framework() ;
   [[nodiscard]] ::int32_t framework() const;
@@ -5060,7 +5073,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 33,
+      ::google::protobuf::internal::TcParseTable<5, 34,
                           0, 273,
                           7>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -5121,6 +5134,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     ::int32_t max_tokens_;
     ::int32_t context_length_;
     double duration_ms_;
+    ::int64_t prompt_eval_time_ms_;
     ::int32_t framework_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -17161,7 +17175,7 @@ inline void GenerationEvent::_internal_set_duration_ms(double value) {
 inline void GenerationEvent::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[1], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[1], 0x00000002U);
 }
 inline ::int32_t GenerationEvent::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.framework)
@@ -17169,7 +17183,7 @@ inline ::int32_t GenerationEvent::framework() const {
 }
 inline void GenerationEvent::set_framework(::int32_t value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[1], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[1], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.framework)
 }
 inline ::int32_t GenerationEvent::_internal_framework() const {
@@ -17179,6 +17193,30 @@ inline ::int32_t GenerationEvent::_internal_framework() const {
 inline void GenerationEvent::_internal_set_framework(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = value;
+}
+
+// int64 prompt_eval_time_ms = 34;
+inline void GenerationEvent::clear_prompt_eval_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prompt_eval_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[1], 0x00000001U);
+}
+inline ::int64_t GenerationEvent::prompt_eval_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.prompt_eval_time_ms)
+  return _internal_prompt_eval_time_ms();
+}
+inline void GenerationEvent::set_prompt_eval_time_ms(::int64_t value) {
+  _internal_set_prompt_eval_time_ms(value);
+  SetHasBit(_impl_._has_bits_[1], 0x00000001U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.prompt_eval_time_ms)
+}
+inline ::int64_t GenerationEvent::_internal_prompt_eval_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.prompt_eval_time_ms_;
+}
+inline void GenerationEvent::_internal_set_prompt_eval_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prompt_eval_time_ms_ = value;
 }
 
 // -------------------------------------------------------------------
