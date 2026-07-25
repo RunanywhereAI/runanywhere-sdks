@@ -419,22 +419,26 @@ async function runEmbeddings(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 // ---- RAG (Knowledge tab) ----
-// rac model-registry enums: category EMBEDDING=7 / LANGUAGE=0, framework ONNX=0 / LLAMACPP=1.
-let ragSession = null; // native session handle, created lazily on first use.
+// Lazy singleton: memoize the in-flight promise so concurrent first-use (ingest
+// + ask) share one download/register/create instead of orphaning a handle.
+let ragSession = null;
+let ragSessionPromise = null;
 async function ragEnsureSession() {
   if (ragSession != null) return ragSession;
-  setStatus('preparing knowledge base…');
-  // Download (idempotent) to get on-disk paths, register them so commons' RAG can
-  // resolve the ids, then create the session over MiniLM (embed) + the chat LLM.
-  const em = await ra.downloadModel('minilm');
-  const lm = await ra.downloadModel(DEFAULT_LLM);
-  await ra.registerModel('minilm', em.primary, 7, 0);
-  await ra.registerModel(DEFAULT_LLM, lm.primary, 0, 1);
-  ragSession = await ra.ragCreateSession({
-    embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
-    topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+  if (ragSessionPromise) return ragSessionPromise;
+  ragSessionPromise = (async () => {
+    setStatus('preparing knowledge base…');
+    // Single SDK entry point — owns download + registry enums + session create.
+    ragSession = await ra.ragCreateSessionFromCatalog({
+      embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
+      topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+    });
+    return ragSession;
+  })().catch((e) => {
+    ragSessionPromise = null; // allow retry after failure
+    throw e;
   });
-  return ragSession;
+  return ragSessionPromise;
 }
 function ragStatsText(s) {
   if (!s) return '';

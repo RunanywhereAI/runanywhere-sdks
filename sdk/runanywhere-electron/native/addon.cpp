@@ -715,12 +715,14 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             for (auto& kv : g_stt_handles) rac_stt_component_destroy(kv.second);
             for (auto& kv : g_tts_handles) rac_tts_component_destroy(kv.second);
             for (auto& kv : g_vad_handles) rac_vad_component_destroy(kv.second);
+            for (auto& kv : g_rag_handles) rac_rag_session_destroy_proto(kv.second);
             g_llm_handles.clear();
             g_vlm_handles.clear();
             g_embed_handles.clear();
             g_stt_handles.clear();
             g_tts_handles.clear();
             g_vad_handles.clear();
+            g_rag_handles.clear();
         }
         rac_shutdown();
     }
@@ -1029,6 +1031,66 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     return env.Undefined();
 }
 
+// Async (worker-thread) — session create resolves model ids and loads embedding
+// (+ optional LLM) services, which can take seconds. A sync call would block the
+// utility-host event loop the same way ingest/query used to.
+class RagCreateSessionWorker : public Napi::AsyncWorker {
+ public:
+    RagCreateSessionWorker(Napi::Env env, std::vector<uint8_t> config)
+        : Napi::AsyncWorker(env),
+          deferred_(Napi::Promise::Deferred::New(env)),
+          config_(std::move(config)) {}
+
+    Napi::Promise Promise() { return deferred_.Promise(); }
+
+    void Execute() override {
+        rac_result_t rc = rac_rag_session_create_proto(config_.data(), config_.size(), &session_);
+        if (rc != RAC_SUCCESS || session_ == nullptr) {
+            err_ = "rag session create failed: " + std::to_string(rc);
+            session_ = nullptr;
+            ok_ = false;
+        } else {
+            ok_ = true;
+        }
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        if (!ok_ || session_ == nullptr) {
+            deferred_.Reject(Napi::Error::New(Env(), err_).Value());
+            return;
+        }
+        int32_t hid;
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            hid = g_next_handle_id++;
+            g_rag_handles[hid] = session_;
+            session_ = nullptr;  // ownership transferred to the map
+        }
+        deferred_.Resolve(Napi::Number::New(Env(), hid));
+    }
+
+    void OnError(const Napi::Error& e) override {
+        if (session_) {
+            rac_rag_session_destroy_proto(session_);
+            session_ = nullptr;
+        }
+        Napi::HandleScope scope(Env());
+        deferred_.Reject(e.Value());
+    }
+
+    ~RagCreateSessionWorker() override {
+        if (session_) rac_rag_session_destroy_proto(session_);
+    }
+
+ private:
+    Napi::Promise::Deferred deferred_;
+    std::vector<uint8_t> config_;
+    rac_handle_t session_ = nullptr;
+    std::string err_;
+    bool ok_ = false;
+};
+
 Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     // Proto bytes arrive as a Uint8Array (Buffers degrade to Uint8Array crossing
@@ -1038,19 +1100,11 @@ Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     Napi::Uint8Array cfg = info[0].As<Napi::Uint8Array>();
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_rag_session_create_proto(cfg.Data(), cfg.ByteLength(), &h);
-    if (rc != RAC_SUCCESS || h == nullptr) {
-        Napi::Error::New(env, "rag session create failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_rag_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    std::vector<uint8_t> copy(cfg.Data(), cfg.Data() + cfg.ByteLength());
+    auto* worker = new RagCreateSessionWorker(env, std::move(copy));
+    Napi::Promise promise = worker->Promise();
+    worker->Queue();
+    return promise;
 }
 
 // Async (worker-thread) — a document's chunks are embedded, which can be slow.

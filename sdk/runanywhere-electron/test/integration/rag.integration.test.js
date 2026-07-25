@@ -58,7 +58,7 @@ test('setup: initialize, download models, register, create RAG session', { timeo
     const cfg = enc(proto.RAGConfiguration, {
       embeddingModelId: EMBED, llmModelId: LLM, topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
     });
-    session = addon.ragCreateSession(cfg);
+    session = await addon.ragCreateSession(cfg);
     assert.equal(typeof session, 'number');
   } catch (e) {
     setupError = e;

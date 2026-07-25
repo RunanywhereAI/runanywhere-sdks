@@ -51,9 +51,9 @@ export interface NativeAddon {
   // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
   // and return serialized runanywhere.v1 RAG protos as bytes.
   registerModel(id: string, localPath: string, category?: number, framework?: number): void;
-  ragCreateSession(configProtoBytes: Uint8Array): number;
-  // ingest/query run on a worker thread (embedding / LLM generation), so they
-  // return a Promise; the utility-host dispatch awaits it.
+  // create/ingest/query run on a worker thread (model load / embedding / LLM), so
+  // they return a Promise; the utility-host dispatch awaits it.
+  ragCreateSession(configProtoBytes: Uint8Array): Promise<number>;
   ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragStats(handle: number): Uint8Array;

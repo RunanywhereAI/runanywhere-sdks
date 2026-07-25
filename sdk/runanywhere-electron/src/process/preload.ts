@@ -16,6 +16,7 @@ import {
   RAGResult,
   RAGStatistics,
 } from '../proto/rag';
+import { createRagSessionFromCatalog } from '../rag';
 import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
@@ -222,8 +223,8 @@ contextBridge.exposeInMainWorld('runanywhere', {
     emitAfter(send('unloadTtsVoice', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'tts' as Modality })),
 
   // Register a downloaded model (id -> local path) in commons' global registry so
-  // RAG can resolve embedding/LLM ids. category/framework are rac enums
-  // (EMBEDDING=7, LANGUAGE=0; ONNX=0, LLAMACPP=1); omit to leave UNKNOWN.
+  // RAG can resolve embedding/LLM ids. Prefer ragCreateSessionFromCatalog from
+  // apps — it owns category/framework selection. Low-level escape hatch only.
   registerModel: (id: string, localPath: string, category?: number, framework?: number) =>
     send('registerModel', [id, localPath, category, framework]),
 
@@ -233,6 +234,22 @@ contextBridge.exposeInMainWorld('runanywhere', {
   // which we decode back. The addon (utility host) is a generic proto-byte pass-through.
   ragCreateSession: (config: RagConfig): Promise<number> =>
     send('ragCreateSession', [RAGConfiguration.encode(RAGConfiguration.fromPartial(config)).finish()]) as Promise<number>,
+  // Download catalog models, register them, and open a session — single entry
+  // point for apps (no raw registry enum ints / multi-step bootstrap in the UI).
+  ragCreateSessionFromCatalog: (config: RagConfig): Promise<number> =>
+    createRagSessionFromCatalog(
+      {
+        downloadModel: (idOrPath) =>
+          send('downloadModel', [idOrPath]) as Promise<{ id: string; primary: string }>,
+        registerModel: (id, localPath, category, framework) =>
+          send('registerModel', [id, localPath, category, framework]),
+        ragCreateSession: (cfg) =>
+          send('ragCreateSession', [
+            RAGConfiguration.encode(RAGConfiguration.fromPartial(cfg)).finish(),
+          ]) as Promise<number>,
+      },
+      config,
+    ),
   ragIngest: async (handle: number, doc: RagDoc): Promise<RagStats> => {
     const bytes = RAGDocument.encode(RAGDocument.fromPartial(doc)).finish();
     // send() already resolves a Uint8Array (a Buffer degrades to one across the
