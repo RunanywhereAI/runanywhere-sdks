@@ -26,6 +26,7 @@ import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
 import type { EventListener, Modality } from '../events';
 import { CATALOG } from '../catalog';
+import { SDKException, asSDKException } from '../errors';
 import type { RpcMessage } from './rpc';
 
 type Pending = {
@@ -68,7 +69,7 @@ ipcRenderer.on('runanywhere-port', (event) => {
     pending.delete(m.id);
     if ('done' in m) p.resolve((m as { result?: unknown }).result);
     else if (m.ok) p.resolve(m.result);
-    else p.reject(new Error(m.error));
+    else p.reject(asSDKException(m.error));
   };
   port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
@@ -80,7 +81,11 @@ ipcRenderer.on('runanywhere-port', (event) => {
 ipcRenderer.on('runanywhere-host-exited', (_e, code?: number) => {
   port = null;
   armReady();
-  rejectAllPending(new Error(`inference host exited unexpectedly (code ${code ?? 'unknown'}) — retrying`));
+  rejectAllPending(
+    SDKException.unknown(
+      `inference host exited unexpectedly (code ${code ?? 'unknown'}) — retrying`
+    )
+  );
 });
 
 function send(method: string, args: unknown[], onToken?: (t: unknown) => void): Promise<unknown> {
@@ -186,7 +191,12 @@ contextBridge.exposeInMainWorld('runanywhere', {
     tools: ToolSpec[],
     options: Record<string, unknown> = {}
   ): Promise<unknown> => {
-    if (!tools || !tools.length) throw new Error('generateToolCall: at least one tool is required');
+    if (!tools || !tools.length) {
+      throw SDKException.validationFailed({
+        fieldPath: 'tools',
+        message: 'at least one tool is required',
+      });
+    }
     const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
     let out = '';
     await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
