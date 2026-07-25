@@ -74,7 +74,9 @@ test('streaming method whose promise rejects posts {ok:false,error} and no done'
   dispatch(port, { id: 11, method: 'generate', args: [] }, deps);
   await tick();
 
-  assert.deepEqual(port.posts, [{ id: 11, ok: false, error: 'boom-stream' }]);
+  assert.deepEqual(port.posts, [
+    { id: 11, ok: false, error: { name: 'Error', message: 'boom-stream' } },
+  ]);
   assert.equal(
     port.posts.some((m) => m.done === true),
     false
@@ -212,7 +214,9 @@ test('load method where resolveLoadArgs rejects posts {ok:false,error}', async (
   dispatch(port, { id: 8, method: 'loadModel', args: [] }, deps);
   await tick();
 
-  assert.deepEqual(port.posts, [{ id: 8, ok: false, error: 'resolve-failed' }]);
+  assert.deepEqual(port.posts, [
+    { id: 8, ok: false, error: { name: 'Error', message: 'resolve-failed' } },
+  ]);
   assert.equal(apiCalled, false);
 });
 
@@ -230,7 +234,9 @@ test('load method where api throws after resolve posts {ok:false,error}', async 
   dispatch(port, { id: 9, method: 'loadModel', args: ['x'] }, deps);
   await tick();
 
-  assert.deepEqual(port.posts, [{ id: 9, ok: false, error: 'load-boom' }]);
+  assert.deepEqual(port.posts, [
+    { id: 9, ok: false, error: { name: 'Error', message: 'load-boom' } },
+  ]);
 });
 
 // ---- PLAIN UNARY --------------------------------------------------------
@@ -267,7 +273,9 @@ test('plain unary method that throws synchronously posts {ok:false,error}', asyn
   dispatch(port, { id: 2, method: 'embed', args: [] }, deps);
   await tick();
 
-  assert.deepEqual(port.posts, [{ id: 2, ok: false, error: 'sync-boom' }]);
+  assert.deepEqual(port.posts, [
+    { id: 2, ok: false, error: { name: 'Error', message: 'sync-boom' } },
+  ]);
 });
 
 // ---- ERROR MESSAGE EXTRACTION ------------------------------------------
@@ -285,7 +293,41 @@ test('an Error thrown is posted as its .message', async () => {
   dispatch(port, { id: 20, method: 'embed', args: [] }, deps);
   await tick();
 
-  assert.deepEqual(port.posts, [{ id: 20, ok: false, error: 'the-message' }]);
+  assert.deepEqual(port.posts, [
+    { id: 20, ok: false, error: { name: 'Error', message: 'the-message' } },
+  ]);
+});
+
+test('a structured native Error keeps numeric SDK fields over RPC', async () => {
+  const port = makePort();
+  const err = new Error('load_model failed: -111');
+  err.code = 111;
+  err.cAbiCode = -111;
+  err.category = 3;
+  const deps = makeDeps({
+    api: {
+      embed: () => {
+        throw err;
+      },
+    },
+  });
+
+  dispatch(port, { id: 23, method: 'embed', args: [] }, deps);
+  await tick();
+
+  assert.deepEqual(port.posts, [
+    {
+      id: 23,
+      ok: false,
+      error: {
+        name: 'Error',
+        message: 'load_model failed: -111',
+        code: 111,
+        cAbiCode: -111,
+        category: 3,
+      },
+    },
+  ]);
 });
 
 test('a non-Error thrown value is String()-ified', async () => {
@@ -370,7 +412,9 @@ test('a rejected Promise from a unary binding is posted as an error', async () =
   });
   dispatch(port, { id: 41, method: 'ragIngest', args: [1, new Uint8Array()] }, deps);
   await tick();
-  assert.deepEqual(port.posts, [{ id: 41, ok: false, error: 'ingest boom' }]);
+  assert.deepEqual(port.posts, [
+    { id: 41, ok: false, error: { name: 'Error', message: 'ingest boom' } },
+  ]);
 });
 
 test('a synchronous unary binding still posts synchronously (no regression)', () => {

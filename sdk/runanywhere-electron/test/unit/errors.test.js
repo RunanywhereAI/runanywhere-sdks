@@ -8,6 +8,7 @@ const {
   ErrorCategory,
   isSDKException,
   asSDKException,
+  raiseForRac,
 } = require('../../dist/errors');
 const { categoryForCode } = require('../../dist/errors');
 
@@ -127,6 +128,40 @@ test('asSDKException coerces any thrown value', () => {
 
   const fromObj = asSDKException({ weird: true });
   assert.equal(fromObj.code, ErrorCode.UNKNOWN);
+});
+
+test('raiseForRac preserves the positive SDK code and negative ABI code', () => {
+  assert.throws(
+    () => raiseForRac(-231, 'native invalid state'),
+    (e) => {
+      assert.ok(isSDKException(e));
+      assert.equal(e.code, ErrorCode.INVALID_STATE);
+      assert.equal(e.cAbiCode, -231);
+      assert.equal(e.category, ErrorCategory.COMPONENT);
+      assert.equal(e.message, 'native invalid state');
+      return true;
+    }
+  );
+});
+
+test('asSDKException prefers structured native fields over UNKNOWN', () => {
+  const e = asSDKException({
+    message: 'load_model failed: -111',
+    code: 111,
+    cAbiCode: -111,
+    category: ErrorCategory.MODEL,
+  });
+  assert.ok(isSDKException(e));
+  assert.equal(e.code, ErrorCode.MODEL_LOAD_FAILED);
+  assert.equal(e.cAbiCode, -111);
+  assert.equal(e.category, ErrorCategory.MODEL);
+});
+
+test('asSDKException maps trailing rac codes in native strings', () => {
+  const e = asSDKException('stream failed: -130');
+  assert.equal(e.code, ErrorCode.GENERATION_FAILED);
+  assert.equal(e.cAbiCode, -130);
+  assert.equal(e.category, ErrorCategory.COMPONENT);
 });
 
 test('raiseForRac maps -111 to MODEL_LOAD_FAILED', () => {

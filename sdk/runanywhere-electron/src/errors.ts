@@ -188,7 +188,10 @@ function stringValue(value: unknown): string | undefined {
 
 function normalizeErrorCode(code: number): ErrorCode {
   const normalized = Math.abs(Math.trunc(code));
-  return (normalized || ErrorCode.UNKNOWN) as ErrorCode;
+  if ((Object.values(ErrorCode) as Array<number | string>).includes(normalized)) {
+    return normalized as ErrorCode;
+  }
+  return ErrorCode.UNKNOWN;
 }
 
 function fromStructuredError(args: {
@@ -199,14 +202,15 @@ function fromStructuredError(args: {
   nestedMessage?: string;
   fieldPath?: string;
 }): SDKException {
+  const code = normalizeErrorCode(args.code);
   return new SDKException({
-    code: normalizeErrorCode(args.code),
+    code,
     message: args.message,
     cAbiCode: args.cAbiCode,
     category:
       args.category != null
         ? (Math.trunc(args.category) as ErrorCategory)
-        : categoryForCode(Math.abs(Math.trunc(args.code))),
+        : categoryForCode(code),
     nestedMessage: args.nestedMessage,
     fieldPath: args.fieldPath,
   });
@@ -215,7 +219,7 @@ function fromStructuredError(args: {
 /**
  * Raise an SDKException for a negative ``rac_result_t`` (parity with Python
  * ``raise_for_rac``). Preserves the raw negative ABI code as ``cAbiCode`` and
- * uses its positive absolute value as the canonical SDK ``ErrorCode``.
+ * uses its positive absolute value as the canonical SDK ``ErrorCode`` when known.
  */
 export function raiseForRac(racCode: number, message?: string): never {
   const cAbiCode = -Math.abs(Math.trunc(racCode || 0));
@@ -269,13 +273,22 @@ export function asSDKException(error: unknown): SDKException {
       });
     }
     const rac = parseRacCodeFromMessage(message);
-    if (rac !== null) return raiseForRac(rac, message);
+    if (rac !== null) {
+      return fromStructuredError({
+        code: Math.abs(rac),
+        cAbiCode: rac,
+        message,
+        nestedMessage: error instanceof Error ? error.message : undefined,
+      });
+    }
     if (error instanceof Error) return SDKException.unknown(message, error);
     return SDKException.unknown(message);
   }
   if (typeof error === 'string') {
     const rac = parseRacCodeFromMessage(error);
-    if (rac !== null) return raiseForRac(rac, error);
+    if (rac !== null) {
+      return fromStructuredError({ code: Math.abs(rac), cAbiCode: rac, message: error });
+    }
     return SDKException.unknown(error);
   }
   return SDKException.unknown(String(error));

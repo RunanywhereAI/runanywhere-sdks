@@ -10,11 +10,21 @@ export interface RpcRequest {
 }
 
 /** utility host -> renderer/main. Either a stream event or a terminal reply. */
+export interface RpcErrorPayload {
+  message: string;
+  name?: string;
+  code?: number;
+  cAbiCode?: number;
+  category?: number;
+  nestedMessage?: string;
+  fieldPath?: string;
+}
+
 export type RpcMessage =
   | { id: number; token: string } // a streamed token (generate / generateVlm)
   | { id: number; done: true; result?: unknown } // stream finished OK (result = resolved value, e.g. downloadModel's ResolvedModel)
   | { id: number; ok: true; result?: unknown } // unary reply
-  | { id: number; ok: false; error: string }; // failure (unary or stream)
+  | { id: number; ok: false; error: string | RpcErrorPayload }; // failure (unary or stream)
 
 /**
  * Methods whose last logical argument is a per-event callback the host injects:
