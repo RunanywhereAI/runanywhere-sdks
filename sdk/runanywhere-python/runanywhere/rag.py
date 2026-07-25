@@ -55,12 +55,13 @@ __all__ = [
     "create_session",
 ]
 
-# rac_inference_framework_t / rac_model_category_t values used to register the RAG models
-# into the global registry so commons can resolve embedding_model_id / llm_model_id -> path.
-_FRAMEWORK_ONNX = 0
-_FRAMEWORK_LLAMACPP = 1
-_CATEGORY_LANGUAGE = 0
-_CATEGORY_EMBEDDING = 7
+# Must match rac_inference_framework_t / rac_model_category_t in
+# rac_model_types.h (C ABI enums — NOT proto wire values). The registry
+# resolves embedding_model_id / llm_model_id → path using these.
+RAC_FRAMEWORK_ONNX = 0
+RAC_FRAMEWORK_LLAMACPP = 1
+RAC_MODEL_CATEGORY_LANGUAGE = 0
+RAC_MODEL_CATEGORY_EMBEDDING = 7
 
 # runanywhere.v1.RAGStreamEventKind values (stable proto enum; hardcoded so RagStreamEvent's
 # convenience flags don't depend on the optional protobuf runtime being importable).
@@ -391,9 +392,9 @@ class RagSession:
 def _framework_for_llm(path: str) -> int:
     ext = os.path.splitext(path)[1].lower()
     if ext in (".onnx", ".ort"):
-        return _FRAMEWORK_ONNX
+        return RAC_FRAMEWORK_ONNX
     # .gguf / .ggml and anything else default to llama.cpp — the desktop LLM engine.
-    return _FRAMEWORK_LLAMACPP
+    return RAC_FRAMEWORK_LLAMACPP
 
 
 # RAGConfiguration knobs the caller may pass to create_rag (proto field -> coercion).
@@ -418,14 +419,14 @@ def create_session(
     _require_native(core)
 
     emb = resolve(embedding_model)
-    core.register_model(emb.id, emb.primary, _FRAMEWORK_ONNX, _CATEGORY_EMBEDDING)
+    core.register_model(emb.id, emb.primary, RAC_FRAMEWORK_ONNX, RAC_MODEL_CATEGORY_EMBEDDING)
 
     config = _pb.RAGConfiguration(embedding_model_id=emb.id)
 
     if llm_model:
         llm = resolve(llm_model)
         core.register_model(
-            llm.id, llm.primary, _framework_for_llm(llm.primary), _CATEGORY_LANGUAGE
+            llm.id, llm.primary, _framework_for_llm(llm.primary), RAC_MODEL_CATEGORY_LANGUAGE
         )
         config.llm_model_id = llm.id
 
@@ -443,7 +444,7 @@ def create_session(
         config.rerank_results = bool(cfg["rerank_results"])
     if cfg.get("reranker_model_id"):
         rr = resolve(cfg["reranker_model_id"])
-        core.register_model(rr.id, rr.primary, _FRAMEWORK_ONNX, _CATEGORY_EMBEDDING)
+        core.register_model(rr.id, rr.primary, RAC_FRAMEWORK_ONNX, RAC_MODEL_CATEGORY_EMBEDDING)
         config.reranker_model_id = rr.id
 
     handle = core.rag_session_create(config.SerializeToString())

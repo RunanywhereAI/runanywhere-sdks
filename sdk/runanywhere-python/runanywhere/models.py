@@ -132,16 +132,20 @@ class LLMModel:
 
         return call
 
+    def cancel(self) -> None:
+        """Request cancellation of an in-flight :meth:`generate` (safe from another thread)."""
+        self._core.cancel_generate(self._handle)
+
     def generate(self, prompt: str, **opts: Any) -> Iterator[str]:
         """Stream the completion token-by-token."""
         self._ensure_loaded()
-        source = iter_tokens(self._native_call(prompt, opts))
+        source = iter_tokens(self._native_call(prompt, opts), on_stop=self.cancel)
         return _guarded_iter(self._guard, source)
 
     def agenerate(self, prompt: str, **opts: Any) -> AsyncIterator[str]:
         """Async twin of :meth:`generate`."""
         self._ensure_loaded()
-        source = aiter_tokens(self._native_call(prompt, opts))
+        source = aiter_tokens(self._native_call(prompt, opts), on_stop=self.cancel)
         return _aguarded_iter(self._guard, source)
 
     # -- text ----------------------------------------------------------------
@@ -294,36 +298,47 @@ class VLMModel:
         self._handle = handle
         self._guard = _GenerationGuard()
 
-    def _native_call(self, image_path: str, prompt: str) -> Callable[[_OnToken], None]:
+    def _native_call(
+        self, image_path: str, prompt: str, opts: dict
+    ) -> Callable[[_OnToken], None]:
         core = self._core
         handle = self._handle
+        kwargs = {
+            k: v
+            for k, v in generate_kwargs(**opts).items()
+            if k in ("max_tokens", "temperature", "top_p", "top_k", "system_prompt")
+        }
 
         def call(on_token: _OnToken) -> None:
-            core.generate_vlm(handle, image_path, prompt, on_token)
+            core.generate_vlm(handle, image_path, prompt, on_token, **kwargs)
 
         return call
 
-    def caption(self, image_path: str, prompt: str) -> Iterator[str]:
+    def cancel(self) -> None:
+        """Request cancellation of an in-flight :meth:`caption` (safe from another thread)."""
+        self._core.cancel_generate_vlm(self._handle)
+
+    def caption(self, image_path: str, prompt: str, **opts: Any) -> Iterator[str]:
         """Stream a caption/answer over an image (JPEG/PNG path) + prompt."""
-        source = iter_tokens(self._native_call(image_path, prompt))
+        source = iter_tokens(self._native_call(image_path, prompt, opts), on_stop=self.cancel)
         return _guarded_iter(self._guard, source)
 
-    def acaption(self, image_path: str, prompt: str) -> AsyncIterator[str]:
+    def acaption(self, image_path: str, prompt: str, **opts: Any) -> AsyncIterator[str]:
         """Async twin of :meth:`caption`."""
-        source = aiter_tokens(self._native_call(image_path, prompt))
+        source = aiter_tokens(self._native_call(image_path, prompt, opts), on_stop=self.cancel)
         return _aguarded_iter(self._guard, source)
 
-    def caption_text(self, image_path: str, prompt: str) -> str:
+    def caption_text(self, image_path: str, prompt: str, **opts: Any) -> str:
         """Convenience: collect the full caption into one string."""
         out: list[str] = []
-        for token in self.caption(image_path, prompt):
+        for token in self.caption(image_path, prompt, **opts):
             out.append(token)
         return "".join(out)
 
-    async def acaption_text(self, image_path: str, prompt: str) -> str:
+    async def acaption_text(self, image_path: str, prompt: str, **opts: Any) -> str:
         """Async twin of :meth:`caption_text`."""
         out: list[str] = []
-        async for token in self.acaption(image_path, prompt):
+        async for token in self.acaption(image_path, prompt, **opts):
             out.append(token)
         return "".join(out)
 
@@ -346,6 +361,10 @@ class Embedder:
     def embed(self, text: str) -> np.ndarray:
         """Return the (L2-normalized) embedding of ``text`` as a float32 array."""
         return self._core.embed(self._handle, text)
+
+    def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
+        """Embed multiple texts; returns one float32 array per input (same order)."""
+        return list(self._core.embed_batch(self._handle, texts))
 
     def unload(self) -> None:
         """Release the model and emit ``ModelUnloadedEvent('embedder')``. Idempotent."""
@@ -410,12 +429,19 @@ class TTSVoice:
 
 
 class Vad:
-    """Voice activity detector (built-in energy VAD; no model needed). Feed 16 kHz mono
-    float samples frame-by-frame to segment speech before STT."""
+    """Voice activity detector. Starts as built-in energy VAD; optionally load a
+    Silero/sherpa model via :meth:`load_model`. Feed 16 kHz mono float samples
+    frame-by-frame to segment speech before STT."""
 
     def __init__(self, core: Any, handle: int) -> None:
         self._core = core
         self._handle = handle
+
+    def load_model(
+        self, model_path: str, *, id: str | None = None, name: str | None = None
+    ) -> None:
+        """Upgrade this detector to a Silero/sherpa model VAD (path to model files)."""
+        self._core.load_vad_model(self._handle, model_path, id, name)
 
     def detect(self, samples: np.ndarray) -> bool:
         """True if this frame of float samples contains speech."""

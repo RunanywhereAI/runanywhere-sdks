@@ -128,9 +128,9 @@ def test_create_session_embed_only_omits_llm():
 
 
 def test_llm_framework_from_extension():
-    assert ragmod._framework_for_llm("/m/x.gguf") == ragmod._FRAMEWORK_LLAMACPP
-    assert ragmod._framework_for_llm("/m/x.onnx") == ragmod._FRAMEWORK_ONNX
-    assert ragmod._framework_for_llm("/m/x.bin") == ragmod._FRAMEWORK_LLAMACPP  # default
+    assert ragmod._framework_for_llm("/m/x.gguf") == ragmod.RAC_FRAMEWORK_LLAMACPP
+    assert ragmod._framework_for_llm("/m/x.onnx") == ragmod.RAC_FRAMEWORK_ONNX
+    assert ragmod._framework_for_llm("/m/x.bin") == ragmod.RAC_FRAMEWORK_LLAMACPP  # default
 
 
 # --------------------------------------------------------------------------- ingest / query
@@ -257,3 +257,13 @@ def test_client_create_rag_rejects_remote_embedder():
 def test_rag_types_exported():
     for name in ("RagSession", "RagDocument", "RagResult", "RagSearchResult", "RagStatistics", "RagStreamEvent"):
         assert hasattr(runanywhere, name)
+
+
+def test_registry_abi_constants_pin_c_enums():
+    """Pin RAG registry ints to rac_model_types.h (NOT proto wire values)."""
+    assert ragmod.RAC_FRAMEWORK_ONNX == 0
+    assert ragmod.RAC_FRAMEWORK_LLAMACPP == 1
+    assert ragmod.RAC_MODEL_CATEGORY_LANGUAGE == 0
+    assert ragmod.RAC_MODEL_CATEGORY_EMBEDDING == 7
+    assert ragmod._framework_for_llm("/x/model.onnx") == ragmod.RAC_FRAMEWORK_ONNX
+    assert ragmod._framework_for_llm("/x/model.gguf") == ragmod.RAC_FRAMEWORK_LLAMACPP

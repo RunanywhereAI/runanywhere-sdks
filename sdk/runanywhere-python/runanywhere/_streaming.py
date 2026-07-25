@@ -26,8 +26,9 @@ class _Bridge:
     the ``on_token`` callback whose return value tells the C loop whether to keep emitting.
     """
 
-    def __init__(self, native_call: NativeCall) -> None:
+    def __init__(self, native_call: NativeCall, on_stop: Callable[[], None] | None = None) -> None:
         self._native_call = native_call
+        self._on_stop = on_stop
         self._stop = threading.Event()
         self._error: BaseException | None = None
         self._thread = threading.Thread(target=self._run, name="ra-stream", daemon=True)
@@ -54,8 +55,17 @@ class _Bridge:
         return not self._stop.is_set()
 
     def request_stop(self) -> None:
-        """Signal the next ``on_token`` to return False so the C loop unwinds."""
+        """Signal the next ``on_token`` to return False so the C loop unwinds.
+
+        Also invokes the optional ``on_stop`` hook (e.g. ``rac_*_component_cancel``)
+        so decode stops promptly rather than waiting for the next token callback.
+        """
         self._stop.set()
+        if self._on_stop is not None:
+            try:
+                self._on_stop()
+            except Exception:  # noqa: BLE001 — teardown must not raise
+                pass
 
     def join(self, timeout: float | None = None) -> None:
         self._thread.join(timeout)
@@ -79,8 +89,10 @@ class _Bridge:
 class _SyncBridge(_Bridge):
     """Backs :func:`iter_tokens`: tokens flow through a bounded ``queue.Queue``."""
 
-    def __init__(self, native_call: NativeCall, maxsize: int) -> None:
-        super().__init__(native_call)
+    def __init__(
+        self, native_call: NativeCall, maxsize: int, on_stop: Callable[[], None] | None = None
+    ) -> None:
+        super().__init__(native_call, on_stop=on_stop)
         self._q: queue.Queue = queue.Queue(maxsize=maxsize)
 
     def _deliver(self, token: str) -> None:
@@ -109,6 +121,7 @@ def iter_tokens(
     native_call: NativeCall,
     *,
     maxsize: int = 64,
+    on_stop: Callable[[], None] | None = None,
 ) -> Iterator[str]:
     """Consume a blocking native streaming call as a synchronous token generator.
 
@@ -117,10 +130,11 @@ def iter_tokens(
     bounded :class:`queue.Queue` (``maxsize``) that provides backpressure. Each token is
     yielded in turn. If the generator is closed or the caller breaks out of the loop, a
     stop :class:`threading.Event` is set so the next ``on_token`` returns ``False`` and the
-    native loop unwinds; the worker is then joined. Any exception raised inside
+    native loop unwinds; ``on_stop`` (when provided) also fires so the C component can
+    cancel promptly. The worker is then joined. Any exception raised inside
     ``native_call`` is re-raised here, in the consumer.
     """
-    bridge = _SyncBridge(native_call, maxsize)
+    bridge = _SyncBridge(native_call, maxsize, on_stop=on_stop)
     bridge.start()
     try:
         while True:
@@ -159,8 +173,9 @@ class _AsyncBridge(_Bridge):
         native_call: NativeCall,
         maxsize: int,
         loop: asyncio.AbstractEventLoop,
+        on_stop: Callable[[], None] | None = None,
     ) -> None:
-        super().__init__(native_call)
+        super().__init__(native_call, on_stop=on_stop)
         self._loop = loop
         self._q: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
 
@@ -207,6 +222,7 @@ async def aiter_tokens(
     native_call: NativeCall,
     *,
     maxsize: int = 64,
+    on_stop: Callable[[], None] | None = None,
 ) -> AsyncIterator[str]:
     """Async twin of :func:`iter_tokens` over the same blocking ``native_call``.
 
@@ -214,11 +230,11 @@ async def aiter_tokens(
     ``loop.call_soon_threadsafe`` into a bounded :class:`asyncio.Queue`; the worker blocks
     on a :class:`concurrent.futures.Future` until the token is accepted, giving
     backpressure. On ``aclose`` (or breaking the ``async for``) the stop event is set — so
-    the next ``on_token`` returns ``False`` — and the worker is joined. Exceptions raised in
-    ``native_call`` are re-raised in the consumer.
+    the next ``on_token`` returns ``False`` — ``on_stop`` fires when provided, and the
+    worker is joined. Exceptions raised in ``native_call`` are re-raised in the consumer.
     """
     loop = asyncio.get_running_loop()
-    bridge = _AsyncBridge(native_call, maxsize, loop)
+    bridge = _AsyncBridge(native_call, maxsize, loop, on_stop=on_stop)
     bridge.start()
     try:
         while True:
