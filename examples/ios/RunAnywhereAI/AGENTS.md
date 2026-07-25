@@ -296,7 +296,7 @@ RunAnywhereAI/
 │   └── ContentView.swift               # 5-tab navigation shell
 ├── Core/
 │   ├── DesignSystem/
-│   │   ├── AppColors.swift             # Brand colors (primary: #FF5500)
+│   │   ├── AppColors.swift             # Brand colors (primary: #FF6900)
 │   │   ├── AppSpacing.swift            # Layout constants + AppLayout namespace
 │   │   ├── Typography.swift            # Font constants (AppTypography)
 │   │   └── ViewCompatibility.swift     # Cross-platform nav shims
@@ -553,7 +553,7 @@ existing canonical proto APIs, it can live in `RunAnywhere+ExampleShims.swift`.
 ## Design System
 
 All styling is centralized — no inline magic numbers or color literals in views:
-- **Colors**: `AppColors` — brand primary `#FF5500`, semantic tokens for text/backgrounds/bubbles/badges/status
+- **Colors**: `AppColors` — brand primary `#FF6900` (the RunAnywhere logo orange), semantic tokens for text/backgrounds/bubbles/badges/status. Canonical palette: `../../DESIGN_GUIDELINE.md`.
 - **Spacing**: `AppSpacing` — xxSmall(2) to xxxLarge(40), icon sizes, button heights, corner radii, strokes
 - **Typography**: `AppTypography` — system text styles + custom sizes + weighted/monospaced variants
 - **Layout**: `AppLayout` — window sizes, content widths, animation durations

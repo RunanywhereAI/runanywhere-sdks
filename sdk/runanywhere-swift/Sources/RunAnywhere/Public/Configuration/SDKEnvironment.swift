@@ -40,11 +40,9 @@ extension RASDKEnvironment: Codable {
 // MARK: - Extensions (preserved from the hand-written enum)
 
 public extension RASDKEnvironment {
-    /// All three deployable environments, excluding `.unspecified` /
-    /// `UNRECOGNIZED`. Preserves the `CaseIterable.allCases` semantics of
-    /// the pre-IDL hand-written enum.
+    /// Deployable product environments (development + production).
     static var deployableCases: [RASDKEnvironment] {
-        [.development, .staging, .production]
+        [.development, .production]
     }
 
     // MARK: - C++ Bridge
@@ -53,7 +51,6 @@ public extension RASDKEnvironment {
     var cEnvironment: rac_environment_t {
         switch self {
         case .development: return RAC_ENV_DEVELOPMENT
-        case .staging:     return RAC_ENV_STAGING
         case .production:  return RAC_ENV_PRODUCTION
         default:           return RAC_ENV_DEVELOPMENT
         }
@@ -63,7 +60,6 @@ public extension RASDKEnvironment {
     var description: String {
         switch self {
         case .development: return "Development Environment"
-        case .staging:     return "Staging Environment"
         case .production:  return "Production Environment"
         default:           return "Unspecified Environment"
         }
@@ -84,7 +80,7 @@ public extension RASDKEnvironment {
     /// environment. Production is only allowed in Release builds.
     var isCompatibleWithCurrentBuild: Bool {
         switch self {
-        case .development, .staging:
+        case .development:
             return true
         case .production:
             #if DEBUG
@@ -112,7 +108,6 @@ public extension RASDKEnvironment {
     var defaultLogLevel: RALogLevel {
         switch self {
         case .development: return .debug
-        case .staging:     return .info
         case .production:  return .warning
         default:           return .info
         }
@@ -133,11 +128,11 @@ public struct SDKInitParams: Sendable {
     /// API key for authentication.
     public let apiKey: String
 
-    /// Base URL for API requests. Required for staging/production; optional
+    /// Base URL for API requests. Required for production; optional
     /// for development (uses placeholder if not provided).
     public let baseURL: URL
 
-    /// Environment mode (development/staging/production).
+    /// Environment mode (development/production).
     public let environment: SDKEnvironment
 
     // MARK: - Default Development URL
@@ -153,7 +148,7 @@ public struct SDKInitParams: Sendable {
 
     // MARK: - Initializers
 
-    /// Create initialization parameters for staging or production.
+    /// Create initialization parameters for production.
     public init(
         apiKey: String,
         baseURL: URL,
@@ -166,7 +161,7 @@ public struct SDKInitParams: Sendable {
         try Self.validate(apiKey: apiKey, baseURL: baseURL, environment: environment)
     }
 
-    /// Convenience initializer with string URL for staging or production.
+    /// Convenience initializer with string URL for production.
     public init(
         apiKey: String,
         baseURL: String,
@@ -219,16 +214,7 @@ public struct SDKInitParams: Sendable {
             throw SDKException(code: .validationFailed, message: message, category: .internal)
         }
 
-        if environment == .staging, baseURL.scheme?.lowercased() == "http" {
-            logger.warning("Using HTTP for staging environment. Consider using HTTPS for security.")
-        }
 
-        if environment == .staging, let host = baseURL.host?.lowercased() {
-            if host.contains("localhost") || host.contains("127.0.0.1") ||
-               host.contains("example.com") || host.contains(".local") {
-                logger.warning("Staging environment using local/example URL: \(host)")
-            }
-        }
 
         logger.info("URL validated for \(environment.description): \(baseURL.absoluteString)")
     }

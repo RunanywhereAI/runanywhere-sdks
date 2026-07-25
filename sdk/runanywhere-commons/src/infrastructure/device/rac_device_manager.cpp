@@ -8,6 +8,8 @@
 
 #include "rac/infrastructure/device/rac_device_manager.h"
 
+#include "rac_device_live_state_internal.h"
+
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -29,6 +31,10 @@ namespace {
 struct DeviceManagerState {
     rac_device_callbacks_t callbacks = {};
     bool callbacks_set = false;
+    // Set when the authenticate response reported device_registered=false —
+    // the server holds only a placeholder row, so the platform-persisted
+    // is_registered flag is stale and must not skip registration.
+    bool server_unregistered = false;
     std::mutex mutex;
 };
 
@@ -89,6 +95,51 @@ void rac_device_manager_clear_callbacks(void) {
     RAC_LOG_INFO(LOG_CAT, "Device manager callbacks cleared");
 }
 
+void rac_device_manager_notify_server_unregistered(void) {
+    auto& state = get_state();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    state.server_unregistered = true;
+    RAC_LOG_INFO(LOG_CAT,
+                 "Server reports device not registered (placeholder row) — next "
+                 "registration attempt will run regardless of the persisted flag");
+}
+
+rac_result_t rac_device_manager_sample_live_state(rac_device_live_state_t* out) {
+    if (!out) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    *out = {};
+    out->battery_level = -1.0;
+
+    auto& state = get_state();
+    // try_lock: never let event tracking block behind an in-flight
+    // registration HTTP round-trip; the caller keeps unknown sentinels.
+    std::unique_lock<std::mutex> lock(state.mutex, std::try_to_lock);
+    if (!lock.owns_lock()) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    if (!state.callbacks_set || !state.callbacks.get_device_info) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    // Platform fills a stack struct; string fields point at platform-owned
+    // storage (same contract as registration) — copy what we keep before
+    // releasing the lock.
+    rac_device_registration_info_t info = {};
+    info.battery_level = -1.0;
+    state.callbacks.get_device_info(&info, state.callbacks.user_data);
+
+    out->battery_level = info.battery_level;
+    if (info.battery_state && info.battery_state[0] != '\0') {
+        strncpy(out->battery_state, info.battery_state, sizeof(out->battery_state) - 1);
+    }
+    out->is_low_power_mode = info.is_low_power_mode;
+    out->has_low_power_mode = RAC_TRUE;
+    out->total_memory = info.total_memory;
+    out->available_memory = info.available_memory;
+    return RAC_SUCCESS;
+}
+
 rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const char* build_token) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
@@ -104,8 +155,13 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Step 1: Check if already registered
     // Production behavior: Skip if already registered (performance, network efficiency)
     // Development behavior: Always update via UPSERT (track active devices, update last_seen_at)
+    // Server heal: the authenticate response can report device_registered=false
+    // (backend holds only a placeholder row), which overrides the stale
+    // platform-persisted flag — otherwise a server-side device reset leaves an
+    // "Unknown"/"SDK Device" row that production mode never upgrades.
     const bool was_registered =
-        state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
+        state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE &&
+        !state.server_unregistered;
     if (was_registered && env != RAC_ENV_DEVELOPMENT) {
         RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping (production mode)");
         // Skip the network round-trip, but still emit the device.registered
@@ -177,8 +233,9 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     RAC_LOG_DEBUG(LOG_CAT, "Registration endpoint: %s", endpoint);
     RAC_LOG_DEBUG(LOG_CAT, "Registration payload prepared (%zu bytes)", json_len);
 
-    // Step 7: Determine if auth is required (staging/production require auth)
-    rac_bool_t requires_auth = (env != RAC_ENV_DEVELOPMENT) ? RAC_TRUE : RAC_FALSE;
+    // Step 7: The register endpoint always requires the SDK bearer token.
+    rac_bool_t requires_auth = RAC_TRUE;
+    (void)env;
 
     // Step 8: Make HTTP request via callback
     rac_device_http_response_t response = {};
@@ -210,8 +267,9 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         return response_result;
     }
 
-    // Step 10: Mark as registered
+    // Step 10: Mark as registered (server placeholder, if any, is now upgraded)
     state.callbacks.set_registered(RAC_TRUE, state.callbacks.user_data);
+    state.server_unregistered = false;
 
     // Step 11: Emit success event
     emit_device_registered(device_id);

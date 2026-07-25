@@ -392,6 +392,7 @@ bool PlatformAdapter_getModelBaseDirectory(char** outValue) {
 // ============================================================================
 
 #import <sys/utsname.h>
+#import <sys/sysctl.h>
 #import <mach/mach.h>
 
 /**
@@ -404,29 +405,59 @@ static NSString* getMachineIdentifier(void) {
 }
 
 /**
- * Get human-readable device model name
+ * Get human-readable device model name.
+ * Mirrors HybridRunAnywhereDeviceInfo.swift deviceModels.
  */
 static NSString* getDeviceModelName(NSString* identifier) {
-    // iPhone models
     NSDictionary* models = @{
-        // iPhone 16 series
+        // iPhone 17 (2025)
+        @"iPhone18,1": @"iPhone 17 Pro",
+        @"iPhone18,2": @"iPhone 17 Pro Max",
+        @"iPhone18,3": @"iPhone 17",
+        @"iPhone18,4": @"iPhone 17 Plus",
+        // iPhone 16 (2024)
         @"iPhone17,1": @"iPhone 16 Pro",
         @"iPhone17,2": @"iPhone 16 Pro Max",
         @"iPhone17,3": @"iPhone 16",
         @"iPhone17,4": @"iPhone 16 Plus",
-        // iPhone 15 series
+        // iPhone 15 (2023)
         @"iPhone16,1": @"iPhone 15 Pro",
         @"iPhone16,2": @"iPhone 15 Pro Max",
         @"iPhone15,4": @"iPhone 15",
         @"iPhone15,5": @"iPhone 15 Plus",
-        // iPhone 14 series
+        // iPhone 14 (2022)
         @"iPhone15,2": @"iPhone 14 Pro",
         @"iPhone15,3": @"iPhone 14 Pro Max",
         @"iPhone14,7": @"iPhone 14",
         @"iPhone14,8": @"iPhone 14 Plus",
-        // iPad models
-        @"iPad14,1": @"iPad Pro 11-inch (4th generation)",
-        @"iPad14,2": @"iPad Pro 12.9-inch (6th generation)",
+        // iPhone 13 (2021)
+        @"iPhone14,2": @"iPhone 13 Pro",
+        @"iPhone14,3": @"iPhone 13 Pro Max",
+        @"iPhone14,4": @"iPhone 13 mini",
+        @"iPhone14,5": @"iPhone 13",
+        // iPhone 12 (2020)
+        @"iPhone13,1": @"iPhone 12 mini",
+        @"iPhone13,2": @"iPhone 12",
+        @"iPhone13,3": @"iPhone 12 Pro",
+        @"iPhone13,4": @"iPhone 12 Pro Max",
+        // iPhone SE
+        @"iPhone14,6": @"iPhone SE (3rd gen)",
+        @"iPhone12,8": @"iPhone SE (2nd gen)",
+        // iPad Pro M4 (2024)
+        @"iPad16,3": @"iPad Pro 11-inch (M4)",
+        @"iPad16,4": @"iPad Pro 11-inch (M4)",
+        @"iPad16,5": @"iPad Pro 13-inch (M4)",
+        @"iPad16,6": @"iPad Pro 13-inch (M4)",
+        // iPad Pro M2 (2022)
+        @"iPad14,3": @"iPad Pro 11-inch (M2)",
+        @"iPad14,4": @"iPad Pro 11-inch (M2)",
+        @"iPad14,5": @"iPad Pro 12.9-inch (M2)",
+        @"iPad14,6": @"iPad Pro 12.9-inch (M2)",
+        // iPad Air
+        @"iPad14,8": @"iPad Air (M2)",
+        @"iPad14,9": @"iPad Air (M2)",
+        @"iPad13,16": @"iPad Air (5th gen)",
+        @"iPad13,17": @"iPad Air (5th gen)",
         // Simulator
         @"x86_64": @"Simulator",
         @"arm64": @"Simulator",
@@ -437,34 +468,29 @@ static NSString* getDeviceModelName(NSString* identifier) {
 }
 
 /**
- * Get chip name for device model
+ * Get chip name for device model.
+ * Mirrors HybridRunAnywhereDeviceInfo.swift getChipNameForModel(_:).
  */
 static NSString* getChipNameForModel(NSString* identifier) {
-    NSDictionary* chips = @{
-        // A18 Pro
-        @"iPhone17,1": @"A18 Pro",
-        @"iPhone17,2": @"A18 Pro",
-        // A18
-        @"iPhone17,3": @"A18",
-        @"iPhone17,4": @"A18",
-        // A17 Pro
-        @"iPhone16,1": @"A17 Pro",
-        @"iPhone16,2": @"A17 Pro",
-        // A16 Bionic
-        @"iPhone15,2": @"A16 Bionic",
-        @"iPhone15,3": @"A16 Bionic",
-        @"iPhone15,4": @"A16 Bionic",
-        @"iPhone15,5": @"A16 Bionic",
-        // A15 Bionic
-        @"iPhone14,7": @"A15 Bionic",
-        @"iPhone14,8": @"A15 Bionic",
-        // M2
-        @"iPad14,1": @"M2",
-        @"iPad14,2": @"M2",
-    };
+    if ([identifier hasPrefix:@"iPhone18,"]) return @"A19 Pro";
+    if ([identifier hasPrefix:@"iPhone17,1"] || [identifier hasPrefix:@"iPhone17,2"]) return @"A18 Pro";
+    if ([identifier hasPrefix:@"iPhone17,"]) return @"A18";
+    if ([identifier hasPrefix:@"iPhone16,"]) return @"A17 Pro";
+    if ([identifier hasPrefix:@"iPhone15,"]) return @"A16 Bionic";
+    if ([identifier hasPrefix:@"iPhone14,"]) return @"A15 Bionic";
+    if ([identifier hasPrefix:@"iPhone13,"]) return @"A14 Bionic";
+    if ([identifier hasPrefix:@"iPhone12,"]) return @"A13 Bionic";
+    if ([identifier hasPrefix:@"iPad16,"]) return @"M4";
+    if ([identifier hasPrefix:@"iPad14,3"] || [identifier hasPrefix:@"iPad14,4"] ||
+        [identifier hasPrefix:@"iPad14,5"] || [identifier hasPrefix:@"iPad14,6"] ||
+        [identifier hasPrefix:@"iPad14,8"] || [identifier hasPrefix:@"iPad14,9"]) return @"M2";
+    if ([identifier hasPrefix:@"iPad13,"]) return @"M1";
 
-    NSString* chip = chips[identifier];
-    return chip ?: @"Apple Silicon";
+#if __arm64__
+    return @"Apple Silicon";
+#else
+    return @"Intel";
+#endif
 }
 
 bool PlatformAdapter_getDeviceModel(char** outValue) {
@@ -608,6 +634,120 @@ bool PlatformAdapter_isTablet(void) {
             return false;
         }
     }
+}
+
+bool PlatformAdapter_getDeviceName(char** outValue) {
+    @autoreleasepool {
+        if (!outValue) return false;
+        *outValue = NULL;
+
+        @try {
+            NSString* name = [[UIDevice currentDevice] name];
+            if (name == nil || name.length == 0) {
+                return false;
+            }
+            const char* utf8Value = [name UTF8String];
+            if (!utf8Value) {
+                return false;
+            }
+            *outValue = strdup(utf8Value);
+            return *outValue != NULL;
+        } @catch (NSException* exception) {
+            return false;
+        }
+    }
+}
+
+/**
+ * UIDevice battery monitoring must be toggled on the main thread; battery
+ * reads are only meaningful afterwards.
+ */
+static void ensureBatteryMonitoringEnabled(void) {
+    if ([NSThread isMainThread]) {
+        [UIDevice currentDevice].batteryMonitoringEnabled = YES;
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [UIDevice currentDevice].batteryMonitoringEnabled = YES;
+        });
+    }
+}
+
+float PlatformAdapter_getBatteryLevel(void) {
+    @autoreleasepool {
+        @try {
+            ensureBatteryMonitoringEnabled();
+            float level = [UIDevice currentDevice].batteryLevel;
+            // -1.0 when monitoring unavailable (e.g. simulator)
+            return level >= 0.0f ? level : -1.0f;
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getBatteryLevel exception: %@", exception);
+            return -1.0f;
+        }
+    }
+}
+
+bool PlatformAdapter_getBatteryState(char** outValue) {
+    @autoreleasepool {
+        if (!outValue) return false;
+        *outValue = NULL;
+
+        @try {
+            ensureBatteryMonitoringEnabled();
+            UIDeviceBatteryState state = [UIDevice currentDevice].batteryState;
+            const char* value = NULL;
+            switch (state) {
+                case UIDeviceBatteryStateCharging: value = "charging"; break;
+                case UIDeviceBatteryStateFull: value = "full"; break;
+                case UIDeviceBatteryStateUnplugged: value = "unplugged"; break;
+                case UIDeviceBatteryStateUnknown:
+                default: break;
+            }
+            if (!value) {
+                return false;
+            }
+            *outValue = strdup(value);
+            return *outValue != NULL;
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getBatteryState exception: %@", exception);
+            return false;
+        }
+    }
+}
+
+bool PlatformAdapter_isLowPowerMode(void) {
+    @autoreleasepool {
+        @try {
+            return [NSProcessInfo processInfo].lowPowerModeEnabled;
+        } @catch (NSException* exception) {
+            return false;
+        }
+    }
+}
+
+/**
+ * Performance (P) core count via sysctl hw.perflevel0.logicalcpu.
+ * Returns -1 when the kernel does not expose per-level counts.
+ */
+int PlatformAdapter_getPerformanceCores(void) {
+    uint32_t value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname("hw.perflevel0.logicalcpu", &value, &size, NULL, 0) == 0 && value > 0) {
+        return (int)value;
+    }
+    return -1;
+}
+
+/**
+ * Efficiency (E) core count via sysctl hw.perflevel1.logicalcpu.
+ * Returns -1 when the kernel does not expose per-level counts.
+ */
+int PlatformAdapter_getEfficiencyCores(void) {
+    uint32_t value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname("hw.perflevel1.logicalcpu", &value, &size, NULL, 0) == 0) {
+        return (int)value;
+    }
+    return -1;
 }
 
 // ============================================================================

@@ -33,3 +33,14 @@ export type { CapturedFrame, VideoCaptureConfig } from './Infrastructure/VideoCa
 
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities.js';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities.js';
+
+export {
+  ensureDownloadStorageReady,
+  LARGE_DOWNLOAD_BYTES,
+  readBrowserStorageEstimate,
+  requestPersistentStorage,
+} from './Infrastructure/BrowserStorage.js';
+export type {
+  BrowserStorageEstimate,
+  BrowserStorageReadiness,
+} from './Infrastructure/BrowserStorage.js';

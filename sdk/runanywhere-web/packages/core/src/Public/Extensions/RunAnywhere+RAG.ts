@@ -1,9 +1,10 @@
 /**
  * RunAnywhere+RAG.ts
  *
- * Public RAG facade. Web views own browser file picking/reading; native or
- * registered providers own session, ingestion, retrieval, and generation via
- * generated proto request/result models.
+ * Public RAG facade. Browser I/O (file picking, IndexedDB/OPFS persistence)
+ * stays in Web adapters; chunking/retrieval/prompt assembly belong in the
+ * commons native RAG session when exports are present. CrossWasm IndexedDB
+ * orchestration is a fallback only when the native session ABI is missing.
  */
 
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
@@ -27,6 +28,12 @@ import {
   rAGQueryOptionsDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { getBackendWorkerOwner } from '../../runtime/BackendWorkerModelOwnership.js';
+import {
+  getModuleForModel,
+  getWasmModuleRecord,
+  getWasmModuleRecordForCapability,
+} from '../../runtime/EmscriptenModule.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 import {
@@ -126,6 +133,46 @@ export function getRAGPipelineState(): RAGPipelineState {
 export function setRAGProvider(provider: RAGProvider | null): void {
   _provider = provider;
   advancePipelineState(null);
+}
+
+/**
+ * Explicit backend-registration hook for Web RAG providers. Split WASM
+ * backends call this after claiming their capabilities; it never runs as an
+ * implicit side effect of a RAG API call.
+ */
+export function registerRAGProvider(provider?: RAGProvider): boolean {
+  // Prefer the commons native RAG session when exports are present (Swift /
+  // Kotlin parity). Fall back to the IndexedDB-backed CrossWasm provider only
+  // when the native session ABI is unavailable in this WASM build.
+  let resolved = provider ?? null;
+  const nativeAvailable = RAGProtoAdapter.tryDefault()?.supportsProtoRAG() ?? false;
+  if (!resolved) {
+    const nativeAdapter = RAGProtoAdapter.tryDefault();
+    if (nativeAdapter?.supportsProtoRAG()) {
+      try {
+        resolved = createRAGNativeProvider({ adapter: nativeAdapter });
+      } catch {
+        resolved = null;
+      }
+    }
+  }
+  // A build with the native session ABI must not silently replace commons
+  // retrieval with the browser-only CrossWasm composition. Apps that need it
+  // can explicitly call registerPersistentRAGProvider() as a degraded path.
+  if (!resolved && !nativeAvailable && supportsCrossWasmRAG()) {
+    logger.warning('Native RAG ABI is unavailable; using degraded CrossWasm RAG provider.');
+    resolved = createPersistentRAGProvider();
+  }
+  if (!resolved) return false;
+  setRAGProvider(resolved);
+  return true;
+}
+
+/** Install a browser-storage-backed cross-WASM RAG provider. */
+export function registerPersistentRAGProvider(): boolean {
+  if (_provider || !supportsCrossWasmRAG()) return false;
+  setRAGProvider(createPersistentRAGProvider());
+  return true;
 }
 
 /** Core-lifecycle cleanup for shutdown paths where a provider destroy fails. */
@@ -279,12 +326,18 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    if (config.persistIndex) {
+      throw SDKException.backendNotAvailable(
+        'RAG.createPipeline',
+        NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+      );
+    }
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
     if (this.session != null) {
-      this.adapter.destroySession(this.session);
+      await this.adapter.destroySession(this.session);
       this.session = null;
     }
-    const session = this.adapter.createSession(config);
+    const session = await this.adapter.createSession(config);
     if (session == null) {
       throw SDKException.backendNotAvailable(
         'RAG.createPipeline',
@@ -297,7 +350,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragDestroyPipeline(): Promise<void> {
     if (this.session != null) {
-      this.adapter.destroySession(this.session);
+      await this.adapter.destroySession(this.session);
       this.session = null;
     }
   }
@@ -310,7 +363,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
     const session = await this.ensureSession();
-    const stats = this.adapter.ingest(session, document);
+    const stats = await this.adapter.ingest(session, document);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.ingest',
@@ -340,7 +393,7 @@ class NativeRAGSessionProvider implements RAGProvider {
         'A session without an LLM model id can ingest but cannot generate answers.',
       );
     }
-    const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
+    const result = await this.adapter.query(session, makeRAGQuery(question, this.config, options));
     if (!result) {
       throw SDKException.backendNotAvailable(
         'RAG.query',
@@ -367,7 +420,7 @@ class NativeRAGSessionProvider implements RAGProvider {
 
   async ragClearDocuments(): Promise<void> {
     const session = await this.ensureSession();
-    const stats = this.adapter.clear(session);
+    const stats = await this.adapter.clear(session);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.clearDocuments',
@@ -412,7 +465,7 @@ class NativeRAGSessionProvider implements RAGProvider {
       }
       return emptyRAGStatistics(this.config);
     }
-    const stats = this.adapter.statistics(this.session);
+    const stats = await this.adapter.statistics(this.session);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.statistics',
@@ -441,6 +494,87 @@ interface CrossWasmRAGDocument {
   chunkCount: number;
 }
 
+interface PersistentRAGSnapshot {
+  config: RAGConfiguration;
+  chunks: CrossWasmRAGChunk[];
+  documents: Array<[string, CrossWasmRAGDocument]>;
+  lastUpdatedMs: number;
+  lastQueryMs: number;
+}
+
+const memoryPersistentRAGStore = new Map<string, PersistentRAGSnapshot>();
+
+async function readPersistentRAGSnapshot(key: string): Promise<PersistentRAGSnapshot | null> {
+  if (typeof indexedDB === 'undefined') return memoryPersistentRAGStore.get(key) ?? null;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readonly');
+      const get = transaction.objectStore('indexes').get(key);
+      get.onsuccess = () => resolve((get.result as PersistentRAGSnapshot | undefined) ?? null);
+      get.onerror = () => reject(get.error);
+      transaction.oncomplete = () => db.close();
+      transaction.onerror = () => db.close();
+      transaction.onabort = () => db.close();
+    };
+  });
+}
+
+async function writePersistentRAGSnapshot(key: string, snapshot: PersistentRAGSnapshot): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    memoryPersistentRAGStore.set(key, snapshot);
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readwrite');
+      transaction.objectStore('indexes').put(snapshot, key);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        reject(transaction.error);
+      };
+      transaction.onabort = () => db.close();
+    };
+  });
+}
+
+async function deletePersistentRAGSnapshot(key: string): Promise<void> {
+  if (typeof indexedDB === 'undefined') {
+    memoryPersistentRAGStore.delete(key);
+    return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('runanywhere-rag', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('indexes');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const transaction = db.transaction('indexes', 'readwrite');
+      transaction.objectStore('indexes').delete(key);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        reject(transaction.error);
+      };
+      transaction.onabort = () => db.close();
+    };
+  });
+}
+
 /**
  * Browser provider for the split-WASM release architecture.
  *
@@ -453,13 +587,13 @@ interface CrossWasmRAGDocument {
 class CrossWasmRAGProvider implements RAGProvider {
   readonly providerKind = 'cross-wasm' as const;
 
-  private config: RAGConfiguration = createDefaultRAGConfiguration();
-  private initialized = false;
-  private chunks: CrossWasmRAGChunk[] = [];
-  private documents = new Map<string, CrossWasmRAGDocument>();
-  private lastUpdatedMs = 0;
-  private lastQueryMs = 0;
-  private lifecycleVersion = 0;
+  protected config: RAGConfiguration = createDefaultRAGConfiguration();
+  protected initialized = false;
+  protected chunks: CrossWasmRAGChunk[] = [];
+  protected documents = new Map<string, CrossWasmRAGDocument>();
+  protected lastUpdatedMs = 0;
+  protected lastQueryMs = 0;
+  protected lifecycleVersion = 0;
 
   async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
     validateNativeRAGConfiguration(config, 'RAG.createPipeline');
@@ -742,7 +876,7 @@ class CrossWasmRAGProvider implements RAGProvider {
     };
   }
 
-  private statistics(): RAGStatistics {
+  protected statistics(): RAGStatistics {
     const totalTokensIndexed = this.chunks.reduce(
       (sum, chunk) => sum + chunk.tokenCount,
       0,
@@ -766,28 +900,207 @@ class CrossWasmRAGProvider implements RAGProvider {
     };
   }
 
-  private removeDocumentInternal(id: string): void {
+  protected removeDocumentInternal(id: string): void {
     this.documents.delete(id);
     this.chunks = this.chunks.filter((chunk) => chunk.documentId !== id);
   }
 
-  private requireInitialized(feature: string): void {
+  protected requireInitialized(feature: string): void {
     if (!this.initialized) {
       throw SDKException.notInitialized(`${feature}: RAG pipeline is not ready`);
     }
   }
 
-  private assertCurrent(version: number, feature: string): void {
+  protected assertCurrent(version: number, feature: string): void {
     if (!this.initialized || version !== this.lifecycleVersion) {
       throw SDKException.notInitialized(`${feature}: RAG pipeline stopped or restarted`);
     }
   }
 }
 
+/**
+ * Cross-WASM RAG with a durable browser index. It persists chunks and embedding
+ * vectors in IndexedDB (with a same-interface memory fallback for non-browser
+ * test environments), while embeddings and generation remain backend-owned.
+ */
+class PersistentRAGProvider extends CrossWasmRAGProvider {
+  private storageKey = '';
+
+  async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    await super.ragCreatePipeline({ ...config, persistIndex: true });
+    this.storageKey = config.indexPath || `default:${config.embeddingModelId}:${config.llmModelId}`;
+    const snapshot = await readPersistentRAGSnapshot(this.storageKey);
+    if (snapshot) {
+      this.chunks = snapshot.chunks;
+      this.documents = new Map(snapshot.documents);
+      this.lastUpdatedMs = snapshot.lastUpdatedMs;
+      this.lastQueryMs = snapshot.lastQueryMs;
+      logger.info(`Restored persistent RAG index '${this.storageKey}'`);
+    }
+  }
+
+  async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
+    const result = await super.ragIngestDocument(document);
+    await this.persist();
+    return result;
+  }
+
+  async ragClearDocuments(): Promise<void> {
+    await super.ragClearDocuments();
+    await deletePersistentRAGSnapshot(this.storageKey);
+  }
+
+  async ragRemoveDocument(id: string): Promise<void> {
+    await super.ragRemoveDocument(id);
+    await this.persist();
+  }
+
+  ragGetCapabilities(): RAGProviderCapabilities {
+    return {
+      native: false,
+      persistent: true,
+      documentListing: true,
+      documentRemoval: true,
+    };
+  }
+
+  protected statistics(): RAGStatistics {
+    return {
+      ...super.statistics(),
+      indexPath: this.storageKey || this.config.indexPath,
+      isPersistent: true,
+      statsJson: JSON.stringify({
+        provider: 'persistent-cross-wasm',
+        persistent: true,
+        dimension: this.chunks[0]?.vector.dimension ?? 0,
+      }),
+    };
+  }
+
+  private async persist(): Promise<void> {
+    if (!this.storageKey) return;
+    await writePersistentRAGSnapshot(this.storageKey, {
+      config: { ...this.config, persistIndex: true },
+      chunks: this.chunks,
+      documents: [...this.documents.entries()],
+      lastUpdatedMs: this.lastUpdatedMs,
+      lastQueryMs: this.lastQueryMs,
+    });
+  }
+}
+
+/** Create a provider whose ingested index survives a browser reload. */
+export function createPersistentRAGProvider(): RAGProvider {
+  return new PersistentRAGProvider();
+}
+
 function supportsCrossWasmRAG(): boolean {
   const embeddings = EmbeddingsProtoAdapter.tryDefault();
   return Boolean(embeddings?.supportsLifecycleProtoEmbeddings())
     && TextGeneration.supportsProtoLLM();
+}
+
+/**
+ * Stable execution-site key for a loaded model. Native RAG can only resolve
+ * artifacts that live on the same site as the RAG ABI host (one Emscripten
+ * heap / BackendWorker). Keys are ownership-derived — never framework enums.
+ */
+function executionSiteForModel(modelId: string): string {
+  const workerOwner = getBackendWorkerOwner(modelId);
+  if (workerOwner) return `worker:${workerOwner}`;
+  const module = getModuleForModel(modelId);
+  if (module) {
+    const record = getWasmModuleRecord(module);
+    return `main:${record?.backend ?? 'unknown'}`;
+  }
+  return `unloaded:${modelId}`;
+}
+
+/**
+ * Where `rac_rag_session_create_proto` will run for this embedding model.
+ * Must stay aligned with `RAGProtoAdapter` worker routing.
+ */
+function executionSiteForNativeRagHost(embeddingModelId: string): string | null {
+  if (getBackendWorkerOwner(embeddingModelId) === 'onnx') {
+    return 'worker:onnx';
+  }
+  const ragRecord = getWasmModuleRecordForCapability('rag');
+  if (!ragRecord) return null;
+  return `main:${ragRecord.backend}`;
+}
+
+/**
+ * Native session iff every artifact the session will load is co-located with
+ * the RAG ABI host. Otherwise compose via public Embeddings + TextGeneration
+ * facades (still worker-backed; no framework hardcoding).
+ */
+function resolveRagExecutionPlan(config: RAGConfiguration): {
+  mode: 'native' | 'composed';
+  reason: string;
+} {
+  const embId = config.embeddingModelId?.trim() ?? '';
+  const llmId = config.llmModelId?.trim() ?? '';
+  if (!embId) {
+    return {
+      mode: 'composed',
+      reason: 'RAGConfiguration.embeddingModelId is required',
+    };
+  }
+
+  const ragHost = executionSiteForNativeRagHost(embId);
+  const embSite = executionSiteForModel(embId);
+  const llmSite = llmId ? executionSiteForModel(llmId) : embSite;
+
+  if (
+    ragHost
+    && embSite === ragHost
+    && llmSite === ragHost
+  ) {
+    return {
+      mode: 'native',
+      reason: `all RAG artifacts co-located with RAG ABI host (${ragHost})`,
+    };
+  }
+
+  return {
+    mode: 'composed',
+    reason: ragHost
+      ? `RAG ABI host is ${ragHost}, but artifacts are at emb=${embSite}`
+        + (llmId ? ` llm=${llmSite}` : '')
+        + '; native session is single-heap'
+      : 'No RAG ABI host is registered; composing via modality facades',
+  };
+}
+
+/**
+ * Install the provider that matches the ownership plan. Replaces a mismatched
+ * wasm-session provider when the pipeline spans heaps.
+ */
+async function ensureProviderForExecutionPlan(
+  config: RAGConfiguration,
+): Promise<void> {
+  const plan = resolveRagExecutionPlan(config);
+  if (plan.mode === 'native') return;
+
+  if (!supportsCrossWasmRAG()) {
+    throw SDKException.backendNotAvailable(
+      'RAG.createPipeline',
+      `${plan.reason}. Composed RAG also unavailable (embeddings + LLM facades `
+        + 'are not both registered).',
+    );
+  }
+
+  const current = _provider;
+  if (current?.providerKind === 'cross-wasm') return;
+  if (current) {
+    try {
+      await current.ragDestroyPipeline();
+    } catch {
+      /* ignore teardown races while swapping providers */
+    }
+  }
+  logger.info(`Using composed RAG provider — ${plan.reason}`);
+  setRAGProvider(createPersistentRAGProvider());
 }
 
 interface NormalizedCrossWasmDocument {
@@ -882,12 +1195,6 @@ function assertNativeHandle(handle: number, feature: string): number {
 }
 
 function validateNativeRAGConfiguration(config: RAGConfiguration, feature: string): void {
-  if (config.persistIndex) {
-    throw SDKException.backendNotAvailable(
-      feature,
-      NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
-    );
-  }
   if (!config.embeddingModelId.trim()) {
     throw SDKException.backendNotAvailable(
       feature,
@@ -1124,27 +1431,13 @@ export async function ragCreatePipeline(
       baseConfiguration,
     )
     : configOrEmbeddingModelId;
-  let provider = activeProvider();
-  let installedCrossWasmProvider = false;
-  // The Web release deliberately keeps llama.cpp and ONNX in independent
-  // Emscripten modules. A native RAG session in either module can see only
-  // one half of the pipeline (LLM or embeddings), so compose those public
-  // primitives in TypeScript when both registered backends are available.
-  if (!provider && supportsCrossWasmRAG()) {
-    provider = new CrossWasmRAGProvider();
-    _provider = provider;
-    installedCrossWasmProvider = true;
-  }
+  await ensureProviderForExecutionPlan(config);
+  const provider = activeProvider();
   if (provider) {
-    try {
-      await provider.ragCreatePipeline(config);
-      advancePipelineState(config);
-      logger.info('RAG pipeline created');
-      return;
-    } catch (error) {
-      if (installedCrossWasmProvider && _provider === provider) _provider = null;
-      throw error;
-    }
+    await provider.ragCreatePipeline(config);
+    advancePipelineState(config);
+    logger.info('RAG pipeline created');
+    return;
   }
 
   const adapter = RAGProtoAdapter.tryDefault();
@@ -1429,7 +1722,10 @@ export async function ragEnsureReady(
 /** Internal constructor used by focused split-WASM provider contract tests. */
 export const __testing__ = {
   createCrossWasmRAGProvider: (): RAGProvider => new CrossWasmRAGProvider(),
+  createPersistentRAGProvider: (): RAGProvider => new PersistentRAGProvider(),
+  clearPersistentRAGStore: (): void => memoryPersistentRAGStore.clear(),
   resetFacadeState: resetRAGFacadeState,
+  resolveRagExecutionPlan,
 };
 
 /**
@@ -1451,6 +1747,10 @@ export const RAG = {
   setProvider: setRAGProvider,
   /** @webOnly Construct a native (WASM-session-backed) RAG provider. */
   createNativeProvider: createRAGNativeProvider,
+  /** @webOnly Construct an IndexedDB-backed cross-WASM provider. */
+  createPersistentProvider: createPersistentRAGProvider,
+  /** @webOnly Install the default IndexedDB-backed cross-WASM provider. */
+  registerPersistentProvider: registerPersistentRAGProvider,
   /** @webOnly Install a pre-existing native RAG session handle as the active provider. */
   setSessionHandle: setRAGSessionHandle,
   /** @webOnly Inspect provider/availability without throwing. */

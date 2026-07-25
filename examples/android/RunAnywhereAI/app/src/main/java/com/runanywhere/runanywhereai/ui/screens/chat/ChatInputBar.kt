@@ -6,11 +6,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -62,14 +64,14 @@ private data class AttachmentAction(
 
 @Composable
 fun ChatInputBar(
-    input: String,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit,
-    canSend: Boolean,
-    isGenerating: Boolean,
-    isStopping: Boolean,
-    onStop: () -> Unit,
-    toolsEnabled: Boolean,
+    input: String = "",
+    onInputChange: (String) -> Unit = {},
+    onSend: () -> Unit = {},
+    canSend: Boolean = false,
+    isGenerating: Boolean = false,
+    isStopping: Boolean = false,
+    onStop: () -> Unit = {},
+    toolsEnabled: Boolean = false,
     toolsUnavailableMessage: String?,
     onToggleTools: () -> Unit,
     onAttachDocument: () -> Unit,
@@ -77,6 +79,9 @@ fun ChatInputBar(
     onOpenLive: () -> Unit,
     onOpenTalk: () -> Unit,
     onOpenAdvanced: () -> Unit,
+    onToggleThinking: () -> Unit,
+    thinkingEnabled: Boolean,
+    thinkingSupported: Boolean,
     modifier: Modifier = Modifier,
     pendingAttachment: ComposerAttachment? = null,
     onClearAttachment: () -> Unit = {},
@@ -85,10 +90,25 @@ fun ChatInputBar(
     val dimens = LocalDimens.current
     var menuExpanded by remember { mutableStateOf(false) }
     val actions = listOf(
-        AttachmentAction("Document", "Ask questions with sources", RACIcons.Outline.FileText, onAttachDocument),
+        AttachmentAction(
+            "Document",
+            "Ask questions with sources",
+            RACIcons.Outline.FileText,
+            onAttachDocument
+        ),
         AttachmentAction("Image", "Ask about a photo", RACIcons.Outline.Eye, onAttachImage),
-        AttachmentAction("Live camera", "Look around with vision", RACIcons.Outline.DeviceMobile, onOpenLive),
-        AttachmentAction("Advanced tools", "SDK demos and diagnostics", RACIcons.Outline.Stack, onOpenAdvanced),
+        AttachmentAction(
+            "Live camera",
+            "Look around with vision",
+            RACIcons.Outline.DeviceMobile,
+            onOpenLive
+        ),
+        AttachmentAction(
+            "Advanced tools",
+            "SDK demos and diagnostics",
+            RACIcons.Outline.Stack,
+            onOpenAdvanced
+        ),
     )
 
     Column(
@@ -134,8 +154,8 @@ fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
-            verticalAlignment = Alignment.Bottom,
+                .padding(horizontal = dimens.spacingMd).padding(top = dimens.spacingSm),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
         ) {
             Box {
@@ -148,7 +168,7 @@ fun ChatInputBar(
                     ),
                 ) {
                     Icon(
-                        imageVector = RACIcons.Outline.Plus,
+                        imageVector = RACIcons.Outline.Menu,
                         contentDescription = "Attach or open a mode",
                         modifier = Modifier.size(dimens.iconMd),
                     )
@@ -181,6 +201,8 @@ fun ChatInputBar(
                 }
             }
 
+            Spacer(modifier = Modifier.weight(1f))
+
             IconButton(
                 onClick = onToggleTools,
                 modifier = Modifier.size(dimens.inputBarMinHeight),
@@ -208,6 +230,59 @@ fun ChatInputBar(
                 )
             }
 
+            IconButton(
+                onClick = onOpenTalk,
+                modifier = Modifier.size(dimens.inputBarMinHeight),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Icon(
+                    imageVector = RACIcons.Outline.Microphone,
+                    contentDescription = "Talk mode",
+                    modifier = Modifier.size(dimens.iconMd),
+                )
+            }
+
+            IconButton(
+                onClick = onToggleThinking,
+                enabled = thinkingSupported,
+                modifier = Modifier.size(dimens.inputBarMinHeight),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = if (thinkingEnabled) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    contentColor = if (thinkingEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                ),
+            ) {
+                Icon(
+                    imageVector = RACIcons.Outline.Brain,
+                    contentDescription = when {
+                        !thinkingSupported -> "Thinking not supported by current model"
+                        thinkingEnabled -> "Disable thinking"
+                        else -> "Enable thinking"
+                    },
+                    modifier = Modifier.size(dimens.iconMd),
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = dimens.spacingMd, vertical = dimens.spacingSm),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        ) {
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -239,21 +314,6 @@ fun ChatInputBar(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Default,
                     ),
-                )
-            }
-
-            IconButton(
-                onClick = onOpenTalk,
-                modifier = Modifier.size(dimens.inputBarMinHeight),
-                colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-                Icon(
-                    imageVector = RACIcons.Outline.Microphone,
-                    contentDescription = "Talk mode",
-                    modifier = Modifier.size(dimens.iconMd),
                 )
             }
 
@@ -337,7 +397,11 @@ private fun AttachmentStatusPill(
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(attachment.icon, contentDescription = null, modifier = Modifier.size(dimens.iconSm))
+            Icon(
+                attachment.icon,
+                contentDescription = null,
+                modifier = Modifier.size(dimens.iconSm)
+            )
             Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
                     attachment.name,
@@ -355,7 +419,11 @@ private fun AttachmentStatusPill(
                 )
             }
             IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Icon(RACIcons.Outline.Close, contentDescription = "Remove attachment", modifier = Modifier.size(dimens.iconSm))
+                Icon(
+                    RACIcons.Outline.Close,
+                    contentDescription = "Remove attachment",
+                    modifier = Modifier.size(dimens.iconSm)
+                )
             }
         }
     }

@@ -13,6 +13,20 @@ The Web SDK is a Swift-aligned TypeScript facade over the RACommons C/C++ core. 
 
 Keep app code on the root `RunAnywhere` facade. Backend packages integrate only through `@runanywhere/web/backend`; browser apps may import UI/device helpers from `@runanywhere/web/browser`.
 
+## Commons-First, Thin TypeScript
+
+**Commons owns business and model logic.** Validation, modality pipelines, tool/structured/LoRA/RAG/hybrid/voice-agent session rules, and streaming state machines live in `runanywhere-commons` and are consumed only through the generated-proto C ABI (`rac_*_proto`, lifecycle, events) inside each backend WASM.
+
+**TypeScript stays thin.** The Web SDK may only:
+- Encode/decode proto bytes and invoke `rac_*` via `ccall` / BackendWorker RPC
+- Own browser I/O (mic, speaker, permissions, DOM, fetch, OPFS/IndexedDB coordination)
+- Host BackendWorkers and route requests to the module that owns the model
+- Expose Swift/Kotlin-shaped `RunAnywhere.*` facades
+
+**Do not reimplement commons pipelines in TS** when a commons export exists. Prefer native session ABIs; CrossWasm/TS fallbacks are degraded-only and must not become the production path.
+
+**Off the UI thread.** All commons/WASM inference and model mutation runs in a BackendWorker. Main thread is I/O + thin facade only. Acceleration is WebGPU-first when the engine and device support it (`navigator.gpu` + `shader-f16`); otherwise CPU worker. Never silently fall back to main-thread inference when a required worker fails.
+
 ## Package Boundaries and Dependency Direction
 
 There are exactly three publishable Web packages. `@runanywhere/web/backend`,
@@ -196,6 +210,25 @@ await RunAnywhere.completeServicesInitialization();
 `RunAnywhere.initialize()` loads `racommons.wasm` (commons only) and records core SDK state. Each backend `register()` call loads its own dedicated WASM, calls `rac_init()` against that module, registers the backend vtable(s) with the plugin registry, and installs the module on the core proto-byte adapters so subsequent operations route correctly.
 
 `ONNX.register()` accepts an optional `wasmUrl` override. The previous `skipProtoBytePlugins` / `skipStandaloneSpeech` options have been removed — the proto-byte path is the only path.
+
+### Demo boot and runtime honesty
+
+- The example boots in this order: `RunAnywhere.initialize()` → backend
+  registration → `completeServicesInitialization()` (Phase 2) → model catalog
+  registration/hydration. Production identity is asynchronous after this path
+  and must never block local shell readiness.
+- `BackendWorkerHost` is the production LlamaCPP inference path when
+  `Worker` is available: `LlamaCPP.register()` installs `backendWorker.ts`,
+  loads models in the worker (preferring the no-pthread WebGPU WASM), and
+  sets `RunAnywhere.runtime.executionContext` to `'worker'`. On handshake
+  failure, `runtime.degradedReason` explains the main-thread fallback.
+  Nesting the pthread CPU artifact in a DedicatedWorker requires
+  `mainScriptUrlOrBlob` so `em-pthread` children can boot.
+- Diffusion is exposed through `@runanywhere/web` core (Swift/Kotlin parity); there is no separate `@runanywhere/web-diffusion` package
+  until it ships a WASM artifact. Do not claim or package diffusion alongside
+  the four current canonical JS/WASM pairs.
+- Hybrid STT registers `Cloud.registerBackend()` only after `ONNX.register()`;
+  a missing optional cloud engine must not make local ONNX/Sherpa unavailable.
 
 ## Build Artifacts
 

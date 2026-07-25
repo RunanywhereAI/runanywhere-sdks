@@ -31,9 +31,12 @@ import {
   type LoRAState,
   type LoraAdapterCatalogEntry,
 } from '@runanywhere/proto-ts/lora_options';
-import { Colors } from '../../theme/colors';
-import { Typography } from '../../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../../theme/system';
 
 interface LoRASheetProps {
   visible: boolean;
@@ -62,6 +65,8 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   onClose,
   onAdaptersChanged,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [availableAdapters, setAvailableAdapters] = useState<
     LoraAdapterCatalogEntry[]
   >([]);
@@ -204,7 +209,11 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
       <BottomSheetScrollView contentContainerStyle={styles.content}>
         {error && (
           <View style={styles.errorBox}>
-            <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
+            <Icon
+              name="alert-circle"
+              size={16}
+              color={colors.onErrorContainer}
+            />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
@@ -233,7 +242,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
                         <Icon
                           name="checkmark-circle"
                           size={14}
-                          color={Colors.primaryGreen}
+                          color={colors.success}
                         />
                         <Text style={styles.badgeAppliedText}>Applied</Text>
                       </View>
@@ -242,7 +251,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
                         <Icon
                           name="checkmark-circle-outline"
                           size={14}
-                          color={Colors.primaryBlue}
+                          color={colors.primary}
                         />
                         <Text style={styles.badgeDownloadedText}>
                           Downloaded
@@ -262,7 +271,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
                           maximumValue={2}
                           step={0.1}
                           value={scale}
-                          minimumTrackTintColor={Colors.primaryPurple}
+                          minimumTrackTintColor={colors.primary}
                           onValueChange={(value: number) =>
                             setScales((prev) => ({
                               ...prev,
@@ -282,7 +291,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
                         {isLoadingLoRA ? (
                           <ActivityIndicator
                             size="small"
-                            color={Colors.textWhite}
+                            color={colors.onPrimary}
                           />
                         ) : (
                           <Text style={styles.applyButtonText}>
@@ -326,7 +335,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
                     <Icon
                       name="close-circle"
                       size={22}
-                      color={Colors.textTertiary}
+                      color={colors.outline}
                     />
                   </TouchableOpacity>
                 </View>
@@ -336,7 +345,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
               style={styles.clearAllRow}
               onPress={handleClearAll}
             >
-              <Icon name="trash-outline" size={16} color={Colors.primaryRed} />
+              <Icon name="trash-outline" size={16} color={colors.error} />
               <Text style={styles.clearAllText}>Clear All Adapters</Text>
             </TouchableOpacity>
           </View>
@@ -344,7 +353,7 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
 
         {availableAdapters.length === 0 && loadedAdapters.length === 0 && (
           <View style={styles.emptyState}>
-            <Icon name="sparkles" size={32} color={Colors.primaryPurple} />
+            <Icon name="sparkles" size={32} color={colors.primary} />
             <Text style={styles.emptyText}>
               No LoRA adapters available for this model.
             </Text>
@@ -355,168 +364,148 @@ export const LoRASheet: React.FC<LoRASheetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  sheetHeader: {
-    paddingHorizontal: Padding.padding16,
-    paddingTop: Spacing.small,
-    paddingBottom: Spacing.medium,
-    alignItems: 'center',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  title: {
-    ...Typography.title3,
-    color: Colors.textPrimary,
-  },
-  doneButton: {
-    padding: Spacing.small,
-  },
-  doneText: {
-    ...Typography.headline,
-    color: Colors.primaryBlue,
-  },
-  content: {
-    padding: Padding.padding16,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    backgroundColor: Colors.badgeRed,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding12,
-    marginBottom: Spacing.medium,
-  },
-  errorText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    flex: 1,
-  },
-  section: {
-    marginBottom: Spacing.xLarge,
-  },
-  sectionHeader: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.small,
-  },
-  sectionFooter: {
-    ...Typography.caption2,
-    color: Colors.textTertiary,
-    marginTop: Spacing.small,
-  },
-  card: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding12,
-    marginBottom: Spacing.small,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  cardInfo: {
-    flex: 1,
-    marginRight: Spacing.small,
-  },
-  adapterName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  adapterDescription: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  adapterSize: {
-    ...Typography.caption2,
-    color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  loadedMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-    marginTop: 2,
-  },
-  badgeApplied: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  badgeAppliedText: {
-    ...Typography.caption2,
-    color: Colors.primaryGreen,
-  },
-  badgeDownloaded: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  badgeDownloadedText: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-  },
-  applyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: Spacing.medium,
-    marginTop: Spacing.small,
-  },
-  sliderColumn: {
-    flex: 1,
-  },
-  scaleLabel: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  applyButton: {
-    backgroundColor: Colors.primaryPurple,
-    borderRadius: BorderRadius.medium,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding8,
-    minWidth: 92,
-    alignItems: 'center',
-  },
-  applyButtonDisabled: {
-    opacity: 0.6,
-  },
-  applyButtonText: {
-    ...Typography.caption,
-    color: Colors.textWhite,
-    fontWeight: '600',
-  },
-  clearAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.small,
-    paddingVertical: Padding.padding12,
-  },
-  clearAllText: {
-    ...Typography.subheadline,
-    color: Colors.primaryRed,
-  },
-  emptyState: {
-    alignItems: 'center',
-    gap: Spacing.medium,
-    paddingVertical: Padding.padding40,
-  },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    sheetHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 6,
+      paddingBottom: 10,
+      alignItems: 'center',
+    },
+    title: {
+      ...typography.titleLarge,
+      color: colors.onSurface,
+    },
+    content: {
+      padding: 16,
+    },
+    errorBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.errorContainer,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 10,
+    },
+    errorText: {
+      ...typography.bodySmall,
+      color: colors.onErrorContainer,
+      flex: 1,
+    },
+    section: {
+      marginBottom: 20,
+    },
+    sectionHeader: {
+      ...typography.labelMedium,
+      color: colors.onSurfaceVariant,
+      marginBottom: 6,
+    },
+    sectionFooter: {
+      ...typography.labelSmall,
+      color: colors.outline,
+      marginTop: 6,
+    },
+    card: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 6,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    cardInfo: {
+      flex: 1,
+      marginRight: 6,
+    },
+    adapterName: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+    },
+    adapterDescription: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+    },
+    adapterSize: {
+      ...typography.labelSmall,
+      color: colors.outline,
+      marginTop: 2,
+    },
+    loadedMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 2,
+    },
+    badgeApplied: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    badgeAppliedText: {
+      ...typography.labelSmall,
+      color: colors.success,
+    },
+    badgeDownloaded: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    badgeDownloadedText: {
+      ...typography.labelSmall,
+      color: colors.primary,
+    },
+    applyRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 10,
+      marginTop: 6,
+    },
+    sliderColumn: {
+      flex: 1,
+    },
+    scaleLabel: {
+      ...typography.labelSmall,
+      color: colors.onSurfaceVariant,
+    },
+    applyButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      minWidth: 92,
+      alignItems: 'center',
+    },
+    applyButtonDisabled: {
+      opacity: 0.6,
+    },
+    applyButtonText: {
+      ...typography.labelMedium,
+      color: colors.onPrimary,
+    },
+    clearAllRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+    },
+    clearAllText: {
+      ...typography.bodyMedium,
+      color: colors.error,
+    },
+    emptyState: {
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 40,
+    },
+    emptyText: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+    },
+  });

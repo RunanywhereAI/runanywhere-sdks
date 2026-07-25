@@ -471,7 +471,7 @@
 .toolbar-model-btn:hover {
   background: var(--bg-hover);
   border-color: var(--color-primary);
-  box-shadow: 0 2px 8px rgba(255,85,0,0.12);
+  box-shadow: 0 2px 8px rgba(255,105,0,0.12);
 }
 .toolbar-model-btn:active {
   transform: scale(0.97);
@@ -1580,7 +1580,7 @@
 .model-action-btn--progress { background: var(--bg-tertiary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .model-action-btn--retry { background: var(--badge-red); color: var(--color-red); }
 .model-action-btn--unavailable {
-  max-width: 132px;
+  max-width: 168px;
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
   cursor: not-allowed;
@@ -1979,7 +1979,6 @@
   flex-direction: column;
   gap: var(--space-xs);
   border-top: 1px solid var(--border-light);
-  animation: fade-in var(--duration-fast) ease-out;
 }
 
 .variant-row {
@@ -2384,8 +2383,8 @@
 .mic-btn.listening { animation: mic-pulse 2s ease-in-out infinite; }
 
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 85, 0, 0.4); }
-  50% { box-shadow: 0 0 0 20px rgba(255, 85, 0, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 0, 0.4); }
+  50% { box-shadow: 0 0 0 20px rgba(255, 105, 0, 0); }
 }
 
 .mic-btn svg { width: 28px; height: 28px; }
@@ -2997,7 +2996,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 64px;
   border-radius: 50%;
   border: 3px solid var(--color-orange);
-  background: rgba(255, 85, 0, 0.15);
+  background: rgba(255, 105, 0, 0.15);
   color: var(--color-orange);
   cursor: pointer;
   display: flex;
@@ -3007,7 +3006,7 @@ input[type="range"]::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 .vision-capture-btn:hover {
-  background: rgba(255, 85, 0, 0.25);
+  background: rgba(255, 105, 0, 0.25);
   transform: scale(1.05);
 }
 /** Scaled-down typing dots for the processing overlay */

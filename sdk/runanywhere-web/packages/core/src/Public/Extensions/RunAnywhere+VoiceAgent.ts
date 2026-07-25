@@ -52,7 +52,12 @@ import {
   MessageRole,
   type ChatMessage,
 } from '@runanywhere/proto-ts/chat';
-import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule.js';
+import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -111,6 +116,93 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
   _provider = provider;
 }
 
+/**
+ * When BackendWorkers own STT/TTS/VAD/LLM, the native single-heap voice-agent
+ * handle cannot see those models (fopen against empty main MEMFS → Silero
+ * "does not exist", processVoiceTurn → RAC_ERROR_NOT_INITIALIZED). Compose
+ * turns through the public STT/LLM/TTS facades that already RPC to workers.
+ */
+function prefersSplitBackendVoiceAgent(): boolean {
+  if (hasBackendWorkerOwnedModels('onnx') || hasBackendWorkerOwnedModels('llamacpp')) {
+    return true;
+  }
+  const onnx = getActiveBackendWorkerHost('onnx');
+  const llama = getActiveBackendWorkerHost('llamacpp');
+  return onnx?.diagnostics.executionContext === 'worker'
+    && llama?.diagnostics.executionContext === 'worker';
+}
+
+/**
+ * Explicit backend-registration hook for the split-WASM voice pipeline.
+ * Backend bridges invoke this after their capability registrations; facade
+ * calls never manufacture a cross-WASM provider as a hidden default.
+ */
+export function registerVoiceAgentProvider(provider?: VoiceAgentProvider): boolean {
+  // Explicit caller-provided providers always win.
+  let resolved = provider ?? null;
+  const nativeAvailable = VoiceAgentProtoAdapter.tryDefault()?.supportsProtoVoiceAgent() ?? false;
+
+  // Production off-main-thread path: STT/TTS/LLM live in DedicatedWorkers.
+  // Prefer CrossWasm composition so each turn hits worker-owned facades.
+  if (!resolved && prefersSplitBackendVoiceAgent() && supportsCrossWasmVoiceAgent()) {
+    if (_provider?.providerKind !== 'cross-wasm') {
+      logger.info(
+        'Using CrossWasm voice-agent provider (modality models are BackendWorker-owned).',
+      );
+    }
+    resolved = _provider?.providerKind === 'cross-wasm'
+      ? _provider
+      : new CrossWasmVoiceAgentProvider();
+  }
+
+  if (!resolved && _provider?.providerKind === 'wasm-handle' && !prefersSplitBackendVoiceAgent()) {
+    resolved = _provider;
+  }
+  if (!resolved && !prefersSplitBackendVoiceAgent()) {
+    resolved = tryCreateNativeVoiceAgentProvider();
+  }
+  // Last resort when the native ABI is absent entirely.
+  if (!resolved && !nativeAvailable && supportsCrossWasmVoiceAgent()) {
+    logger.warning('Native voice-agent ABI is unavailable; using degraded CrossWasm provider.');
+    resolved = new CrossWasmVoiceAgentProvider();
+  }
+  if (!resolved) return false;
+  setVoiceAgentProvider(resolved);
+  return true;
+}
+
+function tryCreateNativeVoiceAgentProvider(): VoiceAgentProvider | null {
+  const adapter = VoiceAgentProtoAdapter.tryDefault();
+  if (!adapter?.supportsProtoVoiceAgent()) return null;
+  const module = getModuleForCapability('voice-agent') as
+    | (EmscriptenRunanywhereModule & {
+      _rac_voice_agent_create_standalone?: (outHandle: number) => number;
+    })
+    | null;
+  if (
+    !module
+    || typeof module._rac_voice_agent_create_standalone !== 'function'
+    || typeof module._malloc !== 'function'
+    || typeof module._free !== 'function'
+    || typeof module.getValue !== 'function'
+  ) {
+    return null;
+  }
+  const outPtr = module._malloc(4);
+  if (!outPtr) return null;
+  try {
+    const rc = module._rac_voice_agent_create_standalone(outPtr);
+    if (rc !== 0) return null;
+    const handle = module.getValue(outPtr, '*');
+    if (!handle) return null;
+    return createVoiceAgentHandleProvider({ handle, module });
+  } catch {
+    return null;
+  } finally {
+    module._free(outPtr);
+  }
+}
+
 export function createVoiceAgentHandleProvider(
   source: Extract<VoiceAgentStreamSource, { handle: number }>,
 ): VoiceAgentProvider {
@@ -150,9 +242,6 @@ function evictUnavailableCrossWasmProvider(): void {
 
 function activeProvider(): VoiceAgentProvider | null {
   evictUnavailableCrossWasmProvider();
-  if (!_provider && supportsCrossWasmVoiceAgent()) {
-    _provider = new CrossWasmVoiceAgentProvider();
-  }
   return _provider;
 }
 
@@ -1127,6 +1216,9 @@ export async function initializeVoiceAgentWithLoadedModels(
   if (ensureVAD) {
     await ensureDefaultVAD();
   }
+  // Re-bind after models are loaded: ONNX/Llama registration may have
+  // installed a native handle before BackendWorkers owned STT/LLM/TTS.
+  registerVoiceAgentProvider();
   await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels(ttsVoiceID);
 }
 

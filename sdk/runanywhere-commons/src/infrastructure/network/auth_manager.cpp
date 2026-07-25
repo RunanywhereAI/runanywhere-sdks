@@ -16,6 +16,11 @@
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 
+#include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
+
+#include "../device/rac_device_live_state_internal.h"
+
 // =============================================================================
 // Global State
 // =============================================================================
@@ -342,6 +347,18 @@ static int handle_auth_response(const char* json, bool refresh) {
         return -1;
     }
 
+    // Registration heal: the authenticate response reports
+    // device_registered=false when the backend only holds a placeholder row
+    // for this device. Flag the device manager so the phase-2 registration
+    // runs even when the platform-persisted is_registered flag says otherwise.
+    // Absent field (older backends) means no override.
+    const bool server_unregistered =
+        !refresh && (strstr(json, "\"device_registered\":false") != nullptr ||
+                     strstr(json, "\"device_registered\": false") != nullptr);
+    if (server_unregistered) {
+        rac_device_manager_notify_server_unregistered();
+    }
+
     int result;
     {
         std::lock_guard<std::mutex> lock(g_auth_mutex);
@@ -370,6 +387,12 @@ static int handle_auth_response(const char* json, bool refresh) {
         // A token is now available — drain telemetry batches deferred by the
         // pre-auth flush gate (see rac_telemetry_manager_flush).
         rac_events_flush_telemetry_sink();
+        // The freshly minted token is now available: run the forced
+        // registration immediately so the server's placeholder row upgrades
+        // this session instead of on the next launch.
+        if (server_unregistered) {
+            (void)rac_device_manager_register_if_needed(rac_state_get_environment(), nullptr);
+        }
     } else {
         if (result == RAC_ERROR_SECURE_STORAGE_FAILED) {
             publish_auth_failure_event("Failed to persist authentication state", refresh,

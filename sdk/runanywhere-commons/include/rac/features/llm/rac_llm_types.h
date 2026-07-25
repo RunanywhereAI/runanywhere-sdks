@@ -199,6 +199,9 @@ typedef struct rac_llm_result {
     /** Time to first token in milliseconds */
     int64_t time_to_first_token_ms;
 
+    /** Prompt eval (prefill) time in milliseconds */
+    int64_t prompt_eval_time_ms;
+
     /** Total generation time in milliseconds */
     int64_t total_time_ms;
 

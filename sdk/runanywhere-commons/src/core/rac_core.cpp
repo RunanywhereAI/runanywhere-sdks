@@ -337,13 +337,6 @@ rac_result_t rac_configure_logging(rac_environment_t environment) {
             RAC_LOG_INFO("RAC.Core", "Logging configured for development: stderr ON, level=DEBUG");
             break;
 
-        case RAC_ENV_STAGING:
-            // Staging: print to C++ stderr + send to Swift
-            rac_logger_set_stderr_always(RAC_TRUE);
-            rac_logger_set_min_level(RAC_LOG_INFO);
-            RAC_LOG_INFO("RAC.Core", "Logging configured for staging: stderr ON, level=INFO");
-            break;
-
         case RAC_ENV_PRODUCTION:
         default:
             // Production: NO C++ stderr, only send to the platform bridge.

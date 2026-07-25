@@ -55,8 +55,10 @@ const localSDKSourceAliases = [
  * emitted as well; otherwise the worker request falls through to the SPA HTML
  * and Emscripten waits forever for its pthread pool.
  *
- * Four JS/WASM artifact pairs ship across three SDK packages. Vite bundles the
- * Emscripten JS glue while this plugin copies each canonical pair next to it:
+ * Four JS/WASM artifact pairs (eight runtime files) ship across three SDK
+ * packages. Diffusion remains workspace-only and is deliberately excluded
+ * until it ships a publishable WASM artifact. Vite bundles the Emscripten JS
+ * glue while this plugin copies each canonical pair next to it:
  *   - `racommons.{js,wasm}` (commons core, owned by `@runanywhere/web`)
  *   - `racommons-llamacpp.{js,wasm}` (CPU LLM backend)
  *   - `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU LLM backend)
@@ -132,6 +134,9 @@ export default defineConfig(({ command }) => {
       alias: useInstalledSDK ? [] : localSDKSourceAliases,
     },
     server: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
       headers: isolationHeaders,
       cors: false,
       fs: {
@@ -141,6 +146,9 @@ export default defineConfig(({ command }) => {
       },
     },
     preview: {
+      host: '127.0.0.1',
+      port: 3000,
+      strictPort: true,
       headers: isolationHeaders,
       cors: false,
     },

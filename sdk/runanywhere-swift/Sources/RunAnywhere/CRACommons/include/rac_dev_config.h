@@ -2,21 +2,15 @@
  * @file rac_dev_config.h
  * @brief Development mode configuration API
  *
- * Provides access to development mode configuration values. Normal builds use
- * the credential-free tracked template. Developers may explicitly opt in to
- * the ignored development_config.cpp with RAC_INCLUDE_LOCAL_DEV_CONFIG=ON.
- *
- * This allows:
- * - Cross-platform sharing of explicitly enabled local development config
- * - Git-ignored credentials with a credential-free build default
- * - Consistent development environment across SDKs
+ * Provides access to the baked staging backend base URL and the canonical
+ * usability checks. Only a neutral backend base URL is ever baked — no
+ * credentials, project refs, or tokens. The SDK reaches the backend solely
+ * through this base URL.
  *
  * Security Model:
  * - development_config.cpp is in .gitignore (not committed to main branch)
  * - Normal, CI, and release builds never compile the ignored local file
- * - Local values require RAC_INCLUDE_LOCAL_DEV_CONFIG=ON and must never be packaged
- * - Values are used only when the SDK is in .development mode
- * - Backend validates build token via POST /api/v1/devices/register/dev
+ * - Local opt-in requires RAC_INCLUDE_LOCAL_DEV_CONFIG=ON and must never be packaged
  */
 
 #ifndef RAC_DEV_CONFIG_H
@@ -35,44 +29,15 @@ extern "C" {
 // =============================================================================
 
 /**
- * @brief Check if development config is available
- * @return true if development config is properly configured
+ * @brief Get the baked staging backend base URL
+ *
+ * Release/CI bakes the OSS backend URL (STAGING_BASE_URL secret) so keyless
+ * development can omit base_url. Open-source placeholder builds must pass a
+ * base URL explicitly (or bake STAGING_BASE_URL at compile time).
+ *
+ * @return URL string or placeholder (static, do not free)
  */
-RAC_API bool rac_dev_config_is_available(void);
-
-/**
- * @brief Get Supabase project URL for development mode
- * @return URL string (static, do not free)
- */
-RAC_API const char* rac_dev_config_get_supabase_url(void);
-
-/**
- * @brief Get Supabase anon key for development mode
- * @return API key string (static, do not free)
- */
-RAC_API const char* rac_dev_config_get_supabase_key(void);
-
-/**
- * @brief Get build token for development mode
- * @return Build token string (static, do not free)
- */
-RAC_API const char* rac_dev_config_get_build_token(void);
-
-// =============================================================================
-// Convenience Functions
-// =============================================================================
-
-/**
- * @brief Check if Supabase config is valid
- * @return true if URL and key are non-empty
- */
-RAC_API bool rac_dev_config_has_supabase(void);
-
-/**
- * @brief Check if build token is valid
- * @return true if build token is non-empty
- */
-RAC_API bool rac_dev_config_has_build_token(void);
+RAC_API const char* rac_dev_config_get_staging_base_url(void);
 
 // =============================================================================
 // Usability Checks (canonical, shared by all SDKs)

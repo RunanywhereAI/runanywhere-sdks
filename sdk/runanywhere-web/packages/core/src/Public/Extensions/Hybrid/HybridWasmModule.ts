@@ -9,79 +9,24 @@
  *   - rac_hybrid_custom_filter.h     (named custom-filter callback table)
  *   - rac_plugin_entry_cloud.h       (rac_backend_cloud_register)
  *
- * EVERY symbol below is optional at the type level because the current Web
- * WASM targets do NOT export them yet (see the BUILD DELTA note). The router
- * facade checks for presence and surfaces `backendNotAvailable` with an
- * actionable message when a build is missing them — exactly how the rest of
- * the Web SDK degrades when a backend isn't linked (cf. SpeechBackendExports).
+ * Symbols remain optional at the type level because a host may load an older
+ * artifact or a capability-specific WASM that does not contain the hybrid
+ * exports. Current Web build targets export the router ABI from
+ * `RAC_EXPORTED_FUNCTIONS_BASE`; the ONNX-sherpa and llama.cpp targets also
+ * export the cloud registration ABI. The router checks at runtime and reports
+ * `backendNotAvailable` when the loaded artifact is stale or incomplete.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * BUILD DELTA (what the WASM build needs before this runs end-to-end)
+ * BUILD STATUS
  * ────────────────────────────────────────────────────────────────────────────
- * The router + device-state + custom-filter C++ sources ALREADY compile into
- * `rac_commons` (sdk/runanywhere-commons/CMakeLists.txt:
- *   src/routing/rac_stt_hybrid_router.cpp
- *   src/routing/rac_stt_hybrid_router_proto.cpp
- *   src/routing/rac_hybrid_device_state.cpp
- *   src/routing/rac_hybrid_custom_filter.cpp)
- * and every Web WASM target links `rac_commons`. They are only DEAD-STRIPPED
- * because:
- *   (1) wasm/src/wasm_exports.cpp does NOT #include the routing headers, and
- *   (2) the symbols are NOT in any RAC_EXPORTED_FUNCTIONS list.
- *
- * To make this binding actually run, the WASM build must:
- *
- *   A. In sdk/runanywhere-web/wasm/src/wasm_exports.cpp, add:
- *        #include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
- *        #include "rac/router/hybrid/rac_stt_hybrid_router.h"
- *        #include "rac/router/hybrid/rac_hybrid_device_state.h"
- *        #include "rac/router/hybrid/rac_hybrid_custom_filter.h"
- *      so the linker keeps the symbols (KEEPALIVE / referenced TUs).
- *
- *   B. In sdk/runanywhere-web/wasm/CMakeLists.txt RAC_EXPORTED_FUNCTIONS_BASE,
- *      add the ROUTER_EXPORTS / DEVICE_STATE_EXPORTS / CUSTOM_FILTER_EXPORTS
- *      names below (these are commons-local, so they belong in the BASE list
- *      that every target inherits).
- *
- *   C. the cloud engine is its OWN engine static library (engines/cloud →
- *      `rac_backend_cloud`), NOT folded into rac_commons — exactly like
- *      rac_backend_sherpa / rac_backend_onnx / rac_backend_llamacpp. To make
- *      the ONLINE side routable in WASM the build must additionally:
- *        - link `rac_backend_cloud` into a target (the ONNX-sherpa target
- *          is the natural home — it already owns the OFFLINE sherpa STT side),
- *        - add a per-backend export list with `_rac_backend_cloud_register`
- *          + `_rac_backend_cloud_unregister` (mirrors
- *          RAC_EXPORTED_FUNCTIONS_SHERPA), appended to that target,
- *        - ensure RAC_STATIC_REGISTER_BACKEND(cloud) is folded into the
- *          static-plugin archive (the Web build already uses
- *          -DRAC_STATIC_PLUGINS=ON, the same path iOS uses).
- *
- *   D. Service creation. The router needs a `rac_stt_service_t*` for each side.
- *      Plugin SELECTION is shared commons: `rac_plugin_find_for_engine(
- *      RAC_PRIMITIVE_TRANSCRIBE, engine_name)` returns the engine's vtable
- *      pointer (0 when no plugin is registered under that engine for the
- *      primitive). Actually building the service from that vtable means
- *      dereferencing `vt->stt_ops->create` INSIDE the struct, which the Web
- *      SDK deliberately never does (it uses proto-byte ABIs + offset helpers,
- *      never raw vtable deref). So the create→wrap stays in a commons C ABI
- *      convenience export that does the selection + deref + heap-wrap in one:
- *
- *        // returns an opaque rac_stt_service_t* (as a pointer/number), or 0
- *        RAC_API rac_stt_service_t* rac_stt_hybrid_router_create_service(
- *            const char* engine_hint,      // "sherpa" | "cloud"
- *            const char* model_id_or_path, // sherpa model id; "" for cloud
- *            const char* config_json);     // cloud config JSON; NULL for sherpa
- *        RAC_API void rac_stt_hybrid_router_destroy_service(rac_stt_service_t*);
- *
- *      exported as `_rac_stt_hybrid_router_create_service` /
- *      `_rac_stt_hybrid_router_destroy_service` (both already land in commons +
- *      the WASM export list). This binding uses `rac_plugin_find_for_engine`
- *      as the routability guard before delegating create→wrap to that pair
- *      (see `HybridSttRouter.createService`).
- *
- * Until A–D land, `HybridSttRouter` constructs cleanly but
- * `supportsHybridRouter()` returns false and `setPair`/`transcribe` raise a
- * clear `backendNotAvailable` — no faked behaviour.
+ * The router, device-state, and custom-filter headers are included by
+ * `wasm/src/wasm_exports.cpp`; their exports, including the opaque service
+ * creation helpers, are listed in `RAC_EXPORTED_FUNCTIONS_BASE`. The cloud
+ * register/unregister and provider-registry exports are appended to the
+ * ONNX-sherpa and llama.cpp targets through `RAC_EXPORTED_FUNCTIONS_CLOUD`.
+ * `_rac_plugin_find_for_engine` is also exported from the base list so the
+ * binding can verify that its named STT engine is routable before service
+ * creation. Rebuild WASM artifacts after changing any of these lists.
  */
 
 import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule.js';
@@ -156,7 +101,7 @@ export interface HybridWasmModule extends EmscriptenRunanywhereModule {
     engineNamePtr: number,
   ): number;
 
-  // ── Service creation convenience (BUILD DELTA item D) ─────────────────────
+  // ── Service creation convenience ──────────────────────────────────────────
   /** `rac_stt_service_t* rac_stt_hybrid_router_create_service(
    *    engine_hint, model_id_or_path, config_json)` — opaque ptr or 0.
    *    Internally selects the engine via `rac_plugin_find_for_engine`, then
@@ -244,16 +189,13 @@ export function hasHybridRouterExports(
   return missingHybridRouterExports(module).length === 0;
 }
 
-/** Actionable message pointing at the WASM build delta when exports are absent. */
+/** Actionable message for an artifact missing the current hybrid export set. */
 export function hybridRouterRequirementMessage(missing: string[]): string {
   const list = missing.length > 0 ? missing.join(', ') : 'none';
   return (
     `Loaded RACommons WASM is missing hybrid STT router exports: ${list}. ` +
-    'The router C++ already compiles into rac_commons; rebuild the Web WASM ' +
-    'with the routing headers #included in wasm_exports.cpp and the ' +
-    'rac_stt_hybrid_router_* / rac_hybrid_* symbols added to ' +
-    'RAC_EXPORTED_FUNCTIONS (see HybridWasmModule.ts BUILD DELTA). For the ' +
-    'online cloud side, also link rac_backend_cloud and export ' +
-    'rac_backend_cloud_register.'
+    'Rebuild the Web WASM with the current wasm/CMakeLists.txt export lists. ' +
+    'For cloud routing, load the ONNX-sherpa or llama.cpp artifact that also ' +
+    'exports rac_backend_cloud_register.'
   );
 }

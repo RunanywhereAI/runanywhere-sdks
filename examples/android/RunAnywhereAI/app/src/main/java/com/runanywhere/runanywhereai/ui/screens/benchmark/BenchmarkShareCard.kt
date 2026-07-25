@@ -64,7 +64,7 @@ import kotlin.coroutines.cancellation.CancellationException
 // same regardless of the app's active Material color scheme).
 private val CardBackgroundTop = Color(0xFF1A0E06)
 private val CardBackgroundBottom = Color(0xFF0B0B0C)
-private val BrandOrange = Color(0xFFFF5500)
+private val BrandOrange = Color(0xFFFF6900)  // RunAnywhere brand orange (see examples/DESIGN_GUIDELINE.md)
 private val CardTextPrimary = Color(0xFFF5F3F1)
 private val CardTextSecondary = Color(0xFF9A938E)
 private val CardRowBackground = Color(0x14FFFFFF)

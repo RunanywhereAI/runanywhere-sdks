@@ -6,12 +6,19 @@
 //  `RADeviceInfo` telemetry schema from sysctl / UIKit / ProcessInfo.
 //
 
+import CryptoKit
 import Foundation
+
+#if canImport(Metal)
+import Metal
+#endif
 
 #if os(iOS) || os(tvOS)
 import UIKit
 #elseif os(watchOS)
 import WatchKit
+#elseif os(macOS)
+import IOKit.ps
 #endif
 
 /// Builds the canonical `RADeviceInfo` (generated proto) for the current
@@ -36,7 +43,7 @@ public enum DeviceInfoFactory {
 
         // Get model identifier for chip/model lookup
         let modelId = getModelIdentifier()
-        let chipName = getChipName(for: modelId)
+        let chipSpec = getChipSpec(for: modelId)
         let (perfCores, effCores) = getCoreDistribution(totalCores: coreCount, modelId: modelId)
 
         // Platform-specific values
@@ -48,7 +55,7 @@ public enum DeviceInfoFactory {
         let platform = "ios"
         let formFactor = device.userInterfaceIdiom == .pad ? "tablet" : "phone"
 
-        // Battery info
+        // Battery info (monitoring must be enabled before reading)
         device.isBatteryMonitoringEnabled = true
         let batteryLevel: Float? = device.batteryLevel >= 0 ? Float(device.batteryLevel) : nil
         let batteryState: String? = {
@@ -64,8 +71,7 @@ public enum DeviceInfoFactory {
         let deviceName = Host.current().localizedName ?? "Mac"
         let platform = "macos"
         let formFactor = modelId.contains("MacBook") ? "laptop" : "desktop"
-        let batteryLevel: Float? = nil
-        let batteryState: String? = nil
+        let (batteryLevel, batteryState) = getMacBatteryInfo()
         #elseif os(tvOS)
         let device = UIDevice.current
         let deviceModel = getDeviceModelName(for: modelId) ?? device.model
@@ -101,7 +107,6 @@ public enum DeviceInfoFactory {
         // Get available memory and clean OS version
         let availableMemory = getAvailableMemory()
         let osVersion = cleanVersion(processInfo.operatingSystemVersionString)
-        let hasNeuralEngine = architecture == "arm64"
 
         var info = RADeviceInfo()
         info.deviceModel = deviceModel
@@ -110,12 +115,12 @@ public enum DeviceInfoFactory {
         info.osVersion = osVersion
         info.formFactor = formFactor
         info.architecture = architecture
-        info.chipName = chipName
+        info.chipName = chipSpec.name
         info.totalMemory = Int64(processInfo.physicalMemory)
         info.availableMemory = Int64(availableMemory)
-        info.hasNeuralEngine_p = hasNeuralEngine
-        info.neuralEngineCores = hasNeuralEngine ? 16 : 0
-        info.gpuFamily = "apple"
+        info.hasNeuralEngine_p = chipSpec.hasNeuralEngine
+        info.neuralEngineCores = chipSpec.neuralEngineCores
+        info.gpuFamily = cachedGPUFamily
         if let batteryLevel { info.batteryLevel = batteryLevel }
         if let batteryState { info.batteryState = batteryState }
         info.isLowPowerMode = processInfo.isLowPowerModeEnabled
@@ -123,6 +128,50 @@ public enum DeviceInfoFactory {
         info.performanceCores = Int32(perfCores)
         info.efficiencyCores = Int32(effCores)
         return info
+    }
+
+    /// Stable hardware fingerprint: deterministic per physical device,
+    /// survives reinstalls (derived only from hardware attributes).
+    static let hardwareFingerprint: String = {
+        let modelId = getModelIdentifier()
+        let chipName = getChipSpec(for: modelId).name
+        let totalMemory = ProcessInfo.processInfo.physicalMemory
+        let coreCount = ProcessInfo.processInfo.processorCount
+        let composite = "\(modelId)|\(chipName)|\(totalMemory)|\(coreCount)"
+        let digest = SHA256.hash(data: Data(composite.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }()
+
+    // MARK: - GPU Family
+
+    private static let cachedGPUFamily: String = computeGPUFamily()
+
+    private static func computeGPUFamily() -> String {
+        #if canImport(Metal)
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            #if arch(arm64)
+            return "apple"
+            #else
+            return "intel"
+            #endif
+        }
+        let families: [(MTLGPUFamily, String)] = [
+            (.apple9, "apple9"), (.apple8, "apple8"), (.apple7, "apple7"),
+            (.apple6, "apple6"), (.apple5, "apple5"), (.apple4, "apple4"),
+            (.apple3, "apple3"), (.apple2, "apple2"), (.apple1, "apple1")
+        ]
+        for (family, name) in families where device.supportsFamily(family) {
+            return name
+        }
+        #if os(macOS)
+        if device.supportsFamily(.mac2) {
+            return device.name.lowercased().contains("intel") ? "intel" : device.name.lowercased()
+        }
+        #endif
+        return "apple"
+        #else
+        return "apple"
+        #endif
     }
 
     // MARK: - System Helpers
@@ -173,6 +222,42 @@ public enum DeviceInfoFactory {
         return totalMemory / 2
     }
 
+    #if os(macOS)
+    private static func getMacBatteryInfo() -> (level: Float?, state: String?) {
+        guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
+              let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else {
+            return (nil, nil)
+        }
+        for source in sources {
+            guard let description = IOPSGetPowerSourceDescription(snapshot, source)?
+                .takeUnretainedValue() as? [String: Any],
+                  description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else {
+                continue
+            }
+            var level: Float?
+            if let current = description[kIOPSCurrentCapacityKey] as? Int,
+               let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,
+               maxCapacity > 0 {
+                level = Float(current) / Float(maxCapacity)
+            }
+            let isCharging = description[kIOPSIsChargingKey] as? Bool ?? false
+            let state: String?
+            if isCharging {
+                state = "charging"
+            } else if let level, level >= 1.0 {
+                state = "full"
+            } else if level != nil {
+                state = "unplugged"
+            } else {
+                state = nil
+            }
+            return (level, state)
+        }
+        // Desktop Mac: no internal battery is legitimate
+        return (nil, nil)
+    }
+    #endif
+
     // MARK: - Device Model Lookup (minimal, common devices only)
 
     private static func getDeviceModelName(for identifier: String) -> String? {
@@ -200,37 +285,97 @@ public enum DeviceInfoFactory {
         return models[identifier]
     }
 
-    private static func getChipName(for identifier: String) -> String {
-        // Map model prefix to chip
-        if identifier.hasPrefix("iPhone18,") { return "A19 Pro" }
-        if identifier.hasPrefix("iPhone17,1") || identifier.hasPrefix("iPhone17,2") { return "A18 Pro" }
-        if identifier.hasPrefix("iPhone17,") { return "A18" }
-        if identifier.hasPrefix("iPhone16,") { return "A17 Pro" }
-        if identifier.hasPrefix("iPhone15,2") || identifier.hasPrefix("iPhone15,3") { return "A16 Bionic" }
-        if identifier.hasPrefix("iPhone15,") { return "A16 Bionic" }
-        if identifier.hasPrefix("iPhone14,") { return "A15 Bionic" }
-        if identifier.hasPrefix("iPad16,") || identifier.hasPrefix("Mac16,") { return "M4" }
-        if identifier.hasPrefix("iPad15,") || identifier.hasPrefix("Mac15,") { return "M3" }
-        if identifier.hasPrefix("Mac14,") { return "M2" }
+    // MARK: - Chip Lookup
+
+    private struct ChipSpec {
+        let name: String
+        let neuralEngineCores: Int32
+        let hasNeuralEngine: Bool
+    }
+
+    private static func getChipSpec(for identifier: String) -> ChipSpec {
+        // Ordered prefix table: most specific entries first.
+        let table: [(prefix: String, name: String, aneCores: Int32)] = [
+            // iPhone
+            ("iPhone18,", "A19 Pro", 16),
+            ("iPhone17,1", "A18 Pro", 16), ("iPhone17,2", "A18 Pro", 16),
+            ("iPhone17,", "A18", 16),
+            ("iPhone16,", "A17 Pro", 16),
+            ("iPhone15,", "A16 Bionic", 16),
+            ("iPhone14,", "A15 Bionic", 16),
+            ("iPhone13,", "A14 Bionic", 16),
+            ("iPhone12,", "A13 Bionic", 8),
+            ("iPhone11,", "A12 Bionic", 8),
+            ("iPhone10,", "A11 Bionic", 2),
+            // iPad
+            ("iPad16,", "M4", 16),
+            ("iPad15,", "M3", 16),
+            ("iPad14,1", "A15 Bionic", 16), ("iPad14,2", "A15 Bionic", 16),
+            ("iPad14,", "M2", 16),
+            ("iPad13,1", "A14 Bionic", 16), ("iPad13,2", "A14 Bionic", 16),
+            ("iPad13,", "M1", 16),
+            // Mac
+            ("Mac16,", "M4", 16),
+            ("Mac15,14", "M3 Ultra", 32),
+            ("Mac15,", "M3", 16),
+            ("Mac14,8", "M2 Ultra", 32), ("Mac14,14", "M2 Ultra", 32),
+            ("Mac14,13", "M2 Max", 16),
+            ("Mac14,", "M2", 16),
+            ("Mac13,2", "M1 Ultra", 32),
+            ("Mac13,1", "M1 Max", 16),
+            ("MacBookPro18,", "M1 Pro/Max", 16),
+            ("MacBookPro17,1", "M1", 16),
+            ("MacBookAir10,1", "M1", 16),
+            ("Macmini9,1", "M1", 16),
+            ("iMac21,", "M1", 16),
+            // Vision Pro
+            ("RealityDevice14,", "M2", 16)
+        ]
+        for entry in table where identifier.hasPrefix(entry.prefix) {
+            return ChipSpec(
+                name: entry.name,
+                neuralEngineCores: entry.aneCores,
+                hasNeuralEngine: true
+            )
+        }
 
         #if arch(arm64)
-        return "Apple Silicon"
+        // Unknown Apple Silicon: report the raw identifier so telemetry stays
+        // informative; ANE presence is a safe assumption, core count is not.
+        let name = identifier.isEmpty ? "Apple Silicon" : identifier
+        return ChipSpec(name: name, neuralEngineCores: 0, hasNeuralEngine: true)
         #else
-        return "Intel"
+        return ChipSpec(name: "Intel", neuralEngineCores: 0, hasNeuralEngine: false)
         #endif
     }
 
+    // MARK: - Core Distribution
+
+    private static func sysctlInt32(_ name: String) -> Int? {
+        var value: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0, value > 0 else { return nil }
+        return Int(value)
+    }
+
     private static func getCoreDistribution(totalCores: Int, modelId: String) -> (perf: Int, eff: Int) {
-        // iPhone: typically 2P + 4E = 6 cores
+        // Real values from the kernel (iOS 15+ / macOS 12+)
+        if let perf = sysctlInt32("hw.perflevel0.logicalcpu") {
+            let eff = sysctlInt32("hw.perflevel1.logicalcpu") ?? 0
+            if perf + eff == totalCores {
+                return (perf, eff)
+            }
+            return (min(perf, totalCores), max(0, totalCores - min(perf, totalCores)))
+        }
+
+        // Heuristic fallback
         if modelId.hasPrefix("iPhone") {
             return (2, totalCores - 2)
         }
-        // iPad/Mac M-series: typically ~40% performance cores
         if modelId.hasPrefix("iPad") || modelId.hasPrefix("Mac") {
             let perf = max(2, totalCores * 2 / 5)
             return (perf, totalCores - perf)
         }
-        // Default split
         return (max(1, totalCores / 3), totalCores - max(1, totalCores / 3))
     }
 }

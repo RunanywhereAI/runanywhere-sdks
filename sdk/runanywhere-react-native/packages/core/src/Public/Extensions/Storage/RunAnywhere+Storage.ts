@@ -173,17 +173,16 @@ export async function deleteModel(
  * Clear the SDK's Temp directory. Mirrors Swift `cleanTempFiles()` →
  * `CppBridge.FileManager.clearTemp()`.
  */
-export async function cleanTempFiles(): Promise<boolean> {
+export async function cleanTempFiles(): Promise<void> {
   if (!isNativeModuleAvailable()) {
-    return false;
+    return;
   }
   try {
     // Swift parity: RunAnywhere+Storage.swift:321 gates on ensureServicesReady.
     await ensureServicesReady();
     const native = requireNativeModule();
-    return await native.cleanTempFiles();
+    await native.cleanTempFiles();
   } catch (error) {
     logger.warning('Failed to clean temp files:', { error });
-    return false;
   }
 }
