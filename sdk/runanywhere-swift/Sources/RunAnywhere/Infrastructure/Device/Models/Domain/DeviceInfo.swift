@@ -229,8 +229,9 @@ public enum DeviceInfoFactory {
             return (nil, nil)
         }
         for source in sources {
+            // IOKit's IOPSGetPowerSourceDescription returns an untyped CFDictionary.
             guard let description = IOPSGetPowerSourceDescription(snapshot, source)?
-                .takeUnretainedValue() as? [String: Any],
+                .takeUnretainedValue() as? NSDictionary,
                   description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else {
                 continue
             }

@@ -18,22 +18,45 @@ extension CppBridge {
     /// Two-phase SDK init bridge.
     public enum SdkInit {
 
-        // MARK: - Symbol bindings (lazy-loaded from RACommons)
+        // MARK: - Symbol bindings
 
-        private static let phase1Symbol = NativeProtoABI.load(
-            "rac_sdk_init_phase1_proto",
-            as: NativeProtoABI.ProtoRequest.self
-        )
+        // Keep a typed reference to each canonical SDK-init entry point. The
+        // Apple distribution links RACommons as a static archive; a dlsym-only
+        // reference does not pull an otherwise-unreferenced archive member into
+        // the final app, so the symbol can be dead-stripped even though it is
+        // present in the XCFramework. The direct fallback is both a link-time
+        // anchor and a valid invocation path when RTLD_DEFAULT cannot enumerate
+        // main-executable symbols.
 
-        private static let phase2Symbol = NativeProtoABI.load(
-            "rac_sdk_init_phase2_proto",
-            as: NativeProtoABI.ProtoRequest.self
-        )
+        private static let phase1Symbol: NativeProtoABI.ProtoRequest? = {
+            let linked: NativeProtoABI.ProtoRequest = rac_sdk_init_phase1_proto
+            return NativeProtoABI.load(
+                "rac_sdk_init_phase1_proto",
+                as: NativeProtoABI.ProtoRequest.self
+            ) ?? linked
+        }()
 
-        private static let retryHTTPSymbol = NativeProtoABI.load(
-            "rac_sdk_retry_http_proto",
-            as: (@convention(c) (UnsafeMutablePointer<rac_proto_buffer_t>?) -> rac_result_t).self
-        )
+        private static let phase2Symbol: NativeProtoABI.ProtoRequest? = {
+            let linked: NativeProtoABI.ProtoRequest = rac_sdk_init_phase2_proto
+            return NativeProtoABI.load(
+                "rac_sdk_init_phase2_proto",
+                as: NativeProtoABI.ProtoRequest.self
+            ) ?? linked
+        }()
+
+        private static let retryHTTPSymbol: (@convention(c) (
+            UnsafeMutablePointer<rac_proto_buffer_t>?
+        ) -> rac_result_t)? = {
+            let linked: @convention(c) (
+                UnsafeMutablePointer<rac_proto_buffer_t>?
+            ) -> rac_result_t = rac_sdk_retry_http_proto
+            return NativeProtoABI.load(
+                "rac_sdk_retry_http_proto",
+                as: (@convention(c) (
+                    UnsafeMutablePointer<rac_proto_buffer_t>?
+                ) -> rac_result_t).self
+            ) ?? linked
+        }()
 
         // MARK: - Phase 1 (synchronous core init)
 

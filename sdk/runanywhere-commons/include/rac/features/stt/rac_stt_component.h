@@ -285,8 +285,10 @@ RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
  *
  * @param handle        STT component handle.
  * @param stream_handle Stream handle returned by rac_stt_component_stream_create.
- * @param samples       Int16 mono PCM samples (non-null when count > 0).
- * @param count         Number of samples at @p samples.
+ * @param samples       Int16 mono PCM samples (non-null when count > 0). NULL
+ *                      with count == 0 requests a synchronous normal-stop
+ *                      finish/drain from a persistent backend.
+ * @param count         Number of samples at @p samples, or zero to finish.
  * @param callback      Partial / final emission callback.
  * @param user_data     Opaque pointer forwarded to @p callback.
  *

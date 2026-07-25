@@ -502,6 +502,7 @@ int test_stt_fallback_reload_cancels_buffered_session() {
 struct MockStreamState {
     int create_count = 0;
     int feed_count = 0;
+    int finish_count = 0;
     int destroy_count = 0;
     int transcribe_stream_count = 0;
     rac_handle_t last_stream = nullptr;
@@ -629,10 +630,18 @@ rac_result_t mock_persistent_stt_stream_create(void* /*impl*/, const rac_stt_opt
 rac_result_t mock_persistent_stt_stream_feed(void* /*impl*/, rac_handle_t stream_handle,
                                              const int16_t* samples, size_t count,
                                              rac_stt_stream_callback_t callback, void* user_data) {
-    (void)samples;
-    (void)count;
     if (stream_handle != g_stream_state.last_stream) {
         return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (count == 0) {
+        if (samples != nullptr) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        g_stream_state.finish_count++;
+        if (callback) {
+            callback("mock-final", RAC_TRUE, user_data);
+        }
+        return RAC_SUCCESS;
     }
     bool emit_second = false;
     {
@@ -730,12 +739,15 @@ int test_stt_persistent_stream_handle() {
           "STT model loads for persistent plugin");
 
     // Register a proto callback so dispatch_stt_stream_event has somewhere to go.
-    auto count_callback = [](const uint8_t*, size_t, void* ud) {
-        int* n = static_cast<int*>(ud);
-        ++(*n);
+    std::vector<runanywhere::v1::STTStreamEvent> stream_events;
+    auto count_callback = [](const uint8_t* data, size_t size, void* ud) {
+        auto* events = static_cast<std::vector<runanywhere::v1::STTStreamEvent>*>(ud);
+        runanywhere::v1::STTStreamEvent event;
+        if (event.ParseFromArray(data, static_cast<int>(size))) {
+            events->push_back(std::move(event));
+        }
     };
-    int proto_events = 0;
-    CHECK(rac_stt_set_stream_proto_callback(stt, count_callback, &proto_events) == RAC_SUCCESS,
+    CHECK(rac_stt_set_stream_proto_callback(stt, count_callback, &stream_events) == RAC_SUCCESS,
           "stream proto callback registers");
 
     runanywhere::v1::STTOptions options;
@@ -762,13 +774,13 @@ int test_stt_persistent_stream_handle() {
                                      &compressed_session_id) == RAC_SUCCESS,
           "persistent compressed stream session starts");
     const uint8_t fake_m4a[] = {0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p'};
-    const int events_before_rejection = proto_events;
+    const size_t events_before_rejection = stream_events.size();
     CHECK(rac_stt_stream_feed_audio_proto(compressed_session_id, fake_m4a, sizeof(fake_m4a)) ==
               RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
           "persistent stream rejects non-PCM before backend creation");
     CHECK(g_stream_state.create_count == 0 && g_stream_state.feed_count == 0,
           "rejected persistent input never reaches backend stream slots");
-    CHECK(proto_events == events_before_rejection + 1,
+    CHECK(stream_events.size() == events_before_rejection + 1,
           "rejected persistent input emits only its error callback");
     CHECK(rac_stt_stream_stop_proto(compressed_session_id) == RAC_SUCCESS,
           "rejected persistent session stops without completion work");
@@ -776,7 +788,7 @@ int test_stt_persistent_stream_handle() {
     // Feed 100 chunks of 1ms audio at 16 kHz: 16 samples per chunk, Int16 PCM.
     const size_t kChunksToFeed = 100;
     const size_t kSamplesPerChunk = 16;
-    const int pcm_events_before = proto_events;
+    const size_t pcm_events_before = stream_events.size();
     std::vector<int16_t> chunk(kSamplesPerChunk, 0);
     for (size_t i = 0; i < kChunksToFeed; ++i) {
         rac_result_t feed_rc = rac_stt_stream_feed_audio_proto(
@@ -793,10 +805,17 @@ int test_stt_persistent_stream_handle() {
           "stream_feed_audio_chunk invoked once per chunk");
     CHECK(g_stream_state.transcribe_stream_count == 0,
           "legacy transcribe_stream fallback NOT engaged when slot is wired");
-    CHECK(std::cmp_equal(proto_events - pcm_events_before, kChunksToFeed),
+    CHECK(std::cmp_equal(stream_events.size() - pcm_events_before, kChunksToFeed),
           "every chunk emits a partial STTStreamEvent");
 
     CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS, "stream session stops");
+    CHECK(g_stream_state.finish_count == 1,
+          "normal stop sends exactly one zero-count provider finish");
+    CHECK(stream_events.size() == pcm_events_before + kChunksToFeed + 1 &&
+              stream_events.back().kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
+              stream_events.back().has_final_output() &&
+              stream_events.back().final_output().text() == "mock-final",
+          "normal stop drains the persistent provider final before returning");
     CHECK(g_stream_state.destroy_count == 1, "stream_destroy invoked exactly once on session stop");
 
     (void)rac_stt_unset_stream_proto_callback(stt);
@@ -858,6 +877,7 @@ int test_stt_persistent_stream_termination_races() {
         }
 
         const int destroys_before = g_stream_state.destroy_count;
+        const int finishes_before = g_stream_state.finish_count;
         std::atomic<bool> termination_returned{false};
         std::atomic<rac_result_t> termination_rc{RAC_ERROR_INTERNAL};
         std::thread termination_thread([&] {
@@ -896,9 +916,12 @@ int test_stt_persistent_stream_termination_races() {
         }
         CHECK(g_stream_state.destroy_count == destroys_before + 1,
               "provider handle is destroyed exactly once");
-        CHECK(counting.events.load(std::memory_order_acquire) == (cancel ? 0 : 1),
+        CHECK(g_stream_state.finish_count == finishes_before + (cancel ? 0 : 1),
+              cancel ? "cancel skips the provider finish signal"
+                     : "stop sends exactly one provider finish signal");
+        CHECK(counting.events.load(std::memory_order_acquire) == (cancel ? 0 : 2),
               cancel ? "cancel drops provider callbacks while draining"
-                     : "stop drains provider callbacks before returning");
+                     : "stop drains provider partial and final callbacks before returning");
         const int events_after_return = counting.events.load(std::memory_order_acquire);
         CHECK(rac_stt_stream_feed_audio_proto(
                   session_id, reinterpret_cast<const uint8_t*>(chunk.data()),

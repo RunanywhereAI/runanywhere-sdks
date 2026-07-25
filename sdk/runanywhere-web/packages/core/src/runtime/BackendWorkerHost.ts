@@ -16,6 +16,7 @@ import type {
 import {
   clearModelOwnedByBackendWorker,
   markLlamaBackendWorkerDead,
+  markOnnxBackendWorkerDead,
 } from './BackendWorkerModelOwnership.js';
 import { setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
 
@@ -390,6 +391,8 @@ export class BackendWorkerHost {
     }
     if (this.backendId === 'llamacpp') {
       markLlamaBackendWorkerDead(message);
+    } else if (this.backendId === 'onnx') {
+      markOnnxBackendWorkerDead(message);
     }
     setRuntimeDegradedReason(
       `BackendWorker (${this.backendId}) crashed; reload the model. `

@@ -17,16 +17,12 @@ let package = Package(
             name: "RunAnywhereMLXCLI",
             dependencies: [
                 .product(name: "RunAnywhere", package: "runanywhere-swift"),
-                .product(name: "RunAnywhereMLX", package: "runanywhere-swift"),
-                // The macOS RACommons slice is built with RAC_STATIC_PLUGINS=ON,
-                // so librac_commons.a's static-init stubs reference every
-                // backend's register symbol. Link the llama.cpp and
-                // ONNX/Sherpa/CoreML runtimes (they force_load the backend
-                // archives and declare the required frameworks) to resolve
-                // them — mirroring the root Package.swift RunAnywhereMLXCLI
-                // target without pulling in the C++ RCLIHost host bridge.
+                // RACommons' static provider registry references every linked
+                // portable backend. Carry their archives in this standalone
+                // CLI so the force-loaded commons library resolves cleanly.
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),
                 .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),
+                .product(name: "RunAnywhereMLX", package: "runanywhere-swift"),
             ],
             path: "Sources/RunAnywhereMLXCLI",
             linkerSettings: [

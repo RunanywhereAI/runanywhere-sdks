@@ -111,6 +111,18 @@ extension CppBridge.ComponentVTable {
         }
     )
 
+    /// Standalone speaker-diarization component vtable.
+    public static let diarization = CppBridge.ComponentVTable(
+        component: .speakerDiarization,
+        create: { rac_diarization_component_create($0) },
+        isLoaded: { rac_diarization_component_is_loaded($0) },
+        cleanup: { _ = rac_diarization_component_unload($0) },
+        destroy: { rac_diarization_component_destroy($0) },
+        loadModel: { handle, path, id, name in
+            rac_diarization_component_load_model(handle, path, id, name)
+        }
+    )
+
     /// VLM component vtable — `rac_vlm_component_*` family.
     ///
     /// SDK-side `loadModel(from:)` adapters were removed from the

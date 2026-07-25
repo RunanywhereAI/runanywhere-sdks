@@ -39,9 +39,72 @@ test('module exports exactly the public surface', () => {
     'isRemoteSource',
     'modelStatus',
     'modelsRoot',
+    'parseHfUrl',
     'pathExists',
     'resolveModel',
   ]);
+});
+
+// --- parseHfUrl(): HuggingFace web URLs route to repo resolution --------------
+
+test('parseHfUrl maps a HuggingFace repo page URL to its repo', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/bartowski/Qwen2.5-0.5B-Instruct-GGUF'), {
+    repo: 'bartowski/Qwen2.5-0.5B-Instruct-GGUF',
+  });
+});
+
+test('parseHfUrl handles /tree/ and trailing slashes + a models/ prefix', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/tree/main'), { repo: 'owner/repo', revision: 'main' });
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/'), { repo: 'owner/repo' });
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/models/owner/repo'), { repo: 'owner/repo' });
+});
+
+test('parseHfUrl maps a /blob/ file URL to repo + explicit file', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/sub/model-Q4_K_M.gguf'), {
+    repo: 'owner/repo',
+    file: 'sub/model-Q4_K_M.gguf',
+    revision: 'main',
+  });
+});
+
+test('parseHfUrl preserves a non-main /blob/ revision', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/v1.2/model.gguf'), {
+    repo: 'owner/repo',
+    file: 'model.gguf',
+    revision: 'v1.2',
+  });
+});
+
+test('parseHfUrl preserves a /tree/ revision', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/tree/v1.2'), {
+    repo: 'owner/repo',
+    revision: 'v1.2',
+  });
+});
+
+test('parseHfUrl decodes percent-escapes in the file path', () => {
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/a%20b/model.gguf'), {
+    repo: 'owner/repo',
+    file: 'a b/model.gguf',
+    revision: 'main',
+  });
+});
+
+test('parseHfUrl does not throw on a malformed percent-escape (falls back to raw)', () => {
+  // decodeURIComponent('%ZZ') throws URIError — must be caught, not propagated.
+  assert.deepEqual(download.parseHfUrl('https://huggingface.co/owner/repo/blob/main/a%ZZbad.gguf'), {
+    repo: 'owner/repo',
+    file: 'a%ZZbad.gguf',
+    revision: 'main',
+  });
+});
+
+test('parseHfUrl returns null for a /resolve/ (direct-download) URL and non-HF URLs', () => {
+  // /resolve/ is already a raw file URL — keep it a direct download.
+  assert.equal(download.parseHfUrl('https://huggingface.co/owner/repo/resolve/main/model.gguf'), null);
+  assert.equal(download.parseHfUrl('https://example.com/models/model.gguf'), null);
+  assert.equal(download.parseHfUrl('owner/repo'), null); // not a URL
+  assert.equal(download.parseHfUrl('https://huggingface.co/owner'), null); // no repo segment
 });
 
 // --- isRemoteSource() (pure classifier; no network) --------------------------

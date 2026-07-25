@@ -1100,6 +1100,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   /// Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
   /// canonical "required" flag — the documented `required` boolean from
   /// newer SDK sources maps onto it (default true, mirrored in Swift).
+  /// Exact on-disk artifact size, verified after download.
   @$pb.TagNumber(4)
   $fixnum.Int64 get sizeBytes => $_getI64(3);
   @$pb.TagNumber(4)
@@ -1148,6 +1149,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearLocalPath() => $_clearField(9);
 
+  /// Exact on-disk artifact checksum, verified after download.
   @$pb.TagNumber(10)
   $core.String get checksumSha256 => $_getSZ(8);
   @$pb.TagNumber(10)

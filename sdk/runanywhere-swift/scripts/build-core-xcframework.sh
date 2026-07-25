@@ -8,7 +8,7 @@
 #   sdk/runanywhere-swift/Binaries/RACommons.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
-#   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework       (skipped if RAC_BACKEND_SHERPA=OFF)
+#   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework        (Apple-only; CoreML Stable-Diffusion engine)
 #   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #   sdk/runanywhere-swift/Binaries/RunAnywhereMLXRuntime.xcframework  (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
@@ -48,7 +48,13 @@ fi
 
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
+RAC_BACKEND_SHERPA="${RAC_BACKEND_SHERPA:-ON}"
+RAC_BACKEND_COREML="${RAC_BACKEND_COREML:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
+if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_COREML}" != "ON" ]; then
+    echo "error: the Swift package unconditionally requires Sherpa and CoreML binaries; RAC_BACKEND_SHERPA and RAC_BACKEND_COREML must be ON" >&2
+    exit 1
+fi
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
 STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 BUILD_JOBS="${RAC_BUILD_JOBS:-$(sysctl -n hw.logicalcpu)}"
@@ -625,16 +631,13 @@ merge_onnx_backend_slice() {
     # built as its own xcframework, keep sherpa's implementation objects and
     # the sherpa-onnx prebuilt archives out of this slice so consumers linking
     # both RABackendONNX + RABackendSherpa don't see duplicate symbols.
-    # When RAC_BACKEND_SHERPA=OFF, fold sherpa in here to keep the ONNX
-    # xcframework self-contained for consumers that want speech-capable ONNX
-    # without a separate sherpa artifact.
     local inputs=(
         "${build_root}/engines/onnx/${slice_dir}/librac_backend_onnx.a"
         "${build_root}/runtimes/onnxrt/${slice_dir}/librac_runtime_onnxrt.a"
         "$(find_onnxruntime_ios_archive "${slice_dir}")"
     )
 
-    if [ "${RAC_BACKEND_SHERPA:-ON}" = "OFF" ]; then
+    if [ "${RAC_BACKEND_SHERPA}" = "OFF" ]; then
         if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a" ]; then
             inputs+=("${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a")
         fi
@@ -845,15 +848,15 @@ EOF
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
-# Prereq: the iOS Sherpa-ONNX xcframework. Required when the sherpa backend
-# is enabled (default). Without it, engines/sherpa's CMake gate sets
+# Prereq: the iOS Sherpa-ONNX xcframework. The Swift package always ships the
+# Sherpa backend. Without it, engines/sherpa's CMake gate sets
 # SHERPA_ONNX_AVAILABLE=0 → RAC_SHERPA_ROUTABLE=0, which strips
 # stt_ops/tts_ops/vad_ops from the sherpa plugin vtable. The xcframework
 # still ships, but every STT/TTS/VAD load with `framework=sherpa` hits the
 # "no backend route supports requested model" router rejection (FIXLOOP-TR-1).
 # ────────────────────────────────────────────────────────────────────────────
 IOS_SHERPA="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
-if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ] && [ ! -d "${IOS_SHERPA}" ] && [ "${DRY_RUN}" != "1" ]; then
+if [ "${RAC_BACKEND_SHERPA}" = "ON" ] && [ ! -d "${IOS_SHERPA}" ] && [ "${DRY_RUN}" != "1" ]; then
     cat >&2 <<EOF
 error: Sherpa-ONNX iOS xcframework not found at
   ${IOS_SHERPA}
@@ -861,8 +864,6 @@ error: Sherpa-ONNX iOS xcframework not found at
 Run this first (one-time, per checkout):
   ./sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
 
-Or re-run with RAC_BACKEND_SHERPA=OFF to skip the Sherpa-ONNX backend (this
-will disable STT/TTS/VAD via Whisper/Piper/Silero on iOS).
 EOF
     exit 1
 fi
@@ -928,19 +929,25 @@ cmake_extra=(
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
+    # Force the complete requested engine set on every configure. These preset
+    # build directories are intentionally reusable, so relying on option
+    # defaults can otherwise preserve an earlier OFF cache entry while the
+    # packaging phase still expects the corresponding archive.
+    "-DRAC_BUILD_BACKENDS=ON"
+    "-DRAC_BACKEND_CLOUD=ON"
+    "-DRAC_BACKEND_RAG=ON"
+    "-DRAC_BACKEND_LLAMACPP=ON"
+    "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
+    "-DRAC_RUNTIME_ONNXRT=${RAC_BACKEND_ONNX}"
+    "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA}"
+    "-DRAC_BACKEND_MLX=${RAC_BACKEND_MLX}"
 )
 ios_cmake_extra=(
-    "-DRAC_BACKEND_COREML=ON"
+    "-DRAC_BACKEND_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_COREML}"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
 )
-if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
-    cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
-fi
-if [ "${RAC_BACKEND_MLX}" = "OFF" ]; then
-    cmake_extra+=("-DRAC_BACKEND_MLX=OFF")
-fi
-
 echo "▶ Configure ios-device"
 run cmake --preset ios-device "${cmake_extra[@]}" "${ios_cmake_extra[@]}"
 echo "▶ Build ios-device (Release)"
@@ -948,14 +955,13 @@ ios_build_targets=(rac_commons rac_backend_llamacpp)
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     ios_build_targets+=(rac_backend_onnx)
 fi
-if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
     ios_build_targets+=(rac_backend_sherpa)
 fi
-# CoreML engine (Stable Diffusion) is Apple-only and forced ON above via
-# ios_cmake_extra (-DRAC_BACKEND_COREML=ON). Building rac_backend_coreml also
-# transitively builds its rac_runtime_coreml dependency; both are folded into
-# RABackendCoreML.xcframework below.
-if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+# CoreML engine (Stable Diffusion) is Apple-only. Building rac_backend_coreml
+# also transitively builds its rac_runtime_coreml dependency; both are folded
+# into RABackendCoreML.xcframework below.
+if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
     ios_build_targets+=(rac_backend_coreml)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
@@ -981,16 +987,17 @@ macos_cmake_args=(
     # rac_commons exactly like the iOS slices, or unconditionally-referenced
     # symbols (rac_backend_cloud_register) fail the consumer link.
     "-DRAC_STATIC_PLUGINS=ON"
+    "-DRAC_BACKEND_CLOUD=ON"
     "-DRAC_BACKEND_RAG=ON"
     "-DRAC_BACKEND_LLAMACPP=ON"
     "-DRAC_BACKEND_ONNX=${RAC_BACKEND_ONNX}"
-    # Force runtimes ON: a polluted macos-release CMakeCache can leave
-    # RAC_RUNTIME_ONNXRT=OFF even when the ONNX backend is enabled, which
-    # fails engines/onnx with "requires rac_runtime_onnxrt".
-    "-DRAC_RUNTIME_ONNXRT=ON"
-    "-DRAC_RUNTIME_COREML=ON"
-    "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA:-ON}"
-    "-DRAC_BACKEND_COREML=ON"
+    # Reset runtime state alongside its owning backend. A polluted reusable
+    # cache can otherwise leave the runtime and engine in contradictory states.
+    "-DRAC_RUNTIME_ONNXRT=${RAC_BACKEND_ONNX}"
+    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA}"
+    "-DRAC_BACKEND_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_BACKEND_MLX=${RAC_BACKEND_MLX}"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
@@ -1007,12 +1014,11 @@ macos_build_targets=(rac_commons rac_backend_llamacpp)
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     macos_build_targets+=(rac_backend_onnx)
 fi
-if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
     macos_build_targets+=(rac_backend_sherpa)
 fi
-# CoreML engine (Stable Diffusion) — forced ON above via macos_cmake_args
-# (-DRAC_BACKEND_COREML=ON). Pulls in rac_runtime_coreml transitively.
-if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+# CoreML engine (Stable Diffusion) pulls in rac_runtime_coreml transitively.
+if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
     macos_build_targets+=(rac_backend_coreml)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
@@ -1318,6 +1324,7 @@ build_mlx_runtime_swift_slice() {
         --package-path "${REPO_ROOT}" \
         --configuration release \
         --product RunAnywhereMLXRuntime \
+        --jobs "${BUILD_JOBS}" \
         --triple "${triple}" \
         --sdk "${sdk_path}" \
         --scratch-path "${scratch}" \
@@ -1625,11 +1632,12 @@ if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
         "/runanywhere/vendor/onnxruntime/source/build/checkout0" 1632
     build_xcframework_from_paths_with_macos "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "${ONNX_MAC_LIB}" "RABackendONNX.xcframework"
 else
+    run rm -rf "${DEST}/RABackendONNX.xcframework"
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
 fi
 
 # RABackendSherpa.xcframework as the speech peer of RABackendONNX.
-if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
     SHERPA_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_sherpa.a"
     SHERPA_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_sherpa.a"
     SHERPA_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_sherpa.a"
@@ -1652,7 +1660,8 @@ if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
             "${SHERPA_MAC_LIB}" "macos RABackendSherpa"
         build_xcframework_from_paths_with_macos "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "${SHERPA_MAC_LIB}" "RABackendSherpa.xcframework"
     else
-        echo "▶ Skipping RABackendSherpa.xcframework (target not built — engines/sherpa disabled?)"
+        echo "error: required Sherpa backend archive was not built" >&2
+        exit 1
     fi
 else
     echo "▶ Skipping RABackendSherpa.xcframework (RAC_BACKEND_SHERPA=OFF)"
@@ -1665,7 +1674,7 @@ fi
 # vtable is present in the plugin registry; commons' RAC_STATIC_PLUGIN_REGISTER
 # (coreml) shim (compiled into rac_commons) references rac_plugin_entry_coreml,
 # pulling the archive at the final link. Folds in librac_runtime_coreml.a.
-if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
+if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
     COREML_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_coreml.a"
     COREML_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_coreml.a"
     COREML_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_coreml.a"
@@ -1681,7 +1690,8 @@ if [ "${RAC_BACKEND_COREML:-ON}" = "ON" ]; then
         sanitize_and_validate_archive_host_paths "${COREML_MAC_LIB}" "macos RABackendCoreML"
         build_xcframework_from_paths_with_macos "${COREML_DEV_LIB}" "${COREML_SIM_LIB}" "${COREML_MAC_LIB}" "RABackendCoreML.xcframework"
     else
-        echo "▶ Skipping RABackendCoreML.xcframework (target not built — engines/coreml disabled?)"
+        echo "error: required CoreML backend archive was not built" >&2
+        exit 1
     fi
 else
     echo "▶ Skipping RABackendCoreML.xcframework (RAC_BACKEND_COREML=OFF)"

@@ -2,17 +2,18 @@ import Foundation
 
 /// Minimal reader for the `config.json` fields the MLX runtime needs outside of
 /// mlx-swift-lm's own model loading. Decoded with explicit `Decodable` structs
-/// (no `[String: Any]`) per repo conventions.
-private struct MLXModelConfigDocument: Decodable {
-    struct TextConfig: Decodable {
-        let maxPositionEmbeddings: Int?
-        enum CodingKeys: String, CodingKey {
-            case maxPositionEmbeddings = "max_position_embeddings"
-        }
-    }
-
+/// instead of untyped dictionaries, per repo conventions.
+private struct MLXTextModelConfig: Decodable {
     let maxPositionEmbeddings: Int?
-    let textConfig: TextConfig?
+
+    enum CodingKeys: String, CodingKey {
+        case maxPositionEmbeddings = "max_position_embeddings"
+    }
+}
+
+private struct MLXModelConfigDocument: Decodable {
+    let maxPositionEmbeddings: Int?
+    let textConfig: MLXTextModelConfig?
 
     enum CodingKeys: String, CodingKey {
         case maxPositionEmbeddings = "max_position_embeddings"

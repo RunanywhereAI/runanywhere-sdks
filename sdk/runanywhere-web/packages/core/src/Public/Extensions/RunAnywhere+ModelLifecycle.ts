@@ -328,6 +328,39 @@ async function unloadAcrossAdaptersAsync(
   return aggregateUnloadResults(results);
 }
 
+/**
+ * Fan a category-only unload out to worker-resident models.
+ *
+ * A category-only async request (no `modelId`, `unloadAll:false`) never
+ * satisfies the modelId/unloadAll worker-dispatch guard in `unloadModelAsync`,
+ * so a model of that category living in a BackendWorker (e.g. ONNX embeddings
+ * in the onnx worker) would stay loaded while the main-thread adapters report
+ * success. Dispatch the same category request to every active worker that owns
+ * a model of the requested category, then drop those ownership records.
+ */
+async function unloadCategoryAcrossWorkers(request: ModelUnloadRequest): Promise<void> {
+  if (request.modelId || request.unloadAll) return;
+  const { category } = request;
+  if (category === undefined || category === ModelCategoryEnum.MODEL_CATEGORY_UNSPECIFIED) return;
+
+  const idsByBackend = new Map<'llamacpp' | 'onnx', string[]>();
+  for (const owned of listBackendWorkerOwnedModels()) {
+    if (safeGetModelSnapshot(owned.modelId)?.category !== category) continue;
+    const ids = idsByBackend.get(owned.backendId) ?? [];
+    ids.push(owned.modelId);
+    idsByBackend.set(owned.backendId, ids);
+  }
+  if (idsByBackend.size === 0) return;
+
+  const requestBytes = ModelUnloadRequestCodec.encode(request).finish();
+  for (const [backendId, modelIds] of idsByBackend) {
+    const host = getActiveBackendWorkerHost(backendId);
+    if (!host) continue;
+    await host.unloadModel(backendId === 'onnx' ? 'stt' : 'llm', { requestBytes });
+    for (const modelId of modelIds) clearModelOwnedByBackendWorker(modelId, backendId);
+  }
+}
+
 async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null> {
   if (model.localPath) return model.localPath;
 
@@ -614,6 +647,12 @@ export const WebModelLifecycle = {
       } else {
         clearModelOwnedByBackendWorker(request.modelId, backendId);
       }
+    } else {
+      // Category-only async unloads (no modelId, unloadAll:false) skip the
+      // guard above, so a worker-resident model of that category (e.g. ONNX
+      // embeddings) would stay loaded while main-thread adapters report
+      // success. Fan the category request out to the owning workers too.
+      await unloadCategoryAcrossWorkers(request);
     }
     return unloadAcrossAdaptersAsync(request);
   },
@@ -630,6 +669,12 @@ export const WebModelLifecycle = {
     const workerOwned = currentModelFromBackendWorker(request);
     if (workerOwned) return workerOwned;
 
+    if (
+      request.framework !== undefined
+      && request.framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+    ) {
+      return requireAdapter(request.framework).currentModel(request);
+    }
     // Aggregate across all registered WASM modules: LlamaCPP holds LLM/VLM
     // state in its g_loaded map; ONNX holds STT/TTS/VAD/Embedding state in
     // its own map. The default adapter only sees one — return the first

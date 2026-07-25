@@ -47,7 +47,7 @@ import {
   modalityEmoji,
   cleanModelName,
   consumerTags,
-  modelFamily,
+  modelOrg,
   modelCapability,
   variantSizeFeel,
   type ConsumerTag,
@@ -118,7 +118,7 @@ let searchQuery = '';
 
 // Which family cards are expanded to reveal their variants (keyed by family
 // key). Reset whenever the sheet is opened so it always starts collapsed.
-const expandedFamilies = new Set<string>();
+const expandedOrgs = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Public API — wiring into the chat view
@@ -370,7 +370,7 @@ export async function ensureModelReady(modelId: string): Promise<boolean> {
 function renderSheet(): void {
   const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   searchQuery = '';
-  expandedFamilies.clear();
+  expandedOrgs.clear();
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
@@ -538,13 +538,13 @@ function bindRowActions(host: HTMLElement): void {
   });
 }
 
-/** Wire family-card expand toggles. */
+/** Wire org-card expand toggles. */
 function bindFamilyInteractions(host: HTMLElement): void {
   host.querySelectorAll('[data-family-toggle]').forEach((el) => {
     el.addEventListener('click', () => {
       const key = (el as HTMLElement).dataset.familyToggle!;
-      if (expandedFamilies.has(key)) expandedFamilies.delete(key);
-      else expandedFamilies.add(key);
+      if (expandedOrgs.has(key)) expandedOrgs.delete(key);
+      else expandedOrgs.add(key);
       renderRows();
     });
   });
@@ -664,16 +664,32 @@ function recommendedShell(cardsHtml: string, companionRows: string): string {
   `;
 }
 
-/** Group the remaining catalog into consumer-facing family cards. */
+/** Group the remaining catalog into organisation cards. */
 function renderFamilySection(entries: readonly CatalogEntry[], hasRecommended: boolean): string {
   if (entries.length === 0) return '';
 
-  const families = groupByFamily(entries);
-  if (families.length === 0) return '';
+  const orgs = groupByOrg(entries);
+  if (orgs.length === 0) return '';
 
-  const heading = hasRecommended ? 'Browse all models' : 'All models';
-  const cards = families.map((family) => renderFamilyCard(family)).join('');
+  const ready = orgs.filter((org) =>
+    org.entries.some((entry) => ['downloaded', 'loaded'].includes(stateOf(entry.id).status)));
+  const rest = orgs.filter((org) => !ready.includes(org));
 
+  const sections: string[] = [];
+  if (ready.length > 0) {
+    sections.push(renderOrgSection('On this device', ready));
+  }
+  if (rest.length > 0) {
+    const heading = ready.length === 0
+      ? (hasRecommended ? 'All organisations' : 'All organisations')
+      : 'More organisations';
+    sections.push(renderOrgSection(heading, rest));
+  }
+  return sections.join('');
+}
+
+function renderOrgSection(heading: string, orgs: OrgGroup[]): string {
+  const cards = orgs.map((org) => renderOrgCard(org)).join('');
   return `
     <div class="model-section">
       <div class="model-section__title">${escapeHtml(heading)}</div>
@@ -682,73 +698,79 @@ function renderFamilySection(entries: readonly CatalogEntry[], hasRecommended: b
   `;
 }
 
-interface FamilyGroup {
+interface OrgGroup {
   key: string;
   name: string;
-  tagline: string;
   entries: CatalogEntry[];
 }
 
-/** Bucket entries by family, preserving catalog order within each family. */
-function groupByFamily(entries: readonly CatalogEntry[]): FamilyGroup[] {
-  const groups = new Map<string, FamilyGroup>();
+/** Bucket entries by organisation, preserving matcher declaration order. */
+function groupByOrg(entries: readonly CatalogEntry[]): OrgGroup[] {
+  const groups = new Map<string, OrgGroup>();
+  const order: string[] = [];
   for (const entry of entries) {
-    const family = modelFamily(entry);
-    const existing = groups.get(family.key);
+    const org = modelOrg(entry);
+    const existing = groups.get(org.key);
     if (existing) {
       existing.entries.push(entry);
     } else {
-      groups.set(family.key, {
-        key: family.key,
-        name: family.name,
-        tagline: family.tagline,
+      groups.set(org.key, {
+        key: org.key,
+        name: org.name,
         entries: [entry],
       });
+      order.push(org.key);
     }
   }
-  return [...groups.values()];
+  // Sort models within each org smaller → larger (by advertised bytes).
+  for (const group of groups.values()) {
+    group.entries.sort((a, b) => modelDisplaySizeBytes(a) - modelDisplaySizeBytes(b));
+  }
+  return order.map((key) => groups.get(key)!);
 }
 
 /**
- * A rounded family card: name, one-liner, the family's cleanest tag, and the
- * option count. Tapping toggles an expanded list of variants. When a variant is
- * loaded/downloaded the card reflects that with a subtle status dot.
+ * A rounded org card: publisher name, NPU/ready status, and model count.
+ * Tapping toggles an expanded list of models.
  */
-function renderFamilyCard(family: FamilyGroup): string {
-  // Searching is a direct lookup, so surface matching variants immediately
-  // instead of hiding exact results behind a second family-card click.
-  const expanded = expandedFamilies.has(family.key) || searchQuery.trim().length > 0;
-  const options = family.entries.length;
-  const representative = pickRepresentative(family.entries);
-  const tag = consumerTags(representative)[0];
-  const activeEntry = family.entries.find((entry) => stateOf(entry.id).status === 'loaded');
-  const onDevice = family.entries.some((entry) =>
+function renderOrgCard(org: OrgGroup): string {
+  const expanded = expandedOrgs.has(org.key) || searchQuery.trim().length > 0;
+  const options = org.entries.length;
+  const representative = pickRepresentative(org.entries);
+  const activeEntry = org.entries.find((entry) => stateOf(entry.id).status === 'loaded');
+  const onDevice = org.entries.some((entry) =>
     ['downloaded', 'loaded'].includes(stateOf(entry.id).status));
+  const hasNpu = org.entries.some((entry) =>
+    formatFramework(entry.framework).toLowerCase().includes('npu')
+    || `${entry.id} ${entry.name}`.toLowerCase().includes('hnpu'));
 
   const statusPill = activeEntry
     ? '<span class="family-card__status family-card__status--active">Active</span>'
     : onDevice
       ? '<span class="family-card__status">On device</span>'
       : '';
+  const npuPill = hasNpu
+    ? '<span class="tag-pill tag-pill--capability">NPU</span>'
+    : '';
 
   const variants = expanded
-    ? `<div class="family-variants">${renderFamilyVariants(family)}</div>`
+    ? `<div class="family-variants">${renderOrgVariants(org)}</div>`
     : '';
 
   return `
-    <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(family.key)}">
-      <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(family.key)}" aria-expanded="${expanded}">
+    <div class="family-card${expanded ? ' family-card--expanded' : ''}" data-family-key="${escapeHtml(org.key)}">
+      <button type="button" class="family-card__head" data-family-toggle="${escapeHtml(org.key)}" aria-expanded="${expanded}">
         <div class="model-logo family-card__logo">${modalityEmoji(representative.category)}</div>
         <div class="family-card__body">
           <div class="family-card__name-row">
-            <span class="family-card__name">${escapeHtml(family.name)}</span>
-            ${tag ? renderTagPill(tag) : ''}
+            <span class="family-card__name">${escapeHtml(org.name)}</span>
+            ${npuPill}
             ${statusPill}
           </div>
-          <div class="family-card__tagline">${escapeHtml(family.tagline)}</div>
+          <div class="family-card__tagline">${options} ${options === 1 ? 'model' : 'models'}</div>
         </div>
         <div class="family-card__aside">
-          <span class="family-card__count">${options} ${options === 1 ? 'option' : 'options'}</span>
+          <span class="family-card__count">${options} ${options === 1 ? 'model' : 'models'}</span>
           <svg class="family-card__chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -759,14 +781,10 @@ function renderFamilyCard(family: FamilyGroup): string {
   `;
 }
 
-/**
- * Render a family's variants once expanded. The best-for-device variant is
- * auto-flagged; each row shows the clean model name, download size, a subtle
- * backend pill, and the friendly size feel — never quant strings.
- */
-function renderFamilyVariants(family: FamilyGroup): string {
-  const best = bestVariantForDevice(family.entries);
-  return family.entries
+/** Render an org's models once expanded. */
+function renderOrgVariants(org: OrgGroup): string {
+  const best = bestVariantForDevice(org.entries);
+  return org.entries
     .map((entry) => renderVariantRow(entry, entry.id === best?.id))
     .join('');
 }
@@ -841,20 +859,19 @@ function stateOf(id: string): RowState {
 }
 
 /**
- * Match against friendly, consumer-facing signals only — model name, family
- * name/tagline, size feel, and consumer tags. Deliberately excludes quant
- * strings and inference backend names.
+ * Match against friendly, consumer-facing signals only — model name, org
+ * name, size feel, and consumer tags. Deliberately excludes quant strings
+ * and inference backend names.
  */
 function matchesSearch(entry: CatalogEntry, query: string): boolean {
   if (!query) return true;
-  const family = modelFamily(entry);
+  const org = modelOrg(entry);
   const normalize = (value: string): string => value.toLowerCase().replace(/[-_./]+/g, ' ');
   const haystack = normalize([
     entry.id,
     entry.name,
     entry.description,
-    family.name,
-    family.tagline,
+    org.name,
     variantSizeFeel(entry),
     ...consumerTags(entry).map((tag) => tag.label),
   ].join(' '));

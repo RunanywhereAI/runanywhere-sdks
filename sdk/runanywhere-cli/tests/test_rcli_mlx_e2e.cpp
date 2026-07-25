@@ -108,7 +108,7 @@ bool serialize(const google::protobuf::MessageLite &message,
 }
 
 rac_result_t fake_create(rac_mlx_session_kind_t kind, const char *model_id,
-                         const char *, rac_handle_t *out_handle, void *) {
+                         rac_handle_t *out_handle, void *) {
   if (!out_handle) {
     return RAC_ERROR_NULL_POINTER;
   }

@@ -320,6 +320,8 @@ struct ModelRequiredOverlay: View {
         case .vlm: return "camera.viewfinder"
         case .ragEmbedding: return "doc.text.magnifyingglass"
         case .ragLLM: return "text.bubble.fill"
+        case .diarization: return "person.2.wave.2"
+        case .segmentation: return "square.3.layers.3d.down.right"
         }
     }
 
@@ -333,6 +335,8 @@ struct ModelRequiredOverlay: View {
         case .vlm: return AppColors.primaryAccent
         case .ragEmbedding: return AppColors.primaryBlue
         case .ragLLM: return AppColors.primaryAccent
+        case .diarization: return AppColors.statusGreen
+        case .segmentation: return AppColors.primaryPurple
         }
     }
 
@@ -346,6 +350,8 @@ struct ModelRequiredOverlay: View {
         case .vlm: return "Live Mode"
         case .ragEmbedding: return "Embedding Model"
         case .ragLLM: return "Language Model"
+        case .diarization: return "Speaker Diarization"
+        case .segmentation: return "Image Segmentation"
         }
     }
 
@@ -359,6 +365,8 @@ struct ModelRequiredOverlay: View {
         case .vlm: return "Choose a vision model to understand photos and the live camera."
         case .ragEmbedding: return "Select an embedding model to convert documents into searchable vectors."
         case .ragLLM: return "Select a language model to generate answers from your documents."
+        case .diarization: return "Download NVIDIA Sortformer, then record audio to identify who spoke when — fully on-device."
+        case .segmentation: return "Download SegFormer B0, then pick an image to segment classes on-device."
         }
     }
 }

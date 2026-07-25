@@ -323,10 +323,23 @@ async function* streamLifecycle(
   }
 }
 
+interface WorkerInitPayload {
+  acceleration?: 'auto' | 'cpu' | 'webgpu';
+  threads?: number;
+  wasmUrl?: string;
+  webgpuWasmUrl?: string;
+}
+
 const workerScope = self as unknown as BackendWorkerScope;
 runBackendWorker(workerScope, {
-  async init(): Promise<void> {
-    await runtime.ensureLoaded();
+  async init(payload?: unknown): Promise<void> {
+    const options = (payload ?? {}) as WorkerInitPayload;
+    await runtime.ensureLoaded({
+      acceleration: options.acceleration ?? 'auto',
+      threads: options.threads,
+      wasmUrl: options.wasmUrl,
+      webgpuWasmUrl: options.webgpuWasmUrl,
+    });
   },
 
   async loadModel(modality, payload: unknown): Promise<unknown> {
@@ -409,7 +422,14 @@ runBackendWorker(workerScope, {
   health() {
     return {
       healthy: runtime.isLoaded,
-      details: { backend: 'onnx-sherpa', ownership: 'worker', diagnostics: runtime.recentDiagnostics },
+      details: {
+        backend: 'onnx-sherpa',
+        ownership: 'worker',
+        acceleration: runtime.acceleration,
+        threads: runtime.threadCount,
+        fallbackReason: runtime.lastFallbackReason,
+        diagnostics: runtime.recentDiagnostics,
+      },
     };
   },
 });

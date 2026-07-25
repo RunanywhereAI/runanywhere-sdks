@@ -11,12 +11,14 @@
   ],
   "scripts": {
     "build:wasm": "cd wasm && ./scripts/build.sh",
-    "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu",
+    "build:wasm:all": "npm run build:wasm -- --core --llamacpp --onnx && npm run build:wasm -- --webgpu && npm run build:wasm -- --onnx-webgpu",
+    "build:wasm:onnx-webgpu": "cd wasm && ./scripts/build.sh --onnx-webgpu",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
     "build:wasm:clean": "npm run clean:wasm && npm run build:wasm:all",
     "vendor:wasm:onnxruntime": "wasm/scripts/vendor-onnxruntime-wasm.sh",
+    "vendor:wasm:onnxruntime-webgpu": "wasm/scripts/vendor-onnxruntime-wasm-webgpu.sh",
     "vendor:wasm:sherpa": "wasm/scripts/vendor-sherpa-onnx-wasm.sh",
-    "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
+    "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:onnxruntime-webgpu && npm run vendor:wasm:sherpa",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
@@ -29,7 +31,8 @@
     "test:browser": "playwright test",
     "test:browser:smoke": "playwright test tests/browser/backend-readiness.spec.ts tests/browser/hybrid-stt.spec.ts",
     "test:browser:release": "RA_RUN_FULL_E2E=1 playwright test tests/browser/release-app.e2e.spec.ts",
-    "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
+    "test:browser:nvidia": "RA_RUN_FULL_E2E=1 playwright test tests/browser/llm-generate.spec.ts tests/browser/vlm-generate.spec.ts tests/browser/speech-rag-e2e.spec.ts tests/browser/nemotron-streaming.e2e.spec.ts",
+    "clean:wasm": "rm -rf wasm/build wasm/build-webgpu wasm/build-core wasm/build-llamacpp wasm/build-llamacpp-webgpu wasm/build-onnx wasm/build-onnx-webgpu packages/core/wasm packages/llamacpp/wasm packages/onnx/wasm",
     "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist && npm run clean:wasm"
   },
   "engines": {
