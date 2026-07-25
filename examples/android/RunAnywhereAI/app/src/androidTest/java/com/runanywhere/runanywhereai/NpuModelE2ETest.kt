@@ -941,6 +941,7 @@ class NpuModelE2ETest {
         recordExecutedCases(report, cases)
         val werMax = suite.werMax
         var rtfSum = 0.0; var worstWer = 0.0; var n = 0; var passed = 0
+        val artifactHits = mutableSetOf<String>()
         for ((i, case) in cases.withIndex()) {
             val asset = requireNotNull(case.wavAsset)
             val ref = case.goldText
@@ -953,18 +954,24 @@ class NpuModelE2ETest {
             val rtf = r.metadata?.real_time_factor?.takeIf { it > 0f }?.toDouble() ?: (procMs / 1000.0 / audioS)
             val text = r.text.trim()
             val wer = NpuMetrics.wer(ref, text)
+            val artifacts = NpuMetrics.tokenizerArtifacts(text)
+            artifactHits += artifacts
             val pass = wer <= werMax
             if (pass) passed++
             report.addSample(JSONObject().put("idx", i).put("id", case.id).put("input", asset)
                 .put("output", text).put("reference", ref)
                 .put("audio_s", round2(audioS)).put("latency_ms", round2(procMs)).put("rtf", round2(rtf))
                 .put("confidence", round2(r.confidence.toDouble()))
-                .put("metric", "wer").put("score", round3(wer)).put("pass", pass))
+                .put("metric", "wer").put("score", round3(wer)).put("pass", pass)
+                .put("tokenizer_artifacts", JSONArray(artifacts)))
             rtfSum += rtf; worstWer = maxOf(worstWer, wer); n++
         }
         val passFraction = passed.toDouble() / cases.size
         report.put("suite_pass_frac", round6(passFraction))
             .gate("asr_wer_suite", passFraction >= suite.passFrac)
+        // Independent of WER, which cannot see boundary markers (see NpuMetrics.tokenizerArtifacts).
+        report.gate("asr_no_tokenizer_artifacts", artifactHits.isEmpty())
+            .put("tokenizer_artifacts", JSONArray(artifactHits.sorted()))
         if (n > 0) report.put("rtf", round2(rtfSum / n)).put("wer", round3(worstWer))
     }
 

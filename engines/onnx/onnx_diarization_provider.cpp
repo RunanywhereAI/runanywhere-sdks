@@ -19,6 +19,14 @@
  *     chunk_pre_encode_embs      f32 [1, chunk_frames, 512]    embeds to append
  *     chunk_pre_encode_lengths   i64 [1]
  *
+ * CHOOSING AN EXPORT: NVIDIA publishes Sortformer only as a `.nemo`, so a community ONNX
+ * export is required and they are NOT interchangeable. Exports that miss this contract fail
+ * at inference with opaque ONNX Runtime errors — observed variants use int32 (not int64)
+ * `*_lengths`, pin the `fifo` axis to length 0, and rename all three outputs. Verify a
+ * candidate against all nine tensors above BEFORE reporting a provider bug: an
+ * `Unexpected input data type ... expected: (tensor(int32))` failure is an export mismatch,
+ * not a defect here. A contract-matching streaming 4-speaker v2.1 export is device-verified.
+ *
  * The graph is one streaming STEP; the FIFO + speaker-cache embedding state and
  * the mel frontend live in this driver. Offline diarize() and the persistent
  * stream share the same streaming loop (offline runs every chunk through a
