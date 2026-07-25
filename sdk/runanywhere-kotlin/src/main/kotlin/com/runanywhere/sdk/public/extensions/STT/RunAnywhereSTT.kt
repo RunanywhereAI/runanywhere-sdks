@@ -20,6 +20,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -108,7 +109,9 @@ fun RunAnywhere.transcribeStream(
                         trySend(RASTTPartialResult(is_final = true))
                     }
                     close()
-                } catch (e: Throwable) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
                     trySend(
                         RASTTPartialResult(
                             text = "STT stream failed: ${e.message ?: e::class.simpleName.orEmpty()}",
