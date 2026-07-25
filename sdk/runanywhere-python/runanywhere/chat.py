@@ -8,17 +8,22 @@ context.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, AsyncIterator, Iterator
+from typing import TYPE_CHECKING, AsyncIterator, Iterator, Literal
+
+from .stream_metrics import astream_with_metrics, stream_with_metrics
 
 if TYPE_CHECKING:
     from .models import LLMModel
+    from .results import LLMStreamEvent
+
+ChatRole = Literal["system", "user", "assistant"]
 
 
 @dataclass
 class ChatMessage:
     """A single conversation turn: role is 'system', 'user' or 'assistant'."""
 
-    role: str
+    role: ChatRole
     content: str
 
 
@@ -57,25 +62,48 @@ class Chat:
         p += "User: " + user_text + "\nAssistant:"
         return p
 
-    def send(self, user_text: str) -> Iterator[str]:
-        """Send a user message; stream the assistant reply, then record both turns."""
+    def send_stream(self, user_text: str) -> Iterator["LLMStreamEvent"]:
+        """Send a user message; stream :class:`LLMStreamEvent`s (incl. thinking), then record.
+
+        History stores the cleaned answer text (thinking stripped). Callers that need to
+        dim/suppress reasoning tokens should inspect ``ev.is_thinking``.
+        """
         prompt = self.build_prompt(user_text)
-        acc = ""
-        for token in self._llm.generate(prompt):
-            acc += token
-            yield token
+        answer = ""
+        for ev in stream_with_metrics(self._llm.generate(prompt)):
+            if ev.is_final and ev.result is not None:
+                answer = ev.result.text
+            yield ev
         self._history.append(ChatMessage(role="user", content=user_text))
-        self._history.append(ChatMessage(role="assistant", content=acc.strip()))
+        self._history.append(ChatMessage(role="assistant", content=answer.strip()))
+
+    def send(self, user_text: str) -> Iterator[str]:
+        """Send a user message; stream answer tokens only, then record both turns.
+
+        Thinking / reasoning tokens are filtered out (use :meth:`send_stream` to observe them).
+        """
+        for ev in self.send_stream(user_text):
+            if ev.is_final or ev.is_thinking:
+                continue
+            yield ev.token
+
+    async def asend_stream(self, user_text: str) -> AsyncIterator["LLMStreamEvent"]:
+        """Async twin of :meth:`send_stream`."""
+        prompt = self.build_prompt(user_text)
+        answer = ""
+        async for ev in astream_with_metrics(self._llm.agenerate(prompt)):
+            if ev.is_final and ev.result is not None:
+                answer = ev.result.text
+            yield ev
+        self._history.append(ChatMessage(role="user", content=user_text))
+        self._history.append(ChatMessage(role="assistant", content=answer.strip()))
 
     async def asend(self, user_text: str) -> AsyncIterator[str]:
         """Async twin of :meth:`send`."""
-        prompt = self.build_prompt(user_text)
-        acc = ""
-        async for token in self._llm.agenerate(prompt):
-            acc += token
-            yield token
-        self._history.append(ChatMessage(role="user", content=user_text))
-        self._history.append(ChatMessage(role="assistant", content=acc.strip()))
+        async for ev in self.asend_stream(user_text):
+            if ev.is_final or ev.is_thinking:
+                continue
+            yield ev.token
 
     def send_text(self, user_text: str) -> str:
         """Convenience: send and collect the full reply as a string."""

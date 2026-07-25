@@ -23,7 +23,7 @@ class CatalogFile:
 class CatalogEntry:
     """One catalog model: its type, files to download, and load metadata."""
 
-    type: str
+    type: ModelType
     files: list[CatalogFile]
     primary: str
     archive: bool = False
@@ -104,7 +104,7 @@ def _piper(voice: str, label: str, size_mb: int) -> CatalogEntry:
     )
 
 
-def _hnpu(repo: str, files: list[str], primary: str, type_: str, label: str,
+def _hnpu(repo: str, files: list[str], primary: str, type_: ModelType, label: str,
           params: str, size_mb: int) -> CatalogEntry:
     """A Qualcomm Hexagon NPU (QHexRT) bundle from a ``*_HNPU`` HF repo.
 
@@ -126,10 +126,10 @@ def _hnpu(repo: str, files: list[str], primary: str, type_: str, label: str,
     )
 
 
-# QHexRT (Hexagon NPU) bundle catalog — populated when the QHexRT engine + its Windows model
-# contract land. Kept as a separate dict so it can be extended independently; it is merged into
-# CATALOG below. Adding a model is then one `_hnpu(...)` line here. Example shape (commented —
-# fill the real per-arch file list from the HF repo when wiring):
+# QHexRT (Hexagon NPU) bundle catalog.
+# TODAY: Android/Snapdragon-only (`RAC_PLATFORM_ANDROID` + private prebuilt). Windows Snapdragon
+# ARM64 HNPU is NOT enabled — no Windows QNN/QHexRT archive in-repo. Keep empty until a
+# Windows-capable engine + model contract ship. Example shape (commented):
 #   "qwen3-0.6b-npu": _hnpu(
 #       "runanywhere/qwen3_0_6b_HNPU", files=["v79/manifest.json", "v79/model.bin", ...],
 #       primary="manifest.json", type_="llm", label="Qwen3-0.6B (NPU)", params="0.6B", size_mb=900),
@@ -283,7 +283,7 @@ CATALOG: dict[str, CatalogEntry] = {
     "piper-ryan": _piper("ryan", "Piper · Ryan", 64),
 }
 
-# Fold in the QHexRT NPU bundles (empty until the engine + Windows model contract land).
+# Fold in QHexRT bundles when populated (Android HNPU today; Windows Snapdragon deferred).
 CATALOG.update(QHEXRT_BUNDLES)
 
 

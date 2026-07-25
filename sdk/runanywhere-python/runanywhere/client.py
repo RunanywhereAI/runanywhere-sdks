@@ -122,7 +122,9 @@ class RunAnywhere:
 
         Does not require :meth:`initialize` — it reflects the wheel's build config. The plugin
         registry auto-selects the highest-priority registered backend for each modality, so an
-        NPU-enabled build reports ``'qhexrt'`` here and ``load_llm`` routes to it automatically.
+        An Android QHexRT-linked build reports ``'qhexrt'`` here (priority 150) and
+        ``load_llm`` routes to it for HNPU bundles. Windows Snapdragon HNPU is not
+        available yet — desktop wheels report CPU backends (llamacpp/onnx/sherpa).
         """
         return list(_native.get_core().backends())
 
@@ -156,20 +158,21 @@ class RunAnywhere:
         Returns ``self`` so the call can be chained.
         """
         global _init_count, _native_up
-        if self._initialized:
-            return self
-
-        core = _native.get_core()
+        # Resolve host paths outside the lock (no shared state). The per-client
+        # idempotency check MUST run under `_state_lock` so two concurrent
+        # initialize() calls on the same instance cannot both bump `_init_count`.
         base = self._base_dir if self._base_dir is not None else _HOME
         secure = self._secure_dir if self._secure_dir is not None else os.path.join(base, "secure")
 
+        first = False
         with _state_lock:
+            if self._initialized:
+                return self
+            core = _native.get_core()
             if not _native_up:
                 core.initialize(secure, base)
                 _native_up = True
                 first = True
-            else:
-                first = False
             _init_count += 1
             self._core = core
             self._initialized = True
@@ -203,12 +206,25 @@ class RunAnywhere:
         — when it reaches zero — calls ``core.shutdown()`` and emits :class:`ShutdownEvent`.
         """
         global _init_count, _native_up, _services_ready
-        if not self._initialized:
-            return
+        # Claim ownership of this client's teardown under the lock so concurrent
+        # shutdown() calls cannot double-decrement `_init_count`.
+        with _state_lock:
+            if not self._initialized:
+                return
+            self._initialized = False
+            models = list(self._models)
+            self._models.clear()
+            core = self._core
+            self._core = None
+            if _init_count > 0:
+                _init_count -= 1
+            last = _init_count == 0 and _native_up
+            if last:
+                _native_up = False
+                _services_ready = False
 
-        # Unload this client's models first (best-effort; a failed unload must not leak the
-        # ref-count). Snapshot because unload() mutates the weak set via callbacks/GC.
-        for model in list(self._models):
+        # Unload outside the lock (best-effort; a failed unload must not leak the ref-count).
+        for model in models:
             unload = getattr(model, "unload", None) or getattr(model, "close", None)
             if unload is not None:
                 try:
@@ -216,19 +232,6 @@ class RunAnywhere:
                 except Exception:
                     # A single model failing to unload must not block core teardown.
                     pass
-        self._models.clear()
-
-        core = self._core
-        last = False
-        with _state_lock:
-            self._initialized = False
-            self._core = None
-            if _init_count > 0:
-                _init_count -= 1
-            if _init_count == 0 and _native_up:
-                _native_up = False
-                _services_ready = False
-                last = True
 
         if last and core is not None:
             core.shutdown()

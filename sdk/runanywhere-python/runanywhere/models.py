@@ -112,12 +112,17 @@ class LLMModel:
         self._handle = handle
         self._guard = _GenerationGuard()
 
+    def _ensure_loaded(self) -> None:
+        if getattr(self, "_unloaded", False):
+            raise SDKException.invalid_state("model has been unloaded")
+
     # -- native stream -------------------------------------------------------
     def _native_call(self, prompt: str, opts: dict) -> Callable[[_OnToken], None]:
         """Build the ``native_call`` closure ``iter_tokens`` drives on its worker
         thread. It captures the handle + prompt + generation kwargs and invokes
         ``core.generate(handle, prompt, on_token, **kwargs)``; ``on_token`` returning
         False stops the C decode loop (backpressure / cancellation)."""
+        self._ensure_loaded()
         core = self._core
         handle = self._handle
         kwargs = generate_kwargs(**opts)
@@ -129,11 +134,13 @@ class LLMModel:
 
     def generate(self, prompt: str, **opts: Any) -> Iterator[str]:
         """Stream the completion token-by-token."""
+        self._ensure_loaded()
         source = iter_tokens(self._native_call(prompt, opts))
         return _guarded_iter(self._guard, source)
 
     def agenerate(self, prompt: str, **opts: Any) -> AsyncIterator[str]:
         """Async twin of :meth:`generate`."""
+        self._ensure_loaded()
         source = aiter_tokens(self._native_call(prompt, opts))
         return _aguarded_iter(self._guard, source)
 
@@ -218,11 +225,18 @@ class LLMModel:
     def generate_with_tools(self, prompt: str, tools: list[ToolSpec], **opts: Any) -> ToolRun:
         """Pick a tool AND run its ``execute`` function, returning
         ``ToolRun(name, arguments, result)``. Tools without an ``execute`` behave like
-        :meth:`generate_tool_call` (no result)."""
+        :meth:`generate_tool_call` (no result).
+
+        Sync path: if ``execute`` returns a coroutine, run it to completion on a private
+        event loop (mirrors Electron's sync tool runner). Prefer :meth:`agenerate_with_tools`
+        when tools are async.
+        """
         call = self.generate_tool_call(prompt, tools, **opts)
         tool = _find_tool(tools, call.name)
         if tool is not None and tool.execute is not None:
             result = tool.execute(call.arguments)
+            if asyncio.iscoroutine(result):
+                result = asyncio.run(result)
             return ToolRun(name=call.name, arguments=call.arguments, result=result)
         return ToolRun(name=call.name, arguments=call.arguments)
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from .errors import SDKException
+
 # The STT model wants 16 kHz mono PCM16 bytes; the TTS model returns float32 at its
 # own sample rate. These helpers bridge to/from those formats. Ported from the
 # Electron SDK audio.ts DSP + WAV layer (MicRecorder / SpeakerPlayer are browser-only
@@ -45,7 +47,7 @@ def downsample(x: np.ndarray, in_rate: int, out_rate: int) -> np.ndarray:
     downsampling, e.g. a 48 kHz mic capture down to the 16 kHz the STT model wants).
     """
     if out_rate <= 0 or in_rate <= 0:
-        raise ValueError("downsample: rates must be positive")
+        raise SDKException.invalid_input("downsample: rates must be positive")
     a = np.asarray(x, dtype=np.float32)
     if out_rate >= in_rate:
         return a.copy()
@@ -102,7 +104,7 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
     """
     b = bytes(data)
     if len(b) < 12 or b[0:4] != b"RIFF" or b[8:12] != b"WAVE":
-        raise ValueError("decode_wav: not a RIFF/WAVE file")
+        raise SDKException.invalid_input("decode_wav: not a RIFF/WAVE file")
     channels = 1
     sample_rate = 16000
     bits = 16
@@ -123,9 +125,11 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
             break
         p = body + size + (size % 2)  # chunks are word-aligned
     if data_offset < 0:
-        raise ValueError("decode_wav: no data chunk")
+        raise SDKException.invalid_input("decode_wav: no data chunk")
     if bits != 16:
-        raise ValueError(f"decode_wav: only 16-bit PCM supported (got {bits}-bit)")
+        raise SDKException.invalid_input(
+            f"decode_wav: only 16-bit PCM supported (got {bits}-bit)"
+        )
     frames = data_len // 2 // channels
     end = data_offset + frames * channels * 2
     raw = np.frombuffer(b[data_offset:end], dtype="<i2")

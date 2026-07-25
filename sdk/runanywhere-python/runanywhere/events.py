@@ -1,6 +1,7 @@
 """A small typed event bus for lifecycle + telemetry (port of electron events.ts)."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Union
 
@@ -95,12 +96,13 @@ class EventBus:
         for listener in list(self._listeners):
             try:
                 listener(event)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # A misbehaving listener must not disrupt the others. Catch Exception
                 # (NOT BaseException) so control-flow signals — KeyboardInterrupt,
                 # SystemExit, asyncio.CancelledError (a BaseException since 3.8) — still
                 # propagate to the caller instead of being silently swallowed here.
-                pass
+                # Log the traceback only — do not serialize the event payload.
+                logging.getLogger(__name__).exception("EventBus listener failed")
 
     def remove_all(self) -> None:
         """Drop every registered listener."""

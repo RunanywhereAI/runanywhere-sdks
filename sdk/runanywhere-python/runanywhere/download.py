@@ -252,7 +252,7 @@ _IN_FLIGHT_LOCK = threading.Lock()
 class _DownloadState:
     """Shared outcome for one in-flight destination: an Event + the owner's error (if any)."""
 
-    __slots__ = ("event", "error")
+    __slots__ = ("error", "event")
 
     def __init__(self) -> None:
         self.event = threading.Event()
@@ -286,9 +286,11 @@ def _download_once(
         state.error = exc  # publish the failure to any waiters holding this state
         raise
     finally:
+        # Signal waiters BEFORE popping so a new owner cannot start a concurrent write
+        # while prior waiters are still blocked on this state (QEF-29 / QEF-11).
         with _IN_FLIGHT_LOCK:
+            state.event.set()
             _IN_FLIGHT.pop(dest, None)
-        state.event.set()
 
 
 _RE_URL = re.compile(r"^https?://", re.IGNORECASE)
