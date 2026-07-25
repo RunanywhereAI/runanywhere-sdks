@@ -21,7 +21,7 @@ from .audio import (
     rms,
 )
 from .catalog import CATALOG, CatalogEntry, CatalogFile, ModelType, is_catalog_id
-from .chat import Chat, ChatMessage
+from .chat import Chat, ChatMessage, ChatRole
 from .client import RunAnywhere
 from .download import (
     download_file,
@@ -104,6 +104,7 @@ __all__ = [
     # conversation
     "Chat",
     "ChatMessage",
+    "ChatRole",
     "VoiceAgent",
     # RAG (talk-to-your-documents)
     "RagSession",
