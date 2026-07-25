@@ -95,14 +95,10 @@ class RunAnywhere:
         *,
         secure_dir: str | None = None,
         base_dir: str | None = None,
-        api_key: str | None = None,
-        base_url: str | None = None,
         environment: str = "production",
     ) -> None:
         self._secure_dir = secure_dir
         self._base_dir = base_dir
-        self._api_key = api_key
-        self._base_url = base_url
         self._environment = environment
         self._initialized = False
         # The native module handle, resolved on initialize(); None while down.
@@ -185,10 +181,10 @@ class RunAnywhere:
         return self
 
     def complete_services_initialization(self) -> None:
-        """Run Phase-2 services bring-up. Idempotent; emits :class:`ServicesReadyEvent` once.
+        """Mark Phase-2 services ready. Idempotent; emits :class:`ServicesReadyEvent` once.
 
-        A seam for future backend auth/telemetry (currently local-only), mirroring the
-        Electron facade's ``completeServicesInitialization()``.
+        Local-only no-op today: no network auth or remote telemetry is performed.
+        Kept as an explicit lifecycle seam mirroring the other SDKs' Phase-2 hook.
         """
         global _services_ready
         emit = False
@@ -423,9 +419,32 @@ class RunAnywhere:
         self._register(session)
         return session
 
+    # -- model registry ------------------------------------------------------
+    def register_model(
+        self, model_id: str, local_path: str, *, framework: int, category: int
+    ) -> None:
+        """Register a model id → path into the global registry (C ABI enums)."""
+        self._require_core().register_model(model_id, local_path, framework, category)
+
+    def get_model(self, model_id: str) -> dict | None:
+        """Look up a registered model by id, or None if absent."""
+        return self._require_core().get_model(model_id)
+
+    def list_models(self) -> list[dict]:
+        """List all models currently in the global registry."""
+        return list(self._require_core().list_models())
+
+    def remove_model(self, model_id: str) -> None:
+        """Remove a model from the global registry."""
+        self._require_core().remove_model(model_id)
+
     # -- secure store --------------------------------------------------------
     def secure_set(self, key: str, value: str) -> None:
-        """Store an encrypted key-value pair (requires initialize())."""
+        """Store a key-value pair in the platform secure store (requires initialize()).
+
+        On Windows the value is DPAPI-protected. On macOS/Linux the store is a
+        mode-0600 plaintext file under the secure directory — not encrypted.
+        """
         self._require_core().secure_set(_validate_secure_key(key), value)
 
     def secure_get(self, key: str) -> str | None:

@@ -92,9 +92,9 @@ def test_init_options_defaults() -> None:
     o = InitOptions()
     assert o.secure_dir is None
     assert o.base_dir is None
-    assert o.api_key is None
-    assert o.base_url is None
     assert o.environment == "production"
+    assert not hasattr(o, "api_key")
+    assert not hasattr(o, "base_url")
 
 
 def test_generate_options_defaults() -> None:

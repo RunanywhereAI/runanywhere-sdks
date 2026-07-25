@@ -10,12 +10,10 @@ from .results import DownloadProgress
 
 @dataclass
 class InitOptions:
-    """Runtime bring-up options (all optional)."""
+    """Runtime bring-up options (all optional). Local paths + environment label only."""
 
     secure_dir: str | None = None
     base_dir: str | None = None
-    api_key: str | None = None
-    base_url: str | None = None
     environment: str = "production"
 
 

@@ -70,11 +70,13 @@ The constructor accepts optional configuration:
 ra = RunAnywhere(
     base_dir="~/my-models",        # where models live (default: ~/.runanywhere)
     secure_dir=None,               # secure store dir (default: <base_dir>/secure)
-    api_key=None,
-    base_url=None,
     environment="production",
 )
 ```
+
+Phase-2 (`complete_services_initialization`) is a local-only lifecycle seam today — it does
+not perform network auth. The HTTP server's optional `api_key` (Bearer guard) is separate
+and configured on `serve()` / the CLI, not on `RunAnywhere()`.
 
 ## Generating Text
 
