@@ -22,9 +22,66 @@ export interface DispatchDeps {
   streamingMethods?: Set<string>;
   /** Override the load-method matcher (defaults to the built-in). */
   loadRe?: RegExp;
+  /** Override the allowed-method set (defaults to ALLOWED_RPC_METHODS). */
+  allowedMethods?: Set<string>;
 }
 
 const DEFAULT_LOAD_RE = /^load(Model|VlmModel|EmbeddingModel|SttModel|TtsVoice)$/;
+
+/**
+ * Explicit allowlist of RPC method names the utility host will dispatch.
+ * Matches the native addon surface plus host-owned helpers (downloadModel,
+ * modelStatus, exists). Unknown methods are rejected before touching `api`.
+ */
+export const ALLOWED_RPC_METHODS: ReadonlySet<string> = new Set([
+  // lifecycle
+  'initialize',
+  'shutdown',
+  'version',
+  // secure store
+  'secureSet',
+  'secureGet',
+  'secureDelete',
+  // host-owned filesystem / download
+  'downloadModel',
+  'modelStatus',
+  'exists',
+  // VAD
+  'createVad',
+  'vadProcess',
+  'vadIsActive',
+  'vadSetThreshold',
+  'vadReset',
+  'unloadVad',
+  // LLM
+  'loadModel',
+  'generate',
+  'unloadModel',
+  // VLM
+  'loadVlmModel',
+  'generateVlm',
+  'unloadVlmModel',
+  // embeddings
+  'loadEmbeddingModel',
+  'embed',
+  'unloadEmbeddingModel',
+  // STT
+  'loadSttModel',
+  'transcribe',
+  'unloadSttModel',
+  // TTS
+  'loadTtsVoice',
+  'synthesize',
+  'unloadTtsVoice',
+  // registry + RAG
+  'registerModel',
+  'ragCreateSession',
+  'ragIngest',
+  'ragQuery',
+  'ragStats',
+  'ragClear',
+  'ragDestroySession',
+]);
 
 const errmsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -39,7 +96,16 @@ export function dispatch(port: DispatchPort, req: RpcRequest, deps: DispatchDeps
   const api = deps.api;
   const streaming = deps.streamingMethods ?? STREAMING_METHODS;
   const loadRe = deps.loadRe ?? DEFAULT_LOAD_RE;
+  const allowed = deps.allowedMethods ?? ALLOWED_RPC_METHODS;
   try {
+    if (!allowed.has(method)) {
+      port.postMessage({
+        id,
+        ok: false,
+        error: `unknown RPC method: '${method}'`,
+      });
+      return;
+    }
     if (streaming.has(method)) {
       const onToken = (token: string) => port.postMessage({ id, token });
       // Carry the resolved value on completion so a streaming method that also

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const os = require('os');
 const path = require('path');
 
-const { dispatch } = require('../../dist/process/dispatch');
+const { dispatch, ALLOWED_RPC_METHODS } = require('../../dist/process/dispatch');
 const { STREAMING_METHODS } = require('../../dist/process/rpc');
 
 // A fake port that records every posted message.
@@ -390,4 +390,58 @@ test('STREAMING_METHODS contains generate and generateVlm, not embed/loadModel',
   assert.equal(STREAMING_METHODS.has('generateVlm'), true);
   assert.equal(STREAMING_METHODS.has('embed'), false);
   assert.equal(STREAMING_METHODS.has('loadModel'), false);
+});
+
+// ---- RPC ALLOWLIST ------------------------------------------------------
+
+test('ALLOWED_RPC_METHODS covers core addon + host helper surface', () => {
+  for (const m of [
+    'initialize',
+    'shutdown',
+    'version',
+    'secureSet',
+    'secureGet',
+    'secureDelete',
+    'downloadModel',
+    'modelStatus',
+    'exists',
+    'loadModel',
+    'generate',
+    'embed',
+    'transcribe',
+    'synthesize',
+    'createVad',
+    'vadProcess',
+    'ragCreateSession',
+    'ragIngest',
+    'ragQuery',
+    'ragDestroySession',
+    'registerModel',
+  ]) {
+    assert.equal(ALLOWED_RPC_METHODS.has(m), true, `expected allowlist to include ${m}`);
+  }
+});
+
+test('unknown RPC method is rejected before calling api', async () => {
+  const port = makePort();
+  let apiCalled = false;
+  const deps = makeDeps({
+    api: new Proxy(
+      {},
+      {
+        get() {
+          apiCalled = true;
+          return () => null;
+        },
+      }
+    ),
+  });
+
+  dispatch(port, { id: 99, method: '__not_a_real_method__', args: [] }, deps);
+  await tick();
+
+  assert.equal(apiCalled, false);
+  assert.deepEqual(port.posts, [
+    { id: 99, ok: false, error: "unknown RPC method: '__not_a_real_method__'" },
+  ]);
 });
