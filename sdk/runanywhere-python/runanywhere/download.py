@@ -120,7 +120,7 @@ def download_file(
         try:
             os.replace(tmp, dest)
         except OSError as e:
-            raise SDKException.generation_failed(f"failed to finalize {dest}", cause=e) from e
+            raise SDKException.storage_error(f"failed to finalize {dest}", cause=e) from e
 
     headers = {"User-Agent": _USER_AGENT}
     if start_at > 0:
@@ -177,7 +177,7 @@ def download_file(
                 except (urllib.error.URLError, TimeoutError, OSError) as e:
                     # A mid-stream reset / read timeout leaves the .part so the next
                     # attempt resumes instead of refetching.
-                    raise SDKException.generation_failed(
+                    raise SDKException.storage_error(
                         f"download interrupted for {url}", cause=e
                     ) from e
                 if not chunk:
@@ -201,7 +201,7 @@ def download_file(
         # A clean-but-early EOF (proxy cutoff, disk-full) still ends the read; reject on a
         # byte-count mismatch so a truncated file is never renamed.
         if total > 0 and received != total:
-            raise SDKException.generation_failed(
+            raise SDKException.storage_error(
                 f"incomplete download for {url}: got {received} of {total} bytes"
             )
     finalize()
@@ -221,7 +221,7 @@ def _extract_tar_bz2(archive: str, dest_dir: str) -> None:
         with tarfile.open(archive, "r:bz2") as tar:
             _safe_extract(tar, dest_dir)
     except (tarfile.TarError, OSError) as e:
-        raise SDKException.generation_failed(
+        raise SDKException.storage_error(
             f"tar extraction failed for {archive}", cause=e
         ) from e
 
@@ -232,7 +232,7 @@ def _safe_extract(tar: tarfile.TarFile, dest_dir: str) -> None:
     for member in tar.getmembers():
         target = os.path.realpath(os.path.join(dest_dir, member.name))
         if target != base and not target.startswith(base + os.sep):
-            raise SDKException.generation_failed(
+            raise SDKException.storage_error(
                 f"unsafe path in archive: {member.name}"
             )
     # Python 3.12 supports the 'data' filter; use it when available for defence in depth.
@@ -276,7 +276,7 @@ def _download_once(
             # The owning download FAILED. Every waiter must fail too — otherwise resolve_model
             # would hand back a path to a file that was never written (one transient network
             # error silently becoming N broken model loads).
-            raise SDKException.generation_failed(
+            raise SDKException.storage_error(
                 f"download failed for {os.path.basename(dest)}", cause=state.error
             )
         return

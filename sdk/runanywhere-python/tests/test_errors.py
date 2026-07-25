@@ -62,8 +62,9 @@ def test_error_category_values():
         (110, ErrorCategory.MODEL),
         (111, ErrorCategory.MODEL),
         (129, ErrorCategory.MODEL),
-        (130, ErrorCategory.COMPONENT),
-        (149, ErrorCategory.COMPONENT),
+        # Generation range is not named in commons → INTERNAL
+        (130, ErrorCategory.INTERNAL),
+        (149, ErrorCategory.INTERNAL),
         (150, ErrorCategory.NETWORK),
         (179, ErrorCategory.NETWORK),
         (180, ErrorCategory.IO),
@@ -81,30 +82,44 @@ def test_error_category_values():
         (299, ErrorCategory.IO),
         (300, ErrorCategory.COMPONENT),
         (319, ErrorCategory.COMPONENT),
+        # AUTH is only 320–329; security 330–349 → INTERNAL (commons)
         (320, ErrorCategory.AUTH),
-        (349, ErrorCategory.AUTH),
-        (350, ErrorCategory.IO),
-        (369, ErrorCategory.IO),
-        (370, ErrorCategory.VALIDATION),
-        (379, ErrorCategory.VALIDATION),
+        (329, ErrorCategory.AUTH),
+        (330, ErrorCategory.INTERNAL),
+        (349, ErrorCategory.INTERNAL),
+        (350, ErrorCategory.INTERNAL),
+        (369, ErrorCategory.INTERNAL),
+        (370, ErrorCategory.INTERNAL),
+        (379, ErrorCategory.INTERNAL),
         (380, ErrorCategory.INTERNAL),
         (389, ErrorCategory.INTERNAL),
-        (400, ErrorCategory.COMPONENT),
-        (499, ErrorCategory.COMPONENT),
-        (500, ErrorCategory.CONFIGURATION),
-        (599, ErrorCategory.CONFIGURATION),
-        (600, ErrorCategory.COMPONENT),
-        (699, ErrorCategory.COMPONENT),
+        (400, ErrorCategory.INTERNAL),
+        (499, ErrorCategory.INTERNAL),
+        (500, ErrorCategory.INTERNAL),
+        (599, ErrorCategory.INTERNAL),
+        (600, ErrorCategory.INTERNAL),
+        (699, ErrorCategory.INTERNAL),
         (700, ErrorCategory.INTERNAL),
         (800, ErrorCategory.INTERNAL),
         (804, ErrorCategory.INTERNAL),
         (999, ErrorCategory.INTERNAL),
-        (1000, ErrorCategory.UNSPECIFIED),
-        (-5, ErrorCategory.UNSPECIFIED),
+        (1000, ErrorCategory.INTERNAL),
+        (-5, ErrorCategory.INTERNAL),
+        (-111, ErrorCategory.MODEL),
+        (-320, ErrorCategory.AUTH),
+        (-330, ErrorCategory.INTERNAL),
     ],
 )
 def test_category_for_code(code, expected):
     assert category_for_code(code) == expected
+
+
+def test_error_code_covers_idl_surface():
+    """Pin the enum size so IDL additions force an update here."""
+    assert len(ErrorCode) >= 130
+    assert ErrorCode.AUTHENTICATION_FAILED == 320
+    assert ErrorCode.KEYCHAIN_ERROR == 330
+    assert ErrorCode.WASM_MEMORY_ERROR == 903
 
 
 def test_category_defaults_applied_in_ctor():
