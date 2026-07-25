@@ -2118,8 +2118,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     // Apply the no-think directive at the prompt level when disable_thinking is
     // set (proto LLMGenerationOptions.disable_thinking). Telemetry/events below
     // keep the original prompt; only the engine sees the directive.
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
+    const std::string effective_prompt = rac::llm::apply_no_think_directive(
+        request.prompt(), options.disable_thinking, ref.framework_name);
     const int64_t started = now_ms();
     rc = (ref.ops && ref.ops->generate)
              ? ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw)
@@ -2251,8 +2251,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // extern "C" boundary into the platform SDK. On WASM this would surface
     // as an opaque `WebAssembly.Exception` (no `.message`) in JS; on native
     // SDKs it would be undefined behaviour through a C ABI return.
-    const std::string effective_prompt =
-        rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
+    const std::string effective_prompt = rac::llm::apply_no_think_directive(
+        request.prompt(), options.disable_thinking, ref.framework_name);
     try {
         rc = ref.ops->generate_stream(ref.impl, effective_prompt.c_str(), &options,
                                       stream_token_callback, &ctx);
