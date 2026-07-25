@@ -88,6 +88,7 @@ enum ModelSelectionContext {
     switch (this) {
       case ModelSelectionContext.ragEmbedding:
         return {
+          sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
           sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
           sdk.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
         };

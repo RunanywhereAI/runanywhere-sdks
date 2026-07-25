@@ -206,6 +206,8 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | ml-stable-diffusion | CoreML image generation |
 | swift-protobuf | Proto-generated type support |
 
-## Unsupported Features
+## Capability Notes
 
-Speaker diarization and wake-word detection are not yet available as SDK facades or executable Commons capabilities.
+Standalone speaker diarization is exposed through `RunAnywhere.diarize` and
+`RunAnywhere.diarizeStream` when a diarization backend is registered. Wake-word
+detection and semantic-segmentation SDK facades are not yet available.

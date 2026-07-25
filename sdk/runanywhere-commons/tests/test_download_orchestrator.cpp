@@ -10,6 +10,7 @@
 
 #include "test_common.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -21,11 +22,12 @@
 #include <thread>
 #include <utility>
 
+#include "rac/core/rac_core.h"
+#include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/core/rac_core.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
@@ -473,6 +475,8 @@ std::vector<uint8_t> fake_payload(size_t n) {
 struct FakeTransport {
     std::vector<uint8_t> payload = fake_payload(static_cast<size_t>(256) * 1024);
     int sleep_ms_per_chunk = 0;
+    std::atomic<int> active_streams{0};
+    std::atomic<int> max_active_streams{0};
     // Flaky-mode accounting for "/flaky" URLs (transient-retry coverage). Each
     // distinct URL fails its FIRST fresh-stream attempt with a mid-transfer
     // network drop (after flushing a prefix to the ".part" sidecar), then every
@@ -481,7 +485,19 @@ struct FakeTransport {
     std::mutex flaky_mutex;
     std::set<std::string> flaky_urls_failed_once;  // URLs that already took their fail
     int stream_attempts = 0;                       // total fresh-stream calls seen
-    int resume_attempts = 0;                        // total resume calls seen
+    int resume_attempts = 0;                       // total resume calls seen
+};
+
+struct ScopedActiveFakeStream {
+    explicit ScopedActiveFakeStream(FakeTransport* fake) : fake(fake) {
+        const int active = fake->active_streams.fetch_add(1) + 1;
+        int observed = fake->max_active_streams.load();
+        while (active > observed &&
+               !fake->max_active_streams.compare_exchange_weak(observed, active)) {}
+    }
+    ~ScopedActiveFakeStream() { fake->active_streams.fetch_sub(1); }
+
+    FakeTransport* fake;
 };
 
 // The prefix a "/flaky" stream flushes to disk before the simulated drop. Small
@@ -518,8 +534,8 @@ bool fake_send_prefix(rac_http_body_chunk_fn cb, void* cb_user_data,
     for (size_t offset = start; offset < end; offset += chunk_size) {
         size_t n = std::min(chunk_size, end - offset);
         delivered += n;
-        if (cb(payload.data() + offset, n, delivered,
-               static_cast<uint64_t>(payload.size() - start), cb_user_data) == RAC_FALSE) {
+        if (cb(payload.data() + offset, n, delivered, static_cast<uint64_t>(payload.size() - start),
+               cb_user_data) == RAC_FALSE) {
             return false;
         }
     }
@@ -549,6 +565,11 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         out_resp_meta->status = 500;
         return RAC_SUCCESS;
     }
+    ScopedActiveFakeStream active_stream(fake);
+    {
+        std::lock_guard<std::mutex> lock(fake->flaky_mutex);
+        fake->stream_attempts++;
+    }
     // Transient-failure simulation: the first fresh-stream attempt for each
     // distinct "/flaky" URL flushes a prefix to the ".part" sidecar and then
     // reports a network drop, so the orchestrator's bounded resume-retry loop
@@ -557,7 +578,6 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         bool should_fail = false;
         {
             std::lock_guard<std::mutex> lock(fake->flaky_mutex);
-            fake->stream_attempts++;
             should_fail = fake->flaky_urls_failed_once.insert(url).second;
         }
         if (should_fail) {
@@ -805,6 +825,79 @@ static TestResult test_proto_plan_single_file() {
     ASSERT_TRUE(plan.total_bytes() == 4096, "Plan should preserve expected bytes");
     ASSERT_TRUE(plan.files(0).destination_path().find("model.gguf") != std::string::npos,
                 "Plan should include a concrete destination path");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown() {
+    TestResult r;
+    r.test_name = "proto_plan_multifile_uses_declared_aggregate_when_head_unknown";
+
+    // The fake HEAD transport deliberately returns no Content-Length. A
+    // curated multi-file model with an exact aggregate must remain startable
+    // even when legacy descriptors do not carry their per-file sizes.
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_multifile_aggregate");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    constexpr int64_t kCanaryBundleBytes = 207170046;
+    rav1::DownloadPlanRequest request;
+    request.set_model_id("canary-aggregate-fallback");
+    request.set_available_storage_bytes(1LL << 30);  // 1 GiB
+    rav1::ModelInfo* model = request.mutable_model();
+    model->set_id(request.model_id());
+    model->set_framework(rav1::INFERENCE_FRAMEWORK_SHERPA);
+    model->set_format(rav1::MODEL_FORMAT_ONNX);
+
+    for (const char* filename : {"encoder.int8.onnx", "decoder.int8.onnx", "tokens.txt"}) {
+        rav1::ModelFileDescriptor* file = model->mutable_multi_file()->add_files();
+        file->set_url(std::string("http://fake/no-content-length/") + filename);
+        file->set_filename(filename);
+        file->set_is_required(true);
+    }
+
+    std::string unknown_bytes = serialize_msg(request);
+    rac_proto_buffer_t unknown_buffer;
+    rac_proto_buffer_init(&unknown_buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(unknown_bytes.data()),
+                                        unknown_bytes.size(), &unknown_buffer) == RAC_SUCCESS,
+                "Unknown-size plan call should return a result proto");
+    rav1::DownloadPlanResult unknown_plan;
+    ASSERT_TRUE(parse_plan(unknown_buffer, &unknown_plan), "Unknown-size plan should parse");
+    rac_proto_buffer_free(&unknown_buffer);
+    ASSERT_TRUE(!unknown_plan.can_start(), "Missing per-file and aggregate sizes must fail closed");
+    ASSERT_TRUE(unknown_plan.total_bytes() == 0, "Unknown-size plan must not invent a total");
+
+    model->set_download_size_bytes(kCanaryBundleBytes);
+    std::string bytes = serialize_msg(request);
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), &buffer) == RAC_SUCCESS,
+                "Plan call should return a result proto");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+    rac_proto_buffer_free(&buffer);
+
+    ASSERT_TRUE(plan.can_start(), "Declared aggregate should keep the multi-file plan startable");
+    ASSERT_TRUE(plan.total_bytes() == kCanaryBundleBytes,
+                "Plan should use the model's declared aggregate size");
+    ASSERT_TRUE(plan.files_size() == 3, "Plan should preserve every file");
+    for (const auto& file : plan.files()) {
+        ASSERT_TRUE(file.expected_bytes() == 0,
+                    "Aggregate fallback must not invent a per-file expected size");
+    }
+    bool aggregate_warning = false;
+    for (const auto& warning : plan.warnings()) {
+        aggregate_warning = aggregate_warning ||
+                            warning.find("using model download_size_bytes") != std::string::npos;
+    }
+    ASSERT_TRUE(aggregate_warning, "Plan should disclose the aggregate-size fallback");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -1230,7 +1323,8 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
     ASSERT_TRUE(start_from_plan(plan, false, &start), "Nested multi-file start should parse");
     ASSERT_TRUE(start.accepted(), "Nested multi-file start should be accepted");
     rav1::DownloadProgress terminal;
-    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal), "Nested multi-file download should finish");
+    ASSERT_TRUE(wait_for_terminal(start.task_id(), &terminal),
+                "Nested multi-file download should finish");
     ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
                 "Nested multi-file download should complete");
 
@@ -1238,8 +1332,9 @@ static TestResult test_proto_nested_multifile_reports_model_root() {
     ASSERT_TRUE(rac_model_paths_get_model_folder(model_id.c_str(), RAC_FRAMEWORK_QHEXRT,
                                                  model_folder, sizeof(model_folder)) == RAC_SUCCESS,
                 "Canonical model root should resolve");
-    ASSERT_TRUE(terminal.local_path() == std::string(model_folder),
-                "Completed multi-file local_path must be the model root, not the first nested parent");
+    ASSERT_TRUE(
+        terminal.local_path() == std::string(model_folder),
+        "Completed multi-file local_path must be the model root, not the first nested parent");
     ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/context/model.bin").good(),
                 "Nested context should exist under the model root");
     ASSERT_TRUE(std::ifstream(std::string(model_folder) + "/manifest.json").good(),
@@ -1582,6 +1677,8 @@ int main(int argc, char** argv) {
 #ifdef RAC_HAVE_PROTOBUF
         // proto-byte workflow ABI
         suite.add("proto_plan_single_file", test_proto_plan_single_file);
+        suite.add("proto_plan_multifile_uses_declared_aggregate_when_head_unknown",
+                  test_proto_plan_multifile_uses_declared_aggregate_when_head_unknown);
         suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
         suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
         suite.add("proto_plan_self_heals_oversized_existing_bytes",

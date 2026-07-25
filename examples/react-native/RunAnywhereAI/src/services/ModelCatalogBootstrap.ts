@@ -23,6 +23,7 @@ import {
   publishNpuCatalogAcceptance,
   toNpuRegistrationRequest,
 } from './NpuModelCatalog';
+import { PORTABLE_NVIDIA_EMBEDDING_MODELS } from './EmbeddingCatalogPolicy';
 
 // Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
@@ -169,6 +170,7 @@ export async function registerAll(
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirement: 1_246_252_768,
       }),
+      ...PORTABLE_NVIDIA_EMBEDDING_MODELS.map((model) => registerModel(model)),
     ]);
   } else {
     logDiagnostic('[App] Skipping LlamaCPP models - backend not available');

@@ -1,0 +1,64 @@
+// RunAnywhere IDL - semantic image-segmentation types.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "SegmentationProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Packed 8-bit pixel layouts accepted at the SDK boundary. Rows are tightly
+// packed; callers must not include per-row padding.
+enum SegmentationPixelFormat {
+    SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED = 0;
+    SEGMENTATION_PIXEL_FORMAT_RGB8        = 1;
+    SEGMENTATION_PIXEL_FORMAT_RGBA8       = 2;
+    SEGMENTATION_PIXEL_FORMAT_BGRA8       = 3;
+}
+
+message SegmentationImage {
+    bytes data = 1;
+    uint32 width = 2;
+    uint32 height = 3;
+    SegmentationPixelFormat pixel_format = 4;
+}
+
+message SegmentationOptions {
+    // When true, also return a deterministic class-colour RGBA image. The
+    // canonical class_mask_u16_le remains the machine-readable result.
+    bool include_diagnostic_rgba = 1;
+}
+
+message SegmentationRequest {
+    SegmentationImage image = 1;
+    optional SegmentationOptions options = 2;
+}
+
+message SegmentationClassSummary {
+    uint32 class_id = 1;
+    uint64 pixel_count = 2;
+    float fraction = 3;
+    string label = 4;
+}
+
+message SegmentationResult {
+    // Both masks always describe the source image dimensions, not the model's
+    // internal 512x512 input or 128x128 logits grid.
+    uint32 width = 1;
+    uint32 height = 2;
+    bytes class_mask_u16_le = 3;
+    optional bytes diagnostic_rgba = 4;
+    repeated SegmentationClassSummary class_summaries = 5;
+    int64 processing_time_ms = 6;
+    string model_id = 7;
+}
+
+service SemanticSegmentation {
+    rpc Segment(SegmentationRequest) returns (SegmentationResult);
+}

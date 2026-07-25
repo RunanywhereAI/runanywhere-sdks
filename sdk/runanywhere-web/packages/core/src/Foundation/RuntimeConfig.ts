@@ -23,6 +23,7 @@ import { SDKLogger } from './SDKLogger.js';
 import { EventBus } from './EventBus.js';
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import { getBackendWorkerRuntimeDiagnostics } from '../runtime/BackendWorkerHost.js';
+import { getBackendWorkerHost } from '../runtime/BackendWorkerHostRegistry.js';
 import type {
   InferenceFramework,
   ModelCategory,
@@ -111,6 +112,50 @@ let _switcher: RuntimeAccelerationSwitcher | null = null;
 let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
 let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
 let _degradedReason: string | null = null;
+/** Speech (ONNX/Sherpa) acceleration — independent of LLM `active`. */
+let _speechAcceleration: 'cpu' | 'webgpu' | null = null;
+let _speechThreads = 1;
+let _speechExecutionContext: 'main' | 'worker' = 'main';
+
+export interface SpeechRuntimeDiagnostics {
+  acceleration: 'cpu' | 'webgpu' | null;
+  threads: number;
+  executionContext: 'main' | 'worker';
+}
+
+/** Per-modality execution status for UI / diagnostics. */
+export type ModalityRuntimeStatus =
+  | 'worker'
+  | 'main'
+  | 'composed'
+  | 'unavailable';
+
+export interface ModalityRuntimeEntry {
+  /** Short product name. */
+  label: string;
+  /** Owning backend package id, or null when no engine ships. */
+  backend: 'llamacpp' | 'onnx' | null;
+  status: ModalityRuntimeStatus;
+  acceleration: 'cpu' | 'webgpu' | null;
+  note?: string;
+}
+
+export type ModalityRuntimeId =
+  | 'llm'
+  | 'vlm'
+  | 'lora'
+  | 'tools'
+  | 'structured'
+  | 'embeddings'
+  | 'stt'
+  | 'tts'
+  | 'vad'
+  | 'rag'
+  | 'voiceAgent'
+  | 'rerank'
+  | 'segmentation'
+  | 'diarization'
+  | 'diffusion';
 
 /**
  * Public `RunAnywhere.runtime` capability object.
@@ -194,6 +239,27 @@ export const Runtime = {
   },
 
   /**
+   * Speech (ONNX/Sherpa) acceleration diagnostics. Independent of LLM
+   * `active` / `setAcceleration` — do not use those for STT/TTS/VAD.
+   */
+  get speech(): SpeechRuntimeDiagnostics {
+    return {
+      acceleration: _speechAcceleration,
+      threads: _speechThreads,
+      executionContext: _speechExecutionContext,
+    };
+  },
+
+  /**
+   * Snapshot of every public modality: worker vs main vs composed vs
+   * unavailable (no browser engine yet). Prefer this over assuming the LLM
+   * badge applies to speech/embeddings/diffusion.
+   */
+  get modalities(): Readonly<Record<ModalityRuntimeId, ModalityRuntimeEntry>> {
+    return buildModalityRuntimeSnapshot();
+  },
+
+  /**
    * Advisory WASM32 memory limits for diagnostics and preflight UI. These
    * numbers do not allocate memory or override browser/device quota checks.
    */
@@ -201,6 +267,118 @@ export const Runtime = {
     return memoryBudget;
   },
 };
+
+function buildModalityRuntimeSnapshot(): Record<ModalityRuntimeId, ModalityRuntimeEntry> {
+  const llamaCtx = getBackendWorkerHost('llamacpp')?.diagnostics.executionContext ?? 'main';
+  const onnxCtx = getBackendWorkerHost('onnx')?.diagnostics.executionContext ?? 'main';
+  const llmAccel = _activeMode;
+  const speechAccel = _speechAcceleration;
+  const llamaWorker = llamaCtx === 'worker';
+  const onnxWorker = onnxCtx === 'worker' || _speechExecutionContext === 'worker';
+
+  return {
+    llm: {
+      label: 'LLM',
+      backend: 'llamacpp',
+      status: llamaWorker ? 'worker' : 'main',
+      acceleration: llmAccel,
+    },
+    vlm: {
+      label: 'VLM',
+      backend: 'llamacpp',
+      status: llamaWorker ? 'worker' : 'main',
+      acceleration: llmAccel,
+    },
+    lora: {
+      label: 'LoRA',
+      backend: 'llamacpp',
+      status: llamaWorker ? 'worker' : 'main',
+      acceleration: llmAccel,
+      note: 'Shares LLM BackendWorker',
+    },
+    tools: {
+      label: 'Tool calling',
+      backend: 'llamacpp',
+      status: llamaWorker ? 'worker' : 'main',
+      acceleration: llmAccel,
+    },
+    structured: {
+      label: 'Structured output',
+      backend: 'llamacpp',
+      status: llamaWorker ? 'worker' : 'main',
+      acceleration: llmAccel,
+      note: 'Use parseAsync under BackendWorker',
+    },
+    embeddings: {
+      label: 'Embeddings',
+      backend: null,
+      status: llamaWorker || onnxWorker ? 'worker' : 'main',
+      acceleration: onnxWorker ? speechAccel : llmAccel,
+      note: 'GGUF → llamacpp worker; ONNX → onnx worker',
+    },
+    stt: {
+      label: 'STT',
+      backend: 'onnx',
+      status: onnxWorker ? 'worker' : 'main',
+      acceleration: speechAccel,
+    },
+    tts: {
+      label: 'TTS',
+      backend: 'onnx',
+      status: onnxWorker ? 'worker' : 'main',
+      acceleration: speechAccel,
+    },
+    vad: {
+      label: 'VAD',
+      backend: 'onnx',
+      status: onnxWorker ? 'worker' : 'main',
+      acceleration: speechAccel,
+      note: 'Stream uses per-chunk vad.process on the worker',
+    },
+    rag: {
+      label: 'RAG',
+      backend: 'onnx',
+      status: onnxWorker || llamaWorker ? 'composed' : 'main',
+      acceleration: speechAccel,
+      note: 'Embeddings/index on onnx; answers on llama when composed',
+    },
+    voiceAgent: {
+      label: 'Voice agent',
+      backend: null,
+      status: onnxWorker && llamaWorker ? 'composed' : 'main',
+      acceleration: null,
+      note: 'CrossWasm STT + LLM + TTS',
+    },
+    rerank: {
+      label: 'Rerank',
+      backend: 'llamacpp',
+      status: 'main',
+      acceleration: llmAccel,
+      note: 'Handle-scoped ABI on main llama bridge (not BackendWorker RPC yet)',
+    },
+    segmentation: {
+      label: 'Segmentation',
+      backend: null,
+      status: 'unavailable',
+      acceleration: null,
+      note: 'No browser WASM engine shipped',
+    },
+    diarization: {
+      label: 'Diarization',
+      backend: null,
+      status: 'unavailable',
+      acceleration: null,
+      note: 'No browser WASM engine shipped',
+    },
+    diffusion: {
+      label: 'Diffusion',
+      backend: null,
+      status: 'unavailable',
+      acceleration: null,
+      note: 'API stub only — no @runanywhere/web-diffusion artifact',
+    },
+  };
+}
 
 /**
  * Backend hook: install the acceleration switcher.
@@ -229,6 +407,37 @@ export function setActiveAccelerationMode(mode: 'cpu' | 'webgpu' | null): void {
       { mode },
     );
   }
+}
+
+/**
+ * Backend hook: report ONNX/Sherpa speech compute mode for UI and diagnostics.
+ * Does not mutate LLM `Runtime.active`.
+ */
+export function setSpeechAccelerationMode(diagnostics: {
+  acceleration: 'cpu' | 'webgpu' | null;
+  threads?: number;
+  executionContext?: 'main' | 'worker';
+}): void {
+  const nextAccel = diagnostics.acceleration;
+  const nextThreads = diagnostics.threads ?? _speechThreads;
+  const nextCtx = diagnostics.executionContext ?? _speechExecutionContext;
+  const changed =
+    _speechAcceleration !== nextAccel
+    || _speechThreads !== nextThreads
+    || _speechExecutionContext !== nextCtx;
+  _speechAcceleration = nextAccel;
+  _speechThreads = nextThreads;
+  _speechExecutionContext = nextCtx;
+  if (!changed || nextAccel === null) return;
+  EventBus.shared.publish(
+    'sdk.speechAcceleration',
+    EventCategory.EVENT_CATEGORY_HARDWARE,
+    {
+      acceleration: nextAccel,
+      threads: nextThreads,
+      executionContext: nextCtx,
+    },
+  );
 }
 
 export function setModelLoadPreparation(fn: RuntimeModelLoadPreparation | null): void {

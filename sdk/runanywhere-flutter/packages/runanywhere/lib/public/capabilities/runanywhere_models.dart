@@ -260,9 +260,8 @@ class RunAnywhereModels {
   /// do not hand-roll a per-capability switch.
   ///
   /// Mirrors Swift `RunAnywhere.loadModel(_:)` which routes `RAModelInfo` to
-  /// the right component lifecycle. Categories without a dedicated capability
-  /// fall through to the LLM lifecycle as the generic default, matching
-  /// Swift's behaviour.
+  /// the right component lifecycle. Categories without a dedicated Flutter
+  /// capability fail explicitly; they must never be misrouted to LLM.
   Future<void> loadModel(ModelInfo model) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -280,8 +279,10 @@ class RunAnywhereModels {
         return RunAnywhereTTS.shared.loadVoice(model.id);
       case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
         return RunAnywhereVAD.shared.loadModel(model.id);
+      case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       default:
-        return RunAnywhereLLM.shared.load(model.id);
+        throw SDKException.unsupportedModality(model.category.name);
     }
   }
 
@@ -303,8 +304,10 @@ class RunAnywhereModels {
         return RunAnywhereTTS.shared.unloadVoice();
       case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
         return RunAnywhereVAD.shared.unloadModel();
+      case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       default:
-        return RunAnywhereLLM.shared.unload();
+        throw SDKException.unsupportedModality(model.category.name);
     }
   }
 
@@ -325,9 +328,10 @@ class RunAnywhereModels {
         return RunAnywhereTTS.shared.currentVoiceId;
       case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
         return RunAnywhereVAD.shared.currentModelId;
+      case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
       default:
-        final m = await RunAnywhereLLM.shared.currentModel();
-        return m?.id;
+        throw SDKException.unsupportedModality(category.name);
     }
   }
 

@@ -229,11 +229,14 @@ public enum DeviceInfoFactory {
             return (nil, nil)
         }
         for source in sources {
+            // IOKit's IOPSGetPowerSourceDescription returns an untyped CFDictionary.
+            // swiftlint:disable avoid_any_type
             guard let description = IOPSGetPowerSourceDescription(snapshot, source)?
                 .takeUnretainedValue() as? [String: Any],
                   description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else {
                 continue
             }
+            // swiftlint:enable avoid_any_type
             var level: Float?
             if let current = description[kIOPSCurrentCapacityKey] as? Int,
                let maxCapacity = description[kIOPSMaxCapacityKey] as? Int,

@@ -67,8 +67,9 @@ typedef void (*rac_diffusion_stream_proto_callback_fn)(const uint8_t* event_byte
  *          Recommended teardown sequence:
  *            (a) call rac_diffusion_unset_stream_proto_callback(handle) —
  *                clears the slot atomically so no NEW dispatches will fire;
- *            (b) call rac_diffusion_proto_quiesce() — spin-waits until every
- *                in-flight callback invocation has returned;
+ *            (b) call rac_diffusion_proto_quiesce() — cancels active
+ *                generations and blocks until every in-flight callback
+ *                invocation has returned;
  *            (c) free @p user_data.
  *
  *          Modalities that currently expose proto_quiesce: LLM
@@ -90,12 +91,15 @@ RAC_API rac_result_t rac_diffusion_set_stream_proto_callback(
 RAC_API rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle);
 
 /**
- * @brief Spin-wait until all in-flight diffusion proto-byte stream
- *        dispatches have returned. Mirrors rac_vlm_proto_quiesce /
- *        rac_llm_proto_quiesce. Callers freeing user_data passed into
+ * @brief Cancel any in-flight diffusion generations, then block (without
+ *        busy-spinning) until every in-flight proto-byte stream dispatch and
+ *        worker has drained. Mirrors rac_vlm_proto_quiesce /
+ *        rac_llm_proto_quiesce, but additionally cancels active generations so
+ *        teardown returns promptly instead of waiting out a full 30-60s image.
+ *        Callers freeing user_data passed into
  *        rac_diffusion_set_stream_proto_callback, or tearing down the
- *        diffusion component, should call this after the unset before
- *        freeing the user_data. Safe to call from any thread.
+ *        diffusion component / swapping the model, should call this after the
+ *        unset before freeing the user_data. Safe to call from any thread.
  */
 RAC_API void rac_diffusion_proto_quiesce(void);
 
@@ -114,12 +118,19 @@ RAC_API rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
                                                       uint64_t* out_session_id);
 
 /**
- * @brief Stop a diffusion streaming session, flushing pending events.
+ * @brief Stop a diffusion streaming session (graceful drain).
+ *
+ * Lets the in-flight generation run to completion and deliver its terminal
+ * COMPLETED event; the session's handle frees once that generation finishes.
+ * Use rac_diffusion_stream_cancel_proto() for immediate teardown.
  */
 RAC_API rac_result_t rac_diffusion_stream_stop_proto(uint64_t session_id);
 
 /**
  * @brief Cancel a diffusion streaming session immediately.
+ *
+ * Aborts the in-flight generation, frees the handle for reuse right away, and
+ * delivers a terminal ERROR (cancelled) event to the registered callback.
  */
 RAC_API rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id);
 

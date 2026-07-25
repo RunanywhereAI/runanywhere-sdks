@@ -94,7 +94,9 @@ typedef struct rac_stt_service_ops {
     // Backends that leave these slots NULL continue to receive one-shot
     // per-chunk `transcribe_stream` calls. Backends that fill them in
     // get a stream_create on first chunk, N x stream_feed_audio_chunk, and
-    // a final stream_destroy on stop/cancel.
+    // a final stream_destroy on cancel. Normal stop first sends one
+    // stream_feed_audio_chunk call with samples == NULL and count == 0 so the
+    // backend can finalize input and synchronously emit its pending final.
     // -------------------------------------------------------------------------
 
     /**
@@ -112,7 +114,10 @@ typedef struct rac_stt_service_ops {
      * samples is non-null when @p count > 0. Backends decode the chunk
      * using their online recognizer and push partials / finals back to
      * commons by invoking @p callback — the same backend emission contract
-     * used by one-shot transcribe_stream calls.
+     * used by one-shot transcribe_stream calls. A call with @p samples == NULL
+     * and @p count == 0 is the normal-stop finish signal: finalize input,
+     * drain decoding, and synchronously emit any pending final before return.
+     * Cancellation skips this finish signal and proceeds directly to destroy.
      */
     rac_result_t (*stream_feed_audio_chunk)(void* impl, rac_handle_t stream_handle,
                                             const int16_t* samples, size_t count,

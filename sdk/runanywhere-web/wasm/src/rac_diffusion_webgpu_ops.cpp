@@ -60,19 +60,23 @@ rac_result_t webgpu_diffusion_get_info(void* impl, rac_diffusion_info_t* out_inf
         return RAC_ERROR_NULL_POINTER;
     auto* ctx = static_cast<WebGpuDiffusionImpl*>(impl);
     *out_info = {};
-    out_info->is_ready = RAC_TRUE;
+    // The WebGPU Stable Diffusion kernels are not linked yet, so generate()
+    // always returns FEATURE_NOT_AVAILABLE. Report the honest not-ready/no-caps
+    // state (mirroring the QHexRT vtable) so callers never surface a false
+    // "ready & fully capable" engine that then fails at generate.
+    out_info->is_ready = RAC_FALSE;
     out_info->current_model = ctx->model_path;
-    out_info->supports_text_to_image = RAC_TRUE;
-    out_info->supports_image_to_image = RAC_TRUE;
-    out_info->supports_inpainting = RAC_TRUE;
-    out_info->max_width = 512;
-    out_info->max_height = 512;
+    out_info->supports_text_to_image = RAC_FALSE;
+    out_info->supports_image_to_image = RAC_FALSE;
+    out_info->supports_inpainting = RAC_FALSE;
+    out_info->max_width = 0;
+    out_info->max_height = 0;
     return RAC_SUCCESS;
 }
 
 uint32_t webgpu_diffusion_get_capabilities(void*) {
-    return RAC_DIFFUSION_CAP_TEXT_TO_IMAGE | RAC_DIFFUSION_CAP_IMAGE_TO_IMAGE |
-           RAC_DIFFUSION_CAP_INPAINTING;
+    // No kernels linked yet -> advertise nothing until generate() actually works.
+    return 0;
 }
 
 rac_result_t webgpu_diffusion_cancel(void*) {

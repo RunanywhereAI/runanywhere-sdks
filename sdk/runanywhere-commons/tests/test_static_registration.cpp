@@ -50,8 +50,9 @@ static const rac_engine_vtable_t g_test_static_vtable = {
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    nullptr,
-    nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

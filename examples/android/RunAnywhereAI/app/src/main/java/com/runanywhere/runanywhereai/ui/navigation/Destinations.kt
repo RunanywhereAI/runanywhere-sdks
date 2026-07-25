@@ -38,6 +38,15 @@ data object Vad
 data class Vision(val openLiveCamera: Boolean = false)
 
 @Serializable
+data object Segmentation
+
+@Serializable
+data object Diarization
+
+@Serializable
+data object Diffusion
+
+@Serializable
 data object Documents
 
 @Serializable

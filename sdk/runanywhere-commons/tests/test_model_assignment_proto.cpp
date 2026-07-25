@@ -247,6 +247,35 @@ int test_metadata_normalization_into_model_info() {
     return 0;
 }
 
+int test_json_diarization_and_segmentation_categories() {
+    reset_assignment_state();
+
+    FakeAssignmentTransport fake;
+    fake.payloads.emplace_back(R"json({"models":[
+        {"id":"category.diarization.string","category":"speaker-diarization"},
+        {"id":"category.segmentation.string","category":"semantic_segmentation"},
+        {"id":"category.diarization.numeric","category":10},
+        {"id":"category.segmentation.numeric","category":11}
+    ]})json");
+    ASSERT_TRUE(install_fake_transport(&fake));
+
+    runanywhere::v1::ModelRegistryRefreshResult result;
+    ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
+    ASSERT_TRUE(result.success());
+    ASSERT_EQ(result.models().models_size(), 4);
+    ASSERT_EQ(result.models().models(0).category(),
+              runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
+    ASSERT_EQ(result.models().models(1).category(),
+              runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
+    ASSERT_EQ(result.models().models(2).category(),
+              runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
+    ASSERT_EQ(result.models().models(3).category(),
+              runanywhere::v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
+
+    reset_assignment_state();
+    return 0;
+}
+
 int test_no_config_no_transport_returns_empty_result() {
     reset_assignment_state();
 
@@ -290,6 +319,7 @@ int main() {
         RUN_TEST(test_cache_refresh_policy);
         RUN_TEST(test_invalid_request_returns_typed_error);
         RUN_TEST(test_metadata_normalization_into_model_info);
+        RUN_TEST(test_json_diarization_and_segmentation_categories);
         RUN_TEST(test_no_config_no_transport_returns_empty_result);
 
         std::fprintf(stdout, "test_model_assignment_proto: all tests passed\n");

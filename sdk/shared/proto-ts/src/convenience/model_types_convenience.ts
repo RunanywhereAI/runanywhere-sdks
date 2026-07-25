@@ -92,6 +92,10 @@ export const modelCategoryWireString = (e: ModelCategory): string => {
       return 'embedding';
     case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
       return 'voice-activity-detection';
+    case ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION:
+      return 'speaker-diarization';
+    case ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+      return 'semantic-segmentation';
     default:
       return '';
   }
@@ -119,6 +123,10 @@ export const modelCategoryFromWireString = (s: string): ModelCategory | undefine
       return ModelCategory.MODEL_CATEGORY_EMBEDDING;
     case 'voice-activity-detection':
       return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
+    case 'speaker-diarization':
+      return ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION;
+    case 'semantic-segmentation':
+      return ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
     default:
       return undefined;
   }

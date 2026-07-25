@@ -3,14 +3,15 @@
  *
  * V2 canonical: this package is a SHELL. It only loads the WASM module,
  * registers the platform adapter, calls `rac_init`, registers the unified
- * llama.cpp backend (LLM + VLM in a single call), then installs the module
+ * llama.cpp backend (LLM + embeddings + VLM in a single call), then installs the module
  * only in its capability-scoped adapter slots via `registerWasmModule(...)`.
  *
  * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
- * tool calling, structured output, LoRA, and VLM all flow through
+ * tool calling, structured output, LoRA, embeddings, and VLM all flow through
  * `@runanywhere/web` core's proto-byte adapters (`LLMProtoAdapter`,
  * `StructuredOutputProtoAdapter`, `VLMProtoAdapter`, etc.) without any
- * further per-package wiring. ONNX owns Web embeddings and cross-WASM RAG.
+ * further per-package wiring. ONNX remains an alternate embeddings provider
+ * and owns its cross-WASM RAG pipeline.
  *
  * Usage:
  *
@@ -105,8 +106,8 @@ function shouldPrepareCpuForModelLoad(
   return modelId.includes('qwen');
 }
 
-// Categories the LlamaCpp backend actually services. STT/TTS/VAD/embedding
-// requests are owned by other backends (Sherpa, ONNX, ...) and must never
+// Categories the LlamaCpp backend actually services. STT/TTS/VAD requests
+// are owned by other backends (Sherpa, ONNX, ...) and must never
 // trigger LlamaCpp's WebGPU→CPU fallback path — otherwise unrelated load
 // failures (e.g. a Sherpa whisper signature mismatch) surface to the user
 // as a misleading "WebGPU model load failed" log + bogus CPU retry.
@@ -114,6 +115,7 @@ const LLAMACPP_ELIGIBLE_CATEGORIES: ReadonlySet<ModelCategory> = new Set([
   ModelCategory.MODEL_CATEGORY_LANGUAGE,
   ModelCategory.MODEL_CATEGORY_VISION,
   ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  ModelCategory.MODEL_CATEGORY_EMBEDDING,
 ]);
 
 function shouldFallbackWebGPUModelLoad(
@@ -207,9 +209,9 @@ export const LlamaCPP = {
    * 3. Registers the 11-callback `rac_platform_adapter_t` browser vtable.
    * 4. Calls `rac_init()` (async, may suspend through ASYNCIFY).
    * 5. Calls `rac_backend_llamacpp_register()` — the unified entry point
-   *    that wires both LLM and VLM modalities in a single call.
-   * 6. Registers the module for its actual LLM/VLM/structured/tool/LoRA
-   *    capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
+   *    that wires LLM, embeddings, and VLM modalities in a single call.
+   * 6. Registers the module for its actual LLM/embedding/VLM/structured/tool/
+   *    LoRA capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
    *    acceleration switcher.
    *

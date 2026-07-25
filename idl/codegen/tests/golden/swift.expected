@@ -80,6 +80,8 @@ extension RARacTestConfig {
         r.precisionDouble = 0.7
         r.enableFeatureBool = true
         r.modeEnum = .balanced
+        r.monoChannelCount = 1
+        r.plainModeEnum = .enabled
         return r
     }
 }
@@ -105,16 +107,24 @@ extension RARacTestConfig {
                 message: "limit_int64 must be in 1...65536 (got \(limitInt64))"
             )
         }
-        if thresholdFloat < 0.0 || thresholdFloat > 1.0 {
+        let effectiveThresholdFloat = hasThresholdFloat ? thresholdFloat : 0.5
+        if !effectiveThresholdFloat.isFinite || effectiveThresholdFloat < 0.0 || effectiveThresholdFloat > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "RacTestConfig.threshold_float",
-                message: "threshold_float must be in 0.0...1.0 (got \(thresholdFloat))"
+                message: "threshold_float must be in 0.0...1.0 (got \(effectiveThresholdFloat))"
             )
         }
-        if precisionDouble < 0.0 || precisionDouble > 1.0 {
+        if !precisionDouble.isFinite || precisionDouble < 0.0 || precisionDouble > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "RacTestConfig.precision_double",
                 message: "precision_double must be in 0.0...1.0 (got \(precisionDouble))"
+            )
+        }
+        let effectiveMonoChannelCount = hasMonoChannelCount ? monoChannelCount : 1
+        if effectiveMonoChannelCount < 1 || effectiveMonoChannelCount > 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.mono_channel_count",
+                message: "mono_channel_count must be in 1...1 (got \(effectiveMonoChannelCount))"
             )
         }
     }

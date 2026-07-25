@@ -35,8 +35,8 @@
 // `Java_...` thunk, not a C ABI export, so Flutter FFI cannot call it. Instead
 // this bridge replicates its body in pure FFI (route → vtable slot →
 // stt_ops->create → build rac_stt_service_t) over faithful Dart mirrors of the
-// commons structs. The struct mirrors track plugin ABI v3
-// (RAC_PLUGIN_API_VERSION = 3); a layout bump there requires updating them.
+// commons structs. The struct mirrors track plugin ABI v7
+// (RAC_PLUGIN_API_VERSION = 7); a layout bump there requires updating them.
 
 import 'dart:ffi';
 import 'dart:typed_data';
@@ -55,7 +55,7 @@ import 'package:runanywhere/native/types/basic_types.dart';
 const int _kPrimitiveTranscribe = 2;
 
 // ============================================================================
-// FFI structs mirroring the commons C ABI (plugin ABI v3).
+// FFI structs mirroring the commons C ABI (plugin ABI v7).
 //
 // Only the prefix needed to reach `stt_ops` (in the engine vtable) and the
 // `create` / `destroy` slots (in the STT ops vtable) is consumed; the full
@@ -92,8 +92,8 @@ final class _RacEngineMetadata extends Struct {
 }
 
 /// Mirrors `rac_engine_vtable_t`. The metadata block is embedded by value;
-/// `capabilityCheck` / `onUnload` are function pointers, then the eight active
-/// primitive op-pointer slots, then ten reserved `const void*` slots. Only
+/// `capabilityCheck` / `onUnload` are function pointers, then the nine active
+/// primitive op-pointer slots, then eight reserved `const void*` slots. Only
 /// `sttOps` is dereferenced.
 final class _RacEngineVtable extends Struct {
   external _RacEngineMetadata metadata;
@@ -106,12 +106,11 @@ final class _RacEngineVtable extends Struct {
   external Pointer<Void> ttsOps;
   external Pointer<Void> vadOps;
   external Pointer<Void> embeddingOps;
-  external Pointer<Void> rerankOps;
   external Pointer<Void> vlmOps;
   external Pointer<Void> diffusionOps;
+  external Pointer<Void> diarizationOps;
+  external Pointer<Void> segmentationOps;
 
-  external Pointer<Void> reservedSlot0;
-  external Pointer<Void> reservedSlot1;
   external Pointer<Void> reservedSlot2;
   external Pointer<Void> reservedSlot3;
   external Pointer<Void> reservedSlot4;

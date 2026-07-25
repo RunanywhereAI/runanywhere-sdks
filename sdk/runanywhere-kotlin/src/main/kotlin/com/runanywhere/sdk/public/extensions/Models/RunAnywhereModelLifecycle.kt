@@ -24,6 +24,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -38,33 +39,52 @@ private val logger = SDKLogger("ModelLifecycle")
 suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) {
-            return@withContext RAModelLoadResult(
-                success = false,
-                model_id = request.model_id,
-                category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-                framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-                error_message = "SDK not initialized",
-            )
+            return@withContext modelLoadFailure(request, "SDK not initialized")
         }
+
+        // Services must be ready BEFORE the compatibility preflight: commons
+        // derives the verdict from the registry entry, which phase-2 init
+        // populates. This mirrors the download path (RunAnywhereDownload.kt),
+        // which also calls ensureServicesReady() before checkModelCompatibility().
+        // (Pre-fix this ran inside the preflight action, i.e. AFTER the registry
+        // read, so a model registered only during phase-2 could spuriously fail.)
         try {
             ensureServicesReady()
-        } catch (_: Throwable) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
-        val result =
-            CppBridgeModelLifecycle.load(request)
-                ?: return@withContext RAModelLoadResult(
-                    success = false,
-                    model_id = request.model_id,
-                    category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-                    framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-                    error_message = "Native model lifecycle load proto API unavailable",
-                )
-        if (result.success) {
-            val modelID = result.model_id.ifEmpty { request.model_id }
-            logger.info("Model load succeeded for $modelID")
+
+        // Commons can only score a REGISTERED model. A model absent from the
+        // registry (a direct load, or one registered only later) has no entry to
+        // evaluate, so skip the preflight and let native load surface the real
+        // "model not found" path instead of masking it as a compatibility
+        // failure. Mirrors downloadModel's isModelRegistered guard.
+        if (!isModelRegistered(request.model_id)) {
+            return@withContext performModelLoad(request)
         }
-        result
+
+        withModelLoadCompatibilityPreflight(
+            request = request,
+            resultProvider = { checkModelCompatibility(request.model_id) },
+        ) {
+            performModelLoad(request)
+        }
     }
+
+private suspend fun RunAnywhere.performModelLoad(request: RAModelLoadRequest): RAModelLoadResult {
+    val result =
+        CppBridgeModelLifecycle.load(request)
+            ?: modelLoadFailure(
+                request,
+                "Native model lifecycle load proto API unavailable",
+            )
+    if (result.success) {
+        val modelID = result.model_id.ifEmpty { request.model_id }
+        logger.info("Model load succeeded for $modelID")
+    }
+    return result
+}
 
 suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
     loadModel(
@@ -190,3 +210,15 @@ private val RAModelInfo.lifecycleLookupCategories: List<ModelCategory>
             ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> emptyList()
             else -> listOf(category)
         }
+
+private fun modelLoadFailure(
+    request: RAModelLoadRequest,
+    message: String,
+): RAModelLoadResult =
+    RAModelLoadResult(
+        success = false,
+        model_id = request.model_id,
+        category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+        framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+        error_message = message,
+    )
