@@ -113,15 +113,7 @@ task downloadNativeLibs {
 
     doLast {
         if (shouldDownloadAndroidLibs()) {
-            println "📦 Remote mode: Downloading RABackendONNX Android native libraries..."
-
             def jniLibsDir = file('build/jniLibs')
-            if (jniLibsDir.exists()) {
-                delete(jniLibsDir)
-            }
-            jniLibsDir.mkdirs()
-
-            buildDir.mkdirs()
             def requiredLibs = [
                 'libc++_shared.so',
                 'librac_backend_onnx.so',
@@ -133,6 +125,31 @@ task downloadNativeLibs {
                 'libsherpa-onnx-c-api.so',
                 'libsherpa-onnx-jni.so',
             ]
+
+            // Skip the wipe + network round trip when a previous build already
+            // staged every required lib for this exact core version. Deleting
+            // build/jniLibs (or bumping VERSION) forces a fresh download.
+            def versionStamp = new File(jniLibsDir, '.rac-natives-version')
+            def upToDate = versionStamp.isFile() &&
+                versionStamp.text.trim() == coreVersion &&
+                onnxAndroidUrls.keySet().every { abi ->
+                    requiredLibs.every { libName ->
+                        new File(jniLibsDir, "${abi}/${libName}").isFile()
+                    }
+                }
+            if (upToDate) {
+                println "✅ RABackendONNX native libraries v${coreVersion} already present - skipping download"
+                return
+            }
+
+            println "📦 Remote mode: Downloading RABackendONNX Android native libraries..."
+
+            if (jniLibsDir.exists()) {
+                delete(jniLibsDir)
+            }
+            jniLibsDir.mkdirs()
+
+            buildDir.mkdirs()
             onnxAndroidUrls.each { abi, downloadUrl ->
                 def zipFile = file("${buildDir}/onnx-${abi}.zip")
                 def tempDir = file("${buildDir}/onnx-${abi}-temp")
@@ -157,6 +174,7 @@ task downloadNativeLibs {
                 delete(zipFile, tempDir)
             }
 
+            versionStamp.text = coreVersion
             println "✅ RABackendONNX native libraries downloaded successfully"
         } else {
             println "🔧 Local mode: Using native libraries from src/main/jniLibs/"
