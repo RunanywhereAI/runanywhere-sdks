@@ -91,7 +91,7 @@ def _read_wav_16k(path: str):
     return samples
 
 
-def _gen_opts(args) -> dict:
+def _gen_opts(args: argparse.Namespace) -> dict:
     opts = {}
     if getattr(args, "temperature", None) is not None:
         opts["temperature"] = args.temperature
@@ -153,7 +153,7 @@ def handle_run(args: argparse.Namespace) -> int:
         return 1
 
 
-def _repl(llm, opts, args, model) -> int:
+def _repl(llm, opts: dict, args: argparse.Namespace, model: str) -> int:
     output.status(f"run {model} — Ctrl-D or 'exit' to quit.")
     while True:
         try:
@@ -191,8 +191,14 @@ def handle_chat(args: argparse.Namespace) -> int:
                     return 0
                 if not line.strip():
                     continue
-                for tok in chat.send(line):
-                    output.result_raw(tok)
+                for ev in chat.send_stream(line):
+                    if ev.is_final:
+                        continue
+                    if ev.is_thinking:
+                        if not args.no_think:
+                            output.status_raw(_dim(ev.token))
+                    else:
+                        output.result_raw(ev.token)
                 output.result("")
     except (SDKException, OSError) as exc:
         output.error(str(exc))
@@ -458,9 +464,13 @@ def handle_serve(args: argparse.Namespace) -> int:
         output.status("The OpenAI-compatible server needs extra dependencies.")
         output.status("Install them with:\n\n    pip install runanywhere[server]\n")
         return 1
-    serve(host=args.host, port=args.port, api_key=args.api_key, default_llm=args.default_llm,
-          allow_image_urls=args.allow_image_urls, allow_arbitrary_models=args.allow_arbitrary_models,
-          log_level=args.log_level)
+    try:
+        serve(host=args.host, port=args.port, api_key=args.api_key, default_llm=args.default_llm,
+              allow_image_urls=args.allow_image_urls, allow_arbitrary_models=args.allow_arbitrary_models,
+              log_level=args.log_level)
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
     return 0
 
 
@@ -482,6 +492,7 @@ def register(sub, gp: argparse.ArgumentParser) -> None:
     c = add("chat", "interactive multi-turn chat")
     c.add_argument("model", nargs="?")
     c.add_argument("--system")
+    c.add_argument("--no-think", action="store_true", help="suppress the model's thinking output")
     c.set_defaults(handler=handle_chat)
 
     ls = add("list", "list models (downloaded; --all for the whole catalog)", aliases=("ls",))

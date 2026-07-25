@@ -10,14 +10,15 @@ from __future__ import annotations
 import asyncio
 import base64
 import hmac
+import http.client
 import ipaddress
 import json
 import os
 import socket
+import ssl
 import tempfile
 import time
 import urllib.parse
-import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
@@ -268,51 +269,88 @@ def _img_suffix(header: str) -> str:
     return ".jpg"
 
 
-def _validate_public_host(url: str) -> None:
-    """Reject a URL whose host resolves to a non-globally-routable address (SSRF guard).
+def _ip_is_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True iff ``ip`` is globally routable (SSRF allowlist). Normalises IPv4-mapped IPv6."""
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:  # ::ffff:127.0.0.1 -> 127.0.0.1 before the check
+        ip = mapped
+    return bool(ip.is_global) and not ip.is_reserved
 
-    Uses ``not is_global`` (allowlist) plus explicit reserved/mapped checks so loopback,
-    private, link-local (169.254/16, incl. cloud metadata), CGNAT, and IPv4-mapped-IPv6
-    loopback are all rejected. NOTE: a residual DNS-rebinding TOCTOU remains (urllib re-resolves
-    at connect); URL fetch is therefore opt-in (allow_image_urls) — data-URIs are the safe path.
+
+def _validated_connect_targets(host: str, port: int) -> list[tuple[int, int, int, tuple]]:
+    """Resolve ``host`` and return ``getaddrinfo`` rows whose IPs pass the SSRF allowlist.
+
+    Fail-closed: any non-public address in the resolution set rejects the whole host (a dual-stack
+    name that also answers on a private A/AAAA must not be fetchable). Callers then ``connect()``
+    to one of these sockaddr tuples — never re-resolve — closing the DNS-rebinding window.
     """
-    host = urllib.parse.urlparse(url).hostname
-    if not host:
-        raise SDKException.invalid_input("invalid image URL")
     try:
-        infos = socket.getaddrinfo(host, None)
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError:
         raise SDKException.invalid_input("could not resolve image host") from None
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        mapped = getattr(ip, "ipv4_mapped", None)
-        if mapped is not None:  # normalise ::ffff:127.0.0.1 -> 127.0.0.1 before the check
-            ip = mapped
-        if not ip.is_global or ip.is_reserved:
+    if not infos:
+        raise SDKException.invalid_input("could not resolve image host")
+    out: list[tuple[int, int, int, tuple]] = []
+    for family, socktype, proto, _canon, sockaddr in infos:
+        if not _ip_is_public(ipaddress.ip_address(sockaddr[0])):
             raise SDKException.invalid_input("image URL host is not allowed")
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse to follow redirects — a redirect can bounce an allowed public URL to an internal
-    address, bypassing the SSRF host check (which only vets the original URL)."""
-
-    def redirect_request(self, *_args, **_kwargs):  # noqa: D102
-        raise SDKException.invalid_input("image URL redirects are not allowed")
-
-
-_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
+        out.append((family, socktype, proto, sockaddr))
+    return out
 
 
 def _fetch_image_bytes(url: str) -> bytes:
-    """Fetch an http(s) image with the SSRF host check + no redirects + a hard size cap."""
-    _validate_public_host(url)
+    """Fetch an http(s) image with SSRF hardening: DNS allowlist, connect-by-IP, no redirects.
+
+    Steps: parse → resolve + validate every A/AAAA → ``connect()`` to a validated sockaddr (so
+    urllib cannot re-resolve to a private IP) → TLS SNI / Host header keep the original hostname
+    → reject 3xx (redirects would need a fresh allowlist check per hop; we disallow instead) →
+    hard size cap. URL fetch remains opt-in (``allow_image_urls``); data-URIs are the safe path.
+    """
+    parsed = urllib.parse.urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        raise SDKException.invalid_input("invalid image URL")
+    host = parsed.hostname
+    if not host:
+        raise SDKException.invalid_input("invalid image URL")
+    port = parsed.port or (443 if scheme == "https" else 80)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
+    family, socktype, proto, sockaddr = _validated_connect_targets(host, port)[0]
+    conn: http.client.HTTPConnection | None = None
     try:
-        with _NO_REDIRECT_OPENER.open(url, timeout=10) as r:  # noqa: S310 — host-vetted, no redirects
-            raw = r.read(MAX_IMAGE_BYTES + 1)
+        sock = socket.socket(family, socktype, proto)
+        sock.settimeout(10)
+        sock.connect(sockaddr)  # validated IP — no second DNS lookup
+        if scheme == "https":
+            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+        # Pre-connected socket: HTTPConnection must not dial/resolve again.
+        conn = http.client.HTTPConnection(host, port, timeout=10)
+        conn.sock = sock
+        conn.request(
+            "GET",
+            path,
+            headers={"Host": host, "Accept": "image/*,*/*", "Connection": "close"},
+        )
+        resp = conn.getresponse()
+        if 300 <= resp.status < 400:
+            # A public URL redirecting to 169.254.169.254 (etc.) would bypass a one-shot host check.
+            raise SDKException.invalid_input("image URL redirects are not allowed")
+        if resp.status != 200:
+            raise SDKException.invalid_input("could not fetch image URL")
+        raw = resp.read(MAX_IMAGE_BYTES + 1)
     except SDKException:
         raise
     except Exception:  # noqa: BLE001 — generic message; exact error stays server-side (recon oracle)
         raise SDKException.invalid_input("could not fetch image URL") from None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001 — best-effort cleanup
+                pass
     if len(raw) > MAX_IMAGE_BYTES:
         raise SDKException.invalid_input("image exceeds the size limit")
     return raw
