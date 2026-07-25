@@ -471,6 +471,16 @@ void unload_model(int32_t handle) {
     if (h) rac_llm_component_destroy(h);
 }
 
+void cancel_generate(int32_t handle) {
+    // Best-effort: invalid / already-unloaded handles are a no-op so stream teardown
+    // can call cancel without racing unload.
+    rac_handle_t h = handle_for(g_llm_handles, handle);
+    if (!h) return;
+    rac_result_t rc = rac_llm_component_cancel(h);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "cancel_generate");
+}
+
+
 // =============================================================================
 // VLM: load_vlm_model / generate_vlm / unload_vlm_model
 // =============================================================================
@@ -500,10 +510,14 @@ int32_t load_vlm_model(const std::string& model_path, const std::string& mmproj_
 }
 
 void generate_vlm(int32_t handle, const std::string& image_path, const std::string& prompt,
-                  py::function on_token) {
+                  py::function on_token, std::optional<int32_t> max_tokens,
+                  std::optional<float> temperature, std::optional<float> top_p,
+                  std::optional<int32_t> top_k, std::optional<std::string> system_prompt) {
     rac_handle_t h = begin_op(g_vlm_handles, handle);
     if (!h) throw std::runtime_error("invalid vlm handle");
     OpScope op(handle);  // keep the handle alive vs a concurrent unload/shutdown
+
+    std::string sys_str = system_prompt.value_or(std::string());
 
     StreamCtx ctx;
     ctx.on_token = std::move(on_token);
@@ -518,10 +532,22 @@ void generate_vlm(int32_t handle, const std::string& image_path, const std::stri
         // Pass explicit defaults: NULL options leaves the VLM sampler config
         // (top_k / seed / ...) reading uninitialized memory, which can crash.
         rac_vlm_options_t opts = RAC_VLM_OPTIONS_DEFAULT;
+        if (max_tokens.has_value()) opts.max_tokens = *max_tokens;
+        if (temperature.has_value()) opts.temperature = *temperature;
+        if (top_p.has_value()) opts.top_p = *top_p;
+        if (top_k.has_value()) opts.top_k = *top_k;
+        if (!sys_str.empty()) opts.system_prompt = sys_str.c_str();
         rc = rac_vlm_component_process_stream(h, &image, prompt.c_str(), &opts, stream_token_cb,
                                               stream_vlm_complete_cb, stream_error_cb, &ctx);
     }
     finish_stream(ctx, rc, "generate_vlm");
+}
+
+void cancel_generate_vlm(int32_t handle) {
+    rac_handle_t h = handle_for(g_vlm_handles, handle);
+    if (!h) return;
+    rac_result_t rc = rac_vlm_component_cancel(h);
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "cancel_generate_vlm");
 }
 
 void unload_vlm_model(int32_t handle) {
@@ -571,6 +597,40 @@ py::array_t<float> embed(int32_t handle, const std::string& text) {
     std::memcpy(arr.mutable_data(), result.embeddings[0].data, dim * sizeof(float));
     rac_embeddings_result_free(&result);
     return arr;
+}
+
+
+py::list embed_batch(int32_t handle, const std::vector<std::string>& texts) {
+    rac_handle_t h = begin_op(g_embed_handles, handle);
+    if (!h) throw std::runtime_error("invalid embedding handle");
+    OpScope op(handle);
+
+    std::vector<const char*> ptrs;
+    ptrs.reserve(texts.size());
+    for (const auto& t : texts) ptrs.push_back(t.c_str());
+
+    rac_embeddings_result_t result;
+    std::memset(&result, 0, sizeof(result));
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_embeddings_embed_batch(h, ptrs.data(), ptrs.size(), nullptr, &result);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "embed_batch");
+
+    py::list out;
+    for (size_t i = 0; i < result.num_embeddings; ++i) {
+        if (!result.embeddings || !result.embeddings[i].data) {
+            rac_embeddings_result_free(&result);
+            throw std::runtime_error("no embedding produced");
+        }
+        size_t dim = result.embeddings[i].dimension;
+        py::array_t<float> arr(static_cast<py::ssize_t>(dim));
+        std::memcpy(arr.mutable_data(), result.embeddings[i].data, dim * sizeof(float));
+        out.append(arr);
+    }
+    rac_embeddings_result_free(&result);
+    return out;
 }
 
 void unload_embedding_model(int32_t handle) {
@@ -627,6 +687,68 @@ void register_model(const std::string& model_id, const std::string& local_path, 
     }
     rac_model_info_free(info);  // save deep-copies; free our transient struct
     if (rc != RAC_SUCCESS) raise_rac_error(rc, "register_model");
+}
+
+
+py::dict model_info_to_dict(const rac_model_info_t* info) {
+    py::dict d;
+    d["id"] = info->id ? info->id : "";
+    d["name"] = info->name ? info->name : "";
+    d["local_path"] = info->local_path ? info->local_path : "";
+    d["framework"] = static_cast<int32_t>(info->framework);
+    d["category"] = static_cast<int32_t>(info->category);
+    return d;
+}
+
+py::object get_model(const std::string& model_id) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_model_registry_handle_t reg = rac_get_model_registry();
+    if (!reg) throw std::runtime_error("global model registry unavailable");
+    rac_model_info_t* info = nullptr;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_model_registry_get(reg, model_id.c_str(), &info);
+    }
+    if (rc == RAC_ERROR_NOT_FOUND || rc == RAC_ERROR_MODEL_NOT_FOUND) {
+        return py::none();
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "get_model");
+    py::dict d = model_info_to_dict(info);
+    rac_model_info_free(info);
+    return d;
+}
+
+py::list list_models() {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_model_registry_handle_t reg = rac_get_model_registry();
+    if (!reg) throw std::runtime_error("global model registry unavailable");
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_model_registry_get_all(reg, &models, &count);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "list_models");
+    py::list out;
+    for (size_t i = 0; i < count; ++i) {
+        if (models[i]) out.append(model_info_to_dict(models[i]));
+    }
+    rac_model_info_array_free(models, count);
+    return out;
+}
+
+void remove_model(const std::string& model_id) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    rac_model_registry_handle_t reg = rac_get_model_registry();
+    if (!reg) throw std::runtime_error("global model registry unavailable");
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_model_registry_remove(reg, model_id.c_str());
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "remove_model");
 }
 
 #ifdef RAC_HAVE_BACKEND_RAG
@@ -960,8 +1082,23 @@ void vad_reset(int32_t handle) {
     if (h) rac_vad_component_reset(h);
 }
 
+
+void load_vad_model(int32_t handle, const std::string& model_path,
+                    std::optional<std::string> id, std::optional<std::string> name) {
+    rac_handle_t h = handle_for(g_vad_handles, handle);
+    if (!h) throw std::runtime_error("invalid vad handle");
+    std::string mid = id.has_value() ? *id : model_path;
+    std::string mname = name.has_value() ? *name : mid;
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_vad_component_load_model(h, model_path.c_str(), mid.c_str(), mname.c_str());
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "load_vad_model");
+}
+
 void unload_vad(int32_t handle) {
-    rac_handle_t h = take_handle(g_vad_handles, handle);
+    rac_handle_t h = take_handle_when_idle(g_vad_handles, handle);
     if (h) rac_vad_component_destroy(h);
 }
 
@@ -978,8 +1115,8 @@ void shutdown() {
             // its component — otherwise destroy / rac_shutdown() could race a live rac_* call on
             // a worker or executor thread (use-after-free). Normally client.shutdown() has already
             // unloaded each model (each unload_*() waited + freed), so this drains only stragglers.
-            // RAG ingest/query/stream/clear/stats take g_inflight leases; VAD stays unleased
-            // because vad_process holds the GIL for the whole call.
+            // RAG ingest/query/stream/clear/stats take g_inflight leases; VAD unload waits via
+            // take_handle_when_idle (vad_process itself holds the GIL for the whole call).
             py::gil_scoped_release release;
             std::unique_lock<std::mutex> lock(g_handles_mutex);
             g_inflight_cv.wait(lock, [] {
@@ -1105,6 +1242,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("disable_thinking") = py::none(),
           "Stream tokens from an LLM handle; on_token(str) is called per token and "
           "may return False to stop.");
+    m.def("cancel_generate", &cancel_generate, py::arg("handle"),
+          "Request cancellation of an in-flight LLM generation.");
     m.def("unload_model", &unload_model, py::arg("handle"), "Unload an LLM handle.");
 
     // VLM
@@ -1112,8 +1251,12 @@ PYBIND11_MODULE(_core, m) {
           py::arg("id") = py::none(), py::arg("name") = py::none(),
           "Load a VLM model + mmproj; returns an integer handle.");
     m.def("generate_vlm", &generate_vlm, py::arg("handle"), py::arg("image_path"), py::arg("prompt"),
-          py::arg("on_token"),
+          py::arg("on_token"), py::arg("max_tokens") = py::none(), py::arg("temperature") = py::none(),
+          py::arg("top_p") = py::none(), py::arg("top_k") = py::none(),
+          py::arg("system_prompt") = py::none(),
           "Stream tokens from a VLM handle over an image + prompt; on_token(str) per token.");
+    m.def("cancel_generate_vlm", &cancel_generate_vlm, py::arg("handle"),
+          "Request cancellation of an in-flight VLM generation.");
     m.def("unload_vlm_model", &unload_vlm_model, py::arg("handle"), "Unload a VLM handle.");
 
     // Embeddings
@@ -1121,6 +1264,8 @@ PYBIND11_MODULE(_core, m) {
           "Load an embedding model (ONNX); returns an integer handle.");
     m.def("embed", &embed, py::arg("handle"), py::arg("text"),
           "Embed text; returns a float32 numpy array.");
+    m.def("embed_batch", &embed_batch, py::arg("handle"), py::arg("texts"),
+          "Embed a batch of texts; returns a list of float32 numpy arrays.");
     m.def("unload_embedding_model", &unload_embedding_model, py::arg("handle"),
           "Unload an embedding handle.");
 
@@ -1129,6 +1274,11 @@ PYBIND11_MODULE(_core, m) {
           py::arg("framework"), py::arg("category"),
           "Register a model (id -> local_path + framework/category ints) into the "
           "global model registry so the RAG session ABI can resolve it.");
+    m.def("get_model", &get_model, py::arg("model_id"),
+          "Look up a registered model by id; returns a dict or None.");
+    m.def("list_models", &list_models, "List all registered models as dicts.");
+    m.def("remove_model", &remove_model, py::arg("model_id"),
+          "Remove a model from the global registry.");
 
 #ifdef RAC_HAVE_BACKEND_RAG
     // RAG — proto-bytes in / proto-bytes out (serialized runanywhere.v1.* msgs).
@@ -1175,11 +1325,14 @@ PYBIND11_MODULE(_core, m) {
     m.def("vad_set_threshold", &vad_set_threshold, py::arg("handle"), py::arg("threshold"),
           "Set the VAD energy threshold.");
     m.def("vad_reset", &vad_reset, py::arg("handle"), "Reset the VAD state.");
+    m.def("load_vad_model", &load_vad_model, py::arg("handle"), py::arg("model_path"),
+          py::arg("id") = py::none(), py::arg("name") = py::none(),
+          "Load a Silero/sherpa VAD model onto an existing energy VAD handle.");
     m.def("unload_vad", &unload_vad, py::arg("handle"), "Unload a VAD handle.");
 
     // Secure store
     m.def("secure_set", &secure_set, py::arg("key"), py::arg("value"),
-          "Store an encrypted key/value pair.");
+          "Store a key/value pair in the platform secure store (DPAPI on Windows; plaintext 0600 on POSIX).");
     m.def("secure_get", &secure_get, py::arg("key"),
           "Read a secure value; returns str or None on a miss.");
     m.def("secure_delete", &secure_delete, py::arg("key"), "Delete a secure key.");
