@@ -671,8 +671,9 @@ int32_t rag_session_create(const std::string& config_bytes) {
 }
 
 py::bytes rag_ingest(int32_t handle, const std::string& document_bytes) {
-    rac_handle_t h = handle_for(g_rag_handles, handle);
+    rac_handle_t h = begin_op(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc;
@@ -685,8 +686,9 @@ py::bytes rag_ingest(int32_t handle, const std::string& document_bytes) {
 }
 
 py::bytes rag_query(int32_t handle, const std::string& query_bytes) {
-    rac_handle_t h = handle_for(g_rag_handles, handle);
+    rac_handle_t h = begin_op(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc;
@@ -723,8 +725,9 @@ rac_bool_t rag_stream_event_cb(const uint8_t* event_bytes, size_t event_size, vo
 }
 
 void rag_query_stream(int32_t handle, const std::string& query_bytes, py::function on_event) {
-    rac_handle_t h = handle_for(g_rag_handles, handle);
+    rac_handle_t h = begin_op(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
     RagStreamCtx ctx;
     ctx.on_event = std::move(on_event);
     rac_result_t rc;
@@ -738,6 +741,8 @@ void rag_query_stream(int32_t handle, const std::string& query_bytes, py::functi
 }
 
 void rag_cancel(int32_t handle) {
+    // Cancel must reach a session that already holds an in-flight lease (query/stream),
+    // so look up without taking another lease — destroy still waits for active ops.
     rac_handle_t h = handle_for(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
     rac_result_t rc;
@@ -749,8 +754,9 @@ void rag_cancel(int32_t handle) {
 }
 
 py::bytes rag_clear(int32_t handle) {
-    rac_handle_t h = handle_for(g_rag_handles, handle);
+    rac_handle_t h = begin_op(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc;
@@ -762,8 +768,9 @@ py::bytes rag_clear(int32_t handle) {
 }
 
 py::bytes rag_stats(int32_t handle) {
-    rac_handle_t h = handle_for(g_rag_handles, handle);
+    rac_handle_t h = begin_op(g_rag_handles, handle);
     if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc;
@@ -775,7 +782,11 @@ py::bytes rag_stats(int32_t handle) {
 }
 
 void rag_session_destroy(int32_t handle) {
-    rac_handle_t h = take_handle(g_rag_handles, handle);
+    rac_handle_t h;
+    {
+        py::gil_scoped_release release;
+        h = take_handle_when_idle(g_rag_handles, handle);
+    }
     if (h) rac_rag_session_destroy_proto(h);
 }
 #endif  // RAC_HAVE_BACKEND_RAG
@@ -967,8 +978,8 @@ void shutdown() {
             // its component — otherwise destroy / rac_shutdown() could race a live rac_* call on
             // a worker or executor thread (use-after-free). Normally client.shutdown() has already
             // unloaded each model (each unload_*() waited + freed), so this drains only stragglers.
-            // RAG sessions + VAD are intentionally not in g_inflight: rac_rag_session_destroy_proto
-            // is documented safe concurrent with active ops, and vad_process holds the GIL.
+            // RAG ingest/query/stream/clear/stats take g_inflight leases; VAD stays unleased
+            // because vad_process holds the GIL for the whole call.
             py::gil_scoped_release release;
             std::unique_lock<std::mutex> lock(g_handles_mutex);
             g_inflight_cv.wait(lock, [] {
