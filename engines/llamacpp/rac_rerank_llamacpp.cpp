@@ -29,7 +29,7 @@
 #include <thread>
 #include <vector>
 
-#include <dirent.h>
+#include "core/internal/platform_compat.h"
 #include <sys/stat.h>
 
 #include "rac/core/rac_error.h"
