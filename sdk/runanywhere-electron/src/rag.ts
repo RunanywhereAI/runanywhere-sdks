@@ -22,7 +22,7 @@ export interface RagConfig {
   maxContextTokens?: number;
   /** Minimum cosine similarity for a chunk to be retrieved (0–1). */
   similarityThreshold?: number;
-  /** Prompt template override (uses "{context}" / "{question}" placeholders). */
+  /** Prompt template override (uses "{context}" / "{query}" placeholders). */
   promptTemplate?: string;
   /** Persist the vector index to disk (default in-memory). */
   persistIndex?: boolean;

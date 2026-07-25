@@ -67,16 +67,33 @@ fs::path utf8_path(const char* p) { return fs::path(utf8_to_wide(p)); }
 FILE* wfopen_utf8(const fs::path& p, const wchar_t* mode) { return _wfopen(p.c_str(), mode); }
 
 // The secure store is a flat key -> file namespace. Reject a key that could escape the store
-// directory (path separators, '..', or an absolute/drive path) so secure_set/get/delete cannot
-// touch an arbitrary file. Defense in depth: the JS facade validates too.
+// directory (path separators, '..', absolute/drive path, ADS `:`), Windows reserved device
+// names (NUL/CON/…), or trailing dots/spaces (Win32 strips them). Defense in depth: the JS
+// facade validates too. Keys are used as filenames one-to-one after this gate.
 bool secure_key_ok(const char* key) {
     if (!key || !*key) return false;
     std::string k(key);
     if (k == "." || k == "..") return false;
     if (k.find('/') != std::string::npos || k.find('\\') != std::string::npos) return false;
-    // Drive-absolute (C:...) or rooted paths.
-    if (k.size() >= 2 && k[1] == ':') return false;
+    if (k.find(':') != std::string::npos) return false;  // ADS / drive separator
+    if (k.back() == '.' || k.back() == ' ') return false;
+    // Drive-absolute (C:...) or rooted paths (also caught by ':' above for drive).
     if (utf8_path(key).is_absolute()) return false;
+    // Reserved device names (case-insensitive), optionally with an extension.
+    std::string stem = k;
+    const auto dot = stem.find('.');
+    if (dot != std::string::npos) stem = stem.substr(0, dot);
+    for (char& c : stem) {
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    }
+    static const char* kReserved[] = {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    };
+    for (const char* r : kReserved) {
+        if (stem == r) return false;
+    }
     return true;
 }
 

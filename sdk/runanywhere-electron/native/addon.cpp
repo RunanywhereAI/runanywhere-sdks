@@ -12,6 +12,7 @@
 #include <napi.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <functional>
@@ -137,12 +138,17 @@ struct OpScope {
     OpScope& operator=(const OpScope&) = delete;
 };
 
+// Bound so a stuck in-flight op cannot freeze the sync JS unload/destroy path
+// forever. Callers treat nullptr as "gone / unavailable" and skip destroy.
+constexpr auto kTakeHandleIdleTimeout = std::chrono::seconds(60);
+
 rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
     std::unique_lock<std::mutex> lock(g_handles_mutex);
-    g_inflight_cv.wait(lock, [&] {
+    const bool idle = g_inflight_cv.wait_for(lock, kTakeHandleIdleTimeout, [&] {
         auto it = g_inflight.find(id);
         return it == g_inflight.end() || it->second == 0;
     });
+    if (!idle) return nullptr;
     auto it = map.find(id);
     if (it == map.end()) return nullptr;
     rac_handle_t h = it->second;
@@ -1217,6 +1223,17 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
         int32_t hid;
         {
             std::lock_guard<std::mutex> lock(g_handles_mutex);
+            // Shutdown may have cleared maps + rac_shutdown() between Execute
+            // and OnOK — never register a session into a dead runtime.
+            if (!g_initialized.load()) {
+                rac_rag_session_destroy_proto(session_);
+                session_ = nullptr;
+                deferred_.Reject(make_rac_error(
+                                     Env(), RAC_ERROR_NOT_INITIALIZED,
+                                     "rag session create aborted: SDK shut down")
+                                     .Value());
+                return;
+            }
             hid = g_next_handle_id++;
             g_rag_handles[hid] = session_;
             session_ = nullptr;  // ownership transferred to the map

@@ -69,27 +69,12 @@ function md(text) {
   return s.replace(/(\d+)/g, (_m, i) => `<pre><code>${blocks[+i]}</code></pre>`);
 }
 
-// Split a reasoning model's <think>…</think> from its answer. Mirrors the SDK's
-// splitThinking (also on window.runanywhere.splitThinking) — inlined here for the
-// per-token streaming hot path so we don't cross the context bridge each token.
-function splitThink(text) {
-  if (!text) return { response: '', thinking: '' };
-  // indexOf scan (O(n)) — not a backreference regex, which backtracks on
-  // adversarial model output (ReDoS). Mirrors the SDK's splitThinking.
-  let idx = -1, tag = '';
-  for (const t of ['<think>', '<thinking>']) { const i = text.indexOf(t); if (i >= 0 && (idx < 0 || i < idx)) { idx = i; tag = t; } }
-  if (idx < 0) return { response: text.trim(), thinking: '' };
-  const afterOpen = idx + tag.length;
-  const closeTag = tag === '<think>' ? '</think>' : '</thinking>';
-  const close = text.indexOf(closeTag, afterOpen);
-  if (close < 0) return { response: text.slice(0, idx).trim(), thinking: text.slice(afterOpen).trim() };
-  return { thinking: text.slice(afterOpen, close).trim(), response: (text.slice(0, idx) + text.slice(close + closeTag.length)).trim() };
-}
 // Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
 // above the rendered answer. `streaming` keeps reasoning open + shows a
-// placeholder while the answer is still empty.
+// placeholder while the answer is still empty. Use the SDK's splitThinking so
+// the demo stays in lockstep with commons (newline join when both sides exist).
 function assistantHtml(raw, streaming) {
-  const { response, thinking } = splitThink(raw || '');
+  const { response, thinking } = ra.splitThinking(raw || '');
   let out = '';
   if (thinking) {
     const open = streaming && !response ? ' open' : '';
