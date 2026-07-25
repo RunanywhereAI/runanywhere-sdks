@@ -43,19 +43,34 @@ fi
     --python_out="${OUT_DIR}" \
     rac_options.proto rag.proto
 
-# Rewrite the bare cross-file import to a package-relative one.
-sed -i.bak 's/^import rac_options_pb2 as/from runanywhere._proto import rac_options_pb2 as/' \
-    "${OUT_DIR}/rag_pb2.py"
-rm -f "${OUT_DIR}/rag_pb2.py.bak"
+# Rewrite the bare cross-file import to a package-relative one, and insert
+# `from __future__ import annotations` after the module docstring. Use Python
+# (not GNU-only `sed -i … a`) so this is portable on macOS BSD sed in CI.
+OUT_DIR="${OUT_DIR}" "${PYTHON_BIN}" - <<'PY'
+from pathlib import Path
+import os
 
-# Emit the repo-standard module preamble: protoc's generated modules carry a docstring but not
-# `from __future__ import annotations`. Insert it right after the module docstring (so it stays
-# the first statement, before the protobuf imports) in each generated module.
-for _f in rag_pb2.py rac_options_pb2.py; do
-    sed -i.bak '/^"""Generated protocol buffer code."""$/a from __future__ import annotations' \
-        "${OUT_DIR}/${_f}"
-    rm -f "${OUT_DIR}/${_f}.bak"
-done
+out = Path(os.environ["OUT_DIR"])
+rag = out / "rag_pb2.py"
+text = rag.read_text()
+text = text.replace(
+    "import rac_options_pb2 as",
+    "from runanywhere._proto import rac_options_pb2 as",
+    1,
+)
+rag.write_text(text)
+
+future = "from __future__ import annotations\n"
+doc = '"""Generated protocol buffer code."""\n'
+for name in ("rag_pb2.py", "rac_options_pb2.py"):
+    path = out / name
+    body = path.read_text()
+    if future.strip() in body.splitlines()[:5]:
+        continue
+    if doc not in body:
+        raise SystemExit(f"unexpected protoc output in {path}: missing module docstring")
+    path.write_text(body.replace(doc, doc + future, 1))
+PY
 
 cat > "${OUT_DIR}/__init__.py" <<'EOF'
 """Generated protobuf modules (do not edit; run idl/codegen/generate_python.sh)."""
