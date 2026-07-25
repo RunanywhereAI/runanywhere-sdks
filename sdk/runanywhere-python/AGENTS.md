@@ -14,12 +14,15 @@ instantiable client over that core, model-handle wrappers, streaming bridges, a 
 catalog + downloader, options/results dataclasses, an event bus, an error type, and audio /
 grammar / structured-output helpers.
 
-The **behavioral source of truth is the Electron SDK** (`sdk/runanywhere-electron`, the
-N-API addon `addon.cpp` + its TypeScript surface). The native `module.cpp` is an exact
-behavioral port of `addon.cpp` (same globals, handle maps, shutdown semantics, secure
-store) translated Node-API → pybind11 with snake_case names; the Python modules port the
-TypeScript facade (`RunAnywhere.ts`, `Chat.ts`, `VoiceAgent.ts`, `events.ts`, `errors.ts`)
-class-for-class. When in doubt about semantics, match the Electron SDK.
+The **behavioral bridge reference is the Electron SDK** (`sdk/runanywhere-electron`,
+N-API `addon.cpp` + TypeScript facade) for handle maps, streaming, and secure-store
+shape. **Product / business-logic truth is C++ commons** (with Swift as the cross-SDK
+reference). The native `module.cpp` is an exact behavioral port of `addon.cpp`
+(same globals, handle maps, shutdown semantics, secure store) translated Node-API →
+pybind11 with snake_case names; the Python modules port the TypeScript facade
+(`RunAnywhere.ts`, `Chat.ts`, `VoiceAgent.ts`, `events.ts`, `errors.ts`)
+class-for-class when the surfaces intentionally mirror each other. When in doubt
+about AI semantics, match commons/Swift — not a stale Electron shortcut.
 
 ## Build Commands
 
@@ -85,7 +88,7 @@ sdk/runanywhere-python/
 │   ├── CMakeLists.txt        # ROOT-target module gated by RAC_BUILD_PYTHON_MODULE
 │   ├── module.cpp            # binds the rac_* C ABI (port of Electron addon.cpp)
 │   ├── win32_platform_adapter.{h,cpp}   # host fs/secure-store/clock/memory adapter (Windows; DPAPI)
-│   └── posix_platform_adapter.{h,cpp}   # host fs/secure-store/clock/memory adapter (POSIX)
+│   └── posix_platform_adapter.{h,cpp}   # host fs/secure-store/clock/memory (POSIX; plaintext 0600)
 ├── runanywhere/              # the importable pure-Python package
 │   ├── __init__.py           # public surface; imports NO _core (direct or transitive)
 │   ├── client.py             # the instantiable RunAnywhere client
@@ -175,15 +178,16 @@ class, weakly registers it (`WeakSet`) so client shutdown can unload it, and emi
 API; each `unload()`/`close()` calls the matching `core.unload_*` and emits
 `ModelUnloadedEvent`.
 
-- `LLMModel` — `generate`/`agenerate` (token iterators), `generate_text`/`agenerate_text`,
-  `generate_stream`/`agenerate_stream` (LLMStreamEvent + metrics), `generate_structured`,
-  `generate_tool_call`, `generate_with_tools` (+ async twins). Composition helpers build on
-  the single token stream with **no extra native calls**.
-- `VLMModel` — `caption`/`acaption` + `_text` twins over an image path + prompt.
-- `Embedder` — `embed(text) -> np.ndarray` (L2-normalized float32).
+- `LLMModel` — `generate`/`agenerate` (token iterators), `cancel`, `generate_text`/
+  `agenerate_text`, `generate_stream`/`agenerate_stream` (LLMStreamEvent + metrics),
+  `generate_structured`, `generate_tool_call`, `generate_with_tools` (+ async twins).
+  Composition helpers build on the single token stream with **no extra native calls**.
+- `VLMModel` — `caption`/`acaption` (+ generation options) + `_text` twins; `cancel`.
+- `Embedder` — `embed(text) -> np.ndarray`, `embed_batch(texts) -> list[np.ndarray]`.
 - `STTModel` — `transcribe(pcm16) -> str`; `atranscribe` runs it on the default executor.
 - `TTSVoice` — `synthesize(text) -> Synthesis`; `asynthesize` on the executor.
-- `Vad` — `detect`/`is_speech_active`/`set_threshold`/`reset`/`close` (built-in energy VAD).
+- `Vad` — energy VAD by default; `load_model` upgrades to Silero/sherpa model VAD;
+  `detect`/`is_speech_active`/`set_threshold`/`reset`/`close`.
 
 ### Single in-flight generation
 
@@ -201,9 +205,9 @@ early) into Python iterators:
 
 - `iter_tokens` (sync) — runs `native_call` on a daemon worker thread; tokens cross to the
   consumer through a bounded `queue.Queue` (backpressure). On close/break/exception a
-  `threading.Event` is set so the next `on_token` returns `False` and the C loop unwinds; the
-  queue is drained (so a parked worker unblocks) and the worker joined. Worker exceptions are
-  re-raised in the consumer.
+  `threading.Event` is set so the next `on_token` returns `False`, optional `on_stop`
+  fires (wired to `rac_*_component_cancel`), the queue is drained, and the worker joined.
+  Worker exceptions are re-raised in the consumer.
 - `aiter_tokens` (async) — same worker model, but hands each token to the running event loop
   via `loop.call_soon_threadsafe` into a bounded `asyncio.Queue`; the worker blocks on a
   `concurrent.futures.Future` until the token is accepted (backpressure). Teardown joins the
@@ -242,13 +246,13 @@ emit. Event types are frozen dataclasses (`InitializedEvent`, `ServicesReadyEven
 ### Error system
 
 `errors.py` defines `SDKException` (the single throwable) carrying a canonical `code`
-(`ErrorCode`) + `category` (`ErrorCategory`) for cross-SDK-uniform handling, mirroring the
-Swift/Kotlin/RN/Web/Electron SDKs. `category_for_code` is a verbatim port of the commons
-range table (keep in sync). Category-specific static factories (`not_initialized`,
-`validation_failed`, `model_not_found`, `generation_failed`, `invalid_state`, …) build the
-right code/category; `raise_for_rac(rac_code)` maps a negative `rac_result_t` back to an
-`ErrorCode` (preserving the raw ABI value as `c_abi_code`). `is_expected` (cancellation) is
-the "don't log as an error" flag.
+(`ErrorCode`, exhaustive vs `idl/errors.proto`) + `category` (`ErrorCategory`) for
+cross-SDK-uniform handling. `category_for_code` is a faithful port of commons
+`rac_result_to_proto_category` (keep in sync). Category-specific static factories
+(`not_initialized`, `validation_failed`, `model_not_found`, `generation_failed`,
+`storage_error`, `invalid_state`, …) build the right code/category; `raise_for_rac(rac_code)`
+maps a negative `rac_result_t` back to an `ErrorCode` (preserving the raw ABI value as
+`c_abi_code`). `is_expected` (cancellation) is the "don't log as an error" flag.
 
 ### Model catalog & download
 
@@ -324,11 +328,121 @@ update `_core.pyi` in the same change.**
   public surface.
 - Keep the public surface in sync: anything meant to be public is imported and listed in
   `runanywhere/__init__.py`'s `__all__`, and re-exported from its module's `__all__`.
-- Keep behavior faithful to the Electron SDK; only translate to idiomatic Python.
+- Keep the native bridge behavior aligned with the Electron addon when they intentionally
+  mirror each other; **business logic truth is C++ commons** (Swift is the cross-SDK
+  reference for product semantics).
+
+## Python SDK Best Practices
+
+Adapted from `thoughts/shared/plans/BEST_PRACTISES.md` for this package. Follow these on
+every change; they are the bar for review.
+
+### Ownership and layering
+
+- **C++ commons owns truth** for inference, model lifecycle, registry, RAG, cancel, and
+  error categories. Python must not re-implement those rules in the facade.
+- The Python layer owns: platform adapter I/O, pybind11 bridging, host download/catalog,
+  streaming fan-out (`_streaming.py`), composition helpers (chat / grammar / tools /
+  server), and honesty in docs/API surface.
+- Keep routers/handlers thin. `runanywhere/server/` is HTTP adaptation over SDK APIs —
+  no new AI business logic in FastAPI routes. If an endpoint needs multi-step AI
+  orchestration, push it down into the client or commons.
+- Prefer one SDK entry point per modality (`load_llm`, `create_rag`, `create_vad`, …).
+  Do not force callers to assemble register → download → load sequences that the SDK
+  should own.
+
+### Typed contracts at every boundary
+
+- Public options/results are dataclasses or IntEnums — never raw string status codes.
+- Native error codes come from `idl/errors.proto` / `rac_error.h`. Keep `ErrorCode` /
+  `ErrorCategory` exhaustive relative to the IDL and map categories with
+  `category_for_code` as a faithful port of commons `rac_result_to_proto_category`
+  (AUTH is only 320–329; unmapped failures → INTERNAL, not UNSPECIFIED).
+- Registry framework/category ints are **C ABI enums** (`RAC_FRAMEWORK_*`,
+  `RAC_MODEL_CATEGORY_*`), not proto wire values. Name them and pin them in tests.
+- Generated RAG protos live in `runanywhere/_proto/`; regenerate via
+  `idl/codegen/generate_python.sh` (wired into `generate_all.sh`). Never hand-edit
+  `_pb2.py`.
+- Keep `_native/_core.pyi` in lockstep with `native/module.cpp` bindings.
+
+### Honesty and readiness
+
+- Document what is actually true today. Do not claim encryption, remote auth, or NPU
+  support that is not wired.
+  - Secure store: DPAPI on Windows; **plaintext mode-0600 files on POSIX**.
+  - Phase-2 `complete_services_initialization` is a **local-only lifecycle seam** (no
+    network auth). The HTTP server's optional Bearer `api_key` is separate and configured
+    on `serve()` / the CLI — not on `RunAnywhere()`.
+  - Desktop wheels report CPU backends (llamacpp/onnx/sherpa). QHexRT/Windows Snapdragon
+    HNPU is not available until packaging and runtime exist.
+- Prefer deleting dead API knobs (`api_key`/`base_url` on the client) over leaving
+  unused fields that imply capabilities.
+- If a capability cannot be done properly (missing HTTP transport, lifecycle migration),
+  document it as deferred — do not stub or mock it into the public surface.
+
+### Concurrency and native safety
+
+- Every modality unload that can race an in-flight op uses `take_handle_when_idle`
+  (including VAD). Blocking ops take `begin_op` / `OpScope` leases.
+- Stream teardown must set the stop `Event` **and** call component cancel
+  (`cancel_generate` / `cancel_generate_vlm`) via `_streaming.on_stop` so decode stops
+  promptly, not only on the next token callback.
+- One in-flight generation per model handle (`_GenerationGuard`); a second concurrent
+  generate is a programming error → `invalid_state`, not a silent queue.
+- Win32 file sizing uses `_fseeki64` / `_ftelli64` (plain `ftell`/`long` truncates >2GB).
+- Secure-store keys must reject path separators / `..` / absolute paths (`secure_key_ok`
+  + Python `_validate_secure_key`).
+
+### Errors and observability
+
+- Raise `SDKException` only on the public surface; map I/O/download failures to
+  `STORAGE_ERROR` (or the correct category), not `GENERATION_FAILED`.
+- Prefer factories (`storage_error`, `model_load_failed`, …) so code/category stay
+  consistent.
+- Never log secrets, secure-store values, or signed URLs alongside destination paths.
+- EventBus listeners must not break emit — failures are swallowed/logged, not re-raised
+  into the lifecycle path.
+
+### Testing
+
+- Hermetic by default: `FakeCore` / no network / no real keys / no models required for
+  the unit suite.
+- Pin ABI and category tables with tests so silent drift fails CI.
+- CI builds a wheel, repairs it, installs into a clean env, and runs pytest from a
+  relocated `tests/` dir — local verification should match that shape when touching
+  packaging.
+- Support the claimed Python range (3.9+); Linux CI matrices both 3.9 and 3.12.
+
+### Security basics
+
+- Validate all external inputs (URLs, archive members, secure keys, model ids).
+- SSRF: connect-by-IP, no open redirects on host download paths.
+- Do not require cloud credentials to initialize or run unit tests.
+- Treat AI output as untrusted: structured/tool paths parse and validate before use.
+
+### Anti-patterns (do not)
+
+- Re-implement commons business logic in Python “for convenience”.
+- Hand-write error codes or framework ints that diverge from IDL/C ABI.
+- Leave dead constructor knobs that imply remote auth.
+- Claim “encrypted secure store” on POSIX.
+- Use `generation_failed` for disk/tar/HTTP I/O.
+- Unload with plain `take_handle` while another thread may still be inside `rac_*`.
+- Add mock/stub public APIs for unfinished capabilities.
+- Mount server admin/eval shortcuts without an explicit, documented opt-in.
+
+### Definition of done (Python SDK change)
+
+- Typed public API (dataclasses / IntEnums / stubs updated).
+- Errors are structured `SDKException`s with correct categories.
+- Native leases/cancel/unload paths stay race-safe.
+- Hermetic tests cover the new behavior (or explicitly skip with reason).
+- Docs/AGENTS/README honesty matches reality.
+- IDL/proto regen committed when schemas change; drift CI stays green.
 
 ## Commit Style
 
-- **One file per commit** — single-file commits, not batched.
+- Prefer **one logical change per commit** (thematic multi-file OK when one concern).
 - **Short, direct messages** — terse subject, no fluff.
 - **No author/co-author trailer** — do not append `Co-Authored-By:` or any author line.
 
@@ -336,15 +450,16 @@ update `_core.pyi` in the same change.**
 
 | File | Purpose |
 |------|---------|
-| `runanywhere/client.py` | The instantiable `RunAnywhere` client; shared-core ref-counting, lifecycle, load paths |
+| `runanywhere/client.py` | The instantiable `RunAnywhere` client; shared-core ref-counting, lifecycle, load paths, registry CRUD |
 | `runanywhere/_native/__init__.py` | `get_core()` — the single lazy door to the extension |
 | `runanywhere/_native/_core.pyi` | Hand-written stub mirroring `native/module.cpp` |
 | `native/module.cpp` | pybind11 bindings of the `rac_*` C ABI (port of Electron `addon.cpp`) |
 | `native/CMakeLists.txt` | `RAC_BUILD_PYTHON_MODULE`-gated `runanywhere_core` target |
-| `runanywhere/models.py` | Loaded-model handle classes + `_GenerationGuard` |
-| `runanywhere/_streaming.py` | Native callback-per-token → sync/async iterators |
+| `runanywhere/models.py` | Loaded-model handle classes + `_GenerationGuard` + cancel/embed_batch/VAD model load |
+| `runanywhere/_streaming.py` | Native callback-per-token → sync/async iterators (+ `on_stop` cancel hook) |
 | `runanywhere/download.py` | urllib resolver/downloader (catalog / URL / HF / local) |
-| `runanywhere/errors.py` | `SDKException`, `ErrorCode`, `ErrorCategory`, `raise_for_rac` |
+| `runanywhere/errors.py` | `SDKException`, exhaustive `ErrorCode`, `ErrorCategory`, `raise_for_rac` |
 | `runanywhere/events.py` | `EventBus` + event dataclasses + the singleton `bus` |
+| `runanywhere/rag.py` | RAG facade + C ABI registry framework/category constants |
 | `pyproject.toml` | scikit-build-core build + project metadata |
 | `tests/test_client.py` | `FakeCore` pattern for native-free tests |
