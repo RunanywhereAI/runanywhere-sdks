@@ -12,8 +12,10 @@
 #include "io/image_io.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <string>
 #include <vector>
 
 namespace rcli::image {
@@ -148,6 +150,107 @@ bool write_png(const std::string& path, const uint8_t* rgba, int width, int heig
         }
         return false;
     }
+    return true;
+}
+
+namespace {
+
+// Parse the next whitespace-delimited unsigned integer from a PPM header,
+// skipping '#'-to-EOL comments. Returns false at EOF / on non-numeric input.
+bool next_ppm_uint(const std::vector<uint8_t>& bytes, size_t* pos, uint32_t* out) {
+    size_t i = *pos;
+    for (;;) {
+        while (i < bytes.size() && std::isspace(bytes[i])) {
+            ++i;
+        }
+        if (i < bytes.size() && bytes[i] == '#') {  // comment to end of line
+            while (i < bytes.size() && bytes[i] != '\n') {
+                ++i;
+            }
+            continue;
+        }
+        break;
+    }
+    if (i >= bytes.size() || !std::isdigit(bytes[i])) {
+        return false;
+    }
+    uint64_t value = 0;
+    while (i < bytes.size() && std::isdigit(bytes[i])) {
+        value = value * 10 + static_cast<uint64_t>(bytes[i] - '0');
+        if (value > 0xFFFFFFFFULL) {
+            return false;
+        }
+        ++i;
+    }
+    *out = static_cast<uint32_t>(value);
+    *pos = i;
+    return true;
+}
+
+}  // namespace
+
+bool read_ppm(const std::string& path, RgbImage* out, std::string* error) {
+    FILE* file = std::fopen(path.c_str(), "rb");
+    if (!file) {
+        if (error) {
+            *error = "cannot open " + path;
+        }
+        return false;
+    }
+    std::vector<uint8_t> bytes;
+    uint8_t chunk[4096];
+    size_t n = 0;
+    while ((n = std::fread(chunk, 1, sizeof(chunk), file)) > 0) {
+        bytes.insert(bytes.end(), chunk, chunk + n);
+    }
+    std::fclose(file);
+
+    if (bytes.size() < 2 || bytes[0] != 'P' || bytes[1] != '6') {
+        if (error) {
+            *error = path + " is not a binary PPM (P6); convert with e.g. `magick in.png out.ppm`";
+        }
+        return false;
+    }
+    size_t pos = 2;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t maxval = 0;
+    if (!next_ppm_uint(bytes, &pos, &width) || !next_ppm_uint(bytes, &pos, &height) ||
+        !next_ppm_uint(bytes, &pos, &maxval)) {
+        if (error) {
+            *error = "malformed PPM header in " + path;
+        }
+        return false;
+    }
+    if (width == 0 || height == 0 || maxval != 255) {
+        if (error) {
+            *error = "unsupported PPM (need non-empty dimensions and maxval 255)";
+        }
+        return false;
+    }
+    // Bound dimensions (4096 mirrors the SDK's segmentation source cap) so the
+    // `width * height * 3` below cannot overflow size_t and a pathological header
+    // cannot mint a huge RgbImage backed by a tiny buffer.
+    constexpr uint32_t kMaxPpmDimension = 4096;
+    if (width > kMaxPpmDimension || height > kMaxPpmDimension) {
+        if (error) {
+            *error = "PPM dimensions exceed the supported maximum (4096x4096) in " + path;
+        }
+        return false;
+    }
+    // Exactly one whitespace byte separates the header from the pixel payload.
+    ++pos;
+    const size_t expected = static_cast<size_t>(width) * height * 3;
+    if (pos + expected > bytes.size()) {
+        if (error) {
+            *error = "truncated PPM pixel data in " + path;
+        }
+        return false;
+    }
+    out->width = width;
+    out->height = height;
+    out->rgb.assign(bytes.begin() + static_cast<std::ptrdiff_t>(pos),
+                    bytes.begin() + static_cast<std::ptrdiff_t>(pos + expected));
     return true;
 }
 

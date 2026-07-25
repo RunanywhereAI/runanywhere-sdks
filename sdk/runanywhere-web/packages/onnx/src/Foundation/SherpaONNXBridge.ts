@@ -36,9 +36,10 @@ import {
   PlatformAdapter,
   SDKException,
   SDKLogger,
-  completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
+  registerRAGProvider,
+  registerVoiceAgentProvider,
   registerWasmModule,
   speechBackendRequirementMessage,
   unregisterWasmModule,
@@ -51,6 +52,10 @@ import type {
 } from '@runanywhere/web/backend';
 
 const logger = new SDKLogger('SherpaONNXBridge');
+
+function logTimedStep(step: string, startedAt: number): void {
+  logger.info(`${step} completed in ${Date.now() - startedAt}ms`);
+}
 
 /**
  * Subset of the Emscripten module surface touched directly by the ONNX bridge.
@@ -72,6 +77,7 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_config_log_level?(): number;
   _rac_init?(configPtr: number): number;
   _rac_shutdown?(): void;
+  _rac_model_paths_set_base_dir?(basePtr: number): number;
   _rac_backend_onnx_register?(): number;
   _rac_backend_onnx_unregister?(): number;
   _rac_backend_sherpa_register?(): number;
@@ -266,7 +272,7 @@ export class SherpaONNXBridge {
       this._bridgeOwnedInit = true;
       completeNativePhase1ForModule(this._module);
 
-      // Claim speech + embedding + RAG. The dedicated racommons-onnx-sherpa
+      // Claim speech + embedding + semantic segmentation + RAG. The dedicated racommons-onnx-sherpa
       // artifact exports `_rac_embeddings_embed_batch_lifecycle_proto` (in the BASE
       // export list — see `RAC_EXPORTED_FUNCTIONS_BASE` in
       // sdk/runanywhere-web/wasm/CMakeLists.txt) and the 6 `_rac_rag_*_proto`
@@ -282,9 +288,18 @@ export class SherpaONNXBridge {
         'vad',
         'voice-agent',
         'embedding',
+        'segmentation',
+        'diarization',
         'rag',
       ];
-      registerWasmModule(capabilities, this._module, ['onnx', 'sherpa']);
+      registerWasmModule(capabilities, this._module, ['onnx', 'sherpa'], {
+        backend: 'onnx-sherpa',
+        acceleration: 'cpu',
+      });
+      // Cross-WASM composition is installed only through this explicit
+      // backend hook once both sibling capability sets are available.
+      registerRAGProvider();
+      registerVoiceAgentProvider();
 
       // Phase 2: Register the ONNX + Sherpa backend vtables. Generic speech
       // component/proto exports are not enough for real STT/TTS/VAD inference.
@@ -296,7 +311,9 @@ export class SherpaONNXBridge {
         );
       }
 
+      const onnxRegistrationStartedAt = Date.now();
       const rc = await this._callMaybeAsync(this._module, 'rac_backend_onnx_register');
+      logTimedStep('rac_backend_onnx_register', onnxRegistrationStartedAt);
       if (!this._isRegistrationSuccess(rc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
@@ -305,7 +322,9 @@ export class SherpaONNXBridge {
       }
       this._onnxBackendRegistered = true;
 
+      const sherpaRegistrationStartedAt = Date.now();
       const sherpaRc = await this._callMaybeAsync(this._module, 'rac_backend_sherpa_register');
+      logTimedStep('rac_backend_sherpa_register', sherpaRegistrationStartedAt);
       if (!this._isRegistrationSuccess(sherpaRc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
@@ -314,11 +333,10 @@ export class SherpaONNXBridge {
       }
       this._sherpaBackendRegistered = true;
       this._loaded = true;
-      await completeDeferredServicesInitialization();
       logger.info('ONNX + Sherpa backends registered (STT/TTS/VAD vtables installed)');
     } catch (err) {
-      // Covers adapter registration, rac_init, capability registration, either
-      // backend registration, and deferred-service completion. Teardown keeps
+      // Covers adapter registration, rac_init, capability registration, and
+      // either backend registration. Teardown keeps
       // the adapter alive until native shutdown has finished.
       this._teardown();
       throw err;
@@ -398,11 +416,13 @@ export class SherpaONNXBridge {
 
     let module: CommonsModule;
     try {
+      const factoryStartedAt = Date.now();
       module = await factory({
         print: (text: string) => logger.info(text),
         printErr: (text: string) => logger.error(text),
         locateFile: (path: string) => baseUrl + path,
       });
+      logTimedStep('racommons-onnx-sherpa factory()', factoryStartedAt);
     } catch (err) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
@@ -475,17 +495,46 @@ export class SherpaONNXBridge {
         module.setValue(configPtr + logLevelOffset, 2, 'i32');
       }
 
+      const racInitStartedAt = Date.now();
       const rc = await this._callMaybeAsync(module, 'rac_init', ['number'], [configPtr]);
+      logTimedStep('rac_init', racInitStartedAt);
       if (!this._isRegistrationSuccess(rc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
           `rac_init returned ${rc}.`,
         );
       }
+      // Match LlamaCppBridge / CommonsModule: C++ registry reconcile and the
+      // download orchestrator require a non-empty model-paths base dir.
+      this._setModelPathsBaseDir(module, '/opfs');
     } finally {
       module._free(configPtr);
     }
     logger.info('RACommons initialized (rac_init returned 0)');
+  }
+
+  private _setModelPathsBaseDir(module: CommonsModule, base: string): void {
+    const setFn = module._rac_model_paths_set_base_dir;
+    if (typeof setFn !== 'function' || typeof module._malloc !== 'function') {
+      logger.warning(
+        'WASM module missing _rac_model_paths_set_base_dir; C++ model-path reconcile may skip downloads.',
+      );
+      return;
+    }
+    const len = module.lengthBytesUTF8(base) + 1;
+    const ptr = module._malloc(len);
+    if (!ptr) return;
+    try {
+      module.stringToUTF8(base, ptr, len);
+      const rc = setFn(ptr);
+      if (rc !== 0) {
+        logger.warning(`rac_model_paths_set_base_dir('${base}') returned ${rc}`);
+      } else {
+        logger.info(`Model paths base dir set to synthetic prefix '${base}'`);
+      }
+    } finally {
+      module._free?.(ptr);
+    }
   }
 
   private _isRegistrationSuccess(rc: number): boolean {

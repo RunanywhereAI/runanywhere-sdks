@@ -1,21 +1,40 @@
 /**
- * Color tokens — ported 1:1 from the Android example app
- * (ui/theme/Color.kt + the Material3 light/dark schemes in Theme.kt).
+ * Color tokens — the single theme source for this app.
+ *
+ * Brand values mirror `examples/DESIGN_GUIDELINE.md` (canonical RunAnywhere
+ * palette): primary is brand orange `#FF6900` in BOTH light and dark schemes
+ * (guideline §2/§4 — "anchor lightScheme.primary and darkScheme.primary to
+ * '#FF6900'"). The primary tonal ramp is re-tuned around that hue (24.7°).
+ * Structure follows the Android example's Material3 light/dark schemes.
  *
  * `palette` holds the raw tonal ramps; `lightScheme`/`darkScheme` map them onto
  * Material3 semantic roles. UI code never reads `palette` directly — it reads
  * roles via `useTheme().colors`, so light/dark stays a single switch.
  */
 
-// Raw tonal palette (Color.kt)
+/**
+ * Brand constants (DESIGN_GUIDELINE.md §1). `gradient` is the canonical
+ * logo/CTA gradient stops (135°, #FF6900 → #FB2C36) for any future gradient
+ * rendering — no screen draws a gradient today.
+ */
+export const brand = {
+  primary: '#FF6900',
+  gradientEnd: '#FB2C36',
+  gradient: ['#FF6900', '#FB2C36'] as const,
+  ink: '#10182B',
+  paper: '#FBFAF8',
+} as const;
+
+// Raw tonal palette
 const palette = {
-  // Primary — Orange
-  primary20: '#4E1C00',
-  primary30: '#732B00',
-  primary60: '#E65500',
-  primary70: '#FF6D1F',
-  primary80: '#FFB693',
-  primary90: '#FFDBCA',
+  // Primary — brand orange ramp, re-tuned around #FF6900 (was Android-derived
+  // #E65500/#FF6D1F). primary60 IS the brand primary for both schemes.
+  primary20: '#522000',
+  primary30: '#7A3100',
+  primary60: brand.primary,
+  primary70: '#FF8C3A', // primary-bright lift (reserved; not a scheme role)
+  primary80: '#FFB98C',
+  primary90: '#FFDCC7',
 
   // Secondary — Warm Neutral
   secondary10: '#1F1A17',
@@ -148,7 +167,9 @@ export const lightScheme: ColorScheme = {
 };
 
 export const darkScheme: ColorScheme = {
-  primary: palette.primary70,
+  // Brand primary is #FF6900 in dark too (DESIGN_GUIDELINE.md §2). On-primary
+  // is the deep brand brown — ink-on-orange passes contrast; white would not.
+  primary: palette.primary60,
   onPrimary: palette.primary20,
   primaryContainer: palette.primary30,
   onPrimaryContainer: palette.primary90,
@@ -175,7 +196,7 @@ export const darkScheme: ColorScheme = {
   surfaceContainer: palette.neutral12,
   surfaceContainerHigh: palette.neutral17,
   surfaceContainerHighest: palette.neutral22,
-  surfaceTint: palette.primary70,
+  surfaceTint: palette.primary60,
   outline: palette.neutralVariant60,
   outlineVariant: palette.neutralVariant30,
   inverseSurface: palette.neutral90,
@@ -184,3 +205,23 @@ export const darkScheme: ColorScheme = {
   scrim: palette.neutral10,
   success: palette.green,
 };
+
+/**
+ * Framework/backend badge colors — intentionally off-palette, theme-invariant
+ * hues that identify third-party inference frameworks (DESIGN_GUIDELINE.md
+ * rule 5: third-party marks stay off-palette). Ported from the retired legacy
+ * theme; `generic` uses the guideline's `info` blue, replacing legacy #007AFF.
+ */
+export const frameworkColors = {
+  llamaCpp: '#FF6B35',
+  onnx: '#1E88E5',
+  coreml: '#FF9500',
+  foundationModels: '#AF52DE',
+  tflite: '#FFC107',
+  piperTTS: '#E91E63',
+  systemTTS: '#8E8E93',
+  mlx: '#AF52DE',
+  executorch: '#FF9500',
+  picoLLM: '#34C759',
+  generic: '#3B82F6',
+} as const;

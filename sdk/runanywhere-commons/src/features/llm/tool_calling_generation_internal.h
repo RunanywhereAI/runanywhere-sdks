@@ -41,6 +41,11 @@ struct GenerationState {
     // llm_module's history normalizer, this is already current-turn-free and
     // pre-alternated, so run_generate_once forwards it as-is (no trailing pop).
     std::vector<std::string> history;
+    // Names of the tools advertised this turn (RUN-80). Used ONLY to build the
+    // QHexRT grammar spec ("toolcall_opt:<names>") when the backend supports
+    // grammar-constrained decoding; empty ⇒ no grammar attached. Non-grammar
+    // engines ignore it.
+    std::vector<std::string> tool_names;
 };
 
 struct GenerationCancelBinding {
@@ -216,6 +221,65 @@ struct ToolLoopTelemetryScope {
     ~ToolLoopTelemetryScope() { publish_tool_loop_telemetry(agg); }
 };
 
+// Whether this turn's decoding should be grammar-constrained to the live tool set
+// (QHexRT). Returns false — leave decoding unconstrained — when tool calls are
+// forbidden this turn (@p none_veto = tool_choice==NONE) or this is a pure
+// synthesis turn (@p a_call_was_made and tools are not kept available). The run
+// loop and the session are parallel implementations, so both derive their
+// tool_names-clearing decision from this ONE predicate to stay in lockstep.
+inline bool tool_grammar_constrained_this_turn(bool none_veto, bool a_call_was_made,
+                                               bool keep_tools_available) {
+    if (none_veto) {
+        return false;
+    }
+    if (a_call_was_made && !keep_tools_available) {
+        return false;
+    }
+    return true;
+}
+
+// The device-proven system-prompt hint that stops small-model over-calling (RUN-80).
+// Given a tool set but NO decision framing, a small model (e.g. Qwen3-0.6B) emits a tool
+// call for EVERY prompt — even "what is the capital of France?". Framing the tool-use
+// decision on the SYSTEM role (not the user turn, where the tool block already lives)
+// makes the model abstain on general-knowledge asks while still calling when a tool IS
+// needed. Verified on-device (S25 / v79, qwen3-0.6b): capital-of-France / who-wrote-Hamlet
+// -> plain answer; weather-in-Tokyo / 45*12 -> get_weather / calculate. It is a universal
+// instruction (the model may still call whenever a tool is genuinely required), so it is
+// applied for EVERY engine on the AUTO tool-calling path — no engine loses capability.
+inline const char* tool_decision_system_hint() {
+    return "Tool use: call a tool only when the user's request genuinely requires it (for "
+           "example live data such as the current weather, or performing a calculation). If "
+           "you can answer from your own knowledge, reply directly in plain text and do not "
+           "call any tool.";
+}
+
+// Append the tool-decision hint to @p system_prompt, PRESERVING any caller-set content
+// (the app supplies its own system prompt; we add tool-use guidance without clobbering it —
+// device-verified that a caller system prompt alone does NOT stop over-calling, but
+// caller-prompt + this hint does). A blank base yields the bare hint (no leading newlines).
+inline void append_tool_decision_hint(std::string* system_prompt) {
+    if (!system_prompt) {
+        return;
+    }
+    if (system_prompt->empty()) {
+        *system_prompt = tool_decision_system_hint();
+    } else {
+        *system_prompt += "\n\n";
+        *system_prompt += tool_decision_system_hint();
+    }
+}
+
+// Whether this turn should carry the tool-decision hint. TRUE only on the AUTO decision
+// path where the model itself chooses whether to call: tools are live this turn (same
+// predicate as the grammar gate — @p tools_live_this_turn) AND the caller is not forcing a
+// call (@p force_a_call = tool_choice REQUIRED/SPECIFIC), where an abstention hint would
+// contradict the forced-call directive appended during prompt-build. The run loop and the
+// session both derive their append decision from this ONE predicate to stay in lockstep.
+inline bool tool_decision_hint_this_turn(bool tools_live_this_turn, bool force_a_call) {
+    return tools_live_this_turn && !force_a_call;
+}
+
 inline bool run_generate_once(GenerationState& generation,
                               const GenerationCancelBinding& cancel_binding,
                               const std::string& prompt, std::string* out_response,
@@ -266,6 +330,27 @@ inline bool run_generate_once(GenerationState& generation,
     options.history = history_ptrs.empty() ? nullptr : history_ptrs.data();
     options.n_history = static_cast<int32_t>(history_ptrs.size());
 
+    // QHexRT grammar-constrained tool decoding (RUN-80). When the backend honors
+    // options.grammar AND a tool set is live, constrain decoding to "free chat OR
+    // exactly one [name(args)] call over the enumerated tools" (ToolCallOptional).
+    // This makes over-calling structurally impossible on QHexRT — the model can
+    // still answer in plain text; it just cannot invent or misformat a call. The
+    // spec string must outlive ops->generate (options.grammar aliases it), so it
+    // lives in this call frame. supports_grammar is false for llama.cpp/onnx/cloud
+    // (set per-framework in the lifecycle accessor), so options.grammar stays NULL
+    // there and behavior is byte-for-byte unchanged for non-grammar engines.
+    std::string grammar_spec;
+    if (ref.supports_grammar && !generation.tool_names.empty()) {
+        grammar_spec = "toolcall_opt:";
+        for (size_t i = 0; i < generation.tool_names.size(); ++i) {
+            if (i != 0) {
+                grammar_spec += ',';
+            }
+            grammar_spec += generation.tool_names[i];
+        }
+        options.grammar = grammar_spec.c_str();
+    }
+
     clear_lifecycle_llm_cancel(&ref);
 
     if (!ref.ops || !ref.ops->generate) {
@@ -307,7 +392,8 @@ inline bool run_generate_once(GenerationState& generation,
     }
 
     rac_llm_result_t raw{};
-    const std::string effective_prompt = apply_no_think_directive(prompt, options.disable_thinking);
+    const std::string effective_prompt =
+        apply_no_think_directive(prompt, options.disable_thinking, ref.framework_name);
     rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     if (cancel_binding.active_ref_mu && cancel_binding.active_ref) {

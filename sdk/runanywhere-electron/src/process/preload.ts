@@ -8,6 +8,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
+import { splitThinking } from '../thinking';
+import {
+  RAGConfiguration,
+  RAGDocument,
+  RAGQueryOptions,
+  RAGResult,
+  RAGStatistics,
+} from '../proto/rag';
+import { createRagSessionFromCatalog } from '../rag';
+import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
@@ -16,6 +26,7 @@ import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
 import type { EventListener, Modality } from '../events';
 import { CATALOG } from '../catalog';
+import { SDKException, asSDKException } from '../errors';
 import type { RpcMessage } from './rpc';
 
 type Pending = {
@@ -58,7 +69,7 @@ ipcRenderer.on('runanywhere-port', (event) => {
     pending.delete(m.id);
     if ('done' in m) p.resolve((m as { result?: unknown }).result);
     else if (m.ok) p.resolve(m.result);
-    else p.reject(new Error(m.error));
+    else p.reject(asSDKException(m.error));
   };
   port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
@@ -70,7 +81,11 @@ ipcRenderer.on('runanywhere-port', (event) => {
 ipcRenderer.on('runanywhere-host-exited', (_e, code?: number) => {
   port = null;
   armReady();
-  rejectAllPending(new Error(`inference host exited unexpectedly (code ${code ?? 'unknown'}) — retrying`));
+  rejectAllPending(
+    SDKException.unknown(
+      `inference host exited unexpectedly (code ${code ?? 'unknown'}) — retrying`
+    )
+  );
 });
 
 function send(method: string, args: unknown[], onToken?: (t: unknown) => void): Promise<unknown> {
@@ -100,6 +115,10 @@ contextBridge.exposeInMainWorld('runanywhere', {
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
+
+  // ---- reasoning ----
+  // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
+  splitThinking: (text: string) => splitThinking(text),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,
@@ -172,7 +191,12 @@ contextBridge.exposeInMainWorld('runanywhere', {
     tools: ToolSpec[],
     options: Record<string, unknown> = {}
   ): Promise<unknown> => {
-    if (!tools || !tools.length) throw new Error('generateToolCall: at least one tool is required');
+    if (!tools || !tools.length) {
+      throw SDKException.validationFailed({
+        fieldPath: 'tools',
+        message: 'at least one tool is required',
+      });
+    }
     const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
     let out = '';
     await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
@@ -207,6 +231,50 @@ contextBridge.exposeInMainWorld('runanywhere', {
   synthesize: (handle: number, text: string) => send('synthesize', [handle, text]),
   unloadTTS: (handle: number) =>
     emitAfter(send('unloadTtsVoice', [handle]), () => bus.emit({ type: 'modelUnloaded', modality: 'tts' as Modality })),
+
+  // Register a downloaded model (id -> local path) in commons' global registry so
+  // RAG can resolve embedding/LLM ids. Prefer ragCreateSessionFromCatalog from
+  // apps — it owns category/framework selection. Low-level escape hatch only.
+  registerModel: (id: string, localPath: string, category?: number, framework?: number) =>
+    send('registerModel', [id, localPath, category, framework]),
+
+  // ---- RAG (retrieval-augmented generation) ----
+  // Object-in / object-out: we encode the runanywhere.v1 proto messages here and
+  // pass raw bytes over the RPC; commons returns serialized RAGResult/RAGStatistics
+  // which we decode back. The addon (utility host) is a generic proto-byte pass-through.
+  ragCreateSession: (config: RagConfig): Promise<number> =>
+    send('ragCreateSession', [RAGConfiguration.encode(RAGConfiguration.fromPartial(config)).finish()]) as Promise<number>,
+  // Download catalog models, register them, and open a session — single entry
+  // point for apps (no raw registry enum ints / multi-step bootstrap in the UI).
+  ragCreateSessionFromCatalog: (config: RagConfig): Promise<number> =>
+    createRagSessionFromCatalog(
+      {
+        downloadModel: (idOrPath) =>
+          send('downloadModel', [idOrPath]) as Promise<{ id: string; primary: string }>,
+        registerModel: (id, localPath, category, framework) =>
+          send('registerModel', [id, localPath, category, framework]),
+        ragCreateSession: (cfg) =>
+          send('ragCreateSession', [
+            RAGConfiguration.encode(RAGConfiguration.fromPartial(cfg)).finish(),
+          ]) as Promise<number>,
+      },
+      config,
+    ),
+  ragIngest: async (handle: number, doc: RagDoc): Promise<RagStats> => {
+    const bytes = RAGDocument.encode(RAGDocument.fromPartial(doc)).finish();
+    // send() already resolves a Uint8Array (a Buffer degrades to one across the
+    // MessagePort) and decode() accepts it directly — no re-wrap/copy needed.
+    return RAGStatistics.decode((await send('ragIngest', [handle, bytes])) as Uint8Array) as RagStats;
+  },
+  ragQuery: async (handle: number, query: RagQuery): Promise<RagResult> => {
+    const bytes = RAGQueryOptions.encode(RAGQueryOptions.fromPartial(query)).finish();
+    return RAGResult.decode((await send('ragQuery', [handle, bytes])) as Uint8Array) as RagResult;
+  },
+  ragStats: async (handle: number): Promise<RagStats> =>
+    RAGStatistics.decode((await send('ragStats', [handle])) as Uint8Array) as RagStats,
+  ragClear: async (handle: number): Promise<RagStats> =>
+    RAGStatistics.decode((await send('ragClear', [handle])) as Uint8Array) as RagStats,
+  ragDestroySession: (handle: number): Promise<void> => send('ragDestroySession', [handle]) as Promise<void>,
 
   secureSet: (key: string, value: string) => send('secureSet', [key, value]),
   secureGet: (key: string) => send('secureGet', [key]),

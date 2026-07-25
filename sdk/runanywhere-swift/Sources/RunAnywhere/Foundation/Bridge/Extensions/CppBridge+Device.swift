@@ -121,7 +121,7 @@ extension CppBridge {
                     if deviceInfo.hasBatteryState {
                         outInfo.pointee.battery_state = store.dup(deviceInfo.batteryState)
                     }
-                    outInfo.pointee.device_fingerprint = store.dup(deviceId)
+                    outInfo.pointee.device_fingerprint = store.dup(DeviceInfoFactory.hardwareFingerprint)
                 }
 
                 outInfo.pointee.total_memory = deviceInfo.totalMemory

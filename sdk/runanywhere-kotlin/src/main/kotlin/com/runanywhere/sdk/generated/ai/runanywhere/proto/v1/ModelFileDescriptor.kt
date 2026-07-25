@@ -57,6 +57,7 @@ public class ModelFileDescriptor(
    * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
    * canonical "required" flag — the documented `required` boolean from
    * newer SDK sources maps onto it (default true, mirrored in Swift).
+   * Exact on-disk artifact size, verified after download.
    */
   @field:WireField(
     tag = 4,
@@ -97,6 +98,9 @@ public class ModelFileDescriptor(
     schemaIndex = 7,
   )
   public val local_path: String? = null,
+  /**
+   * Exact on-disk artifact checksum, verified after download.
+   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

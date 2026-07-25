@@ -22,7 +22,6 @@ package com.runanywhere.sdk.public
 
 import android.content.Context
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
@@ -656,12 +655,7 @@ object RunAnywhere {
 
                 val phase2Result =
                     CppBridgeSdkInit.phase2(
-                        buildToken =
-                            if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                                CppBridgeDevConfig.buildToken
-                            } else {
-                                null
-                            },
+                        buildToken = null,
                         forceRefreshAssignments = false,
                         flushTelemetry = true,
                         discoverDownloadedModels = true,

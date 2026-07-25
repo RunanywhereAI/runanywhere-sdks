@@ -3,12 +3,13 @@
  *
  * Loads `racommons-llamacpp.wasm` (CPU) or `racommons-llamacpp-webgpu.wasm` (WebGPU)
  * as a fully independent Emscripten module, registers the platform adapter,
- * runs `rac_init`, registers the unified llama.cpp backend (LLM + VLM in a
- * single call), then installs the loaded module only in its capability-scoped
- * core adapter slots through `registerWasmModule(...)`.
+ * runs `rac_init`, registers the unified llama.cpp backend (LLM + embeddings
+ * + VLM in a single call), then installs the loaded module only in its
+ * capability-scoped core adapter slots through `registerWasmModule(...)`.
  *
- * This is intentionally MINIMAL — the heavy lifting (LLM/VLM/structured/tool
- * calling/LoRA) flows through `@runanywhere/web` core's
+ * This is intentionally MINIMAL — the heavy lifting
+ * (LLM/embeddings/VLM/structured/tool calling/LoRA) flows through
+ * `@runanywhere/web` core's
  * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once their
  * capability slots are registered.
  */
@@ -21,6 +22,8 @@ import {
   PlatformAdapter,
   ProtoErrorCode,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  registerRAGProvider,
+  registerVoiceAgentProvider,
   SDKException,
   SDKLogger,
   registerWasmModule,
@@ -33,6 +36,10 @@ import {
 } from '@runanywhere/web/backend';
 
 const logger = new SDKLogger('LlamaCppBridge');
+
+function logTimedStep(step: string, startedAt: number): void {
+  logger.info(`${step} completed in ${Date.now() - startedAt}ms`);
+}
 
 // ---------------------------------------------------------------------------
 // LlamaCppModule — extends the typed core module surface with the few
@@ -273,11 +280,13 @@ export class LlamaCppBridge {
       // .wasm binary from the same directory regardless of bundler output.
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
+      const factoryStartedAt = Date.now();
       this._module = await createModule({
         print: (text) => logger.info(text),
         printErr: (text) => logger.info(text),
         locateFile: (path) => baseUrl + path,
       });
+      logTimedStep('racommons-llamacpp factory()', factoryStartedAt);
 
       // Smoke check
       const pingFn = this._module._rac_wasm_ping;
@@ -308,7 +317,7 @@ export class LlamaCppBridge {
       this._loaded = true;
       completeNativePhase1ForModule(this._module);
 
-      // Register the unified llama.cpp backend (LLM + VLM in one call).
+      // Register the unified llama.cpp backend (LLM + embeddings + VLM in one call).
       await this._registerBackend();
 
       // Register against the capabilities this artifact actually serves.
@@ -320,19 +329,29 @@ export class LlamaCppBridge {
       // and sibling-backend lookups stable across LlamaCPP.register() +
       // ONNX.register() in either order.
       //
-      // Do not claim embedding, RAG, or diffusion merely because their
-      // generic proto wrappers are linked into this artifact. The llama.cpp
-      // engine vtable has no embedding/diffusion provider; claiming those
-      // slots would redirect ONNX embeddings into this module after an
-      // acceleration reload, where the lifecycle model is not loaded.
+      // Embeddings are a real llama.cpp primitive. The public embeddings
+      // facade selects a module from the lifecycle-loaded model's framework,
+      // so claiming this capability does not steal ONNX embedding calls when
+      // both backend WASMs are registered or acceleration reloads reorder
+      // their registration. RAG remains ONNX-owned because llama.cpp does not
+      // publish a standalone RAG provider.
       const capabilities: WasmCapability[] = [
         'llm',
         'vlm',
+        'embedding',
+        'rerank',
         'structured-output',
         'tool-calling',
         'lora',
       ];
-      registerWasmModule(capabilities, this._module, ['llamacpp']);
+      registerWasmModule(capabilities, this._module, ['llamacpp'], {
+        backend: 'llamacpp',
+        acceleration: this._accelerationMode,
+      });
+      // A split-WASM provider needs both llama and ONNX/Sherpa. This explicit
+      // registration is harmless until its sibling has completed registration.
+      registerRAGProvider();
+      registerVoiceAgentProvider();
       // HTTP transport — commons-level adapter. Install if no other
       // backend has bound it yet. ModelLifecycleAdapter + ModelRegistryAdapter
       // are bound by `registerWasmModule` because model load requires the
@@ -403,6 +422,7 @@ export class LlamaCppBridge {
       const logLevelOffset = m._rac_wasm_offsetof_config_log_level();
       m.setValue(configPtr + logLevelOffset, 2, 'i32');
 
+      const racInitStartedAt = Date.now();
       const result = (await m.ccall(
         'rac_init',
         'number',
@@ -410,6 +430,7 @@ export class LlamaCppBridge {
         [configPtr],
         { async: true },
       )) as number;
+      logTimedStep('rac_init', racInitStartedAt);
 
       if (result !== 0) {
         const errPtr = m._rac_error_message?.(result) ?? 0;
@@ -487,6 +508,7 @@ export class LlamaCppBridge {
       );
     }
 
+    const backendRegistrationStartedAt = Date.now();
     const llmResult = (await m.ccall(
       'rac_backend_llamacpp_register',
       'number',
@@ -494,6 +516,7 @@ export class LlamaCppBridge {
       [],
       { async: true },
     )) as number;
+    logTimedStep('rac_backend_llamacpp_register', backendRegistrationStartedAt);
     if (llmResult !== 0 && llmResult !== RAC_ERROR_MODULE_ALREADY_REGISTERED) {
       throw new SDKException(
         -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,

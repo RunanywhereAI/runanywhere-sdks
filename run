@@ -31,7 +31,9 @@ ${C_BOLD}DOCTOR & SETUP${C_RESET}
                                 ${C_DIM}target = android | flutter | rn | ios | web${C_RESET}
 
 ${C_BOLD}SDK${C_RESET}
-  ${C_CMD}sdk commons build-android${C_RESET}    Build C++ commons for all Android ABIs + stage .so into consumers
+  ${C_CMD}sdk commons build-android${C_RESET} ${C_DIM}[--env-staging]${C_RESET}
+                                Build C++ commons for all Android ABIs + stage .so into consumers.
+                                ${C_DIM}--env-staging bakes the staging backend URL (keyless staging)${C_RESET}
   ${C_CMD}sdk commons build-ios${C_RESET}        Build C++ commons xcframework ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}sdk commons build-wasm${C_RESET}       Build C++ commons for WebAssembly
   ${C_CMD}sdk commons build-linux${C_RESET}      Build C++ commons for the Linux host
@@ -57,6 +59,12 @@ ${C_BOLD}EXAMPLE APPS${C_RESET}
   ${C_CMD}example flutter${C_RESET} {build|clean}
   ${C_CMD}example ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
   ${C_CMD}example web${C_RESET}     {dev|build|clean}
+
+${C_BOLD}RCLI${C_RESET}
+  ${C_CMD}rcli build${C_RESET} ${C_DIM}[--env-staging]${C_RESET}    Build the desktop CLI (host preset). --env-staging bakes the
+                                staging backend URL from the git-ignored development_config.cpp
+                                so ${C_DIM}RUNANYWHERE_ENVIRONMENT=staging rcli ...${C_RESET} works keyless
+  ${C_CMD}rcli clean${C_RESET}                   Wipe rcli build outputs
 
 ${C_BOLD}UTILITIES${C_RESET}
   ${C_CMD}clean${C_RESET}                        Clean every SDK + native + cache
@@ -90,8 +98,27 @@ require_macos() {
     [ "$(uname -s)" = "Darwin" ] || die "this target requires macOS"
 }
 
+# Reads STAGING_BASE_URL out of the git-ignored development_config.cpp so
+# --env-staging never needs the URL on the command line (or in this script).
+staging_url_from_local_config() {
+    local cfg="sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp"
+    [ -f "${cfg}" ] || die "--env-staging needs the git-ignored development_config.cpp (copy the .template next to it and fill STAGING_BASE_URL)"
+    local url
+    url="$(sed -n 's/.*STAGING_BASE_URL = "\([^"]*\)".*/\1/p' "${cfg}" | head -1)"
+    case "${url}" in
+        ""|YOUR_*) die "STAGING_BASE_URL is not filled in development_config.cpp" ;;
+    esac
+    printf '%s' "${url}"
+}
+
 cmd_sdk_commons() {
-    case "${1:-}" in
+    local sub="${1:-}"
+    if [ "${2:-}" = "--env-staging" ]; then
+        STAGING_BASE_URL="$(staging_url_from_local_config)" || exit 1
+        export STAGING_BASE_URL
+        echo "staging build: baking backend URL from local dev config"
+    fi
+    case "${sub}" in
         build-android) bash scripts/build/build-core-android.sh ;;
         build-ios)     require_macos; bash sdk/runanywhere-swift/scripts/build-core-xcframework.sh ;;
         build-wasm)    bash sdk/runanywhere-web/scripts/build-core-wasm.sh ;;
@@ -213,6 +240,38 @@ cmd_example() {
     esac
 }
 
+cmd_rcli() {
+    local sub="${1:-}"
+    shift 2>/dev/null || true
+    local preset
+    case "$(uname -s)" in
+        Darwin) preset="rcli-macos-release" ;;
+        *)      preset="rcli-linux-release" ;;
+    esac
+    case "${sub}" in
+        build)
+            local extra=()
+            local arg
+            for arg in "$@"; do
+                case "${arg}" in
+                    --env-staging)
+                        # Staging build: bake credentials (incl. STAGING_BASE_URL) from the
+                        # git-ignored development_config.cpp so `RUNANYWHERE_ENVIRONMENT=staging`
+                        # needs no explicit URL. Nothing secret lives in this script.
+                        [ -f sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp ] \
+                            || die "--env-staging needs the git-ignored development_config.cpp (copy the .template next to it and fill STAGING_BASE_URL)"
+                        extra+=(-DRAC_INCLUDE_LOCAL_DEV_CONFIG=ON)
+                        ;;
+                    *) die "unknown rcli build flag: ${arg}" ;;
+                esac
+            done
+            cmake --preset="${preset}" "${extra[@]}" && cmake --build --preset="${preset}" --target rcli
+            ;;
+        clean) rm -rf build/rcli-* ;;
+        *)     bad_subcommand "rcli" "${sub}" ;;
+    esac
+}
+
 cmd_clean() {
     cmd_sdk_kotlin clean   || true
     cmd_example_android clean || true
@@ -237,6 +296,7 @@ case "${1:-help}" in
     setup)              shift; bash scripts/setup/setup.sh "$@" ;;
     sdk)                shift; cmd_sdk "$@" ;;
     example)            shift; cmd_example "$@" ;;
+    rcli)               shift; cmd_rcli "$@" ;;
     clean)              cmd_clean ;;
     lint)               cmd_lint ;;
     format)             cmd_format ;;

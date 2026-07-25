@@ -15,6 +15,7 @@
 import {
   environmentDescription,
   environmentShouldSendTelemetry,
+  getStoredHfToken,
   RunAnywhere,
 } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
@@ -94,7 +95,8 @@ const settings: AppSettings = {
   temperature: 0.7,
   maxTokens: 10000,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
-  thinkingModeEnabled: true,
+  // Opt-in: thinking-capable models answer directly unless the user enables this.
+  thinkingModeEnabled: false,
   apiKey: '',
   baseURL: '',
 };
@@ -202,8 +204,8 @@ export function initSettingsTab(el: HTMLElement): void {
           <div class="toggle ${settings.thinkingModeEnabled ? 'on' : ''}" id="settings-thinking-toggle"></div>
         </div>
         <p class="setting-hint">
-          When off, thinking-capable models (e.g. Qwen3) are asked to answer
-          directly without a reasoning phase.
+          Off by default. Turn on for thinking-capable models (e.g. Qwen3)
+          when you want a visible reasoning phase before the answer.
         </p>
       </div>
 
@@ -228,6 +230,32 @@ export function initSettingsTab(el: HTMLElement): void {
           <div class="flex items-center gap-sm">
             <button type="button" class="btn btn-primary" id="settings-apply-api">Apply &amp; Reinitialize</button>
             <span class="setting-hint" id="settings-api-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hugging Face access token for gated/private model downloads. The SDK
+           owns the token (RunAnywhere.setHfToken); it is held in memory for the
+           current session only and is never persisted to browser storage. -->
+      <div class="settings-section">
+        <div class="settings-section-title">Hugging Face Access</div>
+        <div class="setting-row">
+          <span class="setting-label">Token</span>
+          <span class="setting-value" id="settings-hf-state">${getStoredHfToken() ? 'Configured' : 'Not set'}</span>
+        </div>
+        <div class="setting-row setting-row--stacked">
+          <input type="password" class="text-input w-full" id="settings-hf-token" placeholder="hf_..." autocomplete="off" spellcheck="false">
+          <p class="setting-hint">
+            Optional. Add a Hugging Face token to download gated or private
+            models; public models need none. The token is passed to the SDK via
+            <code>RunAnywhere.setHfToken</code>, kept in memory for this session
+            only, and never persisted to browser storage; re-enter it after a
+            reload.
+            <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
+          </p>
+          <div class="flex items-center gap-sm">
+            <button type="button" class="btn btn-secondary" id="settings-hf-clear">Clear</button>
+            <span class="setting-hint" id="settings-hf-status" role="status" aria-live="polite"></span>
           </div>
         </div>
       </div>
@@ -313,6 +341,38 @@ export function initSettingsTab(el: HTMLElement): void {
   const status = container.querySelector('#settings-api-status') as HTMLElement;
   applyButton.addEventListener('click', () => {
     void applyAPIConfiguration(apiKeyInput, baseURLInput, applyButton, status);
+  });
+
+  // Hugging Face access token. The SDK owns it (RunAnywhere.setHfToken /
+  // getStoredHfToken) and holds it in memory for the current session only; it
+  // is never persisted to browser storage. Public models need no token;
+  // gated/private models download once a token is set.
+  const hfInput = container.querySelector('#settings-hf-token') as HTMLInputElement;
+  const hfState = container.querySelector('#settings-hf-state') as HTMLElement;
+  const hfStatus = container.querySelector('#settings-hf-status') as HTMLElement;
+  hfInput.addEventListener('change', () => {
+    const token = hfInput.value.trim();
+    if (!token) return;
+    try {
+      RunAnywhere.setHfToken(token);
+      hfInput.value = '';
+      hfState.textContent = 'Configured';
+      hfStatus.textContent = 'Token set for downloads this session.';
+    } catch (error) {
+      hfStatus.textContent =
+        error instanceof Error ? error.message : 'Failed to set the token.';
+    }
+  });
+  container.querySelector('#settings-hf-clear')!.addEventListener('click', () => {
+    try {
+      RunAnywhere.setHfToken(null);
+      hfInput.value = '';
+      hfState.textContent = 'Not set';
+      hfStatus.textContent = 'Token cleared.';
+    } catch (error) {
+      hfStatus.textContent =
+        error instanceof Error ? error.message : 'Unable to clear the token. Please try again.';
+    }
   });
 
   // Docs link

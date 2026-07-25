@@ -2,6 +2,7 @@
 #define RAC_TOOL_CALLING_INTERNAL_H
 
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +11,11 @@ extern "C" {
 typedef enum rac_tool_call_format {
     RAC_TOOL_FORMAT_DEFAULT = 0,
     RAC_TOOL_FORMAT_LFM2 = 1,
+    // Bare Pythonic `[name(args)]` with NO surrounding tags. This is what the QHexRT
+    // toolcall_opt grammar emits/enforces; it is selected internally for grammar
+    // backends (never requested over the wire), so there is deliberately NO matching
+    // proto ToolCallFormatName value (keeps the IDL untouched). RUN-80.
+    RAC_TOOL_FORMAT_PYTHONIC = 2,
     RAC_TOOL_FORMAT_COUNT
 } rac_tool_call_format_t;
 
@@ -113,6 +119,13 @@ rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_promp
                                                  const char* tool_result_json,
                                                  rac_bool_t keep_tools_available,
                                                  char** out_prompt);
+// Same as rac_tool_call_format_prompt_proto, but forces the bare-Pythonic
+// `[name(args)]` output format the QHexRT grammar enforces (RUN-80). Internal:
+// commons selects it for grammar backends; it is never invoked over the public ABI.
+rac_result_t rac_tool_call_format_prompt_grammar_proto(const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
+
 rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized);
 rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
                                                size_t num_definitions, char** out_json);

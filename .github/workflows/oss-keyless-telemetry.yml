@@ -1,0 +1,60 @@
+# =============================================================================
+# OSS keyless telemetry gate — rcli development → public staging backend
+# =============================================================================
+# Primary CI for the open-source contract: build rcli in this public repo and
+# keyless-blast all 12 modalities at the staging backend (PUBLIC org). No API
+# key. Staging origin comes from repo secrets/vars — not hardcoded hosts.
+# =============================================================================
+
+name: OSS keyless telemetry
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/oss-keyless-telemetry.yml"
+      - "scripts/ci/oss_keyless_telemetry_blast.sh"
+      - "sdk/runanywhere-cli/**"
+      - "sdk/runanywhere-commons/src/infrastructure/network/**"
+      - "sdk/runanywhere-commons/src/lifecycle/**"
+      - "sdk/runanywhere-commons/src/core/sdk_state.cpp"
+  schedule:
+    # Daily 08:00 UTC — light cadence for Staging drift.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  keyless-staging-blast:
+    name: rcli keyless → staging backend
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install ninja + protobuf
+        run: brew install ninja protobuf
+
+      - name: Require staging backend origin
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          RA_OSS_BASE_URL: ${{ vars.RA_OSS_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${STAGING_BASE_URL:-}" && -z "${RA_OSS_BASE_URL:-}" ]]; then
+            echo "::error::Set repository secret STAGING_BASE_URL (or variable RA_OSS_BASE_URL) to the public staging backend origin."
+            exit 1
+          fi
+
+      - name: Build rcli + keyless blast (12 modalities)
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          RA_OSS_BASE_URL: ${{ vars.RA_OSS_BASE_URL || secrets.STAGING_BASE_URL }}
+        run: bash scripts/ci/oss_keyless_telemetry_blast.sh

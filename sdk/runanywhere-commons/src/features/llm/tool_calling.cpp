@@ -52,8 +52,9 @@ static const char* TAG_LFM2_END = "<|tool_call_end|>";
 
 // Format names for logging/display
 static const char* FORMAT_NAMES[] = {
-    "Default",        // RAC_TOOL_FORMAT_DEFAULT
-    "LFM2 (Liquid)",  // RAC_TOOL_FORMAT_LFM2
+    "Default",         // RAC_TOOL_FORMAT_DEFAULT
+    "LFM2 (Liquid)",   // RAC_TOOL_FORMAT_LFM2
+    "Pythonic (bare)",  // RAC_TOOL_FORMAT_PYTHONIC
 };
 
 static int64_t next_tool_call_id() {
@@ -80,6 +81,15 @@ extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) 
     return "Unknown";
 }
 
+// Per-model-family tool-call FORMAT selector (RUN-83). The format name is carried
+// on ToolCallingOptions.format (populated per model, typically from the model
+// manifest). Family → flavor:
+//   - LFM2.5 / LiquidAI  ("lfm" | "lfm2" | "liquid")  → LFM2  [name(args)] tags
+//   - Qwen3 / Qwen3.5 / Qwen3-VL (v81 1.7B/4B/8B/27B) → DEFAULT <tool_call>{json}
+//   - Bonsai 1-bit / ternary (same ChatML block)      → DEFAULT
+//   - anything unknown / unset                        → DEFAULT
+// On QHexRT the tool-call GRAMMAR (toolcall_opt:<names>) is family-independent, so
+// this flavor only steers the text parser for non-grammar engines (llama.cpp/onnx).
 extern "C" rac_tool_call_format_t rac_tool_call_format_from_name(const char* name) {
     if (!name) {
         return RAC_TOOL_FORMAT_DEFAULT;
@@ -95,6 +105,9 @@ extern "C" rac_tool_call_format_t rac_tool_call_format_from_name(const char* nam
         return RAC_TOOL_FORMAT_DEFAULT;
     } else if (name_lower == "lfm2" || name_lower == "lfm" || name_lower == "liquid") {
         return RAC_TOOL_FORMAT_LFM2;
+    } else if (name_lower == "pythonic" || name_lower == "grammar" || name_lower == "bare") {
+        // Bare [name(args)] — the QHexRT grammar format (RUN-80). Internal-only key.
+        return RAC_TOOL_FORMAT_PYTHONIC;
     }
 
     // Unknown format - default to DEFAULT
@@ -118,6 +131,62 @@ extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_ou
     // Check Default format: <tool_call>
     if (strstr(llm_output, TAG_DEFAULT_START) != nullptr) {
         return RAC_TOOL_FORMAT_DEFAULT;
+    }
+
+    // Bare Pythonic `[name(args)]` with NO tags (the QHexRT grammar output, RUN-80).
+    // Checked LAST and anchored at the FIRST non-space char so it can never shadow the
+    // tagged formats above. The predicate is deliberately strict — `[` then an
+    // identifier then `(` then either `)` or `key=` — so ordinary prose ("[1]", a
+    // markdown link "[text](url)", a bare "[list, item]") is NOT misdetected. A relaxed
+    // check would false-positive on markdown links; a rejected candidate simply falls
+    // through to DEFAULT (which then finds no <tool_call> and yields plain text).
+    {
+        const char* p = llm_output;
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') {
+            ++p;
+        }
+        if (*p == '[') {
+            const char* q = p + 1;
+            while (*q == ' ') {
+                ++q;
+            }
+            const bool ident_start =
+                (*q >= 'a' && *q <= 'z') || (*q >= 'A' && *q <= 'Z') || *q == '_';
+            if (ident_start) {
+                const char* id = q;
+                while ((*id >= 'a' && *id <= 'z') || (*id >= 'A' && *id <= 'Z') ||
+                       (*id >= '0' && *id <= '9') || *id == '_') {
+                    ++id;
+                }
+                while (*id == ' ') {
+                    ++id;
+                }
+                if (*id == '(') {
+                    const char* a = id + 1;
+                    while (*a == ' ') {
+                        ++a;
+                    }
+                    if (*a == ')') {
+                        return RAC_TOOL_FORMAT_PYTHONIC;  // [name()]
+                    }
+                    const bool arg_ident =
+                        (*a >= 'a' && *a <= 'z') || (*a >= 'A' && *a <= 'Z') || *a == '_';
+                    if (arg_ident) {
+                        const char* k = a;
+                        while ((*k >= 'a' && *k <= 'z') || (*k >= 'A' && *k <= 'Z') ||
+                               (*k >= '0' && *k <= '9') || *k == '_') {
+                            ++k;
+                        }
+                        while (*k == ' ') {
+                            ++k;
+                        }
+                        if (*k == '=') {
+                            return RAC_TOOL_FORMAT_PYTHONIC;  // [name(key=...)]
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // No recognizable format detected - return DEFAULT
@@ -1148,6 +1217,68 @@ static bool lfm2_arguments_to_json(const std::string& args, std::string* out_jso
     return true;
 }
 
+// Parse a Pythonic call `[name(arg="v", ...)]` (surrounding brackets/whitespace tolerated)
+// into an owned tool_name + args_json. Shared by the LFM2 parser (tag-wrapped) and the
+// bare-Pythonic parser (QHexRT grammar output, RUN-80). On failure, leaves the out params
+// untouched-null and allocates nothing (so callers need no partial cleanup).
+static bool parse_pythonic_call(const std::string& content, char** out_tool_name,
+                                char** out_args_json) {
+    size_t start = 0, end = content.size();
+    while (start < end &&
+           (content[start] == ' ' || content[start] == '\n' || content[start] == '[')) {
+        start++;
+    }
+    while (end > start &&
+           (content[end - 1] == ' ' || content[end - 1] == '\n' || content[end - 1] == ']')) {
+        end--;
+    }
+    if (start >= end) {
+        return false;
+    }
+    const std::string call_str = content.substr(start, end - start);
+
+    const size_t paren_pos = call_str.find('(');
+    std::string func_name;
+    std::string json_args;
+    if (paren_pos == std::string::npos) {
+        // No arguments — the whole token is the function name.
+        func_name = call_str;
+        json_args = "{}";
+    } else {
+        func_name = call_str.substr(0, paren_pos);
+        while (!func_name.empty() && func_name.back() == ' ') {
+            func_name.pop_back();
+        }
+        if (func_name.empty()) {
+            return false;
+        }
+        const size_t args_start = paren_pos + 1;
+        size_t args_end = call_str.rfind(')');
+        if (args_end == std::string::npos || args_end < args_start) {
+            args_end = call_str.size();
+        }
+        const std::string args_str = call_str.substr(args_start, args_end - args_start);
+        if (!lfm2_arguments_to_json(args_str, &json_args)) {
+            return false;  // malformed args (e.g. a markdown link mis-fed here) -> no call
+        }
+    }
+
+    // Allocate ATOMICALLY: both succeed or neither is handed back (honors the contract so
+    // callers need no partial cleanup; never returns true with a null out param).
+    char* name_buf = static_cast<char*>(malloc(func_name.size() + 1));
+    char* args_buf = static_cast<char*>(malloc(json_args.size() + 1));
+    if (!name_buf || !args_buf) {
+        free(name_buf);
+        free(args_buf);
+        return false;
+    }
+    std::memcpy(name_buf, func_name.c_str(), func_name.size() + 1);
+    std::memcpy(args_buf, json_args.c_str(), json_args.size() + 1);
+    *out_tool_name = name_buf;
+    *out_args_json = args_buf;
+    return true;
+}
+
 /**
  * @brief Parse LFM2 (Liquid AI) format: <|tool_call_start|>[func(arg="val")]<|tool_call_end|>
  *
@@ -1194,78 +1325,9 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
     size_t content_len = end_tag - content_start;
     std::string content(content_start, content_len);
 
-    // Parse Pythonic format: [func_name(arg1="val1", arg2="val2")]
-    // First, strip leading/trailing whitespace and brackets
-    size_t start = 0, end = content.size();
-    while (start < end &&
-           (content[start] == ' ' || content[start] == '\n' || content[start] == '[')) {
-        start++;
-    }
-    while (end > start &&
-           (content[end - 1] == ' ' || content[end - 1] == '\n' || content[end - 1] == ']')) {
-        end--;
-    }
-
-    if (start >= end) {
+    // Parse the inner Pythonic call `[func(arg="v", ...)]` (shared with the bare parser).
+    if (!parse_pythonic_call(content, out_tool_name, out_args_json)) {
         return false;
-    }
-
-    std::string call_str = content.substr(start, end - start);
-
-    RAC_LOG_INFO("ToolCalling", "LFM2 call_str: '%s'", call_str.c_str());
-
-    // Find function name (everything before '(')
-    size_t paren_pos = call_str.find('(');
-    if (paren_pos == std::string::npos) {
-        // No arguments - whole thing is function name
-        *out_tool_name = static_cast<char*>(malloc(call_str.size() + 1));
-        if (*out_tool_name) {
-            std::memcpy(*out_tool_name, call_str.c_str(), call_str.size() + 1);
-        }
-        *out_args_json = static_cast<char*>(malloc(3));
-        if (*out_args_json) {
-            std::memcpy(*out_args_json, "{}", 3);
-        }
-    } else {
-        std::string func_name = call_str.substr(0, paren_pos);
-
-        // Trim whitespace from function name
-        while (!func_name.empty() && func_name.back() == ' ') {
-            func_name.pop_back();
-        }
-
-        *out_tool_name = static_cast<char*>(malloc(func_name.size() + 1));
-        if (*out_tool_name) {
-            std::memcpy(*out_tool_name, func_name.c_str(), func_name.size() + 1);
-        }
-
-        // Parse keyword arguments while respecting quoted strings and nested
-        // JSON arrays/objects. LFM2 uses Pythonic call syntax but tool argument
-        // values must retain their schema types in reconstructed JSON.
-        size_t args_start = paren_pos + 1;
-        size_t args_end = call_str.rfind(')');
-        if (args_end == std::string::npos) {
-            args_end = call_str.size();
-        }
-
-        std::string args_str = call_str.substr(args_start, args_end - args_start);
-
-        RAC_LOG_INFO("ToolCalling", "LFM2 args_str: '%s' (paren=%zu, end=%zu)", args_str.c_str(),
-                     paren_pos, args_end);
-
-        std::string json_args;
-        if (!lfm2_arguments_to_json(args_str, &json_args)) {
-            free(*out_tool_name);
-            *out_tool_name = nullptr;
-            return false;
-        }
-
-        RAC_LOG_INFO("ToolCalling", "LFM2 parsed json_args: '%s'", json_args.c_str());
-
-        *out_args_json = static_cast<char*>(malloc(json_args.size() + 1));
-        if (*out_args_json) {
-            std::memcpy(*out_args_json, json_args.c_str(), json_args.size() + 1);
-        }
     }
 
     RAC_LOG_INFO("ToolCalling", "LFM2 RESULT: tool='%s', args='%s'",
@@ -1302,6 +1364,92 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
     }
 
     return *out_tool_name != nullptr;
+}
+
+/**
+ * @brief Parse bare Pythonic format: [name(arg="val")] with NO surrounding tags.
+ *
+ * This is what the QHexRT toolcall_opt grammar emits (RUN-80). The call is located from
+ * the first '[' to its MATCHING ']' (quote- and nesting-aware, so a ']' inside a string
+ * arg or a later bracket group can't hijack the match); text before/after becomes
+ * clean_text. Reuses the shared Pythonic-call parser. detect_format() only routes here on
+ * a strict `[ident(...)]` prefix, so free-text answers (abstentions) never reach this path.
+ */
+static bool parse_pythonic_format(const char* llm_output, char** out_tool_name,
+                                  char** out_args_json, char** out_clean_text) {
+    *out_tool_name = nullptr;
+    *out_args_json = nullptr;
+    *out_clean_text = nullptr;
+
+    const char* open = strchr(llm_output, '[');
+    if (!open) {
+        return false;
+    }
+    // Find the ']' that closes `open`: skip quoted strings (single/double, with escapes)
+    // and track '[' nesting so trailing text or a second bracket group can't be captured.
+    const char* close = nullptr;
+    int depth = 0;
+    bool in_str = false;
+    char quote = 0;
+    for (const char* c = open; *c != '\0'; ++c) {
+        if (in_str) {
+            if (*c == '\\' && *(c + 1) != '\0') {
+                ++c;  // skip the escaped char
+            } else if (*c == quote) {
+                in_str = false;
+            }
+            continue;
+        }
+        if (*c == '"' || *c == '\'') {
+            in_str = true;
+            quote = *c;
+        } else if (*c == '[') {
+            ++depth;
+        } else if (*c == ']') {
+            if (--depth == 0) {
+                close = c;
+                break;
+            }
+        }
+    }
+    if (!close) {
+        return false;
+    }
+
+    const std::string content(open, static_cast<size_t>(close - open) + 1);
+    if (!parse_pythonic_call(content, out_tool_name, out_args_json)) {
+        return false;
+    }
+
+    // clean_text = text before '[' + text after ']' (a pure grammar call yields "").
+    std::string clean_text;
+    clean_text.append(llm_output, static_cast<size_t>(open - llm_output));
+    if (*(close + 1) != '\0') {
+        clean_text.append(close + 1);
+    }
+    size_t trim_start = 0, trim_end = clean_text.size();
+    while (trim_start < trim_end &&
+           (clean_text[trim_start] == ' ' || clean_text[trim_start] == '\n')) {
+        trim_start++;
+    }
+    while (trim_end > trim_start &&
+           (clean_text[trim_end - 1] == ' ' || clean_text[trim_end - 1] == '\n')) {
+        trim_end--;
+    }
+    char* clean_buf = static_cast<char*>(malloc(trim_end - trim_start + 1));
+    if (!clean_buf) {
+        // Keep the whole parse atomic: don't hand back a call with a null clean_text.
+        free(*out_tool_name);
+        free(*out_args_json);
+        *out_tool_name = nullptr;
+        *out_args_json = nullptr;
+        return false;
+    }
+    memcpy(clean_buf, clean_text.c_str() + trim_start, trim_end - trim_start);
+    clean_buf[trim_end - trim_start] = '\0';
+    *out_clean_text = clean_buf;
+
+    return true;
 }
 
 /**
@@ -1452,6 +1600,10 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
             parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
             break;
 
+        case RAC_TOOL_FORMAT_PYTHONIC:
+            parsed = parse_pythonic_format(llm_output, &tool_name, &args_json, &clean_text);
+            break;
+
         default:
             parsed = false;
             break;
@@ -1579,8 +1731,12 @@ static std::string compact_specific_tool_prompt(const std::string& user_prompt,
                                                 const runanywhere::v1::ToolDefinition& tool,
                                                 rac_tool_call_format_t format) {
     std::string call_example;
-    if (format == RAC_TOOL_FORMAT_LFM2) {
-        call_example = "<|tool_call_start|>[" + tool.name() + "(";
+    if (format == RAC_TOOL_FORMAT_LFM2 || format == RAC_TOOL_FORMAT_PYTHONIC) {
+        // Pythonic call syntax. LFM2 wraps it in tags; the bare grammar format
+        // (RAC_TOOL_FORMAT_PYTHONIC, QHexRT) uses the brackets alone.
+        const bool bare = (format == RAC_TOOL_FORMAT_PYTHONIC);
+        call_example = bare ? "[" : "<|tool_call_start|>[";
+        call_example += tool.name() + "(";
         bool first = true;
         for (const auto& parameter : tool.parameters()) {
             if (!parameter.required()) {
@@ -1612,7 +1768,7 @@ static std::string compact_specific_tool_prompt(const std::string& user_prompt,
                     break;
             }
         }
-        call_example += ")]<|tool_call_end|>";
+        call_example += bare ? ")]" : ")]<|tool_call_end|>";
     } else {
         json arguments = json::object();
         for (const auto& parameter : tool.parameters()) {
@@ -1940,15 +2096,20 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
 #endif
 }
 
-extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request_proto_bytes,
-                                                          size_t request_proto_size,
-                                                          rac_proto_buffer_t* out_result) {
+// Shared implementation for rac_tool_call_format_prompt_proto and its grammar variant.
+// format_override == RAC_TOOL_FORMAT_COUNT means "use the caller's declared format";
+// any other value forces that format (RUN-80: grammar backends force bare-Pythonic).
+static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
+                                             size_t request_proto_size,
+                                             rac_tool_call_format_t format_override,
+                                             rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_proto_bytes;
     (void)request_proto_size;
+    (void)format_override;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
@@ -1970,6 +2131,15 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
     if (request.has_options()) {
         converted = tool_calling_options_from_proto(request.options());
         refresh_proto_tool_calling_options(&converted);
+    }
+    // RUN-80: grammar backends (QHexRT) force the bare-Pythonic `[name(args)]` format the
+    // toolcall_opt grammar enforces, overriding the caller's declared format so the
+    // grammar actually engages on-device. Applied to BOTH the enum (build_initial_prompt
+    // path) and the string key (the keep-tools / empty-prompt paths). NONE-suppressed and
+    // empty-tool turns emit no format body below, so the override is inert there.
+    if (format_override != RAC_TOOL_FORMAT_COUNT) {
+        converted.options.format = format_override;
+        converted.format_key = "pythonic";
     }
 
     char* prompt = nullptr;
@@ -2029,9 +2199,14 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
         }
     } else {
         const auto& tool_result = request.tool_results(0);
+        // tool_choice=NONE suppresses further calls even on the follow-up/synthesis
+        // turn: never re-advertise the tools body nor invite "use another tool".
+        const rac_bool_t keep_tools =
+            (converted.options.keep_tools_available == RAC_TRUE && !suppress_tools) ? RAC_TRUE
+                                                                                   : RAC_FALSE;
         std::string tools_prompt;
         char* tools_prompt_raw = nullptr;
-        if (converted.options.keep_tools_available == RAC_TRUE) {
+        if (keep_tools == RAC_TRUE) {
             const rac_result_t tools_rc = rac_tool_call_format_prompt_json_with_format_name(
                 effective_tools_json.c_str(), converted.format_key.c_str(), &tools_prompt_raw);
             if (tools_rc != RAC_SUCCESS) {
@@ -2064,7 +2239,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
                 tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
                 tool_result.name().empty() ? tool_result.tool_call_id().c_str()
                                            : tool_result.name().c_str(),
-                payload.c_str(), converted.options.keep_tools_available, &prompt);
+                payload.c_str(), keep_tools, &prompt);
         } else {
             std::string followup;
             if (!tools_prompt.empty()) {
@@ -2086,7 +2261,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
                 followup += "\n";
             }
             followup += "\nUsing all results above, answer the original question. ";
-            if (converted.options.keep_tools_available == RAC_TRUE) {
+            if (keep_tools == RAC_TRUE) {
                 followup += "You may use another tool if needed.";
             } else {
                 followup += "Do not emit tool calls or tool tags.";
@@ -2094,6 +2269,22 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
             prompt = dup_owned_string(followup);
             rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
         }
+    }
+
+    // tool_choice=REQUIRED: the neutralized body says "call a tool only when
+    // needed" (RUN-80), but REQUIRED means the caller wants a call THIS turn — the
+    // run loop structurally errors ("tool_choice=REQUIRED requires a tool call")
+    // if none is made. Append one firm directive so the model actually calls,
+    // WITHOUT reintroducing the global "ALWAYS use a tool" bias for AUTO callers.
+    // Only on an initial, tool-advertising turn (not NONE, not a follow-up).
+    if (rc == RAC_SUCCESS && prompt != nullptr && !suppress_tools &&
+        request.tool_results_size() == 0 &&
+        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED) {
+        std::string firm = prompt;
+        firm += "\n\nYou must call exactly one tool now.";
+        free(prompt);
+        prompt = dup_owned_string(firm);
+        rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     }
 
     if (rc != RAC_SUCCESS) {
@@ -2109,6 +2300,23 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
     free(prompt);
     return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
 #endif
+}
+
+extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request_proto_bytes,
+                                                          size_t request_proto_size,
+                                                          rac_proto_buffer_t* out_result) {
+    // Public ABI: honor the caller's declared format (no override).
+    return format_prompt_proto_impl(request_proto_bytes, request_proto_size,
+                                    RAC_TOOL_FORMAT_COUNT, out_result);
+}
+
+extern "C" rac_result_t rac_tool_call_format_prompt_grammar_proto(const uint8_t* request_proto_bytes,
+                                                                  size_t request_proto_size,
+                                                                  rac_proto_buffer_t* out_result) {
+    // Internal: force bare-Pythonic for grammar backends (QHexRT), so the toolcall_opt
+    // grammar's `[name(args)]` output matches the prompt the model was given (RUN-80).
+    return format_prompt_proto_impl(request_proto_bytes, request_proto_size,
+                                    RAC_TOOL_FORMAT_PYTHONIC, out_result);
 }
 
 extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_proto_bytes,
@@ -2681,26 +2889,37 @@ extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
 static std::string get_format_instructions(rac_tool_call_format_t format) {
     std::string instructions;
 
+    // Neutral, tool-agnostic guidance (RUN-80): describes HOW to call a tool when
+    // one is needed, without biasing toward calling or toward specific tool names.
+    // Kept in parity with the JSON path (get_format_example_json / RULES block).
     switch (format) {
         case RAC_TOOL_FORMAT_LFM2:
             // Liquid AI LFM2 format
             instructions += "TOOL CALLING FORMAT (LFM2):\n";
-            instructions += "When you need to use a tool, output ONLY this format:\n";
+            instructions += "To call a tool, output exactly one call in this format:\n";
             instructions +=
-                "<|tool_call_start|>[TOOL_NAME(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>"
-                "\n\n";
-
-            instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
-            instructions +=
-                "- User asks 'weather in Tokyo' -> "
-                "<|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
-            instructions +=
-                "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San "
-                "Francisco\")]<|tool_call_end|>\n\n";
+                "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n\n";
 
             instructions += "RULES:\n";
-            instructions += "1. For greetings or general chat, respond normally without tools\n";
+            instructions +=
+                "1. Call a tool only when it is needed; for greetings or general chat, respond "
+                "normally without tools\n";
             instructions += "2. Use Python-style function call syntax inside the tags\n";
+            instructions += "3. String values MUST be quoted with double quotes\n";
+            instructions += "4. Multiple arguments are separated by commas";
+            break;
+
+        case RAC_TOOL_FORMAT_PYTHONIC:
+            // Bare Pythonic — same call syntax as LFM2 but with NO surrounding tags
+            // (the QHexRT toolcall_opt grammar emits exactly `[name(args)]`).
+            instructions += "TOOL CALLING FORMAT (bracketed):\n";
+            instructions += "To call a tool, output exactly one call in this format:\n";
+            instructions += "[tool_name(param=\"value\")]\n\n";  // concrete, not <angle> (RUN-80)
+            instructions += "RULES:\n";
+            instructions +=
+                "1. Call a tool only when it is needed; for greetings or general chat, respond "
+                "normally without tools\n";
+            instructions += "2. Use Python-style function call syntax in square brackets, no tags\n";
             instructions += "3. String values MUST be quoted with double quotes\n";
             instructions += "4. Multiple arguments are separated by commas";
             break;
@@ -2708,24 +2927,17 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         case RAC_TOOL_FORMAT_DEFAULT:
         default:
             // Default SDK format
-            instructions += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
+            instructions += "TOOL CALLING FORMAT:\n";
+            instructions += "To call a tool, output exactly one call in this format:\n";
             instructions +=
-                "When you need to use a tool, output ONLY this (no other text before or after):\n";
-            instructions +=
-                "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": "
-                "\"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
-
-            instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
-            instructions +=
-                "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", "
-                "\"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
-            instructions +=
-                "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", "
-                "\"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
+                "<tool_call>{\"tool\": \"<tool_name>\", \"arguments\": {\"<param>\": "
+                "\"<value>\"}}</tool_call>\n\n";
 
             instructions += "RULES:\n";
-            instructions += "1. For greetings or general chat, respond normally without tools\n";
-            instructions += "2. When using a tool, output ONLY the <tool_call> tag, nothing else\n";
+            instructions +=
+                "1. Call a tool only when it is needed; for greetings or general chat, respond "
+                "normally without tools\n";
+            instructions += "2. When you call a tool, output only the <tool_call> tag for it\n";
             instructions += "3. Use the exact parameter names shown in the tool definitions above";
             break;
     }
@@ -2739,52 +2951,34 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
 static std::string get_format_example_json(rac_tool_call_format_t format) {
     std::string example;
 
+    // Format skeleton ONLY — a neutral placeholder that shows the required shape.
+    // The hardcoded weather/calculate few-shot examples were removed: they biased
+    // small models toward calling those exact tools (and toward calling at all)
+    // even when the caller's tools were different or no tool was needed (RUN-80).
     switch (format) {
         case RAC_TOOL_FORMAT_LFM2:
-            // LFM2 format - enhanced with more math examples for better reliability
             example += "## OUTPUT FORMAT\n";
-            example += "You MUST respond with ONLY a tool call in this exact format:\n";
-            example += "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n\n";
-            example +=
-                "CRITICAL: Always include the FULL format with <|tool_call_start|> and "
-                "<|tool_call_end|> tags.\n\n";
-            example += "## EXAMPLES\n";
-            example += "Q: What's the weather in NYC?\n";
-            example +=
-                "A: <|tool_call_start|>[get_weather(location=\"New York\")]<|tool_call_end|>\n\n";
-            example += "Q: weather in sf\n";
-            example +=
-                "A: <|tool_call_start|>[get_weather(location=\"San "
-                "Francisco\")]<|tool_call_end|>\n\n";
-            example += "Q: calculate 2+2\n";
-            example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n\n";
-            example += "Q: What's 5*10?\n";
-            example +=
-                "A: <|tool_call_start|>[calculate(expression=\"5*10\")]<|tool_call_end|>\n\n";
-            example += "Q: What is 100/4?\n";
-            example += "A: <|tool_call_start|>[calculate(expression=\"100/4\")]<|tool_call_end|>\n";
+            example += "A tool call has exactly this shape:\n";
+            example += "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n";
+            break;
+
+        case RAC_TOOL_FORMAT_PYTHONIC:
+            example += "## OUTPUT FORMAT\n";
+            example += "A tool call has exactly this shape (square brackets, no tags):\n";
+            // CONCRETE placeholders, NOT `<angle>` ones: device-proven (S25/v79, qwen3-0.6b)
+            // that `<tool_name>`-style placeholders prime the model to emit a markdown-ish
+            // `[name](args)` (bracket closes after the name) that the bare parser rejects;
+            // `tool_name`/`param` yields clean `[name(args)]` for every tool. RUN-80.
+            example += "[tool_name(param=\"value\")]\n";
             break;
 
         case RAC_TOOL_FORMAT_DEFAULT:
         default:
             example += "## OUTPUT FORMAT\n";
-            example += "You MUST respond with ONLY a tool call in this exact format:\n";
+            example += "A tool call has exactly this shape:\n";
             example +=
                 "<tool_call>{\"tool\": \"<tool_name>\", \"arguments\": {\"<param>\": "
-                "\"<value>\"}}</tool_call>\n\n";
-            example += "## EXAMPLES\n";
-            example += "Q: What's the weather in NYC?\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"New "
-                "York\"}}</tool_call>\n\n";
-            example += "Q: weather in sf\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San "
-                "Francisco\"}}</tool_call>\n\n";
-            example += "Q: calculate 2+2\n";
-            example +=
-                "A: <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": "
-                "\"2+2\"}}</tool_call>\n";
+                "\"<value>\"}}</tool_call>\n";
             break;
     }
 
@@ -2890,19 +3084,20 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += get_format_example_json(actual_format);
 
     prompt += "\n\n## RULES\n";
-    prompt += "- Weather question = call get_weather\n";
-    prompt +=
-        "- Math/calculation question (add, subtract, multiply, divide, \"what's X*Y\", etc.) = "
-        "call calculate with the EXPRESSION as a string\n";
-    prompt += "- Time question = call get_current_time\n";
-    prompt +=
-        "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
+    prompt += "- Call a tool only when it is needed to answer; otherwise reply normally.\n";
+    prompt += "- Use only the tools listed above, with their exact names and parameters.\n";
 
-    // Format-specific tag instructions
+    // Format-specific tag instructions (the parser keys on these exact tags, so a
+    // tool call must always be wrapped in them — but this does NOT mean a tool must
+    // be called; it only describes the shape of a call when one is made).
     if (actual_format == RAC_TOOL_FORMAT_LFM2) {
-        prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
+        prompt += "- When you call a tool, wrap it in <|tool_call_start|> and <|tool_call_end|>.\n";
+    } else if (actual_format == RAC_TOOL_FORMAT_PYTHONIC) {
+        prompt +=
+            "- When you call a tool, write it as [tool_name(param=\"value\")] with square "
+            "brackets and NO other tags.\n";
     } else {
-        prompt += "- ALWAYS include <tool_call> and </tool_call> tags.\n";
+        prompt += "- When you call a tool, wrap it in <tool_call> and </tool_call>.\n";
     }
 
     RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", (int)actual_format,
@@ -2966,20 +3161,16 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     std::string full_prompt;
     full_prompt.reserve(2048);
 
-    // Add system prompt if provided
+    // Add the caller's system prompt if provided. Its placement is the same either
+    // way; whether it REPLACES the tool-instruction body is decided just below.
     if (options && options->system_prompt) {
-        if (options->replace_system_prompt != 0) {
-            // Replace entirely - just use the system prompt
-            full_prompt += options->system_prompt;
-            full_prompt += "\n\n";
-        } else {
-            // Append tool instructions after system prompt
-            full_prompt += options->system_prompt;
-            full_prompt += "\n\n";
-        }
+        full_prompt += options->system_prompt;
+        full_prompt += "\n\n";
     }
 
-    // Add tools prompt (unless replace_system_prompt is true and we already have system_prompt)
+    // Add the tools body UNLESS the caller opted to own the whole prompt
+    // (replace_system_prompt set together with a system_prompt). In that case the
+    // caller's system prompt stands alone with no auto-injected tool guidance.
     if (options == nullptr || options->replace_system_prompt == 0 ||
         options->system_prompt == nullptr) {
         if (tools_prompt && strlen(tools_prompt) > 0) {

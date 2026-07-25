@@ -1,4 +1,4 @@
-import { Colors } from '../theme/colors';
+import { frameworkColors } from '../theme/system/colors';
 import { QHexRT } from '@runanywhere/qhexrt';
 import type { IconName } from '../theme/system/icons';
 import {
@@ -15,33 +15,33 @@ export const getFrameworkColor = (
 ): string => {
   switch (framework) {
     case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-      return Colors.frameworkLlamaCpp;
+      return frameworkColors.llamaCpp;
     case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
-      return Colors.frameworkPiperTTS;
+      return frameworkColors.piperTTS;
     case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-      return Colors.frameworkFoundationModels;
+      return frameworkColors.foundationModels;
     case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-      return Colors.frameworkCoreML;
+      return frameworkColors.coreml;
     case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-      return Colors.frameworkONNX;
+      return frameworkColors.onnx;
     case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-      return Colors.frameworkSystemTTS;
+      return frameworkColors.systemTTS;
     case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
-      return Colors.frameworkTFLite;
+      return frameworkColors.tflite;
     case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
     case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT:
-      return Colors.primaryPurple;
+      return frameworkColors.mlx;
     case InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
     case InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
-      return Colors.primaryOrange;
+      return frameworkColors.executorch;
     case InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
-      return Colors.primaryGreen;
+      return frameworkColors.picoLLM;
     case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
     case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
     case InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
-      return Colors.primaryBlue;
+      return frameworkColors.generic;
     default:
-      return Colors.primaryBlue;
+      return frameworkColors.generic;
   }
 };
 

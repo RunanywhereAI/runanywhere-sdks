@@ -53,10 +53,26 @@ rac_result_t acquire_lifecycle_llm(LifecycleLlmRef* out_ref) {
         out_ref->model_id = (*token)->model_id.c_str();
         out_ref->framework_name = (*token)->framework_name.c_str();
         out_ref->supports_lora = (*token)->model.supports_lora();
+        // Backend capability, gated on the framework enum: only QHexRT currently
+        // consumes rac_llm_options_t.grammar (on-device grammar-constrained
+        // decoding). Every other engine leaves this false, so the grammar attach
+        // in the tool-calling loop is a no-op for llama.cpp/onnx/cloud.
+        out_ref->supports_grammar =
+            (*token)->framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT;
     }
     out_ref->opaque = token.release();
     return RAC_SUCCESS;
 #endif
+}
+
+bool lifecycle_llm_supports_grammar() {
+    LifecycleLlmRef ref;
+    if (acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
+        return false;
+    }
+    const bool supported = ref.supports_grammar;
+    release_lifecycle_llm(&ref);
+    return supported;
 }
 
 void release_lifecycle_llm(LifecycleLlmRef* ref) {
@@ -371,6 +387,46 @@ rac_result_t acquire_lifecycle_diffusion(LifecycleDiffusionRef* out_ref) {
 }
 
 void release_lifecycle_diffusion(LifecycleDiffusionRef* ref) {
+#if defined(RAC_HAVE_PROTOBUF)
+    release_component(ref);
+#else
+    if (ref)
+        *ref = {};
+#endif
+}
+
+rac_result_t acquire_lifecycle_diarization(LifecycleDiarizationRef* out_ref) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    if (out_ref)
+        *out_ref = {};
+    return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
+#else
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_SPEAKER_DIARIZATION, out_ref,
+                             &LoadedModel::diarization_ops);
+#endif
+}
+
+void release_lifecycle_diarization(LifecycleDiarizationRef* ref) {
+#if defined(RAC_HAVE_PROTOBUF)
+    release_component(ref);
+#else
+    if (ref)
+        *ref = {};
+#endif
+}
+
+rac_result_t acquire_lifecycle_segmentation(LifecycleSegmentationRef* out_ref) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    if (out_ref)
+        *out_ref = {};
+    return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
+#else
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_SEMANTIC_SEGMENTATION, out_ref,
+                             &LoadedModel::segmentation_ops);
+#endif
+}
+
+void release_lifecycle_segmentation(LifecycleSegmentationRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else

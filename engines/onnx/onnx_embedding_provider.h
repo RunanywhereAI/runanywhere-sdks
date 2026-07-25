@@ -36,8 +36,11 @@ class ONNXEmbeddingProvider {
     ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept;
     ONNXEmbeddingProvider& operator=(ONNXEmbeddingProvider&&) noexcept;
 
-    std::vector<float> embed(const std::string& text);
-    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts);
+    // out_total_tokens (optional): receives the real, non-padding token count
+    // consumed across the input(s). Nullptr-safe; existing callers are unaffected.
+    std::vector<float> embed(const std::string& text, size_t* out_total_tokens = nullptr);
+    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts,
+                                                size_t* out_total_tokens = nullptr);
     size_t dimension() const noexcept;
     bool is_ready() const noexcept;
     const char* name() const noexcept;

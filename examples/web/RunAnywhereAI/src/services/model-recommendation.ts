@@ -39,9 +39,26 @@ export interface RecommendedSelection {
  * list and keeps the first entries that exist and fit the memory budget.
  */
 const LLM_PREFERENCE_BY_TIER: Record<HardwareTier, readonly string[]> = {
-  high: ['qwen3-4b-q4_k_m', 'qwen3-0.6b-q4_k_m', 'qwen2.5-0.5b-instruct-q6_k', 'lfm2-350m-q4_k_m'],
-  mid: ['qwen2.5-0.5b-instruct-q6_k', 'qwen3-0.6b-q4_k_m', 'lfm2-350m-q4_k_m', 'smollm2-360m-q8_0'],
-  low: ['lfm2-350m-q4_k_m', 'qwen3-0.6b-q4_k_m', 'smollm2-360m-q8_0'],
+  // Prefer PrismML Bonsai on mid/high tiers — tiny on-disk footprint for the
+  // quality class (1-bit Q1_0). 27B stays out of recommendations (WASM-blocked).
+  high: [
+    'bonsai-4b-q1_0',
+    'bonsai-8b-q1_0',
+    'bonsai-1.7b-q1_0',
+    'qwen3-4b-q4_k_m',
+    'qwen3-0.6b-q4_k_m',
+    'qwen2.5-0.5b-instruct-q6_k',
+    'lfm2-350m-q4_k_m',
+  ],
+  mid: [
+    'bonsai-1.7b-q1_0',
+    'bonsai-4b-q1_0',
+    'qwen2.5-0.5b-instruct-q6_k',
+    'qwen3-0.6b-q4_k_m',
+    'lfm2-350m-q4_k_m',
+    'smollm2-360m-q8_0',
+  ],
+  low: ['bonsai-1.7b-q1_0', 'lfm2-350m-q4_k_m', 'qwen3-0.6b-q4_k_m', 'smollm2-360m-q8_0'],
 };
 
 /** VLM companion preference per tier (smallest first on low-RAM devices). */

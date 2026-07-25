@@ -23,10 +23,10 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 /**
  * SDK environment mode — determines how data is handled.
  *
- * Use the proto enum cases directly:
+ * Product surface (use these):
  * - `SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT`
- * - `SDKEnvironment.SDK_ENVIRONMENT_STAGING`
  * - `SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION`
+ *
  */
 typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
 
@@ -39,15 +39,13 @@ typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
 // `Companion.fromWireString` factory).
 
 /**
- * Legacy C-ABI integer (0 = development, 1 = staging, 2 = production).
- * Kept so the JNI `rac_environment_t` mapping continues to compile
- * unchanged; new code should prefer `toString()` / `wireString` instead.
+ * Legacy C-ABI integer (0 = development, 2 = production).
+ * Reserved staging wire value (1) maps to production.
  */
 val SDKEnvironment.cEnvironment: Int
     get() =
         when (this) {
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> 0
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> 1
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> 2
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> 0
         }
@@ -57,7 +55,6 @@ val SDKEnvironment.description: String
     get() =
         when (this) {
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "Development Environment"
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> "Staging Environment"
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "Production Environment"
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "Unspecified Environment"
         }
@@ -66,7 +63,6 @@ val deployableSDKEnvironments: List<SDKEnvironment>
     get() =
         listOf(
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING,
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         )
 
@@ -92,7 +88,6 @@ val SDKEnvironment.defaultLogLevel: LogLevel
     get() =
         when (this) {
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.LOG_LEVEL_DEBUG
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.LOG_LEVEL_INFO
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.LOG_LEVEL_WARNING
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.LOG_LEVEL_INFO
         }
@@ -118,10 +113,10 @@ private fun isSDKDebugBuild(): Boolean =
  * (`sdk/runanywhere-swift/Sources/RunAnywhere/Public/Configuration/SDKEnvironment.swift`):
  *
  * - [apiKey] — backend API key for authentication.
- * - [baseURL] — backend API base URL. Required for staging/production; a
+ * - [baseURL] — backend API base URL. Required for production; a
  *   development placeholder is used when the development convenience
  *   constructor is invoked.
- * - [environment] — environment mode (development/staging/production).
+ * - [environment] — environment mode (development/production).
  * All three Swift convenience initializers are surfaced as Kotlin factories
  * on the companion object so the call shape mirrors Swift line-for-line.
  */
@@ -139,9 +134,9 @@ data class SDKInitParams(
         const val DEVELOPMENT_PLACEHOLDER_URL: String = "https://dev.runanywhere.local"
 
         /**
-         * Create initialization parameters for staging or production. Throws
-         * [SDKException] when [apiKey] or [baseURL] fail validation against
-         * the configured [environment].
+         * Create initialization parameters for production (or an explicit
+         * environment). Throws [SDKException] when [apiKey] or [baseURL] fail
+         * validation against the configured [environment].
          *
          * Mirrors Swift's
          * `init(apiKey:baseURL:environment:)` (URL-typed) — Kotlin folds the

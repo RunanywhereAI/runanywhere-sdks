@@ -9,13 +9,16 @@
 #ifndef RUNANYWHERE_SWIFT_MLX_RUNTIME_RAC_MLX_FORWARDING_H
 #define RUNANYWHERE_SWIFT_MLX_RUNTIME_RAC_MLX_FORWARDING_H
 
-#if __has_include("rac/backends/rac_mlx.h")
-#include "rac/backends/rac_mlx.h"
-#elif __has_include("../../../../runanywhere-commons/include/rac/backends/rac_mlx.h")
-// Packaging-only builds intentionally omit the RACommons binary so the
-// resulting static runtime resolves against the application's single Commons
-// registry. Read the canonical source header without copying its ABI here.
+#if __has_include("../../../../runanywhere-commons/include/rac/backends/rac_mlx.h")
+// In-repo builds must prefer the canonical source header. The local
+// RACommons XCFramework can legitimately lag while a coordinated callback ABI
+// change is being compiled and tested; selecting its packaged copy first
+// would make Swift see the previous struct layout.
 #include "../../../../runanywhere-commons/include/rac/backends/rac_mlx.h"
+#elif __has_include("rac/backends/rac_mlx.h")
+// Published/package-only builds do not carry the source tree. Resolve against
+// the RACommons XCFramework header that the application links.
+#include "rac/backends/rac_mlx.h"
 #else
 #error "RunAnywhere MLX callback ABI header not found"
 #endif

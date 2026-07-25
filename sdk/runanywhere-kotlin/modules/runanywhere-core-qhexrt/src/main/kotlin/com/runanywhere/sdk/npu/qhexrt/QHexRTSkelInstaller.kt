@@ -43,8 +43,7 @@ internal object QHexRTSkelInstaller {
                             // resolves it by name via ADSP_LIBRARY_PATH, so it must be
                             // installed into the skel dir alongside the QNN skels.
                             it == "librun_main_on_hexagon_skel.so"
-                    }
-                    .orEmpty()
+                    }.orEmpty()
                     .sorted()
             if (skelNames.isEmpty()) {
                 logger.warning("QHexRT DSP skel assets missing at $assetDir")

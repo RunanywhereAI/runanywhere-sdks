@@ -144,7 +144,6 @@ template <>
 }
 enum SdkInitEnvironment : int {
   SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0,
-  SDK_INIT_ENVIRONMENT_STAGING = 1,
   SDK_INIT_ENVIRONMENT_PRODUCTION = 2,
   SdkInitEnvironment_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
@@ -158,7 +157,7 @@ inline constexpr SdkInitEnvironment SdkInitEnvironment_MIN =
 inline constexpr SdkInitEnvironment SdkInitEnvironment_MAX =
     static_cast<SdkInitEnvironment>(2);
 [[nodiscard]] inline bool SdkInitEnvironment_IsValid(int value) {
-  return 0 <= value && value <= 2;
+  return 0 <= value && value <= 2 && ((5u >> value) & 1) != 0;
 }
 inline constexpr int SdkInitEnvironment_ARRAYSIZE = 2 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL

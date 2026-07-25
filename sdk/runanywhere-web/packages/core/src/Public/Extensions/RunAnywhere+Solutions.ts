@@ -17,6 +17,10 @@ import {
   SolutionHandle,
   type SolutionRunInput,
 } from '../../Adapters/SolutionAdapter.js';
+import {
+  SolutionModuleCoordinator,
+  type SolutionModuleResolution,
+} from '../../Adapters/SolutionModuleCoordinator.js';
 
 /**
  * `RunAnywhere.solutions` capability accessor.
@@ -34,5 +38,6 @@ export const solutions = {
   },
 };
 
-export { SolutionHandle, SolutionAdapter };
+export { SolutionHandle, SolutionAdapter, SolutionModuleCoordinator };
 export type { SolutionConfig, SolutionRunInput };
+export type { SolutionModuleResolution };

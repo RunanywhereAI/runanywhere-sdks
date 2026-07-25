@@ -340,6 +340,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     out_result->prompt_tokens = result.prompt_tokens;
     out_result->total_tokens = result.prompt_tokens + result.tokens_generated;
     out_result->time_to_first_token_ms = 0;
+    out_result->prompt_eval_time_ms = static_cast<int64_t>(result.prompt_eval_time_ms);
     out_result->total_time_ms = result.inference_time_ms;
     out_result->tokens_per_second =
         result.tokens_generated > 0 && result.inference_time_ms > 0

@@ -9,7 +9,6 @@
  *
  * All cross-platform HTTP policy lives in commons:
  *   - `rac_http_default_headers`         → canonical SDK header list
- *   - `rac_http_request_set_upsert_mode` → Supabase upsert semantics
  *   - `rac_api_error_from_response`      → HTTP-status → SDKException
  *
  * SDK-level HTTP requests (auth, device registration, telemetry) route
@@ -75,27 +74,14 @@ internal data class ApiErrorInfo(
 public object HTTPClientAdapter {
     private const val DEFAULT_TIMEOUT_MS: Int = 30_000
 
-    /**
-     * Supabase device-registration endpoint marker (mirrors Swift's
-     * `RAC_ENDPOINT_DEV_DEVICE_REGISTER` =
-     * `"/rest/v1/sdk_devices"`). Path-substring match triggers the
-     * upsert-mode rewrite on the C side.
-     */
-    private const val DEV_DEVICE_REGISTER_MARKER: String = "/rest/v1/sdk_devices"
-
-    /**
-     * Conflict-key column for the device-registration upsert (mirrors
-     * Swift's `"device_id"` literal passed to
-     * `rac_http_request_set_upsert_mode`).
-     */
-    private const val DEV_DEVICE_REGISTER_UPSERT_FIELD: String = "device_id"
-
     private val logger = SDKLogger("HTTPClientAdapter")
     private val stateLock = Any()
 
     private data class Configuration(
         val baseURL: String,
-        val apiKey: String,
+        // Null in keyless staging: requests go out unauthenticated and the
+        // backend attributes them to the PUBLIC org.
+        val apiKey: String?,
     )
 
     @Volatile private var configuration: Configuration? = null
@@ -108,16 +94,20 @@ public object HTTPClientAdapter {
      * by Swift's `CppBridge.DevConfig`. On invalid input the adapter is
      * left unconfigured rather than throwing.
      */
-    public suspend fun configure(baseURL: String, apiKey: String) {
-        val trimmedKey = apiKey.trim()
+    public suspend fun configure(baseURL: String, apiKey: String?) {
+        val trimmedKey = apiKey?.trim()
         synchronized(stateLock) {
-            if (!isUsableHTTPURL(baseURL) || !isUsableCredential(trimmedKey)) {
+            if (!isUsableHTTPURL(baseURL)) {
                 configuration = null
                 logger.info("HTTP adapter not configured: no usable external config")
                 return
             }
-            configuration = Configuration(baseURL = baseURL.trimEnd('/'), apiKey = trimmedKey)
-            logger.info("HTTP adapter configured with base URL: ${urlForLog(baseURL)}")
+            val usableKey = trimmedKey?.takeIf { isUsableCredential(it) }
+            configuration = Configuration(baseURL = baseURL.trimEnd('/'), apiKey = usableKey)
+            logger.info(
+                "HTTP adapter configured with base URL: ${urlForLog(baseURL)}" +
+                    if (usableKey == null) " (keyless)" else "",
+            )
         }
     }
 
@@ -139,7 +129,8 @@ public object HTTPClientAdapter {
     public val hasUsableConfiguration: Boolean
         get() {
             val snapshot = configuration ?: return false
-            return isUsableHTTPURL(snapshot.baseURL) && isUsableCredential(snapshot.apiKey)
+            // A usable URL is enough — keyless staging sends unauthenticated.
+            return isUsableHTTPURL(snapshot.baseURL)
         }
 
     // Public request surface
@@ -179,7 +170,7 @@ public object HTTPClientAdapter {
         url: String,
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): ByteArray {
-        val headers = buildHeaders(apiKey = null, authToken = null, upsert = false)
+        val headers = buildHeaders(apiKey = null, authToken = null)
         val result =
             platformExecuteHttp(
                 method = "GET",
@@ -205,47 +196,27 @@ public object HTTPClientAdapter {
         val url = buildURL(base = snapshot.baseURL, path = path)
         val token = resolveToken(requiresAuth = requiresAuth, apiKey = snapshot.apiKey)
         requireCurrentConfiguration(snapshot)
-        val isUpsert = path.contains(DEV_DEVICE_REGISTER_MARKER)
 
         val headers =
             buildHeaders(
                 apiKey = snapshot.apiKey,
                 authToken = token.ifEmpty { null },
-                upsert = isUpsert,
             )
 
-        val headerKeys = headers.keys.toTypedArray()
-        val headerValues = headers.values.toTypedArray()
-
         val result =
-            if (isUpsert) {
-                // Supabase upsert path — defer URL + Prefer header rewrite
-                // to commons via `rac_http_request_set_upsert_mode`.
-                platformExecuteHttpUpsert(
-                    method = method,
-                    url = url,
-                    headerKeys = headerKeys,
-                    headerValues = headerValues,
-                    body = body,
-                    timeoutMs = DEFAULT_TIMEOUT_MS,
-                    // Control-plane requests carry the API key and may also
-                    // contain device-registration metadata/build tokens.
-                    // Fail on redirects so no custom credential or payload is
-                    // replayed to a different origin.
-                    followRedirects = false,
-                    onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
-                )
-            } else {
-                platformExecuteHttp(
-                    method = method,
-                    url = url,
-                    headerKeys = headerKeys,
-                    headerValues = headerValues,
-                    body = body,
-                    timeoutMs = DEFAULT_TIMEOUT_MS,
-                    followRedirects = false,
-                )
-            }
+            platformExecuteHttp(
+                method = method,
+                url = url,
+                headerKeys = headers.keys.toTypedArray(),
+                headerValues = headers.values.toTypedArray(),
+                body = body,
+                timeoutMs = DEFAULT_TIMEOUT_MS,
+                // Control-plane requests carry the API key and may also
+                // contain device-registration metadata/build tokens. Fail on
+                // redirects so no custom credential or payload is replayed to
+                // a different origin.
+                followRedirects = false,
+            )
         requireCurrentConfiguration(snapshot)
         return interpretResult(result, method = method, url = url)
     }
@@ -263,12 +234,13 @@ public object HTTPClientAdapter {
      *  - When auth is required and a valid token is available → use it.
      *  - Otherwise fall back to the API key, throwing if none is set.
      */
-    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String): String {
-        if (!requiresAuth) return apiKey
+    private suspend fun resolveToken(requiresAuth: Boolean, apiKey: String?): String {
+        if (!requiresAuth) return apiKey ?: ""
         val token = platformResolveAuthToken()
         if (!token.isNullOrEmpty()) return token
-        if (apiKey.isNotEmpty()) return apiKey
-        throw SDKException.authenticationFailed(reason = "No valid authentication token")
+        // Keyless staging: no token and no key means the request goes out
+        // unauthenticated (the backend attributes it to the PUBLIC org)
+        return apiKey ?: ""
     }
 
     /**
@@ -354,7 +326,6 @@ public object HTTPClientAdapter {
     private fun buildHeaders(
         apiKey: String?,
         authToken: String?,
-        upsert: Boolean,
     ): LinkedHashMap<String, String> {
         val headers = LinkedHashMap<String, String>(8)
         val canonical = platformDefaultHeaders()
@@ -377,13 +348,6 @@ public object HTTPClientAdapter {
         headers["X-Platform"] = SDK_PLATFORM
         if (apiKey != null) {
             headers["apikey"] = apiKey
-            // Supabase PostgREST: include the inserted/updated row in
-            // the response body. Mirrors Swift's identical line.
-            // For upserts, the commons-side `rac_http_request_set_upsert_mode`
-            // rewrites this header to add `resolution=merge-duplicates`.
-            if (!upsert) {
-                headers["Prefer"] = "return=representation"
-            }
         }
         if (authToken != null) {
             headers["Authorization"] = "Bearer $authToken"
@@ -475,39 +439,6 @@ internal suspend fun platformExecuteHttp(
         nativeHttpResponseToResult(resp)
     }
 
-@Suppress("UnusedParameter")
-internal suspend fun platformExecuteHttpUpsert(
-    method: String,
-    url: String,
-    headerKeys: Array<String>,
-    headerValues: Array<String>,
-    body: ByteArray?,
-    timeoutMs: Int,
-    followRedirects: Boolean,
-    onConflictField: String,
-): HttpExecutionResult =
-    withContext(Dispatchers.IO) {
-        // The commons C API does not expose an upsert-mode HTTP variant, so
-        // the upsert request is emitted via the standard execute path with
-        // a Kotlin-side Prefer-header rewrite to advertise the Supabase
-        // `resolution=merge-duplicates` policy expected by PostgREST. The
-        // `onConflictField` is informational only at this layer; the
-        // caller is responsible for appending any `?on_conflict={field}`
-        // URL query argument.
-        val (rewrittenKeys, rewrittenValues) = rewriteForUpsertFallback(headerKeys, headerValues)
-        val resp =
-            RunAnywhereBridge.racHttpRequestExecute(
-                method = method,
-                url = url,
-                headerKeys = rewrittenKeys,
-                headerValues = rewrittenValues,
-                body = body,
-                timeoutMs = timeoutMs,
-                followRedirects = followRedirects,
-            )
-        nativeHttpResponseToResult(resp)
-    }
-
 internal fun platformDefaultHeaders(): List<Pair<String, String>>? {
     return try {
         val flat = RunAnywhereBridge.racHttpDefaultHeaders() ?: return null
@@ -580,34 +511,4 @@ private fun nativeHttpResponseToResult(resp: NativeHttpResponse?): HttpExecution
             transportError = null,
         )
     }
-}
-
-/**
- * Kotlin-side Supabase upsert rewrite. Commons does not expose an
- * upsert-mode HTTP variant, so the Prefer header is rewritten here to
- * advertise the `resolution=merge-duplicates` policy expected by
- * PostgREST. The URL `?on_conflict={field}` query argument is not
- * appended at this layer — the caller owns URL construction.
- */
-private fun rewriteForUpsertFallback(
-    keys: Array<String>,
-    values: Array<String>,
-): Pair<Array<String>, Array<String>> {
-    val outKeys = keys.copyOf().toMutableList()
-    val outValues = values.copyOf().toMutableList()
-    var preferIdx = -1
-    for (i in outKeys.indices) {
-        if (outKeys[i].equals("Prefer", ignoreCase = true)) {
-            preferIdx = i
-            break
-        }
-    }
-    val upsertPrefer = "resolution=merge-duplicates,return=representation"
-    if (preferIdx >= 0) {
-        outValues[preferIdx] = upsertPrefer
-    } else {
-        outKeys.add("Prefer")
-        outValues.add(upsertPrefer)
-    }
-    return outKeys.toTypedArray() to outValues.toTypedArray()
 }

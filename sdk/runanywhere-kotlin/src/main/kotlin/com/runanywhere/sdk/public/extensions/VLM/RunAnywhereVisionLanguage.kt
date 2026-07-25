@@ -157,6 +157,17 @@ fun RunAnywhere.processImageStream(
         }
     }
 
+/**
+ * Ergonomic overload mirroring Swift `processImageStream(_:prompt:options:)`
+ * and React Native: the prompt is applied onto `options.prompt` before
+ * streaming.
+ */
+fun RunAnywhere.processImageStream(
+    image: RAVLMImage,
+    prompt: String,
+    options: RAVLMGenerationOptions = RAVLMGenerationOptions.defaults(),
+): Flow<RAVLMStreamEvent> = processImageStream(image, options.copy(prompt = prompt))
+
 // MARK: - Generation Control
 
 suspend fun RunAnywhere.cancelVLMGeneration() {

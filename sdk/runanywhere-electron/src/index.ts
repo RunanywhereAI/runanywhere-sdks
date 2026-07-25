@@ -1,5 +1,5 @@
 // @runanywhere/electron — on-device LLM / VLM / STT / TTS / embeddings for
-// Electron & Node, over the Hexagon-ready native addon (Windows-first).
+// Electron & Node, over the Windows-first native addon (QHexRT NPU seam open).
 export {
   RunAnywhere,
   LLMModel,
@@ -23,7 +23,7 @@ export type {
   Environment,
   VadOptions,
 } from './RunAnywhere';
-export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException } from './errors';
+export { SDKException, ErrorCode, ErrorCategory, isSDKException, asSDKException, raiseForRac } from './errors';
 export { EventBus } from './events';
 export type {
   RunAnywhereEvent,
@@ -37,6 +37,8 @@ export type {
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
+export { splitThinking, stripThinking, isThinking } from './thinking';
+export type { ThinkingSplit } from './thinking';
 export { streamWithMetrics } from './stream';
 export {
   float32ToPcm16,
@@ -64,3 +66,21 @@ export { CATALOG, isCatalogId } from './catalog';
 export type { CatalogEntry, ModelType } from './catalog';
 export { resolveModel, downloadFile, modelsRoot } from './download';
 export type { DownloadProgress, ResolvedModel } from './download';
+export {
+  RagSession,
+  createRagSessionFromCatalog,
+  frameworkForModelPath,
+  RagModelCategory,
+  RagInferenceFramework,
+} from './rag';
+export type {
+  RagConfig,
+  RagDoc,
+  RagQuery,
+  RagResult,
+  RagChunk,
+  RagStats,
+  RagBridge,
+  RagCatalogBridge,
+  RagResolvedModel,
+} from './rag';

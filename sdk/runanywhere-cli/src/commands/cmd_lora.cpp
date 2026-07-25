@@ -15,7 +15,9 @@
 #include <string>
 
 #include "lora_options.pb.h"
+#include "model_types.pb.h"
 #include "rac/core/rac_core.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/lora/rac_lora_service.h"
 
 #include "io/output.h"
@@ -146,6 +148,82 @@ int run_lora_list(const GlobalOptions &options) {
   return 0;
 }
 
+// Load an LLM through the model-lifecycle service so rac_lora_apply_proto can
+// acquire it. validate_availability=true auto-pulls the model if missing.
+bool load_llm_for_lora(const GlobalOptions &options, const std::string &model_id) {
+  v1::ModelLoadRequest request;
+  request.set_model_id(model_id);
+  request.set_category(v1::MODEL_CATEGORY_LANGUAGE);
+  request.set_validate_availability(true);
+
+  const std::string bytes = proto::serialize(request);
+  rac_proto_buffer_t out_buffer;
+  rac_proto_buffer_init(&out_buffer);
+  std::string error;
+  v1::ModelLoadResult result;
+  if (rac_model_lifecycle_load_proto(rac_get_model_registry(),
+                                     reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size(),
+                                     &out_buffer) != RAC_SUCCESS ||
+      !proto::parse_proto_buffer(&out_buffer, &result, &error)) {
+    out::error_line("LLM load failed: " + error);
+    return false;
+  }
+  if (!result.success()) {
+    out::error_line("LLM load failed: " +
+                    (result.error_message().empty() ? "unknown error" : result.error_message()));
+    return false;
+  }
+  return true;
+}
+
+int run_lora_apply(const GlobalOptions &options, const std::string &model_id,
+                   const std::string &adapter_path, float scale) {
+  Bootstrapped env;
+  if (bootstrap(options, &env) != RAC_SUCCESS) {
+    return 1;
+  }
+  if (!load_llm_for_lora(options, model_id)) {
+    return 1;
+  }
+
+  v1::LoRAApplyRequest request;
+  request.set_replace_existing(true);
+  v1::LoRAAdapterConfig *adapter = request.add_adapters();
+  adapter->set_adapter_path(adapter_path);
+  adapter->set_scale(scale);
+
+  const std::string request_bytes = proto::serialize(request);
+  rac_proto_buffer_t out_buffer;
+  rac_proto_buffer_init(&out_buffer);
+  const rac_result_t rc = rac_lora_apply_proto(
+      reinterpret_cast<const uint8_t *>(request_bytes.data()), request_bytes.size(), &out_buffer);
+  v1::LoRAApplyResult result;
+  std::string error;
+  if (!proto::parse_proto_buffer(&out_buffer, &result, &error) || rc != RAC_SUCCESS) {
+    out::error_line("apply failed: " + error);
+    return 1;
+  }
+  if (!result.success()) {
+    out::error_line("apply failed: " +
+                    (result.error_message().empty() ? std::to_string(result.error_code())
+                                                     : result.error_message()));
+    return 1;
+  }
+
+  if (options.json) {
+    out::JsonWriter json;
+    json.begin_object()
+        .field("success", result.success())
+        .field("adapters", static_cast<int64_t>(result.adapters_size()))
+        .end_object();
+    out::result_line(json.str());
+  } else {
+    out::result_line("applied " + std::to_string(result.adapters_size()) + " adapter(s) to " +
+                     model_id);
+  }
+  return 0;
+}
+
 } // namespace
 
 void register_lora(CLI::App &app, GlobalOptions &options) {
@@ -168,6 +246,24 @@ void register_lora(CLI::App &app, GlobalOptions &options) {
       cmd->add_subcommand("list", "List registered LoRA adapters");
   list_cmd->callback([&options]() {
     const int exit_code = run_lora_list(options);
+    if (exit_code != 0) {
+      throw CLI::RuntimeError(exit_code);
+    }
+  });
+
+  CLI::App *apply_cmd = cmd->add_subcommand(
+      "apply", "Load an LLM and attach a LoRA adapter (.gguf) to it");
+  auto apply_model = std::make_shared<std::string>();
+  auto adapter_path = std::make_shared<std::string>();
+  auto scale = std::make_shared<float>(1.0f);
+  apply_cmd->add_option("adapter", *adapter_path, "Path to the adapter file (.gguf)")
+      ->required();
+  apply_cmd->add_option("--model,-m", *apply_model, "LLM model id to attach the adapter to")
+      ->required();
+  apply_cmd->add_option("--scale", *scale, "Adapter scale factor (default: 1.0)")
+      ->default_val(1.0f);
+  apply_cmd->callback([&options, apply_model, adapter_path, scale]() {
+    const int exit_code = run_lora_apply(options, *apply_model, *adapter_path, *scale);
     if (exit_code != 0) {
       throw CLI::RuntimeError(exit_code);
     }

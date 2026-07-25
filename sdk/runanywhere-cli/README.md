@@ -78,10 +78,61 @@ clear unsupported-backend error.
 | `rcli serve [model]` | OpenAI-compatible HTTP server (`/v1/chat/completions`, `/v1/models`, `/health`). LLM-only, one model per process |
 | `rcli backends` | Registered inference backends per primitive |
 | `rcli info` / `rcli version` | Environment / versions |
+| `rcli auth login` | Real control-plane handshake: API key → JWT, device registration, model-assignment fetch |
+| `rcli telemetry emit --modality <m>` | Emit model-free telemetry events of one modality through the real pipeline |
+| `rcli telemetry blast` | Emit events of all 12 modalities in one run and print a per-modality result table |
 
 Global flags: `--json` (one machine-readable document on stdout),
-`--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`.
+`--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`, plus the
+control-plane connection flags below.
 Exit codes: `0` ok · `1` runtime error · `2` usage error · `130` cancelled.
+
+## Control plane
+
+Two SDK environments:
+
+| Who | Flags | Auth | Backend |
+|---|---|---|---|
+| OSS / no key | `--environment development` (default) | Keyless | Baked staging backend → PUBLIC org |
+| Team testing | `--environment production --base-url <https://…> --api-key $KEY` | JWT | Your team backend |
+| Customers | `--environment production --api-key $KEY` | JWT | Production backend |
+
+| Flag | Env var | Meaning |
+|---|---|---|
+| `--environment <development\|production>` | `RUNANYWHERE_ENVIRONMENT` | `development` (default) = keyless OSS telemetry. `production` = API key + https. |
+| `--base-url <url>` | `RUNANYWHERE_BASE_URL` | Optional in development (baked staging URL in release builds). Required https for production. |
+| `--api-key <key>` | `RUNANYWHERE_API_KEY` | Required for production (≥ 10 chars). Omit for keyless development. |
+
+```console
+# OSS keyless blast → staging backend (PUBLIC org)
+# Unset ambient RUNANYWHERE_API_KEY or an invalid key will force a failed JWT login.
+$ unset RUNANYWHERE_API_KEY RUNANYWHERE_BASE_URL
+$ rcli --environment development \
+    --base-url "$STAGING_BASE_URL" \
+    telemetry blast --processing-ms 42.5
+# Release builds can omit --base-url (baked STAGING_BASE_URL).
+# CI gate: STAGING_BASE_URL=… ./scripts/ci/oss_keyless_telemetry_blast.sh
+
+# Team / customer authed path
+$ rcli --environment production \
+    --base-url https://api.example.com \
+    --api-key $KEY auth login
+
+$ rcli --environment production \
+    --base-url https://api.example.com \
+    --api-key $KEY telemetry blast
+MODALITY      RESULT    STATUS      RECEIVED    STORED    SKIPPED
+llm           ok        HTTP 200    1           1         0
+…                                            (one row per modality, 12 total)
+```
+
+- `auth login` runs the authenticated handshake (`/api/v1/auth/sdk/authenticate`
+  → `/api/v1/devices/register` → model assignments). Production only.
+- `telemetry emit|blast` drive the real commons telemetry pipeline to
+  `/api/v2/sdk/telemetry/{modality}`. Development is keyless (no JWT).
+  Production logs in first. Modalities: `llm stt tts vlm rag imagegen
+  embeddings vad voice lora model system`. Exit is non-zero when any POST
+  fails or any tracked event never reached the backend.
 
 ### `rcli run` REPL
 
