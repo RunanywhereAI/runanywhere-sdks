@@ -232,7 +232,7 @@ public enum DeviceInfoFactory {
             // IOKit's IOPSGetPowerSourceDescription returns an untyped CFDictionary.
             // swiftlint:disable avoid_any_type
             guard let description = IOPSGetPowerSourceDescription(snapshot, source)?
-                .takeUnretainedValue() as? [String: Any],
+                .takeUnretainedValue() as? NSDictionary,
                   description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else {
                 continue
             }
