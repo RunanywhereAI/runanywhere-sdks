@@ -141,6 +141,9 @@ object CppBridgeFileManager {
     fun checkStorage(requiredBytes: Long): Boolean =
         RunAnywhereBridge.racFileManagerCheckStorage(requiredBytes)
 
+    /** Free bytes on the same volume that owns the model base directory. */
+    fun availableSpace(): Long = File(CppBridgeModelPaths.getBaseDirectory()).freeSpace
+
     /**
      * Provides platform file I/O methods called by C++ via JNI.
      * Method signatures must match JNI expectations exactly.
@@ -191,10 +194,7 @@ object CppBridgeFileManager {
         }
 
         @Suppress("unused") // Called from JNI
-        fun getAvailableSpace(): Long {
-            val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
-            return baseDir.freeSpace
-        }
+        fun getAvailableSpace(): Long = CppBridgeFileManager.availableSpace()
 
         @Suppress("unused") // Called from JNI
         fun getTotalSpace(): Long {

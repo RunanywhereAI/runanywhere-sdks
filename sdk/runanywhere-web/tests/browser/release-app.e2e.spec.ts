@@ -34,7 +34,7 @@ import {
 } from './support/release-harness';
 
 const EXPECTED_ORIGIN = new URL(
-  process.env.RA_E2E_BASE_URL ?? 'http://127.0.0.1:43173',
+  process.env.RA_E2E_BASE_URL ?? 'http://localhost:43173',
 ).origin;
 const RELEASE_LOCAL_DIRECTORY = 'runanywhere-release-e2e';
 const RELEASE_LOCAL_PERMISSION_KEY = 'runanywhere-release-e2e-permission';
@@ -472,7 +472,7 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     }
   });
 
-  test('05 — keeps Bonsai visible but blocks its incompatible app runtime path', async ({ appPage }) => {
+  test('05 — keeps Bonsai 27B visible but explains why WebGPU cannot run it here', async ({ appPage }) => {
     await appPage.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForInteractive(appPage);
     await navigateTo(appPage, 'chat');
@@ -488,21 +488,24 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
     await expect(row).toBeVisible();
     const unavailable = row.locator('button[data-model-id="bonsai-27b-q1_0"]');
     await expect(unavailable).toBeDisabled();
-    await expect(unavailable).toHaveText('Unavailable in this app');
+    await expect(unavailable).toHaveText('Too large for Web WASM');
     await expect(unavailable).toHaveAttribute(
       'data-compatibility-code',
       'wasm32-address-space',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText('3.803 GB GGUF');
     await expect(row.locator('.model-compatibility-reason')).toContainText(
-      'current llama.cpp/WebGPU backend',
+      'llama.cpp path must stage the full',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText(
       '4 GiB WASM32 heap',
     );
     await expect(row.locator('.model-compatibility-reason')).toContainText('281 MiB');
+    await expect(row.locator('.model-compatibility-reason')).toContainText(
+      /WebGPU|webgpu/i,
+    );
     const reference = row.locator('.model-compatibility-reason a');
-    await expect(reference).toHaveText(/Experimental direct-WebGPU reference/);
+    await expect(reference).toHaveText(/PrismML direct-WebGPU demo/);
     await expect(reference).toHaveAttribute(
       'href',
       'https://huggingface.co/spaces/webml-community/bonsai-webgpu-kernels',
@@ -1432,10 +1435,10 @@ test.describe('RunAnywhere Web example — full Chromium release gate', () => {
 
   test('40 — indexes a real document and returns a grounded RAG answer', async ({ appPage }) => {
     // Reinstantiate the llama.cpp artifact after ONNX registration. This is a
-    // production path (explicit acceleration changes and Qwen VLM fallback)
-    // and previously let llama.cpp steal the embedding capability despite
-    // having no embedding vtable. RAG below proves ONNX lifecycle state and
-    // routing survive last-writer registration order.
+    // production path (explicit acceleration changes and Qwen VLM fallback).
+    // Both llama.cpp and ONNX now expose embeddings, so RAG below proves that
+    // framework-aware routing preserves the ONNX lifecycle regardless of
+    // registration order.
     const accelerationSwitch = await switchToOppositeAcceleration(appPage);
     expect(accelerationSwitch.active).toBe(accelerationSwitch.requested);
     expect(accelerationSwitch.active).not.toBe(accelerationSwitch.previous);

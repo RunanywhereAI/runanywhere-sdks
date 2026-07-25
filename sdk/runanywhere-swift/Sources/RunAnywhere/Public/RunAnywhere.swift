@@ -403,7 +403,7 @@ public enum RunAnywhere {
     /// Swift retains only platform-service callback registration.
     private static func _performServicesInitialization() async throws {
         let snapshot = state.withLock { ($0.initParams, $0.currentEnvironment) }
-        guard let params = snapshot.0, let environment = snapshot.1 else {
+        guard let params = snapshot.0, snapshot.1 != nil else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -412,15 +412,14 @@ public enum RunAnywhere {
         // Step 1: configure the Swift HTTP adapter used by callback-based
         // platform services. Auth and control-plane orchestration stay in C++.
         if await !CppBridge.HTTP.shared.isConfigured {
-            if environment == .development {
-                if await CppBridge.DevConfig.configureHTTP() {
-                    logger.debug("HTTP adapter configured from C++ development config")
-                } else {
-                    logger.debug("HTTP adapter disabled: no usable development config")
-                }
-            } else if CppBridge.DevConfig.isUsableCredential(params.apiKey),
-                      CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString) {
-                await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+            // Effective config from commons state (baked OSS URL fills development when empty)
+            // resolves the baked keyless base URL, dev/prod use whatever the app
+            // passed. There is no direct-to-datastore path — the backend is always
+            // reached through this base URL. Auth stays in C++.
+            let effectiveURLString = CppBridge.State.baseURL ?? params.baseURL.absoluteString
+            if CppBridge.DevConfig.isUsableHTTPURL(effectiveURLString),
+               let effectiveURL = URL(string: effectiveURLString) {
+                await CppBridge.HTTP.shared.configure(baseURL: effectiveURL, apiKey: params.apiKey)
             } else {
                 logger.debug("HTTP adapter disabled: no usable external config")
             }
@@ -433,7 +432,6 @@ public enum RunAnywhere {
         // Step 3 (C++): auth, device registration, model assignments,
         // telemetry flush, and downloaded-model discovery.
         let phase2Result = try CppBridge.SdkInit.phase2(
-            buildToken: environment == .development ? CppBridge.DevConfig.buildToken : nil,
             forceRefreshAssignments: false,
             flushTelemetry: true,
             discoverDownloadedModels: true,

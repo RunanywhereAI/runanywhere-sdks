@@ -3,14 +3,15 @@
  *
  * V2 canonical: this package is a SHELL. It only loads the WASM module,
  * registers the platform adapter, calls `rac_init`, registers the unified
- * llama.cpp backend (LLM + VLM in a single call), then installs the module
+ * llama.cpp backend (LLM + embeddings + VLM in a single call), then installs the module
  * only in its capability-scoped adapter slots via `registerWasmModule(...)`.
  *
  * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
- * tool calling, structured output, LoRA, and VLM all flow through
+ * tool calling, structured output, LoRA, embeddings, and VLM all flow through
  * `@runanywhere/web` core's proto-byte adapters (`LLMProtoAdapter`,
  * `StructuredOutputProtoAdapter`, `VLMProtoAdapter`, etc.) without any
- * further per-package wiring. ONNX owns Web embeddings and cross-WASM RAG.
+ * further per-package wiring. ONNX remains an alternate embeddings provider
+ * and owns its cross-WASM RAG pipeline.
  *
  * Usage:
  *
@@ -31,14 +32,22 @@
  */
 
 import {
-  completeDeferredServicesInitialization,
+  BackendWorkerHost,
+  clearLlamaBackendWorkerDead,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
   setModelLoadPreparation,
   setModelLoadFailureRecovery,
+  setRuntimeDegradedReason,
   setVisionLanguageProvider,
+  getBackendWorkerFactory,
+  setBackendWorkerFactory,
+  setLlamaBackendWorkerRequired,
+  setStreamWorkerFactory,
+  setStreamWorkerInit,
   SDKLogger,
   type BackendRegistrationState,
+  type BackendWorkerFactory,
   type RuntimeModelLoadRequest,
 } from '@runanywhere/web/backend';
 import {
@@ -46,9 +55,19 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge.js';
+import {
+  LLAMACPP_STREAM_WORKER_FACTORY_ID,
+  LLAMACPP_STREAM_WORKER_WEBGPU_FACTORY_ID,
+} from './streamWorkerFactoryId.js';
 import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider.js';
 
 const logger = new SDKLogger('LlamaCPP');
+let _installedBackendWorkerFactory = false;
+let _backendWorkerFactory: BackendWorkerFactory | null = null;
+let _backendWorkerHost: BackendWorkerHost | null = null;
+/** Acceleration used for LLM inference (worker when present, else bridge). */
+let _inferenceAcceleration: 'cpu' | 'webgpu' = 'cpu';
+let _installedStreamWorker = false;
 
 const MODULE_ID = 'llamacpp';
 
@@ -87,8 +106,8 @@ function shouldPrepareCpuForModelLoad(
   return modelId.includes('qwen');
 }
 
-// Categories the LlamaCpp backend actually services. STT/TTS/VAD/embedding
-// requests are owned by other backends (Sherpa, ONNX, ...) and must never
+// Categories the LlamaCpp backend actually services. STT/TTS/VAD requests
+// are owned by other backends (Sherpa, ONNX, ...) and must never
 // trigger LlamaCpp's WebGPU→CPU fallback path — otherwise unrelated load
 // failures (e.g. a Sherpa whisper signature mismatch) surface to the user
 // as a misleading "WebGPU model load failed" log + bogus CPU retry.
@@ -96,6 +115,7 @@ const LLAMACPP_ELIGIBLE_CATEGORIES: ReadonlySet<ModelCategory> = new Set([
   ModelCategory.MODEL_CATEGORY_LANGUAGE,
   ModelCategory.MODEL_CATEGORY_VISION,
   ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  ModelCategory.MODEL_CATEGORY_EMBEDDING,
 ]);
 
 function shouldFallbackWebGPUModelLoad(
@@ -128,6 +148,30 @@ export interface LlamaCPPRegisterOptions {
   wasmUrl?: string;
   /** Override the URL to the racommons-llamacpp-webgpu.js glue file. */
   webgpuWasmUrl?: string;
+  /**
+   * Optional Stage 3 worker bootstrap. When omitted and `preferBackendWorker`
+   * is enabled, LlamaCPP installs a Vite-friendly default factory that loads
+   * `./backendWorker.ts`.
+   */
+  backendWorkerFactory?: BackendWorkerFactory;
+  /**
+   * Prefer the model-owning BackendWorker for LLM load/stream. Defaults to
+   * `true` when `Worker` + `URL` are available. The worker prefers the
+   * no-pthread WebGPU WASM when possible; CPU pthread artifacts set
+   * `mainScriptUrlOrBlob` so nested `em-pthread` workers can boot.
+   */
+  preferBackendWorker?: boolean;
+  /**
+   * Fail registration when the BackendWorker handshake cannot complete.
+   * Defaults to `true` in browser environments (Worker available); `false`
+   * in Node/unit tests without Worker.
+   */
+  requireBackendWorker?: boolean;
+  /**
+   * Install the T6.1 stream-worker mirror. Opt-in only and mutually exclusive
+   * with the model-owning BackendWorker path. Defaults to `false`.
+   */
+  enableStreamWorker?: boolean;
 }
 
 export const LlamaCPP = {
@@ -146,9 +190,13 @@ export const LlamaCPP = {
     return _registrationState;
   },
 
-  /** Active hardware acceleration mode (cpu | webgpu). Available after `register()`. */
+  /**
+   * Acceleration used for LLM inference (cpu | webgpu).
+   * When the BackendWorker owns the model, this is the worker's resolved mode
+   * (WebGPU-first), not the main-thread bridge which may stay on CPU.
+   */
   get accelerationMode(): 'cpu' | 'webgpu' {
-    return LlamaCppBridge.shared.accelerationMode;
+    return _inferenceAcceleration;
   },
 
   /**
@@ -161,9 +209,9 @@ export const LlamaCPP = {
    * 3. Registers the 11-callback `rac_platform_adapter_t` browser vtable.
    * 4. Calls `rac_init()` (async, may suspend through ASYNCIFY).
    * 5. Calls `rac_backend_llamacpp_register()` — the unified entry point
-   *    that wires both LLM and VLM modalities in a single call.
-   * 6. Registers the module for its actual LLM/VLM/structured/tool/LoRA
-   *    capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
+   *    that wires LLM, embeddings, and VLM modalities in a single call.
+   * 6. Registers the module for its actual LLM/embedding/VLM/structured/tool/
+   *    LoRA capabilities while leaving ONNX embeddings and cross-WASM RAG intact.
    * 7. Wires `RunAnywhere.runtime.setAcceleration(mode)` to the bridge's
    *    acceleration switcher.
    *
@@ -211,11 +259,51 @@ export const LlamaCPP = {
           return true;
         });
 
-        await bridge.ensureLoaded(options.acceleration ?? 'auto');
+        // When the BackendWorker owns LLM inference, keep the main-thread
+        // bridge on CPU so we do not open a second WebGPU device (dual
+        // WebGPU modules have been correlated with worker generate Abort()).
+        // The worker still resolves auto → WebGPU when the adapter supports it.
+        const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+        const preferWorker = options.preferBackendWorker !== false && workerAvailable;
+        const requested = options.acceleration ?? 'auto';
+        const bridgeAcceleration = preferWorker && requested !== 'cpu'
+          ? 'cpu'
+          : requested;
+        await bridge.ensureLoaded(bridgeAcceleration);
+        await installLlamaCppBackendWorker(options, bridge.accelerationMode);
+        const enableStreamWorker = options.enableStreamWorker === true
+          && typeof Worker !== 'undefined'
+          && typeof URL !== 'undefined'
+          && _backendWorkerHost == null;
+        if (enableStreamWorker) {
+          try {
+            await installLlamaCppStreamWorker(bridge.accelerationMode === 'webgpu');
+            _installedStreamWorker = true;
+          } catch (error) {
+            logger.warning(
+              `Stream worker bootstrap failed; keeping main-thread streaming: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
 
-        // Publish the active mode so `RunAnywhere.runtime.active` reflects
-        // what the bridge actually picked (auto → webgpu/cpu resolution).
-        setActiveAccelerationMode(bridge.accelerationMode);
+        // Prefer the worker's resolved acceleration for runtime.active so the
+        // UI badge matches where inference actually runs.
+        let publishedMode: 'cpu' | 'webgpu' = bridge.accelerationMode;
+        if (_backendWorkerHost) {
+          try {
+            const health = await _backendWorkerHost.health();
+            const details = health.details as { acceleration?: string } | undefined;
+            if (details?.acceleration === 'webgpu' || details?.acceleration === 'cpu') {
+              publishedMode = details.acceleration;
+            }
+          } catch {
+            /* keep bridge mode */
+          }
+        }
+        _inferenceAcceleration = publishedMode;
+        setActiveAccelerationMode(publishedMode);
 
         // VLM is wired alongside LLM by the unified
         // `rac_backend_llamacpp_register()` call, so once `ensureLoaded()`
@@ -230,11 +318,12 @@ export const LlamaCPP = {
             'VLM backend not registered — RunAnywhere.visionLanguage will report as unavailable.',
           );
         }
-        await completeDeferredServicesInitialization();
-
         _isRegistered = true;
         _registrationState = 'registered';
-        logger.info(`LlamaCpp backend registered (${bridge.accelerationMode})`);
+        logger.info(
+          `LlamaCpp backend registered (bridge=${bridge.accelerationMode}, inference=${publishedMode}`
+          + `${_backendWorkerHost ? ', executionContext=worker' : ''})`,
+        );
       } catch (error) {
         // Registration installs core hooks before deferred service startup.
         // A late failure must not leave those hooks pointing at a backend that
@@ -244,6 +333,8 @@ export const LlamaCPP = {
         setModelLoadPreparation(null);
         setModelLoadFailureRecovery(null);
         setVisionLanguageProvider(null);
+        clearLlamaCppBackendWorker();
+        clearLlamaCppStreamWorker();
         bridge.shutdown();
         _isRegistered = false;
         _registrationState = 'failed';
@@ -269,12 +360,135 @@ export const LlamaCPP = {
     setModelLoadPreparation(null);
     setModelLoadFailureRecovery(null);
     setVisionLanguageProvider(null);
+    clearLlamaCppBackendWorker();
+    clearLlamaCppStreamWorker();
     LlamaCppBridge.shared.shutdown();
+    _inferenceAcceleration = 'cpu';
     _isRegistered = false;
     _registrationState = 'unregistered';
     logger.info('LlamaCpp backend unregistered');
   },
 };
+
+async function installLlamaCppBackendWorker(
+  options: LlamaCPPRegisterOptions,
+  accelerationMode: 'cpu' | 'webgpu',
+): Promise<void> {
+  const workerAvailable = typeof Worker !== 'undefined' && typeof URL !== 'undefined';
+  const prefer = options.preferBackendWorker !== false && workerAvailable;
+  if (!prefer) {
+    const reason = !workerAvailable
+      ? 'Web Worker API unavailable; LLM inference stays on the main thread.'
+      : 'BackendWorker disabled via LlamaCPP.register({ preferBackendWorker: false }).';
+    setRuntimeDegradedReason(reason);
+    if (options.requireBackendWorker) {
+      throw new Error(reason);
+    }
+    return;
+  }
+
+  if (!globalThis.crossOriginIsolated) {
+    logger.warning(
+      'crossOriginIsolated is false; pthread-backed BackendWorker WASM may fail. '
+      + 'Serve with COOP/COEP headers for production worker inference.',
+    );
+  }
+
+  const factory = options.backendWorkerFactory
+    ?? (() => new Worker(new URL('./backendWorker.ts', import.meta.url), {
+      type: 'module',
+      name: 'runanywhere-llamacpp-backend',
+    }));
+  setBackendWorkerFactory(factory);
+  _installedBackendWorkerFactory = true;
+  _backendWorkerFactory = factory;
+
+  const requireWorker = options.requireBackendWorker
+    ?? (typeof Worker !== 'undefined' && typeof URL !== 'undefined');
+  setLlamaBackendWorkerRequired(requireWorker);
+  const host = new BackendWorkerHost(factory, {
+    initTimeoutMs: 120_000,
+    backendId: 'llamacpp',
+  });
+  _backendWorkerHost = host;
+  try {
+    // WebGPU-first inside the worker; CPU WASM only when WebGPU/shader-f16
+    // is unavailable (WorkerLlamaRuntime resolves auto → cpu). If a later
+    // generate Abort()s the worker, BackendWorkerHost retries next init on CPU.
+    await host.init({
+      acceleration: options.acceleration === 'cpu' ? 'cpu' : 'auto',
+    });
+    clearLlamaBackendWorkerDead();
+    setRuntimeDegradedReason(null);
+    logger.info(
+      `BackendWorker ready (executionContext=worker; main bridge=${accelerationMode})`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    host.dispose();
+    _backendWorkerHost = null;
+    if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+      setBackendWorkerFactory(null);
+    }
+    _installedBackendWorkerFactory = false;
+    _backendWorkerFactory = null;
+    const reason = `BackendWorker handshake failed: ${message}`;
+    setRuntimeDegradedReason(reason);
+    if (requireWorker) {
+      logger.error(`${reason}; main-thread LLM inference is disabled`);
+      throw error instanceof Error ? error : new Error(reason);
+    }
+    setLlamaBackendWorkerRequired(false);
+    logger.warning(`${reason}; continuing without BackendWorker (requireBackendWorker=false)`);
+  }
+}
+
+function clearLlamaCppBackendWorker(): void {
+  if (_backendWorkerHost) {
+    try {
+      _backendWorkerHost.dispose();
+    } catch {
+      /* ignore */
+    }
+    _backendWorkerHost = null;
+  }
+  if (_installedBackendWorkerFactory && getBackendWorkerFactory() === _backendWorkerFactory) {
+    setBackendWorkerFactory(null);
+  }
+  _installedBackendWorkerFactory = false;
+  _backendWorkerFactory = null;
+  setRuntimeDegradedReason(null);
+}
+
+async function installLlamaCppStreamWorker(useWebGPU: boolean): Promise<void> {
+  const wasmName = useWebGPU
+    ? 'racommons-llamacpp-webgpu.wasm'
+    : 'racommons-llamacpp.wasm';
+  const wasmUrl = new URL(`../wasm/${wasmName}`, import.meta.url).href;
+  const wasmResponse = await fetch(wasmUrl);
+  if (!wasmResponse.ok) {
+    throw new Error(`Failed to fetch stream-worker WASM (${wasmResponse.status}): ${wasmName}`);
+  }
+  const wasmBytes = await wasmResponse.arrayBuffer();
+  setStreamWorkerFactory(() => new Worker(new URL('./streamWorker.ts', import.meta.url), {
+    type: 'module',
+    name: 'runanywhere-llamacpp-stream',
+  }));
+  setStreamWorkerInit({
+    wasmBytes,
+    moduleFactoryId: useWebGPU
+      ? LLAMACPP_STREAM_WORKER_WEBGPU_FACTORY_ID
+      : LLAMACPP_STREAM_WORKER_FACTORY_ID,
+  });
+  logger.info(`Stream worker installed (${useWebGPU ? 'webgpu' : 'cpu'})`);
+}
+
+function clearLlamaCppStreamWorker(): void {
+  if (!_installedStreamWorker) return;
+  setStreamWorkerFactory(null);
+  setStreamWorkerInit(null);
+  _installedStreamWorker = false;
+}
 
 /**
  * Auto-register the llama.cpp backend.

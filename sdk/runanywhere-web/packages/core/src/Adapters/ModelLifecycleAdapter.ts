@@ -174,6 +174,19 @@ export class ModelLifecycleAdapter {
     return ModelLifecycleAdapter.tryDefault();
   }
 
+  /** The backend module selected for a framework, without default fallback. */
+  static moduleForFramework(
+    framework: InferenceFramework | string | undefined | null,
+  ): ModelLifecycleModule | null {
+    if (framework === undefined || framework === null || framework === '') return null;
+    return lookupFrameworkModule(framework as InferenceFramework | string);
+  }
+
+  /** Module this adapter dispatches lifecycle calls to. */
+  get boundModule(): ModelLifecycleModule {
+    return this.module;
+  }
+
   private constructor(private readonly module: ModelLifecycleModule) {}
 
   supportsProtoLifecycle(): boolean {

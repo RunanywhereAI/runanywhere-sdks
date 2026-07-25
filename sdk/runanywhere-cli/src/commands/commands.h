@@ -29,13 +29,19 @@ void register_rm(CLI::App& app, GlobalOptions& options);
 void register_show(CLI::App& app, GlobalOptions& options);
 void register_run(CLI::App& app, GlobalOptions& options);
 void register_image(CLI::App& app, GlobalOptions& options);
+void register_segment(CLI::App& app, GlobalOptions& options);
 void register_embed(CLI::App& app, GlobalOptions& options);
+void register_diarize(CLI::App& app, GlobalOptions& options);
 void register_stt(CLI::App& app, GlobalOptions& options);
 void register_tts(CLI::App& app, GlobalOptions& options);
 void register_vad(CLI::App& app, GlobalOptions& options);
 void register_voice(CLI::App& app, GlobalOptions& options);
 void register_serve(CLI::App& app, GlobalOptions& options);
 void register_lora(CLI::App& app, GlobalOptions& options);
+void register_rag(CLI::App& app, GlobalOptions& options);
+void register_bench(CLI::App& app, GlobalOptions& options);
+void register_auth(CLI::App& app, GlobalOptions& options);
+void register_telemetry(CLI::App& app, GlobalOptions& options);
 
 /**
  * Shared pull flow (plan → start → progress → terminal state) for an

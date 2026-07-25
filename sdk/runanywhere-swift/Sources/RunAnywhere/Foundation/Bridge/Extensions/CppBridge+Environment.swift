@@ -20,7 +20,6 @@ extension CppBridge {
         public static func toC(_ env: SDKEnvironment) -> rac_environment_t {
             switch env {
             case .development:   return RAC_ENV_DEVELOPMENT
-            case .staging:       return RAC_ENV_STAGING
             case .production:    return RAC_ENV_PRODUCTION
             default:             return RAC_ENV_DEVELOPMENT
             }
@@ -30,7 +29,6 @@ extension CppBridge {
         public static func fromC(_ env: rac_environment_t) -> SDKEnvironment {
             switch env {
             case RAC_ENV_DEVELOPMENT: return .development
-            case RAC_ENV_STAGING: return .staging
             case RAC_ENV_PRODUCTION: return .production
             default: return .development
             }
@@ -68,77 +66,10 @@ extension CppBridge {
 extension CppBridge {
 
     /// Development configuration bridge
-    /// Wraps C++ rac_dev_config.h functions
-    /// Used for development mode with Supabase backend
+    /// Wraps the canonical commons usability checks from rac_dev_config.h so
+    /// every SDK agrees on the placeholder/URL rules. The backend is reached
+    /// only through the effective base URL — no credentials are baked in.
     public enum DevConfig {
-
-        /// Check if development config is available
-        public static var isAvailable: Bool {
-            rac_dev_config_is_available()
-        }
-
-        /// Get Supabase URL for development mode
-        public static var supabaseURL: String? {
-            guard isAvailable else { return nil }
-            guard let ptr = rac_dev_config_get_supabase_url() else { return nil }
-            return String(cString: ptr)
-        }
-
-        /// Get Supabase API key for development mode
-        public static var supabaseKey: String? {
-            guard isAvailable else { return nil }
-            guard let ptr = rac_dev_config_get_supabase_key() else { return nil }
-            return String(cString: ptr)
-        }
-
-        /// True when the development Supabase config is present and not a template placeholder.
-        public static var hasUsableSupabaseConfig: Bool {
-            guard let urlString = supabaseURL,
-                  let apiKey = supabaseKey,
-                  isUsableHTTPURL(urlString),
-                  isUsableCredential(apiKey) else {
-                return false
-            }
-            return true
-        }
-
-        /// True when development device registration has all required values.
-        public static var hasUsableDevelopmentRegistrationConfig: Bool {
-            hasUsableSupabaseConfig && hasUsableBuildToken
-        }
-
-        /// Get build token for development mode
-        public static var buildToken: String? {
-            guard rac_dev_config_has_build_token() else { return nil }
-            guard let ptr = rac_dev_config_get_build_token() else { return nil }
-            let token = String(cString: ptr)
-            return isUsableCredential(token) ? token : nil
-        }
-
-        /// True when the development build token is present and not a placeholder.
-        public static var hasUsableBuildToken: Bool {
-            buildToken != nil
-        }
-
-        /// Configure CppBridge.HTTP for development mode using C++ config
-        /// - Returns: true if configured successfully, false if config not available
-        @discardableResult
-        public static func configureHTTP() async -> Bool {
-            guard hasUsableSupabaseConfig,
-                  let rawURLString = supabaseURL,
-                  let rawAPIKey = supabaseKey else {
-                return false
-            }
-
-            let urlString = rawURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-            let apiKey = rawAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard let url = URL(string: urlString) else {
-                return false
-            }
-            await CppBridge.HTTP.shared.configure(baseURL: url, apiKey: apiKey)
-            return true
-        }
 
         /// Whether a baked-in credential is usable: non-empty and not a
         /// scaffolding placeholder. Delegates to the canonical commons rule

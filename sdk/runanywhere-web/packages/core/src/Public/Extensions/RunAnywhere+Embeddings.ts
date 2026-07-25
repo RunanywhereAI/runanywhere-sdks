@@ -11,9 +11,12 @@
  * calls dispatch through `EmbeddingsProtoAdapter.embedBatch(...)`.
  */
 
-import { ModelCategory, type ModelLoadResult, type ModelUnloadResult } from '@runanywhere/proto-ts/model_types';
-import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
-import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import {
+  type InferenceFramework,
+  ModelCategory,
+  type ModelLoadResult,
+  type ModelUnloadResult,
+} from '@runanywhere/proto-ts/model_types';
 import type {
   EmbeddingVector,
   EmbeddingsOptions,
@@ -24,19 +27,21 @@ import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry.js';
 
 const logger = new SDKLogger('Embeddings');
+let activeEmbedding: { modelID: string; framework?: InferenceFramework } | null = null;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function requireAdapter(): EmbeddingsProtoAdapter {
-  const adapter = EmbeddingsProtoAdapter.tryDefault();
+function requireAdapter(framework?: InferenceFramework): EmbeddingsProtoAdapter {
+  const adapter = EmbeddingsProtoAdapter.tryDefaultForFramework(framework);
   if (!adapter) {
     throw SDKException.backendNotAvailable(
       'Embeddings',
-      'No backend is registered for the Embeddings capability. Register a backend WASM module (e.g. OnnxRuntime.register()) during app init.',
+      'No backend is registered for the Embeddings capability. Register LlamaCPP or ONNX during app init.',
     );
   }
   if (!adapter.supportsLifecycleProtoEmbeddings()) {
@@ -66,19 +71,23 @@ function requireInitialized(): void {
 // ensureLoaded — mirrors Swift private func ensureLoaded(modelID:)
 // ---------------------------------------------------------------------------
 
-async function ensureLoaded(modelID: string): Promise<void> {
-  const snapshot = WebModelLifecycle.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS);
-  if (snapshot?.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
-      && snapshot.modelId === modelID) {
-    return;
+async function ensureLoaded(modelID: string): Promise<InferenceFramework | undefined> {
+  let requestedFramework: InferenceFramework | undefined;
+  try {
+    requestedFramework = ModelRegistry.getModel(modelID)?.framework as
+      | InferenceFramework
+      | undefined;
+  } catch {
+    requestedFramework = undefined;
   }
-
   const current = WebModelLifecycle.currentModel({
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: requestedFramework,
     includeModelMetadata: false,
   });
   if (current?.found && current.modelId === modelID) {
-    return;
+    activeEmbedding = { modelID, framework: current.framework };
+    return current.framework;
   }
 
   const result: ModelLoadResult | null = await WebModelLifecycle.loadModelAsync({
@@ -93,6 +102,9 @@ async function ensureLoaded(modelID: string): Promise<void> {
     logger.warning(`ensureLoaded(${modelID}) failed: ${msg}`);
     throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED, msg, 'Embeddings.ensureLoaded');
   }
+  const framework = result.framework ?? requestedFramework;
+  activeEmbedding = { modelID, framework };
+  return framework;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,11 +140,11 @@ async function embedBatch(
     );
   }
 
-  await ensureLoaded(modelID);
+  const framework = await ensureLoaded(modelID);
 
   const lifecycleRequest: EmbeddingsRequest = { ...request, modelId: modelID };
 
-  const adapter = requireAdapter();
+  const adapter = requireAdapter(framework);
 
   // Use the handle-less lifecycle ABI, matching Swift's
   // `CppBridge.EmbeddingsProto.embedBatchLifecycle`. The handle-based
@@ -158,24 +170,13 @@ async function embedBatch(
 async function unload(): Promise<void> {
   requireInitialized();
 
-  let modelID: string | undefined;
-
-  const snapshot = WebModelLifecycle.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS);
-  if (snapshot?.modelId) {
-    modelID = snapshot.modelId;
-  } else {
-    const current = WebModelLifecycle.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
-      includeModelMetadata: false,
-    });
-    modelID = current?.modelId;
-  }
-
-  if (!modelID) return;
-
   const result: ModelUnloadResult | null = await WebModelLifecycle.unloadModelAsync({
-    modelId: modelID,
+    modelId: '',
     category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    // Category-only requests fan out across every registered WASM module.
+    // `unloadAll` must remain false: the native lifecycle gives that flag
+    // precedence over `category`, which would also tear down active chat,
+    // speech, and vision models in each module.
     unloadAll: false,
   });
 
@@ -183,6 +184,7 @@ async function unload(): Promise<void> {
     const msg = result?.errorMessage || 'Embeddings lifecycle unload failed';
     throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, msg, 'Embeddings.unload');
   }
+  activeEmbedding = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,18 +192,21 @@ async function unload(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function isLoaded(): boolean {
-  const snapshot = WebModelLifecycle.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS);
-  return snapshot?.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
-    && Boolean(snapshot?.modelId);
+  return currentModelID() !== null;
 }
 
 function currentModelID(): string | null {
-  const snapshot = WebModelLifecycle.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS);
-  if (snapshot?.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
-      && snapshot.modelId) {
-    return snapshot.modelId;
+  const current = WebModelLifecycle.currentModel({
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: activeEmbedding?.framework,
+    includeModelMetadata: false,
+  });
+  if (!current?.found || !current.modelId) {
+    activeEmbedding = null;
+    return null;
   }
-  return null;
+  activeEmbedding = { modelID: current.modelId, framework: current.framework };
+  return current.modelId;
 }
 
 // ---------------------------------------------------------------------------

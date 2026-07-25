@@ -20,7 +20,12 @@ internal sealed interface CatalogModel {
     suspend fun register(): ModelInfo?
 }
 
-internal data class ModelFile(val url: String, val filename: String)
+internal data class ModelFile(
+    val url: String,
+    val filename: String,
+    val sizeBytes: Long? = null,
+    val checksumSha256: String? = null,
+)
 
 internal data class SingleFileModel(
     override val id: String,
@@ -29,6 +34,7 @@ internal data class SingleFileModel(
     val framework: InferenceFramework,
     val category: ModelCategory,
     val memoryBytes: Long,
+    val downloadBytes: Long = memoryBytes,
     val contextLength: Int? = null,
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
@@ -63,6 +69,7 @@ internal data class SingleFileModel(
             modality = category,
             artifactType = null,
             memoryRequirement = memoryBytes,
+            downloadSize = downloadBytes,
             supportsThinking = supportsThinking,
             supportsLora = supportsLora,
         )
@@ -100,6 +107,7 @@ internal data class MultiFileModel(
     val framework: InferenceFramework,
     val category: ModelCategory,
     val memoryBytes: Long,
+    val downloadBytes: Long = memoryBytes,
     val files: List<ModelFile>,
 ) : CatalogModel {
     override suspend fun register(): ModelInfo =
@@ -110,17 +118,20 @@ internal data class MultiFileModel(
             framework = framework,
             modality = category,
             memoryRequirement = memoryBytes,
+            downloadSize = downloadBytes,
             contextLength = null,
             supportsThinking = false,
             source = ModelSource.MODEL_SOURCE_REMOTE,
         )
 
-    private fun descriptors(): List<ModelFileDescriptor> =
+    internal fun descriptors(): List<ModelFileDescriptor> =
         files.mapIndexed { idx, file ->
             ModelFileDescriptor(
                 url = file.url,
                 filename = file.filename,
                 is_required = true,
+                size_bytes = file.sizeBytes,
+                checksum_sha256 = file.checksumSha256,
                 role = if (idx == 0) {
                     ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
                 } else {

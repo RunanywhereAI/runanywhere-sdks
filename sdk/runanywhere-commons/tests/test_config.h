@@ -1,12 +1,12 @@
 #ifndef TEST_CONFIG_H
 #define TEST_CONFIG_H
 
+#include "test_common.h"
+
 #include <cstdlib>
 #include <string>
 
 #include "core/internal/platform_compat.h"
-
-#include "test_common.h"
 
 namespace test_config {
 
@@ -73,6 +73,16 @@ inline std::string get_stt_model_path() {
     if (env && env[0] != '\0')
         return std::string(env);
     return get_model_dir() + "/ONNX/whisper-tiny-en";
+}
+
+inline std::string get_stt_audio_path() {
+    const char* env = std::getenv("RAC_TEST_STT_AUDIO");
+    return env && env[0] != '\0' ? std::string(env) : std::string();
+}
+
+inline std::string get_stt_expected_text() {
+    const char* env = std::getenv("RAC_TEST_STT_EXPECT");
+    return env && env[0] != '\0' ? std::string(env) : std::string();
 }
 
 // =============================================================================

@@ -738,14 +738,14 @@ const char descriptor_table_protodef_sdk_5finit_2eproto[] ABSL_ATTRIBUTE_SECTION
     "}\n\014SdkInitPhase\022\036\n\032SDK_INIT_PHASE_UNSPEC"
     "IFIED\020\000\022\026\n\022SDK_INIT_PHASE_ONE\020\001\022\026\n\022SDK_I"
     "NIT_PHASE_TWO\020\002\022\035\n\031SDK_INIT_PHASE_RETRY_"
-    "HTTP\020\003*\201\001\n\022SdkInitEnvironment\022$\n SDK_INI"
-    "T_ENVIRONMENT_DEVELOPMENT\020\000\022 \n\034SDK_INIT_"
-    "ENVIRONMENT_STAGING\020\001\022#\n\037SDK_INIT_ENVIRO"
-    "NMENT_PRODUCTION\020\002B\207\001\n\027ai.runanywhere.pr"
-    "oto.v1B\014SdkInitProtoP\001Z<github.com/runan"
-    "ywhere/runanywhere-sdks/idl/v1;runanywhe"
-    "rev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pr"
-    "oto3"
+    "HTTP\020\003*\203\001\n\022SdkInitEnvironment\022$\n SDK_INI"
+    "T_ENVIRONMENT_DEVELOPMENT\020\000\022#\n\037SDK_INIT_"
+    "ENVIRONMENT_PRODUCTION\020\002\"\004\010\001\020\001*\034SDK_INIT"
+    "_ENVIRONMENT_STAGINGB\207\001\n\027ai.runanywhere."
+    "proto.v1B\014SdkInitProtoP\001Z<github.com/run"
+    "anywhere/runanywhere-sdks/idl/v1;runanyw"
+    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
+    "proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5finit_2eproto_deps[1] = {
@@ -755,7 +755,7 @@ static ::absl::once_flag descriptor_table_sdk_5finit_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2eproto = {
     false,
     false,
-    1124,
+    1126,
     descriptor_table_protodef_sdk_5finit_2eproto,
     "sdk_init.proto",
     &descriptor_table_sdk_5finit_2eproto_once,
@@ -783,7 +783,7 @@ SdkInitEnvironment_descriptor() {
   return file_level_enum_descriptors_sdk_5finit_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t SdkInitEnvironment_internal_data_[] = {
-    196608u, 0u, };
+    65536u, 32u, 2u, };
 // ===================================================================
 
 SdkInitPhase1Request::SdkInitPhase1Request(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)

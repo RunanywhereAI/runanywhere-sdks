@@ -152,8 +152,6 @@ function mapSdkInitEnvironment(
   environment: SDKEnvironment
 ): SdkInitEnvironment {
   switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
@@ -165,8 +163,6 @@ function mapSdkInitEnvironment(
 
 function environmentToConfigString(environment: SDKEnvironment): string {
   switch (environment) {
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return 'staging';
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return 'production';
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
@@ -242,8 +238,10 @@ export const RunAnywhere = {
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
           : '';
+        // Keyless staging is valid: commons overrides the base URL with the
+        // baked staging backend and requests go out unauthenticated
+        // (PUBLIC-org ingestion). Only production demands credentials.
         const requiresCredentials =
-          environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
           environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
         if (
           !isUsableHTTPURL(effectiveBaseURL, {
@@ -277,7 +275,9 @@ export const RunAnywhere = {
 
         const phase2Request: SdkInitPhase2RequestMessage =
           SdkInitPhase2Request.create();
-        phase2Request.buildToken = options.buildToken?.trim() ?? '';
+        // The baked dev build token is gone; the backend is reached solely
+        // through the effective base URL. Keep the proto field, always empty.
+        phase2Request.buildToken = '';
         phase2Request.forceRefreshAssignments =
           options.forceRefreshAssignments ?? false;
         phase2Request.flushTelemetry = options.flushTelemetry ?? true;
@@ -617,39 +617,32 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get device ID from native device state.
-   *
-   * Matches Swift's throwing `RunAnywhere.deviceId` property. RN returns a
-   * Promise because the value lives behind the Nitro async bridge and rejects
-   * if native identity cannot be resolved durably.
-   */
-  async getDeviceId(): Promise<string> {
-    if (!isNativeModuleAvailable()) {
-      throw SDKException.nativeModuleUnavailable();
-    }
-    const native = requireNativeModule();
-    try {
-      const registeredDeviceId = await native.getDeviceId();
-      if (registeredDeviceId) return registeredDeviceId;
-
-      const persistentDeviceId = await native.getPersistentDeviceUUID();
-      if (!persistentDeviceId) {
-        throw SDKException.notInitialized('Persistent device identity');
-      }
-      return persistentDeviceId;
-    } catch (error) {
-      throw await asNativeSDKException(error);
-    }
-  },
-
-  /**
    * Device ID persisted in platform secure storage for the app installation.
    *
-   * RN-only property accessor — matches Swift's throwing device-ID getter,
-   * but returns `Promise<string>` through the Nitro async native bridge.
+   * Mirrors Swift's single throwing `RunAnywhere.deviceId` accessor. RN returns
+   * a `Promise<string>` because the value lives behind the Nitro async bridge
+   * (a synchronous getter is not expressible over it); the promise rejects if
+   * native identity cannot be resolved durably.
    */
   get deviceId(): Promise<string> {
-    return this.getDeviceId();
+    return (async () => {
+      if (!isNativeModuleAvailable()) {
+        throw SDKException.nativeModuleUnavailable();
+      }
+      const native = requireNativeModule();
+      try {
+        const registeredDeviceId = await native.getDeviceId();
+        if (registeredDeviceId) return registeredDeviceId;
+
+        const persistentDeviceId = await native.getPersistentDeviceUUID();
+        if (!persistentDeviceId) {
+          throw SDKException.notInitialized('Persistent device identity');
+        }
+        return persistentDeviceId;
+      } catch (error) {
+        throw await asNativeSDKException(error);
+      }
+    })();
   },
 
   // ============================================================================
@@ -807,7 +800,6 @@ export const RunAnywhere = {
   // ============================================================================
 
   registerModel: ModelManagement.registerModel,
-  registerModelFromUrl: ModelManagement.registerModelFromUrl,
   registerMultiFileModel: ModelManagement.registerMultiFileModel,
   registerArchiveModel: ModelManagement.registerArchiveModel,
   listModels: ModelManagement.listModels,
@@ -842,6 +834,7 @@ export const RunAnywhere = {
   // ============================================================================
 
   subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
+  unsubscribeSDKEvents: SDKEvents.unsubscribeSDKEvents,
   publishSDKEvent: SDKEvents.publishSDKEvent,
   pollSDKEvent: SDKEvents.pollSDKEvent,
   publishSDKFailure: SDKEvents.publishSDKFailure,

@@ -268,6 +268,12 @@ class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION =
       ModelCategory._(
           9, _omitEnumNames ? '' : 'MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION');
+  static const ModelCategory MODEL_CATEGORY_SPEAKER_DIARIZATION =
+      ModelCategory._(
+          10, _omitEnumNames ? '' : 'MODEL_CATEGORY_SPEAKER_DIARIZATION');
+  static const ModelCategory MODEL_CATEGORY_SEMANTIC_SEGMENTATION =
+      ModelCategory._(
+          11, _omitEnumNames ? '' : 'MODEL_CATEGORY_SEMANTIC_SEGMENTATION');
 
   static const $core.List<ModelCategory> values = <ModelCategory>[
     MODEL_CATEGORY_UNSPECIFIED,
@@ -280,10 +286,12 @@ class ModelCategory extends $pb.ProtobufEnum {
     MODEL_CATEGORY_AUDIO,
     MODEL_CATEGORY_EMBEDDING,
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+    MODEL_CATEGORY_SPEAKER_DIARIZATION,
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
   ];
 
   static final $core.List<ModelCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 11);
   static ModelCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -291,28 +299,21 @@ class ModelCategory extends $pb.ProtobufEnum {
 }
 
 /// ---------------------------------------------------------------------------
-/// SDK environment. Sources pre-IDL:
-///   Swift  SDKEnvironment.swift:5     (development, staging, production)
-///   Kotlin RunAnywhere.kt:47          (DEVELOPMENT, STAGING, PRODUCTION, cEnvironment)
-///   Kotlin SDKLogger.kt:159           (DEVELOPMENT, STAGING, PRODUCTION) ← duplicate
-///   Dart   sdk_environment.dart:5     (development, staging, production)
-///   RN     enums.ts:11                (Development, Staging, Production)
-///   Web    enums.ts:9                 (Development, Staging, Production)
+/// SDK environment — product surface is development + production only.
+/// Number 2 was formerly SDK_ENVIRONMENT_STAGING; reserved so wire values
+/// never shift PRODUCTION=3.
 /// ---------------------------------------------------------------------------
 class SDKEnvironment extends $pb.ProtobufEnum {
   static const SDKEnvironment SDK_ENVIRONMENT_UNSPECIFIED =
       SDKEnvironment._(0, _omitEnumNames ? '' : 'SDK_ENVIRONMENT_UNSPECIFIED');
   static const SDKEnvironment SDK_ENVIRONMENT_DEVELOPMENT =
       SDKEnvironment._(1, _omitEnumNames ? '' : 'SDK_ENVIRONMENT_DEVELOPMENT');
-  static const SDKEnvironment SDK_ENVIRONMENT_STAGING =
-      SDKEnvironment._(2, _omitEnumNames ? '' : 'SDK_ENVIRONMENT_STAGING');
   static const SDKEnvironment SDK_ENVIRONMENT_PRODUCTION =
       SDKEnvironment._(3, _omitEnumNames ? '' : 'SDK_ENVIRONMENT_PRODUCTION');
 
   static const $core.List<SDKEnvironment> values = <SDKEnvironment>[
     SDK_ENVIRONMENT_UNSPECIFIED,
     SDK_ENVIRONMENT_DEVELOPMENT,
-    SDK_ENVIRONMENT_STAGING,
     SDK_ENVIRONMENT_PRODUCTION,
   ];
 

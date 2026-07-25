@@ -4,99 +4,29 @@
  *
  * SETUP INSTRUCTIONS:
  * 1. Copy this file to development_config.cpp
- * 2. Fill in your development credentials
- * 3. development_config.cpp is git-ignored, so your secrets won't be committed
+ * 2. Fill in your development values
+ * 3. development_config.cpp is git-ignored, so your config won't be committed
  *
- * For RunAnywhere team members:
- * - Get credentials from the team's secure credential storage
- * - Contact team lead for access to development credentials
+ * Only a neutral staging backend base URL is baked here (so
+ * environment=development can run keyless with no explicit URL). CI
+ * substitutes STAGING_BASE_URL from a secret; open-source builds keep the
+ * placeholder and pass a base URL explicitly. No credentials, project refs,
+ * or tokens are embedded — the SDK reaches the backend only through this
+ * neutral base URL.
  */
 
-#include <algorithm>
-#include <cctype>
-#include <cstring>
-#include <string>
-
-#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 
 // =============================================================================
-// Configuration Values - FILL IN YOUR CREDENTIALS BELOW
+// Configuration Values
 // =============================================================================
 
 namespace {
 
-// Supabase project URL for development device analytics
-// Get this from: https://supabase.com/dashboard → Your Project → Settings → API
-constexpr const char* SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-
-// Supabase anon/public API key
-// Get this from: https://supabase.com/dashboard → Your Project → Settings → API → anon key
-constexpr const char* SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-
-// Development mode build token
-// Get this from your team's credential storage, or use a debug token for local dev
-constexpr const char* BUILD_TOKEN = "YOUR_BUILD_TOKEN";
-
-std::string trim(const char* value) {
-    if (!value) {
-        return {};
-    }
-
-    std::string out(value);
-    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
-    out.erase(out.begin(), std::find_if(out.begin(), out.end(), [&](char c) {
-                  return !is_space(static_cast<unsigned char>(c));
-              }));
-    out.erase(std::find_if(out.rbegin(), out.rend(), [&](char c) {
-                  return !is_space(static_cast<unsigned char>(c));
-              }).base(),
-              out.end());
-    return out;
-}
-
-std::string lowercase(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    return value;
-}
-
-bool looks_like_placeholder(const char* value) {
-    std::string normalized = lowercase(trim(value));
-    if (normalized.empty()) {
-        return true;
-    }
-
-    return normalized.find("your_") != std::string::npos ||
-           normalized.find("<your") != std::string::npos ||
-           normalized.find("replace_me") != std::string::npos ||
-           normalized.find("placeholder") != std::string::npos;
-}
-
-bool is_usable_http_url(const char* value) {
-    std::string url = trim(value);
-    if (looks_like_placeholder(url.c_str())) {
-        return false;
-    }
-
-    std::string normalized = lowercase(url);
-    bool has_scheme =
-        normalized.rfind("https://", 0) == 0 || normalized.rfind("http://", 0) == 0;
-    if (!has_scheme) {
-        return false;
-    }
-
-    size_t scheme_end = url.find("://");
-    if (scheme_end == std::string::npos) {
-        return false;
-    }
-
-    size_t host_start = scheme_end + 3;
-    size_t host_end = url.find_first_of("/?#", host_start);
-    std::string host = url.substr(host_start, host_end - host_start);
-    return !host.empty() && host.find_first_of(" \t\r\n<>") == std::string::npos;
-}
+// Staging backend base URL — baked into release/CI builds so
+// environment=development needs no explicit URL. Leave the placeholder to
+// require an explicit URL for local/OSS builds without the secret.
+constexpr const char* STAGING_BASE_URL = "YOUR_STAGING_BASE_URL";
 
 }  // anonymous namespace
 
@@ -106,28 +36,8 @@ bool is_usable_http_url(const char* value) {
 
 extern "C" {
 
-bool rac_dev_config_is_available(void) {
-    return rac_dev_config_has_supabase();
-}
-
-const char* rac_dev_config_get_supabase_url(void) {
-    return SUPABASE_URL;
-}
-
-const char* rac_dev_config_get_supabase_key(void) {
-    return SUPABASE_ANON_KEY;
-}
-
-const char* rac_dev_config_get_build_token(void) {
-    return BUILD_TOKEN;
-}
-
-bool rac_dev_config_has_supabase(void) {
-    return is_usable_http_url(SUPABASE_URL) && !looks_like_placeholder(SUPABASE_ANON_KEY);
-}
-
-bool rac_dev_config_has_build_token(void) {
-    return !looks_like_placeholder(BUILD_TOKEN);
+const char* rac_dev_config_get_staging_base_url(void) {
+    return STAGING_BASE_URL;
 }
 
 }  // extern "C"

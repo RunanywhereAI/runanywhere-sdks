@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Flutter reference app demonstrating the RunAnywhere on-device AI SDK. It mirrors the native iOS app's feature set: LLM chat (streaming + non-streaming), speech-to-text, text-to-speech, voice assistant pipeline (STT→LLM→TTS), vision/VLM with live camera, tool calling, RAG with PDF ingestion, structured JSON output, and a solutions YAML runner. Eight tabs: Chat, Vision, STT, Speak, Voice, Tools, Solutions, Settings.
 
+## Design System
+
+Brand primary is RunAnywhere orange **#FF6900** (the logo color) — see the canonical
+`../../DESIGN_GUIDELINE.md`. Theme lives in `lib/core/design_system/app_colors.dart`
+(`AppColors.brandOrange`/`primaryAccent`) and the two `ThemeData` blocks in
+`lib/app/runanywhere_ai_app.dart` (Material 3, seed = brand orange with `primary`
+pinned exactly, light + dark via `ThemeMode.system`). `primaryBlue` is a genuine
+secondary blue, not the brand. When changing brand colors, edit `app_colors.dart` and
+keep it in sync with the guideline.
+
 ## Common Commands
 
 ```bash

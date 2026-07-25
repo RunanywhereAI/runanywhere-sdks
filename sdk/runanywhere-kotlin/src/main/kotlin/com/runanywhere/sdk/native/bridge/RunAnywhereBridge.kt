@@ -278,6 +278,86 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttStreamCancelProto(sessionId: Long): Int
 
+    // SPEAKER DIARIZATION (rac_diarization.h). Component handle family used by
+    // the streaming session path, one offline lifecycle-proto verb, and the
+    // persistent stream-session ABI. Mirrors the STT component + stream ABI.
+
+    @JvmStatic
+    external fun racDiarizationComponentCreate(): Long
+
+    @JvmStatic
+    external fun racDiarizationComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racDiarizationComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racDiarizationComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationComponentDestroy(handle: Long)
+
+    // Takes a serialized DiarizationRequest (audio + options bundled) and
+    // resolves the lifecycle-loaded speaker-diarization model internally.
+    @JvmStatic
+    external fun racDiarizationDiarizeLifecycleProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racDiarizationSetStreamProtoCallback(
+        handle: Long,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    @JvmStatic
+    external fun racDiarizationUnsetStreamProtoCallback(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationProtoQuiesce()
+
+    /**
+     * Start a persistent speaker-diarization stream session.
+     *
+     * @return positive session id on success; negative RAC error code on failure.
+     */
+    @JvmStatic
+    external fun racDiarizationStreamStartProto(handle: Long, optionsProto: ByteArray): Long
+
+    @JvmStatic
+    external fun racDiarizationStreamFeedAudioProto(sessionId: Long, audioData: ByteArray): Int
+
+    @JvmStatic
+    external fun racDiarizationStreamStopProto(sessionId: Long): Int
+
+    @JvmStatic
+    external fun racDiarizationStreamCancelProto(sessionId: Long): Int
+
+    // CROSS-ENCODER RERANK (rac_rerank_component.h). Component handle family plus
+    // the single handle-scoped proto verb. Unlike diarization/segmentation the
+    // revived rerank primitive ships no handle-free `*_lifecycle_proto` verb, so
+    // the offline path loads the lifecycle-resolved model into this component's
+    // handle (owner-scoped acquire) before scoring.
+
+    @JvmStatic
+    external fun racRerankComponentCreate(): Long
+
+    @JvmStatic
+    external fun racRerankComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racRerankComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racRerankComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racRerankComponentDestroy(handle: Long)
+
+    // Takes a serialized RerankRequest (query + candidates + options) and scores
+    // it against the model loaded into `handle`. Returns a serialized
+    // RerankResult, or null on failure.
+    @JvmStatic
+    external fun racRerankComponentRerankProto(handle: Long, requestProto: ByteArray): ByteArray?
+
     // TTS COMPONENT (rac_tts_component.h)
 
     @JvmStatic
@@ -449,6 +529,13 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDiffusionGenerateLifecycleProto(requestProto: ByteArray): ByteArray?
 
+    // SEMANTIC SEGMENTATION LIFECYCLE-PROTO ABI. The generated request carries
+    // tightly-packed RGB/RGBA/BGRA pixels and resolves the lifecycle-owned
+    // semantic-segmentation model without a Kotlin-owned component handle.
+
+    @JvmStatic
+    external fun racSegmentationSegmentLifecycleProto(requestProto: ByteArray): ByteArray?
+
     // Backend registration
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
     //
@@ -539,6 +626,13 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Evaluate a registered model against caller-supplied available RAM and
+     * storage using the canonical commons compatibility policy.
+     */
+    @JvmStatic
+    external fun racModelCompatibilityCheckProto(requestProto: ByteArray): ByteArray?
 
     /**
      * Canonical "register a model from a URL" entry point. Forwards to
@@ -643,7 +737,7 @@ object RunAnywhereBridge {
 
     /**
      * Register device with backend if not already registered.
-     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param environment SDK environment (0=DEVELOPMENT, 2=PRODUCTION)
      * @param buildToken Optional build token for development mode
      */
     @JvmStatic
@@ -902,34 +996,6 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
 
     /**
-     * Check if development config is available (has Supabase credentials configured).
-     * @return true if dev config is available
-     */
-    @JvmStatic
-    external fun racDevConfigIsAvailable(): Boolean
-
-    /**
-     * Get Supabase URL for development mode.
-     * @return Supabase URL or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseUrl(): String?
-
-    /**
-     * Get Supabase anon key for development mode.
-     * @return Supabase anon key or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseKey(): String?
-
-    /**
-     * Get build token for development mode.
-     * @return Build token or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetBuildToken(): String?
-
-    /**
      * Whether a baked-in credential is usable: non-empty and not a scaffolding
      * placeholder. Canonical commons rule shared by all SDKs.
      */
@@ -949,7 +1015,7 @@ object RunAnywhereBridge {
      * This must be called during SDK initialization for device registration
      * to include the correct sdk_version (instead of "unknown").
      *
-     * @param environment Environment (0=development, 1=staging, 2=production)
+     * @param environment Environment (0=development, 2=production; 1 reserved)
      * @param deviceId Device ID string
      * @param platform Platform string (e.g., "android")
      * @param sdkVersion SDK version string (e.g., "0.1.0")
@@ -1415,10 +1481,6 @@ object RunAnywhereBridge {
     // `HTTPClientAdapter` to converge on the same canonical SDK header
     // list and structured API-error parsing Swift consumes, instead of
     // inlining the policy on the Kotlin side.
-    //
-    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
-    // commons does not expose an upsert-mode HTTP variant through the
-    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical
@@ -1486,7 +1548,7 @@ object RunAnywhereBridge {
 
     /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.
      *  Returns null on error. The 6-arg signature mirrors rac_sdk_config_t.
-     *  environment: 0 = DEVELOPMENT, 1 = STAGING, 2 = PRODUCTION. */
+     *  environment: 0 = DEVELOPMENT, 2 = PRODUCTION (1 reserved). */
     @JvmStatic external fun racAuthBuildAuthenticateRequest(
         apiKey: String,
         baseUrl: String,

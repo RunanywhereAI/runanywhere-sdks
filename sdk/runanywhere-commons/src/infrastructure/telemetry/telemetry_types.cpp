@@ -18,6 +18,10 @@ rac_telemetry_payload_t rac_telemetry_payload_default(void) {
     payload.has_is_streaming = RAC_FALSE;
     payload.is_online = RAC_FALSE;
     payload.has_is_online = RAC_FALSE;
+    payload.battery_level = -1.0;
+    payload.is_low_power_mode = RAC_FALSE;
+    payload.has_is_low_power_mode = RAC_FALSE;
+    payload.cpu_usage_percent = -1.0;
     return payload;
 }
 

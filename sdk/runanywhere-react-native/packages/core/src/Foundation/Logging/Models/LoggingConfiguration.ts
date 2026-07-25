@@ -20,6 +20,7 @@ const DEVELOPMENT: LoggingConfiguration = LoggingConfiguration.fromPartial({
   minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
 });
 
+/** Info-level logging profile — not an SDK environment. */
 const STAGING: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: true,
   minLogLevel: LogLevel.LOG_LEVEL_INFO,
@@ -36,11 +37,14 @@ export function getConfigurationForEnvironment(
   switch (environment) {
     case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       return { ...DEVELOPMENT };
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return { ...STAGING };
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return { ...PRODUCTION };
     default:
       return { ...DEVELOPMENT };
   }
+}
+
+/** Info-level logging profile — not tied to an SDK environment. */
+export function getStagingConfiguration(): LoggingConfiguration {
+  return { ...STAGING };
 }

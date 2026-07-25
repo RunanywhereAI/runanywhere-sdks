@@ -9,12 +9,16 @@
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/CloudSttProvider.kt|kotlin:org-json-usage
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/Cloud.kt|kotlin:org-json-usage
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt|kotlin:json-serialisation
+# Web-search tool parses the external DuckDuckGo JSON response (not an SDK DTO);
+# mirrors the already-allowlisted Swift RunAnywhere+WebSearchTool.swift.
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/RunAnywhereWebSearchTool.kt|kotlin:json-serialisation
 
 # Swift public value types and typed JSON boundaries.
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift|swift:types-dto-file
 sdk/runanywhere-swift/Sources/MLXRuntime/MLX.swift|swift:json-bridge
+sdk/runanywhere-swift/Sources/MLXRuntime/Nemotron.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+WebSearchTool.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift|swift:json-bridge
 sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/CloudSttProvider.swift|swift:json-bridge
@@ -56,6 +60,9 @@ sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h|cpp:json-para
 sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/segmentation/rac_segmentation_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/diarization/rac_diarization_service.h|cpp:json-param-in-public-api
+sdk/runanywhere-commons/include/rac/features/rerank/rac_rerank_service.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/plugin/rac_onnxrt_runtime_ep.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h|cpp:json-param-in-public-api
 sdk/runanywhere-commons/include/rac/cloud/rac_cloud_stt_provider.h|cpp:json-param-in-public-api

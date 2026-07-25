@@ -36,7 +36,8 @@ describe('OPFSBridge multi-module hydration', () => {
 
     expect(replacement.files.get(MODEL_PATH)).toEqual(persisted);
     expect(replacement.writeFile).toHaveBeenCalledOnce();
-    expect(getFile).toHaveBeenCalledOnce();
+    // Size probe + byte read each call getFile().
+    expect(getFile).toHaveBeenCalled();
   });
 
   it('does not read OPFS when every filesystem module already has the model', async () => {
@@ -71,7 +72,7 @@ describe('OPFSBridge multi-module hydration', () => {
     await expect(OPFSBridge.ensureModelPathReadyForLoad(
       [sibling.module, replacement.module],
       MODEL_PATH,
-    )).rejects.toThrow('missing from 1 MEMFS module');
+    )).rejects.toThrow(/could not load .* into memory.*1 WASM module/);
   });
 
   it('completes a partially hydrated directory from the full persisted bundle', async () => {

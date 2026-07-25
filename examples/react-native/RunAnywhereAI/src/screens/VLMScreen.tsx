@@ -33,11 +33,16 @@ import {
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
 import { type ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../theme/system';
 
 const VLMScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { height: screenHeight } = useWindowDimensions();
   const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice('back');
@@ -96,12 +101,12 @@ const VLMScreen: React.FC = () => {
     vlm.clearError();
   }, [vlm]);
 
-  // Main action button color
+  // Main action button color — brand primary for capture, error red for stop
   const mainButtonColor = vlm.isAutoStreaming
-    ? Colors.primaryRed
+    ? colors.error
     : vlm.isProcessing
-      ? Colors.textTertiary
-      : Colors.primaryOrange;
+      ? colors.outline
+      : colors.primary;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -111,7 +116,7 @@ const VLMScreen: React.FC = () => {
           <Icon
             name="scan-outline"
             size={48}
-            color={Colors.primaryOrange}
+            color={colors.primary}
             style={styles.modelRequiredIcon}
           />
           <Text style={styles.modelRequiredTitle}>Vision AI</Text>
@@ -146,7 +151,7 @@ const VLMScreen: React.FC = () => {
                 <Icon
                   name="camera"
                   size={48}
-                  color={Colors.textSecondary}
+                  color={colors.onSurfaceVariant}
                   style={styles.cameraPermissionIcon}
                 />
                 <Text style={styles.cameraPermissionTitle}>
@@ -174,7 +179,7 @@ const VLMScreen: React.FC = () => {
             {vlm.isProcessing && (
               <View style={styles.processingOverlay}>
                 <View style={styles.processingContent}>
-                  <ActivityIndicator size="small" color={Colors.textWhite} />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                   <Text style={styles.processingText}>Analyzing...</Text>
                 </View>
               </View>
@@ -202,7 +207,7 @@ const VLMScreen: React.FC = () => {
                   <Icon
                     name="copy-outline"
                     size={18}
-                    color={Colors.textSecondary}
+                    color={colors.onSurfaceVariant}
                   />
                 </TouchableOpacity>
               )}
@@ -220,7 +225,7 @@ const VLMScreen: React.FC = () => {
                 <Icon
                   name="close"
                   size={18}
-                  color={Colors.primaryRed}
+                  color={colors.onErrorContainer}
                   style={styles.errorDismissIcon}
                 />
               </TouchableOpacity>
@@ -256,9 +261,7 @@ const VLMScreen: React.FC = () => {
               <Icon
                 name="images-outline"
                 size={24}
-                color={
-                  vlm.isProcessing ? Colors.textTertiary : Colors.primaryBlue
-                }
+                color={vlm.isProcessing ? colors.outline : colors.primary}
               />
             </TouchableOpacity>
 
@@ -275,7 +278,7 @@ const VLMScreen: React.FC = () => {
               <Icon
                 name={vlm.isAutoStreaming ? 'stop' : 'camera'}
                 size={28}
-                color={Colors.textWhite}
+                color="#FFFFFF"
               />
             </TouchableOpacity>
 
@@ -291,10 +294,10 @@ const VLMScreen: React.FC = () => {
                 size={24}
                 color={
                   vlm.isAutoStreaming
-                    ? Colors.statusGreen
+                    ? colors.success
                     : vlm.isProcessing
-                      ? Colors.textTertiary
-                      : Colors.primaryBlue
+                      ? colors.outline
+                      : colors.primary
                 }
               />
             </TouchableOpacity>
@@ -308,7 +311,7 @@ const VLMScreen: React.FC = () => {
               <Icon
                 name="hardware-chip-outline"
                 size={24}
-                color={Colors.primaryBlue}
+                color={colors.primary}
               />
             </TouchableOpacity>
           </View>
@@ -326,204 +329,205 @@ const VLMScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  mainContent: {
-    flex: 1,
-  },
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    mainContent: {
+      flex: 1,
+    },
 
-  // Model Required Overlay
-  modelRequiredOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.overlayMedium,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Padding.padding24,
-    zIndex: 100,
-  },
-  modelRequiredIcon: {
-    marginBottom: Spacing.large,
-  },
-  modelRequiredTitle: {
-    ...Typography.title2,
-    color: Colors.textWhite,
-    marginBottom: Spacing.small,
-    textAlign: 'center',
-  },
-  modelRequiredSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.xLarge,
-  },
-  selectModelButton: {
-    backgroundColor: Colors.primaryOrange,
-    paddingHorizontal: Padding.padding24,
-    paddingVertical: Padding.padding12,
-    borderRadius: BorderRadius.medium,
-  },
-  selectModelButtonText: {
-    ...Typography.headline,
-    color: Colors.textWhite,
-  },
+    // Model Required Overlay (always-dark scrim, so text stays literal white)
+    modelRequiredOverlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      zIndex: 100,
+    },
+    modelRequiredIcon: {
+      marginBottom: 16,
+    },
+    modelRequiredTitle: {
+      ...typography.titleLarge,
+      color: '#FFFFFF',
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    modelRequiredSubtitle: {
+      ...typography.bodyLarge,
+      color: 'rgba(255, 255, 255, 0.7)',
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    selectModelButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 10,
+    },
+    selectModelButtonText: {
+      ...typography.titleMedium,
+      color: colors.onPrimary,
+    },
 
-  // Camera Preview
-  cameraPreview: {
-    backgroundColor: Colors.backgroundPrimary,
-    position: 'relative',
-  },
-  cameraPermissionView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  cameraPermissionIcon: {
-    marginBottom: Spacing.medium,
-  },
-  cameraPermissionTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.medium,
-  },
-  openSettingsButton: {
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding8,
-    borderRadius: BorderRadius.regular,
-  },
-  openSettingsButtonText: {
-    ...Typography.body,
-    color: Colors.textWhite,
-  },
+    // Camera Preview
+    cameraPreview: {
+      backgroundColor: colors.background,
+      position: 'relative',
+    },
+    cameraPermissionView: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceContainer,
+    },
+    cameraPermissionIcon: {
+      marginBottom: 10,
+    },
+    cameraPermissionTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+      marginBottom: 10,
+    },
+    openSettingsButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    openSettingsButtonText: {
+      ...typography.bodyLarge,
+      color: colors.onPrimary,
+    },
 
-  // Processing Overlay
-  processingOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: Spacing.large,
-  },
-  processingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderRadius: BorderRadius.pill,
-  },
-  processingText: {
-    ...Typography.caption,
-    color: Colors.textWhite,
-    marginLeft: Spacing.smallMedium,
-  },
+    // Processing Overlay
+    processingOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      paddingBottom: 16,
+    },
+    processingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 20,
+    },
+    processingText: {
+      ...typography.bodySmall,
+      color: '#FFFFFF',
+      marginLeft: 8,
+    },
 
-  // Description Panel
-  descriptionPanel: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding14,
-  },
-  descriptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.mediumLarge,
-  },
-  descriptionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  descriptionTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${Colors.statusGreen}20`,
-    paddingHorizontal: Spacing.smallMedium,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-    marginLeft: Spacing.small,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.statusGreen,
-    marginRight: Spacing.xSmall,
-  },
-  liveText: {
-    ...Typography.caption2,
-    color: Colors.statusGreen,
-    fontWeight: '700',
-  },
-  errorBanner: {
-    backgroundColor: Colors.badgeRed,
-    padding: Spacing.smallMedium,
-    borderRadius: BorderRadius.regular,
-    marginBottom: Spacing.medium,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  errorText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    flex: 1,
-  },
-  errorDismissIcon: {
-    marginLeft: Spacing.small,
-  },
-  descriptionScroll: {
-    flex: 1,
-  },
-  descriptionScrollContent: {
-    flexGrow: 1,
-  },
-  descriptionText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 22,
-  },
-  descriptionPlaceholder: {
-    color: Colors.textSecondary,
-  },
+    // Description Panel
+    descriptionPanel: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    descriptionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    descriptionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    descriptionTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
+    liveBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: `${colors.success}20`,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginLeft: 6,
+    },
+    liveDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success,
+      marginRight: 4,
+    },
+    liveText: {
+      ...typography.labelSmall,
+      color: colors.success,
+      fontWeight: '700',
+    },
+    errorBanner: {
+      backgroundColor: colors.errorContainer,
+      padding: 8,
+      borderRadius: 8,
+      marginBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    errorText: {
+      ...typography.bodySmall,
+      color: colors.onErrorContainer,
+      flex: 1,
+    },
+    errorDismissIcon: {
+      marginLeft: 6,
+    },
+    descriptionScroll: {
+      flex: 1,
+    },
+    descriptionScrollContent: {
+      flexGrow: 1,
+    },
+    descriptionText: {
+      ...typography.bodyLarge,
+      color: colors.onSurface,
+      lineHeight: 22,
+    },
+    descriptionPlaceholder: {
+      color: colors.onSurfaceVariant,
+    },
 
-  // Control Bar
-  controlBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundPrimary,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderLight,
-    paddingVertical: Spacing.large,
-    paddingHorizontal: Padding.padding16,
-  },
-  controlButton: {
-    padding: Spacing.medium,
-  },
-  mainActionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-});
+    // Control Bar
+    controlBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-evenly',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.outlineVariant,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+    },
+    controlButton: {
+      padding: 10,
+    },
+    mainActionButton: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+  });
 
 export default VLMScreen;

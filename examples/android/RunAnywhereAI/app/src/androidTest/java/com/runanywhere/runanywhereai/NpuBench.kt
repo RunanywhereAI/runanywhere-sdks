@@ -74,6 +74,23 @@ object NpuMetrics {
         }
     }
 
+    // Sub-word tokenizer boundary markers that must never survive detokenization into
+    // user-visible text: SentencePiece U+2581, GPT-2/BPE U+0120 and U+010A, and the
+    // replacement char U+FFFD (mis-decoded UTF-8).
+    private val TOKENIZER_ARTIFACTS = listOf('\u2581', '\u0120', '\u010A', '\uFFFD')
+
+    /**
+     * Tokenizer artifacts left in [s], as U+XXXX labels; empty when the text is clean.
+     *
+     * [words] deliberately mirrors forge's `normalize_text`, which keeps only letter/number
+     * runs — so a marker like U+2581 is treated as a SEPARATOR and `▁a▁b` scores identically
+     * to `a b`. That makes WER structurally blind to a detokenizer that leaks markers, which
+     * is exactly how a Canary build scored WER 0.000 while emitting unusable text. Assert this
+     * ALONGSIDE the parity metric rather than widening the parity math itself.
+     */
+    fun tokenizerArtifacts(s: String): List<String> =
+        TOKENIZER_ARTIFACTS.filter { s.contains(it) }.map { "U+%04X".format(it.code) }
+
     /** word-level WER = Levenshtein(ref_words, hyp_words) / |ref_words|  (forge text.wer). */
     fun wer(ref: String, hyp: String): Double {
         val r = words(ref); val h = words(hyp)
@@ -514,6 +531,9 @@ class NpuSuite(
     val passFrac: Double get() = gate.optDouble("suite_pass_frac", 0.60)
     val minInputs: Int get() = gate.optInt("min_inputs", 1)
     val minDecodeToks: Double get() = gate.optDouble("min_decode_toks", 0.0)
+    // text-to-image (diffusion) smoke gate: minimum RGB8 population std (structure) + optional reference PSNR
+    val t2iMinStd: Double get() = gate.optDouble("min_pixel_std", 20.0)
+    val t2iMinPsnr: Double get() = gate.optDouble("min_psnr_db", 20.0)
     val minTriples: Int get() = gate.optInt("min_triples", 1)
     val expectedDimension: Int get() = gate.optInt("expected_dimension", 0)
     val minimumPairwiseMargin: Double get() = gate.optDouble("minimum_pairwise_margin", 0.0)

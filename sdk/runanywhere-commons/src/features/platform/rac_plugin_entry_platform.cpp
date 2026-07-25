@@ -126,10 +126,10 @@ static const rac_engine_vtable_t g_platform_engine_vtable = {
 #else
     nullptr,
 #endif
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_0..9 */
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

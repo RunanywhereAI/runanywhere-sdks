@@ -91,6 +91,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
   case voiceAgent // = 9
   case wakeword // = 10
   case speakerDiarization // = 11
+  case semanticSegmentation // = 12
+  case rerank // = 13
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -111,6 +113,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 9: self = .voiceAgent
     case 10: self = .wakeword
     case 11: self = .speakerDiarization
+    case 12: self = .semanticSegmentation
+    case 13: self = .rerank
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -129,6 +133,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .voiceAgent: return 9
     case .wakeword: return 10
     case .speakerDiarization: return 11
+    case .semanticSegmentation: return 12
+    case .rerank: return 13
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -147,6 +153,8 @@ public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
     .voiceAgent,
     .wakeword,
     .speakerDiarization,
+    .semanticSegmentation,
+    .rerank,
   ]
 
 }
@@ -2503,6 +2511,12 @@ public nonisolated struct RAGenerationEvent: @unchecked Sendable {
     set {_uniqueStorage()._framework = newValue}
   }
 
+  /// prompt eval (prefill) duration
+  public var promptEvalTimeMs: Int64 {
+    get {_storage._promptEvalTimeMs}
+    set {_uniqueStorage()._promptEvalTimeMs = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -3906,7 +3920,7 @@ public nonisolated struct RASDKEventSubscribeRequest: Sendable {
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASDKComponent: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0\u{1}SDK_COMPONENT_SEMANTIC_SEGMENTATION\0\u{1}SDK_COMPONENT_RERANK\0")
 }
 
 nonisolated extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {
@@ -4645,7 +4659,7 @@ nonisolated extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0\u{3}tokens_per_second\0\u{3}time_to_first_token_ms\0\u{3}is_streaming\0\u{1}temperature\0\u{3}max_tokens\0\u{3}context_length\0\u{3}model_name\0\u{3}duration_ms\0\u{1}framework\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0\u{3}tokens_per_second\0\u{3}time_to_first_token_ms\0\u{3}is_streaming\0\u{1}temperature\0\u{3}max_tokens\0\u{3}context_length\0\u{3}model_name\0\u{3}duration_ms\0\u{1}framework\0\u{3}prompt_eval_time_ms\0")
 
   fileprivate class _StorageClass {
     var _kind: RAGenerationEventKind = .unspecified
@@ -4681,6 +4695,7 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
     var _modelName: String = String()
     var _durationMs: Double = 0
     var _framework: Int32 = 0
+    var _promptEvalTimeMs: Int64 = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4724,6 +4739,7 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
       _modelName = source._modelName
       _durationMs = source._durationMs
       _framework = source._framework
+      _promptEvalTimeMs = source._promptEvalTimeMs
     }
   }
 
@@ -4775,6 +4791,7 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
         case 31: try { try decoder.decodeSingularStringField(value: &_storage._modelName) }()
         case 32: try { try decoder.decodeSingularDoubleField(value: &_storage._durationMs) }()
         case 33: try { try decoder.decodeSingularInt32Field(value: &_storage._framework) }()
+        case 34: try { try decoder.decodeSingularInt64Field(value: &_storage._promptEvalTimeMs) }()
         default: break
         }
       }
@@ -4882,6 +4899,9 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
       if _storage._framework != 0 {
         try visitor.visitSingularInt32Field(value: _storage._framework, fieldNumber: 33)
       }
+      if _storage._promptEvalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._promptEvalTimeMs, fieldNumber: 34)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4924,6 +4944,7 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._modelName != rhs_storage._modelName {return false}
         if _storage._durationMs != rhs_storage._durationMs {return false}
         if _storage._framework != rhs_storage._framework {return false}
+        if _storage._promptEvalTimeMs != rhs_storage._promptEvalTimeMs {return false}
         return true
       }
       if !storagesAreEqual {return false}

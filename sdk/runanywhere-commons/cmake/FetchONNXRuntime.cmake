@@ -38,8 +38,15 @@ if(EMSCRIPTEN)
     # engines/onnx and engines/sherpa link against it. Otherwise fall back to
     # an INTERFACE-only target so builds that don't enable ONNX still work —
     # sherpa-onnx's build tree has historically supplied the headers.
+    #
+    # Override with -DRAC_ONNX_WASM_RUNTIME_DIR=.../onnxruntime-wasm-webgpu for
+    # the speech WebGPU twin (Asyncify + ORT WebGPU EP archive).
     # ==========================================================================
-    set(ONNX_WASM_ROOT "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-wasm")
+    if(DEFINED RAC_ONNX_WASM_RUNTIME_DIR AND NOT RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
+        set(ONNX_WASM_ROOT "${RAC_ONNX_WASM_RUNTIME_DIR}")
+    else()
+        set(ONNX_WASM_ROOT "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-wasm")
+    endif()
     set(ONNX_WASM_LIB "${ONNX_WASM_ROOT}/lib/libonnxruntime.a")
     set(ONNX_WASM_HEADERS "${ONNX_WASM_ROOT}/include")
 

@@ -109,6 +109,26 @@ RAC_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t type);
  */
 RAC_API rac_device_class_t rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type);
 
+/**
+ * Probe whether the linked ORT build can append the WebGPU EP.
+ * Returns non-zero only when SessionOptionsAppendExecutionProvider("WebGPU")
+ * succeeds (compile-time RAC_ONNXRT_EP_WEBGPU_ENABLED alone is not enough).
+ */
+RAC_API int rac_onnxrt_probe_webgpu_ep(void);
+
+/**
+ * Activate WebGPU when `prefer_webgpu != 0` and the probe succeeds; otherwise
+ * activate CPU. Returns 1 when WebGPU is active, 0 for CPU.
+ */
+RAC_API int rac_onnxrt_activate_preferred_wasm_ep(int prefer_webgpu);
+
+/**
+ * NUL-terminated reason for the last failed `rac_onnxrt_probe_webgpu_ep` /
+ * activate attempt. Empty string when the last probe succeeded or was never run.
+ * Pointer is process-owned; valid until the next probe/activate call.
+ */
+RAC_API const char* rac_onnxrt_last_webgpu_probe_error(void);
+
 #ifdef __cplusplus
 }
 #endif

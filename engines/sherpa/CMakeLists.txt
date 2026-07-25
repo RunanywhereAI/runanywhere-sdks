@@ -363,6 +363,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 set(SHERPA_BACKEND_SOURCES
+    sherpa_model_inspector.cpp
     sherpa_backend.cpp
     rac_stt_sherpa.cpp
     rac_tts_sherpa.cpp
@@ -370,6 +371,19 @@ set(SHERPA_BACKEND_SOURCES
     rac_backend_sherpa_register.cpp
     rac_plugin_entry_sherpa.cpp
 )
+
+if(RAC_BUILD_TESTS AND NOT EMSCRIPTEN)
+    add_executable(test_sherpa_model_inspector
+        tests/test_sherpa_model_inspector.cpp
+        sherpa_model_inspector.cpp
+    )
+    target_include_directories(test_sherpa_model_inspector PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    target_compile_features(test_sherpa_model_inspector PRIVATE cxx_std_20)
+    add_test(NAME sherpa_model_inspector_tests COMMAND test_sherpa_model_inspector)
+    set_tests_properties(sherpa_model_inspector_tests PROPERTIES LABELS "native;sherpa;stt")
+endif()
 
 set(SHERPA_LINK_LIBS onnxruntime nlohmann_json::nlohmann_json)
 set(SHERPA_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX RAC_SHERPA_SPEECH_OPS_AVAILABLE=1)
