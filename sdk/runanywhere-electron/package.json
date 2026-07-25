@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.1.0",
-  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first, Hexagon-ready).",
+  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "commonjs",
@@ -53,6 +53,9 @@
     "test:integration": "node --test \"test/integration/**/*.test.js\"",
     "test:all": "node --test \"test/unit/**/*.test.js\" \"test/integration/**/*.test.js\"",
     "prepack": "npm run build && npm run bundle:native"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.1"
   },
   "devDependencies": {
     "@types/node": "^22.7.0",

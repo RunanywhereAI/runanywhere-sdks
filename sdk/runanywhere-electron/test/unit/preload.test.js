@@ -5,6 +5,7 @@
 // and drive a fake MessagePort — no real Electron / renderer needed.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { isSDKException, ErrorCode } = require('../../dist/errors');
 
 let electronPath = null;
 try {
@@ -81,18 +82,30 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   const api = exposed.runanywhere;
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
-    'ready', 'version', 'initialize', 'onEvent', 'catalog', 'modelStatus', 'downloadModel',
+    'ready', 'version', 'initialize', 'onEvent', 'splitThinking', 'catalog', 'modelStatus', 'downloadModel',
     'loadLLM', 'generate', 'generateStream', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
     'loadSTT', 'transcribe', 'unloadSTT',
     'loadTTS', 'synthesize', 'unloadTTS',
+    'registerModel',
+    'ragCreateSession', 'ragCreateSessionFromCatalog',
+    'ragIngest', 'ragQuery', 'ragStats', 'ragClear', 'ragDestroySession',
+
     'secureSet', 'secureGet', 'secureDelete',
     'createVad', 'vadProcess', 'vadIsActive', 'vadSetThreshold', 'vadReset', 'unloadVad',
     'shutdown',
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
   }
+});
+
+test('splitThinking bridge splits reasoning from the answer', { skip: SKIP }, () => {
+  const { exposed } = freshPreload();
+  assert.deepEqual(exposed.runanywhere.splitThinking('<think>ponder</think>Answer.'), {
+    thinking: 'ponder',
+    response: 'Answer.',
+  });
 });
 
 test('generateObject builds a grammar, accumulates the stream, and parses JSON', { skip: SKIP }, async () => {
@@ -233,6 +246,32 @@ test('a failing reply rejects with the error message', { skip: SKIP }, async () 
   assert.equal(msg.method, 'loadModel');
   port.onmessage({ data: { id: msg.id, ok: false, error: 'boom' } });
   await assert.rejects(() => p, /boom/);
+});
+
+test('a structured failing reply rejects with a typed SDKException', { skip: SKIP }, async () => {
+  const { exposed, state } = freshPreload();
+  const port = connect(state);
+  const p = exposed.runanywhere.loadLLM('/model.gguf');
+  await tick();
+  const msg = port.last();
+  port.onmessage({
+    data: {
+      id: msg.id,
+      ok: false,
+      error: {
+        message: 'load_model failed: -111',
+        code: 111,
+        cAbiCode: -111,
+        category: 3,
+      },
+    },
+  });
+  await assert.rejects(() => p, (e) => {
+    assert.ok(isSDKException(e));
+    assert.equal(e.code, ErrorCode.MODEL_LOAD_FAILED);
+    assert.equal(e.cAbiCode, -111);
+    return true;
+  });
 });
 
 test('generate streams tokens to onToken then resolves on done', { skip: SKIP }, async () => {

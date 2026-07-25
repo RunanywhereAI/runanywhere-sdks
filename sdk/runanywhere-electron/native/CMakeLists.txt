@@ -72,8 +72,25 @@ if(RAC_BUILD_ELECTRON_ADDON)
     target_compile_definitions(runanywhere_native PRIVATE
         NAPI_VERSION=8 NODE_ADDON_API_DISABLE_DEPRECATED BUILDING_NODE_EXTENSION)
     target_compile_features(runanywhere_native PRIVATE cxx_std_20)
-    target_link_libraries(runanywhere_native PRIVATE
-        rac_commons rac_backend_llamacpp rac_backend_onnx rac_backend_sherpa Crypt32 "${RAC_NODE_LIB}")
+    target_link_libraries(runanywhere_native PRIVATE rac_commons Crypt32 "${RAC_NODE_LIB}")
+
+    # Link whichever engine backends this build enabled, and tell addon.cpp which
+    # are present via RAC_HAVE_BACKEND_<X>. Default CPU build provides llamacpp +
+    # onnx + sherpa. QHexRT / MLX / CoreML / cloud self-link when their upstream
+    # RAC_BACKEND_* flag builds the target — no wrapper source change required.
+    # Do NOT claim Windows NPU readiness: qhexrt may link as a shell, but Snapdragon
+    # Windows packaging is a separate gate.
+    set(_ra_backends llamacpp onnx sherpa qhexrt mlx coreml cloud)
+    set(_ra_linked_backends "")
+    foreach(_ra_b IN LISTS _ra_backends)
+        if(TARGET rac_backend_${_ra_b})
+            target_link_libraries(runanywhere_native PRIVATE rac_backend_${_ra_b})
+            string(TOUPPER "${_ra_b}" _ra_bU)
+            target_compile_definitions(runanywhere_native PRIVATE RAC_HAVE_BACKEND_${_ra_bU})
+            list(APPEND _ra_linked_backends ${_ra_b})
+        endif()
+    endforeach()
+    message(STATUS "runanywhere-electron: engine backends -> ${_ra_linked_backends}")
 
     if(MSVC)
         target_link_directories(runanywhere_native PRIVATE "${_ra_bundled_dir}")
