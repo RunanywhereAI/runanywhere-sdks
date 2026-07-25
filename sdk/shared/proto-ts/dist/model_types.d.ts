@@ -411,6 +411,13 @@ export interface ModelInfo {
     usageCount?: number | undefined;
     syncPending?: boolean | undefined;
     statusMessage?: string | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+     * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+     * models. Lets the catalog mark which models are drivable through
+     * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+     */
+    cuaProfile?: string | undefined;
 }
 /**
  * Repeated model registry responses use this wrapper because protobuf cannot
@@ -959,6 +966,11 @@ export interface RegisterMultiFileModelRequest {
     supportsLora?: boolean | undefined;
     description?: string | undefined;
     source?: ModelSource | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+     * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+     */
+    cuaProfile?: string | undefined;
 }
 export declare const ModelInfoMetadata: MessageFns<ModelInfoMetadata>;
 export declare const ModelRuntimeCompatibility: MessageFns<ModelRuntimeCompatibility>;

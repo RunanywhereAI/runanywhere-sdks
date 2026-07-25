@@ -1371,6 +1371,7 @@ function createBaseModelInfo() {
         usageCount: undefined,
         syncPending: undefined,
         statusMessage: undefined,
+        cuaProfile: undefined,
     };
 }
 exports.ModelInfo = {
@@ -1482,6 +1483,9 @@ exports.ModelInfo = {
         }
         if (message.statusMessage !== undefined) {
             writer.uint32(298).string(message.statusMessage);
+        }
+        if (message.cuaProfile !== undefined) {
+            writer.uint32(306).string(message.cuaProfile);
         }
         return writer;
     },
@@ -1744,6 +1748,13 @@ exports.ModelInfo = {
                     message.statusMessage = reader.string();
                     continue;
                 }
+                case 38: {
+                    if (tag !== 306) {
+                        break;
+                    }
+                    message.cuaProfile = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1898,6 +1909,11 @@ exports.ModelInfo = {
                 : isSet(object.status_message)
                     ? globalThis.String(object.status_message)
                     : undefined,
+            cuaProfile: isSet(object.cuaProfile)
+                ? globalThis.String(object.cuaProfile)
+                : isSet(object.cua_profile)
+                    ? globalThis.String(object.cua_profile)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -2010,6 +2026,9 @@ exports.ModelInfo = {
         if (message.statusMessage !== undefined) {
             obj.statusMessage = message.statusMessage;
         }
+        if (message.cuaProfile !== undefined) {
+            obj.cuaProfile = message.cuaProfile;
+        }
         return obj;
     },
     create(base) {
@@ -2067,6 +2086,7 @@ exports.ModelInfo = {
         message.usageCount = object.usageCount ?? undefined;
         message.syncPending = object.syncPending ?? undefined;
         message.statusMessage = object.statusMessage ?? undefined;
+        message.cuaProfile = object.cuaProfile ?? undefined;
         return message;
     },
 };
@@ -7250,6 +7270,7 @@ function createBaseRegisterMultiFileModelRequest() {
         supportsLora: undefined,
         description: undefined,
         source: undefined,
+        cuaProfile: undefined,
     };
 }
 exports.RegisterMultiFileModelRequest = {
@@ -7292,6 +7313,9 @@ exports.RegisterMultiFileModelRequest = {
         }
         if (message.source !== undefined) {
             writer.uint32(104).int32(message.source);
+        }
+        if (message.cuaProfile !== undefined) {
+            writer.uint32(114).string(message.cuaProfile);
         }
         return writer;
     },
@@ -7393,6 +7417,13 @@ exports.RegisterMultiFileModelRequest = {
                     message.source = reader.int32();
                     continue;
                 }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.cuaProfile = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -7438,6 +7469,11 @@ exports.RegisterMultiFileModelRequest = {
                     : undefined,
             description: isSet(object.description) ? globalThis.String(object.description) : undefined,
             source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+            cuaProfile: isSet(object.cuaProfile)
+                ? globalThis.String(object.cuaProfile)
+                : isSet(object.cua_profile)
+                    ? globalThis.String(object.cua_profile)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -7481,6 +7517,9 @@ exports.RegisterMultiFileModelRequest = {
         if (message.source !== undefined) {
             obj.source = modelSourceToJSON(message.source);
         }
+        if (message.cuaProfile !== undefined) {
+            obj.cuaProfile = message.cuaProfile;
+        }
         return obj;
     },
     create(base) {
@@ -7501,6 +7540,7 @@ exports.RegisterMultiFileModelRequest = {
         message.supportsLora = object.supportsLora ?? undefined;
         message.description = object.description ?? undefined;
         message.source = object.source ?? undefined;
+        message.cuaProfile = object.cuaProfile ?? undefined;
         return message;
     },
 };

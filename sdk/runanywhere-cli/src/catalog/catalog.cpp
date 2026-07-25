@@ -577,7 +577,8 @@ constexpr CatalogEntry kCatalog[] = {
      v1::MODEL_FORMAT_GGUF, nullptr, kQwen2VlFiles, 2, 1800 * MB, 2048, false},
     {"fara1.5-4b-q4_k_m", "fara", "Fara1.5 4B Computer-Use Agent Q4_K_M",
      v1::MODEL_CATEGORY_MULTIMODAL, v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
-     v1::MODEL_FORMAT_GGUF, nullptr, kFara15GgufFiles, 2, 3300 * MB, 4096, false},
+     v1::MODEL_FORMAT_GGUF, nullptr, kFara15GgufFiles, 2, 3300 * MB, 4096, false,
+     /*cua_profile*/ "fara"},
 
     // --- Speech (Sherpa-ONNX archives; orchestrator extracts in-core) ---
     {"sherpa-onnx-whisper-tiny.en", "whisper-tiny",
@@ -750,6 +751,9 @@ rac_result_t register_entry(const CatalogEntry &entry) {
     }
     if (entry.supports_thinking) {
       request.set_supports_thinking(true);
+    }
+    if (entry.cua_profile != nullptr && entry.cua_profile[0] != '\0') {
+      request.set_cua_profile(entry.cua_profile);
     }
     for (size_t i = 0; i < entry.file_count; ++i) {
       runanywhere::v1::ModelFileDescriptor *file = request.add_files();

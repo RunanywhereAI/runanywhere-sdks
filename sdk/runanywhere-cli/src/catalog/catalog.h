@@ -44,6 +44,7 @@ struct CatalogEntry {
     int64_t download_size_bytes;  // approximate, for display/planning
     int32_t context_length;       // 0 = unknown/not applicable
     bool supports_thinking;
+    const char* cua_profile = "";  // Computer-Use-Agent profile id ("" = not a CUA model)
 };
 
 /** All built-in entries. */

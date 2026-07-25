@@ -619,6 +619,9 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
     if (request.has_description()) {
         model.mutable_metadata()->set_description(request.description());
     }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        model.set_cua_profile(request.cua_profile());
+    }
     *model.mutable_multi_file()->mutable_files() = request.files();
     model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
 
