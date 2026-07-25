@@ -169,9 +169,48 @@ export function isSDKException(error: unknown): error is SDKException {
   return error instanceof SDKException;
 }
 
+/** True if `n` is a known ErrorCode enum numeric value. */
+function isKnownErrorCode(n: number): n is ErrorCode {
+  return (Object.values(ErrorCode) as Array<number | string>).includes(n);
+}
+
+/**
+ * Raise an SDKException for a negative ``rac_result_t`` (parity with Python
+ * ``raise_for_rac``). Maps ``-|code|`` → ``ErrorCode`` when known, else UNKNOWN.
+ */
+export function raiseForRac(racCode: number, message?: string): never {
+  const positive = -racCode;
+  const code = isKnownErrorCode(positive) ? positive : ErrorCode.UNKNOWN;
+  throw SDKException.of(code, message ?? `Native call failed (rac=${racCode})`, {
+    cAbiCode: racCode,
+  });
+}
+
+/**
+ * Parse a trailing negative rac code from a native error message
+ * (e.g. ``"load_model failed: -111"``). Returns null when none found.
+ */
+export function parseRacCodeFromMessage(message: string): number | null {
+  const m = /failed:\s*(-?\d+)\s*(?:\(|$)/i.exec(message) ?? /(?:^|\s)(-[1-9]\d{0,3})\s*$/.exec(message);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n < 0 ? n : null;
+}
+
 /** Coerce any thrown value into an SDKException (matches RN/Web `asSDKException`). */
 export function asSDKException(error: unknown): SDKException {
   if (error instanceof SDKException) return error;
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : String(error);
+  const rac = parseRacCodeFromMessage(message);
+  if (rac !== null) {
+    const positive = -rac;
+    const code = isKnownErrorCode(positive) ? positive : ErrorCode.UNKNOWN;
+    return SDKException.of(code, message, {
+      cAbiCode: rac,
+      nestedMessage: error instanceof Error ? error.message : undefined,
+    });
+  }
   if (error instanceof Error) return SDKException.unknown(error.message, error);
   if (typeof error === 'string') return SDKException.unknown(error);
   return SDKException.unknown(String(error));

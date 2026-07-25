@@ -128,3 +128,46 @@ test('asSDKException coerces any thrown value', () => {
   const fromObj = asSDKException({ weird: true });
   assert.equal(fromObj.code, ErrorCode.UNKNOWN);
 });
+
+test('raiseForRac maps -111 to MODEL_LOAD_FAILED', () => {
+  const { raiseForRac } = require('../../dist/errors');
+  assert.throws(
+    () => raiseForRac(-111),
+    (e) => {
+      assert.ok(isSDKException(e));
+      assert.equal(e.code, ErrorCode.MODEL_LOAD_FAILED);
+      assert.equal(e.category, ErrorCategory.MODEL);
+      assert.equal(e.cAbiCode, -111);
+      return true;
+    }
+  );
+});
+
+test('raiseForRac unknown code falls back to UNKNOWN', () => {
+  const { raiseForRac } = require('../../dist/errors');
+  assert.throws(
+    () => raiseForRac(-9999, 'boom'),
+    (e) => {
+      assert.ok(isSDKException(e));
+      assert.equal(e.code, ErrorCode.UNKNOWN);
+      assert.equal(e.message, 'boom');
+      assert.equal(e.cAbiCode, -9999);
+      return true;
+    }
+  );
+});
+
+test('asSDKException parses native "failed: -<rac>" messages', () => {
+  const e = asSDKException(new Error('load_model failed: -111'));
+  assert.ok(isSDKException(e));
+  assert.equal(e.code, ErrorCode.MODEL_LOAD_FAILED);
+  assert.equal(e.category, ErrorCategory.MODEL);
+  assert.equal(e.cAbiCode, -111);
+  assert.match(e.message, /load_model failed: -111/);
+});
+
+test('asSDKException parses stream failed messages', () => {
+  const e = asSDKException('stream failed: -130');
+  assert.equal(e.code, ErrorCode.GENERATION_FAILED);
+  assert.equal(e.cAbiCode, -130);
+});
