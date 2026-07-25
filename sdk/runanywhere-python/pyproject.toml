@@ -34,7 +34,14 @@ dependencies = ["numpy>=1.21"]
 test = ["pytest>=7", "httpx>=0.24", "protobuf>=5.29,<7"]
 # The built-in OpenAI-compatible server (`runanywhere serve`). Kept out of the base install so a
 # plain `pip install runanywhere` stays numpy + stdlib only.
-server = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.32"]
+server = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    # 0.0.21+ dropped 3.9; keep the last 3.9-compatible line there and the
+    # hardened floor on 3.10+ (where those releases are installable).
+    "python-multipart>=0.0.18,<0.0.21; python_version < '3.10'",
+    "python-multipart>=0.0.32; python_version >= '3.10'",
+]
 # RAG (`runanywhere.rag` / RunAnywhere.create_rag). The native core already carries the RAG
 # pipeline; this extra just adds the protobuf runtime the facade uses to (de)serialize the
 # rac_rag_*_proto byte ABI. The generated *_pb2.py were built with protoc 5.29; protobuf's
