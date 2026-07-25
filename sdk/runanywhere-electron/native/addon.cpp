@@ -1132,7 +1132,13 @@ static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, c
     std::vector<uint8_t> copy(bytes.Data(), bytes.Data() + bytes.ByteLength());
     auto* worker = new RagProtoWorker(env, h, hid, std::move(copy), op, what);
     Napi::Promise promise = worker->Promise();
-    worker->Queue();
+    try {
+        worker->Queue();
+    } catch (...) {
+        end_op(hid);
+        delete worker;
+        throw;
+    }
     return promise;
 }
 
@@ -1192,6 +1198,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
 
     void Execute() override {
         rac_result_t rc = rac_rag_session_create_proto(config_.data(), config_.size(), &session_);
+        code_ = rc;
         if (rc != RAC_SUCCESS || session_ == nullptr) {
             err_ = "rag session create failed: " + std::to_string(rc);
             session_ = nullptr;
@@ -1204,7 +1211,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     void OnOK() override {
         Napi::HandleScope scope(Env());
         if (!ok_ || session_ == nullptr) {
-            deferred_.Reject(Napi::Error::New(Env(), err_).Value());
+            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
             return;
         }
         int32_t hid;
@@ -1236,6 +1243,7 @@ class RagCreateSessionWorker : public Napi::AsyncWorker {
     rac_handle_t session_ = nullptr;
     std::string err_;
     bool ok_ = false;
+    rac_result_t code_ = RAC_SUCCESS;
 };
 
 Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {

@@ -166,8 +166,12 @@ test('asSDKException parses native "failed: -<rac>" messages', () => {
   assert.match(e.message, /load_model failed: -111/);
 });
 
-test('asSDKException parses stream failed messages', () => {
-  const e = asSDKException('stream failed: -130');
-  assert.equal(e.code, ErrorCode.GENERATION_FAILED);
-  assert.equal(e.cAbiCode, -130);
+test('asSDKException prefers structured cAbiCode from native Errors', () => {
+  const native = Object.assign(new Error('load_model failed: -111'), {
+    code: 111,
+    cAbiCode: -111,
+  });
+  const e = asSDKException(native);
+  assert.equal(e.code, ErrorCode.MODEL_LOAD_FAILED);
+  assert.equal(e.cAbiCode, -111);
 });

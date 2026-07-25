@@ -169,20 +169,60 @@ export function isSDKException(error: unknown): error is SDKException {
   return error instanceof SDKException;
 }
 
-/** True if `n` is a known ErrorCode enum numeric value. */
-function isKnownErrorCode(n: number): n is ErrorCode {
-  return (Object.values(ErrorCode) as Array<number | string>).includes(n);
+type ErrorLike = {
+  message?: unknown;
+  code?: unknown;
+  cAbiCode?: unknown;
+  category?: unknown;
+  nestedMessage?: unknown;
+  fieldPath?: unknown;
+};
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function normalizeErrorCode(code: number): ErrorCode {
+  const normalized = Math.abs(Math.trunc(code));
+  return (normalized || ErrorCode.UNKNOWN) as ErrorCode;
+}
+
+function fromStructuredError(args: {
+  code: number;
+  message: string;
+  cAbiCode?: number;
+  category?: number;
+  nestedMessage?: string;
+  fieldPath?: string;
+}): SDKException {
+  return new SDKException({
+    code: normalizeErrorCode(args.code),
+    message: args.message,
+    cAbiCode: args.cAbiCode,
+    category:
+      args.category != null
+        ? (Math.trunc(args.category) as ErrorCategory)
+        : categoryForCode(Math.abs(Math.trunc(args.code))),
+    nestedMessage: args.nestedMessage,
+    fieldPath: args.fieldPath,
+  });
 }
 
 /**
  * Raise an SDKException for a negative ``rac_result_t`` (parity with Python
- * ``raise_for_rac``). Maps ``-|code|`` → ``ErrorCode`` when known, else UNKNOWN.
+ * ``raise_for_rac``). Preserves the raw negative ABI code as ``cAbiCode`` and
+ * uses its positive absolute value as the canonical SDK ``ErrorCode``.
  */
 export function raiseForRac(racCode: number, message?: string): never {
-  const positive = -racCode;
-  const code = isKnownErrorCode(positive) ? positive : ErrorCode.UNKNOWN;
-  throw SDKException.of(code, message ?? `Native call failed (rac=${racCode})`, {
-    cAbiCode: racCode,
+  const cAbiCode = -Math.abs(Math.trunc(racCode || 0));
+  throw fromStructuredError({
+    code: Math.abs(cAbiCode) || ErrorCode.UNKNOWN,
+    cAbiCode,
+    message: message ?? `Native call failed (rac=${cAbiCode})`,
   });
 }
 
@@ -200,18 +240,43 @@ export function parseRacCodeFromMessage(message: string): number | null {
 /** Coerce any thrown value into an SDKException (matches RN/Web `asSDKException`). */
 export function asSDKException(error: unknown): SDKException {
   if (error instanceof SDKException) return error;
-  const message =
-    error instanceof Error ? error.message : typeof error === 'string' ? error : String(error);
-  const rac = parseRacCodeFromMessage(message);
-  if (rac !== null) {
-    const positive = -rac;
-    const code = isKnownErrorCode(positive) ? positive : ErrorCode.UNKNOWN;
-    return SDKException.of(code, message, {
-      cAbiCode: rac,
-      nestedMessage: error instanceof Error ? error.message : undefined,
-    });
+  if (error && typeof error === 'object') {
+    const candidate = error as ErrorLike;
+    const message =
+      stringValue(candidate.message) ??
+      (error instanceof Error ? error.message : undefined) ??
+      String(error);
+    const cAbiCode = finiteNumber(candidate.cAbiCode);
+    if (cAbiCode != null && cAbiCode !== 0) {
+      return fromStructuredError({
+        code: Math.abs(cAbiCode),
+        cAbiCode,
+        message,
+        category: finiteNumber(candidate.category) ?? undefined,
+        nestedMessage: stringValue(candidate.nestedMessage),
+        fieldPath: stringValue(candidate.fieldPath),
+      });
+    }
+    const code = finiteNumber(candidate.code);
+    if (code != null && code > 0) {
+      return fromStructuredError({
+        code,
+        cAbiCode: -Math.abs(Math.trunc(code)),
+        message,
+        category: finiteNumber(candidate.category) ?? undefined,
+        nestedMessage: stringValue(candidate.nestedMessage),
+        fieldPath: stringValue(candidate.fieldPath),
+      });
+    }
+    const rac = parseRacCodeFromMessage(message);
+    if (rac !== null) return raiseForRac(rac, message);
+    if (error instanceof Error) return SDKException.unknown(message, error);
+    return SDKException.unknown(message);
   }
-  if (error instanceof Error) return SDKException.unknown(error.message, error);
-  if (typeof error === 'string') return SDKException.unknown(error);
+  if (typeof error === 'string') {
+    const rac = parseRacCodeFromMessage(error);
+    if (rac !== null) return raiseForRac(rac, error);
+    return SDKException.unknown(error);
+  }
   return SDKException.unknown(String(error));
 }
