@@ -86,9 +86,9 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"nemoguard_topic_8b", kV81, false},
     {"qwen3_vl_2b_text", kV81, false},
     {"qwen3_vl", kV75V79, false},
-    {"cosmos3_edge_text", kV81, false},   // Cosmos3-Edge reasoning/text AR path (sharded fp16 decode, split_generate); v81 device-validated greedy-exact
-    {"cosmos3_edge_vlm", kV81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v81 device-validated
-    {"cosmos3_edge_diffusion", kV81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v81
+    {"cosmos3_edge_text", kV79V81, false},   // Cosmos3-Edge reasoning/text AR path (split_generate); v81 greedy-exact, v79 W8-mono decode + fp16 lm-head
+    {"cosmos3_edge_vlm", kV79V81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v79 + v81
+    {"cosmos3_edge_diffusion", kV79V81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v79 + v81
     {"internvl3_5_1b", kAllSupportedArches, false},
     {"gemma4_e2b_vlm", kV79V81, false},
     {"gemma4_e4b_vlm", kV81, false},
