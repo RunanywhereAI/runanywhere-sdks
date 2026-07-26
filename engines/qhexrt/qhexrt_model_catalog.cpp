@@ -116,6 +116,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"kitten_nano_0_8", kV75V81, false},
     {"kitten_mini_0_8", kV81, false},
     {"kitten_micro_0_8", kV81, false},
+    // Magpie-TTS: published with v75/ + v81/ child dirs only (no v79 build).
+    {"magpie_tts_357m", kV75V81, false},
 };
 
 const ModelPolicy* find_model_policy(std::string_view model_id) {

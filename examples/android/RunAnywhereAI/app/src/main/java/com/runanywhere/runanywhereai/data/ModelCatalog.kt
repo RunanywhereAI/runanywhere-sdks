@@ -120,6 +120,7 @@ internal object ModelCatalog {
         SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 44_135_896L),
         SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 184_334_815L),
         SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 103_930_338L),
+        SingleFileModel("magpie_tts_357m", "Magpie-TTS Multilingual 357M (HNPU)", "https://huggingface.co/runanywhere/magpie_tts_357m_HNPU/magpie-357m-v81.json", QHEXRT, TTS, 749_093_186L),
     )
 
     // The Play build intentionally ships no refusal-removal or safety-bypass adapters.
