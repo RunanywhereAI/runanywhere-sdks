@@ -1,145 +1,44 @@
 # @runanywhere/onnx
 
-ONNX backend registration package for the RunAnywhere React Native SDK.
+**ONNX/Sherpa backend registration for the RunAnywhere React Native SDK** — installs native STT, TTS, and VAD providers; public speech APIs live in `@runanywhere/core`.
 
-This package does not own public model catalog, download, lifecycle, STT, TTS,
-VAD, or voice-agent APIs. Those surfaces live in `@runanywhere/core` over the
-generated proto/Nitro/commons bridge, mirroring the Swift architecture source
-of truth. `@runanywhere/onnx` only installs or removes native backend providers
-and ships the `RABackendONNX` plus `RABackendSherpa` native binaries.
-
-## Requirements
-
-- `@runanywhere/core` peer dependency
-- React Native 0.83.1+
-- iOS 17.5+ / Android API 24+
-- Microphone permission in the host app for live audio capture
+---
 
 ## Installation
 
 ```bash
-npm install @runanywhere/core @runanywhere/onnx
-```
-
-For iOS, run CocoaPods from the app:
-
-```bash
+npm install @runanywhere/core@0.20.10 @runanywhere/onnx@0.20.10
 cd ios && pod install && cd ..
 ```
 
-Host apps that capture audio still need the platform microphone permission.
+See the [React Native SDK README](../../README.md) for microphone permissions and platform setup.
+
+---
 
 ## Usage
 
 ```typescript
 import { RunAnywhere } from '@runanywhere/core';
-import {
-  InferenceFramework,
-  ModelCategory,
-  ModelLoadRequest,
-} from '@runanywhere/proto-ts/model_types';
 import { ONNX } from '@runanywhere/onnx';
 
 await RunAnywhere.initialize();
+await ONNX.register();
 
-const registered = await ONNX.register();
-if (!registered) {
-  throw new Error('ONNX backend is not available');
-}
-
-await RunAnywhere.registerModel({
-  id: 'sherpa-onnx-whisper-tiny.en',
-  name: 'Sherpa Whisper Tiny English',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-  url: 'https://example.invalid/model.tar.gz',
-});
-
-const download = RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en')[Symbol.asyncIterator]();
-while (!(await download.next()).done) {}
-await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
-  modelId: 'sherpa-onnx-whisper-tiny.en',
-  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-}));
-
-// Use @runanywhere/core for model lifecycle and STT/TTS/VAD/voice APIs.
+// Register, download, load STT models and transcribe via @runanywhere/core
 ```
 
-## Public API
+See the [React Native SDK README](../../README.md) for full STT/TTS/VAD examples.
 
-```typescript
-import { ONNX } from '@runanywhere/onnx';
-```
+---
 
-### `ONNX.register()`
+## Support
 
-Registers ONNX providers with the native backend registry.
+- [React Native SDK documentation](../../README.md)
+- [Discord](https://discord.gg/N359FBbDVd)
+- [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
 
-```typescript
-ONNX.register(): Promise<boolean>
-```
+---
 
-### `ONNX.unregister()`
+## License
 
-Unregisters ONNX providers. Core-owned model lifecycle handles remain owned by
-core.
-
-```typescript
-ONNX.unregister(): Promise<boolean>
-```
-
-### `ONNX.isRegistered()`
-
-Checks native backend registration state.
-
-```typescript
-ONNX.isRegistered(): Promise<boolean>
-```
-
-### Metadata
-
-```typescript
-ONNX.moduleId
-ONNX.moduleName
-ONNX.inferenceFramework
-ONNX.capabilities
-ONNX.defaultPriority
-```
-
-## Native Boundary
-
-The generated Nitro spec exposes only backend registration hooks:
-
-- `registerBackend`
-- `unregisterBackend`
-- `isBackendRegistered`
-
-Direct ONNX STT, TTS, VAD, and voice-agent bridges were deleted. Use
-`@runanywhere/core` for public model lifecycle and inference APIs.
-
-## Package Structure
-
-```text
-packages/onnx/
-|-- src/
-|   |-- index.ts
-|   |-- ONNX.ts
-|   |-- ONNXProvider.ts
-|   |-- native/
-|   |   `-- NativeRunAnywhereONNX.ts
-|   `-- specs/
-|       `-- RunAnywhereONNX.nitro.ts
-|-- cpp/
-|   |-- HybridRunAnywhereONNX.cpp
-|   `-- HybridRunAnywhereONNX.hpp
-|-- ios/
-|   `-- Binaries/
-|       |-- RABackendONNX.xcframework
-|       `-- RABackendSherpa.xcframework
-|-- RunAnywhereONNX.podspec
-|-- android/
-|   |-- build.gradle
-|   `-- CMakeLists.txt
-`-- nitrogen/
-    `-- generated/
-```
+RunAnywhere License. See [LICENSE](LICENSE).

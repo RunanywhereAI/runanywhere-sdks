@@ -7,7 +7,7 @@
 <p align="center">
   <strong>On-device AI for every platform.</strong><br/>
   Run LLMs, vision, speech-to-text, and text-to-speech locally. Private, offline, fast.<br/>
-  One SDK for iOS, Android, Flutter, React Native, and Web, with Hexagon NPU acceleration on Snapdragon.
+  One SDK for iOS, Android, Flutter, React Native, Web, and more — with Hexagon NPU acceleration on Snapdragon.
 </p>
 
 <p align="center">
@@ -32,13 +32,13 @@
 
 ## What is RunAnywhere?
 
-RunAnywhere lets you add AI features to your app that run entirely on-device, with no cloud, no latency, and no data leaving the device:
+RunAnywhere lets you add AI features to your app that run entirely on-device — no cloud, no latency, no data leaving the device:
 
-- **LLM Chat**: Llama, Qwen, Gemma, Phi, LFM, Mistral, and more
-- **Vision (VLM)**: image understanding and captioning
-- **Speech-to-Text**: Whisper- and Moonshine-based transcription
-- **Text-to-Speech**: neural voice synthesis
-- **Voice Assistant**: a full speech-to-text, LLM, and text-to-speech pipeline
+- **LLM Chat** — Llama, Qwen, Gemma, Phi, LFM, Mistral, and more
+- **Vision (VLM)** — image understanding and captioning
+- **Speech-to-Text** — Whisper- and Moonshine-based transcription
+- **Text-to-Speech** — neural voice synthesis
+- **Voice Assistant** — full STT → LLM → TTS pipeline
 
 One API spans iOS, Android, Flutter, React Native, and Web, and routes to the best engine on each device: Core ML on Apple, WebGPU in the browser, llama.cpp everywhere as a fallback, and the Hexagon NPU on Snapdragon.
 
@@ -60,16 +60,16 @@ Measured on a Samsung Galaxy S25 (Snapdragon 8 Elite, Hexagon v79):
 | LFM2.5-230M | LLM | 0.23 B | 164 tok/s | 32 ms |
 | Qwen3-0.6B | LLM | 0.6 B | 33 tok/s (prefill up to 3,692 tok/s) | 127 ms |
 | Llama-3.2-1B | LLM | 1.2 B | 16.3 tok/s | 56 ms |
-| Phi-tiny-MoE | MoE LLM | 3.8 B (1.1 B active) | 5-7 tok/s | ~2.5 s |
+| Phi-tiny-MoE | MoE LLM | 3.8 B (1.1 B active) | 5–7 tok/s | ~2.5 s |
 | InternVL3.5-1B | VLM | 1 B | 37 tok/s | 290 ms |
-| Whisper base | ASR | 74 M | ~5x real-time | n/a |
-| MeloTTS-EN | TTS | n/a | ~4.5x real-time | n/a |
+| Whisper base | ASR | 74 M | ~5× real-time | n/a |
+| MeloTTS-EN | TTS | n/a | ~4.5× real-time | n/a |
 
 Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm64) only.
 
 ---
 
-## See It In Action
+## See it in action
 
 <div align="center">
 <table>
@@ -83,7 +83,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
     <td align="center" width="50%">
       <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="240"/><br/><br/>
       <strong>Voice AI</strong><br/>
-      <sub>STT to LLM to TTS pipeline, fully offline</sub>
+      <sub>STT → LLM → TTS pipeline, fully offline</sub>
     </td>
   </tr>
   <tr><td colspan="3" height="30"></td></tr>
@@ -107,14 +107,18 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 
 ## SDKs
 
-| Platform | Status | Installation | Documentation | NPU |
-|----------|--------|--------------|---------------|:---:|
-| **Swift** (iOS/macOS) | Stable | [Swift Package Manager](#swift-ios--macos) | [docs.runanywhere.ai/swift](https://docs.runanywhere.ai/swift/introduction) | n/a |
-| **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) | Yes |
-| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) | n/a |
-| **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) | Yes |
-| **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) | Yes |
-| **Python** (Windows/macOS/Linux) | Alpha | [pip](#python-desktop--server) | [SDK README](sdk/runanywhere-python/) | n/a |
+| Platform | Status | Install | Docs | NPU |
+|----------|--------|---------|------|:---:|
+| **Swift** (iOS/macOS) | Stable | [SPM](#swift-ios--macos) | [docs](https://docs.runanywhere.ai/swift/introduction) | — |
+| **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs](https://docs.runanywhere.ai/kotlin/introduction) | Yes |
+| **React Native** | Beta | [npm](#react-native) | [docs](https://docs.runanywhere.ai/react-native/introduction) | Yes |
+| **Flutter** | Beta | [pub.dev](#flutter) | [docs](https://docs.runanywhere.ai/flutter/introduction) | Yes |
+| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) | — |
+| **Python** (Desktop/Server) | Alpha | [pip](#python-desktop--server) | [SDK README](sdk/runanywhere-python/) | — |
+| **Electron** | Preview | [Build from source](sdk/runanywhere-electron/) | [SDK README](sdk/runanywhere-electron/) | — |
+| **CLI** (`rcli`) | Stable | [Homebrew / scripts](sdk/runanywhere-cli/) | [SDK README](sdk/runanywhere-cli/) | — |
+
+Latest published package version: **0.20.10**. Repo tip may be ahead (currently 0.20.11).
 
 ---
 
@@ -126,63 +130,72 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 import RunAnywhere
 import LlamaCPPRuntime
 
-// 1. Initialize
 LlamaCPP.register()
 try RunAnywhere.initialize()
 
-// 2. Load a model
 var load = RAModelLoadRequest()
 load.modelID = "smollm2-360m"
 load.category = .language
 load.framework = .llamaCpp
 _ = await RunAnywhere.loadModel(load)
 
-// 3. Generate
 var req = RALLMGenerateRequest()
 req.prompt = "What is the capital of France?"
 let result = try await RunAnywhere.generate(req)
-print(result.text) // "Paris is the capital of France."
+print(result.text)
 ```
 
-**Install via Swift Package Manager:**
+**Install via Swift Package Manager** — add the package URL:
 
 ```
 https://github.com/RunanywhereAI/runanywhere-sdks
 ```
 
-[Documentation](https://docs.runanywhere.ai/swift/introduction) · [Source code](sdk/runanywhere-swift/)
+Products: `RunAnywhere`, `RunAnywhereLlamaCPP`, `RunAnywhereONNX`, `RunAnywhereMLX`.
+
+[Documentation](https://docs.runanywhere.ai/swift/introduction) · [Source](sdk/runanywhere-swift/)
 
 ---
 
 ### Kotlin (Android)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.SDKEnvironment
+import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 
-// 1. Initialize
 LlamaCPP.register()
-RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+RunAnywhere.initialize(
+    context = this,
+    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+)
 
-// 2. Load a model
-RunAnywhere.downloadModel("smollm2-360m").collect { println("${it.progress * 100}%") }
-RunAnywhere.loadLLMModel("smollm2-360m")
+val modelId = "smollm2-360m-instruct-q8_0"
+RunAnywhere.downloadModelStream(RAModelInfo(id = modelId)).collect { /* progress */ }
+RunAnywhere.loadModel(
+    RAModelLoadRequest(model_id = modelId, category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+)
 
-// 3. Generate
-val response = RunAnywhere.chat("What is the capital of France?")
-println(response) // "Paris is the capital of France."
+val result = RunAnywhere.generate("What is the capital of France?")
+println(result.text)
 ```
 
-**Install via Gradle:**
+**Install via Gradle** (Maven Central):
 
 ```kotlin
 dependencies {
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.16.1")
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.16.1")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.10")
+    // Optional: STT / TTS / VAD
+    // implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.10")
 }
 ```
 
-[Documentation](https://docs.runanywhere.ai/kotlin/introduction) · [Source code](sdk/runanywhere-kotlin/)
+[Documentation](https://docs.runanywhere.ai/kotlin/introduction) · [Source](sdk/runanywhere-kotlin/)
 
 ---
 
@@ -192,26 +205,23 @@ dependencies {
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 
-// 1. Initialize
-await RunAnywhere.initialize({ environment: SDKEnvironment.Development });
+await RunAnywhere.initialize({ environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT });
 LlamaCPP.register();
 
-// 2. Load a model
 await RunAnywhere.downloadModel('smollm2-360m');
 await RunAnywhere.loadModel('smollm2-360m');
 
-// 3. Generate
-const response = await RunAnywhere.chat('What is the capital of France?');
-console.log(response); // "Paris is the capital of France."
+const result = await RunAnywhere.generate('What is the capital of France?');
+console.log(result.text);
 ```
 
 **Install via npm:**
 
 ```bash
-npm install @runanywhere/core @runanywhere/llamacpp
+npm install @runanywhere/core@0.20.10 @runanywhere/llamacpp@0.20.10
 ```
 
-[Documentation](https://docs.runanywhere.ai/react-native/introduction) · [Source code](sdk/runanywhere-react-native/)
+[Documentation](https://docs.runanywhere.ai/react-native/introduction) · [Source](sdk/runanywhere-react-native/)
 
 ---
 
@@ -221,29 +231,26 @@ npm install @runanywhere/core @runanywhere/llamacpp
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 
-// 1. Initialize
 await RunAnywhere.initialize();
-await LlamaCpp.register();
+LlamaCpp.register();
 
-// 2. Load a model
 await RunAnywhere.downloadModel('smollm2-360m');
-await RunAnywhere.loadModel('smollm2-360m');
+await RunAnywhere.llm.load('smollm2-360m');
 
-// 3. Generate
-final response = await RunAnywhere.chat('What is the capital of France?');
-print(response); // "Paris is the capital of France."
+final response = await RunAnywhere.llm.chat('What is the capital of France?');
+print(response);
 ```
 
 **Install via pub.dev:**
 
 ```yaml
 dependencies:
-  runanywhere: ^0.16.0
-  runanywhere_llamacpp: ^0.16.0  # LLM text generation
-  # runanywhere_onnx: ^0.16.0   # Add this if you need STT, TTS, or Voice features
+  runanywhere: ^0.20.10
+  runanywhere_llamacpp: ^0.20.10
+  # runanywhere_onnx: ^0.20.10   # STT, TTS, Voice
 ```
 
-[Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source code](sdk/runanywhere-flutter/)
+[Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](sdk/runanywhere-flutter/)
 
 ---
 
@@ -252,29 +259,26 @@ dependencies:
 ```typescript
 import { RunAnywhere } from '@runanywhere/web';
 
-// 1. Initialize
 await RunAnywhere.initialize({ environment: 'development' });
 
-// 2. Load a model
 await RunAnywhere.loadModel({
   id: 'qwen2.5-0.5b',
   source: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
 });
 
-// 3. Generate
 const result = await RunAnywhere.generate({
   prompt: 'What is the capital of France?',
 });
-console.log(result.text); // "Paris is the capital of France."
+console.log(result.text);
 ```
 
 **Install via npm:**
 
 ```bash
-npm install @runanywhere/web
+npm install @runanywhere/web@0.20.10
 ```
 
-[Source code](sdk/runanywhere-web/)
+[Source](sdk/runanywhere-web/)
 
 ---
 
@@ -283,48 +287,38 @@ npm install @runanywhere/web
 ```python
 from runanywhere import RunAnywhere
 
-# Instantiable client + context manager; process-global native runtime underneath.
 with RunAnywhere() as ra:
-    # 1. Load a model (auto-downloads on first use)
     llm = ra.load_llm("qwen2.5-0.5b")
-
-    # 2. Stream tokens (sync)
-    for token in llm.generate("What is the capital of France?"):
-        print(token, end="", flush=True)
-
-    # 2b. Or async
-    # async for token in llm.agenerate("..."):
-    #     ...
-
-    print(llm.generate_text("Capital of France? One word."))  # "Paris"
+    print(llm.generate_text("What is the capital of France?"))
 ```
 
 **Install via pip:**
 
 ```bash
-pip install runanywhere
+pip install runanywhere==0.20.10
 ```
 
-[Source code](sdk/runanywhere-python/)
+[Source](sdk/runanywhere-python/)
 
 ---
 
 ## Features
 
 | Feature | iOS | Android | Web | React Native | Flutter |
-|---------|:-:|:-:|:-:|:-:|:-:|
+|---------|:---:|:-------:|:---:|:------------:|:-------:|
 | LLM Text Generation | Yes | Yes | Yes | Yes | Yes |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
 | Speech-to-Text | Yes | Yes | Yes | Yes | Yes |
 | Text-to-Speech | Yes | Yes | Yes | Yes | Yes |
 | Voice Assistant Pipeline | Yes | Yes | Yes | Yes | Yes |
-| Vision Language Models | Yes | Yes | Yes | n/a | Yes |
-| Hexagon NPU (QHexRT) | n/a | Yes | n/a | Yes | Yes |
+| Vision Language Models | Yes | Yes | Yes | — | Yes |
+| LoRA Adapters | Yes | Yes | Yes | Yes | Yes |
+| Hexagon NPU (QHexRT) | — | Yes | — | Yes | Yes |
 | Model Download + Progress | Yes | Yes | Yes | Yes | Yes |
 | Structured Output (JSON) | Yes | Yes | Yes | Soon | Soon |
-| Tool Calling | Yes | Yes | Yes | n/a | n/a |
-| Embeddings | n/a | n/a | Yes | n/a | n/a |
-| Apple Foundation Models | Yes | n/a | n/a | n/a | n/a |
+| Tool Calling | Yes | Yes | Yes | — | — |
+| Embeddings | — | — | Yes | — | — |
+| Apple Foundation Models | Yes | — | — | — | — |
 
 ---
 
@@ -332,13 +326,13 @@ pip install runanywhere
 
 ### Hexagon NPU (QHexRT)
 
-Prebuilt bundles published on [Hugging Face](https://huggingface.co/runanywhere/models); the SDK downloads the one matching the device.
+Prebuilt bundles on [Hugging Face](https://huggingface.co/runanywhere/models); the SDK downloads the bundle matching the device.
 
 | Model | Task | Params | Bundle |
 |---|---|---|---|
 | Llama-3.2-1B | LLM | 1.2 B | [llama3_2_1b_HNPU](https://huggingface.co/runanywhere/llama3_2_1b_HNPU) |
 | LFM2.5-230M / 350M | LLM | 0.23 / 0.35 B | [lfm2_5_230m_HNPU](https://huggingface.co/runanywhere/lfm2_5_230m_HNPU) · [lfm2_5_350m_HNPU](https://huggingface.co/runanywhere/lfm2_5_350m_HNPU) |
-| Qwen3.5-0.8B / 2B / 4B | LLM | 0.8-4 B | [qwen3_5_0_8b_HNPU](https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU) · [2b](https://huggingface.co/runanywhere/qwen3_5_2b_HNPU) · [4b](https://huggingface.co/runanywhere/qwen3_5_4b_HNPU) |
+| Qwen3.5-0.8B / 2B / 4B | LLM | 0.8–4 B | [qwen3_5_0_8b_HNPU](https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU) · [2b](https://huggingface.co/runanywhere/qwen3_5_2b_HNPU) · [4b](https://huggingface.co/runanywhere/qwen3_5_4b_HNPU) |
 | Gemma-4-E2B / E4B | LLM + VLM | ~2 / 4 B | [gemma4_e2b_HNPU](https://huggingface.co/runanywhere/gemma4_e2b_HNPU) · [gemma4_e4b_HNPU](https://huggingface.co/runanywhere/gemma4_e4b_HNPU) |
 | Phi-tiny-MoE | MoE LLM | 3.8 B | [phi_tiny_moe_HNPU](https://huggingface.co/runanywhere/phi_tiny_moe_HNPU) |
 | DeepSeek-R1-Distill-Qwen | LLM | 1.5 / 7 B | [1.5b](https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_1_5b_HNPU) · [7b](https://huggingface.co/runanywhere/deepseek_r1_distill_qwen_7b_HNPU) |
@@ -370,8 +364,9 @@ Prebuilt bundles published on [Hugging Face](https://huggingface.co/runanywhere/
 | Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
 | React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
 | Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
+| Electron | [examples/electron/RunAnywhereAI](examples/electron/RunAnywhereAI/) | Build from source (Windows) |
 
-The Android, Flutter, and React Native apps include an NPU section that detects the device's Hexagon arch and runs LLM, vision, speech, and text-to-speech on the NPU.
+The Android, Flutter, and React Native apps include an NPU section that detects Hexagon arch and runs LLM, vision, speech, and TTS on the NPU.
 
 ---
 
@@ -392,17 +387,18 @@ Minimal projects to get up and running on each platform:
 
 Real-world projects built with RunAnywhere. Each ships as a standalone app you can build and run.
 
-- **[Android Use Agent](Playground/android-use-agent/)**: an on-device autonomous Android agent that reads the screen and controls the phone with an on-device LLM. [Benchmarks](Playground/android-use-agent/ASSESSMENT.md).
-- **[On-Device Browser Agent](Playground/on-device-browser-agent/)**: a Chrome extension that automates browser tasks on-device with WebLLM and WebGPU.
-- **[Swift Starter App](Playground/swift-starter-app/)**: a SwiftUI app with LLM chat, speech-to-text, text-to-speech, and a full voice pipeline.
-- **[Linux Voice Assistant](Playground/linux-voice-assistant/)**: an on-device voice pipeline (VAD, STT, LLM, TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64.
-- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)**: on-device VAD, STT, and TTS with cloud LLM reasoning.
+- **[Android Use Agent](Playground/android-use-agent/)** — on-device autonomous Android agent that reads the screen and controls the phone with an on-device LLM
+- **[On-Device Browser Agent](Playground/on-device-browser-agent/)** — Chrome extension that automates browser tasks on-device with WebLLM and WebGPU
+- **[Swift Starter App](Playground/swift-starter-app/)** — SwiftUI app with LLM chat, STT, TTS, and a full voice pipeline
+- **[Linux Voice Assistant](Playground/linux-voice-assistant/)** — on-device voice pipeline (VAD → STT → LLM → TTS) in one C++ binary for Raspberry Pi 5, x86_64, and ARM64
+- **[OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)** — on-device VAD, STT, and TTS with cloud LLM reasoning
+- **[YapRun](Playground/YapRun/)** — on-device dictation for iOS/macOS
 
 ---
 
 ## Architecture
 
-A single C/C++ core (`runanywhere-commons`) behind a C ABI, with thin platform SDKs on top and a plugin registry that selects the best engine per device (llama.cpp, ONNX/sherpa, Core ML, Metal, and QHexRT on the Hexagon NPU). Business logic lives in the core, so one fix lands on all five SDKs.
+A single C/C++ core (`runanywhere-commons`) behind a C ABI, with thin platform SDKs on top and a plugin registry that selects the best engine per device (llama.cpp, ONNX/sherpa, Core ML, Metal, and QHexRT on the Hexagon NPU). Business logic lives in the core, so one fix lands on all SDKs.
 
 ```
 runanywhere-sdks/
@@ -413,12 +409,14 @@ runanywhere-sdks/
 │   ├── runanywhere-react-native/   # React Native SDK
 │   ├── runanywhere-flutter/        # Flutter SDK
 │   ├── runanywhere-python/         # Python SDK (pybind11 over the C core)
+│   ├── runanywhere-electron/       # Electron / Node (Windows preview)
+│   ├── runanywhere-cli/            # rcli command-line tool
 │   └── runanywhere-commons/        # Shared C/C++ core
 │
 ├── engines/                        # Pluggable inference backends
 ├── examples/                       # Sample apps
 ├── Playground/                     # Real-world reference apps
-└── docs/                           # Documentation
+└── docs/gifs/                      # Demo media assets
 ```
 
 ---
@@ -427,28 +425,33 @@ runanywhere-sdks/
 
 | Platform | Minimum | Recommended |
 |----------|---------|-------------|
-| iOS | 17.0+ | 17.0+ |
+| iOS | 17.0+ | 17.5+ |
 | macOS | 14.0+ | 14.0+ |
 | Android | API 24 (7.0) | API 28+ |
 | Web | Chrome 96+ / Edge 96+ | Chrome 120+ |
-| React Native | 0.74+ | 0.76+ |
+| React Native | 0.74+ | 0.76+ (Node.js 22.12+) |
 | Flutter | 3.10+ | 3.24+ |
+| Python | 3.10+ | 3.12+ |
+| Electron | Windows x64 (preview) | — |
 
-Hexagon NPU: Snapdragon with Hexagon v79 / v81 (Snapdragon 8 Elite class), Android arm64.
+Hexagon NPU: Snapdragon with Hexagon v79 / v81 (Snapdragon 8 Elite class), Android arm64.  
 Memory: 2 GB minimum, 4 GB+ recommended for larger models.
 
 ---
 
 ## Contributing
 
-We welcome contributions. See our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions. See the [Contributing Guide](CONTRIBUTING.md) for details.
 
 ```bash
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 
-# Build the native XCFrameworks into sdk/runanywhere-swift/Binaries/.
-# Required for local Swift development.
+# Doctor / setup helpers
+./run doctor
+./run setup
+
+# Build native XCFrameworks for local Swift development
 ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 # Run the iOS sample app
@@ -470,5 +473,5 @@ open RunAnywhereAI.xcodeproj
 
 ## License
 
-RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).
+RunAnywhere License (Apache 2.0 based, with additional commercial-use terms).  
 See [LICENSE](LICENSE) for details.

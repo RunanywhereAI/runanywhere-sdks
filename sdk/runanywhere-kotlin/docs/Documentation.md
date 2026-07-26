@@ -28,13 +28,13 @@ Complete API reference for the RunAnywhere Kotlin SDK. All public APIs are acces
 // build.gradle.kts
 dependencies {
     // Core SDK with native libraries
-    implementation("io.github.sanchitmonga22:runanywhere-sdk-android:0.16.1")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
 
     // LlamaCPP backend for LLM text generation
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp-android:0.16.1")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.10")
 
     // ONNX backend for STT/TTS/VAD
-    implementation("io.github.sanchitmonga22:runanywhere-onnx-android:0.16.1")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.10")
 }
 ```
 
@@ -1651,5 +1651,5 @@ if (allModelsLoaded) {
 
 ## See Also
 
-- [README.md](./README.md) - Getting started guide
-- [Sample App](../../examples/android/RunAnywhereAI/) - Working example
+- [README.md](../README.md) - Getting started guide
+- [Sample App](../../../examples/android/RunAnywhereAI/) - Working example

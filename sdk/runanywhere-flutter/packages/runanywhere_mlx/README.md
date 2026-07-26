@@ -1,35 +1,48 @@
-# RunAnywhere MLX for Flutter
+# runanywhere_mlx
 
-Optional Apple MLX backend for the RunAnywhere Flutter SDK. The package uses
-the canonical Swift `RunAnywhereMLX` runtime and supports LLM, VLM, embedding,
-speech-recognition, and speech-synthesis models on physical iOS 17.5 or newer
-devices. The arm64 iOS Simulator slice is provided only for package, compile,
-link, and startup validation; MLX registration returns `false` there.
+**Apple MLX backend for the RunAnywhere Flutter SDK** — on-device LLM, VLM, speech, and embeddings on physical iOS 17.5+ devices.
 
-The iOS plugin intentionally uses CocoaPods. Its precompiled Hub/Crypto
-dependencies look for named bundles at the application root, and CocoaPods
-preserves that required layout without introducing SwiftPM module collisions.
+[![pub package](https://img.shields.io/pub/v/runanywhere_mlx.svg)](https://pub.dev/packages/runanywhere_mlx)
 
-## Requirements
+---
 
-- Flutter 3.44+
-- Xcode 26+ with the Swift 6.2 toolchain
-- A physical Apple device running iOS 17.5+ for MLX execution
+## Installation
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.11
-  runanywhere_mlx: ^0.20.11
+  runanywhere: 0.20.10
+  runanywhere_mlx: 0.20.10
 ```
 
-Register the backend before initializing the core SDK:
+Requires Xcode 26+ and a physical iOS device for MLX execution. See the [Flutter SDK README](../../README.md) for Podfile setup.
+
+---
+
+## Usage
 
 ```dart
+import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_mlx/runanywhere_mlx.dart';
 
-final mlxRegistered = await MLX.register();
+final registered = await MLX.register(); // false on simulator / unsupported targets
+if (registered) {
+  await RunAnywhere.initialize();
+  // Model registration, download, load, and inference via core RunAnywhere APIs
+}
 ```
 
-`MLX.register()` is idempotent and returns `false` when the runtime is not
-available. Model registration, download, loading, and inference use the normal
-`RunAnywhere` core APIs.
+See the [Flutter SDK README](../../README.md) for full examples.
+
+---
+
+## Support
+
+- [Flutter SDK documentation](../../README.md)
+- [Discord](https://discord.gg/N359FBbDVd)
+- [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
+
+---
+
+## License
+
+RunAnywhere License. See [LICENSE](LICENSE).
