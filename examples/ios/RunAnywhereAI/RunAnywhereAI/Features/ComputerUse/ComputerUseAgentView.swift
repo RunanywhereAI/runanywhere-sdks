@@ -13,11 +13,13 @@
 import PhotosUI
 import RunAnywhere
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ComputerUseAgentView: View {
     @State private var viewModel = ComputerUseAgentViewModel()
     @State private var photoItem: PhotosPickerItem?
     @State private var showModelPicker = false
+    @State private var showFileImporter = false
 
     var body: some View {
         ZStack {
@@ -81,6 +83,20 @@ struct ComputerUseAgentView: View {
                 Task { await viewModel.loadModelFromSelection(model) }
             }
         }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.image]
+        ) { result in
+            guard case .success(let url) = result else { return }
+            // Sandboxed app: the picked URL is only readable inside a
+            // security-scoped session.
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            if let data = try? Data(contentsOf: url), let image = AgentImage(data: data) {
+                viewModel.screenshot = image
+                viewModel.clearResult()
+            }
+        }
         .task { viewModel.refreshModelStatus() }
         .onChange(of: photoItem) { _, newValue in
             guard let newValue else { return }
@@ -142,12 +158,28 @@ struct ComputerUseAgentView: View {
                     )
             }
 
-            PhotosPicker(selection: $photoItem, matching: .images) {
-                Label(viewModel.screenshot == nil ? "Choose Screenshot" : "Change Screenshot",
-                      systemImage: "photo")
+            // Screenshots live on disk on the Mac (Desktop / a capture folder),
+            // not in the Photos library — so PhotosPicker is the wrong
+            // affordance there and makes the screen unusable. Use the file
+            // importer on macOS and keep PhotosPicker on iOS.
+            #if os(macOS)
+            Button {
+                showFileImporter = true
+            } label: {
+                Label(pickerTitle, systemImage: "photo")
                     .font(.callout)
             }
+            #else
+            PhotosPicker(selection: $photoItem, matching: .images) {
+                Label(pickerTitle, systemImage: "photo")
+                    .font(.callout)
+            }
+            #endif
         }
+    }
+
+    private var pickerTitle: String {
+        viewModel.screenshot == nil ? "Choose Screenshot" : "Change Screenshot"
     }
 
     private var targetMarker: some View {
