@@ -77,9 +77,14 @@ extension RunAnywhere {
                 rac_cua_parse_action_proto(
                     profile, output, UInt32(viewport.width), UInt32(viewport.height), &buffer)
             }
-            guard rc == RAC_SUCCESS, let data = buffer.data, buffer.size > 0,
-                  let proto = try? RACuaAction(serializedBytes: Data(bytes: data, count: buffer.size))
-            else { return nil }
+            // NOTE: a valid "no tool call found" result is an all-defaults
+            // CuaAction, which proto3 serializes to ZERO bytes. Rejecting
+            // size == 0 here would report it as nil — the value this function
+            // reserves for an unknown profile — and would make Swift the lone
+            // SDK that cannot tell those two cases apart.
+            guard rc == RAC_SUCCESS, let data = buffer.data else { return nil }
+            let bytes = buffer.size > 0 ? Data(bytes: data, count: buffer.size) : Data()
+            guard let proto = try? RACuaAction(serializedBytes: bytes) else { return nil }
 
             let coordinate = proto.coordinateValid ? (x: Int(proto.x), y: Int(proto.y)) : nil
             return CuaAction(

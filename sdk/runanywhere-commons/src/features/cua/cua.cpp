@@ -7,12 +7,12 @@
  * entry here (or, later, a declarative proto), not new public API.
  */
 
-#include "rac/features/cua/rac_cua.h"
-
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
+
+#include "rac/features/cua/rac_cua.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "cua.pb.h"
@@ -76,79 +76,276 @@ const CuaProfile* find_profile(const char* id) {
 }
 
 // --- minimal, dependency-free JSON-ish extractors (Fara's tool_call is fixed) ---
+//
+// Every extractor is ANCHORED to the matched key's own value: it locates
+// `"key"` used as a key (quoted name, optional space, ':') and then requires
+// the value to have the expected shape. They fail closed — a present-but-wrong
+// value (null, wrong type, malformed) reports absent rather than latching onto
+// an unrelated token later in the payload. This matters because the input is
+// untrusted model output.
 
-// Value of "key": "...". Returns "" if absent. Handles \" and \\ escapes.
-std::string json_string(const std::string& s, const char* key) {
-    std::string needle = std::string("\"") + key + "\"";
-    size_t k = s.find(needle);
-    if (k == std::string::npos) {
-        return "";
-    }
-    size_t colon = s.find(':', k + needle.size());
-    if (colon == std::string::npos) {
-        return "";
-    }
-    size_t q = s.find('"', colon);
-    if (q == std::string::npos) {
-        return "";
-    }
-    std::string out;
-    for (size_t i = q + 1; i < s.size(); ++i) {
-        char c = s[i];
-        if (c == '\\' && i + 1 < s.size()) {
-            char n = s[++i];
-            switch (n) {
-                case 'n': out.push_back('\n'); break;
-                case 't': out.push_back('\t'); break;
-                case '"': out.push_back('"'); break;
-                case '\\': out.push_back('\\'); break;
-                default: out.push_back(n); break;
-            }
-        } else if (c == '"') {
-            break;
-        } else {
-            out.push_back(c);
-        }
-    }
-    return out;
+bool is_json_space(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
-// Value of "key": [a, b]. Returns false if absent/malformed.
-bool json_int_pair(const std::string& s, const char* key, long* a, long* b) {
-    std::string needle = std::string("\"") + key + "\"";
-    size_t k = s.find(needle);
-    if (k == std::string::npos) {
+// Index of the first non-space character of `"key"`'s value, or npos.
+size_t json_value_start(const std::string& s, const char* key) {
+    const std::string needle = std::string("\"") + key + "\"";
+    size_t from = 0;
+    while (true) {
+        size_t k = s.find(needle, from);
+        if (k == std::string::npos) {
+            return std::string::npos;
+        }
+        size_t i = k + needle.size();
+        while (i < s.size() && is_json_space(s[i])) {
+            ++i;
+        }
+        // Only a name followed by ':' is a key; otherwise this was a value that
+        // merely looks like the key name, so keep searching.
+        if (i < s.size() && s[i] == ':') {
+            ++i;
+            while (i < s.size() && is_json_space(s[i])) {
+                ++i;
+            }
+            return i < s.size() ? i : std::string::npos;
+        }
+        from = k + needle.size();
+    }
+}
+
+void append_utf8(std::string* out, uint32_t cp) {
+    if (cp < 0x80) {
+        out->push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out->push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp < 0x10000) {
+        out->push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out->push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out->push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+// Read 4 hex digits at `at`. Returns false when they are not all hex.
+bool read_hex4(const std::string& s, size_t at, uint32_t* out) {
+    if (at + 3 >= s.size()) {
         return false;
     }
-    size_t lb = s.find('[', k + needle.size());
-    if (lb == std::string::npos) {
-        return false;
+    uint32_t cp = 0;
+    for (size_t h = 0; h < 4; ++h) {
+        char d = s[at + h];
+        cp <<= 4;
+        if (d >= '0' && d <= '9') {
+            cp |= static_cast<uint32_t>(d - '0');
+        } else if (d >= 'a' && d <= 'f') {
+            cp |= static_cast<uint32_t>(d - 'a' + 10);
+        } else if (d >= 'A' && d <= 'F') {
+            cp |= static_cast<uint32_t>(d - 'A' + 10);
+        } else {
+            return false;
+        }
     }
-    char* end = nullptr;
-    *a = std::strtol(s.c_str() + lb + 1, &end, 10);
-    if (end == nullptr) {
-        return false;
-    }
-    const char* comma = std::strchr(end, ',');
-    if (comma == nullptr) {
-        return false;
-    }
-    *b = std::strtol(comma + 1, nullptr, 10);
+    *out = cp;
     return true;
 }
 
-// Value of "key": <number>. Returns false if absent.
+// Scan the JSON string literal at s[start] (must be '"'). Writes the decoded
+// value and the index just past the closing quote. False when unterminated.
+bool scan_json_string(const std::string& s, size_t start, std::string* out, size_t* next) {
+    if (start >= s.size() || s[start] != '"') {
+        return false;
+    }
+    std::string value;
+    for (size_t i = start + 1; i < s.size(); ++i) {
+        char c = s[i];
+        if (c == '\\') {
+            if (i + 1 >= s.size()) {
+                return false;  // dangling escape
+            }
+            char n = s[++i];
+            switch (n) {
+                case 'n':
+                    value.push_back('\n');
+                    break;
+                case 't':
+                    value.push_back('\t');
+                    break;
+                case 'r':
+                    value.push_back('\r');
+                    break;
+                case 'b':
+                    value.push_back('\b');
+                    break;
+                case 'f':
+                    value.push_back('\f');
+                    break;
+                case '"':
+                    value.push_back('"');
+                    break;
+                case '\\':
+                    value.push_back('\\');
+                    break;
+                case '/':
+                    value.push_back('/');
+                    break;
+                case 'u': {
+                    // Decode to UTF-8. These land in proto3 `string` fields, so
+                    // an unpaired surrogate becomes U+FFFD rather than invalid
+                    // UTF-8 on the wire.
+                    uint32_t cp = 0;
+                    if (!read_hex4(s, i + 1, &cp)) {
+                        value.push_back('\\');
+                        value.push_back('u');
+                        break;
+                    }
+                    i += 4;
+                    if (cp >= 0xD800 && cp <= 0xDBFF) {
+                        uint32_t low = 0;
+                        if (i + 6 < s.size() && s[i + 1] == '\\' && s[i + 2] == 'u' &&
+                            read_hex4(s, i + 3, &low) && low >= 0xDC00 && low <= 0xDFFF) {
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                            i += 6;
+                        } else {
+                            cp = 0xFFFD;
+                        }
+                    } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+                        cp = 0xFFFD;  // lone trailing surrogate
+                    }
+                    append_utf8(&value, cp);
+                    break;
+                }
+                default:
+                    value.push_back(n);
+                    break;
+            }
+        } else if (c == '"') {
+            *out = value;
+            if (next != nullptr) {
+                *next = i + 1;
+            }
+            return true;
+        } else {
+            value.push_back(c);
+        }
+    }
+    return false;  // unterminated
+}
+
+// Value of "key": "...". False when absent, null, a non-string, or unterminated.
+bool json_string(const std::string& s, const char* key, std::string* out) {
+    size_t i = json_value_start(s, key);
+    if (i == std::string::npos || s[i] != '"') {
+        return false;
+    }
+    return scan_json_string(s, i, out, nullptr);
+}
+
+// Value of "key": ["a","b"] joined with single spaces. False when absent or not
+// an array of strings. Used for `keys` (the KEY action's chord).
+bool json_string_array(const std::string& s, const char* key, std::string* out) {
+    size_t i = json_value_start(s, key);
+    if (i == std::string::npos || s[i] != '[') {
+        return false;
+    }
+    std::string joined;
+    size_t j = i + 1;
+    while (true) {
+        while (j < s.size() && is_json_space(s[j])) {
+            ++j;
+        }
+        if (j >= s.size()) {
+            return false;  // unterminated array
+        }
+        if (s[j] == ']') {
+            *out = joined;
+            return true;
+        }
+        std::string item;
+        size_t next = 0;
+        if (!scan_json_string(s, j, &item, &next)) {
+            return false;  // non-string element
+        }
+        if (!joined.empty()) {
+            joined.push_back(' ');
+        }
+        joined += item;
+        j = next;
+        while (j < s.size() && is_json_space(s[j])) {
+            ++j;
+        }
+        if (j < s.size() && s[j] == ',') {
+            ++j;
+            continue;
+        }
+        if (j < s.size() && s[j] == ']') {
+            *out = joined;
+            return true;
+        }
+        return false;  // junk between elements
+    }
+}
+
+// Value of "key": [a, b]. Requires EXACTLY two integers inside this key's own
+// array — a scalar, a 1- or 3-element array, or a non-array all report absent.
+bool json_int_pair(const std::string& s, const char* key, long* a, long* b) {
+    size_t i = json_value_start(s, key);
+    if (i == std::string::npos || s[i] != '[') {
+        return false;
+    }
+    size_t close = s.find(']', i + 1);
+    if (close == std::string::npos) {
+        return false;
+    }
+    // Parse strictly inside the brackets so nothing after ']' can be consumed.
+    const std::string span = s.substr(i + 1, close - (i + 1));
+    const char* p = span.c_str();
+    char* end = nullptr;
+    long first = std::strtol(p, &end, 10);
+    if (end == p) {
+        return false;  // no leading integer
+    }
+    while (*end != '\0' && is_json_space(*end)) {
+        ++end;
+    }
+    if (*end != ',') {
+        return false;  // single element
+    }
+    const char* second = end + 1;
+    char* end2 = nullptr;
+    long value = std::strtol(second, &end2, 10);
+    if (end2 == second) {
+        return false;
+    }
+    while (*end2 != '\0' && is_json_space(*end2)) {
+        ++end2;
+    }
+    if (*end2 != '\0') {
+        return false;  // a third element: not a coordinate
+    }
+    *a = first;
+    *b = value;
+    return true;
+}
+
+// Value of "key": <number>. False when absent or the value is not numeric.
 bool json_number(const std::string& s, const char* key, double* out) {
-    std::string needle = std::string("\"") + key + "\"";
-    size_t k = s.find(needle);
-    if (k == std::string::npos) {
+    size_t i = json_value_start(s, key);
+    if (i == std::string::npos) {
         return false;
     }
-    size_t colon = s.find(':', k + needle.size());
-    if (colon == std::string::npos) {
-        return false;
+    const char* p = s.c_str() + i;
+    char* end = nullptr;
+    double value = std::strtod(p, &end);
+    if (end == p) {
+        return false;  // null, string, or anything non-numeric
     }
-    *out = std::strtod(s.c_str() + colon + 1, nullptr);
+    *out = value;
     return true;
 }
 
@@ -185,19 +382,28 @@ rac_cua_action_type_t action_from_string(const std::string& a) {
     return RAC_CUA_ACTION_UNKNOWN;
 }
 
+// Copy into a fixed char[cap], NUL-terminated. Truncation backs off to a UTF-8
+// character boundary: these buffers feed proto3 `string` fields, and a severed
+// multi-byte sequence would be invalid UTF-8 on the wire (SwiftProtobuf and
+// dart-protobuf reject it outright, so the whole action would be lost).
 void copy_bounded(char* dst, size_t cap, const std::string& src) {
     if (cap == 0) {
         return;
     }
     size_t n = src.size() < cap - 1 ? src.size() : cap - 1;
+    if (n < src.size()) {
+        while (n > 0 && (static_cast<unsigned char>(src[n]) & 0xC0) == 0x80) {
+            --n;  // sitting on a continuation byte: rewind to the lead byte
+        }
+    }
     std::memcpy(dst, src.data(), n);
     dst[n] = '\0';
 }
 
 }  // namespace
 
-extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
-                                     uint32_t display_h, char* out, size_t out_size) {
+extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t display_h,
+                                     char* out, size_t out_size) {
     const CuaProfile* p = find_profile(profile_id);
     if (p == nullptr) {
         return -1;
@@ -253,8 +459,8 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
         body = s.substr(start, close == std::string::npos ? std::string::npos : close - start);
     }
 
-    std::string action = json_string(body, "action");
-    if (action.empty()) {
+    std::string action;
+    if (!json_string(body, "action", &action) || action.empty()) {
         out->parse_ok = 0;
         return 0;
     }
@@ -279,27 +485,53 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
         out->wait_seconds = num;
     }
 
-    // Primary string argument, keyed by action.
+    // Primary string argument, keyed by action. KEY is the odd one out: its
+    // argument is `keys`, an ARRAY, which the documented contract (rac_cua.h,
+    // cua.proto, every SDK facade) says arrives space-joined.
+    if (out->type == RAC_CUA_KEY) {
+        std::string keys;
+        if (json_string_array(body, "keys", &keys)) {
+            copy_bounded(out->text, sizeof(out->text), keys);
+        }
+        return 0;
+    }
+
     const char* text_key = nullptr;
     switch (out->type) {
-        case RAC_CUA_TYPE: text_key = "text"; break;
-        case RAC_CUA_VISIT_URL: text_key = "url"; break;
-        case RAC_CUA_WEB_SEARCH: text_key = "query"; break;
-        case RAC_CUA_TERMINATE: text_key = "answer"; break;
+        case RAC_CUA_TYPE:
+            text_key = "text";
+            break;
+        case RAC_CUA_VISIT_URL:
+            text_key = "url";
+            break;
+        case RAC_CUA_WEB_SEARCH:
+            text_key = "query";
+            break;
+        case RAC_CUA_TERMINATE:
+            text_key = "answer";
+            break;
         case RAC_CUA_ASK_USER:
-        case RAC_CUA_READ_PAGE_ANSWER: text_key = "question"; break;
-        case RAC_CUA_PAUSE_MEMORIZE: text_key = "fact"; break;
-        default: break;
+        case RAC_CUA_READ_PAGE_ANSWER:
+            text_key = "question";
+            break;
+        case RAC_CUA_PAUSE_MEMORIZE:
+            text_key = "fact";
+            break;
+        default:
+            break;
     }
     if (text_key != nullptr) {
-        copy_bounded(out->text, sizeof(out->text), json_string(body, text_key));
+        std::string text;
+        if (json_string(body, text_key, &text)) {
+            copy_bounded(out->text, sizeof(out->text), text);
+        }
     }
     return 0;
 }
 
-extern "C" rac_result_t rac_cua_parse_action_proto(const char* profile_id,
-                                                   const char* model_output, uint32_t viewport_w,
-                                                   uint32_t viewport_h, rac_proto_buffer_t* out) {
+extern "C" rac_result_t rac_cua_parse_action_proto(const char* profile_id, const char* model_output,
+                                                   uint32_t viewport_w, uint32_t viewport_h,
+                                                   rac_proto_buffer_t* out) {
     if (out == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

@@ -109,6 +109,12 @@ rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRe
     if (request.has_description()) {
         multi_file.set_description(request.description());
     }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
+    }
 
     bool first = true;
     for (const hf::ResolvedFile& resolved_file : resolved.files) {
@@ -274,6 +280,12 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     }
     if (request.has_description()) {
         multi_file.set_description(request.description());
+    }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
     }
 
     bool first = true;

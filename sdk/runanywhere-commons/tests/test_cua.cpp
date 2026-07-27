@@ -54,7 +54,8 @@ TestResult run_golden_left_click() {
     int rc = rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
     ASSERT_EQ(rc, 0, "recognized profile must return 0");
     ASSERT_EQ(static_cast<int>(a.parse_ok), 1, "must parse a valid tool_call");
-    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_LEFT_CLICK), "action = left_click");
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_LEFT_CLICK),
+              "action = left_click");
     ASSERT_EQ(static_cast<int>(a.has_coordinate), 1, "must have coordinate");
     ASSERT_EQ(a.x, 720, "x = 500 * 1440/1000 = 720");
     ASSERT_EQ(a.y, 344, "y = 382 * 900/1000 = 344 (rounded)");
@@ -86,9 +87,106 @@ TestResult run_terminate_answer() {
     return TEST_PASS();
 }
 
+// --- regressions: the extractors must fail CLOSED on untrusted model output ---
+
+// A non-array `coordinate` must not latch onto a later array (it used to read
+// `keys` as a click point and report has_coordinate=1).
+TestResult run_coordinate_null_does_not_borrow_other_array() {
+    const char* out =
+        "<tool_call>{\"name\": \"computer_use\", \"arguments\": "
+        "{\"action\": \"left_click\", \"coordinate\": null, \"keys\": [7, 8]}}</tool_call>";
+    rac_cua_action_t a;
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a), 0, "return 0");
+    ASSERT_EQ(static_cast<int>(a.parse_ok), 1, "action still parses");
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 0, "must NOT fabricate a coordinate");
+    return TEST_PASS();
+}
+
+// A one-element array is not a coordinate (it used to yield y = 0).
+TestResult run_single_element_coordinate_rejected() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"left_click\", \"coordinate\": "
+        "[500]}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 0, "1-element array is not a coordinate");
+    return TEST_PASS();
+}
+
+// A three-element array is not a coordinate either.
+TestResult run_three_element_coordinate_rejected() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"left_click\", "
+        "\"coordinate\": [1, 2, 3]}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 0, "3-element array is not a coordinate");
+    return TEST_PASS();
+}
+
+// A null string value must not return the NEXT key's name (it used to yield
+// text = "note" for url:null).
+TestResult run_null_string_does_not_return_next_key() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"visit_url\", \"url\": null, "
+        "\"note\": \"hello\"}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_VISIT_URL), "action = visit_url");
+    ASSERT_TRUE(a.text[0] == '\0', "text must be empty, not the next key's name");
+    return TEST_PASS();
+}
+
+// KEY carries its chord space-joined, per rac_cua.h / cua.proto / every facade.
+TestResult run_key_action_joins_keys() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"key\", "
+        "\"keys\": [\"ctrl\", \"l\"]}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_KEY), "action = key");
+    ASSERT_TRUE(std::strcmp(a.text, "ctrl l") == 0, "keys joined with a space");
+    return TEST_PASS();
+}
+
+// A non-numeric value for a numeric key must report absent, not 0.
+TestResult run_non_numeric_scroll_rejected() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"scroll\", \"pixels\": null}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_SCROLL), "action = scroll");
+    ASSERT_EQ(a.scroll_pixels, 0, "non-numeric pixels leaves the default");
+    return TEST_PASS();
+}
+
+// \uXXXX decodes to UTF-8 rather than emitting a literal "uXXXX".
+TestResult run_unicode_escape_decoded() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"type\", "
+        "\"text\": \"caf\\u00e9\"}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_TRUE(std::strcmp(a.text, "caf\xc3\xa9") == 0, "\\u00e9 -> UTF-8 e-acute");
+    return TEST_PASS();
+}
+
+// A key name appearing as a VALUE must not be mistaken for the key itself.
+TestResult run_key_name_inside_value_ignored() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"type\", "
+        "\"text\": \"the word coordinate\", \"coordinate\": [10, 20]}}</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a);
+    ASSERT_TRUE(std::strcmp(a.text, "the word coordinate") == 0, "text intact");
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 1, "the real coordinate key still resolves");
+    return TEST_PASS();
+}
+
 TestResult run_malformed_not_ok() {
     rac_cua_action_t a;
-    int rc = rac_cua_parse_action(RAC_CUA_PROFILE_FARA, "just some prose, no tool call", 100, 100, &a);
+    int rc =
+        rac_cua_parse_action(RAC_CUA_PROFILE_FARA, "just some prose, no tool call", 100, 100, &a);
     ASSERT_EQ(rc, 0, "recognized profile still returns 0");
     ASSERT_EQ(static_cast<int>(a.parse_ok), 0, "no tool_call -> parse_ok = 0");
     return TEST_PASS();
@@ -126,8 +224,8 @@ TestResult run_proto_roundtrip_golden() {
 TestResult run_proto_unknown_profile_error() {
     rac_proto_buffer_t buf;
     rac_proto_buffer_init(&buf);
-    rac_result_t rc = rac_cua_parse_action_proto("does-not-exist", "<tool_call>{}</tool_call>",
-                                                 100, 100, &buf);
+    rac_result_t rc =
+        rac_cua_parse_action_proto("does-not-exist", "<tool_call>{}</tool_call>", 100, 100, &buf);
     ASSERT_TRUE(rc != RAC_SUCCESS, "unknown profile must fail");
     ASSERT_TRUE(buf.data == nullptr, "error buffer carries no data");
     rac_proto_buffer_free(&buf);
@@ -145,6 +243,15 @@ int main(int argc, char** argv) {
     suite.add("type_action_text", run_type_action_text);
     suite.add("terminate_answer", run_terminate_answer);
     suite.add("malformed_not_ok", run_malformed_not_ok);
+    suite.add("coordinate_null_does_not_borrow_other_array",
+              run_coordinate_null_does_not_borrow_other_array);
+    suite.add("single_element_coordinate_rejected", run_single_element_coordinate_rejected);
+    suite.add("three_element_coordinate_rejected", run_three_element_coordinate_rejected);
+    suite.add("null_string_does_not_return_next_key", run_null_string_does_not_return_next_key);
+    suite.add("key_action_joins_keys", run_key_action_joins_keys);
+    suite.add("non_numeric_scroll_rejected", run_non_numeric_scroll_rejected);
+    suite.add("unicode_escape_decoded", run_unicode_escape_decoded);
+    suite.add("key_name_inside_value_ignored", run_key_name_inside_value_ignored);
 #if defined(RAC_HAVE_PROTOBUF)
     suite.add("proto_roundtrip_golden", run_proto_roundtrip_golden);
     suite.add("proto_unknown_profile_error", run_proto_unknown_profile_error);

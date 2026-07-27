@@ -352,6 +352,11 @@ private struct MLXVLMOptionsSnapshot: Sendable {
     let minP: Float
     let repetitionPenalty: Float
     let seed: Int64
+    /// System prompt (options.system_prompt); nil when NULL/empty. MLX owns its
+    /// chat template, so — exactly like the LLM path — this must be rendered as
+    /// a `.system` message or it is silently lost. Computer-use agents carry
+    /// their whole contract (tool schema + output format) in here.
+    let systemPrompt: String?
 
     init(_ options: UnsafePointer<rac_vlm_options_t>?) {
         guard let options = options?.pointee else {
@@ -363,6 +368,7 @@ private struct MLXVLMOptionsSnapshot: Sendable {
             minP = 0
             repetitionPenalty = 1.1
             seed = 0
+            systemPrompt = nil
             return
         }
 
@@ -374,6 +380,11 @@ private struct MLXVLMOptionsSnapshot: Sendable {
         minP = options.min_p
         repetitionPenalty = options.repetition_penalty
         seed = options.seed
+        if let sys = options.system_prompt.map({ String(cString: $0) }), !sys.isEmpty {
+            systemPrompt = sys
+        } else {
+            systemPrompt = nil
+        }
     }
 }
 
@@ -702,7 +713,12 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> (String, MLXGenerationMetrics) {
         let image = try imageInput(from: image)
         let params = generateParameters(from: options)
-        return try await collectVLM(prompt: prompt, image: image, parameters: params)
+        return try await collectVLM(
+            prompt: prompt,
+            image: image,
+            parameters: params,
+            instructions: options.systemPrompt
+        )
     }
 
     func processStream(
@@ -714,7 +730,12 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> MLXGenerationMetrics {
         let image = try imageInput(from: image)
         let params = generateParameters(from: options)
-        return try await streamVLM(prompt: prompt, image: image, parameters: params) { token in
+        return try await streamVLM(
+            prompt: prompt,
+            image: image,
+            parameters: params,
+            instructions: options.systemPrompt
+        ) { token in
             guard let callback else { return false }
             return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
         }
@@ -778,10 +799,16 @@ private final class MLXSession: @unchecked Sendable {
     private func collectVLM(
         prompt: String,
         image: UserInput.Image,
-        parameters: GenerateParameters
+        parameters: GenerateParameters,
+        instructions: String?
     ) async throws -> (String, MLXGenerationMetrics) {
         let text = OSAllocatedUnfairLock(initialState: "")
-        let metrics = try await streamVLM(prompt: prompt, image: image, parameters: parameters) { token in
+        let metrics = try await streamVLM(
+            prompt: prompt,
+            image: image,
+            parameters: parameters,
+            instructions: instructions
+        ) { token in
             text.withLock { $0 += token }
             return true
         }
@@ -792,6 +819,7 @@ private final class MLXSession: @unchecked Sendable {
         prompt: String,
         image: UserInput.Image,
         parameters: GenerateParameters,
+        instructions: String?,
         onToken: @escaping @Sendable (String) -> Bool
     ) async throws -> MLXGenerationMetrics {
         try await ensureResidentModelLoaded()
@@ -822,8 +850,14 @@ private final class MLXSession: @unchecked Sendable {
         mlxRuntimeLogger.debug(
             "MLX VLM image resize=\(resizeTarget) native=\(nativeSize) contextLength=\(contextLength) model=\(modelID)"
         )
+        // MLX renders the chat template itself, so the system prompt has to be
+        // handed to the session as `instructions` — passing only `prompt` drops
+        // it. Computer-use agents ship their whole contract (the tool schema and
+        // the <tool_call> output format) in the system prompt, so losing it
+        // silently produces plain prose instead of a parseable action.
         let session = ChatSession(
             container,
+            instructions: instructions,
             generateParameters: parameters,
             processing: UserInput.Processing(resize: resizeTarget)
         )

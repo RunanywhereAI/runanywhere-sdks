@@ -21,7 +21,7 @@ struct ComputerUseAgentView: View {
 
     var body: some View {
         ZStack {
-            if viewModel.isModelLoaded {
+            if viewModel.isCuaCapable {
                 ScrollView {
                     VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                         screenshotCard
@@ -43,7 +43,18 @@ struct ComputerUseAgentView: View {
                     .padding(AppSpacing.mediumLarge)
                 }
             } else {
-                ModelRequiredOverlay(modality: .vlm) { showModelPicker = true }
+                VStack(spacing: AppSpacing.small) {
+                    ModelRequiredOverlay(modality: .vlm) { showModelPicker = true }
+                    // A multimodal model can be loaded and still not be a
+                    // computer-use agent — say so rather than silently driving it.
+                    if viewModel.isModelLoaded, !viewModel.statusMessage.isEmpty {
+                        Text(viewModel.statusMessage)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, AppSpacing.mediumLarge)
+                    }
+                }
             }
         }
         .navigationTitle("Computer Use")

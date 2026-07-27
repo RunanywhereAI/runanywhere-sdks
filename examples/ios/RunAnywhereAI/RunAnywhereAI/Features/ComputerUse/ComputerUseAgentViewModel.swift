@@ -30,6 +30,14 @@ final class ComputerUseAgentViewModel {
 
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
+    /// The loaded model's declared CUA profile (`ModelInfo.cuaProfile`), or nil
+    /// when the model is not a computer-use agent. Everything is driven off this
+    /// rather than assuming Fara: other multimodal models in the catalog share
+    /// the same `<tool_call>` format but emit absolute-pixel coordinates, so
+    /// running them through a CUA profile yields confidently wrong targets.
+    private(set) var loadedCuaProfile: String?
+
+    var isCuaCapable: Bool { loadedCuaProfile != nil }
     private(set) var isRunning = false
     /// Raw model output, streamed in as it arrives.
     private(set) var rawOutput = ""
@@ -53,16 +61,17 @@ final class ComputerUseAgentViewModel {
     // MARK: - Model lifecycle
 
     func refreshModelStatus() {
-        var request = RACurrentModelRequest()
-        request.category = .multimodal
-        let current = RunAnywhere.currentModel(request)
-        isModelLoaded = current.found
-        if current.found {
-            let name = current.model.name
-            loadedModelName = name.isEmpty ? (current.modelID.isEmpty ? nil : current.modelID) : name
-        } else {
+        // Needs the populated ModelInfo (not the bare snapshot) to read the
+        // catalog-declared cuaProfile.
+        guard let model = RunAnywhere.modelInfoForCategory(.multimodal) else {
+            isModelLoaded = false
             loadedModelName = nil
+            loadedCuaProfile = nil
+            return
         }
+        isModelLoaded = true
+        loadedModelName = model.name.isEmpty ? (model.id.isEmpty ? nil : model.id) : model.name
+        loadedCuaProfile = model.cuaProfile.isEmpty ? nil : model.cuaProfile
     }
 
     func loadModelFromSelection(_ model: RAModelInfo) async {
@@ -78,9 +87,10 @@ final class ComputerUseAgentViewModel {
             statusMessage = ""
             return
         }
-        loadedModelName = model.name.isEmpty ? model.id : model.name
-        isModelLoaded = true
-        statusMessage = ""
+        refreshModelStatus()
+        statusMessage = isCuaCapable
+            ? ""
+            : "\(model.name.isEmpty ? model.id : model.name) is not a computer-use model — pick one that declares a CUA profile."
     }
 
     // MARK: - One agent step
@@ -89,6 +99,14 @@ final class ComputerUseAgentViewModel {
     /// over the screenshot, then parse the reply into a viewport-scaled action.
     func runStep() async {
         guard let screenshot, !isRunning else { return }
+        // Drive the model's OWN declared profile. Never fall back to Fara: a
+        // non-CUA multimodal model would be handed Fara's tool schema and could
+        // emit a well-formed tool call in a different coordinate convention,
+        // which then rescales into a confidently wrong target.
+        guard let profile = loadedCuaProfile else {
+            error = "The loaded model does not declare a CUA profile."
+            return
+        }
 
         isRunning = true
         error = nil
@@ -100,10 +118,10 @@ final class ComputerUseAgentViewModel {
         // 1. The agent prompt for this profile — identity + the computer_use tool
         //    schema — comes from commons, not from this app.
         guard let systemPrompt = RunAnywhere.CUA.systemPrompt(
-            profile: RunAnywhere.CUA.faraProfile,
+            profile: profile,
             display: Self.modelSpace
         ) else {
-            error = "Unknown CUA profile"
+            error = "Unknown CUA profile: \(profile)"
             return
         }
 
@@ -139,7 +157,7 @@ final class ComputerUseAgentViewModel {
             let viewport = Self.pixelSize(of: screenshot)
             action = RunAnywhere.CUA.parseAction(
                 rawOutput,
-                profile: RunAnywhere.CUA.faraProfile,
+                profile: profile,
                 viewport: viewport
             )
             if action?.isValid == false {
