@@ -53,6 +53,15 @@ class DartBridgeCua {
 
   final _logger = SDKLogger('DartBridge.CUA');
 
+  // Resolved once and reused: parseAction runs on every agent-loop turn, and
+  // re-running lookupFunction each time is avoidable work that also diverges
+  // from the SDK's cached-lookup convention for FFI bindings. `_resolved`
+  // distinguishes "not looked up yet" from "looked up and absent".
+  _CuaSystemPromptDart? _systemPromptFn;
+  _CuaParseActionProtoDart? _parseActionFn;
+  bool _systemPromptResolved = false;
+  bool _parseActionResolved = false;
+
   /// Render [profileId]'s system prompt at a declared coordinate space.
   /// Returns null for an unknown profile (C returns -1). Mirrors Swift
   /// `CUA.systemPrompt`: a first sizing call (null out-buffer) then a second
@@ -126,26 +135,32 @@ class DartBridgeCua {
   }
 
   _CuaSystemPromptDart? _lookupSystemPromptOrNull() {
+    if (_systemPromptResolved) return _systemPromptFn;
+    _systemPromptResolved = true;
     try {
-      return PlatformLoader.loadCommons()
+      _systemPromptFn = PlatformLoader.loadCommons()
           .lookupFunction<_CuaSystemPromptNative, _CuaSystemPromptDart>(
             'rac_cua_system_prompt',
           );
     } catch (_) {
       _logger.debug('rac_cua_system_prompt is unavailable');
-      return null;
+      _systemPromptFn = null;
     }
+    return _systemPromptFn;
   }
 
   _CuaParseActionProtoDart? _lookupParseActionOrNull() {
+    if (_parseActionResolved) return _parseActionFn;
+    _parseActionResolved = true;
     try {
-      return PlatformLoader.loadCommons()
+      _parseActionFn = PlatformLoader.loadCommons()
           .lookupFunction<_CuaParseActionProtoNative, _CuaParseActionProtoDart>(
             'rac_cua_parse_action_proto',
           );
     } catch (_) {
       _logger.debug('rac_cua_parse_action_proto is unavailable');
-      return null;
+      _parseActionFn = null;
     }
+    return _parseActionFn;
   }
 }

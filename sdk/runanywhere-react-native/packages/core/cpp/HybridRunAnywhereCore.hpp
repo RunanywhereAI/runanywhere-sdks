@@ -390,10 +390,13 @@ public:
 
   std::string cuaSystemPrompt(const std::string &profileId, double displayWidth,
                               double displayHeight) override;
-  CuaActionNative cuaParseAction(const std::string &profileId,
-                                 const std::string &modelOutput,
-                                 double viewportWidth,
-                                 double viewportHeight) override;
+  // Returns serialized runanywhere.v1.CuaAction bytes; the TS facade decodes
+  // them. Must match HybridRunAnywhereCoreSpec exactly — this header is
+  // hand-written, so a spec change does not update it automatically.
+  std::shared_ptr<ArrayBuffer> cuaParseAction(const std::string &profileId,
+                                              const std::string &modelOutput,
+                                              double viewportWidth,
+                                              double viewportHeight) override;
 
   // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)

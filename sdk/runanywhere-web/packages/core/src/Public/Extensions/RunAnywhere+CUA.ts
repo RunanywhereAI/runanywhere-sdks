@@ -104,6 +104,26 @@ const REBUILD_HINT =
 const logger = new SDKLogger('CUA');
 
 /**
+ * Guard a width/height pair before it crosses into WASM. JS `number` can be
+ * negative, fractional, non-finite, or beyond `uint32_t`; Emscripten coerces
+ * silently, so a bad value would reach native CUA as garbage. Validate at the
+ * boundary per the SDK's WASM rules.
+ */
+function requireDimensions(size: CuaDisplaySize, label: string): void {
+  for (const [name, value] of [
+    ['width', size.width],
+    ['height', size.height],
+  ] as const) {
+    if (!Number.isSafeInteger(value) || value <= 0 || value > 0xffffffff) {
+      throw new SDKException(
+        -1,
+        `CUA ${label}.${name} must be a positive integer within uint32 range, got ${value}`,
+      );
+    }
+  }
+}
+
+/**
  * Resolve the module that carries the stateless CUA exports. They are compiled
  * into commons, so every backend WASM (and the commons-only artifact) exports
  * them — `tryRunanywhereModule()` returns whichever is registered.
@@ -142,6 +162,7 @@ export const CUA = {
     profile: string = FARA_PROFILE,
     display: CuaDisplaySize = DEFAULT_DISPLAY,
   ): string | null {
+    requireDimensions(display, 'display');
     const module = requireModule();
     const systemPromptFn = module._rac_cua_system_prompt;
     if (typeof systemPromptFn !== 'function') {
@@ -177,6 +198,7 @@ export const CUA = {
     profile: string = FARA_PROFILE,
     viewport: CuaDisplaySize,
   ): CuaAction | null {
+    requireDimensions(viewport, 'viewport');
     const module = requireModule();
     const parseFn = module._rac_cua_parse_action_proto;
     if (typeof parseFn !== 'function') {

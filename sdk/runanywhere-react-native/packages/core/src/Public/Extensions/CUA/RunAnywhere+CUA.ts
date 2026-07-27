@@ -62,6 +62,13 @@ export enum CuaActionKind {
   Terminate = 18,
 }
 
+/** Map a raw native ordinal onto the enum, degrading to Unknown out of range. */
+function clampKind(raw: number): CuaActionKind {
+  return raw >= CuaActionKind.Unknown && raw <= CuaActionKind.Terminate
+    ? (raw as CuaActionKind)
+    : CuaActionKind.Unknown;
+}
+
 /** A viewport-scaled pixel coordinate. */
 export interface CuaCoordinate {
   x: number;
@@ -157,7 +164,10 @@ export function parseAction(
   }
   const proto = CuaActionProto.decode(new Uint8Array(bytes));
   return {
-    kind: (proto.type as number) as CuaActionKind,
+    // Clamp like every other SDK (Swift `?? .unknown`, Kotlin `fromRawValue`,
+    // Web's range check): a value outside the enum must degrade to Unknown
+    // rather than produce a CuaActionKind that matches no member.
+    kind: clampKind(proto.type as number),
     coordinate: proto.coordinateValid ? { x: proto.x, y: proto.y } : undefined,
     text: proto.text,
     reasoning: proto.reasoning,
