@@ -192,6 +192,80 @@ TestResult run_malformed_not_ok() {
     return TEST_PASS();
 }
 
+// --- goldens captured from REAL Fara1.5 runs (see PR #590) ------------------
+//
+// Synthetic cases cover the edges, but they are written against what we THINK
+// the model emits. These four are verbatim stdout from Fara1.5-4B on this
+// project's own screenshots — two engines (llama.cpp GGUF Q4_K_M and MLX 4-bit)
+// plus a two-step agent loop — so they pin the parser to the shapes the model
+// actually produces, including its leading chain-of-thought and its habit of
+// omitting a trailing newline before </tool_call>.
+
+// GGUF, Metal: "Open a new browser tab." over a 1386x900 screenshot.
+TestResult run_golden_real_gguf_new_tab() {
+    const char* out =
+        "I will click the plus icon to open a new browser tab.\n"
+        "<tool_call>\n"
+        "{\"name\": \"computer_use\", \"arguments\": {\"action\": \"left_click\", "
+        "\"coordinate\": [964, 53]}}\n"
+        "</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1386, 900, &a);
+    ASSERT_EQ(static_cast<int>(a.parse_ok), 1, "real output must parse");
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_LEFT_CLICK), "left_click");
+    ASSERT_EQ(a.x, 1336, "964 * 1386/1000 -> 1336 (verified on-screen)");
+    ASSERT_EQ(a.y, 48, "53 * 900/1000 -> 48");
+    ASSERT_TRUE(std::strstr(a.reasoning, "plus icon") != nullptr, "CoT captured");
+    return TEST_PASS();
+}
+
+// MLX 4-bit, same task/screenshot: a different engine must land on the same
+// element. Cross-engine agreement is the strongest signal the scaling is right.
+TestResult run_golden_real_mlx_new_tab() {
+    const char* out =
+        "I will click the button that opens a new browser tab.\n"
+        "<tool_call>\n"
+        "{\"name\": \"computer_use\", \"arguments\": {\"action\": \"left_click\", "
+        "\"coordinate\": [962, 53]}}\n"
+        "</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1386, 900, &a);
+    ASSERT_EQ(a.x, 1333, "962 * 1386/1000 -> 1333, within 3px of the GGUF run");
+    ASSERT_EQ(a.y, 48, "same row as the GGUF run");
+    return TEST_PASS();
+}
+
+// Agent loop step 1: click a button in a 1000x666 sandbox capture.
+TestResult run_golden_real_loop_click() {
+    const char* out =
+        "<tool_call>\n"
+        "{\"name\": \"computer_use\", \"arguments\": {\"action\": \"left_click\", "
+        "\"coordinate\": [543, 281]}}\n"
+        "</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1000, 666, &a);
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 1, "coordinate present");
+    ASSERT_EQ(a.x, 543, "1000-wide viewport is 1:1 with the model space");
+    ASSERT_EQ(a.y, 187, "281 * 666/1000 -> 187 (landed on the real button)");
+    return TEST_PASS();
+}
+
+// Agent loop step 2: after acting, the model reads the result and terminates.
+TestResult run_golden_real_loop_terminate() {
+    const char* out =
+        "<tool_call>\n"
+        "{\"name\": \"computer_use\", \"arguments\": {\"action\": \"terminate\", "
+        "\"answer\": \"The final status text shown on the page is: CLICKED: ACCEPTED.\"}}\n"
+        "</tool_call>";
+    rac_cua_action_t a;
+    rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1000, 666, &a);
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_TERMINATE), "terminate");
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 0, "terminate carries no coordinate");
+    ASSERT_TRUE(std::strcmp(a.text, "The final status text shown on the page is: CLICKED: ACCEPTED.") == 0,
+                "answer mapped to text verbatim");
+    return TEST_PASS();
+}
+
 #if defined(RAC_HAVE_PROTOBUF)
 // The proto-byte variant is a faithful projection of the struct parse: same
 // golden output, decoded from the wire CuaAction each SDK will see.
@@ -252,6 +326,10 @@ int main(int argc, char** argv) {
     suite.add("non_numeric_scroll_rejected", run_non_numeric_scroll_rejected);
     suite.add("unicode_escape_decoded", run_unicode_escape_decoded);
     suite.add("key_name_inside_value_ignored", run_key_name_inside_value_ignored);
+    suite.add("golden_real_gguf_new_tab", run_golden_real_gguf_new_tab);
+    suite.add("golden_real_mlx_new_tab", run_golden_real_mlx_new_tab);
+    suite.add("golden_real_loop_click", run_golden_real_loop_click);
+    suite.add("golden_real_loop_terminate", run_golden_real_loop_terminate);
 #if defined(RAC_HAVE_PROTOBUF)
     suite.add("proto_roundtrip_golden", run_proto_roundtrip_golden);
     suite.add("proto_unknown_profile_error", run_proto_unknown_profile_error);
