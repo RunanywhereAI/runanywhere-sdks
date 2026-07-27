@@ -43,6 +43,22 @@ const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
 const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
 const tts = () => ensure('tts', () => ra.loadTTS('piper-lessac'));
 
+// The backend keeps ONE generative model loaded, so loading anything else (another
+// LLM, or a VLM) evicts ours and the memoized handle above goes stale — every later
+// call then fails with "No model loaded". EVERY caller must go through withLlm so
+// the recovery lives in one place instead of only in chat.
+const STALE_MODEL_RE = /no model|not loaded|model.*load/i;
+async function withLlm(fn) {
+  try {
+    return await fn(await llm());
+  } catch (e) {
+    if (!STALE_MODEL_RE.test(e.message || '')) throw e;
+    delete handles.llm;
+    for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale badges
+    return fn(await llm());
+  }
+}
+
 // ---- minimal, XSS-safe markdown (escape first, then format) ----
 // Code blocks are stashed behind private-use sentinels () so inline
 // formatting doesn't touch them; they're restored last. (Private-use chars keep
@@ -173,26 +189,14 @@ async function sendChat() {
   setStatus('generating…');
   try {
     let result = null;
-    const runGen = async () => {
+    // withLlm re-loads once if the handle was evicted by another model.
+    await withLlm((h) => {
       asst.content = '';
-      const h = await llm();
-      await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+      return ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
         if (e.isFinal) { result = e.result; }
         else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
       });
-    };
-    try {
-      await runGen();
-    } catch (e) {
-      // The backend keeps ONE LLM loaded at a time, so loading a model from the
-      // Models tab evicts the chat model and our memoized handle goes stale. Drop
-      // it and reload the chat model once before surfacing an error.
-      if (/no model|not loaded|model.*load/i.test(e.message || '')) {
-        delete handles.llm;
-        for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale LLM badges
-        await runGen();
-      } else throw e;
-    }
+    });
     asst.content = asst.content.trim();
     if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
     bubble.classList.remove('streaming');
@@ -389,13 +393,13 @@ async function saveSettings() {
 
 // ---- shared feature helpers (used by UI + self-test) ----
 async function runStructured(text) {
-  return ra.generateStructured(await llm(), `Extract the person as JSON. Text: "${text}"`, {
+  return withLlm((h) => ra.generateStructured(h, `Extract the person as JSON. Text: "${text}"`, {
     type: 'object',
     properties: { name: { type: 'string' }, age: { type: 'integer' }, interests: { type: 'array', items: { type: 'string' }, maxItems: 5 } },
     required: ['name', 'age', 'interests'],
-  });
+  }));
 }
-async function runTools(text) { return ra.generateToolCall(await llm(), text, TOOLS); }
+async function runTools(text) { return withLlm((h) => ra.generateToolCall(h, text, TOOLS)); }
 async function runEmbeddings(a, b) {
   const h = await embedder();
   const [ea, eb] = await Promise.all([ra.embed(h, a), ra.embed(h, b)]);
@@ -585,7 +589,7 @@ function wireVoice() {
     const heard = await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate));
     $('voiceheard').textContent = heard;
     let reply = ''; $('voicereply').textContent = '';
-    await ra.generate(await llm(), `You are concise. Reply in one sentence.\n\n${heard}`, (t) => { reply += t; $('voicereply').textContent = reply; });
+    await withLlm((h) => ra.generate(h, `You are concise. Reply in one sentence.\n\n${heard}`, (t) => { reply += t; $('voicereply').textContent = reply; }));
     const audio = await ra.synthesize(await tts(), reply.trim());
     setStatus('speaking…');
     const pctx = new AudioContext(); const buf = pctx.createBuffer(1, audio.samples.length, audio.sampleRate); buf.getChannelData(0).set(audio.samples);
@@ -624,7 +628,7 @@ async function selfTest() {
     conv.messages.push({ role: 'assistant', content: '' }); // exercise chat plumbing minimally
     conv.messages.pop();
     let reply = '';
-    await ra.generateStream(await llm(), buildPrompt([], 'Say hello in one short sentence.'), { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; });
+    await withLlm((h) => ra.generateStream(h, buildPrompt([], 'Say hello in one short sentence.'), { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; }));
     if (!reply.trim()) throw new Error('empty chat reply');
     log('[selftest] chat OK: ' + JSON.stringify(reply.trim().slice(0, 70)));
 
