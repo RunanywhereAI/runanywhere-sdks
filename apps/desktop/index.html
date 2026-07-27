@@ -8,28 +8,37 @@
     />
     <title>RunAnywhere AI</title>
     <style>
-      /* ===== RunAnywhere brand system (AppColors/AppSpacing.swift, runanywhere.ai) =====
-         Vibrant orange-red #FF5500 accent on deep dark blue-gray #0F172A. */
+      /* ===== RunAnywhere brand system =====
+         Mirrors examples/DESIGN_GUIDELINE.md — the canonical brand reference.
+         Primary is the LOGO's gradient start #FF6900 (NOT the legacy #FF5500 the
+         guideline explicitly bans); dark surfaces trend to brand ink #0C0E17.
+         Contrast caveat (§5): white on solid #FF6900 is ~2.9:1 and fails AA, so
+         solid-orange fills carry white text only at large/bold sizes; small text
+         on orange uses ink, and orange is otherwise a border/icon/accent color. */
       :root {
-        --bg: #0b1120;            /* app backdrop, a touch deeper than surfaces */
-        --bg2: #0f172a;           /* backgroundPrimaryDark */
-        --sidebar: #0c1322;
-        --surface: #161d2e;       /* card / elevated */
-        --surface-2: #1e2638;     /* higher elevation */
-        --surface-3: #262f44;
-        --line: rgba(255,255,255,0.07);
+        --bg: #0c0e17;            /* background — brand ink surface */
+        --bg2: #101422;           /* one step up from the backdrop */
+        --sidebar: #0a0c14;       /* sidebar sits slightly below the canvas */
+        --surface: #131620;       /* card */
+        --surface-2: #1c2230;     /* muted / secondary */
+        --surface-3: #242a38;     /* highest elevation, matches --line-2 border */
+        --line: #242a38;          /* border / input */
         --line-2: rgba(255,255,255,0.12);
-        --fg: #f2f5fb;
-        --fg-2: #aab4c6;          /* secondary */
-        --fg-3: #6b7688;          /* tertiary / slate */
-        --accent: #ff5500;        /* primaryAccent */
-        --accent-2: #e64500;      /* gradient end / darker */
-        --accent-lift: #ff7a3d;
-        --accent-soft: rgba(255,85,0,0.14);
-        --accent-glow: rgba(255,85,0,0.35);
-        --green: #10b981;
-        --red: #ef4444;
-        --yellow: #eab308;
+        --fg: #f7f4ee;            /* foreground */
+        --fg-2: #c3c8d4;          /* secondary text */
+        --fg-3: #9aa1b3;          /* muted-foreground */
+        --accent: #ff6900;        /* primary — the logo's gradient start */
+        --accent-2: #fb2c36;      /* the logo's gradient end (red) */
+        --accent-lift: #ff8534;   /* hover/emphasis tint of the primary */
+        --accent-ink: #10182b;    /* ink for text ON an orange fill (§5) */
+        --accent-soft: rgba(255,105,0,0.14);
+        --accent-glow: rgba(255,105,0,0.32);
+        --brand-gradient: linear-gradient(135deg, #ff6900 0%, #fb2c36 100%);
+        --green: #45c97f;         /* success (dark) */
+        --red: #dc2626;           /* destructive (dark) */
+        --yellow: #f7ae2a;        /* warning (dark) */
+        --blue: #60a5fa;          /* info (dark) */
+        --radius: 8px;            /* guideline radius */
         --ease: cubic-bezier(.16,.84,.44,1);
         --shadow-1: 0 1px 2px rgba(0,0,0,.4);
         --shadow-2: 0 8px 24px rgba(0,0,0,.35);
@@ -42,16 +51,21 @@
         font-size: 14px; line-height: 1.5; color: var(--fg);
         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
         background:
-          radial-gradient(1100px 620px at 88% -8%, rgba(255,85,0,.10), transparent 58%),
+          radial-gradient(1100px 620px at 88% -8%, rgba(255,105,0,.10), transparent 58%),
           radial-gradient(900px 500px at -6% 108%, rgba(59,130,246,.05), transparent 55%),
           var(--bg);
-        display: flex; flex-direction: column; overflow: hidden; user-select: none;
+        display: flex; flex-direction: column; overflow: hidden;
+        /* Chrome (nav, labels, buttons) is not selectable; CONTENT is — a blanket
+           user-select:none on body made every model answer impossible to copy. */
+        user-select: none;
       }
       ::selection { background: var(--accent-soft); }
       ::-webkit-scrollbar { width: 10px; height: 10px; }
       ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.09); border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
       ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.16); background-clip: padding-box; }
       input, textarea { user-select: text; }
+      /* Anything the model or the user produced must be selectable + copyable. */
+      .bubble, .out, .reasonbody, .ragchunk, .metrics, pre, code { user-select: text; cursor: auto; }
       button { font: inherit; cursor: pointer; color: inherit; }
       @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
       @keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
@@ -101,6 +115,35 @@
       .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; color: var(--fg-2); }
       .pill svg { width: 15px; height: 15px; color: var(--fg-3); }
       .pill select { background: none; border: none; color: var(--fg); font: inherit; outline: none; cursor: pointer; }
+
+      /* ---------- model chip + picker popover ----------
+         The active model for the CURRENT tab's modality. Slots are per-modality
+         (a VLM does not disturb the LLM), so each tab picks independently. */
+      .modelchip { display: inline-flex; align-items: center; gap: 9px; max-width: 320px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px 6px 8px; color: var(--fg); transition: .15s var(--ease); }
+      .modelchip:hover { border-color: var(--line-2); background: var(--surface-2); }
+      .modelchip .mark { width: 22px; height: 22px; border-radius: 7px; background: var(--brand-gradient); display: grid; place-items: center; flex: 0 0 auto; }
+      .modelchip .mark svg { width: 13px; height: 13px; color: #fff; }
+      .modelchip .txt { min-width: 0; text-align: left; line-height: 1.15; }
+      .modelchip .t1 { display: block; font-size: 13px; font-weight: 600; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .modelchip .t2 { display: block; font-size: 10.5px; color: var(--fg-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .modelchip .chev { width: 14px; height: 14px; color: var(--fg-3); flex: 0 0 auto; }
+      .modelchip[disabled] { opacity: .55; cursor: default; }
+
+      .picker { position: absolute; z-index: 60; width: 340px; max-height: 60vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-3); padding: 6px; animation: pop .13s var(--ease); }
+      .picker .phead { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); font-weight: 650; padding: 9px 10px 6px; }
+      .picker .row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: none; background: none; border-radius: 10px; text-align: left; transition: .12s var(--ease); }
+      .picker .row:hover { background: rgba(255,255,255,.05); }
+      .picker .row .info { flex: 1; min-width: 0; }
+      .picker .row .nm { display: block; font-size: 13.5px; font-weight: 550; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .picker .row .meta { display: block; font-size: 11px; color: var(--fg-3); margin-top: 1px; }
+      .picker .row .state { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+      .picker .row .state.active { background: var(--accent-soft); color: var(--accent-lift); }
+      .picker .row .state.ready { background: rgba(255,255,255,.07); color: var(--fg-3); }
+      .picker .row .state.get { background: rgba(255,255,255,.07); color: var(--fg-2); }
+      .picker .row .state.heavy { background: rgba(247,174,42,.14); color: var(--yellow); }
+      .picker .bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); margin: 4px 10px 8px; overflow: hidden; }
+      .picker .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
+      .picker .note { font-size: 11.5px; color: var(--fg-3); padding: 8px 10px 10px; line-height: 1.45; }
       .pill select option { background: var(--surface-2); color: var(--fg); }
       .status { display: inline-flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 12.5px; }
       .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px var(--green); }
@@ -243,9 +286,12 @@
         <div class="topbar">
           <h2 id="sectiontitle">Chat</h2>
           <div class="spacer"></div>
-          <span class="pill" id="devicepill" title="Inference runs on the CPU in this build.">
+          <!-- The model this tab will use. Filled per tab by renderModelChips(). -->
+          <span id="chipslot" style="display:flex;gap:8px;align-items:center"></span>
+          <div class="spacer"></div>
+          <span class="pill" id="devicepill" title="Which compute device this build runs on.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
-            <select id="device"><option value="cpu">CPU</option><option value="gpu" disabled>GPU · needs build</option></select>
+            <span id="devicelabel">CPU</span>
           </span>
           <span class="status" id="statuswrap"><span class="dot"></span><span id="status">starting…</span></span>
         </div>
