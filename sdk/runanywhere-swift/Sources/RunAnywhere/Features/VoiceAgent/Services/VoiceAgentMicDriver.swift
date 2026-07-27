@@ -175,6 +175,6 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
 }
 
 private enum MicConstants {
-    static let sampleRateHz = 16_000
-    static let channelCapacity = 128
+    static let sampleRateHz = RADefaults.AudioCapture.micSampleRateHz
+    static let channelCapacity = RADefaults.AudioCapture.micChannelCapacity
 }

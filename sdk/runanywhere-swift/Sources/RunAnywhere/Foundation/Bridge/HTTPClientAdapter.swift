@@ -46,7 +46,7 @@ public actor HTTPClientAdapter {
         attributes: .concurrent
     )
 
-    private static let defaultTimeoutMs: Int32 = 30_000
+    private static let defaultTimeoutMs = Int32(RADefaults.Network.adapterTimeoutMs)
 
     private init() {}
 

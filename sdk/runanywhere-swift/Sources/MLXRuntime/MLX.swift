@@ -303,16 +303,20 @@ private struct MLXLLMOptionsSnapshot: Sendable {
 
     init(_ options: UnsafePointer<rac_llm_options_t>?) {
         guard let options = options?.pointee else {
+            // No options from the C layer: take the commons defaults rather than
+            // a private table. These fallbacks had drifted to their own values
+            // (max_tokens 1024) while every other layer said otherwise.
+            let d = RAC_LLM_OPTIONS_DEFAULT
             hasOptions = false
-            maxTokens = 1024
-            temperature = 0
-            topP = 0
-            topK = 0
-            minP = 0
-            repetitionPenalty = 1
-            presencePenalty = 0
-            frequencyPenalty = 0
-            seed = 0
+            maxTokens = d.max_tokens
+            temperature = d.temperature
+            topP = d.top_p
+            topK = d.top_k
+            minP = d.min_p
+            repetitionPenalty = d.repetition_penalty
+            presencePenalty = d.presence_penalty
+            frequencyPenalty = d.frequency_penalty
+            seed = d.seed
             disableThinking = false
             systemPrompt = nil
             history = []
@@ -355,14 +359,16 @@ private struct MLXVLMOptionsSnapshot: Sendable {
 
     init(_ options: UnsafePointer<rac_vlm_options_t>?) {
         guard let options = options?.pointee else {
+            // See MLXLLMOptionsSnapshot: commons owns the defaults.
+            let d: rac_vlm_options_t = RAC_VLM_OPTIONS_DEFAULT
             hasOptions = false
-            maxTokens = 1024
-            temperature = 0.7
-            topP = 0.9
-            topK = 40
-            minP = 0
-            repetitionPenalty = 1.1
-            seed = 0
+            maxTokens = d.max_tokens
+            temperature = d.temperature
+            topP = d.top_p
+            topK = d.top_k
+            minP = d.min_p
+            repetitionPenalty = d.repetition_penalty
+            seed = d.seed
             return
         }
 
@@ -1290,7 +1296,9 @@ private final class SyncResultBox<T>: @unchecked Sendable {
 
 private func generateParameters(from options: MLXLLMOptionsSnapshot) -> GenerateParameters {
     guard options.hasOptions else {
-        return GenerateParameters(maxTokens: 1024)
+        // Snapshot already carries the commons defaults when the C layer passed
+        // no options; do not introduce a second number here.
+        return GenerateParameters(maxTokens: Int(options.maxTokens))
     }
     return GenerateParameters(
         maxTokens: options.maxTokens > 0 ? Int(options.maxTokens) : nil,
@@ -1337,18 +1345,20 @@ private func llmUserInput(prompt: String, options: MLXLLMOptionsSnapshot) -> Use
 
 private func generateParameters(from options: MLXVLMOptionsSnapshot) -> GenerateParameters {
     guard options.hasOptions else {
+        // As above: the snapshot's no-options branch already resolved these from
+        // RAC_VLM_OPTIONS_DEFAULT.
         return GenerateParameters(
-            maxTokens: 1024,
-            temperature: 0.7,
-            topP: 0.9,
-            topK: 40,
-            repetitionPenalty: 1.1,
+            maxTokens: Int(options.maxTokens),
+            temperature: options.temperature,
+            topP: options.topP,
+            topK: Int(options.topK),
+            repetitionPenalty: options.repetitionPenalty,
             repetitionContextSize: 32
         )
     }
     let repetitionPenalty = options.repetitionPenalty > 0.0
         ? options.repetitionPenalty
-        : 1.1
+        : RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY
     return GenerateParameters(
         maxTokens: options.maxTokens > 0 ? Int(options.maxTokens) : nil,
         temperature: options.temperature,
@@ -1373,8 +1383,20 @@ private func string(from pointer: UnsafePointer<CChar>?) -> String? {
     return value.isEmpty ? nil : value
 }
 
-private func modelHints(from directory: URL, modelID: String) -> [String] {
-    var hints = [modelID, directory.lastPathComponent]
+/// Architecture evidence read out of the model's own `config.json`.
+///
+/// Deliberately excludes the model id and the containing directory name. Those
+/// used to be folded into the same lowercased blob the STT loader matches on,
+/// which meant a directory could pick which model class loaded a set of
+/// weights: a checkpoint placed in a folder called `whisper-something` would be
+/// handed to `WhisperModel` regardless of what its config said. Vendors also
+/// ship unrelated checkpoints under one prefix, so a name predicts nothing.
+///
+/// MLX models always carry `model_type` / `architectures` — that is how MLX
+/// itself dispatches — so if this comes back without a match the right answer is
+/// to fail rather than fall back to the name.
+private func architectureHints(from directory: URL) -> [String] {
+    var hints: [String] = []
     let configURL = directory.appendingPathComponent("config.json")
     if let data = try? Data(contentsOf: configURL),
        let config = try? JSONDecoder().decode(MLXModelConfigHints.self, from: data) {
@@ -1392,7 +1414,7 @@ private func modelHints(from directory: URL, modelID: String) -> [String] {
 #if canImport(MLXAudioSTT) && canImport(MLXAudioTTS)
 private func loadSpeechRecognitionModel(from directory: URL, modelID: String) async throws
     -> STTGenerationModel {
-    let hints = modelHints(from: directory, modelID: modelID)
+    let hints = architectureHints(from: directory)
     let joinedHints = hints.joined(separator: " ")
 
     if joinedHints.contains("qwen3") && joinedHints.contains("asr") {
@@ -1420,7 +1442,13 @@ private func loadSpeechRecognitionModel(from directory: URL, modelID: String) as
         return try await MoonshineModel.fromModelDirectory(directory)
     }
 
-    throw MLXRuntimeError.unsupportedSTTModel(hints)
+    // No name-based fallback on purpose: matching the model id or folder name
+    // here is what let a directory name override the artifact. Report what the
+    // config actually said instead.
+    let reported = hints.isEmpty
+        ? ["<no architecture in config.json for \(modelID)>"]
+        : hints
+    throw MLXRuntimeError.unsupportedSTTModel(reported)
 }
 
 private func makeSTTAudioArray(

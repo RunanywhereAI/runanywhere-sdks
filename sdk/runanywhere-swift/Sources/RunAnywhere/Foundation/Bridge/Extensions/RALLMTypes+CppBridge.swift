@@ -10,22 +10,18 @@ import Foundation
 // MARK: - RALLMGenerationOptions: C-bridge + convenience
 
 public extension RALLMGenerationOptions {
-    static func defaults() -> RALLMGenerationOptions {
-        RALLMGenerationOptions(
-            maxTokens: 100,
-            temperature: 0.8,
-            topP: 1.0,
-            topK: 0,
-            repetitionPenalty: 1.0
-        )
-    }
+    // `defaults()` is generated into RAConvenience.swift from the rac_default
+    // annotations in idl/llm_options.proto. The hand-written copy that used to
+    // live here disagreed with the initializer below it — 100/0.8/1.0/0 versus
+    // 512/0.7/0.95/40 — so which values a caller got depended on which entry
+    // point they happened to use.
 
     init(
-        maxTokens: Int = 512,
-        temperature: Float = 0.7,
-        topP: Float = 0.95,
-        topK: Int = 40,
-        repetitionPenalty: Float = 1.0,
+        maxTokens: Int = Int(RALLMGenerationOptions.defaults().maxTokens),
+        temperature: Float = RALLMGenerationOptions.defaults().temperature,
+        topP: Float = RALLMGenerationOptions.defaults().topP,
+        topK: Int = Int(RALLMGenerationOptions.defaults().topK),
+        repetitionPenalty: Float = RALLMGenerationOptions.defaults().repetitionPenalty,
         stopSequences: [String] = [],
         streamingEnabled: Bool = false,
         preferredFramework: RAInferenceFramework = .unspecified,
