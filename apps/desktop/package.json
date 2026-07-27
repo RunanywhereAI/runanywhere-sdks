@@ -10,6 +10,6 @@
   "scripts": {
     "start": "electron .",
     "start:gpu": "electron . --gpu",
-    "icon": "node assets/make-icon.js"
+    "icon": "electron assets/make-icon.js"
   }
 }
