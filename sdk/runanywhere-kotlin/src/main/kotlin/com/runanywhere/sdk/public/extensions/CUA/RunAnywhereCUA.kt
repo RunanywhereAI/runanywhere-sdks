@@ -21,8 +21,8 @@
 
 package com.runanywhere.sdk.public.extensions.CUA
 
-import ai.runanywhere.proto.v1.CuaAction as CuaActionProto
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import ai.runanywhere.proto.v1.CuaAction as CuaActionProto
 
 /**
  * A computer-use-agent action parsed from a model's output, with coordinates
@@ -53,13 +53,18 @@ data class CuaAction(
      * A viewport-scaled pixel coordinate. Structured value type so the public
      * API never leaks raw pairs / arrays.
      */
-    data class Coordinate(val x: Int, val y: Int)
+    data class Coordinate(
+        val x: Int,
+        val y: Int,
+    )
 
     /**
      * The action the model wants to perform. Ordinals match the C
      * `rac_cua_action_type_t` enum in `rac_cua.h` — do not reorder.
      */
-    enum class Kind(val rawValue: Int) {
+    enum class Kind(
+        val rawValue: Int,
+    ) {
         UNKNOWN(0),
         LEFT_CLICK(1),
         RIGHT_CLICK(2),
@@ -108,7 +113,10 @@ data class CuaAction(
  * rescale parsed coordinates into. Structured so the public API never passes a
  * bare width/height pair.
  */
-data class CuaDisplay(val width: Int, val height: Int)
+data class CuaDisplay(
+    val width: Int,
+    val height: Int,
+)
 
 /**
  * Computer-use-agent scaffold namespace. Reached as `RunAnywhere.CUA`.

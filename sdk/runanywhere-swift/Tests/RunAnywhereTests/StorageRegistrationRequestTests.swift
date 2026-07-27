@@ -11,9 +11,11 @@ import XCTest
 
 final class StorageRegistrationRequestTests: XCTestCase {
     func testMultiFileRegistrationPublicSurfaceAppendsDownloadSize() {
+        // Trailing optionals track the public surface: downloadSize (independent
+        // download-size planning) then cuaProfile (Computer-Use-Agent profile id).
         let register:
             ([RAModelFileDescriptor], String, String, InferenceFramework, ModelCategory,
-             Int64?, Int?, Bool, RAModelSource, Int64?) async throws -> RAModelInfo =
+             Int64?, Int?, Bool, RAModelSource, Int64?, String?) async throws -> RAModelInfo =
             RunAnywhere.registerModel
 
         _ = register

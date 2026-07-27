@@ -38,7 +38,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.extensions.CUA.CUA as CuaNamespace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +55,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.URL
+import com.runanywhere.sdk.public.extensions.CUA.CUA as CuaNamespace
 
 /** Linearizes synchronous initialization with asynchronous SDK reset. */
 internal class SDKLifetimeGate {
