@@ -56,7 +56,12 @@ if [ -z "${RAC_PROTO_FILES:-}" ]; then
     RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
 fi
 
-RAC_PROTO_EXCLUDES_TS=()
+# sdk_defaults.proto is the central default pool: it carries rac_default
+# annotations and nothing sends its messages over a wire, so no message types
+# are emitted for it. idl/codegen/generate_defaults_pool.py turns it into plain
+# per-language constants instead. Mirrors DECLARATION_ONLY_FILES in
+# idl/codegen/_convenience_common.py.
+RAC_PROTO_EXCLUDES_TS=(sdk_defaults.proto)
 
 TS_PROTO_BASENAMES=()
 while IFS= read -r proto_path; do

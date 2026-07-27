@@ -812,7 +812,7 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADConfiguration, _impl_.enable_auto_calibration_), 5>(),
        {40, 5, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.enable_auto_calibration_)}},
-      // float calibration_multiplier = 6;
+      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
       {::_pbi::TcParser::FastF32S1,
        {53, 6, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.calibration_multiplier_)}},
@@ -850,7 +850,7 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool enable_auto_calibration = 5;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.enable_auto_calibration_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // float calibration_multiplier = 6;
+      // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.calibration_multiplier_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 7;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
@@ -2186,93 +2186,94 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_vad_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021vad_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\"\261\003\n\020VA"
+    "el_types.proto\032\021rac_options.proto\"\320\003\n\020VA"
     "DConfiguration\022\020\n\010model_id\030\001 \001(\t\022(\n\013samp"
     "le_rate\030\002 \001(\005B\023\212\265\030\00516000\240\265\030\001\250\265\030\200\367\002\022)\n\017fr"
     "ame_length_ms\030\003 \001(\005B\020\212\265\030\003100\240\265\030\001\250\265\030\350\007\0222\n"
     "\tthreshold\030\004 \001(\002B\037\212\265\030\0050.015\261\265\030\000\000\000\000\000\000\000\000\271\265"
     "\030\000\000\000\000\000\000\360\?\022\037\n\027enable_auto_calibration\030\005 \001"
-    "(\010\022\036\n\026calibration_multiplier\030\006 \001(\002\022D\n\023pr"
-    "eferred_framework\030\007 \001(\0162\".runanywhere.v1"
-    ".InferenceFrameworkH\000\210\001\001\022\027\n\nmodel_path\030\010"
-    " \001(\tH\001\210\001\001\022\033\n\023window_size_samples\030\t \001(\005\022\036"
-    "\n\026max_speech_duration_ms\030\n \001(\005B\026\n\024_prefe"
-    "rred_frameworkB\r\n\013_model_path\"\234\001\n\nVADOpt"
-    "ions\022\021\n\tthreshold\030\001 \001(\002\022\036\n\026min_speech_du"
-    "ration_ms\030\002 \001(\005\022\037\n\027min_silence_duration_"
-    "ms\030\003 \001(\005\022\036\n\026max_speech_duration_ms\030\004 \001(\005"
-    "\022\032\n\022include_statistics\030\005 \001(\010\"\276\001\n\016VADAudi"
-    "oSource\022\024\n\naudio_data\030\001 \001(\014H\000\022\030\n\016adapter"
-    "_handle\030\002 \001(\tH\000\0222\n\010encoding\030\003 \001(\0162 .runa"
-    "nywhere.v1.VADAudioEncoding\022\023\n\013sample_ra"
-    "te\030\004 \001(\005\022\020\n\010channels\030\005 \001(\005\022\027\n\017frame_offs"
-    "et_ms\030\006 \001(\003B\010\n\006source\"\227\002\n\021VADProcessRequ"
-    "est\022\022\n\nrequest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036"
-    ".runanywhere.v1.VADAudioSourceH\000\210\001\001\0220\n\007o"
-    "ptions\030\003 \001(\0132\032.runanywhere.v1.VADOptions"
-    "H\001\210\001\001\022A\n\010metadata\030\004 \003(\0132/.runanywhere.v1"
-    ".VADProcessRequest.MetadataEntry\032/\n\rMeta"
-    "dataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028"
-    "\001B\010\n\006_audioB\n\n\010_options\"\242\002\n\tVADResult\022\021\n"
-    "\tis_speech\030\001 \001(\010\022\022\n\nconfidence\030\002 \001(\002\022\016\n\006"
-    "energy\030\003 \001(\002\022\023\n\013duration_ms\030\004 \001(\005\022\024\n\014tim"
-    "estamp_ms\030\005 \001(\003\022\025\n\rstart_time_ms\030\006 \001(\003\022\023"
-    "\n\013end_time_ms\030\007 \001(\003\0226\n\nstatistics\030\010 \001(\0132"
-    "\035.runanywhere.v1.VADStatisticsH\000\210\001\001\022\032\n\re"
-    "rror_message\030\t \001(\tH\001\210\001\001\022\022\n\nerror_code\030\n "
-    "\001(\005B\r\n\013_statisticsB\020\n\016_error_message\"\357\001\n"
-    "\rVADStatistics\022\026\n\016current_energy\030\001 \001(\002\022\031"
-    "\n\021current_threshold\030\002 \001(\002\022\025\n\rambient_lev"
-    "el\030\003 \001(\002\022\022\n\nrecent_avg\030\004 \001(\002\022\022\n\nrecent_m"
-    "ax\030\005 \001(\002\022\035\n\025total_speech_segments\030\006 \001(\005\022"
-    " \n\030total_speech_duration_ms\030\007 \001(\003\022\026\n\016ave"
-    "rage_energy\030\010 \001(\002\022\023\n\013peak_energy\030\t \001(\002\"\357"
-    "\001\n\023SpeechActivityEvent\0226\n\nevent_type\030\001 \001"
-    "(\0162\".runanywhere.v1.SpeechActivityKind\022\024"
-    "\n\014timestamp_ms\030\002 \001(\003\022\023\n\013duration_ms\030\003 \001("
-    "\005\022\022\n\nconfidence\030\004 \001(\002\022.\n\006result\030\005 \001(\0132\031."
-    "runanywhere.v1.VADResultH\000\210\001\001\022\027\n\nsegment"
-    "_id\030\006 \001(\tH\001\210\001\001B\t\n\007_resultB\r\n\013_segment_id"
-    "\"\206\003\n\016VADStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014time"
-    "stamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004ki"
-    "nd\030\004 \001(\0162\".runanywhere.v1.VADStreamEvent"
-    "Kind\022.\n\006result\030\005 \001(\0132\031.runanywhere.v1.VA"
-    "DResultH\000\210\001\001\022:\n\010activity\030\006 \001(\0132#.runanyw"
-    "here.v1.SpeechActivityEventH\001\210\001\001\0226\n\nstat"
-    "istics\030\007 \001(\0132\035.runanywhere.v1.VADStatist"
-    "icsH\002\210\001\001\022\032\n\rerror_message\030\010 \001(\tH\003\210\001\001\022\022\n\n"
-    "error_code\030\t \001(\005B\t\n\007_resultB\013\n\t_activity"
-    "B\r\n\013_statisticsB\020\n\016_error_message\"\365\001\n\017VA"
-    "DServiceState\022\020\n\010is_ready\030\001 \001(\010\022\030\n\020is_sp"
-    "eech_active\030\002 \001(\010\022\030\n\020energy_threshold\030\003 "
-    "\001(\002\022\023\n\013sample_rate\030\004 \001(\005\022\027\n\017frame_length"
-    "_ms\030\005 \001(\005\022\032\n\rcurrent_model\030\006 \001(\tH\000\210\001\001\022\032\n"
-    "\rerror_message\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_code\030"
-    "\010 \001(\005B\020\n\016_current_modelB\020\n\016_error_messag"
-    "e*\254\001\n\022SpeechActivityKind\022$\n SPEECH_ACTIV"
-    "ITY_KIND_UNSPECIFIED\020\000\022\'\n#SPEECH_ACTIVIT"
-    "Y_KIND_SPEECH_STARTED\020\001\022%\n!SPEECH_ACTIVI"
-    "TY_KIND_SPEECH_ENDED\020\002\022 \n\034SPEECH_ACTIVIT"
-    "Y_KIND_ONGOING\020\003*|\n\020VADAudioEncoding\022\"\n\036"
-    "VAD_AUDIO_ENCODING_UNSPECIFIED\020\000\022!\n\035VAD_"
-    "AUDIO_ENCODING_PCM_F32_LE\020\001\022!\n\035VAD_AUDIO"
-    "_ENCODING_PCM_S16_LE\020\002*\270\002\n\022VADStreamEven"
-    "tKind\022%\n!VAD_STREAM_EVENT_KIND_UNSPECIFI"
-    "ED\020\000\022!\n\035VAD_STREAM_EVENT_KIND_STARTED\020\001\022"
-    "\037\n\033VAD_STREAM_EVENT_KIND_FRAME\020\002\022)\n%VAD_"
-    "STREAM_EVENT_KIND_SPEECH_ACTIVITY\020\003\022$\n V"
-    "AD_STREAM_EVENT_KIND_STATISTICS\020\004\022!\n\035VAD"
-    "_STREAM_EVENT_KIND_STOPPED\020\005\022\037\n\033VAD_STRE"
-    "AM_EVENT_KIND_ERROR\020\006\022\"\n\036VAD_STREAM_EVEN"
-    "T_KIND_BARGE_IN\020\0072\242\001\n\003VAD\022L\n\014ProcessFram"
-    "e\022!.runanywhere.v1.VADProcessRequest\032\031.r"
-    "unanywhere.v1.VADResult\022M\n\006Stream\022!.runa"
-    "nywhere.v1.VADProcessRequest\032\036.runanywhe"
-    "re.v1.VADStreamEvent0\001B\212\001\n\027ai.runanywher"
-    "e.proto.v1B\017VadOptionsProtoP\001Z<github.co"
-    "m/runanywhere/runanywhere-sdks/idl/v1;ru"
-    "nanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002"
-    "\002RAb\006proto3"
+    "(\010\022=\n\026calibration_multiplier\030\006 \001(\002B\035\212\265\030\003"
+    "2.0\261\265\030\000\000\000\000\000\000\370\?\271\265\030\000\000\000\000\000\000\020@\022D\n\023preferred_f"
+    "ramework\030\007 \001(\0162\".runanywhere.v1.Inferenc"
+    "eFrameworkH\000\210\001\001\022\027\n\nmodel_path\030\010 \001(\tH\001\210\001\001"
+    "\022\033\n\023window_size_samples\030\t \001(\005\022\036\n\026max_spe"
+    "ech_duration_ms\030\n \001(\005B\026\n\024_preferred_fram"
+    "eworkB\r\n\013_model_path\"\234\001\n\nVADOptions\022\021\n\tt"
+    "hreshold\030\001 \001(\002\022\036\n\026min_speech_duration_ms"
+    "\030\002 \001(\005\022\037\n\027min_silence_duration_ms\030\003 \001(\005\022"
+    "\036\n\026max_speech_duration_ms\030\004 \001(\005\022\032\n\022inclu"
+    "de_statistics\030\005 \001(\010\"\276\001\n\016VADAudioSource\022\024"
+    "\n\naudio_data\030\001 \001(\014H\000\022\030\n\016adapter_handle\030\002"
+    " \001(\tH\000\0222\n\010encoding\030\003 \001(\0162 .runanywhere.v"
+    "1.VADAudioEncoding\022\023\n\013sample_rate\030\004 \001(\005\022"
+    "\020\n\010channels\030\005 \001(\005\022\027\n\017frame_offset_ms\030\006 \001"
+    "(\003B\010\n\006source\"\227\002\n\021VADProcessRequest\022\022\n\nre"
+    "quest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036.runanywh"
+    "ere.v1.VADAudioSourceH\000\210\001\001\0220\n\007options\030\003 "
+    "\001(\0132\032.runanywhere.v1.VADOptionsH\001\210\001\001\022A\n\010"
+    "metadata\030\004 \003(\0132/.runanywhere.v1.VADProce"
+    "ssRequest.MetadataEntry\032/\n\rMetadataEntry"
+    "\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006_aud"
+    "ioB\n\n\010_options\"\242\002\n\tVADResult\022\021\n\tis_speec"
+    "h\030\001 \001(\010\022\022\n\nconfidence\030\002 \001(\002\022\016\n\006energy\030\003 "
+    "\001(\002\022\023\n\013duration_ms\030\004 \001(\005\022\024\n\014timestamp_ms"
+    "\030\005 \001(\003\022\025\n\rstart_time_ms\030\006 \001(\003\022\023\n\013end_tim"
+    "e_ms\030\007 \001(\003\0226\n\nstatistics\030\010 \001(\0132\035.runanyw"
+    "here.v1.VADStatisticsH\000\210\001\001\022\032\n\rerror_mess"
+    "age\030\t \001(\tH\001\210\001\001\022\022\n\nerror_code\030\n \001(\005B\r\n\013_s"
+    "tatisticsB\020\n\016_error_message\"\357\001\n\rVADStati"
+    "stics\022\026\n\016current_energy\030\001 \001(\002\022\031\n\021current"
+    "_threshold\030\002 \001(\002\022\025\n\rambient_level\030\003 \001(\002\022"
+    "\022\n\nrecent_avg\030\004 \001(\002\022\022\n\nrecent_max\030\005 \001(\002\022"
+    "\035\n\025total_speech_segments\030\006 \001(\005\022 \n\030total_"
+    "speech_duration_ms\030\007 \001(\003\022\026\n\016average_ener"
+    "gy\030\010 \001(\002\022\023\n\013peak_energy\030\t \001(\002\"\357\001\n\023Speech"
+    "ActivityEvent\0226\n\nevent_type\030\001 \001(\0162\".runa"
+    "nywhere.v1.SpeechActivityKind\022\024\n\014timesta"
+    "mp_ms\030\002 \001(\003\022\023\n\013duration_ms\030\003 \001(\005\022\022\n\nconf"
+    "idence\030\004 \001(\002\022.\n\006result\030\005 \001(\0132\031.runanywhe"
+    "re.v1.VADResultH\000\210\001\001\022\027\n\nsegment_id\030\006 \001(\t"
+    "H\001\210\001\001B\t\n\007_resultB\r\n\013_segment_id\"\206\003\n\016VADS"
+    "treamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030"
+    "\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162"
+    "\".runanywhere.v1.VADStreamEventKind\022.\n\006r"
+    "esult\030\005 \001(\0132\031.runanywhere.v1.VADResultH\000"
+    "\210\001\001\022:\n\010activity\030\006 \001(\0132#.runanywhere.v1.S"
+    "peechActivityEventH\001\210\001\001\0226\n\nstatistics\030\007 "
+    "\001(\0132\035.runanywhere.v1.VADStatisticsH\002\210\001\001\022"
+    "\032\n\rerror_message\030\010 \001(\tH\003\210\001\001\022\022\n\nerror_cod"
+    "e\030\t \001(\005B\t\n\007_resultB\013\n\t_activityB\r\n\013_stat"
+    "isticsB\020\n\016_error_message\"\365\001\n\017VADServiceS"
+    "tate\022\020\n\010is_ready\030\001 \001(\010\022\030\n\020is_speech_acti"
+    "ve\030\002 \001(\010\022\030\n\020energy_threshold\030\003 \001(\002\022\023\n\013sa"
+    "mple_rate\030\004 \001(\005\022\027\n\017frame_length_ms\030\005 \001(\005"
+    "\022\032\n\rcurrent_model\030\006 \001(\tH\000\210\001\001\022\032\n\rerror_me"
+    "ssage\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\020\n\016"
+    "_current_modelB\020\n\016_error_message*\254\001\n\022Spe"
+    "echActivityKind\022$\n SPEECH_ACTIVITY_KIND_"
+    "UNSPECIFIED\020\000\022\'\n#SPEECH_ACTIVITY_KIND_SP"
+    "EECH_STARTED\020\001\022%\n!SPEECH_ACTIVITY_KIND_S"
+    "PEECH_ENDED\020\002\022 \n\034SPEECH_ACTIVITY_KIND_ON"
+    "GOING\020\003*|\n\020VADAudioEncoding\022\"\n\036VAD_AUDIO"
+    "_ENCODING_UNSPECIFIED\020\000\022!\n\035VAD_AUDIO_ENC"
+    "ODING_PCM_F32_LE\020\001\022!\n\035VAD_AUDIO_ENCODING"
+    "_PCM_S16_LE\020\002*\270\002\n\022VADStreamEventKind\022%\n!"
+    "VAD_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035V"
+    "AD_STREAM_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_ST"
+    "REAM_EVENT_KIND_FRAME\020\002\022)\n%VAD_STREAM_EV"
+    "ENT_KIND_SPEECH_ACTIVITY\020\003\022$\n VAD_STREAM"
+    "_EVENT_KIND_STATISTICS\020\004\022!\n\035VAD_STREAM_E"
+    "VENT_KIND_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT_"
+    "KIND_ERROR\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_BA"
+    "RGE_IN\020\0072\242\001\n\003VAD\022L\n\014ProcessFrame\022!.runan"
+    "ywhere.v1.VADProcessRequest\032\031.runanywher"
+    "e.v1.VADResult\022M\n\006Stream\022!.runanywhere.v"
+    "1.VADProcessRequest\032\036.runanywhere.v1.VAD"
+    "StreamEvent0\001B\212\001\n\027ai.runanywhere.proto.v"
+    "1B\017VadOptionsProtoP\001Z<github.com/runanyw"
+    "here/runanywhere-sdks/idl/v1;runanywhere"
+    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
+    "o3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_vad_5foptions_2eproto_deps[2] = {
@@ -2283,7 +2284,7 @@ static ::absl::once_flag descriptor_table_vad_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vad_5foptions_2eproto = {
     false,
     false,
-    3491,
+    3522,
     descriptor_table_protodef_vad_5foptions_2eproto,
     "vad_options.proto",
     &descriptor_table_vad_5foptions_2eproto_once,
@@ -2516,7 +2517,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // float calibration_multiplier = 6;
+  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_calibration_multiplier()) != 0) {
       target = stream->EnsureSpace(target);
@@ -2622,7 +2623,7 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
         total_size += 2;
       }
     }
-    // float calibration_multiplier = 6;
+    // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_calibration_multiplier()) != 0) {
         total_size += 5;

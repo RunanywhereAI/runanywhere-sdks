@@ -32,15 +32,31 @@ fi
 
 # Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone. C++ is the authoritative
-# consumer and emits every proto in idl/ — no exclusions.
+# consumer and emits every proto in idl/ except the declaration-only pool.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
     RAC_PROTO_FILES="$(ls "${PROTO_DIR}"/*.proto | sort)"
 fi
 
+# sdk_defaults.proto carries rac_default annotations and no wire messages.
+# commons consumes it as macros via idl/codegen/generate_cpp_defaults.py
+# (include/rac/rac_defaults_generated.h), so message classes here would be dead
+# weight that also has to be listed in the CMakeLists *.pb.cc set. Mirrors
+# DECLARATION_ONLY_FILES in idl/codegen/_convenience_common.py.
+RAC_PROTO_EXCLUDES_CPP=(sdk_defaults.proto)
+
 CPP_PROTO_BASENAMES=()
 while IFS= read -r proto_path; do
     [ -z "${proto_path}" ] && continue
-    CPP_PROTO_BASENAMES+=("$(basename "${proto_path}")")
+    proto_base="$(basename "${proto_path}")"
+    skip=0
+    for excluded in "${RAC_PROTO_EXCLUDES_CPP[@]}"; do
+        if [ "${proto_base}" = "${excluded}" ]; then
+            skip=1
+            break
+        fi
+    done
+    [ "${skip}" -eq 1 ] && continue
+    CPP_PROTO_BASENAMES+=("${proto_base}")
 done <<< "${RAC_PROTO_FILES}"
 
 protoc \

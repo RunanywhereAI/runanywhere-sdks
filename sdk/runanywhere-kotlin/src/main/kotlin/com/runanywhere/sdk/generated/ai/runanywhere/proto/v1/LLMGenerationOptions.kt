@@ -33,6 +33,20 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
+ * The rac_default annotations on LLMGenerationOptions are the single
+ * declaration of the LLM sampling defaults. RAC_LLM_OPTIONS_DEFAULT in
+ * rac_llm_types.h is generated from them, and every SDK reads the generated
+ * defaults() rather than keeping its own table (Swift, Kotlin, Flutter, and Web
+ * each used to).
+ *
+ * On the wire, a proto3 zero still means "unset, let the engine decide". The
+ * generated defaults() is for callers who want a populated options value; it
+ * does not change how an unset field is interpreted.
+ *
+ * This block is deliberately separated from the message by a blank line. protoc
+ * only attaches a comment that directly abuts an element, and notes about the
+ * codegen pipeline should not be copied into the generated message in five
+ * languages. Keep pipeline commentary here and wire semantics below.
  * ---------------------------------------------------------------------------
  * Options for a single text generation invocation.
  *
@@ -46,6 +60,8 @@ public class LLMGenerationOptions(
    * Maximum number of tokens to generate. 0 (default) = unset → engine
    * default (typically 100).
    */
+  @RacDefaultOption("100")
+  @RacMinOption(0)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -57,6 +73,9 @@ public class LLMGenerationOptions(
   /**
    * Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
    */
+  @RacDefaultOption("0.8")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(2.0)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -67,6 +86,9 @@ public class LLMGenerationOptions(
   /**
    * Nucleus sampling (top-p). 1.0 = no nucleus truncation.
    */
+  @RacDefaultOption("1.0")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -78,6 +100,8 @@ public class LLMGenerationOptions(
   /**
    * Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
    */
+  @RacDefaultOption("0")
+  @RacMinOption(0)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -89,6 +113,8 @@ public class LLMGenerationOptions(
   /**
    * Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
    */
+  @RacDefaultOption("1.0")
+  @RacMinFloatOption(0.0)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

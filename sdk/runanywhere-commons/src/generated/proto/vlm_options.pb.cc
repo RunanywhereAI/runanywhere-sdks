@@ -1617,19 +1617,19 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::FastUS1,
        {10, 1, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.prompt_)}},
-      // int32 max_tokens = 2;
+      // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.max_tokens_), 5>(),
        {16, 5, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_tokens_)}},
-      // float temperature = 3;
+      // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
       {::_pbi::TcParser::FastF32S1,
        {29, 6, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.temperature_)}},
-      // float top_p = 4;
+      // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {37, 7, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_p_)}},
-      // int32 top_k = 5;
+      // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.top_k_), 8>(),
        {40, 8, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_k_)}},
@@ -1637,7 +1637,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::FastUR1,
        {50, 0, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.stop_sequences_)}},
-      // bool streaming_enabled = 7;
+      // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMGenerationOptions, _impl_.streaming_enabled_), 12>(),
        {56, 12, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.streaming_enabled_)}},
@@ -1653,7 +1653,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.n_threads_), 10>(),
        {80, 10, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.n_threads_)}},
-      // bool use_gpu = 11;
+      // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMGenerationOptions, _impl_.use_gpu_), 13>(),
        {88, 13, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.use_gpu_)}},
@@ -1673,7 +1673,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMGenerationOptions, _impl_.seed_), 15>(),
        {120, 15, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.seed_)}},
-      // float repetition_penalty = 16;
+      // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
       {::_pbi::TcParser::FastF32S2,
        {389, 16, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.repetition_penalty_)}},
@@ -1703,17 +1703,17 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
     }}, {{
       // string prompt = 1;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 max_tokens = 2;
+      // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float temperature = 3;
+      // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // float top_p = 4;
+      // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 top_k = 5;
+      // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // repeated string stop_sequences = 6;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.stop_sequences_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-      // bool streaming_enabled = 7;
+      // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.streaming_enabled_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional string system_prompt = 8;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.system_prompt_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
@@ -1721,7 +1721,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_image_size_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 n_threads = 10;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.n_threads_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool use_gpu = 11;
+      // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.use_gpu_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // .runanywhere.v1.VLMModelFamily model_family = 12;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.model_family_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
@@ -1731,7 +1731,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.image_marker_override_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int64 seed = 15;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.seed_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float repetition_penalty = 16;
+      // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.repetition_penalty_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // float min_p = 17;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.min_p_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
@@ -2313,115 +2313,120 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_vlm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021vlm_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\"\222\001\n\017VLMChatTemplate\022\025\n\rte"
-    "mplate_text\030\001 \001(\t\022\031\n\014image_marker\030\002 \001(\tH"
-    "\000\210\001\001\022\"\n\025default_system_prompt\030\003 \001(\tH\001\210\001\001"
-    "B\017\n\r_image_markerB\030\n\026_default_system_pro"
-    "mpt\"\363\002\n\010VLMImage\022\023\n\tfile_path\030\001 \001(\tH\000\022\021\n"
-    "\007encoded\030\002 \001(\014H\000\022\021\n\007raw_rgb\030\003 \001(\014H\000\022\020\n\006b"
-    "ase64\030\004 \001(\tH\000\022\r\n\005width\030\005 \001(\005\022\016\n\006height\030\006"
-    " \001(\005\022.\n\006format\030\007 \001(\0162\036.runanywhere.v1.VL"
-    "MImageFormat\022\027\n\nmedia_type\030\010 \001(\tH\001\210\001\001\022\021\n"
-    "\004name\030\t \001(\tH\002\210\001\001\022\022\n\nsize_bytes\030\n \001(\003\0228\n\010"
-    "metadata\030\013 \003(\0132&.runanywhere.v1.VLMImage"
-    ".MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001"
-    " \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006sourceB\r\n\013_me"
-    "dia_typeB\007\n\005_name\"\247\002\n\020VLMConfiguration\022\020"
-    "\n\010model_id\030\001 \001(\t\022\031\n\021max_image_size_px\030\002 "
-    "\001(\005\022\022\n\nmax_tokens\030\003 \001(\005\022\026\n\016context_lengt"
-    "h\030\004 \001(\005\022\023\n\013temperature\030\005 \001(\002\022\032\n\rsystem_p"
-    "rompt\030\006 \001(\tH\000\210\001\001\022\031\n\021streaming_enabled\030\007 "
-    "\001(\010\022D\n\023preferred_framework\030\010 \001(\0162\".runan"
-    "ywhere.v1.InferenceFrameworkH\001\210\001\001B\020\n\016_sy"
-    "stem_promptB\026\n\024_preferred_framework\"\263\004\n\024"
-    "VLMGenerationOptions\022\016\n\006prompt\030\001 \001(\t\022\022\n\n"
-    "max_tokens\030\002 \001(\005\022\023\n\013temperature\030\003 \001(\002\022\r\n"
-    "\005top_p\030\004 \001(\002\022\r\n\005top_k\030\005 \001(\005\022\026\n\016stop_sequ"
-    "ences\030\006 \003(\t\022\031\n\021streaming_enabled\030\007 \001(\010\022\032"
-    "\n\rsystem_prompt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_"
-    "size\030\t \001(\005\022\021\n\tn_threads\030\n \001(\005\022\017\n\007use_gpu"
-    "\030\013 \001(\010\0224\n\014model_family\030\014 \001(\0162\036.runanywhe"
-    "re.v1.VLMModelFamily\022B\n\024custom_chat_temp"
-    "late\030\r \001(\0132\037.runanywhere.v1.VLMChatTempl"
-    "ateH\001\210\001\001\022\"\n\025image_marker_override\030\016 \001(\tH"
-    "\002\210\001\001\022\014\n\004seed\030\017 \001(\003\022\032\n\022repetition_penalty"
-    "\030\020 \001(\002\022\r\n\005min_p\030\021 \001(\002\022\035\n\025emit_image_embe"
-    "ddings\030\022 \001(\010B\020\n\016_system_promptB\027\n\025_custo"
-    "m_chat_templateB\030\n\026_image_marker_overrid"
-    "e\"\267\002\n\024VLMGenerationRequest\022\022\n\nrequest_id"
-    "\030\001 \001(\t\022(\n\006images\030\002 \003(\0132\030.runanywhere.v1."
-    "VLMImage\022:\n\007options\030\003 \001(\0132$.runanywhere."
-    "v1.VLMGenerationOptionsH\000\210\001\001\022\025\n\010model_id"
-    "\030\004 \001(\tH\001\210\001\001\022D\n\010metadata\030\005 \003(\01322.runanywh"
-    "ere.v1.VLMGenerationRequest.MetadataEntr"
-    "y\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value"
-    "\030\002 \001(\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\"\215\003\n\t"
-    "VLMResult\022\014\n\004text\030\001 \001(\t\022\025\n\rprompt_tokens"
-    "\030\002 \001(\005\022\031\n\021completion_tokens\030\003 \001(\005\022\024\n\014tot"
-    "al_tokens\030\004 \001(\003\022\032\n\022processing_time_ms\030\005 "
-    "\001(\003\022\031\n\021tokens_per_second\030\006 \001(\002\022\024\n\014image_"
-    "tokens\030\007 \001(\005\022\036\n\026time_to_first_token_ms\030\010"
-    " \001(\003\022\034\n\024image_encode_time_ms\030\t \001(\003\022\032\n\rha"
-    "rdware_used\030\n \001(\tH\000\210\001\001\022\032\n\rerror_message\030"
-    "\013 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\014 \001(\005\022\025\n\rfinish"
-    "_reason\030\r \001(\t\022\030\n\020images_processed\030\016 \001(\005B"
-    "\020\n\016_hardware_usedB\020\n\016_error_message\"\307\002\n\016"
-    "VLMStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp"
-    "_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 "
-    "\001(\0162\".runanywhere.v1.VLMStreamEventKind\022"
-    "\r\n\005token\030\005 \001(\t\022\023\n\013token_index\030\006 \001(\005\022\020\n\010i"
-    "s_final\030\007 \001(\010\022\031\n\021tokens_per_second\030\010 \001(\002"
-    "\022.\n\006result\030\t \001(\0132\031.runanywhere.v1.VLMRes"
-    "ultH\000\210\001\001\022\032\n\rerror_message\030\n \001(\tH\001\210\001\001\022\022\n\n"
-    "error_code\030\013 \001(\005B\t\n\007_resultB\020\n\016_error_me"
-    "ssage\"\243\002\n\017VLMServiceState\022\020\n\010is_ready\030\001 "
-    "\001(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001\022\026\n\016conte"
-    "xt_length\030\003 \001(\005\022\032\n\022supports_streaming\030\004 "
-    "\001(\010\022 \n\030supports_multiple_images\030\005 \001(\010\022 \n"
-    "\023vision_encoder_type\030\006 \001(\tH\001\210\001\001\022\032\n\rerror"
-    "_message\030\007 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\010 \001(\005B"
-    "\020\n\016_current_modelB\026\n\024_vision_encoder_typ"
-    "eB\020\n\016_error_message*\374\001\n\016VLMImageFormat\022 "
-    "\n\034VLM_IMAGE_FORMAT_UNSPECIFIED\020\000\022\031\n\025VLM_"
-    "IMAGE_FORMAT_JPEG\020\001\022\030\n\024VLM_IMAGE_FORMAT_"
-    "PNG\020\002\022\031\n\025VLM_IMAGE_FORMAT_WEBP\020\003\022\034\n\030VLM_"
-    "IMAGE_FORMAT_RAW_RGB\020\004\022\035\n\031VLM_IMAGE_FORM"
-    "AT_RAW_RGBA\020\005\022\033\n\027VLM_IMAGE_FORMAT_BASE64"
-    "\020\006\022\036\n\032VLM_IMAGE_FORMAT_FILE_PATH\020\007*\303\001\n\016V"
-    "LMModelFamily\022 \n\034VLM_MODEL_FAMILY_UNSPEC"
-    "IFIED\020\000\022\031\n\025VLM_MODEL_FAMILY_AUTO\020\001\022\035\n\031VL"
-    "M_MODEL_FAMILY_QWEN2_VL\020\002\022\034\n\030VLM_MODEL_F"
-    "AMILY_SMOLVLM\020\003\022\032\n\026VLM_MODEL_FAMILY_LLAV"
-    "A\020\004\022\033\n\027VLM_MODEL_FAMILY_CUSTOM\020c*\356\001\n\022VLM"
-    "StreamEventKind\022%\n!VLM_STREAM_EVENT_KIND"
-    "_UNSPECIFIED\020\000\022!\n\035VLM_STREAM_EVENT_KIND_"
-    "STARTED\020\001\022\'\n#VLM_STREAM_EVENT_KIND_IMAGE"
-    "_ENCODED\020\002\022\037\n\033VLM_STREAM_EVENT_KIND_TOKE"
-    "N\020\003\022#\n\037VLM_STREAM_EVENT_KIND_COMPLETED\020\004"
-    "\022\037\n\033VLM_STREAM_EVENT_KIND_ERROR\020\0052\244\001\n\003VL"
-    "M\022K\n\010Generate\022$.runanywhere.v1.VLMGenera"
-    "tionRequest\032\031.runanywhere.v1.VLMResult\022P"
-    "\n\006Stream\022$.runanywhere.v1.VLMGenerationR"
-    "equest\032\036.runanywhere.v1.VLMStreamEvent0\001"
-    "B\212\001\n\027ai.runanywhere.proto.v1B\017VlmOptions"
-    "ProtoP\001Z<github.com/runanywhere/runanywh"
-    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
-    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "el_types.proto\032\021rac_options.proto\"\222\001\n\017VL"
+    "MChatTemplate\022\025\n\rtemplate_text\030\001 \001(\t\022\031\n\014"
+    "image_marker\030\002 \001(\tH\000\210\001\001\022\"\n\025default_syste"
+    "m_prompt\030\003 \001(\tH\001\210\001\001B\017\n\r_image_markerB\030\n\026"
+    "_default_system_prompt\"\363\002\n\010VLMImage\022\023\n\tf"
+    "ile_path\030\001 \001(\tH\000\022\021\n\007encoded\030\002 \001(\014H\000\022\021\n\007r"
+    "aw_rgb\030\003 \001(\014H\000\022\020\n\006base64\030\004 \001(\tH\000\022\r\n\005widt"
+    "h\030\005 \001(\005\022\016\n\006height\030\006 \001(\005\022.\n\006format\030\007 \001(\0162"
+    "\036.runanywhere.v1.VLMImageFormat\022\027\n\nmedia"
+    "_type\030\010 \001(\tH\001\210\001\001\022\021\n\004name\030\t \001(\tH\002\210\001\001\022\022\n\ns"
+    "ize_bytes\030\n \001(\003\0228\n\010metadata\030\013 \003(\0132&.runa"
+    "nywhere.v1.VLMImage.MetadataEntry\032/\n\rMet"
+    "adataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\002"
+    "8\001B\010\n\006sourceB\r\n\013_media_typeB\007\n\005_name\"\247\002\n"
+    "\020VLMConfiguration\022\020\n\010model_id\030\001 \001(\t\022\031\n\021m"
+    "ax_image_size_px\030\002 \001(\005\022\022\n\nmax_tokens\030\003 \001"
+    "(\005\022\026\n\016context_length\030\004 \001(\005\022\023\n\013temperatur"
+    "e\030\005 \001(\002\022\032\n\rsystem_prompt\030\006 \001(\tH\000\210\001\001\022\031\n\021s"
+    "treaming_enabled\030\007 \001(\010\022D\n\023preferred_fram"
+    "ework\030\010 \001(\0162\".runanywhere.v1.InferenceFr"
+    "ameworkH\001\210\001\001B\020\n\016_system_promptB\026\n\024_prefe"
+    "rred_framework\"\262\005\n\024VLMGenerationOptions\022"
+    "\016\n\006prompt\030\001 \001(\t\022 \n\nmax_tokens\030\002 \001(\005B\014\212\265\030"
+    "\0042048\240\265\030\000\0222\n\013temperature\030\003 \001(\002B\035\212\265\030\0030.7\261"
+    "\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\004 \001(\002B\035\212\265"
+    "\030\0030.9\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\005 \001"
+    "(\005B\t\212\265\030\0010\240\265\030\000\022\026\n\016stop_sequences\030\006 \003(\t\022#\n"
+    "\021streaming_enabled\030\007 \001(\010B\010\212\265\030\004true\022\032\n\rsy"
+    "stem_prompt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_size"
+    "\030\t \001(\005\022\021\n\tn_threads\030\n \001(\005\022\031\n\007use_gpu\030\013 \001"
+    "(\010B\010\212\265\030\004true\0224\n\014model_family\030\014 \001(\0162\036.run"
+    "anywhere.v1.VLMModelFamily\022B\n\024custom_cha"
+    "t_template\030\r \001(\0132\037.runanywhere.v1.VLMCha"
+    "tTemplateH\001\210\001\001\022\"\n\025image_marker_override\030"
+    "\016 \001(\tH\002\210\001\001\022\014\n\004seed\030\017 \001(\003\022.\n\022repetition_p"
+    "enalty\030\020 \001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000\022\r\n\005min_"
+    "p\030\021 \001(\002\022\035\n\025emit_image_embeddings\030\022 \001(\010B\020"
+    "\n\016_system_promptB\027\n\025_custom_chat_templat"
+    "eB\030\n\026_image_marker_override\"\267\002\n\024VLMGener"
+    "ationRequest\022\022\n\nrequest_id\030\001 \001(\t\022(\n\006imag"
+    "es\030\002 \003(\0132\030.runanywhere.v1.VLMImage\022:\n\007op"
+    "tions\030\003 \001(\0132$.runanywhere.v1.VLMGenerati"
+    "onOptionsH\000\210\001\001\022\025\n\010model_id\030\004 \001(\tH\001\210\001\001\022D\n"
+    "\010metadata\030\005 \003(\01322.runanywhere.v1.VLMGene"
+    "rationRequest.MetadataEntry\032/\n\rMetadataE"
+    "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010"
+    "_optionsB\013\n\t_model_id\"\215\003\n\tVLMResult\022\014\n\004t"
+    "ext\030\001 \001(\t\022\025\n\rprompt_tokens\030\002 \001(\005\022\031\n\021comp"
+    "letion_tokens\030\003 \001(\005\022\024\n\014total_tokens\030\004 \001("
+    "\003\022\032\n\022processing_time_ms\030\005 \001(\003\022\031\n\021tokens_"
+    "per_second\030\006 \001(\002\022\024\n\014image_tokens\030\007 \001(\005\022\036"
+    "\n\026time_to_first_token_ms\030\010 \001(\003\022\034\n\024image_"
+    "encode_time_ms\030\t \001(\003\022\032\n\rhardware_used\030\n "
+    "\001(\tH\000\210\001\001\022\032\n\rerror_message\030\013 \001(\tH\001\210\001\001\022\022\n\n"
+    "error_code\030\014 \001(\005\022\025\n\rfinish_reason\030\r \001(\t\022"
+    "\030\n\020images_processed\030\016 \001(\005B\020\n\016_hardware_u"
+    "sedB\020\n\016_error_message\"\307\002\n\016VLMStreamEvent"
+    "\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nr"
+    "equest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywh"
+    "ere.v1.VLMStreamEventKind\022\r\n\005token\030\005 \001(\t"
+    "\022\023\n\013token_index\030\006 \001(\005\022\020\n\010is_final\030\007 \001(\010\022"
+    "\031\n\021tokens_per_second\030\010 \001(\002\022.\n\006result\030\t \001"
+    "(\0132\031.runanywhere.v1.VLMResultH\000\210\001\001\022\032\n\rer"
+    "ror_message\030\n \001(\tH\001\210\001\001\022\022\n\nerror_code\030\013 \001"
+    "(\005B\t\n\007_resultB\020\n\016_error_message\"\243\002\n\017VLMS"
+    "erviceState\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent"
+    "_model\030\002 \001(\tH\000\210\001\001\022\026\n\016context_length\030\003 \001("
+    "\005\022\032\n\022supports_streaming\030\004 \001(\010\022 \n\030support"
+    "s_multiple_images\030\005 \001(\010\022 \n\023vision_encode"
+    "r_type\030\006 \001(\tH\001\210\001\001\022\032\n\rerror_message\030\007 \001(\t"
+    "H\002\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\020\n\016_current_mo"
+    "delB\026\n\024_vision_encoder_typeB\020\n\016_error_me"
+    "ssage*\374\001\n\016VLMImageFormat\022 \n\034VLM_IMAGE_FO"
+    "RMAT_UNSPECIFIED\020\000\022\031\n\025VLM_IMAGE_FORMAT_J"
+    "PEG\020\001\022\030\n\024VLM_IMAGE_FORMAT_PNG\020\002\022\031\n\025VLM_I"
+    "MAGE_FORMAT_WEBP\020\003\022\034\n\030VLM_IMAGE_FORMAT_R"
+    "AW_RGB\020\004\022\035\n\031VLM_IMAGE_FORMAT_RAW_RGBA\020\005\022"
+    "\033\n\027VLM_IMAGE_FORMAT_BASE64\020\006\022\036\n\032VLM_IMAG"
+    "E_FORMAT_FILE_PATH\020\007*\303\001\n\016VLMModelFamily\022"
+    " \n\034VLM_MODEL_FAMILY_UNSPECIFIED\020\000\022\031\n\025VLM"
+    "_MODEL_FAMILY_AUTO\020\001\022\035\n\031VLM_MODEL_FAMILY"
+    "_QWEN2_VL\020\002\022\034\n\030VLM_MODEL_FAMILY_SMOLVLM\020"
+    "\003\022\032\n\026VLM_MODEL_FAMILY_LLAVA\020\004\022\033\n\027VLM_MOD"
+    "EL_FAMILY_CUSTOM\020c*\356\001\n\022VLMStreamEventKin"
+    "d\022%\n!VLM_STREAM_EVENT_KIND_UNSPECIFIED\020\000"
+    "\022!\n\035VLM_STREAM_EVENT_KIND_STARTED\020\001\022\'\n#V"
+    "LM_STREAM_EVENT_KIND_IMAGE_ENCODED\020\002\022\037\n\033"
+    "VLM_STREAM_EVENT_KIND_TOKEN\020\003\022#\n\037VLM_STR"
+    "EAM_EVENT_KIND_COMPLETED\020\004\022\037\n\033VLM_STREAM"
+    "_EVENT_KIND_ERROR\020\0052\244\001\n\003VLM\022K\n\010Generate\022"
+    "$.runanywhere.v1.VLMGenerationRequest\032\031."
+    "runanywhere.v1.VLMResult\022P\n\006Stream\022$.run"
+    "anywhere.v1.VLMGenerationRequest\032\036.runan"
+    "ywhere.v1.VLMStreamEvent0\001B\212\001\n\027ai.runany"
+    "where.proto.v1B\017VlmOptionsProtoP\001Z<githu"
+    "b.com/runanywhere/runanywhere-sdks/idl/v"
+    "1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere."
+    "V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_vlm_5foptions_2eproto_deps[1] = {
+    descriptor_table_vlm_5foptions_2eproto_deps[2] = {
         &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_vlm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vlm_5foptions_2eproto = {
     false,
     false,
-    3789,
+    3935,
     descriptor_table_protodef_vlm_5foptions_2eproto,
     "vlm_options.proto",
     &descriptor_table_vlm_5foptions_2eproto_once,
     descriptor_table_vlm_5foptions_2eproto_deps,
-    1,
+    2,
     10,
     schemas,
     file_message_globals,
@@ -3895,7 +3900,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // int32 max_tokens = 2;
+  // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_max_tokens() != 0) {
       target =
@@ -3904,7 +3909,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // float temperature = 3;
+  // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
       target = stream->EnsureSpace(target);
@@ -3913,7 +3918,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // float top_p = 4;
+  // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
       target = stream->EnsureSpace(target);
@@ -3922,7 +3927,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // int32 top_k = 5;
+  // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_top_k() != 0) {
       target =
@@ -3941,7 +3946,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // bool streaming_enabled = 7;
+  // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (this_._internal_streaming_enabled() != 0) {
       target = stream->EnsureSpace(target);
@@ -3976,7 +3981,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // bool use_gpu = 11;
+  // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     if (this_._internal_use_gpu() != 0) {
       target = stream->EnsureSpace(target);
@@ -4018,7 +4023,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // float repetition_penalty = 16;
+  // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
   if (CheckHasBit(cached_has_bits, 0x00010000U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_repetition_penalty()) != 0) {
       target = stream->EnsureSpace(target);
@@ -4102,20 +4107,20 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.custom_chat_template_);
     }
-    // int32 max_tokens = 2;
+    // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_max_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_tokens());
       }
     }
-    // float temperature = 3;
+    // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
         total_size += 5;
       }
     }
-    // float top_p = 4;
+    // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
         total_size += 5;
@@ -4123,7 +4128,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // int32 top_k = 5;
+    // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_top_k() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
@@ -4151,13 +4156,13 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_model_family());
       }
     }
-    // bool streaming_enabled = 7;
+    // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (this_._internal_streaming_enabled() != 0) {
         total_size += 2;
       }
     }
-    // bool use_gpu = 11;
+    // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (this_._internal_use_gpu() != 0) {
         total_size += 2;
@@ -4178,7 +4183,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
-    // float repetition_penalty = 16;
+    // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
     if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_repetition_penalty()) != 0) {
         total_size += 6;

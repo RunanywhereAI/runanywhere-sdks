@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 #include "structured_output.pb.h"
 #include "thinking_tag_pattern.pb.h"
 #include "tool_calling.pb.h"
@@ -2491,7 +2492,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   ::runanywhere::v1::ToolCallingOptions* PROTOBUF_NONNULL _internal_mutable_tool_calling();
 
   public:
-  // int32 max_tokens = 1;
+  // int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
   void clear_max_tokens() ;
   [[nodiscard]] ::int32_t max_tokens() const;
   void set_max_tokens(::int32_t value);
@@ -2501,7 +2502,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_max_tokens(::int32_t value);
 
   public:
-  // float temperature = 2;
+  // float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
   void clear_temperature() ;
   [[nodiscard]] float temperature() const;
   void set_temperature(float value);
@@ -2511,7 +2512,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_temperature(float value);
 
   public:
-  // float top_p = 3;
+  // float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_top_p() ;
   [[nodiscard]] float top_p() const;
   void set_top_p(float value);
@@ -2521,7 +2522,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_top_p(float value);
 
   public:
-  // int32 top_k = 4;
+  // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
   void clear_top_k() ;
   [[nodiscard]] ::int32_t top_k() const;
   void set_top_k(::int32_t value);
@@ -2531,7 +2532,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // float repetition_penalty = 5;
+  // float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
   void clear_repetition_penalty() ;
   [[nodiscard]] float repetition_penalty() const;
   void set_repetition_penalty(float value);
@@ -3067,7 +3068,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationRequest final : public
 
 // LLMGenerationOptions
 
-// int32 max_tokens = 1;
+// int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
 inline void LLMGenerationOptions::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
@@ -3091,7 +3092,7 @@ inline void LLMGenerationOptions::_internal_set_max_tokens(::int32_t value) {
   _impl_.max_tokens_ = value;
 }
 
-// float temperature = 2;
+// float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
 inline void LLMGenerationOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
@@ -3115,7 +3116,7 @@ inline void LLMGenerationOptions::_internal_set_temperature(float value) {
   _impl_.temperature_ = value;
 }
 
-// float top_p = 3;
+// float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void LLMGenerationOptions::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;
@@ -3139,7 +3140,7 @@ inline void LLMGenerationOptions::_internal_set_top_p(float value) {
   _impl_.top_p_ = value;
 }
 
-// int32 top_k = 4;
+// int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
 inline void LLMGenerationOptions::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
@@ -3163,7 +3164,7 @@ inline void LLMGenerationOptions::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// float repetition_penalty = 5;
+// float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
 inline void LLMGenerationOptions::clear_repetition_penalty() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.repetition_penalty_ = 0;
