@@ -969,26 +969,65 @@ private func runVLM(_ args: [String]) async throws {
     }
 }
 
-// Self-test for the SDK's computer-use-agent scaffold (RunAnywhere.CUA) — no
-// model needed: renders the Fara system prompt and parses a golden tool_call,
-// exercising the commons rac_cua_* path through the Swift facade.
+// Computer-use-agent exercise for `RunAnywhere.CUA`.
+//
+//   cua                                  -> offline self-test (no model)
+//   cua <model> <image> <w> <h> [task]   -> REAL end-to-end step:
+//        CUA.systemPrompt -> options.systemPrompt -> processImage (MLX)
+//        -> CUA.parseAction, printing the viewport-scaled action.
+//
+// The real mode is the only path that proves the system prompt actually reaches
+// the model: MLX renders its own chat template, so a dropped system prompt is
+// invisible until the model answers in prose instead of a <tool_call>.
 private func runCUA(_ args: [String]) async throws {
     guard let prompt = RunAnywhere.CUA.systemPrompt() else {
         throw CLIError.usage("CUA: fara profile not found")
     }
     print("cua.prompt\tchars=\(prompt.count)\ttools=\(prompt.contains("<tools>"))\tcomputer_use=\(prompt.contains("computer_use"))")
 
-    let golden = """
-    I will click the search box.
-    <tool_call>
-    {"name": "computer_use", "arguments": {"action": "left_click", "coordinate": [500, 382]}}
-    </tool_call>
-    """
-    guard let action = RunAnywhere.CUA.parseAction(golden, viewport: (width: 1440, height: 900)) else {
-        throw CLIError.usage("CUA: parse returned nil")
+    guard args.count >= 4 else {
+        let golden = """
+        I will click the search box.
+        <tool_call>
+        {"name": "computer_use", "arguments": {"action": "left_click", "coordinate": [500, 382]}}
+        </tool_call>
+        """
+        guard let action = RunAnywhere.CUA.parseAction(golden, viewport: (width: 1440, height: 900)) else {
+            throw CLIError.usage("CUA: parse returned nil")
+        }
+        let coord = action.coordinate.map { "(\($0.x), \($0.y))" } ?? "nil"
+        print("cua.parse\tkind=\(action.kind)\tcoord=\(coord)\tvalid=\(action.isValid)")
+        return
     }
-    let coord = action.coordinate.map { "(\($0.x), \($0.y))" } ?? "nil"
-    print("cua.parse\tkind=\(action.kind)\tcoord=\(coord)\tvalid=\(action.isValid)")
+
+    guard let entry = MLXCatalog.resolve(args[0]) else { throw CLIError.modelNotFound(args[0]) }
+    let imageURL = URL(fileURLWithPath: args[1])
+    guard FileManager.default.fileExists(atPath: imageURL.path) else {
+        throw CLIError.usage("Image not found: \(imageURL.path)")
+    }
+    let viewportW = Int(args[2]) ?? 1440
+    let viewportH = Int(args[3]) ?? 900
+    let task = args.count > 4 ? args.dropFirst(4).joined(separator: " ") : "Open a new browser tab."
+
+    try await withReadyModel(entry) {
+        var options = RAVLMGenerationOptions.defaults(prompt: task)
+        options.systemPrompt = prompt
+        options.maxTokens = 256
+        options.temperature = 0
+
+        let result = try await RunAnywhere.processImage(.fromFilePath(imageURL.path), options: options)
+        print("cua.raw\t\(result.text.replacingOccurrences(of: "\n", with: "\\n"))")
+
+        guard let action = RunAnywhere.CUA.parseAction(
+            result.text,
+            viewport: (width: viewportW, height: viewportH)
+        ) else {
+            print("cua.action\tnil (unknown profile)")
+            return
+        }
+        let coord = action.coordinate.map { "(\($0.x), \($0.y))" } ?? "nil"
+        print("cua.action\tkind=\(action.kind)\tcoord=\(coord)\tvalid=\(action.isValid)\ttext=[\(action.text)]")
+    }
 }
 
 private func runSTT(_ args: [String]) async throws {
