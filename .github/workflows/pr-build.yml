@@ -581,6 +581,14 @@ jobs:
       - name: Yarn install (RN standalone workspace)
         working-directory: sdk/runanywhere-react-native
         run: yarn install --immutable
+      # `yarn typecheck` only covers TypeScript. The RN bridge C++ is compiled
+      # solely by an app build (CocoaPods / Gradle), which PR CI does not run —
+      # so a Nitro spec change that regenerated a pure virtual while the
+      # hand-written `override` stayed stale shipped a header that could not
+      # compile, with every job green. Compile it here, where the install above
+      # has already provided the Nitro and React Native jsi headers.
+      - name: Compile RN C++ headers against the generated Nitro specs
+        run: bash scripts/validation/gates/check_rn_cpp_headers_compile.sh
       - name: Typecheck React Native workspace
         working-directory: sdk/runanywhere-react-native
         run: yarn typecheck
