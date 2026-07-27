@@ -37,7 +37,7 @@ and a native prebuild present under `sdk/runanywhere-electron/prebuilds/`.
 | `main.js` | Electron main: forks the utility host (native addon), owns the window + local JSON store |
 | `preload.js` | Loads the SDK preload (`window.runanywhere`) and exposes `window.appStore` |
 | `renderer.js` / `index.html` | The UI — Chat, Models, Settings, Structured, Tools, Vision, Embeddings, Knowledge, Voice, VAD |
-| `build/make-icon.js` | Regenerates `build/icon.ico` + `icon.png` (zero deps) — `npm run icon` |
+| `assets/make-icon.js` | Regenerates `assets/icon.ico` + `icon.png` (zero deps) — `npm run icon` |
 
 Conversations, settings, and custom models persist as JSON under
 `%APPDATA%\RunAnywhere AI\`.

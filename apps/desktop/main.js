@@ -105,7 +105,7 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
       // Paint the app's own background immediately so launch doesn't flash white.
       backgroundColor: '#0a0e1a',
       title: 'RunAnywhere AI',
-      icon: path.join(__dirname, 'build', 'icon.ico'),
+      icon: path.join(__dirname, 'assets', 'icon.ico'),
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
