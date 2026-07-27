@@ -39,6 +39,7 @@ import {
   requireInitialized,
 } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 
@@ -111,7 +112,7 @@ export async function initializeVoiceAgent(
  * Exposed so callers do not hard-code the string when invoking
  * `ensureDefaultVAD(...)`. Mirrors Swift `RunAnywhere.defaultVADModelID`.
  */
-export const defaultVADModelID = 'silero-vad';
+export const defaultVADModelID = voiceAgentDefaults.defaultVadModelId;
 
 /**
  * Ensure a VAD model is loaded in the canonical lifecycle before a voice
