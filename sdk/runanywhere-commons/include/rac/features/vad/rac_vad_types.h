@@ -51,9 +51,11 @@ extern "C" {
 #define RAC_VAD_MIN_ENERGY_THRESHOLD 0.001f
 #define RAC_VAD_MAX_ENERGY_THRESHOLD 0.5f
 
-// Frame Processing. Seconds here; the proto's frame_length_ms is milliseconds,
-// so this is deliberately not aliased to the pool.
-#define RAC_VAD_DEFAULT_FRAME_LENGTH 0.1f
+// Frame Processing. Seconds here, milliseconds in the proto, so this converts
+// rather than aliases. Deriving it still beats restating 0.1f: change
+// frame_length_ms in idl/vad_options.proto and this follows.
+#define RAC_VAD_DEFAULT_FRAME_LENGTH \
+    (RAC_DEFAULT_VAD_CONFIGURATION_FRAME_LENGTH_MS / 1000.0f)
 #define RAC_VAD_MIN_FRAME_LENGTH 0.02f
 #define RAC_VAD_MAX_FRAME_LENGTH 0.5f
 
