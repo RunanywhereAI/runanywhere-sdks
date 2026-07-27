@@ -113,6 +113,13 @@ TS = Target(
     rel_path="sdk/shared/proto-ts/src/defaults/pool.ts",
     profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
 )
+# Python consumes the flat C ABI for everything but RAG and has no convenience
+# post-processor, but it still has pooled values of its own (the STT capture rate
+# in the HTTP server, for one), so it gets the constants like everyone else.
+PYTHON = Target(
+    rel_path="sdk/runanywhere-python/runanywhere/_generated_defaults.py",
+    profile=LangProfile(int64_wrapper=None, int64_suffix="", float_suffix=""),
+)
 
 
 def strip_defaults_suffix(message_name: str) -> str:
@@ -291,12 +298,57 @@ def render_ts(groups) -> str:
     return "\n".join(lines)
 
 
+def render_python(groups) -> str:
+    lines: list[str] = []
+    # One-line docstring then `from __future__ import annotations`, per the
+    # Python SDK's module convention; the detail goes in comments below it.
+    lines.append('"""Central default pool generated from idl/sdk_defaults.proto."""')
+    lines.append("")
+    lines.append("from __future__ import annotations")
+    lines.append("")
+    lines.append("# GENERATED FILE - DO NOT EDIT.")
+    lines.append(f"# Regenerate with: {REGEN}")
+    lines.append("#")
+    lines.append("# Values come from `(runanywhere.v1.rac_default)` annotations. Change the")
+    lines.append(f"# value in idl/{POOL_FILE}, not here.")
+    lines.append("")
+    lines.append("from typing import Final")
+    for group, fields in groups:
+        lines.append("")
+        lines.append("")
+        lines.append(f"class {group}Defaults:")
+        lines.append(f'    """Generated from {group}Defaults in idl/{POOL_FILE}."""')
+        lines.append("")
+        for field_name, field, default_str in fields:
+            literal = to_default_literal(field, default_str, {}, PYTHON.profile)
+            if field.type == TYPE_BOOL:
+                literal = "True" if literal == "true" else "False"
+            lines.append(f"    {field_name.upper()}: Final[{python_type(field)}] = {literal}")
+    names = ", ".join(f'"{g}Defaults"' for g, _ in groups)
+    lines.append("")
+    lines.append("")
+    lines.append(f"__all__ = [{names}]")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def python_type(field: descriptor_pb2.FieldDescriptorProto) -> str:
+    if field.type == TYPE_STRING:
+        return "str"
+    if field.type == TYPE_BOOL:
+        return "bool"
+    if field.type in FLOAT_TYPES:
+        return "float"
+    return "int"
+
+
 RENDERERS = (
     (SWIFT, render_swift),
     (KOTLIN, render_kotlin),
     *((t, render_kotlin) for t in KOTLIN_ANDROID_FORKS),
     (DART, render_dart),
     (TS, render_ts),
+    (PYTHON, render_python),
 )
 
 
@@ -330,7 +382,7 @@ def main() -> int:
         print(f"✓ {out_path.relative_to(repo_root)}")
 
     total = sum(len(f) for _, f in groups)
-    print(f"✓ default pool → {total} constants in {len(groups)} groups, 4 languages")
+    print(f"✓ default pool → {total} constants in {len(groups)} groups, {len(RENDERERS)} targets")
     return 0
 
 

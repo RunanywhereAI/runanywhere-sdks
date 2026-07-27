@@ -84,17 +84,18 @@ def collect(
 
 def render(enums: dict[str, list[tuple[str, int, str]]]) -> str:
     lines: list[str] = []
-    lines.append('"""Error enums generated from idl/errors.proto.')
-    lines.append("")
-    lines.append("GENERATED FILE — DO NOT EDIT.")
-    lines.append("Regenerate with: idl/codegen/generate_python_errors.py")
-    lines.append("")
-    lines.append("Values are the positive canonical numbers from the IDL. The C ABI returns")
-    lines.append("them negated as rac_result_t; negate once at the boundary rather than")
-    lines.append("maintaining a second table.")
-    lines.append('"""')
+    # One-line docstring then the future import, per the Python SDK's module
+    # convention; everything else is a comment below them.
+    lines.append('"""Error enums generated from idl/errors.proto."""')
     lines.append("")
     lines.append("from __future__ import annotations")
+    lines.append("")
+    lines.append("# GENERATED FILE - DO NOT EDIT.")
+    lines.append("# Regenerate with: idl/codegen/generate_python_errors.py")
+    lines.append("#")
+    lines.append("# Values are the positive canonical numbers from the IDL. The C ABI returns")
+    lines.append("# them negated as rac_result_t; negate once at the boundary rather than")
+    lines.append("# maintaining a second table.")
     lines.append("")
     lines.append("from enum import IntEnum")
     lines.append("")
@@ -114,7 +115,8 @@ def render(enums: dict[str, list[tuple[str, int, str]]]) -> str:
                 lines.append(f"    {py_name} = {number}")
         lines.append("")
 
-    names = ", ".join(f'"{n}"' for n in WANTED if enums.get(n))
+    # Sorted so RUF022 stays quiet on every regeneration.
+    names = ", ".join(f'"{n}"' for n in sorted(n for n in WANTED if enums.get(n)))
     lines.append("")
     lines.append(f"__all__ = [{names}]")
     lines.append("")

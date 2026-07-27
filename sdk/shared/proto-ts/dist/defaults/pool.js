@@ -9,7 +9,7 @@
 // here; the C header and the other three SDK languages are generated from
 // the same annotations, so editing this copy only desynchronizes one SDK.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.storageDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.hybridDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.networkDefaults = void 0;
+exports.storageDefaults = exports.structuredOutputDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.hybridDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.networkDefaults = void 0;
 /** Central default pool. Read these instead of retyping a literal. */
 exports.networkDefaults = Object.freeze({
     requestTimeoutMs: 60000,
@@ -49,6 +49,10 @@ exports.environmentDefaults = Object.freeze({
     productionBaseUrl: "https://api.runanywhere.ai",
     developmentBaseUrl: "https://dev-api.runanywhere.ai",
     developmentPlaceholderUrl: "https://dev.runanywhere.local",
+});
+exports.structuredOutputDefaults = Object.freeze({
+    maxTokens: 512,
+    temperature: 0.0,
 });
 exports.storageDefaults = Object.freeze({
     contextLength: 2048,

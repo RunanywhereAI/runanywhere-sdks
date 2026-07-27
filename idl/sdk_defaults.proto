@@ -293,6 +293,30 @@ message EnvironmentDefaults {
 }
 
 // ---------------------------------------------------------------------------
+// Structured-output generation.
+//
+// Distinct from LLMGenerationOptions on purpose: a schema-constrained call wants
+// deterministic decoding and enough room to close the JSON, which is not the
+// same tradeoff as free-form chat.
+//
+// Pre-pool call site: runanywhere_structured_output.dart:39-40.
+// ---------------------------------------------------------------------------
+message StructuredOutputDefaults {
+    // Room to emit and close a JSON document.
+    int32 max_tokens  = 1 [
+        (runanywhere.v1.rac_default) = "512",
+        (runanywhere.v1.rac_min) = 1
+    ];
+
+    // Greedy: a schema-constrained result should not vary between calls.
+    float temperature = 2 [
+        (runanywhere.v1.rac_default) = "0.0",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 2.0
+    ];
+}
+
+// ---------------------------------------------------------------------------
 // Model storage analysis.
 //
 // Pre-pool call site: RunAnywhere+Storage.swift:47,158. No other SDK had a

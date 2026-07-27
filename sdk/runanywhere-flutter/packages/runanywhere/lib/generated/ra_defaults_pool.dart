@@ -57,6 +57,11 @@ abstract final class RADefaultsEnvironment {
   static const String developmentPlaceholderUrl = "https://dev.runanywhere.local";
 }
 
+abstract final class RADefaultsStructuredOutput {
+  static const int maxTokens = 512;
+  static const double temperature = 0.0;
+}
+
 abstract final class RADefaultsStorage {
   static const int contextLength = 2048;
 }

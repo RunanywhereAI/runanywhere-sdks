@@ -58,6 +58,11 @@ public object RADefaults {
         public const val DEVELOPMENT_PLACEHOLDER_URL: String = "https://dev.runanywhere.local"
     }
 
+    public object StructuredOutput {
+        public const val MAX_TOKENS: Int = 512
+        public const val TEMPERATURE: Float = 0.0f
+    }
+
     public object Storage {
         public const val CONTEXT_LENGTH: Int = 2048
     }

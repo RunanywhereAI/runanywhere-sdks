@@ -56,6 +56,11 @@ export const environmentDefaults = Object.freeze({
   developmentPlaceholderUrl: "https://dev.runanywhere.local" as string,
 });
 
+export const structuredOutputDefaults = Object.freeze({
+  maxTokens: 512 as number,
+  temperature: 0.0 as number,
+});
+
 export const storageDefaults = Object.freeze({
   contextLength: 2048 as number,
 });

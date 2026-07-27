@@ -38,6 +38,10 @@ export declare const environmentDefaults: Readonly<{
     developmentBaseUrl: string;
     developmentPlaceholderUrl: string;
 }>;
+export declare const structuredOutputDefaults: Readonly<{
+    maxTokens: number;
+    temperature: number;
+}>;
 export declare const storageDefaults: Readonly<{
     contextLength: number;
 }>;

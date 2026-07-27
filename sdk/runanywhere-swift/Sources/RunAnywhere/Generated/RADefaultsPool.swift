@@ -56,6 +56,11 @@ public enum RADefaults {
         public static let developmentPlaceholderUrl: String = "https://dev.runanywhere.local"
     }
 
+    public enum StructuredOutput {
+        public static let maxTokens: Int = 512
+        public static let temperature: Float = 0.0
+    }
+
     public enum Storage {
         public static let contextLength: Int = 2048
     }

@@ -37,6 +37,7 @@ from google.protobuf import descriptor_pb2
 
 from _convenience_common import (
     RAC_DEFAULT_FIELD_NUM,
+    TYPE_BOOL,
     TYPE_ENUM,
     LangProfile,
     enum_name_to_screaming_snake,
@@ -84,6 +85,13 @@ def collect(fds: descriptor_pb2.FileDescriptorSet) -> list[tuple[str, str, list[
                     )
                     continue
                 literal = to_default_literal(field, default_str, {}, C_PROFILE)
+                if field.type == TYPE_BOOL and literal is not None:
+                    # `true` / `false` are C++ keywords; in C they need
+                    # <stdbool.h>, and this header is included from C
+                    # translation units through rac_llm_types.h and friends.
+                    # RAC_TRUE / RAC_FALSE are the repo's rac_bool_t constants
+                    # and carry the right type as well as the right value.
+                    literal = "RAC_TRUE" if literal == "true" else "RAC_FALSE"
                 if literal is None:
                     print(
                         f"note: skipping {msg_name}.{field.name}: "
@@ -111,6 +119,8 @@ def render(groups: list[tuple[str, str, list[tuple[str, str, str]]]]) -> str:
     lines.append("")
     lines.append(f"#ifndef {HEADER_GUARD}")
     lines.append(f"#define {HEADER_GUARD}")
+    lines.append("")
+    lines.append('#include "rac/core/rac_types.h"  // RAC_TRUE / RAC_FALSE')
     lines.append("")
 
     total = 0

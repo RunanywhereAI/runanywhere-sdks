@@ -1,14 +1,13 @@
-"""Error enums generated from idl/errors.proto.
-
-GENERATED FILE — DO NOT EDIT.
-Regenerate with: idl/codegen/generate_python_errors.py
-
-Values are the positive canonical numbers from the IDL. The C ABI returns
-them negated as rac_result_t; negate once at the boundary rather than
-maintaining a second table.
-"""
+"""Error enums generated from idl/errors.proto."""
 
 from __future__ import annotations
+
+# GENERATED FILE - DO NOT EDIT.
+# Regenerate with: idl/codegen/generate_python_errors.py
+#
+# Values are the positive canonical numbers from the IDL. The C ABI returns
+# them negated as rac_result_t; negate once at the boundary rather than
+# maintaining a second table.
 
 from enum import IntEnum
 
@@ -162,4 +161,4 @@ class ErrorCategory(IntEnum):
     CONFIGURATION = 8
 
 
-__all__ = ["ErrorCode", "ErrorCategory"]
+__all__ = ["ErrorCategory", "ErrorCode"]
