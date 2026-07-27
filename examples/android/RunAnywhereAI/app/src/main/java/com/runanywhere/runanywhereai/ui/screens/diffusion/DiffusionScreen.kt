@@ -79,7 +79,14 @@ fun DiffusionScreen() {
             )
         }
 
-        ModelCard(model = model, busy = busy, onClick = { showSheet = true })
+        // Lock the sheet during generation too: swapping the model under an
+        // in-flight generateImage would pull native state out from under it.
+        ModelCard(
+            model = model,
+            busy = busy,
+            sheetLocked = busy || vm.isGenerating,
+            onClick = { showSheet = true },
+        )
 
         OutlinedTextField(
             value = vm.prompt,
@@ -155,7 +162,12 @@ fun DiffusionScreen() {
 }
 
 @Composable
-private fun ModelCard(model: RAModelInfo?, busy: Boolean, onClick: () -> Unit) {
+private fun ModelCard(
+    model: RAModelInfo?,
+    busy: Boolean,
+    sheetLocked: Boolean,
+    onClick: () -> Unit,
+) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -164,7 +176,7 @@ private fun ModelCard(model: RAModelInfo?, busy: Boolean, onClick: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(enabled = !busy, onClick = onClick)
+                .clickable(enabled = !sheetLocked, onClick = onClick)
                 .padding(dimens.spacingLg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),

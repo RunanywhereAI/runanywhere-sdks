@@ -83,6 +83,10 @@ object RuntimeModelSelection {
      */
     suspend fun unloadAllForDownload(): Boolean {
         return try {
+            // unload_all tears down the resident LLM too, so let the
+            // activity-scoped chat cancel and drain any in-flight generation
+            // first — the same barrier every other model-change path takes.
+            LlmModelChangeInterlock.awaitReadyForModelChange()
             RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
             clearAll()
             GlobalState.model.set(null)

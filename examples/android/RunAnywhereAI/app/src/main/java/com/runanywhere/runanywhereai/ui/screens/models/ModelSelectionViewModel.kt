@@ -261,6 +261,11 @@ class ModelSelectionViewModel(
         return select(onDisk)
     }
 
+    // Download-only staging step. Multi-component flows (Voice AI) fetch every
+    // missing model first because each download unloads resident models for RAM
+    // headroom — loading between downloads would be undone by the next one.
+    suspend fun ensureDownloaded(model: RAModelInfo): Boolean = awaitDownload(model)
+
     // Downloads via the foreground service (survives screen-off / Doze) and suspends
     // until this model reaches a terminal state, falling back to the in-VM stream when
     // the service can't start (e.g. app already backgrounded). Returns true when the

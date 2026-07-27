@@ -119,11 +119,16 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        // Only fire the process-wide native cancel when this screen actually owns
+        // an in-flight extraction; another screen's VLM generation may be running.
+        val extracting = job?.isActive == true
         job?.cancel()
-        // viewModelScope is already cancelling; use an independent scope so the
-        // one-shot native cancel actually runs during teardown.
-        CoroutineScope(Dispatchers.Default).launch {
-            runCatching { RunAnywhere.cancelVLMGeneration() }
+        if (extracting) {
+            // viewModelScope is already cancelling; use an independent scope so the
+            // one-shot native cancel actually runs during teardown.
+            CoroutineScope(Dispatchers.Default).launch {
+                runCatching { RunAnywhere.cancelVLMGeneration() }
+            }
         }
     }
 
