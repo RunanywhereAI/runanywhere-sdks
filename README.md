@@ -36,6 +36,8 @@ RunAnywhere lets you add AI features to your app that run entirely on-device, wi
 
 - **LLM Chat**: Llama, Qwen, Gemma, Phi, LFM, Mistral, and more
 - **Vision (VLM)**: image understanding and captioning
+- **Computer-Use Agent (CUA)**: drive a screen with Fara1.5 — the SDK renders the
+  agent prompt and parses each action back with viewport-scaled coordinates
 - **Speech-to-Text**: Whisper- and Moonshine-based transcription
 - **Text-to-Speech**: neural voice synthesis
 - **Voice Assistant**: a full speech-to-text, LLM, and text-to-speech pipeline
@@ -319,12 +321,16 @@ pip install runanywhere
 | Text-to-Speech | Yes | Yes | Yes | Yes | Yes |
 | Voice Assistant Pipeline | Yes | Yes | Yes | Yes | Yes |
 | Vision Language Models | Yes | Yes | Yes | n/a | Yes |
+| Computer-Use Agent (CUA) | Yes | Yes | API only | Yes | Yes |
 | Hexagon NPU (QHexRT) | n/a | Yes | n/a | Yes | Yes |
 | Model Download + Progress | Yes | Yes | Yes | Yes | Yes |
 | Structured Output (JSON) | Yes | Yes | Yes | Soon | Soon |
 | Tool Calling | Yes | Yes | Yes | n/a | n/a |
 | Embeddings | n/a | n/a | Yes | n/a | n/a |
 | Apple Foundation Models | Yes | n/a | n/a | n/a | n/a |
+
+CUA on Web is "API only": the prompt/parse scaffold ships, but the catalogued
+Fara1.5-4B does not fit the 4 GB WASM32 heap, so no CUA model is seeded there.
 
 ---
 
