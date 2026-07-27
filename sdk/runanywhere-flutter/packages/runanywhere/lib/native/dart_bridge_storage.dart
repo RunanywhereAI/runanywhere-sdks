@@ -8,10 +8,10 @@ import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/storage_types.pb.dart' as storage_pb;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Storage bridge for C++ storage operations.
 /// Matches Swift's `CppBridge+Storage.swift`.
@@ -57,7 +57,7 @@ class DartBridgeStorage {
       final valuePtr = value.toNativeUtf8();
       try {
         final result = setFn(keyPtr, valuePtr);
-        return result == RacResultCode.success;
+        return result == RacResultCodes.success;
       } finally {
         calloc.free(keyPtr);
         calloc.free(valuePtr);
@@ -78,7 +78,7 @@ class DartBridgeStorage {
       final keyPtr = key.toNativeUtf8();
       try {
         final result = deleteFn(keyPtr);
-        return result == RacResultCode.success;
+        return result == RacResultCodes.success;
       } finally {
         calloc.free(keyPtr);
       }
@@ -115,7 +115,7 @@ class DartBridgeStorage {
           'rac_storage_clear');
 
       final result = clearFn();
-      return result == RacResultCode.success;
+      return result == RacResultCodes.success;
     } catch (e) {
       _logger.debug('rac_storage_clear not available: $e');
       return false;
@@ -216,7 +216,7 @@ class DartBridgeStorage {
       }
       bindings.rac_proto_buffer_init(out);
       final code = fn(analyzer, registry, requestPtr, bytes.length, out);
-      if (code != RacResultCode.success || out.ref.data == nullptr) {
+      if (code != RacResultCodes.success || out.ref.data == nullptr) {
         final message = out.ref.errorMessage == nullptr
             ? 'code=$code status=${out.ref.status}'
             : out.ref.errorMessage.toDartString();
@@ -248,7 +248,7 @@ class DartBridgeStorage {
     final outHandle = calloc<Pointer<Void>>();
     try {
       final code = createFn(_callbacksPtr!, outHandle);
-      if (code != RacResultCode.success || outHandle.value == nullptr) {
+      if (code != RacResultCodes.success || outHandle.value == nullptr) {
         _logger.debug('rac_storage_analyzer_create failed: code=$code');
         return null;
       }
@@ -349,13 +349,13 @@ int _getTotalSpace(Pointer<Void> userData) => 0;
 int _deletePath(Pointer<Utf8> path, int recursive, Pointer<Void> userData) {
   try {
     final entity = FileSystemEntity.typeSync(path.toDartString());
-    if (entity == FileSystemEntityType.notFound) return RacResultCode.success;
+    if (entity == FileSystemEntityType.notFound) return RacResultCodes.success;
     if (entity == FileSystemEntityType.directory) {
       Directory(path.toDartString()).deleteSync(recursive: recursive != 0);
     } else {
       File(path.toDartString()).deleteSync();
     }
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     return -187;
   }
@@ -367,8 +367,8 @@ int _isModelLoaded(
   Pointer<Void> userData,
 ) {
   if (outIsLoaded != nullptr) outIsLoaded.value = 0;
-  return RacResultCode.success;
+  return RacResultCodes.success;
 }
 
 int _unloadModel(Pointer<Utf8> modelId, Pointer<Void> userData) =>
-    RacResultCode.success;
+    RacResultCodes.success;

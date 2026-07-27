@@ -12,6 +12,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -133,7 +135,7 @@ class DartBridgeDevice {
           >('rac_device_manager_set_callbacks');
 
       final result = setCallbacks(callbacks);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.warning(
           'Failed to set device callbacks',
           metadata: {'error_code': result},
@@ -204,7 +206,7 @@ class DartBridgeDevice {
           >('rac_device_manager_set_callbacks');
 
       final result = setCallbacks(callbacks);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.warning(
           'Failed to register device callbacks',
           metadata: {'code': result},
@@ -296,7 +298,7 @@ class DartBridgeDevice {
 
     // Build full URL: baseURL + endpoint path
     // Matches Kotlin: baseUrl.trimEnd('/') + finalEndpoint
-    final baseURL = _baseURL ?? 'https://api.runanywhere.ai';
+    final baseURL = _baseURL ?? RADefaultsEnvironment.productionBaseUrl;
     final trimmedBase = baseURL.endsWith('/')
         ? baseURL.substring(0, baseURL.length - 1)
         : baseURL;
@@ -705,7 +707,7 @@ int _httpPostCallback(
   Pointer<Void> userData,
 ) {
   if (endpoint == nullptr || outResponse == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
@@ -719,15 +721,15 @@ int _httpPostCallback(
 
     // Return success so C++ proceeds with set_registered(true).
     // The post-Phase-2 drain rolls back if the real HTTP fails.
-    outResponse.ref.result = RacResultCode.success;
+    outResponse.ref.result = RacResultCodes.success;
     outResponse.ref.statusCode = 200;
     outResponse.ref.responseBody = nullptr;
     outResponse.ref.errorMessage = nullptr;
 
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     SDKLogger('DartBridge.Device').error('HTTP POST callback failed');
-    return RacResultCode.errorNetworkError;
+    return RacResultCodes.errorNetworkError;
   }
 }
 

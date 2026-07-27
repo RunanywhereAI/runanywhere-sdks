@@ -43,6 +43,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
@@ -670,7 +671,7 @@ class DartBridgeHybridStt {
           _CloudRegisterDart>('rac_backend_cloud_register');
       final rc = fn();
       if (rc != RAC_SUCCESS &&
-          rc != RacResultCode.errorModuleAlreadyRegistered) {
+          rc != RacResultCodes.errorModuleAlreadyRegistered) {
         _logger.warning('rac_backend_cloud_register rc=$rc');
       }
       return rc;

@@ -17,8 +17,8 @@ import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 // =============================================================================
 // C++ Constants (from rac_model_types.h)
@@ -72,7 +72,7 @@ int _invokeEnumMapper(String symbol, int input, int fallback) {
   final outPtr = calloc<Int32>();
   try {
     final result = fn(input, outPtr);
-    if (result == RacResultCode.success) {
+    if (result == RacResultCodes.success) {
       return outPtr.value;
     }
     return fallback;
@@ -206,7 +206,7 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
     final out = calloc<Pointer<Utf8>>();
     try {
       final rc = fn(toC(), out);
-      if (rc != RacResultCode.success || out.value == nullptr) {
+      if (rc != RacResultCodes.success || out.value == nullptr) {
         return 'unknown';
       }
       // Static literal owned by commons — read, never free.

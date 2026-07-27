@@ -30,7 +30,7 @@ library;
 import 'dart:async';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 
 /// ONNX Runtime module for STT, TTS, and VAD services.
@@ -95,8 +95,8 @@ class Onnx {
       final result = _bindings!.register();
 
       // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
-      if (result != RacResultCode.success &&
-          result != RacResultCode.errorModuleAlreadyRegistered) {
+      if (result != RacResultCodes.success &&
+          result != RacResultCodes.errorModuleAlreadyRegistered) {
         _logger.warning('C++ backend registration returned: $result');
         return;
       }
@@ -119,13 +119,13 @@ class Onnx {
     if (bindings == null) return;
 
     final result = bindings.registerSherpa();
-    if (result == RacResultCode.success ||
-        result == RacResultCode.errorModuleAlreadyRegistered) {
+    if (result == RacResultCodes.success ||
+        result == RacResultCodes.errorModuleAlreadyRegistered) {
       _isSherpaRegistered = true;
       _logger.info(
         'Sherpa engine plugin registered (STT + TTS + VAD via Sherpa-ONNX)',
       );
-    } else if (result == RacResultCode.errorNotSupported) {
+    } else if (result == RacResultCodes.errorNotSupported) {
       _logger.warning(
         'Sherpa engine plugin entry not exported by this build '
         '— Sherpa STT/TTS/VAD will not route',

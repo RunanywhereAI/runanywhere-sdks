@@ -3,6 +3,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
 
 export 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -169,7 +170,7 @@ class SDKInitParams {
     // placeholder. Mirrors Swift's `SDKInitParams(forDevelopmentWithAPIKey:)`.
     return SDKInitParams(
       apiKey: apiKey,
-      baseURL: Uri.parse('https://dev.runanywhere.local'),
+      baseURL: Uri.parse(RADefaultsEnvironment.developmentPlaceholderUrl),
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     );
   }

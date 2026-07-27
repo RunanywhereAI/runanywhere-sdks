@@ -15,6 +15,7 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -22,7 +23,6 @@ import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_audio.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
-import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
@@ -205,7 +205,7 @@ class RunAnywhereTTS {
         timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
         isFinal: true,
         errorMessage: 'TTS stream failed: $e',
-        errorCode: RacResultCode.errorProcessingFailed,
+        errorCode: RacResultCodes.errorProcessingFailed,
       );
       return;
     }

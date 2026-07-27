@@ -15,6 +15,7 @@ import 'dart:convert';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
@@ -397,15 +398,9 @@ class RunAnywhereTools {
 
   // -- helpers --------------------------------------------------------------
 
-  /// Mirrors Swift `RALLMGenerationOptions.defaults()`
-  /// (RALLMTypes+CppBridge.swift:13-21).
-  static LLMGenerationOptions _defaultLLMOptions() => LLMGenerationOptions(
-    maxTokens: 100,
-    temperature: 0.8,
-    topP: 1.0,
-    topK: 0,
-    repetitionPenalty: 1.0,
-  );
+  /// Generated from the rac_default annotations in idl/llm_options.proto.
+  static LLMGenerationOptions _defaultLLMOptions() =>
+      LLMGenerationOptionsConvenience.defaults();
 
   /// Mirrors Swift `RAToolCallingOptions.defaults()`
   /// (ToolCallingTypes.swift:148-154).

@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere_qhexrt/native/qhexrt_bindings.dart';
 
 // Re-export the generated wire types so consumers never hand-mirror them.
@@ -106,15 +106,15 @@ class QHexRT {
       _bindings!.setSkelDirectory(skelDirectory);
       final result = _bindings!.register();
       _logger.info('rac_backend_qhexrt_register() returned: $result');
-      if (result == RacResultCode.errorBackendUnavailable ||
-          result == RacResultCode.errorCapabilityUnsupported) {
+      if (result == RacResultCodes.errorBackendUnavailable ||
+          result == RacResultCodes.errorCapabilityUnsupported) {
         _logger.error(
           'QHexRT unavailable; a supported Hexagon V75/V79/V81 NPU is required.',
         );
         return false;
       }
-      if (result != RacResultCode.success &&
-          result != RacResultCode.errorModuleAlreadyRegistered) {
+      if (result != RacResultCodes.success &&
+          result != RacResultCodes.errorModuleAlreadyRegistered) {
         _logger.error('QHexRT registration failed with code: $result');
         return false;
       }

@@ -9,6 +9,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -240,24 +241,24 @@ class RunAnywhereLLM {
     LLMGenerationOptions? options, {
     required bool streaming,
   }) {
+    // Fill unset fields from the generated defaults, which come from the
+    // rac_default annotations in idl/llm_options.proto.
+    final d = LLMGenerationOptionsConvenience.defaults();
     final requestOptions = (options ?? LLMGenerationOptions()).deepCopy();
     if (!requestOptions.hasMaxTokens() || requestOptions.maxTokens <= 0) {
-      requestOptions.maxTokens = 100;
+      requestOptions.maxTokens = d.maxTokens;
     }
     if (!requestOptions.hasTemperature()) {
-      requestOptions.temperature = 0.8;
+      requestOptions.temperature = d.temperature;
     }
     if (!requestOptions.hasTopP() || requestOptions.topP <= 0) {
-      requestOptions.topP = 1.0;
+      requestOptions.topP = d.topP;
     }
     if (!requestOptions.hasRepetitionPenalty() ||
         requestOptions.repetitionPenalty <= 0) {
-      requestOptions.repetitionPenalty = 1.0;
+      requestOptions.repetitionPenalty = d.repetitionPenalty;
     }
     requestOptions.streamingEnabled = streaming;
-    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-    // (RALLMTypes+CppBridge.swift:13-21): maxTokens=100, temperature=0.8,
-    // topP=1.0, topK=0, repetitionPenalty=1.0.
     return requestOptions;
   }
 
