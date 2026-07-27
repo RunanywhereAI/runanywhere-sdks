@@ -1,0 +1,309 @@
+// RunAnywhere IDL — the central default pool.
+//
+// Every message here exists so a default value has exactly one declaration in
+// the repo. The messages are not wire types: nothing sends a NetworkDefaults
+// over the C ABI. They are carriers for `rac_default` annotations, which the
+// convenience post-processors in idl/codegen/ turn into per-language constants
+// and which generate_cpp_defaults.py turns into C macros for commons.
+//
+// Values that belong to an existing option message stay on that message —
+// sampling parameters live in llm_options.proto and vlm_options.proto. This
+// file is for the platform-layer knobs that had no proto message at all and so
+// were retyped in every SDK: HTTP timeouts, audio capture rates, worker
+// handshakes, retry policy.
+//
+// Grouping rule: a message is named for who owns the value. Most are shared by
+// every SDK. WorkerDefaults is Web-only because no other platform has a worker
+// handshake, and FFIDefaults is read only by the two SDKs that marshal C
+// strings. A value being platform-specific is a reason to name its owner here,
+// not a reason to hide it in platform source.
+//
+// Provenance for each default is recorded per field: the pre-pool call sites
+// are listed so a reader can see what was consolidated and check the value.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "rac_options.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "SdkDefaultsProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// HTTP transport timings and buffer sizes.
+//
+// Pre-pool call sites: URLSessionHttpTransport.swift:47-48,526;
+// HTTPClientAdapter.swift:49; OkHttpHttpTransport.kt:75,90-93,118-121 (three
+// forked copies, drifted); http_client_adapter.dart:130;
+// DeviceRegistrationAdapter.ts:24; PlatformAdapterBridge.kt:173-174;
+// RunAnywhere.ts:950,959.
+//
+// The three OkHttp copies disagreed on stream_chunk_bytes by 8x (256 KB vs
+// 32 KB) and on read timeout (60s vs 120s). The Kotlin SDK's values win here
+// because it is the only copy that also set a call timeout, i.e. the one that
+// had been maintained.
+// ---------------------------------------------------------------------------
+message NetworkDefaults {
+    // Per-request timeout for ordinary API calls.
+    int32 request_timeout_ms     = 1 [
+        (runanywhere.v1.rac_default) = "60000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Whole-resource ceiling for a non-streaming request, including retries.
+    int32 resource_timeout_ms    = 2 [
+        (runanywhere.v1.rac_default) = "600000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Read ceiling for a long-lived streaming response (24 hours). Streaming
+    // responses set no call timeout at all; this caps stalled reads.
+    int32 streaming_timeout_ms   = 3 [
+        (runanywhere.v1.rac_default) = "86400000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Default applied by the platform HTTP adapter when a caller passes no
+    // per-request timeout. Deliberately tighter than request_timeout_ms.
+    int32 adapter_timeout_ms     = 4 [
+        (runanywhere.v1.rac_default) = "30000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Connect timeout, distinct from read/write. Uniform across SDKs already.
+    int32 connect_timeout_ms     = 5 [
+        (runanywhere.v1.rac_default) = "30000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Read buffer used when copying a streaming body. 256 KB.
+    int32 stream_chunk_bytes     = 6 [
+        (runanywhere.v1.rac_default) = "262144",
+        (runanywhere.v1.rac_min) = 1024
+    ];
+
+    // Retry attempts for a failed request. Only Web had a retry policy
+    // pre-pool; declaring it here does not switch it on elsewhere.
+    int32 max_retries            = 7 [
+        (runanywhere.v1.rac_default) = "3",
+        (runanywhere.v1.rac_min) = 0,
+        (runanywhere.v1.rac_max) = 10
+    ];
+
+    // Base delay for exponential backoff: delay = base * 2^attempt.
+    int32 retry_backoff_base_ms  = 8 [
+        (runanywhere.v1.rac_default) = "100",
+        (runanywhere.v1.rac_min) = 1
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Microphone capture and audio playback rates.
+//
+// Pre-pool call sites: VoiceAgentMicDriver.swift:178-179;
+// VoiceAgentMicDriver.kt:127,135; voice_agent_mic_driver.dart:45,70;
+// audio_capture_manager.dart:59-60,89-90; RunAnywhereSTT.kt:132;
+// RunAnywhere+TTS.swift:122; AudioCaptureManager.swift:299,309.
+//
+// mic_sample_rate_hz duplicates RAC_STT_DEFAULT_SAMPLE_RATE and
+// tts_sample_rate_hz duplicates RAC_TTS_DEFAULT_SAMPLE_RATE; both of those C
+// macros are regenerated from this message.
+// ---------------------------------------------------------------------------
+message AudioCaptureDefaults {
+    // Capture rate for STT and VAD input. Both expect 16 kHz mono PCM16.
+    int32 mic_sample_rate_hz     = 1 [
+        (runanywhere.v1.rac_default) = "16000",
+        (runanywhere.v1.rac_min) = 8000,
+        (runanywhere.v1.rac_max) = 48000
+    ];
+
+    // Capture channel count. Mono; the STT frontends downmix anyway.
+    int32 mic_channels           = 2 [
+        (runanywhere.v1.rac_default) = "1",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 2
+    ];
+
+    // Bounded queue depth between the capture callback and the consumer.
+    // Frames are dropped rather than buffered without limit when full.
+    int32 mic_channel_capacity   = 3 [
+        (runanywhere.v1.rac_default) = "128",
+        (runanywhere.v1.rac_min) = 1
+    ];
+
+    // Hardware tap buffer size in frames.
+    int32 mic_tap_buffer_frames  = 4 [
+        (runanywhere.v1.rac_default) = "4096",
+        (runanywhere.v1.rac_min) = 256
+    ];
+
+    // Playback rate assumed when a TTS backend reports none.
+    int32 tts_sample_rate_hz     = 5 [
+        (runanywhere.v1.rac_default) = "22050",
+        (runanywhere.v1.rac_min) = 8000,
+        (runanywhere.v1.rac_max) = 48000
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Voice agent orchestration.
+//
+// Pre-pool call sites: voice_agent_internal.h:36,40 (C++);
+// RunAnywhere+VoiceAgent.swift:37; RunAnywhereVoiceAgent.kt:91;
+// runanywhere_voice.dart:62; RunAnywhere+VoiceAgent.ts:114 (RN);
+// RunAnywhere+VoiceAgent.ts:67,69,688,814 (Web);
+// voice_agent_mic_driver.dart:49,52; VoiceAgentMicDriver.ts:54,56 (RN);
+// VoiceAgentMicDriver.ts:22-23 (Web).
+//
+// Web previously ran its own sampling (max_tokens 200, temperature 0.7) while
+// the other four platforms inherited 96/0.0 from C++. Web now reads these.
+// ---------------------------------------------------------------------------
+message VoiceAgentDefaults {
+    // Reply length cap for a conversational turn. Short on purpose: a voice
+    // reply that runs long is worse than one that gets cut off.
+    int32 max_tokens               = 1 [
+        (runanywhere.v1.rac_default) = "96",
+        (runanywhere.v1.rac_min) = 1
+    ];
+
+    // Greedy decoding. Voice turns favor predictability over variety.
+    float temperature              = 2 [
+        (runanywhere.v1.rac_default) = "0.0",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 2.0
+    ];
+
+    // Catalogued VAD model loaded when a voice session starts with no VAD
+    // model current. Four SDKs each declared this string separately.
+    string default_vad_model_id    = 3 [
+        (runanywhere.v1.rac_default) = "silero-vad"
+    ];
+
+    // RMS energy above which a frame counts as speech, and the initial noise
+    // floor estimate. Mirrors RAC_VAD_DEFAULT_ENERGY_THRESHOLD.
+    float speech_rms_threshold     = 4 [
+        (runanywhere.v1.rac_default) = "0.015",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+
+    // Speech gate relative to the tracked noise floor:
+    // threshold = noise_floor * multiplier. Flutter, RN, and Web each used
+    // 2.2 against the C layer's 2.0; the C value wins.
+    float speech_floor_multiplier  = 5 [
+        (runanywhere.v1.rac_default) = "2.0",
+        (runanywhere.v1.rac_min_float) = 1.5,
+        (runanywhere.v1.rac_max_float) = 4.0
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Hybrid on-device / cloud routing.
+//
+// Pre-pool call sites: hybrid_routing_policy.dart:26;
+// HybridRoutingPolicy.ts:114 (RN); HybridTypes.ts:62 (Web). Swift and Kotlin
+// carried the number only inside doc comments
+// (HybridSTTRouter.swift:51, HybridSTTRouter.kt:54).
+// ---------------------------------------------------------------------------
+message HybridDefaults {
+    // On-device STT confidence below which the router cascades to cloud.
+    float stt_confidence_threshold = 1 [
+        (runanywhere.v1.rac_default) = "0.5",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Web-only: worker and WASM instantiation timings.
+//
+// No other SDK runs backends in a worker, so nothing else reads this message.
+// Pre-pool call sites: BackendWorkerHost.ts:79; OffscreenRuntimeBridge.ts:480;
+// LlamaCPP.ts:410; ONNX.ts:232.
+// ---------------------------------------------------------------------------
+message WorkerDefaults {
+    // Worker must answer the initial handshake within this window.
+    int32 handshake_timeout_ms      = 1 [
+        (runanywhere.v1.rac_default) = "10000",
+        (runanywhere.v1.rac_min) = 100
+    ];
+
+    // Ceiling on compiling and instantiating a backend WASM module. Much
+    // larger than the handshake: a cold WASM compile is slow.
+    int32 backend_init_timeout_ms   = 2 [
+        (runanywhere.v1.rac_default) = "120000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// FFI marshalling limits.
+//
+// Read only by the SDKs that copy C strings across a foreign function
+// boundary. Pre-pool call sites: CppBridge+ModelPaths.swift:20;
+// dart_bridge_model_paths.dart:85.
+// ---------------------------------------------------------------------------
+message FFIDefaults {
+    // Scratch buffer for a filesystem path returned by the C ABI.
+    int32 path_buffer_bytes         = 1 [
+        (runanywhere.v1.rac_default) = "1024",
+        (runanywhere.v1.rac_min) = 256
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Control-plane hosts.
+//
+// Pre-pool call sites: dart_bridge_http.dart:334-342 (a full environment→host
+// map living inside a Dart FFI bridge); dart_bridge_device.dart:299;
+// NetworkConfiguration.ts:13 (RN); HybridRunAnywhereCore.cpp:81 (RN, a second
+// default behind the first); SDKEnvironment.swift:143 and SDKEnvironment.kt:134
+// (the development placeholder).
+//
+// Note a behavioral difference this does not change: Swift and Kotlin require
+// the caller to pass a base URL and only fall back to the development
+// placeholder, while Flutter and React Native silently default to the
+// production host. Consolidating the strings here is separate from deciding
+// which of those two behaviors is right.
+// ---------------------------------------------------------------------------
+message EnvironmentDefaults {
+    // Production control plane.
+    string production_base_url    = 1 [
+        (runanywhere.v1.rac_default) = "https://api.runanywhere.ai"
+    ];
+
+    // Development / staging control plane.
+    string development_base_url   = 2 [
+        (runanywhere.v1.rac_default) = "https://dev-api.runanywhere.ai"
+    ];
+
+    // Stand-in used when a development build supplies no base URL. Deliberately
+    // unroutable so an unconfigured build fails visibly rather than talking to
+    // production.
+    string development_placeholder_url = 3 [
+        (runanywhere.v1.rac_default) = "https://dev.runanywhere.local"
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Model storage analysis.
+//
+// Pre-pool call site: RunAnywhere+Storage.swift:47,158. No other SDK had a
+// counterpart, so this default was Swift-only by accident rather than by
+// decision. Declaring it here makes it available to the rest.
+// ---------------------------------------------------------------------------
+message StorageDefaults {
+    // Context length assumed when computing a model's memory footprint and
+    // the artifact reports none.
+    int32 context_length            = 1 [
+        (runanywhere.v1.rac_default) = "2048",
+        (runanywhere.v1.rac_min) = 1
+    ];
+}

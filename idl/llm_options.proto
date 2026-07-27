@@ -20,6 +20,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "rac_options.proto";
 import "structured_output.proto";
 import "thinking_tag_pattern.proto";
 import "tool_calling.proto";
@@ -33,6 +34,21 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
+// The rac_default annotations on LLMGenerationOptions are the single
+// declaration of the LLM sampling defaults. RAC_LLM_OPTIONS_DEFAULT in
+// rac_llm_types.h is generated from them, and every SDK reads the generated
+// defaults() rather than keeping its own table (Swift, Kotlin, Flutter, and Web
+// each used to).
+//
+// On the wire, a proto3 zero still means "unset, let the engine decide". The
+// generated defaults() is for callers who want a populated options value; it
+// does not change how an unset field is interpreted.
+//
+// This block is deliberately separated from the message by a blank line. protoc
+// only attaches a comment that directly abuts an element, and notes about the
+// codegen pipeline should not be copied into the generated message in five
+// languages. Keep pipeline commentary here and wire semantics below.
+
 // ---------------------------------------------------------------------------
 // Options for a single text generation invocation.
 //
@@ -43,19 +59,36 @@ option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;r
 message LLMGenerationOptions {
     // Maximum number of tokens to generate. 0 (default) = unset → engine
     // default (typically 100).
-    int32  max_tokens          = 1;
+    int32  max_tokens          = 1 [
+        (runanywhere.v1.rac_default) = "100",
+        (runanywhere.v1.rac_min) = 0
+    ];
 
     // Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
-    float  temperature         = 2;
+    float  temperature         = 2 [
+        (runanywhere.v1.rac_default) = "0.8",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 2.0
+    ];
 
     // Nucleus sampling (top-p). 1.0 = no nucleus truncation.
-    float  top_p               = 3;
+    float  top_p               = 3 [
+        (runanywhere.v1.rac_default) = "1.0",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 
     // Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
-    int32  top_k               = 4;
+    int32  top_k               = 4 [
+        (runanywhere.v1.rac_default) = "0",
+        (runanywhere.v1.rac_min) = 0
+    ];
 
     // Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
-    float  repetition_penalty  = 5;
+    float  repetition_penalty  = 5 [
+        (runanywhere.v1.rac_default) = "1.0",
+        (runanywhere.v1.rac_min_float) = 0.0
+    ];
 
     // Stop sequences. Generation halts when any of these strings appears in
     // the output stream.
