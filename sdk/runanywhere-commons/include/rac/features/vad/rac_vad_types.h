@@ -26,6 +26,7 @@
 #define RAC_VAD_TYPES_H
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,25 +35,31 @@ extern "C" {
 // =============================================================================
 // CONSTANTS - Single Source of Truth for VAD
 // Swift references these via CRACommons import
+//
+// The RAC_VAD_DEFAULT_* values below alias the generated pool so the proto stays
+// the single declaration; the MIN/MAX guard rails are C-side clamps with no
+// proto counterpart and are declared here.
 // =============================================================================
 
 // Audio Format Constants
-#define RAC_VAD_DEFAULT_SAMPLE_RATE 16000
+#define RAC_VAD_DEFAULT_SAMPLE_RATE RAC_DEFAULT_VAD_CONFIGURATION_SAMPLE_RATE
 #define RAC_VAD_MAX_SAMPLE_RATE 48000
 #define RAC_VAD_MIN_SAMPLE_RATE 8000
 
 // Energy Thresholds
-#define RAC_VAD_DEFAULT_ENERGY_THRESHOLD 0.015f
+#define RAC_VAD_DEFAULT_ENERGY_THRESHOLD RAC_DEFAULT_VAD_CONFIGURATION_THRESHOLD
 #define RAC_VAD_MIN_ENERGY_THRESHOLD 0.001f
 #define RAC_VAD_MAX_ENERGY_THRESHOLD 0.5f
 
-// Frame Processing
+// Frame Processing. Seconds here; the proto's frame_length_ms is milliseconds,
+// so this is deliberately not aliased to the pool.
 #define RAC_VAD_DEFAULT_FRAME_LENGTH 0.1f
 #define RAC_VAD_MIN_FRAME_LENGTH 0.02f
 #define RAC_VAD_MAX_FRAME_LENGTH 0.5f
 
 // Calibration
-#define RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER 2.0f
+#define RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER \
+    RAC_DEFAULT_VAD_CONFIGURATION_CALIBRATION_MULTIPLIER
 #define RAC_VAD_MIN_CALIBRATION_MULTIPLIER 1.2f
 #define RAC_VAD_MAX_CALIBRATION_MULTIPLIER 5.0f
 

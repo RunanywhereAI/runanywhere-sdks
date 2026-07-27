@@ -25,6 +25,7 @@
 #define RAC_VLM_TYPES_H
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -243,25 +244,32 @@ typedef struct rac_vlm_options {
 
 /**
  * @brief Default VLM generation options
+ *
+ * Values come from the `rac_default` annotations on
+ * runanywhere.v1.VLMGenerationOptions, via the generated
+ * rac_defaults_generated.h. Change idl/vlm_options.proto, not this macro: the
+ * five platform SDKs generate their defaults from the same annotations, and
+ * they had already drifted to three different max_tokens values before this was
+ * a single declaration.
  */
-#define RAC_VLM_OPTIONS_DEFAULT                 \
-    {.max_tokens = 2048,                        \
-     .temperature = 0.7f,                       \
-     .top_p = 0.9f,                             \
-     .stop_sequences = RAC_NULL,                \
-     .num_stop_sequences = 0,                   \
-     .streaming_enabled = RAC_TRUE,             \
-     .system_prompt = RAC_NULL,                 \
-     .max_image_size = 0,                       \
-     .n_threads = 0,                            \
-     .use_gpu = RAC_TRUE,                       \
-     .model_family = RAC_VLM_MODEL_FAMILY_AUTO, \
-     .custom_chat_template = RAC_NULL,          \
-     .image_marker_override = RAC_NULL,         \
-     .top_k = 0,                                \
-     .seed = 0,                                 \
-     .repetition_penalty = 1.1f,                \
-     .min_p = 0.0f,                             \
+#define RAC_VLM_OPTIONS_DEFAULT                                                    \
+    {.max_tokens = RAC_DEFAULT_VLM_GENERATION_OPTIONS_MAX_TOKENS,                  \
+     .temperature = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TEMPERATURE,                \
+     .top_p = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TOP_P,                            \
+     .stop_sequences = RAC_NULL,                                                   \
+     .num_stop_sequences = 0,                                                      \
+     .streaming_enabled = RAC_TRUE,                                                \
+     .system_prompt = RAC_NULL,                                                    \
+     .max_image_size = 0,                                                          \
+     .n_threads = 0,                                                               \
+     .use_gpu = RAC_TRUE,                                                          \
+     .model_family = RAC_VLM_MODEL_FAMILY_AUTO,                                    \
+     .custom_chat_template = RAC_NULL,                                             \
+     .image_marker_override = RAC_NULL,                                            \
+     .top_k = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TOP_K,                            \
+     .seed = 0,                                                                    \
+     .repetition_penalty = RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY,  \
+     .min_p = 0.0f,                                                                \
      .emit_image_embeddings = RAC_FALSE}
 
 // =============================================================================

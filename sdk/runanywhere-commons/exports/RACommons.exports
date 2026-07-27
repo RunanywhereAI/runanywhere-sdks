@@ -155,6 +155,9 @@ _rac_vad_stream_cancel_proto
 _rac_voice_agent_set_proto_callback
 # Caller-side shutdown helper.
 _rac_voice_agent_proto_quiesce
+# Catalogued default VAD model id, declared in idl/sdk_defaults.proto. Exported
+# because every platform SDK used to re-declare the "silero-vad" literal itself.
+_rac_voice_agent_default_vad_model_id
 
 # LLM Structured Output — SDK-facing surface is proto-byte only.
 # Legacy hand-written parse/validate/prepare helpers are now internal.
