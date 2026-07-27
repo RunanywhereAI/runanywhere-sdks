@@ -39,6 +39,7 @@ import type {
   HybridRoutingContext,
   HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
+import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 // Re-export the wire enums so callers can use them directly without importing
 // from `@runanywhere/proto-ts` (the structured-types-as-data rule: provider is
@@ -59,7 +60,7 @@ export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
  * Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the
  * router uses the threshold carried in the installed policy; this is only the
  * recommended value to build it with. */
-export const HYBRID_STT_CONFIDENCE_THRESHOLD = 0.5;
+export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThreshold;
 
 // ---------------------------------------------------------------------------
 // Filter

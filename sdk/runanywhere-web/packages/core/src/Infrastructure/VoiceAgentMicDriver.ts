@@ -15,12 +15,13 @@ import type { VoiceAgentResult } from '@runanywhere/proto-ts/voice_agent_service
 import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
 import { AudioCapture } from './AudioCapture.js';
 import { AudioPlayback } from './AudioPlayback.js';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgentMicDriver');
 
 const SAMPLE_RATE_HZ = 16_000;
-const SPEECH_RMS_THRESHOLD = 0.015;
-const SPEECH_FLOOR_MULTIPLIER = 2.2;
+const SPEECH_RMS_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
+const SPEECH_FLOOR_MULTIPLIER = voiceAgentDefaults.speechFloorMultiplier;
 const NOISE_FLOOR_RISE = 0.05;
 const END_OF_UTTERANCE_SILENCE_MS = 800;
 const MIN_SPEECH_MS = 300;

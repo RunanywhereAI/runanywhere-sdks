@@ -136,6 +136,7 @@ import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
 import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
+import { networkDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -947,7 +948,7 @@ function throwDownloadFailure(feature: string, message: string, reason?: Downloa
 async function pollDownloadWithRetry(
   modelId: string,
   taskId: string,
-  maxRetries = 3,
+  maxRetries = networkDefaults.maxRetries,
 ): Promise<DownloadProgress | null> {
   let failure: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -956,7 +957,7 @@ async function pollDownloadWithRetry(
     } catch (error) {
       failure = error;
       if (attempt === maxRetries) break;
-      const backoffMs = 100 * (2 ** attempt);
+      const backoffMs = networkDefaults.retryBackoffBaseMs * (2 ** attempt);
       logger.warning(`Download poll failed; resuming '${modelId}' in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`);
       await delay(backoffMs);
       // Native download tasks retain their resume token and partial bytes.

@@ -28,6 +28,7 @@ import {
   getRegisteredBackendWorkerDiagnostics,
   setBackendWorkerHost,
 } from './BackendWorkerHostRegistry.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 export interface BackendWorkerLike {
   onmessage: ((event: MessageEvent<BackendWorkerResponse>) => void) | null;
@@ -76,7 +77,7 @@ interface StreamPending {
 
 type PendingRequest = UnaryPending | StreamPending;
 
-const defaultInitTimeoutMs = 10_000;
+const defaultInitTimeoutMs = workerDefaults.handshakeTimeoutMs;
 
 /** Current worker-runtime state for `RunAnywhere.runtime` diagnostics. */
 export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
