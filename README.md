@@ -118,7 +118,7 @@ Available on the Kotlin, Flutter, and React Native SDKs. Snapdragon (Android arm
 | **Electron** | Preview | [Build from source](sdk/runanywhere-electron/) | [SDK README](sdk/runanywhere-electron/) | — |
 | **CLI** (`rcli`) | Stable | [Homebrew / scripts](sdk/runanywhere-cli/) | [SDK README](sdk/runanywhere-cli/) | — |
 
-Latest published package version: **0.20.10**. Repo tip may be ahead (currently 0.20.11).
+All SDKs ship on one version line, currently **0.20.11**. Pin the same version across the core package and its backends. See [Releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for what is published today.
 
 ---
 
@@ -188,10 +188,10 @@ println(result.text)
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
     // Optional: STT / TTS / VAD
-    // implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.10")
+    // implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
 }
 ```
 
@@ -218,7 +218,7 @@ console.log(result.text);
 **Install via npm:**
 
 ```bash
-npm install @runanywhere/core@0.20.10 @runanywhere/llamacpp@0.20.10
+npm install @runanywhere/core@0.20.11 @runanywhere/llamacpp@0.20.11
 ```
 
 [Documentation](https://docs.runanywhere.ai/react-native/introduction) · [Source](sdk/runanywhere-react-native/)
@@ -245,9 +245,9 @@ print(response);
 
 ```yaml
 dependencies:
-  runanywhere: ^0.20.10
-  runanywhere_llamacpp: ^0.20.10
-  # runanywhere_onnx: ^0.20.10   # STT, TTS, Voice
+  runanywhere: ^0.20.11
+  runanywhere_llamacpp: ^0.20.11
+  # runanywhere_onnx: ^0.20.11   # STT, TTS, Voice
 ```
 
 [Documentation](https://docs.runanywhere.ai/flutter/introduction) · [Source](sdk/runanywhere-flutter/)
@@ -257,14 +257,16 @@ dependencies:
 ### Web (Browser)
 
 ```typescript
-import { RunAnywhere } from '@runanywhere/web';
+import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
+import { LlamaCPP } from '@runanywhere/web-llamacpp';
 
-await RunAnywhere.initialize({ environment: 'development' });
-
-await RunAnywhere.loadModel({
-  id: 'qwen2.5-0.5b',
-  source: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
+await RunAnywhere.initialize({
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
+await LlamaCPP.register({ acceleration: 'auto' });
+await RunAnywhere.completeServicesInitialization();
+
+await RunAnywhere.loadModel({ modelId: 'qwen2.5-0.5b' });
 
 const result = await RunAnywhere.generate({
   prompt: 'What is the capital of France?',
@@ -275,7 +277,7 @@ console.log(result.text);
 **Install via npm:**
 
 ```bash
-npm install @runanywhere/web@0.20.10
+npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
 ```
 
 [Source](sdk/runanywhere-web/)
@@ -295,7 +297,7 @@ with RunAnywhere() as ra:
 **Install via pip:**
 
 ```bash
-pip install runanywhere==0.20.10
+pip install runanywhere==0.20.11
 ```
 
 [Source](sdk/runanywhere-python/)
@@ -425,13 +427,13 @@ runanywhere-sdks/
 
 | Platform | Minimum | Recommended |
 |----------|---------|-------------|
-| iOS | 17.0+ | 17.5+ |
-| macOS | 14.0+ | 14.0+ |
+| iOS | 17.5+ | 17.5+ |
+| macOS | 14.5+ | 14.5+ |
 | Android | API 24 (7.0) | API 28+ |
 | Web | Chrome 96+ / Edge 96+ | Chrome 120+ |
-| React Native | 0.74+ | 0.76+ (Node.js 22.12+) |
-| Flutter | 3.10+ | 3.24+ |
-| Python | 3.10+ | 3.12+ |
+| React Native | 0.83.1+ | 0.85+ (Node.js 22.12+) |
+| Flutter | 3.44+ (Dart 3.12+) | 3.44.6+ |
+| Python | 3.9+ | 3.12+ |
 | Electron | Windows x64 (preview) | — |
 
 Hexagon NPU: Snapdragon with Hexagon v79 / v81 (Snapdragon 8 Elite class), Android arm64.  

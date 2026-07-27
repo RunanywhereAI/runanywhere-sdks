@@ -13,7 +13,7 @@ On-device AI for Flutter — run LLMs, speech-to-text, text-to-speech, and voice
 </p>
 
 <p align="center">
-  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.10+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.10+" /></a>
+  <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.44+-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.44+" /></a>
   <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.12+-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.12+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-API%2024+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" /></a>
@@ -25,8 +25,8 @@ On-device AI for Flutter — run LLMs, speech-to-text, text-to-speech, and voice
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **Flutter** | 3.10+ | Latest stable (see `pubspec.yaml`) |
-| **Dart** | 3.12+ | Matches workspace constraint |
+| **Flutter** | 3.44+ | 3.44.6 (see `pubspec.yaml`) |
+| **Dart** | 3.12+ | 3.12.2 (workspace constraint) |
 | **iOS** | 17.5+ | 17.5+ |
 | **Android** | API 24 (7.0+) | API 28+ |
 | **Xcode** | 26+ | 26+ |
@@ -40,36 +40,36 @@ ARM64 devices are recommended. Metal on iOS and NEON on Android provide signific
 
 ## Installation
 
-Add the packages you need to `pubspec.yaml`. Pin to **0.20.10**:
+Add the packages you need to `pubspec.yaml`. Pin to **0.20.11**:
 
 **Core + LlamaCpp (LLM):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.10
-  runanywhere_llamacpp: 0.20.10
+  runanywhere: 0.20.11
+  runanywhere_llamacpp: 0.20.11
 ```
 
 **Core + ONNX (STT / TTS / VAD):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.10
-  runanywhere_onnx: 0.20.10
+  runanywhere: 0.20.11
+  runanywhere_onnx: 0.20.11
 ```
 
 **Core + MLX (Apple LLM / VLM / speech on physical iOS devices):**
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.10
-  runanywhere_mlx: 0.20.10
+  runanywhere: 0.20.11
+  runanywhere_mlx: 0.20.11
 ```
 
 **Optional NPU (Snapdragon Android):**
 
 ```yaml
-  runanywhere_qhexrt: 0.20.10
+  runanywhere_qhexrt: 0.20.11
 ```
 
 Then run:
@@ -134,7 +134,7 @@ Register backend modules (`LlamaCpp`, `Onnx`, `Mlx`) before downloading or loadi
 | `RunAnywhere.llm` | Text generation | `llm.chat()`, `llm.generate()`, `llm.generateStream()` |
 | `RunAnywhere.stt` | Speech-to-text | `stt.transcribe()`, `stt.transcribeStream()` |
 | `RunAnywhere.tts` | Text-to-speech | `tts.synthesize()`, `tts.speak()` |
-| `RunAnywhere.vad` | Voice activity detection | `vad.process()` |
+| `RunAnywhere.vad` | Voice activity detection | `vad.detectVoiceActivity()`, `vad.streamVAD()` |
 | `RunAnywhere.vlm` | Vision-language | `vlm.processImage()` |
 | `RunAnywhere.voice` | Voice agent pipeline | `voice.initializeWithLoadedModels()` |
 | `RunAnywhere.models` | Model registry | `models.register()`, `models.available()` |

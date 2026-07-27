@@ -35,32 +35,46 @@ Commons provides the shared infrastructure, engine plugin registry, model lifecy
 ┌───────────────────────────────▼──────────────────────────────────────────┐
 │  Engine Plugins (engines/)                                               │
 │  ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐  ┌───────────┐ │
-│  │  llamacpp/  │  │  sherpa/ onnx/  │  │  cloud/       │  │ platform/ │ │
-│  │  LLM (GGUF) │  │ STT/TTS/VAD,    │  │  STT (HTTP)   │  │ Apple FM  │ │
-│  │  Metal/CUDA │  │ embeddings      │  │               │  │ System TTS│ │
+│  │  llamacpp/  │  │  sherpa/ onnx/  │  │  qhexrt/      │  │ cloud/    │ │
+│  │  LLM + VLM  │  │ STT/TTS/VAD,    │  │ LLM/VLM/STT/  │  │ STT       │ │
+│  │  (GGUF),    │  │ embeddings,     │  │ TTS on the    │  │ (HTTP)    │ │
+│  │  rerank     │  │ diarize/segment │  │ Hexagon NPU   │  │           │ │
+│  │  Metal/CUDA │  │                 │  │ (Snapdragon)  │  │           │ │
 │  └─────────────┘  └─────────────────┘  └───────────────┘  └───────────┘ │
+│  ┌─────────────┐  ┌─────────────────┐                                    │
+│  │  coreml/    │  │  platform/      │   (Apple only)                     │
+│  │  diffusion  │  │  Apple FM,      │                                    │
+│  │             │  │  System TTS     │                                    │
+│  └─────────────┘  └─────────────────┘                                    │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Supported capabilities
 
-| Capability | Backends |
-|------------|----------|
-| **TEXT_GENERATION** (LLM) | LlamaCPP, Platform (Apple Foundation Models), MLX (macOS) |
-| **VLM** | LlamaCPP (mmproj), MLX |
-| **STT** | Sherpa (offline ONNX), Cloud STT (online HTTP) |
-| **TTS** | Sherpa/ONNX (Piper), Platform (System TTS) |
-| **VAD** | ONNX (Silero), built-in energy VAD |
-| **EMBEDDINGS** | ONNX Runtime |
-| **VOICE_AGENT** | Composite (VAD + STT + LLM + TTS) |
+Each row is a plugin ABI primitive (`RAC_PRIMITIVE_*`) with the engines that fill its vtable slot. A NULL slot means the engine does not serve that primitive.
+
+| Primitive | vtable slot | Backends |
+|-----------|-------------|----------|
+| **GENERATE_TEXT** (LLM) | `llm_ops` | LlamaCPP, QHexRT (Hexagon NPU), Platform (Apple Foundation Models), MLX (Apple; registered from the Swift SDK) |
+| **VLM** | `vlm_ops` | LlamaCPP (mmproj), QHexRT, MLX |
+| **TRANSCRIBE** (STT) | `stt_ops` | Sherpa (offline ONNX), QHexRT, Cloud STT (online HTTP) |
+| **SYNTHESIZE** (TTS) | `tts_ops` | Sherpa/ONNX (Piper), QHexRT, Platform (System TTS) |
+| **DETECT_VOICE** (VAD) | `vad_ops` | Sherpa (Silero), built-in energy VAD |
+| **EMBED** | `embedding_ops` | ONNX Runtime |
+| **DIARIZE** | `diarization_ops` | ONNX (Sortformer) |
+| **SEGMENT** | `segmentation_ops` | ONNX |
+| **RERANK** | `rerank_ops` | LlamaCPP (rank-pooling GGUF) |
+| **DIFFUSION** | `diffusion_ops` | Platform (Core ML, Apple) |
+
+RAG and Voice Agent are composed pipelines rather than primitives: they orchestrate the services above and own no vtable of their own.
 
 ## Getting started (contributors)
 
 ### Prerequisites
 
-- CMake 3.22+
+- CMake 3.24+
 - C++20 compiler (Clang, GCC, or MSVC)
-- Platform toolchains as needed (Xcode 15+, Android NDK r25+, MSVC on Windows)
+- Platform toolchains as needed (Xcode 26+, Android NDK 27.3.13750724, MSVC on Windows)
 
 ### Clone and build
 
@@ -117,6 +131,10 @@ Offline STT, TTS, and VAD via ONNX. Registration: `rac/plugin/rac_plugin_entry_s
 
 Embeddings and general ONNX inference. Registration: `rac/plugin/rac_plugin_entry_onnx.h`.
 
+### QHexRT
+
+LLM, VLM, STT, and TTS on the Qualcomm Hexagon NPU from QNN context bundles. Android arm64 only; registers itself only on supported Snapdragon parts. Registration: `rac_backend_qhexrt_register()`.
+
 ### Cloud STT
 
 Online speech-to-text over HTTP. Offline STT is served by Sherpa; a hybrid router picks per request.
@@ -124,6 +142,10 @@ Online speech-to-text over HTTP. Offline STT is served by Sherpa; a hybrid route
 ### Platform (Apple)
 
 Apple Foundation Models (LLM) and System TTS via Swift callbacks on iOS/macOS.
+
+### Core ML
+
+Image generation (diffusion) on Apple platforms. Registration: `rac/plugin/rac_plugin_entry_coreml.h`.
 
 ## Platform SDK integration
 

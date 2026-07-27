@@ -4,7 +4,7 @@ Strictly typed, on-device AI for browser applications. The Web SDK exposes a Swi
 
 The packages target ESM-aware browser bundlers such as Vite and webpack. They are not a server-side Node.js inference runtime.
 
-**Current release:** `0.20.10`
+**Current release:** `0.20.11`
 
 ## Packages
 
@@ -24,13 +24,13 @@ Install core plus only the backends your application needs. Pin compatible versi
 
 ```bash
 # Full SDK
-npm install @runanywhere/web@0.20.10 @runanywhere/web-llamacpp@0.20.10 @runanywhere/web-onnx@0.20.10
+npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11 @runanywhere/web-onnx@0.20.11
 
 # LLM, GGUF embeddings, and VLM only
-npm install @runanywhere/web@0.20.10 @runanywhere/web-llamacpp@0.20.10
+npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
 
 # Speech and ONNX embeddings only
-npm install @runanywhere/web@0.20.10 @runanywhere/web-onnx@0.20.10
+npm install @runanywhere/web@0.20.11 @runanywhere/web-onnx@0.20.11
 ```
 
 Keep all three package versions aligned. Backend peer dependencies declare the supported core version range.
@@ -156,7 +156,7 @@ Threaded WebAssembly uses `SharedArrayBuffer`, which browsers only expose in cro
 No. These packages target browser bundlers with WASM and OPFS. Use the Python SDK or CLI for server-side local inference.
 
 **Which package version should I pin?**  
-Use `0.20.10` for all three packages unless release notes specify otherwise. Mismatched core/backend versions may fail peer dependency checks.
+Use `0.20.11` for all three packages unless release notes specify otherwise. Mismatched core/backend versions may fail peer dependency checks.
 
 **Where are models stored?**  
 In the browser's Origin Private File System (OPFS), scoped to your origin.

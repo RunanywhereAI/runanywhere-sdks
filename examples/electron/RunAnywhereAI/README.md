@@ -140,7 +140,7 @@ npx electron examples/electron/RunAnywhereAI
 | Resource | Link |
 |----------|------|
 | **Electron SDK** | [sdk/runanywhere-electron/README.md](../../../sdk/runanywhere-electron/README.md) |
-| **Web example** | [examples/web/RunAnywhereAI](../../web/RunAnywhereAI/README.md) |
+| **Web example** | [examples/web/RunAnywhereAI](../../web/RunAnywhereAI/) |
 | **Android example** | [examples/android/RunAnywhereAI](../../android/RunAnywhereAI/README.md) |
 | **Discord** | [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd) |
 | **Issues** | [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues) |

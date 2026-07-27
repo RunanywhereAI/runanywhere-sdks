@@ -55,10 +55,16 @@ cd examples/ios/RunAnywhereAI
 
 Expected artifacts under `sdk/runanywhere-swift/Binaries/`:
 
-- `RACommons.xcframework`
-- `RABackendLLAMACPP.xcframework`
-- `RABackendONNX.xcframework`
-- `RABackendSherpa.xcframework`
+| Artifact | Needed for |
+|----------|-----------|
+| `RACommons.xcframework` | Core (required) |
+| `RABackendLLAMACPP.xcframework` | LLM and VLM |
+| `RABackendONNX.xcframework` · `RABackendSherpa.xcframework` | STT, TTS, VAD |
+| `onnxruntime.xcframework` · `onnx.xcframework` | ONNX Runtime for the two above |
+| `RABackendMLX.xcframework` · `RunAnywhereMLXRuntime.xcframework` · `RunAnywhereMLXMetal.xcframework` | Apple MLX (this app links `RunAnywhereMLX`) |
+| `RABackendCoreML.xcframework` | Core ML image generation |
+
+All ten are produced by one run of the script. A short list is the usual cause of link errors on the MLX path, since this app's `Package.swift` depends on the `RunAnywhereMLX` product.
 
 Re-run this step after any C++ change in `runanywhere-commons`.
 

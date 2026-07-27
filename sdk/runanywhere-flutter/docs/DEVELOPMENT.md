@@ -8,11 +8,11 @@ This guide covers platform setup, building from source, and contributor workflow
 
 | Tool | Version |
 |------|---------|
-| **Flutter** | 3.10+ (see `pubspec.yaml` for the workspace constraint) |
+| **Flutter** | 3.44+ (workspace constraint is `>=3.44.0`; validated on 3.44.6) |
 | **Dart** | Matches workspace `pubspec.yaml` (`>=3.12.0 <4.0.0`) |
 | **Xcode** | 26+ (iOS builds) |
 | **Android Studio** | with NDK 28.2.13676358 |
-| **CMake** | 3.22+ |
+| **CMake** | 3.24+ |
 
 ---
 

@@ -10,8 +10,8 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
-    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
 }
 ```
 
@@ -42,7 +42,7 @@ See the [Kotlin SDK README](../../README.md) for full setup.
 
 - Android `arm64-v8a`
 - Qualcomm Snapdragon device with Hexagon V75, V79, or V81 NPU
-- Core artifact `runanywhere-sdk:0.20.10`
+- Core artifact `runanywhere-sdk:0.20.11`
 
 ---
 

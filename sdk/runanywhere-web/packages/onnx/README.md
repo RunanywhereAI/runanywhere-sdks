@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-npm install @runanywhere/web@0.20.10 @runanywhere/web-onnx@0.20.10
+npm install @runanywhere/web@0.20.11 @runanywhere/web-onnx@0.20.11
 ```
 
 See the [Web SDK README](../../README.md) for bundler configuration and cross-origin isolation headers.

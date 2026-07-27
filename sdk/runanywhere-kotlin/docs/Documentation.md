@@ -28,13 +28,13 @@ Complete API reference for the RunAnywhere Kotlin SDK. All public APIs are acces
 // build.gradle.kts
 dependencies {
     // Core SDK with native libraries
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
 
     // LlamaCPP backend for LLM text generation
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
 
     // ONNX backend for STT/TTS/VAD
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
 }
 ```
 
@@ -222,94 +222,67 @@ RunAnywhere.loadModel(
     ),
 )
 
-// Your audio capture Flow (16kHz, mono, 16-bit PCM)
-// See AudioCaptureService example below
-val audioChunks: Flow<ByteArray> = audioCaptureService.startCapture()
+// Compose the agent from the models loaded above. The SDK owns mic capture,
+// VAD gating, turn segmentation, and TTS playback from here on.
+RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
-// Configure voice session
-val config = VoiceSessionConfig(
-    silenceDuration = 1.5,      // 1.5 seconds of silence triggers processing
-    speechThreshold = 0.1f,     // Audio level threshold for speech detection
-    autoPlayTTS = false,        // We'll handle playback ourselves
-    continuousMode = true       // Auto-resume listening after each turn
-)
-
-// Start the SDK voice session - all business logic is handled by the SDK
+// Collect pipeline events. VoiceEvent is a Wire oneof envelope: exactly one
+// payload field is set per event, so check for null rather than matching on
+// sealed subclasses.
 sessionJob = scope.launch {
     try {
-        RunAnywhere.streamVoiceSession(audioChunks, config).collect { event ->
-            when (event) {
-                is VoiceSessionEvent.Started -> {
-                    sessionState = VoiceSessionState.LISTENING
-                }
-
-                is VoiceSessionEvent.Listening -> {
-                    audioLevel = event.audioLevel
-                }
-
-                is VoiceSessionEvent.SpeechStarted -> {
-                    sessionState = VoiceSessionState.SPEECH_DETECTED
-                }
-
-                is VoiceSessionEvent.Processing -> {
-                    sessionState = VoiceSessionState.PROCESSING
+        RunAnywhere.streamVoiceAgent().collect { event ->
+            event.state?.let { state ->
+                sessionState = state.to_state
+                if (state.to_state != PipelineState.PIPELINE_STATE_LISTENING) {
                     audioLevel = 0f
                 }
+            }
 
-                is VoiceSessionEvent.Transcribed -> {
-                    // User's speech was transcribed
-                    showTranscript(event.text)
-                }
+            event.vad?.let { vad ->
+                audioLevel = vad.energy
+            }
 
-                is VoiceSessionEvent.Responded -> {
-                    // LLM generated a response
-                    showResponse(event.text)
-                }
+            event.user_said?.let { said ->
+                // User's speech was transcribed
+                showTranscript(said.text)
+            }
 
-                is VoiceSessionEvent.Speaking -> {
-                    sessionState = VoiceSessionState.SPEAKING
-                }
+            event.assistant_token?.let { token ->
+                // LLM response, streamed token by token
+                appendResponse(token.text)
+            }
 
-                is VoiceSessionEvent.TurnCompleted -> {
-                    // Play the synthesized audio
-                    event.audio?.let { audio ->
-                        sessionState = VoiceSessionState.SPEAKING
-                        playWavAudio(audio)
-                    }
-                    // Resume listening state
-                    sessionState = VoiceSessionState.LISTENING
-                    audioLevel = 0f
-                }
+            event.audio?.let { frame ->
+                // Synthesized audio frame; the SDK plays it unless you opted out
+                enqueueAudio(frame.samples)
+            }
 
-                is VoiceSessionEvent.Stopped -> {
-                    sessionState = VoiceSessionState.IDLE
-                    audioLevel = 0f
-                }
-
-                is VoiceSessionEvent.Error -> {
-                    errorMessage = event.message
-                    sessionState = VoiceSessionState.IDLE
-                }
+            event.error?.let { error ->
+                errorMessage = error.message
             }
         }
     } catch (e: CancellationException) {
         // Expected when stopping
     } catch (e: Exception) {
         errorMessage = "Session error: ${e.message}"
-        sessionState = VoiceSessionState.IDLE
+        sessionState = PipelineState.PIPELINE_STATE_IDLE
     }
 }
 
 // To stop the session:
-fun stopSession() {
+suspend fun stopSession() {
     sessionJob?.cancel()
     sessionJob = null
-    audioCaptureService.stopCapture()
-    sessionState = VoiceSessionState.IDLE
+    RunAnywhere.cleanupVoiceAgent()
+    sessionState = PipelineState.PIPELINE_STATE_IDLE
 }
 ```
 
-#### Audio Capture Service (Required for Voice Pipeline)
+#### Audio Capture Service (single-modality STT only)
+
+The voice agent above captures its own audio. You only need your own recorder
+for standalone `transcribe` / `detectVoiceActivity` calls:
 
 ```kotlin
 import android.media.AudioFormat
@@ -441,26 +414,29 @@ suspend fun playWavAudio(wavData: ByteArray) = withContext(Dispatchers.IO) {
 
 #### Option 2: Manual Processing
 
-For more control, use `processVoice()` with your own silence detection:
+For more control, use `processVoiceTurn()` with your own silence detection:
 
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.processVoice
+import com.runanywhere.sdk.public.extensions.processVoiceTurn
 
 // Record audio (app responsibility - use AudioRecord)
 val audioData: ByteArray = recordAudio() // 16kHz, mono, 16-bit PCM
 
-// Process through full pipeline - SDK handles orchestration
-val result = RunAnywhere.processVoice(audioData)
+// Process one turn through the full pipeline - SDK handles orchestration
+val result = RunAnywhere.processVoiceTurn(audioData)
 
-if (result.speechDetected) {
+if (result.speech_detected) {
     println("You said: ${result.transcription}")
-    println("AI response: ${result.response}")
+    println("AI response: ${result.assistant_response}")
 
     // Play synthesized audio (app responsibility)
-    result.synthesizedAudio?.let { playWavAudio(it) }
+    result.synthesized_audio?.let { playWavAudio(it.toByteArray()) }
 }
 ```
+
+`VoiceAgentResult` is a Wire-generated proto type, so its fields use
+`snake_case` and `synthesized_audio` is a `ByteString`.
 
 ### Voice Session Events
 
@@ -887,29 +863,32 @@ fun RunAnywhere.streamVAD(audio: Flow<ByteArray>, options: RAVADOptions? = null)
 
 ```kotlin
 /**
- * Configure VAD settings.
+ * Detect speech in one buffer.
  *
- * @param configuration VAD configuration
+ * @param audioData 16 kHz mono PCM16
+ * @param options Per-call thresholds; null uses the component defaults
  */
-suspend fun RunAnywhere.configureVAD(configuration: VADConfiguration)
+suspend fun RunAnywhere.detectVoiceActivity(
+    audioData: ByteArray,
+    options: RAVADOptions? = null,
+): RAVADResult
 
 /**
- * Get current VAD statistics.
+ * Detect speech across a stream of buffers.
  */
-suspend fun RunAnywhere.getVADStatistics(): VADStatistics
-
-/**
- * Calibrate VAD with ambient noise.
- *
- * @param ambientAudioData Audio data of ambient noise
- */
-suspend fun RunAnywhere.calibrateVAD(ambientAudioData: ByteArray)
+fun RunAnywhere.streamVAD(
+    audio: Flow<ByteArray>,
+    options: RAVADOptions? = null,
+): Flow<RAVADResult>
 
 /**
  * Reset VAD state.
  */
 suspend fun RunAnywhere.resetVAD()
 ```
+
+VAD is configured per call through `RAVADOptions`. There is no separate
+`configureVAD`, statistics accessor, or ambient-noise calibration call.
 
 ### VAD Types
 
@@ -944,99 +923,75 @@ data class VADResult(
 
 Extension functions for full voice conversation pipelines.
 
-### Configuration
+### Setup
 
 ```kotlin
 /**
- * Configure the voice agent.
+ * Initialize the voice agent from an explicit compose config.
  *
- * @param configuration Voice agent configuration
+ * @param config Proto-backed compose config naming the STT, LLM, and TTS models
  */
-suspend fun RunAnywhere.configureVoiceAgent(configuration: VoiceAgentConfiguration)
+suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig)
 
 /**
- * Get current voice agent component states.
+ * Initialize the voice agent from the models already loaded in each component.
+ *
+ * @param ttsVoiceId Optional TTS voice override
+ * @param ensureVAD Load the default VAD model when none is present (default: true)
  */
-suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentStates
+suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
+    ttsVoiceId: String? = null,
+    ensureVAD: Boolean = true,
+)
 
 /**
- * Check if voice agent is fully ready.
+ * Per-component readiness snapshot (VAD, STT, LLM, TTS).
  */
-suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
+suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates
 
 /**
- * Initialize voice agent with currently loaded models.
+ * Load the default VAD model if the pipeline does not have one yet.
+ *
+ * @return true when a VAD model is available afterwards
  */
-suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
+suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean
+
+/**
+ * Tear down the voice agent and release its component handles.
+ */
+suspend fun RunAnywhere.cleanupVoiceAgent()
 ```
 
 ### Voice Processing
 
 ```kotlin
 /**
- * Process audio through full pipeline (VAD → STT → LLM → TTS).
+ * Process one turn through the full pipeline (VAD → STT → LLM → TTS).
  *
  * @param audioData Audio data to process
- * @return VoiceAgentResult with full response
+ * @return VoiceAgentResult with the full response
  */
-suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentResult
+suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
 ```
 
 ### Voice Session
 
-```kotlin
-/**
- * Start a voice session.
- * Returns a Flow of voice session events.
- *
- * @param config Session configuration
- * @return Flow of VoiceSessionEvent
- */
-fun RunAnywhere.startVoiceSession(
-    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT
-): Flow<VoiceSessionEvent>
-
-/**
- * Stop the current voice session.
- */
-suspend fun RunAnywhere.stopVoiceSession()
-
-/**
- * Check if a voice session is active.
- */
-suspend fun RunAnywhere.isVoiceSessionActive(): Boolean
-```
-
-### Conversation History
+The SDK owns the audio pipeline. Subscribe to the event stream rather than
+driving start/stop yourself:
 
 ```kotlin
 /**
- * Clear the voice agent conversation history.
+ * Stream voice pipeline events for the initialized agent.
+ * Emits state, VAD, userSaid, assistantToken, audio, and error payloads.
  */
-suspend fun RunAnywhere.clearVoiceConversation()
-
-/**
- * Set the system prompt for LLM responses.
- *
- * @param prompt System prompt text
- */
-suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
+fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent>
 ```
 
-### Voice Agent Types
-
-#### VoiceAgentConfiguration
-
-```kotlin
-data class VoiceAgentConfiguration(
-    val sttModelId: String,
-    val llmModelId: String,
-    val ttsVoiceId: String,
-    val systemPrompt: String? = null,
-    val vadConfiguration: VADConfiguration? = null,
-    val interruptionEnabled: Boolean = true
-)
-```
+Cancel the collecting coroutine to end the session, then call
+`cleanupVoiceAgent()` to release handles. There is no separate
+`startVoiceSession` / `stopVoiceSession` pair, and conversation history plus the
+system prompt are configured through the compose config rather than through
+setter calls.
 
 #### VoiceSessionEvent
 
@@ -1129,58 +1084,62 @@ fun RunAnywhere.registerModel(
 
 ### Model Discovery
 
+Discovery is proto-backed: requests and results are generated types, not plain
+lists of `ModelInfo`.
+
 ```kotlin
 /**
- * Get all available models.
+ * List models. Pass a populated ModelListRequest to filter.
  */
-suspend fun RunAnywhere.availableModels(): List<ModelInfo>
+suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest()): ModelListResult
 
 /**
- * Get models by category.
- *
- * @param category Model category to filter by
+ * Query models with structured criteria (category, framework, downloaded state).
  */
-suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo>
+suspend fun RunAnywhere.queryModels(query: ModelQuery): ModelListResult
 
 /**
- * Get downloaded models only.
+ * Downloaded models only.
  */
-suspend fun RunAnywhere.downloadedModels(): List<ModelInfo>
+suspend fun RunAnywhere.downloadedModels(): ModelListResult
 
 /**
- * Get model info by ID.
- *
- * @param modelId Model identifier
- * @return ModelInfo or null if not found
+ * Fetch one model's metadata.
  */
-suspend fun RunAnywhere.model(modelId: String): ModelInfo?
+suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult
+
+/**
+ * Resolve the model currently loaded for a category.
+ */
+suspend fun RunAnywhere.modelInfoForCategory(category: ModelCategory): RAModelInfo?
 ```
+
+A model's downloaded state is read from `RAModelInfo.isDownloaded` on a
+discovery result rather than through a separate predicate call.
 
 ### Model Downloads
 
+Downloads take a `RAModelInfo`, not a bare id string. Get one from a discovery
+call first.
+
 ```kotlin
 /**
- * Download a model.
+ * Download a model, suspending until it completes.
  *
- * @param modelId Model identifier
+ * @param model Model metadata from a discovery call
+ */
+suspend fun RunAnywhere.downloadModel(model: RAModelInfo, /* ... */)
+
+/**
+ * Download a model and observe progress.
+ *
  * @return Flow of DownloadProgress
  */
-fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress>
-
-/**
- * Cancel a model download.
- *
- * @param modelId Model identifier
- */
-suspend fun RunAnywhere.cancelDownload(modelId: String)
-
-/**
- * Check if a model is downloaded.
- *
- * @param modelId Model identifier
- */
-suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean
+fun RunAnywhere.downloadModelStream(model: RAModelInfo): Flow<DownloadProgress>
 ```
+
+Cancel a download by cancelling the coroutine collecting
+`downloadModelStream`; there is no separate `cancelDownload` call.
 
 ### Model Lifecycle
 
@@ -1191,15 +1150,13 @@ suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean
 suspend fun RunAnywhere.deleteModel(modelId: String)
 
 /**
- * Delete all downloaded models.
- */
-suspend fun RunAnywhere.deleteAllModels()
-
-/**
  * Refresh the model registry from remote.
  */
 suspend fun RunAnywhere.refreshModelRegistry()
 ```
+
+To clear everything, use the storage surface (`deleteStorage`, `clearCache`,
+`cleanTempFiles`) rather than a bulk model delete.
 
 ### LLM Model Loading
 
@@ -1235,12 +1192,10 @@ suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModel
  * from tests.
  */
 suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
-
-/**
- * Get the currently loaded STT model info.
- */
-suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
 ```
+
+There are no per-modality accessors. To ask which STT model is loaded, pass the
+category to the canonical call: `modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)`.
 
 ### Model Types
 

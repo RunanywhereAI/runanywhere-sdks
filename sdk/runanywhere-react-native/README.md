@@ -9,7 +9,7 @@ On-device AI for React Native — run LLMs, speech-to-text, text-to-speech, and 
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/React%20Native-0.74+-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.74+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/React%20Native-0.83.1+-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.83.1+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Node.js-22.12+-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js 22.12+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/iOS-17.5+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-API%2024+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" /></a>
@@ -21,7 +21,7 @@ On-device AI for React Native — run LLMs, speech-to-text, text-to-speech, and 
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| **React Native** | 0.74+ | Latest stable |
+| **React Native** | 0.83.1+ | 0.85.3 |
 | **Node.js** | 22.12+ | 24 LTS |
 | **iOS** | 17.5+ | 17.5+ |
 | **Android** | API 24 (7.0+) | API 28+ |
@@ -34,10 +34,10 @@ Apple Silicon devices and Android phones with 6 GB+ RAM are recommended for 3B+ 
 
 ## Installation
 
-Install the core package plus the backends you need. Pin to **0.20.10**:
+Install the core package plus the backends you need. Pin to **0.20.11**:
 
 ```bash
-npm install @runanywhere/core@0.20.10 @runanywhere/llamacpp@0.20.10
+npm install @runanywhere/core@0.20.11 @runanywhere/llamacpp@0.20.11
 ```
 
 | Package | Purpose |
@@ -104,7 +104,7 @@ The SDK exposes a unified `RunAnywhere` namespace. Register backend modules (`Ll
 | **STT** | `transcribe`, `transcribeStream` | `@runanywhere/onnx` |
 | **TTS** | `synthesize`, `synthesizeStream` | `@runanywhere/onnx` |
 | **VAD** | Voice activity detection helpers | `@runanywhere/onnx` |
-| **Voice agent** | `voiceAgent.start`, `processVoiceTurn` | Core + ONNX + LLM backend |
+| **Voice agent** | `initializeVoiceAgent`, `streamVoiceAgent`, `processVoiceTurn` | Core + ONNX + LLM backend |
 | **Models** | `registerModel`, `downloadModel`, `loadModel`, `listModels` | `@runanywhere/core` |
 | **RAG / tools** | `ragQuery`, `generateWithTools` | `@runanywhere/core` |
 
@@ -146,7 +146,7 @@ try {
 | **Docs site** | [docs.runanywhere.ai/react-native/introduction](https://docs.runanywhere.ai/react-native/introduction) |
 | **API reference** | [Docs/Documentation.md](Docs/Documentation.md) |
 | **Example app** | [examples/react-native/RunAnywhereAI/](../../examples/react-native/RunAnywhereAI/) |
-| **Contributing / building from source** | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| **Contributing / building from source** | [Docs/DEVELOPMENT.md](Docs/DEVELOPMENT.md) |
 
 ---
 

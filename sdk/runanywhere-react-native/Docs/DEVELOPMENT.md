@@ -8,8 +8,8 @@ This guide covers building the SDK from source, contributor workflows, and platf
 
 | Tool | Version |
 |------|---------|
-| **Node.js** | 22.12+ |
-| **React Native** | 0.74+ |
+| **Node.js** | 22.12+ (CI pins 24 LTS) |
+| **React Native** | 0.83.1+ |
 | **Xcode** | 26+ with Swift 6.2 (iOS) |
 | **Android Studio** | Hedgehog+ with NDK 27.3.13750724 |
 | **CMake** | 3.24+ |
@@ -69,18 +69,19 @@ After staging local natives, iOS consumes the package-owned `ios/Binaries/*.xcfr
 # 2. Navigate to the sample app
 cd ../../examples/react-native/RunAnywhereAI
 
-# 3. Install sample app dependencies
-npm install
+# 3. Install sample app dependencies (Yarn Berry workspace, not npm)
+corepack enable
+yarn install --ignore-scripts
 
 # 4. iOS: Install pods and run
-cd ios && pod install && cd ..
-npx react-native run-ios
+yarn pod-install
+yarn ios
 
 # 5. Android: Run directly
-npx react-native run-android
+yarn android
 ```
 
-The sample app's `package.json` uses workspace dependencies to reference the local SDK packages.
+The sample app is a Yarn Berry 3.6.1 workspace member (`nodeLinker: node-modules`) whose `package.json` references the local SDK packages by workspace. Running `npm install` inside it will fight the workspace symlink layout. Use `--ignore-scripts` on the first install so postinstall hooks cannot mask missing native artifacts.
 
 ---
 
@@ -138,11 +139,13 @@ while (true) {
 | Surface | Yields |
 |---------|--------|
 | `RunAnywhere.generateStream(prompt, options)` | `LLMStreamEvent` |
-| `RunAnywhere.transcribe(...)` / `transcribeStream(...)` | `STTStreamEvent` |
-| `RunAnywhere.synthesize(...)` / `synthesizeStream(...)` | `TTSStreamEvent` |
-| `RunAnywhere.processImage(request)` | `VLMStreamEvent` |
+| `RunAnywhere.transcribeStream(audio, options)` | `STTPartialResult` |
+| `RunAnywhere.synthesizeStream(text, options)` | `TTSStreamEvent` |
+| `RunAnywhere.processImageStream(request)` | `VLMStreamEvent` |
 | `RunAnywhere.downloadModelStream(model)` | `DownloadProgress` |
-| `RunAnywhere.voiceAgent.start(...)` | `VoiceEvent` |
+| `RunAnywhere.streamVoiceAgent()` | `VoiceEvent` |
+
+The batch twins (`transcribe`, `synthesize`, `processImage`, `generate`, `downloadModel`) return a single `Promise` and need no iteration.
 
 `for await` only works on JavaScriptCore when Hermes is disabled. Breaking from the loop with `break` or `return` automatically cancels the native subscription.
 

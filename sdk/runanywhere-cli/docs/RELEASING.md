@@ -26,7 +26,8 @@ $ rcli --environment development \
     --base-url "$STAGING_BASE_URL" \
     telemetry blast --processing-ms 42.5
 # Release builds can omit --base-url (baked STAGING_BASE_URL).
-# CI gate: STAGING_BASE_URL=… ./scripts/ci/oss_keyless_telemetry_blast.sh
+# CI gate (path is relative to the repo root):
+#   STAGING_BASE_URL=… ./scripts/ci/oss_keyless_telemetry_blast.sh
 
 # Team / customer authed path
 $ rcli --environment production \

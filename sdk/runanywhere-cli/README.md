@@ -58,11 +58,19 @@ MLX is Apple Silicon only. Commands that require an unavailable engine return a 
 | `rcli vad --input a.wav [model]` | Speech segments with timestamps (default: silero) |
 | `rcli voice --input a.wav [--output reply.wav]` | Full voice turn: STT → LLM → TTS |
 | `rcli serve [model]` | OpenAI-compatible HTTP server (`/v1/chat/completions`, `/v1/models`, `/health`) |
+| `rcli embed [text]` | Generate text embeddings |
+| `rcli rag query <question>` | Ingest documents (`--doc`, `--file`) and answer over them |
+| `rcli diarize <a.wav> -m <model>` | Speaker diarization: who spoke when |
+| `rcli segment <image.ppm> -m <model>` | Semantic segmentation, per-class mask summary |
+| `rcli image generate -p "…"` | Text-to-image via Core ML diffusion (Apple only) |
+| `rcli lora {import,list,apply}` | LoRA adapter catalog and attachment |
+| `rcli bench [model]` | Benchmark downloaded LLM/STT/TTS/VLM models |
+| `rcli telemetry {emit,blast}` | Drive the control-plane telemetry pipeline (no model needed) |
 | `rcli backends` | Registered inference backends per primitive |
 | `rcli info` / `rcli version` | Environment and version info |
 | `rcli auth login` | Authenticated control-plane login (production) |
 
-Global flags: `--json` (one machine-readable document on stdout), `--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`.
+Global flags: `--json` (one machine-readable document on stdout), `--home <dir>`, `-v/--verbose`, `-q/--quiet`, `--no-progress`, plus the control-plane trio `--environment <development|production>`, `--base-url <url>`, and `--api-key <key>` (see [docs/RELEASING.md](./docs/RELEASING.md)).
 
 Exit codes: `0` ok · `1` runtime error · `2` usage error · `130` cancelled.
 
@@ -108,7 +116,7 @@ Models pulled by `rcli` are shared with other RunAnywhere desktop apps using the
 
 ## Building from source
 
-Requires CMake ≥ 3.22, a C++20 compiler, and libcurl dev headers on Linux (`apt install libcurl4-openssl-dev`).
+Requires CMake ≥ 3.24, a C++20 compiler, and libcurl dev headers on Linux (`apt install libcurl4-openssl-dev`).
 
 ```bash
 # macOS (full MLX host):

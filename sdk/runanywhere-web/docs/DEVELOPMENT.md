@@ -30,16 +30,21 @@ The WASM build scripts fail if required vendored static archives or canonical ou
 
 ## Runtime artifacts
 
-The publish gate requires these four canonical JavaScript/WebAssembly pairs:
+Publishing expects these JavaScript/WebAssembly pairs, one per `build:wasm` flag:
 
 ```text
-packages/core/wasm/racommons.{js,wasm}
-packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}
-packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}
-packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}
+packages/core/wasm/racommons.{js,wasm}                        # --core
+packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}           # --llamacpp  (CPU)
+packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}    # --webgpu
+packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}            # --onnx      (CPU/pthread)
+packages/onnx/wasm/racommons-onnx-sherpa-webgpu.{js,wasm}     # --onnx-webgpu (ORT WebGPU EP)
 ```
 
+The first four are mandatory; the ONNX WebGPU twin ships when speech acceleration is enabled (see [ONNX_WEBGPU.md](./ONNX_WEBGPU.md)).
+
 CPU and WebGPU are separate llama.cpp builds owned by one npm package. ONNX Runtime and Sherpa-ONNX share one backend artifact because Sherpa uses ONNX Runtime.
+
+`packages/onnx` must not publish `wasm/sherpa/**`. That standalone artifact no longer exists; the proto-byte path through `racommons-onnx-sherpa.wasm` is the only Sherpa surface.
 
 The canonical `.js` files are required at runtime by threaded Emscripten workers. A deployment must serve every pair as a real static asset, never as an SPA HTML fallback.
 

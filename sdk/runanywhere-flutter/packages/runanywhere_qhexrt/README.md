@@ -10,8 +10,8 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.10
-  runanywhere_qhexrt: 0.20.10
+  runanywhere: 0.20.11
+  runanywhere_qhexrt: 0.20.11
 ```
 
 See the [Flutter SDK README](../../README.md) for Android setup.

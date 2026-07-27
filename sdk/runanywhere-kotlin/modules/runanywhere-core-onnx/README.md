@@ -12,8 +12,8 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
 }
 ```
 
@@ -45,7 +45,7 @@ For model registration, TTS, VAD, and voice-agent flows, see the [Kotlin SDK REA
 
 - Android API 24+
 - `RECORD_AUDIO` permission for microphone capture
-- Core artifact `runanywhere-sdk:0.20.10`
+- Core artifact `runanywhere-sdk:0.20.11`
 
 ---
 

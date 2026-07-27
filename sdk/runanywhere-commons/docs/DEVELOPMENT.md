@@ -10,14 +10,23 @@ Contributor guide for building, integrating, and extending the internal C/C++ co
 |--------|---------|-------------|
 | `RAC_BUILD_JNI` | OFF | Build JNI bridge for Android/JVM |
 | `RAC_BUILD_TESTS` | OFF | Build unit tests |
-| `RAC_BUILD_SHARED` | OFF | Build shared libraries (default: static) |
-| `RAC_BUILD_PLATFORM` | ON | Build platform backend (Apple FM, System TTS) |
-| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the ignored local development credentials; local development only, never packaging |
+| `RAC_BUILD_SHARED` | OFF | Build shared libraries (default: static archive) |
+| `RAC_BUILD_PLATFORM` | ON (Apple only) | Build platform backend (Apple FM, System TTS, Core ML diffusion) |
 | `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
 | `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
 | `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
-| `RAC_BACKEND_SHERPA` | ON | Build Sherpa-ONNX backend — offline STT/TTS/VAD (when BACKENDS=ON) |
-| `RAC_BACKEND_CLOUD` | ON | Build cloud HTTP backend — online STT (when BACKENDS=ON) |
+| `RAC_BACKEND_RAG` | ON (except Emscripten) | Build the RAG pipeline (USearch vector search) |
+| `RAC_ENABLE_SOLUTIONS` | ON desktop, OFF mobile/WASM | Solutions API (needs Protobuf + Abseil); OFF returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` |
+| `RAC_STATIC_PLUGINS` | Forced ON for iOS/WASM | Static plugin linking instead of `dlopen` |
+| `RAC_BUILD_SERVER` | OFF | OpenAI-compatible HTTP server (`src/server/`) |
+| `RAC_DESKTOP_ADAPTER` | OFF | Desktop platform adapter plus libcurl HTTP transport (rcli, server, Playground) |
+| `RAC_BUILD_ELECTRON_ADDON` | OFF | The `runanywhere-electron` N-API `.node` addon |
+| `RAC_BUILD_PYTHON_MODULE` | OFF | The `runanywhere-python` pybind11 extension |
+| `RAC_GPU_CUDA` | OFF | Build llama.cpp with the CUDA backend (NVIDIA; needs the CUDA toolkit) |
+| `RAC_REGENERATE_PROTO` | OFF | Re-run `idl/codegen/generate_cpp.sh` when `.proto` files change |
+| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the git-ignored local development credentials; never for packaging |
+
+Per-engine `RAC_BACKEND_<NAME>` options are declared by each engine's own `CMakeLists.txt`, not centrally: `RAC_BACKEND_SHERPA` (ON), `RAC_BACKEND_CLOUD` (ON), `RAC_BACKEND_MLX` (ON, Apple), `RAC_BACKEND_COREML` (Apple), and `RAC_BACKEND_QHEXRT` (OFF; private prebuilt archive). Each engine self-gates with a `return()` guard, so `engines/` descends into all of them unconditionally.
 
 ### Platform-specific builds
 

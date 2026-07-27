@@ -12,7 +12,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Android%20API%2024%2B-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android API 24+" />
-  <img src="https://img.shields.io/badge/Kotlin-2.1%2B-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin 2.1+" />
+  <img src="https://img.shields.io/badge/Kotlin-2.4%2B-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin 2.4+" />
   <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose" />
   <img src="https://img.shields.io/badge/License-RunAnywhere-blue?style=flat-square" alt="RunAnywhere License" />
 </p>
@@ -26,7 +26,7 @@
 | Item | Minimum |
 |------|---------|
 | **Android Studio** | Latest stable (Ladybug or newer recommended) |
-| **Android SDK** | API 24+ (Android 7.0); compile/target SDK 36 |
+| **Android SDK** | API 24+ (Android 7.0); compile/target SDK 37 |
 | **JDK** | 17 |
 | **NDK & CMake** | As required by the repo root native build scripts |
 | **Disk space** | Several GB for native builds and downloaded AI models |

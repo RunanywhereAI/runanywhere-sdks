@@ -10,8 +10,8 @@
 
 ```yaml
 dependencies:
-  runanywhere: 0.20.10
-  runanywhere_onnx: 0.20.10
+  runanywhere: 0.20.11
+  runanywhere_onnx: 0.20.11
 ```
 
 Platform setup (Podfile, microphone permissions) is documented in the [Flutter SDK README](../../README.md).

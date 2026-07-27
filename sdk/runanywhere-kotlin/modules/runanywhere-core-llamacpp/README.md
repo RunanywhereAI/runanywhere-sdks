@@ -12,8 +12,8 @@ Requires the core SDK. Add both to your app module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.10")
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.10")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
 }
 ```
 
@@ -53,7 +53,7 @@ For registration, downloads, streaming, and model catalogs, see the [Kotlin SDK 
 ## Requirements
 
 - Android API 24+ (ARM64 recommended)
-- Core artifact `runanywhere-sdk:0.20.10`
+- Core artifact `runanywhere-sdk:0.20.11`
 
 ---
 
