@@ -50,11 +50,10 @@
       html, body { height: 100%; margin: 0; }
       body {
         font-family: 'Segoe UI Variable Text','Segoe UI Variable','Segoe UI',-apple-system,system-ui,sans-serif;
-        font-size: 14px; line-height: 1.5; color: var(--fg);
+        font-size: 14.5px; line-height: 1.55; color: var(--fg);
         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
         background:
-          radial-gradient(1100px 620px at 88% -8%, rgba(255,105,0,.10), transparent 58%),
-          radial-gradient(900px 500px at -6% 108%, rgba(59,130,246,.05), transparent 55%),
+          radial-gradient(1200px 700px at 82% -12%, rgba(255,105,0,.045), transparent 60%),
           var(--bg);
         display: flex; flex-direction: column; overflow: hidden;
         /* Chrome (nav, labels, buttons) is not selectable; CONTENT is — a blanket
@@ -78,24 +77,25 @@
       .shell { flex: 1; display: flex; min-height: 0; }
 
       /* ---------------- sidebar ---------------- */
-      .sidebar { width: 280px; flex: 0 0 auto; background: linear-gradient(180deg, var(--sidebar), #0a0f1c); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 14px; }
+      .sidebar { width: 280px; flex: 0 0 auto; background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 14px; }
       .brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 14px; }
-      .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 4px 16px var(--accent-glow); }
-      .brand .logo svg { width: 17px; height: 17px; color: #fff; }
+      .brand .logo { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; }
+      .brand .logo svg { width: 26px; height: 26px; }
       .brand .name { font-size: 15px; font-weight: 640; letter-spacing: -.01em; }
       .brand .name small { display: block; font-size: 11px; font-weight: 500; color: var(--fg-3); letter-spacing: .01em; }
-      .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; margin-bottom: 14px; border-radius: 12px; border: none; color: #fff; font-weight: 600; letter-spacing: -.005em; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px var(--accent-glow); transition: .18s var(--ease); }
-      .newchat:hover { filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
-      .newchat:active { transform: translateY(0); }
+      .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; margin-bottom: 16px; border-radius: 10px; border: 1px solid var(--line); color: var(--fg); font-size: 13.5px; font-weight: 550; letter-spacing: -.005em; background: var(--surface); transition: .15s var(--ease); }
+      .newchat:hover { background: var(--surface-2); border-color: var(--line-2); }
+      .newchat:active { background: var(--surface-3); }
+      .newchat svg { color: var(--accent); }
       .nav { display: flex; flex-direction: column; gap: 3px; }
       .nav .grouplabel { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); padding: 16px 10px 6px; font-weight: 650; }
       .nav button { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 11px; border-radius: 11px; border: none; background: none; color: var(--fg-2); font-size: 14px; font-weight: 500; text-align: left; transition: .15s var(--ease); }
       .nav button svg { width: 18px; height: 18px; flex: 0 0 auto; stroke-width: 1.7; color: var(--fg-3); transition: .15s; }
       .nav button:hover { background: rgba(255,255,255,.045); color: var(--fg); }
       .nav button:hover svg { color: var(--fg-2); }
-      .nav button.active { background: var(--accent-soft); color: #fff; font-weight: 560; }
-      .nav button.active svg { color: var(--accent-lift); }
-      .nav button.active::before { content: ''; position: absolute; left: -14px; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--accent); }
+      .nav button.active { background: var(--surface-2); color: var(--fg); font-weight: 600; }
+      .nav button.active svg { color: var(--accent); }
+      
       .convs { flex: 1; min-height: 0; display: flex; flex-direction: column; }
       .convs .grouplabel { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); padding: 16px 10px 6px; font-weight: 650; }
       #convlist { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1px; padding-right: 2px; }
@@ -213,8 +213,8 @@
       input[type=file] { display: none; }
       .filepick { display: flex; align-items: center; gap: 12px; }
       .filepick .fname { color: var(--fg-3); font-size: 13px; }
-      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; letter-spacing: -.005em; box-shadow: 0 6px 18px var(--accent-glow); transition: .17s var(--ease); }
-      .btn:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 10px 26px var(--accent-glow); }
+      .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; letter-spacing: -.005em; box-shadow: var(--shadow-2); transition: .17s var(--ease); }
+      .btn:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: var(--shadow-2); }
       .btn:active { transform: translateY(0); filter: brightness(.98); }
       .btn:disabled { opacity: .45; filter: grayscale(.4); transform: none; box-shadow: none; cursor: default; }
       .btn.ghost { background: var(--surface); color: var(--fg); border: 1px solid var(--line-2); box-shadow: none; }
@@ -279,7 +279,8 @@
       .sugg .s2 { display: block; font-size: 12px; color: var(--fg-3); margin-top: 1px; }
       .composer { flex: 0 0 auto; padding: 12px 24px 22px; }
       .composer .box { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; background: rgba(30,38,56,.7); backdrop-filter: blur(16px); border: 1px solid var(--line-2); border-radius: 20px; padding: 8px 8px 8px 18px; box-shadow: var(--shadow-2); transition: .18s var(--ease); }
-      .composer .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2); }
+      /* Focus = a slightly brighter border, not a glowing ring. */
+      .composer .box:focus-within { border-color: rgba(255,105,0,.45); box-shadow: var(--shadow-2); }
       .composer input { flex: 1; background: none; border: none; padding: 9px 0; outline: none; font-size: 14.5px; }
       .composer .send { width: 40px; height: 40px; border-radius: 13px; padding: 0; flex: 0 0 auto; }
       .composer .send svg { width: 18px; height: 18px; }
@@ -312,7 +313,8 @@
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></span>
+          <!-- The canonical RunAnywhere mark (examples/logo.svg) — never repainted. -->
+          <span class="logo"><svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M769 797L668.631 737.392C621.495 771.306 564.931 789.549 506.905 789.549H352.652C352.679 789.4 358.703 756.03 365.663 735.531C372.568 715.195 387.949 685.269 387.966 685.235H557.109C618.7 685.234 668.631 635.195 668.631 573.469V411.413C668.631 411.413 695.339 380.194 715.099 362.98C734.671 345.931 768.849 323.96 769 323.863V797Z" fill="url(#bm)"/><path d="M356.369 286.608C403.505 252.694 460.069 234.451 518.095 234.451H672.348C672.322 234.595 666.297 267.971 659.337 288.472C652.428 308.82 637.034 338.765 637.034 338.765H467.891C406.3 338.766 356.369 388.805 356.369 450.531V612.587C356.369 612.587 329.661 643.806 309.901 661.02C290.328 678.07 256.148 700.042 256 700.137V227L356.369 286.608Z" fill="url(#bm)"/><defs><linearGradient id="bm" x1="256" y1="227" x2="822.851" y2="737.166" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6900"/><stop offset="1" stop-color="#FB2C36"/></linearGradient></defs></svg></span>
           <span class="name">RunAnywhere AI<small>on-device AI</small></span>
         </div>
         <button class="newchat" id="newchat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New chat</button>
