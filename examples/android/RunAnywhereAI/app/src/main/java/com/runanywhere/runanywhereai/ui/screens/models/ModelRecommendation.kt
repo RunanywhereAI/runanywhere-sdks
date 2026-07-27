@@ -144,9 +144,19 @@ object ModelRecommendation {
         val byId = models.associateBy { it.id }
         val preferNpu = hasNpu && tier == HardwareTier.HIGH_END
         return VoicePipeline(
-            stt = pickAsr(preferNpu, hasNpu, budget, byId, models),
+            // The voice PIPELINE keeps STT on CPU (sherpa) even on NPU devices: an
+            // NPU STT would fight the NPU LLM for the single Hexagon slot, forcing a
+            // slow per-turn Whisper<->LLM swap. CPU STT leaves the slot for the LLM
+            // (which stays warm) and routes the turn through the streaming hybrid path
+            // (useNpuSwap=false). NPU Whisper is still preferred for standalone
+            // dictation via recommendedFor(STT); this falls back to NPU only if no
+            // CPU ASR is available.
+            stt = pickAsr(preferNpu = false, hasNpu, budget, byId, models),
             llm = pickLLMs(tier, preferNpu, budget, byId, models).firstOrNull(),
-            tts = pickTts(preferNpu, hasNpu, budget, byId, models),
+            // TTS also stays on CPU (sherpa piper) for the same reason as STT: an NPU
+            // TTS would contend with the NPU LLM for the single Hexagon slot. Only the
+            // LLM runs on the NPU in the hybrid pipeline.
+            tts = pickTts(preferNpu = false, hasNpu, budget, byId, models),
             // VAD is tiny + backend-neutral (ONNX Silero); include it so the pipeline is
             // fully pre-staged. The voice agent also auto-ensures it, so it's a nicety.
             vad = pickCategory(

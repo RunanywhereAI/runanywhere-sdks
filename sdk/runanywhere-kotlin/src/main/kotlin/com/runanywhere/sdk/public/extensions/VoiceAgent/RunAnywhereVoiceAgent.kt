@@ -20,6 +20,7 @@ import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceEvent
 import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
+import com.runanywhere.sdk.features.TTS.Services.StreamingAudioPlayer
 import com.runanywhere.sdk.features.VoiceAgent.Services.VoiceAgentMicDriver
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
@@ -33,7 +34,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -67,6 +68,28 @@ private fun notInitializedException(): SDKException =
         category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
         shouldLog = false,
     )
+
+/**
+ * True when [text] carries no actual speech — it is empty or reduces to nothing
+ * but bracketed / parenthesized non-speech tags, punctuation, or symbols. STT
+ * engines (Whisper especially) emit tags like "[BLANK_AUDIO]", "[wind blowing]",
+ * "(music)", "♪♪♪", "..." when handed silence or ambient noise; treating those
+ * as user utterances makes an always-on voice agent answer its own room noise in
+ * a loop. Real speech always leaves alphanumeric characters OUTSIDE any tag, so
+ * this never suppresses a genuine reply.
+ */
+internal fun transcriptIsNonSpeech(text: String?): Boolean {
+    if (text.isNullOrEmpty()) return true
+    var depth = 0
+    for (c in text) {
+        when (c) {
+            '[', '(', '{', '<' -> depth++
+            ']', ')', '}', '>' -> if (depth > 0) depth--
+            else -> if (depth == 0 && c.isLetterOrDigit()) return false
+        }
+    }
+    return true
+}
 
 private fun isComponentReady(component: SDKComponent): Boolean =
     CppBridgeModelLifecycle.snapshot(component)?.let {
@@ -270,16 +293,44 @@ fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
         if (!isInitialized) throw notInitializedException()
         ensureServicesReady()
         val handle = CppBridgeVoiceAgent.getHandle()
+        // Play the spoken reply INCREMENTALLY: as each AudioFrameEvent lands on the
+        // stream, feed its PCM to a streaming AudioTrack so the first sentence/clause
+        // is heard while the rest is still being generated + synthesized. Replaces
+        // VoiceAgentMicDriver's one-shot WAV-blob playback (now disabled). is_final
+        // marks the reply's end; barge-in/teardown hard-stops via player.stop().
+        val player = StreamingAudioPlayer()
         coroutineScope {
             val driver = launch(Dispatchers.IO) { VoiceAgentMicDriver(handle).run() }
             try {
-                emitAll(VoiceAgentStreamAdapter(handle).stream())
+                // Skip playback for a turn whose transcript is an STT non-speech
+                // hallucination ("[BLANK_AUDIO]", "[wind blowing]", …). An always-on
+                // session keeps segmenting silence between real utterances; without
+                // this the agent speaks a reply to its own ambient noise every few
+                // seconds and appears to loop. user_said(is_final) always precedes
+                // that turn's audio frames, so this flag is set before they arrive.
+                var currentTurnSuppressed = false
+                VoiceAgentStreamAdapter(handle).stream().collect { event ->
+                    event.user_said?.let { said ->
+                        if (said.is_final) currentTurnSuppressed = transcriptIsNonSpeech(said.text)
+                    }
+                    if (!currentTurnSuppressed) {
+                        event.audio?.let { audio ->
+                            if (audio.is_final) {
+                                player.markFinal()
+                            } else if (audio.pcm.size > 0) {
+                                player.enqueue(audio.pcm.toByteArray(), audio.sample_rate_hz)
+                            }
+                        }
+                    }
+                    emit(event)
+                }
             } finally {
                 // Cancellation of a coroutine blocked in JNI is cooperative:
                 // wait for the active feed/turn to return and for the driver's
                 // finally block to stop AudioRecord before this stream is
                 // considered closed. This prevents a retained Talk screen from
                 // continuing to feed the shared STT model after navigation.
+                player.stop()
                 withContext(NonCancellable) { driver.cancelAndJoin() }
             }
         }
