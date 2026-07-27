@@ -17,6 +17,7 @@ import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -119,6 +120,11 @@ class OcrViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         job?.cancel()
+        // viewModelScope is already cancelling; use an independent scope so the
+        // one-shot native cancel actually runs during teardown.
+        CoroutineScope(Dispatchers.Default).launch {
+            runCatching { RunAnywhere.cancelVLMGeneration() }
+        }
     }
 
     private fun writeJpegToCache(bitmap: Bitmap): File {

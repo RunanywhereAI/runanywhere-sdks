@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.models
 
 import ai.runanywhere.proto.v1.ModelListRequest
-import ai.runanywhere.proto.v1.ModelUnloadRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,7 +21,6 @@ import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModelStream
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
-import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
@@ -234,12 +232,7 @@ class ModelSelectionViewModel(
         return try {
             // Same as ModelDownloadService: free resident weights so the RAM
             // preflight can pass when another STT/LLM is still loaded.
-            runCatching {
-                RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
-            }
-            RuntimeModelSelection.clearAll()
-            GlobalState.model.set(null)
-            GlobalState.lora.set(null)
+            RuntimeModelSelection.unloadAllForDownload()
             RunAnywhere.downloadModelStream(model).collect { p ->
                 val pct = if (p.total_bytes > 0) {
                     (p.bytes_downloaded * 100 / p.total_bytes).toInt()

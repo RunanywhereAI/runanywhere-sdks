@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
 import java.nio.ByteBuffer
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Drives semantic image segmentation through `RunAnywhere.segment`. Model
@@ -94,6 +95,8 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
                     maskBitmap = bitmapFromRgba(diagnostic.toByteArray(), result.width, result.height)
                 }
                 status = "Done — ${result.class_summaries.size} classes in ${result.processing_time_ms}ms."
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 RACLog.e("$TAG: Segmentation failed", e)
                 error = "Segmentation failed: ${e.message}"

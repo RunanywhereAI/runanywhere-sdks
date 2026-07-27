@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
 
 /** The resource dimensions required before an SDK operation may start. */
 internal enum class ModelCompatibilityOperation {
@@ -147,8 +148,12 @@ internal suspend fun withModelLoadCompatibilityPreflight(
  * simply no-op.
  */
 internal suspend fun reclaimLoadedModelMemory() {
-    runCatching {
+    try {
         RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Throwable) {
+        // Best-effort reclaim: ordinary unload failures must not block the retry path.
     }
 }
 

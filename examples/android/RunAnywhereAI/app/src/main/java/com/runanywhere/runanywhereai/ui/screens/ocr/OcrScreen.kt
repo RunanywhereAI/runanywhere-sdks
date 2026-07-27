@@ -69,6 +69,7 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val modelLoaded = model != null
     val busy = modelVm.state.busyModelId != null
+    val sheetLocked = busy || viewModel.isExtracting
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -105,7 +106,12 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
             )
         }
 
-        ModelCard(model = model, busy = busy, onClick = { showSheet = true })
+        ModelCard(
+            model = model,
+            busy = busy,
+            sheetLocked = sheetLocked,
+            onClick = { showSheet = true },
+        )
         DocumentCard(
             viewModel = viewModel,
             modelLoaded = modelLoaded,
@@ -143,7 +149,12 @@ fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
 }
 
 @Composable
-private fun ModelCard(model: RAModelInfo?, busy: Boolean, onClick: () -> Unit) {
+private fun ModelCard(
+    model: RAModelInfo?,
+    busy: Boolean,
+    sheetLocked: Boolean,
+    onClick: () -> Unit,
+) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -152,7 +163,7 @@ private fun ModelCard(model: RAModelInfo?, busy: Boolean, onClick: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(enabled = !busy, onClick = onClick)
+                .clickable(enabled = !sheetLocked, onClick = onClick)
                 .padding(dimens.spacingLg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),

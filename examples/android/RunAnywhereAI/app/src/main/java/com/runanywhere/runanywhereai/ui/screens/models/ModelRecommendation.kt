@@ -195,11 +195,13 @@ object ModelRecommendation {
                 allowNpu = hasNpu,
             )
             ModelSelectionContext.IMAGE_GENERATION ->
-                models.filter { it.servesTextToImage() && it.effectiveBytes() <= budget }
+                models.filter {
+                    it.servesTextToImage() && it.allowedForNpu(hasNpu) && it.effectiveBytes() <= budget
+                }
                     .minByOrNull { it.effectiveBytes() }
-                    ?: models.firstOrNull { it.servesTextToImage() }
+                    ?: models.firstOrNull { it.servesTextToImage() && it.allowedForNpu(hasNpu) }
             ModelSelectionContext.OCR ->
-                models.filter { it.isDocumentOcrModel() }
+                models.filter { it.isDocumentOcrModel() && it.allowedForNpu(hasNpu) }
                     .sortedBy { it.effectiveBytes() }
                     .let { ocr ->
                         ocr.firstOrNull { it.id == "nemotron_ocr_v1" || it.id == "nemotron_ocr" }

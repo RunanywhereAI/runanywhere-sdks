@@ -62,6 +62,7 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val modelLoaded = model != null
+    val busy = modelVm.state.busyModelId != null
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -96,10 +97,11 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ModelCard(model = model, onClick = { showSheet = true })
+        ModelCard(model = model, busy = busy, onClick = { showSheet = true })
         ImageCard(
             viewModel = viewModel,
             modelLoaded = modelLoaded,
+            busy = busy,
             onPickImage = { imagePicker.launch("image/*") },
         )
 
@@ -129,7 +131,7 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
 }
 
 @Composable
-private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
+private fun ModelCard(model: RAModelInfo?, busy: Boolean, onClick: () -> Unit) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -138,7 +140,7 @@ private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onClick)
+                .clickable(enabled = !busy, onClick = onClick)
                 .padding(dimens.spacingLg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
@@ -159,16 +161,24 @@ private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    model?.name ?: "Select a model",
+                    when {
+                        busy -> "Preparing model…"
+                        model != null -> model.name
+                        else -> "Select a model"
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 model?.let { BackendBadge(framework = it.framework, compact = true) }
             }
-            Icon(
-                imageVector = RACIcons.Outline.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (busy) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+            } else {
+                Icon(
+                    imageVector = RACIcons.Outline.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -177,6 +187,7 @@ private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
 private fun ImageCard(
     viewModel: SegmentationViewModel,
     modelLoaded: Boolean,
+    busy: Boolean,
     onPickImage: () -> Unit,
 ) {
     val dimens = LocalDimens.current
@@ -233,6 +244,7 @@ private fun ImageCard(
             Button(
                 onClick = { viewModel.runSegmentation() },
                 enabled = modelLoaded &&
+                    !busy &&
                     viewModel.sourceBitmap != null &&
                     !viewModel.isSegmenting,
             ) {
