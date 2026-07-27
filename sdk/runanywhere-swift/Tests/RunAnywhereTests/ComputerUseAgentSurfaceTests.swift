@@ -124,12 +124,44 @@ final class ComputerUseAgentSurfaceTests: XCTestCase {
         XCTAssertEqual(action?.text, "hello world")
     }
 
-    /// The scaffold is model-agnostic: the enum the facade exposes must line up
-    /// with the C enum ordinals commons emits, or every action mis-maps.
-    func testKindOrdinalsMatchTheNativeEnum() {
-        XCTAssertEqual(CuaAction.Kind.unknown.rawValue, 0)
-        XCTAssertEqual(CuaAction.Kind.leftClick.rawValue, 1)
-        XCTAssertEqual(CuaAction.Kind.key.rawValue, 8)
-        XCTAssertEqual(CuaAction.Kind.terminate.rawValue, 18)
+    /// `CuaAction.Kind` is deliberately hand-mirrored so the public surface
+    /// stays proto-free (every SDK does the same), which makes this test the
+    /// thing that ties it back to the IDL. Pair every generated
+    /// `runanywhere.v1.CuaActionType` case to its `Kind`: unequal ordinals
+    /// silently re-label every action crossing the bridge, and a proto case
+    /// added without a mirror fails the count check rather than decoding to
+    /// `.unknown` in the field.
+    func testKindOrdinalsMatchTheGeneratedProtoEnum() {
+        let mirrored: [(RACuaActionType, CuaAction.Kind)] = [
+            (.unspecified, .unknown),
+            (.leftClick, .leftClick),
+            (.rightClick, .rightClick),
+            (.doubleClick, .doubleClick),
+            (.tripleClick, .tripleClick),
+            (.mouseMove, .mouseMove),
+            (.leftClickDrag, .leftClickDrag),
+            (.type, .type),
+            (.key, .key),
+            (.scroll, .scroll),
+            (.hscroll, .hscroll),
+            (.visitURL, .visitURL),
+            (.historyBack, .historyBack),
+            (.webSearch, .webSearch),
+            (.readPageAnswer, .readPageAnswer),
+            (.pauseMemorize, .pauseMemorize),
+            (.askUser, .askUser),
+            (.wait, .wait),
+            (.terminate, .terminate)
+        ]
+
+        XCTAssertEqual(
+            mirrored.count,
+            RACuaActionType.allCases.count,
+            "cua.proto gained a CuaActionType case — mirror it in CuaAction.Kind and here"
+        )
+        for (proto, kind) in mirrored {
+            XCTAssertEqual(kind.rawValue, proto.rawValue, "ordinal drift for \(kind)")
+            XCTAssertEqual(CuaAction.Kind(rawValue: proto.rawValue), kind)
+        }
     }
 }
