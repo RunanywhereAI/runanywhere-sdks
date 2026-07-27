@@ -137,6 +137,7 @@ import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/Offscree
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
 import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
 import { networkDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -2155,7 +2156,7 @@ export const RunAnywhere = {
           // singleton) so `stopSpeaking()` can stop in-flight speech.
           await sharedTTSPlayback().play(
             samples,
-            output.sampleRate > 0 ? output.sampleRate : 22050,
+            output.sampleRate > 0 ? output.sampleRate : audioCaptureDefaults.ttsSampleRateHz,
           );
         }
       } catch (err) {

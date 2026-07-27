@@ -16,10 +16,11 @@ import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
 import { AudioCapture } from './AudioCapture.js';
 import { AudioPlayback } from './AudioPlayback.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgentMicDriver');
 
-const SAMPLE_RATE_HZ = 16_000;
+const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;
 const SPEECH_RMS_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const SPEECH_FLOOR_MULTIPLIER = voiceAgentDefaults.speechFloorMultiplier;
 const NOISE_FLOOR_RISE = 0.05;

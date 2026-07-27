@@ -59,6 +59,7 @@ import {
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -1141,7 +1142,7 @@ function modelNotLoadedException(message: string): SDKException {
 
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
-    vadSampleRate: 16000,
+    vadSampleRate: audioCaptureDefaults.micSampleRateHz,
     vadFrameLength: 0.1,
     vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
     sessionId: 'web-voice-agent',
