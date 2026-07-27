@@ -33,27 +33,65 @@ const DEFAULT_LLM = 'qwen2.5-0.5b';
 // The chat's active LLM. Loading another LLM from the Models tab replaces it (the
 // backend keeps one loaded at a time), so we track it in loadedById/loadedType too
 // to keep the Models badges coherent — exactly one LLM ever shows "loaded".
-const llm = () => ensure('llm', async () => {
-  const h = await ra.loadLLM(DEFAULT_LLM);
-  loadedById[DEFAULT_LLM] = h; loadedType[DEFAULT_LLM] = 'llm';
-  return h;
-});
-const embedder = () => ensure('embedder', () => ra.loadEmbedder('minilm'));
-const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
-const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
-const tts = () => ensure('tts', () => ra.loadTTS('piper-lessac'));
+const llm = () => acquire('llm');
+const embedder = () => acquire('embedder');
+const vlm = () => acquire('vlm');
+const stt = () => acquire('stt');
+const tts = () => acquire('tts');
 
-// The backend keeps ONE generative model loaded, so loading anything else (another
-// LLM, or a VLM) evicts ours and the memoized handle above goes stale — every later
-// call then fails with "No model loaded". EVERY caller must go through withLlm so
-// the recovery lives in one place instead of only in chat.
-const STALE_MODEL_RE = /no model|not loaded|model.*load/i;
+// ---- per-tab model selection -------------------------------------------------
+// The backend keeps ONE slot PER MODALITY, so each tab can hold its own model and
+// tabs of different modalities never fight. `settings.models` is the user's choice
+// per modality (persisted); `acquire()` is the single place that turns a choice
+// into a loaded handle — download-if-needed, then load, memoized per modality.
+const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'smolvlm-256m', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac' };
+const MODALITY_LABEL = { llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text', tts: 'Text-to-speech' };
+const selectedModel = (m) => (settings.models && settings.models[m]) || DEFAULT_MODELS[m];
+
+async function acquire(modality) {
+  const id = selectedModel(modality);
+  // Re-loading is only needed when the choice changed or nothing is loaded yet.
+  if (handles[modality] && handles[`${modality}:id`] === id) return handles[modality];
+  handles[`${modality}:id`] = id;
+  const p = (async () => {
+    setStatus(`loading ${id}…`);
+    try {
+      const h = await loaders[modality](id);
+      loadedById[id] = h; loadedType[id] = modality;
+      return h;
+    } finally { setStatus('ready'); }
+  })();
+  // Don't memoize a rejection — one failed download would poison the modality
+  // for the rest of the session.
+  handles[modality] = p.catch((e) => { delete handles[modality]; delete handles[`${modality}:id`]; throw e; });
+  return handles[modality];
+}
+
+// Switch a modality to another model: drop the old handle so the next acquire()
+// loads the new one. Persisted so the choice survives a restart.
+async function selectModel(modality, id) {
+  settings.models = { ...(settings.models || {}), [modality]: id };
+  try { await store.saveSettings(settings); } catch { /* optional */ }
+  const prev = handles[modality];
+  delete handles[modality]; delete handles[`${modality}:id`];
+  if (prev) { try { await unloaders[modality](await prev); } catch { /* already gone */ } }
+  for (const k of Object.keys(loadedById)) if (loadedType[k] === modality) forgetLoaded(k);
+  renderModelChips();
+  if (currentTab === 'models') renderModels();
+}
+
+// The backend keeps one slot PER MODALITY (verified on device: loading a VLM does
+// NOT disturb the LLM, but loading a second LLM evicts the first). So the memoized
+// handle above goes stale whenever another LLM is loaded, and every later call
+// fails with "No model loaded". A host respawn invalidates it too. EVERY LLM caller
+// must go through withLlm so the recovery lives in one place instead of only chat.
+const STALE_MODEL_RE = /no model|not loaded|model.*load|invalid handle|host exited/i;
 async function withLlm(fn) {
   try {
     return await fn(await llm());
   } catch (e) {
     if (!STALE_MODEL_RE.test(e.message || '')) throw e;
-    delete handles.llm;
+    delete handles.llm; delete handles['llm:id'];
     for (const k of Object.keys(loadedById)) if (loadedType[k] === 'llm') forgetLoaded(k); // stale badges
     return fn(await llm());
   }
@@ -262,18 +300,12 @@ function buildCard(o) {
       try {
         if (loaded) {
           await unloaders[o.type](loaded); forgetLoaded(o.key);
-          if (o.type === 'llm') delete handles.llm; // chat reloads its default next time
+          delete handles[o.type]; delete handles[`${o.type}:id`];
         } else {
-          if (o.type === 'llm') {
-            // Backend keeps ONE LLM loaded — unload whichever is active first.
-            for (const k of Object.keys(loadedById)) {
-              if (loadedType[k] === 'llm') { try { await unloaders.llm(loadedById[k]); } catch { /* already gone */ } forgetLoaded(k); }
-            }
-            delete handles.llm;
-          }
-          loadedById[o.key] = await loaders[o.type](o.source);
-          loadedType[o.key] = o.type;
-          if (o.type === 'llm') handles.llm = Promise.resolve(loadedById[o.key]); // chat now uses this model
+          // Loading from here IS selecting: route through the same choke point the
+          // per-tab chips use, so the Models tab and the chips can't disagree.
+          await selectModel(o.type, o.source);
+          await acquire(o.type);
         }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
       renderModels();
@@ -282,7 +314,7 @@ function buildCard(o) {
   }
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
-      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); if (o.type === 'llm') delete handles.llm; }
+      if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); delete handles[o.type]; delete handles[`${o.type}:id`]; }
       customModels = customModels.filter((m) => m.id !== o.key); persistCustom(); renderModels();
     }));
   }
@@ -342,10 +374,8 @@ function looksRemote(source) {
 function applyDeviceUi() {
   const device = new URLSearchParams(location.search).get('device') || 'cpu';
   if (device !== 'gpu') return;
-  const sel = $('device');
-  const gpuOpt = sel && sel.querySelector('option[value="gpu"]');
-  if (gpuOpt) { gpuOpt.disabled = false; gpuOpt.textContent = 'GPU · CUDA'; }
-  if (sel) sel.value = 'gpu';
+  const label = $('devicelabel');
+  if (label) label.textContent = 'GPU · CUDA';
   const pill = $('devicepill');
   if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
   const note = $('devicenote');
@@ -386,7 +416,15 @@ function applySettingsToUi() {
   if ($('setreason')) $('setreason').checked = !!settings.reasoning;
 }
 async function saveSettings() {
-  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256, reasoning: !!($('setreason') && $('setreason').checked) };
+  // MERGE, don't rebuild — a wholesale replace drops keys this panel doesn't own
+  // (e.g. the per-tab model choices) on every save.
+  settings = {
+    ...settings,
+    systemPrompt: $('setsystem').value,
+    temperature: parseFloat($('settemp').value),
+    maxTokens: parseInt($('setmax').value, 10) || 256,
+    reasoning: !!($('setreason') && $('setreason').checked),
+  };
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
@@ -461,12 +499,121 @@ async function runVad() {
 }
 
 // ---- tabs ----
+let currentTab = 'chat';
 function showTab(name) {
+  currentTab = name;
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((x) => x.classList.toggle('active', x.id === name));
   const btn = document.querySelector(`.nav button[data-tab="${name}"]`);
   if (btn) $('sectiontitle').textContent = btn.textContent.trim();
+  closePicker();
+  renderModelChips();
   if (name === 'models') renderModels();
+}
+
+// ---- model chip + picker ------------------------------------------------------
+// Which modalities each tab lets you choose. Slots are per-modality, so a tab only
+// ever shows the models it actually uses.
+const TAB_MODALITIES = {
+  chat: ['llm'], vision: ['vlm'], embeddings: ['embedder'], voice: ['stt', 'tts'],
+  rag: ['embedder', 'llm'], structured: ['llm'], tools: ['llm'],
+};
+const CHIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m8 12 3 3 5-6"/></svg>';
+
+let openPicker = null;
+function closePicker() {
+  if (openPicker) { openPicker.remove(); openPicker = null; }
+}
+document.addEventListener('click', (e) => {
+  if (openPicker && !openPicker.contains(e.target) && !e.target.closest('.modelchip')) closePicker();
+});
+
+function catalogEntry(id) {
+  const c = catalogCache || {};
+  if (c[id]) return c[id];
+  const custom = customModels.find((m) => m.id === id);
+  return custom ? { label: custom.label || id, type: custom.type } : null;
+}
+let catalogCache = null;
+
+function renderModelChips() {
+  const slot = $('chipslot');
+  if (!slot) return;
+  const mods = TAB_MODALITIES[currentTab] || [];
+  slot.innerHTML = '';
+  for (const m of mods) {
+    const id = selectedModel(m);
+    const entry = catalogEntry(id);
+    const btn = document.createElement('button');
+    btn.className = 'modelchip';
+    btn.title = `${MODALITY_LABEL[m]} — click to change`;
+    btn.innerHTML =
+      `<span class="mark">${CHIP_ICON}</span>` +
+      `<span class="txt"><span class="t1">${escapeHtml((entry && entry.label) || id)}</span>` +
+      `<span class="t2">${escapeHtml(MODALITY_LABEL[m])}</span></span>` +
+      '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+    btn.onclick = (e) => { e.stopPropagation(); togglePicker(btn, m); };
+    slot.appendChild(btn);
+  }
+}
+
+async function togglePicker(anchor, modality) {
+  if (openPicker && openPicker.dataset.modality === modality) { closePicker(); return; }
+  closePicker();
+  const box = document.createElement('div');
+  box.className = 'picker';
+  box.dataset.modality = modality;
+  box.innerHTML = `<div class="phead">${escapeHtml(MODALITY_LABEL[modality])}</div><div class="note">Loading…</div>`;
+  document.body.appendChild(box);
+  const r = anchor.getBoundingClientRect();
+  box.style.top = `${r.bottom + 8}px`;
+  box.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - 352))}px`;
+  openPicker = box;
+
+  const [cat, status] = await Promise.all([ra.catalog(), ra.modelStatus()]);
+  catalogCache = cat;
+  if (openPicker !== box) return; // closed while loading
+  const items = Object.entries(cat).filter(([, e]) => e.type === modality)
+    .concat(customModels.filter((m) => m.type === modality).map((m) => [m.id, { label: m.label, type: m.type, custom: true }]));
+  const active = selectedModel(modality);
+
+  box.innerHTML = `<div class="phead">${escapeHtml(MODALITY_LABEL[modality])}</div>`;
+  for (const [id, entry] of items) {
+    const st = status[id] || {};
+    const isActive = id === active;
+    const stateCls = isActive ? 'active' : st.downloaded ? 'ready' : 'get';
+    const stateTxt = isActive ? 'Active' : st.downloaded ? 'Ready' : 'Download';
+    const bits = [entry.params, st.downloaded ? fmtSize(st.sizeBytes) : entry.sizeMB ? '~' + fmtMB(entry.sizeMB) : ''].filter(Boolean);
+    const row = document.createElement('button');
+    row.className = 'row';
+    row.innerHTML =
+      `<span class="info"><span class="nm">${escapeHtml(entry.label || id)}</span>` +
+      `<span class="meta">${escapeHtml(bits.join(' · '))}${entry.heavy ? ' · heavy' : ''}</span></span>` +
+      `<span class="state ${stateCls}">${stateTxt}</span>`;
+    row.onclick = async (e) => {
+      e.stopPropagation();
+      if (isActive) { closePicker(); return; }
+      const stateEl = row.querySelector('.state');
+      if (!st.downloaded) {
+        stateEl.textContent = '0%';
+        const bar = document.createElement('div');
+        bar.className = 'bar'; bar.innerHTML = '<div></div>';
+        row.after(bar);
+        try {
+          await ra.downloadModel(id, (p) => {
+            const pct = Math.round(p.percent || 0);
+            stateEl.textContent = pct + '%';
+            bar.firstElementChild.style.width = pct + '%';
+          });
+        } catch (err) { stateEl.textContent = 'Failed'; console.error(err); return; }
+        bar.remove();
+      }
+      await selectModel(modality, id);
+      closePicker();
+    };
+    box.appendChild(row);
+  }
+  if (!items.length) box.innerHTML += '<div class="note">No models of this type in the catalog yet.</div>';
 }
 document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -475,6 +622,9 @@ function wireUi() {
   applySettingsToUi();
   applyDeviceUi();
   renderSidebar(); renderChat();
+  // Warm the catalog so the model chips can show real labels immediately.
+  Promise.resolve(ra.catalog()).then((c) => { catalogCache = c; renderModelChips(); }).catch(() => {});
+  renderModelChips();
   wireModels();
   $('newchat').addEventListener('click', () => { newConversation(); showTab('chat'); $('chatinput').focus(); });
   $('chatsend').addEventListener('click', sendChat);
@@ -671,7 +821,9 @@ const IS_SELFTEST = new URLSearchParams(location.search).get('selftest') === '1'
   await ra.ready();
   await ra.initialize();
   if (!IS_SELFTEST) {
-    try { const s = await store.loadSettings(); if (s && s.systemPrompt) settings = { ...settings, ...s }; } catch { /* ignore */ }
+    // Accept ANY persisted object — gating on systemPrompt discarded saved
+    // settings whose prompt was cleared, and would drop the model choices too.
+    try { const s = await store.loadSettings(); if (s && typeof s === 'object') settings = { ...settings, ...s }; } catch { /* ignore */ }
     try { const c = await store.loadConversations(); if (c && Array.isArray(c.conversations)) { conversations = c.conversations; nextConvId = c.nextConvId || conversations.length + 1; activeId = conversations[0] ? conversations[0].id : null; } } catch { /* ignore */ }
     try { const cm = await store.loadCustomModels(); if (Array.isArray(cm)) customModels = cm; } catch { /* ignore */ }
   }
