@@ -27,29 +27,41 @@ IMPL = CORE / "cpp/HybridRunAnywhereCore.hpp"
 COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
 # Trailing `<ret...> <name>(` of a declaration, once comments are gone.
 SIGNATURE_RE = re.compile(r"^(?P<ret>.*?)\b(?P<name>\w+)\s*\($", re.S)
+# What ends a declaration on each side. Anchoring to the tail (rather than
+# "contains `= 0`") keeps a default argument like `int x = 0` from being read as
+# a pure virtual, which is what lets every match below be treated as
+# must-parse.
+SPEC_TAIL_RE = re.compile(r"\)\s*(?:const\s*)?(?:noexcept\s*)?=\s*0\s*$")
+IMPL_TAIL_RE = re.compile(r"\)\s*(?:const\s*)?(?:noexcept\s*)?override\s*$")
 
 
 def strip_comments(text: str) -> str:
     return COMMENT_RE.sub(" ", text)
 
 
-def declarations(text: str, marker: str) -> dict[str, str]:
-    """Map method name -> normalized return type for statements containing `marker`.
+def declarations(text: str, tail_re: re.Pattern[str]) -> tuple[dict[str, str], list[str]]:
+    """Map method name -> normalized return type, plus any declaration we failed to read.
 
     Splitting on ';' is what makes this robust: every C++ declaration ends with
     one, so wrapped signatures rejoin naturally and prose can't be mistaken for a
-    declaration (it would have to end in `) override;`).
+    declaration (it would have to end in `) override`).
+
+    Every statement matching `tail_re` MUST parse. Returning the failures rather
+    than skipping them is what makes the gate fail closed: if the generated
+    header's shape ever changes, this reports "could not read" instead of
+    quietly checking a subset.
     """
     found: dict[str, str] = {}
+    unparsed: list[str] = []
     for statement in strip_comments(text).split(";"):
-        if marker not in statement:
+        statement = statement.strip()
+        if not tail_re.search(statement):
             continue
         # Keep only the part before the argument list.
         head, sep, _ = statement.partition("(")
-        if not sep:
-            continue
-        match = SIGNATURE_RE.match(head.strip() + "(")
+        match = SIGNATURE_RE.match(head.strip() + "(") if sep else None
         if not match:
+            unparsed.append(" ".join(statement.split())[:100])
             continue
         ret = re.sub(r"\s+", " ", match.group("ret")).strip()
         # The first declaration in a class carries the preamble ("class X {
@@ -64,9 +76,16 @@ def declarations(text: str, marker: str) -> dict[str, str]:
             if ret.startswith(kw + " "):
                 ret = ret[len(kw) + 1:]
         ret = ret.replace("& ", "&").replace(" &", "&").strip()
-        if ret:
-            found[match.group("name")] = ret
-    return found
+        if not ret:
+            unparsed.append(" ".join(statement.split())[:100])
+            continue
+        name = match.group("name")
+        # Nitro specs do not overload; a collision would silently drop one side.
+        if name in found and found[name] != ret:
+            unparsed.append(f"{name}: two declarations disagree ({found[name]} vs {ret})")
+            continue
+        found[name] = ret
+    return found, unparsed
 
 
 def main() -> int:
@@ -75,19 +94,33 @@ def main() -> int:
             print(f"::error::missing {path.relative_to(REPO)}")
             return 1
 
-    spec = declarations(SPEC.read_text(), "= 0")
-    impl = declarations(IMPL.read_text(), "override")
+    spec, spec_unparsed = declarations(SPEC.read_text(), SPEC_TAIL_RE)
+    impl, impl_unparsed = declarations(IMPL.read_text(), IMPL_TAIL_RE)
+
+    if spec_unparsed or impl_unparsed:
+        print("::error::this gate could not read every declaration — refusing to pass a partial check")
+        for where, bad in (("spec", spec_unparsed), ("header", impl_unparsed)):
+            for line in bad:
+                print(f"  {where}: {line}")
+        return 1
 
     if len(spec) < 20:
         print(f"::error::parsed only {len(spec)} spec methods — this gate's parser is broken")
         return 1
 
     problems: list[str] = []
-    for name, ret in sorted(spec.items()):
+    # Union, not just the spec: a method deleted from the spec leaves a stale
+    # `override` in the hand-written header, which also fails to compile.
+    for name in sorted(set(spec) | set(impl)):
         if name not in impl:
             problems.append(f"  {name}: in the spec, missing from the hand-written header")
-        elif impl[name] != ret:
-            problems.append(f"  {name}: spec returns '{ret}', header declares '{impl[name]}'")
+        elif name not in spec:
+            problems.append(
+                f"  {name}: declared 'override' in the header but absent from the spec "
+                "(a removed Nitro method — this will not compile)"
+            )
+        elif impl[name] != spec[name]:
+            problems.append(f"  {name}: spec returns '{spec[name]}', header declares '{impl[name]}'")
 
     if problems:
         print("::error::HybridRunAnywhereCore.hpp is out of sync with the generated Nitro spec")
