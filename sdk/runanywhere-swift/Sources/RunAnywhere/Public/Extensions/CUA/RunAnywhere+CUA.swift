@@ -44,9 +44,11 @@ extension RunAnywhere {
         public static let faraProfile = RAC_CUA_PROFILE_FARA
 
         /// The system prompt (identity + `computer_use` tool schema) for a
-        /// profile, rendered at a declared coordinate space (pass the profile's
-        /// native space, e.g. 1000×1000 for Fara). Returns nil for an unknown
-        /// profile.
+        /// profile, rendered at the profile's coordinate space. Returns nil
+        /// for an unknown profile, or if `display` is neither the profile's own
+        /// space (1000×1000 for Fara) nor zero: the space is a property of the
+        /// model, and declaring a different one would contradict how
+        /// `parseAction` rescales the model's output.
         public static func systemPrompt(
             profile: String = faraProfile,
             display: (width: Int, height: Int) = (1000, 1000)

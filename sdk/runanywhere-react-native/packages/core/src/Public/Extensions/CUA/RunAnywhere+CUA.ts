@@ -112,8 +112,10 @@ const DEFAULT_DISPLAY: CuaDisplaySize = { width: 1000, height: 1000 };
 
 /**
  * The system prompt (identity + `computer_use` tool schema) for a profile,
- * rendered at a declared coordinate space (pass the profile's native space,
- * e.g. 1000x1000 for Fara). Returns `null` for an unknown profile.
+ * rendered at the profile's coordinate space. Returns `null` for an unknown
+ * profile, or if `display` is neither the profile's own space (1000x1000 for
+ * Fara) nor zero: the space is a property of the model, and declaring a
+ * different one would contradict how `parseAction` rescales its output.
  *
  * Matches Swift `RunAnywhere.CUA.systemPrompt(profile:display:)`.
  */

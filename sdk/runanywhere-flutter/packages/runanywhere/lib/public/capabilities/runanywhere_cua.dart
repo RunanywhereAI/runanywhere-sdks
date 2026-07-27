@@ -104,9 +104,11 @@ class RunAnywhereCUA {
   static const String faraProfile = 'fara';
 
   /// The system prompt (identity + `computer_use` tool schema) for a profile,
-  /// rendered at a declared coordinate space (pass the profile's native space,
-  /// e.g. 1000x1000 for Fara). Returns null for an unknown profile. Mirrors
-  /// Swift `CUA.systemPrompt(profile:display:)`.
+  /// rendered at the profile's coordinate space. Returns null for an unknown
+  /// profile, or if the declared space is neither the profile's own (1000x1000
+  /// for Fara) nor zero: the space is a property of the model, and declaring a
+  /// different one would contradict how [parseAction] rescales its output.
+  /// Mirrors Swift `CUA.systemPrompt(profile:display:)`.
   String? systemPrompt({
     String profile = faraProfile,
     int displayWidth = 1000,
