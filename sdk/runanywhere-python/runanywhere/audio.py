@@ -105,6 +105,8 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
     b = bytes(data)
     if len(b) < 12 or b[0:4] != b"RIFF" or b[8:12] != b"WAVE":
         raise SDKException.invalid_input("decode_wav: not a RIFF/WAVE file")
+    # not-a-default: RIFF header scratch values, overwritten from the fmt chunk
+    # a few lines below. Nothing reads them if the file parses.
     channels = 1
     sample_rate = 16000
     bits = 16
