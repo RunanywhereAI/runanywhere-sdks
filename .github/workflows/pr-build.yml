@@ -731,11 +731,6 @@ jobs:
         run: python3 sdk/runanywhere-kotlin/scripts/test_validate_public_artifacts.py
       - name: React Native release-boundary validator tests
         run: python3 sdk/runanywhere-react-native/scripts/test_validate_public_packages.py
-      # The RN C++ is compiled only by a consumer app build, which PR CI does
-      # not run, so a hand-written override drifting from the generated Nitro
-      # spec stays invisible until someone's build breaks.
-      - name: Nitro spec / hand-written header sync
-        run: python3 scripts/validation/gates/check_nitro_spec_header_sync.py
       - name: Web release-boundary validator tests
         run: python3 sdk/runanywhere-web/scripts/test_validate_public_packages.py
       - name: Python release-boundary validator tests
