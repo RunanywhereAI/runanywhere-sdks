@@ -45,6 +45,8 @@
         --shadow-3: 0 16px 48px rgba(0,0,0,.45);
       }
       * { box-sizing: border-box; }
+      /* `display:` on a component beats the hidden attribute, so restate it. */
+      [hidden] { display: none !important; }
       html, body { height: 100%; margin: 0; }
       body {
         font-family: 'Segoe UI Variable Text','Segoe UI Variable','Segoe UI',-apple-system,system-ui,sans-serif;
@@ -144,6 +146,49 @@
       .picker .bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); margin: 4px 10px 8px; overflow: hidden; }
       .picker .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
       .picker .note { font-size: 11.5px; color: var(--fg-3); padding: 8px 10px 10px; line-height: 1.45; }
+
+      /* ---------- voice ----------
+         One state machine on #voiceroot[data-state]: idle | listening | thinking
+         | speaking. Everything below is driven by that attribute, so the JS only
+         sets state and a --level custom property. */
+      .voicewrap { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 24px; }
+      .voicestage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .orb { position: relative; width: 132px; height: 132px; border: none; background: none; display: grid; place-items: center; }
+      .orb .ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--line); transition: .2s var(--ease);
+                   /* --level (0..1) is written from the mic RMS each frame. */
+                   transform: scale(calc(1 + var(--level, 0) * .28)); opacity: calc(.35 + var(--level, 0) * .65); }
+      .orb .core { position: relative; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center;
+                   background: var(--surface-2); border: 1px solid var(--line); transition: .2s var(--ease); }
+      .orb .core svg { width: 34px; height: 34px; color: var(--fg-2); }
+      .orb .ic-stop, .orb .spin { display: none; }
+      .orb:hover .core { background: var(--surface-3); }
+
+      [data-state="listening"] .orb .core { background: var(--brand-gradient); border-color: transparent; box-shadow: 0 0 0 6px var(--accent-soft); }
+      [data-state="listening"] .orb .core svg { color: #fff; }
+      [data-state="listening"] .orb .ring { border-color: var(--accent); }
+      [data-state="listening"] .orb .ic-mic { display: none; }
+      [data-state="listening"] .orb .ic-stop { display: block; }
+
+      [data-state="thinking"] .orb .core { background: var(--surface-2); }
+      [data-state="thinking"] .orb svg { display: none; }
+      [data-state="thinking"] .orb .spin { display: block; width: 30px; height: 30px; border-radius: 50%;
+        border: 2.5px solid var(--line-2); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+
+      [data-state="speaking"] .orb .core { background: var(--accent-soft); border-color: var(--accent); }
+      [data-state="speaking"] .orb .core svg { color: var(--accent-lift); }
+      [data-state="speaking"] .orb .ring { border-color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+      [data-state="speaking"] .orb .ic-mic { display: none; }
+      [data-state="speaking"] .orb .ic-stop { display: block; }
+
+      .voicestatus { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+      .voicehint { font-size: 12.5px; color: var(--fg-3); text-align: center; max-width: 330px; line-height: 1.5; }
+      .voicetranscript { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 12px; animation: fadeUp .2s var(--ease); }
+      .voicetranscript .turn { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; }
+      .voicetranscript .turn.user { background: var(--surface-2); }
+      .voicetranscript .who { display: block; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--fg-3); font-weight: 650; margin-bottom: 4px; }
+      .voicetranscript .turn div { font-size: 14.5px; line-height: 1.6; color: var(--fg); min-height: 1.6em; }
+      .voiceerror { width: 100%; max-width: 560px; background: rgba(220,38,38,.10); border: 1px solid rgba(220,38,38,.4); color: #ffb4b4; border-radius: 12px; padding: 10px 13px; font-size: 13px; }
+      .voicetoggle { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-3); cursor: pointer; }
       .pill select option { background: var(--surface-2); color: var(--fg); }
       .status { display: inline-flex; align-items: center; gap: 8px; color: var(--fg-2); font-size: 12.5px; }
       .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px var(--green); }
@@ -215,14 +260,23 @@
       .ragchunk .txt { font-size: 13px; color: var(--fg-2); line-height: 1.55; white-space: pre-wrap; }
       .ragscore { color: var(--accent-lift); }
       .bubble ul { margin: 8px 0; padding-left: 20px; } .bubble li { margin: 3px 0; }
-      .empty { max-width: 540px; margin: 16vh auto 0; text-align: center; animation: pop .4s var(--ease); }
-      .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 12px 40px var(--accent-glow); }
-      .empty .logo svg { width: 30px; height: 30px; color: #fff; }
-      .empty h3 { font-size: 24px; font-weight: 680; letter-spacing: -.025em; margin: 0 0 8px; }
-      .empty p { color: var(--fg-2); margin: 0 0 24px; font-size: 14.5px; }
-      .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
-      .chip { background: var(--surface); border: 1px solid var(--line-2); color: var(--fg-2); border-radius: 12px; padding: 9px 14px; font-size: 13px; transition: .15s var(--ease); }
-      .chip:hover { border-color: var(--accent); color: var(--fg); background: var(--surface-2); transform: translateY(-1px); }
+      /* Empty state: sparkle in a soft halo, a time-aware greeting, and four
+         openers in a 2x2 grid — each PREFILLS the composer rather than sending. */
+      .empty { max-width: 470px; margin: 12vh auto 0; text-align: center; animation: pop .4s var(--ease); }
+      .empty .halo { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto 22px; display: grid; place-items: center;
+                     background: radial-gradient(circle at 50% 45%, rgba(255,105,0,.22), rgba(255,105,0,.10) 55%, transparent 72%); }
+      .empty .halo svg { width: 34px; height: 34px; color: var(--accent); }
+      .empty h3 { font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px; }
+      .empty p { color: var(--fg-3); margin: 0 auto 26px; font-size: 15px; max-width: 330px; line-height: 1.5; }
+      .suggs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 440px; margin: 0 auto; }
+      .sugg { display: flex; align-items: center; gap: 11px; text-align: left; padding: 13px 14px; border-radius: 16px;
+              background: var(--surface); border: 1px solid var(--line); transition: .15s var(--ease); }
+      .sugg:hover { border-color: var(--line-2); background: var(--surface-2); transform: translateY(-1px); }
+      .sugg .si { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: 0 0 auto; background: var(--accent-soft); }
+      .sugg .si svg { width: 17px; height: 17px; color: var(--accent); }
+      .sugg .st { min-width: 0; }
+      .sugg .s1 { display: block; font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: var(--fg); }
+      .sugg .s2 { display: block; font-size: 12px; color: var(--fg-3); margin-top: 1px; }
       .composer { flex: 0 0 auto; padding: 12px 24px 22px; }
       .composer .box { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; background: rgba(30,38,56,.7); backdrop-filter: blur(16px); border: 1px solid var(--line-2); border-radius: 20px; padding: 8px 8px 8px 18px; box-shadow: var(--shadow-2); transition: .18s var(--ease); }
       .composer .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2); }
@@ -369,7 +423,7 @@
           <section class="panel" id="tools"><div class="wrap">
             <h2 class="lead">Tool calling</h2>
             <p class="hint">The model picks a tool and fills its arguments.</p>
-            <textarea id="toolstext" rows="2">What is the weather in Tokyo in celsius?</textarea>
+            <textarea id="toolstext" rows="2">What time is it right now?</textarea>
             <div style="margin-top:12px"><button class="btn" id="toolsgo">Choose tool</button></div>
             <div id="toolsout" class="out"></div>
           </div></section>
@@ -416,12 +470,25 @@
             <div id="ragsources"></div>
           </div></section>
 
-          <section class="panel" id="voice"><div class="wrap">
-            <h2 class="lead">Voice</h2>
-            <p class="hint">Hold to talk — mic → speech-to-text → LLM → text-to-speech → speaker.</p>
-            <button class="btn" id="voicebtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Hold to talk</button>
-            <div class="label">Heard</div><div id="voiceheard" class="out"></div>
-            <div class="label">Reply</div><div id="voicereply" class="out"></div>
+          <section class="panel" id="voice"><div class="wrap voicewrap" id="voiceroot" data-state="idle">
+            <div class="voicestage">
+              <button class="orb" id="voiceorb" aria-label="Start talking">
+                <span class="ring" id="voicering"></span>
+                <span class="core">
+                  <svg class="ic-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>
+                  <svg class="ic-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+                  <span class="spin"></span>
+                </span>
+              </button>
+              <div class="voicestatus" id="voicestatus">Tap to talk</div>
+              <div class="voicehint" id="voicehint">Speech, reasoning and speech-synthesis all run on this device.</div>
+            </div>
+            <div class="voicetranscript" id="voicetranscript" hidden>
+              <div class="turn user"><span class="who">You</span><div id="voiceheard"></div></div>
+              <div class="turn assistant"><span class="who">RunAnywhere</span><div id="voicereply"></div></div>
+            </div>
+            <div class="voiceerror" id="voiceerror" hidden></div>
+            <label class="voicetoggle"><input id="voicevad" type="checkbox" checked /> <span>Stop automatically when I stop speaking</span></label>
           </div></section>
 
           <section class="panel" id="vad"><div class="wrap">
