@@ -14,9 +14,44 @@ const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(0) + ' MB' : (b / 1e3).toFixed(0) + ' KB');
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
+// Tools the model can call. `execute` actually RUNS locally — a tool call that is
+// only parsed and never executed looks broken. get_weather has no offline data
+// source, so it returns an openly-labelled sample instead of pretending.
 const TOOLS = [
-  { name: 'get_weather', description: 'Get the current weather for a city', parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city', 'unit'] } },
-  { name: 'set_timer', description: 'Start a countdown timer', parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds', 'label'] } },
+  {
+    name: 'get_current_time',
+    description: "Get the user's current date and time",
+    parameters: { type: 'object', properties: { timezone: { type: 'string' } }, required: [] },
+    execute: () => new Date().toLocaleString(),
+  },
+  {
+    name: 'calculate',
+    description: 'Evaluate a basic arithmetic expression, e.g. "12 * (3 + 4)"',
+    parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] },
+    execute: ({ expression }) => {
+      // Arithmetic only — never eval() model output.
+      const src = String(expression || '');
+      if (!/^[\d\s+\-*/().%]+$/.test(src)) return 'unsupported expression (digits and + - * / ( ) only)';
+      try { return String(Function(`"use strict";return (${src})`)()); } catch { return 'could not evaluate'; }
+    },
+  },
+  {
+    name: 'set_timer',
+    description: 'Start a countdown timer',
+    parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds'] },
+    execute: ({ seconds, label }) => {
+      const secs = Math.max(1, Math.min(3600, Number(seconds) || 0));
+      setTimeout(() => flashToast(`Timer finished${label ? ': ' + label : ''}`), secs * 1000);
+      return `timer started for ${secs}s${label ? ` (${label})` : ''}`;
+    },
+  },
+  {
+    name: 'get_weather',
+    description: 'Get the current weather for a city',
+    parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city'] },
+    execute: ({ city, unit }) =>
+      `(sample data — this build has no weather source) 18°${unit === 'fahrenheit' ? 'F' : 'C'}, clear in ${city}`,
+  },
 ];
 
 // ---- settings + conversations + custom models (persisted via appStore) ----
@@ -169,18 +204,36 @@ function bubbleHtml(m) {
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
   return `<div class="msg ${m.role}"><div class="av">${av}</div><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
 }
+// Four openers, each with an icon, a title and the prompt it prefills. Clicking
+// one PREFILLS and focuses the composer (it does not fire a request) so the user
+// can edit before sending.
 const SUGGESTIONS = [
-  ['Explain on-device AI', 'Explain on-device AI in one sentence.'],
-  ['Write a haiku', 'Write a haiku about the ocean.'],
-  ['Dinner ideas', 'Give me three quick dinner ideas with chicken.'],
+  { icon: '<path d="M8 2h8M9 2v4M15 2v4"/><rect x="4" y="6" width="16" height="16" rx="2"/><path d="M8 12h8M8 16h5"/>',
+    title: 'Plan', sub: 'from messy notes', prompt: 'Turn these notes into a clear plan with next steps:\n' },
+  { icon: '<path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+    title: 'Rewrite', sub: 'clear and warm', prompt: 'Rewrite this to be clear and warm, keeping my meaning:\n' },
+  { icon: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    title: 'Compare', sub: 'weigh options', prompt: 'Compare these options and tell me which you would pick and why:\n' },
+  { icon: '<path d="M11 12H3M16 6H3M16 18H3"/><path d="m18 9 3 3-3 3"/>',
+    title: 'Summarize', sub: 'into next steps', prompt: 'Summarize this into the decisions and next steps:\n' },
 ];
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return 'Still up?';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 function emptyStateHtml() {
-  const chips = SUGGESTIONS.map(([l, q], i) => `<button class="chip" data-i="${i}">${escapeHtml(l)}</button>`).join('');
+  const cards = SUGGESTIONS.map((s, i) => `<button class="sugg" data-i="${i}">
+      <span class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></span>
+      <span class="st"><span class="s1">${escapeHtml(s.title)}</span><span class="s2">${escapeHtml(s.sub)}</span></span>
+    </button>`).join('');
   return `<div class="empty">
-    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></div>
-    <h3>On-device AI, privately</h3>
-    <p>Ask anything — everything runs locally on your machine, nothing leaves your device.</p>
-    <div class="chips">${chips}</div>
+    <div class="halo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6l1.9 5.6 5.6 1.9-5.6 1.9L12 17.6l-1.9-5.6L4.5 10l5.6-1.9L12 2.6z"/><path d="M19 14.2l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" opacity=".7"/></svg></div>
+    <h3>${escapeHtml(greeting())}</h3>
+    <p>Ask anything — everything runs privately on your device.</p>
+    <div class="suggs">${cards}</div>
   </div>`;
 }
 function renderChat() {
@@ -189,9 +242,11 @@ function renderChat() {
     $('chatlog').innerHTML = '<div class="thread">' + conv.messages.map(bubbleHtml).join('') + '</div>';
   } else {
     $('chatlog').innerHTML = emptyStateHtml();
-    document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
-      $('chatinput').value = SUGGESTIONS[+c.dataset.i][1];
-      sendChat();
+    document.querySelectorAll('.sugg').forEach((c) => c.addEventListener('click', () => {
+      const inp = $('chatinput');
+      inp.value = SUGGESTIONS[+c.dataset.i].prompt;
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
     }));
   }
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
@@ -437,7 +492,28 @@ async function runStructured(text) {
     required: ['name', 'age', 'interests'],
   }));
 }
-async function runTools(text) { return withLlm((h) => ra.generateToolCall(h, text, TOOLS)); }
+async function runTools(text) {
+  // Honour the user's Settings — the native default is only 100 tokens, which can
+  // truncate a longer tool call mid-JSON.
+  const call = await withLlm((h) => ra.generateToolCall(h, text, TOOLS.map(({ execute, ...t }) => t), {
+    temperature: settings.temperature, maxTokens: settings.maxTokens,
+  }));
+  // A tool call that is never executed is just a parse. Run it locally.
+  const tool = TOOLS.find((t) => t.name === call.name);
+  let result;
+  try { result = tool && tool.execute ? await tool.execute(call.arguments || {}) : '(no local handler)'; }
+  catch (e) { result = 'tool failed: ' + (e.message || e); }
+  return { ...call, result };
+}
+
+// Small transient toast (used by set_timer when it fires).
+function flashToast(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:200;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font-size:13.5px;box-shadow:var(--shadow-3);animation:fadeUp .18s var(--ease)';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 async function runEmbeddings(a, b) {
   const h = await embedder();
   const [ea, eb] = await Promise.all([ra.embed(h, a), ra.embed(h, b)]);
@@ -507,6 +583,7 @@ function showTab(name) {
   const btn = document.querySelector(`.nav button[data-tab="${name}"]`);
   if (btn) $('sectiontitle').textContent = btn.textContent.trim();
   closePicker();
+  if (name !== 'voice' && voiceCleanup) voiceCleanup(); // release the mic on tab change
   renderModelChips();
   if (name === 'models') renderModels();
 }
@@ -640,7 +717,11 @@ function wireUi() {
 
   const out = (id, fn) => async () => { setStatus('working…'); $(id).textContent = '…'; try { $(id).textContent = await fn(); } catch (e) { $(id).textContent = 'error: ' + e.message; } setStatus('ready'); };
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
-  $('toolsgo').addEventListener('click', out('toolsout', async () => { const c = await runTools($('toolstext').value); return `${c.name}(${JSON.stringify(c.arguments)})`; }));
+  $('toolsgo').addEventListener('click', out('toolsout', async () => {
+    const c = await runTools($('toolstext').value);
+    return `${c.name}(${JSON.stringify(c.arguments)})
+→ ${c.result}`;
+  }));
   $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
 
   $('ragadd').addEventListener('click', async () => {
@@ -725,30 +806,158 @@ function captureController() {
     stop() { if (!cap) return null; const { stream, ctx, node, chunks } = cap; node.disconnect(); stream.getTracks().forEach((t) => t.stop()); ctx.close(); cap = null; let n = 0; for (const c of chunks) n += c.length; const m = new Float32Array(n); let o = 0; for (const c of chunks) { m.set(c, o); o += c.length; } return { samples: m, rate: ctx.sampleRate }; },
   };
 }
+// Mic float samples -> 16 kHz PCM16 bytes for STT. Uses the SDK's block-averaging
+// downsample, not a nearest-neighbour pick: at 48k->16k, dropping samples folds
+// everything above 8 kHz back into the band Whisper reads.
 function toPcm16At16k(samples, rate) {
-  const ratio = rate / 16000, outLen = Math.floor(samples.length / ratio), pcm = new Int16Array(outLen);
-  for (let i = 0; i < outLen; i++) { const s = Math.max(-1, Math.min(1, samples[Math.floor(i * ratio)])); pcm[i] = Math.max(-32768, Math.min(32767, Math.round(s * 32768))); }
-  return new Uint8Array(pcm.buffer);
+  return ra.pcm16Bytes(rate === 16000 ? samples : ra.downsample(samples, rate, 16000));
 }
+
+// ---- voice: a 4-state machine (idle | listening | thinking | speaking) --------
+// Tap to start, tap to stop (or let it end itself on silence); tap while it is
+// speaking to barge in. All visual state is driven by data-state on the root, so
+// this code only sets state, a --level, and the transcript text.
 function wireVoice() {
-  const btn = $('voicebtn'); const cc = captureController();
-  const begin = async () => { setStatus('listening…'); await cc.start(); };
-  const end = async () => {
-    const rec = cc.stop(); if (!rec) return;
-    setStatus('thinking…');
-    const heard = await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate));
-    $('voiceheard').textContent = heard;
-    let reply = ''; $('voicereply').textContent = '';
-    await withLlm((h) => ra.generate(h, `You are concise. Reply in one sentence.\n\n${heard}`, (t) => { reply += t; $('voicereply').textContent = reply; }));
-    const audio = await ra.synthesize(await tts(), reply.trim());
-    setStatus('speaking…');
-    const pctx = new AudioContext(); const buf = pctx.createBuffer(1, audio.samples.length, audio.sampleRate); buf.getChannelData(0).set(audio.samples);
-    const s = pctx.createBufferSource(); s.buffer = buf; s.connect(pctx.destination);
-    await new Promise((r) => { s.onended = () => { pctx.close(); r(); }; s.start(); });
-    setStatus('ready');
+  const root = $('voiceroot');
+  const orb = $('voiceorb');
+  const statusEl = $('voicestatus');
+  const hintEl = $('voicehint');
+  const errEl = $('voiceerror');
+  const transcript = $('voicetranscript');
+  const cc = captureController();
+
+  // One long-lived output context so a reply can be interrupted (barge-in).
+  let playCtx = null;
+  let playing = null;
+  let state = 'idle';
+  let busy = false;          // a turn is in flight; ignore re-entrant taps
+  let levelRaf = 0;
+  let level = 0;             // smoothed mic RMS, 0..1
+
+  const COPY = {
+    idle: ['Tap to talk', 'Speech, reasoning and speech-synthesis all run on this device.'],
+    listening: ['Listening…', 'Tap again when you are done — or just stop speaking.'],
+    thinking: ['Thinking…', 'Transcribing and composing a reply on-device.'],
+    speaking: ['Speaking…', 'Tap to interrupt.'],
   };
-  btn.addEventListener('mousedown', begin); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  function setVoiceState(s) {
+    state = s;
+    root.dataset.state = s;
+    statusEl.textContent = COPY[s][0];
+    hintEl.textContent = COPY[s][1];
+    orb.setAttribute('aria-label', COPY[s][0]);
+    setStatus(s === 'idle' ? 'ready' : s + '…');
+  }
+  const showError = (msg) => { errEl.hidden = false; errEl.textContent = msg; };
+  const clearError = () => { errEl.hidden = true; errEl.textContent = ''; };
+
+  function stopPlayback() {
+    if (playing) { try { playing.onended = null; playing.stop(); } catch { /* already ended */ } playing = null; }
+  }
+
+  // Level meter: painted from ONE rAF loop. Never write the DOM from the audio
+  // callback — that runs on the audio thread's cadence and thrashes layout.
+  function startLevelLoop() {
+    cancelAnimationFrame(levelRaf);
+    const tick = () => {
+      root.style.setProperty('--level', level.toFixed(3));
+      if (state === 'listening') levelRaf = requestAnimationFrame(tick);
+      else root.style.setProperty('--level', '0');
+    };
+    levelRaf = requestAnimationFrame(tick);
+  }
+
+  async function beginListening() {
+    clearError();
+    transcript.hidden = true;
+    try {
+      await cc.start();
+    } catch (e) {
+      showError('Could not open the microphone: ' + (e.message || e));
+      setVoiceState('idle');
+      return;
+    }
+    setVoiceState('listening');
+    startLevelLoop();
+
+    // Endpointing: learn the room's noise floor for ~400ms, then commit the turn
+    // after a stretch of silence. Self-contained (no calibration state to poison)
+    // and always overridable by tapping.
+    let noiseFloor = 1, heardSpeech = false, silentFor = 0, elapsed = 0;
+    const autoStop = $('voicevad');
+    cc.onFrame((frame, rate) => {
+      const r = ra.rms(frame);
+      level = Math.min(1, Math.max(level * 0.72, r * 9)); // smooth + scale for display
+      const ms = (frame.length / rate) * 1000;
+      elapsed += ms;
+      if (elapsed < 400) { noiseFloor = Math.min(noiseFloor, r); return; }
+      const gate = Math.max(noiseFloor * 3, 0.012);
+      if (r > gate) { heardSpeech = true; silentFor = 0; } else if (heardSpeech) silentFor += ms;
+      const done = (autoStop && autoStop.checked && heardSpeech && silentFor > 800) || elapsed > 30000;
+      if (done && state === 'listening') finishTurn();
+    });
+  }
+
+  async function finishTurn() {
+    if (busy) return;
+    busy = true;
+    const rec = cc.stop();
+    level = 0;
+    if (!rec || !rec.samples.length) { setVoiceState('idle'); busy = false; return; }
+    setVoiceState('thinking');
+    try {
+      const heard = (await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate)) || '').trim();
+      if (!heard) { showError('I did not catch that — try again a little closer to the mic.'); setVoiceState('idle'); return; }
+      transcript.hidden = false;
+      $('voiceheard').textContent = heard;
+      $('voicereply').textContent = '';
+      let reply = '';
+      await withLlm((h) => ra.generate(h, buildPrompt([], heard), {
+        temperature: settings.temperature, maxTokens: settings.maxTokens,
+      }, (t) => { reply += t; $('voicereply').textContent = reply; }));
+      reply = ra.splitThinking(reply).response.trim();
+      $('voicereply').textContent = reply;
+      if (!reply) { setVoiceState('idle'); return; }
+
+      const audio = await ra.synthesize(await tts(), reply);
+      if (!audio || !audio.samples || !audio.samples.length) { setVoiceState('idle'); return; } // createBuffer(0) throws
+      setVoiceState('speaking');
+      playCtx = playCtx || new AudioContext();
+      if (playCtx.state === 'suspended') await playCtx.resume();
+      const buf = playCtx.createBuffer(1, audio.samples.length, audio.sampleRate);
+      buf.getChannelData(0).set(audio.samples);
+      const src = playCtx.createBufferSource();
+      src.buffer = buf; src.connect(playCtx.destination);
+      playing = src;
+      await new Promise((r) => { src.onended = r; src.start(); });
+      playing = null;
+    } catch (e) {
+      showError(e.message || String(e));
+    } finally {
+      busy = false;
+      if (state !== 'listening') setVoiceState('idle');
+    }
+  }
+
+  // One tap does the right thing for the current state.
+  orb.addEventListener('click', () => {
+    if (busy && state === 'thinking') return;         // can't interrupt generation (no cancel API)
+    if (state === 'idle') beginListening();
+    else if (state === 'listening') finishTurn();
+    else if (state === 'speaking') { stopPlayback(); setVoiceState('idle'); } // barge-in
+  });
+  orb.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); orb.click(); } });
+
+  // Leaving the tab must release the mic — otherwise the OS keeps showing the
+  // recording indicator and the capture keeps running in the background.
+  voiceCleanup = () => {
+    if (state === 'listening') { cc.stop(); level = 0; }
+    stopPlayback();
+    if (state !== 'idle') setVoiceState('idle');
+  };
+  setVoiceState('idle');
 }
+let voiceCleanup = null;
 function wireVad() {
   const btn = $('vadbtn'); const cc = captureController(); let vadHandle = null; let frames = 0, speech = 0;
   $('vadth').addEventListener('input', async () => { $('vadthval').textContent = $('vadth').value; if (vadHandle != null) await ra.vadSetThreshold(vadHandle, parseFloat($('vadth').value)); });
@@ -786,8 +995,9 @@ async function selfTest() {
     if (typeof obj.name !== 'string' || typeof obj.age !== 'number' || !Array.isArray(obj.interests)) throw new Error('structured shape wrong');
     log('[selftest] structured OK: ' + JSON.stringify(obj));
 
-    const call = await runTools('What is the weather in Tokyo in celsius?');
+    const call = await runTools('What time is it right now?');
     if (!TOOLS.some((t) => t.name === call.name)) throw new Error('bad tool');
+    if (call.result == null) throw new Error('tool did not execute');
     log('[selftest] tools OK: ' + call.name + ' ' + JSON.stringify(call.arguments));
 
     const close = await runEmbeddings('a cat sat on the mat', 'a kitten rested on the rug');
