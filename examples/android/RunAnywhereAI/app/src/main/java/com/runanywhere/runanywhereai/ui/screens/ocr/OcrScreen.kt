@@ -1,10 +1,14 @@
-package com.runanywhere.runanywhereai.ui.screens.segmentation
+package com.runanywhere.runanywhereai.ui.screens.ocr
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,10 +16,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,11 +37,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,23 +52,24 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import java.util.Locale
 
 /**
- * Semantic image segmentation UI. Model selection uses the shared catalog
- * [ModelSelectionSheet] (same as iOS / STT / Vision). The file picker here is
- * only for the input image, never for model weights.
+ * Document OCR experience for Nemotron OCR / Parse. Model download/load uses
+ * the shared catalog picker; the file picker is only for the document photo.
  */
 @Composable
-fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
+fun OcrScreen(viewModel: OcrViewModel = viewModel()) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
     val modelVm: ModelSelectionViewModel =
-        viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.SEGMENTATION))
+        viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.OCR))
     var showSheet by remember { mutableStateOf(false) }
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val modelLoaded = model != null
     val busy = modelVm.state.busyModelId != null
+    val sheetLocked = busy || viewModel.isExtracting
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -86,46 +93,50 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             .padding(dimens.screenPadding),
         verticalArrangement = Arrangement.spacedBy(dimens.spacingLg),
     ) {
-        Text(
-            text = "Segmentation",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "Download SegFormer B0 from the catalog, then pick an image to segment classes on-device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingXs)) {
+            Text(
+                text = "Document OCR",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Extract text from invoices, receipts, and scans with Nemotron OCR on the NPU.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
-        // Lock the sheet during inference too: swapping the model under an
-        // in-flight segmentation would pull native state out from under it.
         ModelCard(
             model = model,
             busy = busy,
-            sheetLocked = busy || viewModel.isSegmenting,
+            sheetLocked = sheetLocked,
             onClick = { showSheet = true },
         )
-        ImageCard(
+        DocumentCard(
             viewModel = viewModel,
             modelLoaded = modelLoaded,
             busy = busy,
             onPickImage = { imagePicker.launch("image/*") },
         )
 
-        if (viewModel.classSummaries.isNotEmpty()) {
-            ResultCard(viewModel)
+        if (viewModel.extractedText.isNotBlank()) {
+            ResultCard(
+                text = viewModel.extractedText,
+                latencyMs = viewModel.latencyMs,
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("OCR text", viewModel.extractedText))
+                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                },
+            )
         }
 
-        viewModel.error?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
+        viewModel.error?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         if (viewModel.status.isNotEmpty()) {
             Text(
-                text = viewModel.status,
+                viewModel.status,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -158,7 +169,7 @@ private fun ModelCard(
             horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
             Icon(
-                imageVector = RACIcons.Outline.Cpu,
+                imageVector = RACIcons.Outline.FileText,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(dimens.iconMd),
@@ -168,7 +179,7 @@ private fun ModelCard(
                 verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
             ) {
                 Text(
-                    "Model",
+                    "OCR model",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,7 +187,7 @@ private fun ModelCard(
                     when {
                         busy -> "Preparing model…"
                         model != null -> model.name
-                        else -> "Select a model"
+                        else -> "Select an OCR model"
                     },
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -196,112 +207,12 @@ private fun ModelCard(
 }
 
 @Composable
-private fun ImageCard(
-    viewModel: SegmentationViewModel,
+private fun DocumentCard(
+    viewModel: OcrViewModel,
     modelLoaded: Boolean,
     busy: Boolean,
     onPickImage: () -> Unit,
 ) {
-    val dimens = LocalDimens.current
-    Card {
-        Text("Image", style = MaterialTheme.typography.titleMedium)
-
-        val source = viewModel.sourceBitmap
-        if (source != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(dimens.radiusMd)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(
-                    bitmap = source.asImageBitmap(),
-                    contentDescription = "Source image",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                viewModel.maskBitmap?.let { mask ->
-                    Image(
-                        bitmap = mask.asImageBitmap(),
-                        contentDescription = "Segmentation mask",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .alpha(0.55f),
-                    )
-                }
-            }
-        } else {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                shape = RoundedCornerShape(dimens.radiusMd),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "No image selected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
-            OutlinedButton(onClick = onPickImage) {
-                Text(if (viewModel.sourceBitmap == null) "Pick image…" else "Change image…")
-            }
-            Button(
-                onClick = { viewModel.runSegmentation() },
-                enabled = modelLoaded &&
-                    !busy &&
-                    viewModel.sourceBitmap != null &&
-                    !viewModel.isSegmenting,
-            ) {
-                if (viewModel.isSegmenting) {
-                    CircularProgressIndicator(modifier = Modifier.height(18.dp))
-                } else {
-                    Text("Run segmentation")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ResultCard(viewModel: SegmentationViewModel) {
-    Card {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Classes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            if (viewModel.processingTimeMs > 0) {
-                Text(
-                    "${viewModel.processingTimeMs} ms",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        viewModel.classSummaries.forEach { summary ->
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    summary.label.ifEmpty { "class ${summary.class_id}" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    "${summary.pixel_count} px · ${"%.1f".format(summary.fraction * 100)}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val dimens = LocalDimens.current
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -309,11 +220,100 @@ private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnS
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(dimens.spacingLg),
+            modifier = Modifier.padding(dimens.spacingLg),
             verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-            content = content,
-        )
+        ) {
+            Text("Document", style = MaterialTheme.typography.titleMedium)
+
+            val source = viewModel.image
+            if (source != null) {
+                Image(
+                    bitmap = source.asImageBitmap(),
+                    contentDescription = "Document image",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                        .clip(RoundedCornerShape(dimens.radiusMd)),
+                )
+            } else {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shape = RoundedCornerShape(dimens.radiusMd),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "No document selected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd)) {
+                OutlinedButton(onClick = onPickImage, enabled = !viewModel.isExtracting) {
+                    Text(if (viewModel.image == null) "Pick document…" else "Change document…")
+                }
+                Button(
+                    onClick = { viewModel.extract() },
+                    enabled = modelLoaded &&
+                        !busy &&
+                        viewModel.image != null &&
+                        !viewModel.isExtracting,
+                ) {
+                    if (viewModel.isExtracting) {
+                        CircularProgressIndicator(modifier = Modifier.height(18.dp))
+                    } else {
+                        Text("Extract text")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultCard(text: String, latencyMs: Long?, onCopy: () -> Unit) {
+    val dimens = LocalDimens.current
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(dimens.radiusLg),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(dimens.spacingLg),
+            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Extracted text",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                latencyMs?.let {
+                    Text(
+                        String.format(Locale.US, "%.1f s", it / 1000.0),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            SelectionContainer {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                )
+            }
+            OutlinedButton(onClick = onCopy) {
+                Text("Copy")
+            }
+        }
     }
 }

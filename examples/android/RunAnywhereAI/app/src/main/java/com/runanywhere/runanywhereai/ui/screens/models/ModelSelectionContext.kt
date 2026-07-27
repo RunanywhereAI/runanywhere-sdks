@@ -16,6 +16,9 @@ enum class ModelSelectionContext(
     VLM("Choose Image Model"),
     RAG_EMBEDDING("Choose Document Index Model"),
     RAG_LLM("Choose Document Answer Model"),
+    SEGMENTATION("Choose Segmentation Model"),
+    IMAGE_GENERATION("Choose Image Generation Model"),
+    OCR("Choose OCR Model"),
     ;
 
     val loadsModel: Boolean get() = this != RAG_EMBEDDING && this != RAG_LLM
@@ -35,10 +38,12 @@ enum class ModelSelectionContext(
             STT -> listOf(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
             TTS -> listOf(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
             VAD -> listOf(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
-            VLM -> listOf(
+            VLM, OCR -> listOf(
                 ModelCategory.MODEL_CATEGORY_MULTIMODAL,
                 ModelCategory.MODEL_CATEGORY_VISION,
             )
+            SEGMENTATION -> listOf(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION)
+            IMAGE_GENERATION -> listOf(ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION)
             RAG_EMBEDDING, RAG_LLM -> emptyList()
         }
 
@@ -47,7 +52,13 @@ enum class ModelSelectionContext(
         STT -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
         TTS -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
         VAD -> model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
-        VLM -> model.isVisionLanguageModel
+        // Caption / Q&A VLMs only — OCR/Parse document pipelines have their own picker.
+        VLM -> model.isVisionLanguageModel && !model.isDocumentOcrModel()
+        OCR -> model.isDocumentOcrModel()
+        SEGMENTATION ->
+            model.matchesLifecycleCategory(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION)
+        // IMAGE_GENERATION also covers inpainting (LaMa). This picker is text-to-image only.
+        IMAGE_GENERATION -> model.servesTextToImage()
         // Text-passage retrievers only. Exclude cross-modal CLIP towers (SigLIP2's text tower is a
         // short-caption image-alignment encoder, not a document retriever), rerankers, and code
         // embedders — all register as MODEL_CATEGORY_EMBEDDING but silently return poor RAG retrieval.

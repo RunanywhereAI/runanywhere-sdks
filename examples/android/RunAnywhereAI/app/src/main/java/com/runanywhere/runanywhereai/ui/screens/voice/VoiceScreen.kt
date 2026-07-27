@@ -146,11 +146,25 @@ fun VoiceScreen() {
         scope.launch {
             isPreparing = true
             try {
-                // Sequential so per-component progress reads cleanly and memory stays bounded.
+                // Phase 1: fetch every missing model first. Each download unloads
+                // resident models for RAM headroom, so loading a component between
+                // downloads would be undone by the next component's fetch.
+                var staged = true
                 for (component in components) {
                     val model = component.model ?: continue
-                    val ok = component.viewModel.prepare(model)
-                    if (!ok && !component.optional) break
+                    if (!component.viewModel.ensureDownloaded(model) && !component.optional) {
+                        staged = false
+                        break
+                    }
+                }
+                // Phase 2: load sequentially so per-component progress reads
+                // cleanly and memory stays bounded.
+                if (staged) {
+                    for (component in components) {
+                        val model = component.model ?: continue
+                        val ok = component.viewModel.prepare(model)
+                        if (!ok && !component.optional) break
+                    }
                 }
             } finally {
                 isPreparing = false

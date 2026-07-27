@@ -4,14 +4,17 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlin.coroutines.cancellation.CancellationException
 
 /** A lifecycle-confirmed model snapshot captured immediately before inference. */
 data class RuntimeModelSnapshot(
@@ -64,6 +67,35 @@ object RuntimeModelSelection {
     fun clearModelEverywhere(modelId: String) {
         ModelSelectionContext.values().forEach { context ->
             if (store.snapshot(context)?.id == modelId) publish(context, null)
+        }
+    }
+
+    /** Clear lifecycle modality mirrors after a process-wide unload (preserve RAG refs). */
+    fun clearAll() {
+        ModelSelectionContext.values()
+            .filter { it.loadsModel }
+            .forEach { context -> publish(context, null) }
+    }
+
+    /**
+     * Unload every resident model, then clear lifecycle mirrors + GlobalState.
+     * Returns false when unload fails so callers keep their previous selection state.
+     */
+    suspend fun unloadAllForDownload(): Boolean {
+        return try {
+            // unload_all tears down the resident LLM too, so let the
+            // activity-scoped chat cancel and drain any in-flight generation
+            // first — the same barrier every other model-change path takes.
+            LlmModelChangeInterlock.awaitReadyForModelChange()
+            RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
+            clearAll()
+            GlobalState.model.set(null)
+            GlobalState.lora.set(null)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            false
         }
     }
 

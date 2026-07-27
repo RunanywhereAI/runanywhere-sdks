@@ -47,6 +47,9 @@ data object Diarization
 data object Diffusion
 
 @Serializable
+data object Ocr
+
+@Serializable
 data object Documents
 
 @Serializable
