@@ -15,10 +15,10 @@
 package com.runanywhere.sdk.public.extensions.CUA
 
 import ai.runanywhere.proto.v1.CuaActionType
+import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.Test
 import ai.runanywhere.proto.v1.CuaAction as CuaActionProto
 
 class CuaActionMappingTest {
