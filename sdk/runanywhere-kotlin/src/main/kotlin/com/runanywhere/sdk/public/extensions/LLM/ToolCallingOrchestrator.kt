@@ -21,7 +21,7 @@
 package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
-import com.runanywhere.sdk.foundation.bridge.extensions.defaults
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeRunLoopHandleListener
 import com.runanywhere.sdk.native.bridge.NativeToolExecuteListener

@@ -24,6 +24,7 @@ import com.runanywhere.sdk.features.VoiceAgent.Services.VoiceAgentMicDriver
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
@@ -88,7 +89,7 @@ private fun getMissingComponents(): List<String> {
  * [ensureDefaultVAD]. Mirrors Swift `RunAnywhere.defaultVADModelID`.
  */
 val RunAnywhere.defaultVADModelID: String
-    get() = "silero-vad"
+    get() = RADefaults.VoiceAgent.DEFAULT_VAD_MODEL_ID
 
 /**
  * Ensure a VAD model is loaded in the canonical lifecycle before a voice

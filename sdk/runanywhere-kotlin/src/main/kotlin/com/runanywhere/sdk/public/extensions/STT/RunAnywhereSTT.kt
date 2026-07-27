@@ -15,6 +15,7 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -129,7 +130,7 @@ fun RunAnywhere.transcribeStream(
 // Private helper
 private fun estimateAudioLength(dataSize: Int): Double {
     val bytesPerSample = 2 // 16-bit
-    val sampleRate = 16000.0
+    val sampleRate = RADefaults.AudioCapture.MIC_SAMPLE_RATE_HZ.toDouble()
     val samples = dataSize.toDouble() / bytesPerSample.toDouble()
     return samples / sampleRate
 }
