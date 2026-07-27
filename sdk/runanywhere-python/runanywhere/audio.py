@@ -105,11 +105,13 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
     b = bytes(data)
     if len(b) < 12 or b[0:4] != b"RIFF" or b[8:12] != b"WAVE":
         raise SDKException.invalid_input("decode_wav: not a RIFF/WAVE file")
-    # not-a-default: RIFF header scratch values, overwritten from the fmt chunk
-    # a few lines below. Nothing reads them if the file parses.
+    # not-a-default: RIFF scratch values for the chunk walk below, not a
+    # configurable default. `saw_fmt` exists so a file whose `data` chunk
+    # precedes `fmt ` is rejected rather than silently decoded as 16 kHz mono.
     channels = 1
     sample_rate = 16000
     bits = 16
+    saw_fmt = False
     data_offset = -1
     data_len = 0
     p = 12
@@ -118,6 +120,9 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
         size = int.from_bytes(b[p + 4:p + 8], "little")
         body = p + 8
         if chunk_id == b"fmt ":
+            if body + 16 > len(b):
+                raise SDKException.invalid_input("decode_wav: truncated fmt chunk")
+            saw_fmt = True
             channels = int.from_bytes(b[body + 2:body + 4], "little") or 1
             sample_rate = int.from_bytes(b[body + 4:body + 8], "little") or 16000
             bits = int.from_bytes(b[body + 14:body + 16], "little") or 16
@@ -126,6 +131,8 @@ def decode_wav(data: bytes) -> tuple[int, np.ndarray]:
             data_len = size
             break
         p = body + size + (size % 2)  # chunks are word-aligned
+    if not saw_fmt:
+        raise SDKException.invalid_input("decode_wav: no fmt chunk before data")
     if data_offset < 0:
         raise SDKException.invalid_input("decode_wav: no data chunk")
     if bits != 16:
