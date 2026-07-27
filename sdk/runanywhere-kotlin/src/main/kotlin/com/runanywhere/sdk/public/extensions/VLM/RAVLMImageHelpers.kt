@@ -15,10 +15,10 @@ import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMImageFormat
 import android.graphics.Bitmap
-import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import okio.ByteString.Companion.toByteString
+import com.runanywhere.sdk.generated.convenience.defaults as generatedDefaults
 
 // MARK: - VLMConfiguration
 
@@ -46,8 +46,8 @@ fun VLMConfiguration.Companion.defaults(modelId: String = ""): VLMConfiguration 
  * capped max_tokens at 256 against the C layer's 2048 and set top_k=40 where the
  * C layer disables it.
  */
-fun VLMGenerationOptions.Companion.defaults(prompt: String): RAVLMGenerationOptions =
-    defaults().copy(prompt = prompt)
+fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): RAVLMGenerationOptions =
+    generatedDefaults().copy(prompt = prompt)
 
 // MARK: - VLMImage factories (platform-agnostic)
 
