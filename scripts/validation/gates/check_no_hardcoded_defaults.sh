@@ -62,6 +62,7 @@ LIST_ONLY=0
 # plugin forks. Deliberately excluded:
 #   */generated/*, */Generated/*   the pool and proto output — the declarations
 #   *.pb.*, *_pb2*, *.g.dart       proto codegen
+#   */_generated_*.py              Python codegen (no generated/ dir there)
 #   tests, __tests__, *.spec.*     fixtures legitimately pin literals
 #   node_modules, build, dist      not source
 #   DevTools, Playground, examples not shipped SDK surface
@@ -80,6 +81,7 @@ mapfile -t FILES < <(
   | grep -vE '/(generated|Generated)/' \
   | grep -vE '\.(pb|pbenum|pbjson|g)\.dart$' \
   | grep -vE '\.pb\.swift$|\.pb\.go$|_pb2(_grpc)?\.py$' \
+  | grep -vE '/_generated_[A-Za-z0-9_]+\.py$' \
   | grep -vE '/node_modules/|/build/|/dist/|/\.dart_tool/' \
   | grep -vE 'runanywhere-(react-native|web)/packages/[^/]+/lib/' \
   | grep -vE '/(tests?|__tests__|Tests)/|\.spec\.[tj]s$|_test\.(py|dart)$|Test\.kt$' \
@@ -154,7 +156,9 @@ for entry in "${PATTERNS[@]}"; do
     fi
     # Look back a few lines so the reason can be a normal multi-line comment
     # rather than something crammed onto one line.
-    window_start=$(( line - 3 ))
+    # 5 lines: a suppression reason worth reading is usually a short comment
+    # block, and the marker sits on its first line.
+    window_start=$(( line - 5 ))
     (( window_start < 1 )) && window_start=1
     if (( line > 1 )) && sed -n "${window_start},$(( line - 1 ))p" "${file}" 2>/dev/null \
         | grep -qE 'not-a-default:[[:space:]]*[^[:space:]]'; then
@@ -164,7 +168,11 @@ for entry in "${PATTERNS[@]}"; do
     printf "::error file=%s,line=%s::re-declared default (%s): %s\n" \
       "${file}" "${line}" "${label}" "${trimmed}" >&2
     violations=$(( violations + 1 ))
-  done < <(grep -nHE "${regex}" "${FILES[@]}" 2>/dev/null || true)
+  # -i is required: the patterns are written snake_case, and without it
+  # `maxTokens: 256` / `topK = 40` / `topP: 0.9` slip through in every
+  # camelCase language. The first version of this gate missed exactly those
+  # and only caught the drifted files via their adjacent `temperature` lines.
+  done < <(grep -inHE "${regex}" "${FILES[@]}" 2>/dev/null || true)
 done
 
 if (( violations > 0 )); then

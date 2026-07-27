@@ -53,6 +53,7 @@ TARGETS = {
     "kotlin": Path("sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/RADefaultsPool.kt"),
     "dart":   Path("sdk/runanywhere-flutter/packages/runanywhere/lib/generated/ra_defaults_pool.dart"),
     "ts":     Path("sdk/shared/proto-ts/src/defaults/pool.ts"),
+    "python": Path("sdk/runanywhere-python/runanywhere/_generated_defaults.py"),
     # The Flutter and RN Android plugins get their own copy because neither
     # depends on the Kotlin SDK; they must match it byte-for-byte in value.
     "kotlin/flutter-android": Path(
@@ -102,6 +103,8 @@ def norm_val(v: str) -> str:
     eats the trailing "l".
     """
     v = v.strip().rstrip(",;")
+    if v in ("True", "False"):        # Python bool spelling
+        return v.lower()
     if v[:1] in ('"', "'"):
         return v.strip('"').strip("'")
     core = v.rstrip("fFlL")
@@ -142,12 +145,17 @@ def parse_proto(text):
     return out
 
 
-def parse_c(text):
+def parse_c(text, group_prefixes):
+    """The C macro name is RAC_DEFAULT_<GROUP>_<FIELD> with both parts already
+    SCREAMING_SNAKE, so the split point is only recoverable from the known group
+    list. That list is derived from the proto rather than hardcoded: a hardcoded
+    one silently reports every field of a newly added message as absent."""
     out = {}
+    # longest first, so AUDIO_CAPTURE wins over a hypothetical AUDIO
+    ordered = sorted(group_prefixes, key=len, reverse=True)
     for m in re.finditer(r"#define\s+RAC_DEFAULT_([A-Z0-9_]+)\s+(\S+)", text):
         name, val = m.group(1), m.group(2)
-        for grp in ("NETWORK", "AUDIO_CAPTURE", "VOICE_AGENT", "HYBRID",
-                    "WORKER", "FFI", "ENVIRONMENT", "STORAGE"):
+        for grp in ordered:
             if name.startswith(grp + "_"):
                 field = name[len(grp) + 1:].lower()
                 out[f"{grp.lower()}.{field}"] = norm_val(val)
@@ -166,6 +174,21 @@ def parse_nested(text, group_re, field_re):
             continue
         if group:
             fm = re.search(field_re, line)
+            if fm:
+                out[norm_key(group, fm.group(1))] = norm_val(fm.group(2))
+    return out
+
+
+def parse_python(text):
+    out = {}
+    group = None
+    for line in text.splitlines():
+        gm = re.search(r"^class (\w+)Defaults:", line)
+        if gm:
+            group = gm.group(1)
+            continue
+        if group:
+            fm = re.search(r"^\s+(\w+):\s*Final\[\w+\]\s*=\s*(.+)$", line)
             if fm:
                 out[norm_key(group, fm.group(1))] = norm_val(fm.group(2))
     return out
@@ -211,13 +234,22 @@ SWIFT_FIELD = r"public static let (\w+):\s*\w+\s*=\s*(.+)$"
 KT_GROUP = r"public object (\w+) \{"
 KT_FIELD = r"public const val (\w+):\s*\w+\s*=\s*(.+)$"
 
+# Group prefixes exactly as generate_cpp_defaults.py forms them: the message
+# name in SCREAMING_SNAKE with a trailing _DEFAULTS stripped.
+C_GROUP_PREFIXES = set()
+for _m in re.finditer(r"^\s*message\s+(\w+)\s*\{", TARGETS["proto"].read_text(), re.M):
+    _g = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", _m.group(1))
+    _g = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", _g).upper()
+    C_GROUP_PREFIXES.add(re.sub(r"_?DEFAULTS$", "", _g))
+
 parsed = {
     "proto":  parse_proto(TARGETS["proto"].read_text()),
-    "c":      parse_c(TARGETS["c"].read_text()),
+    "c":      parse_c(TARGETS["c"].read_text(), C_GROUP_PREFIXES),
     "swift":  parse_nested(TARGETS["swift"].read_text(), SWIFT_GROUP, SWIFT_FIELD),
     "kotlin": parse_nested(TARGETS["kotlin"].read_text(), KT_GROUP, KT_FIELD),
     "dart":   parse_dart(TARGETS["dart"].read_text()),
     "ts":     parse_ts(TARGETS["ts"].read_text()),
+    "python": parse_python(TARGETS["python"].read_text()),
     "kotlin/flutter-android": parse_nested(
         TARGETS["kotlin/flutter-android"].read_text(), KT_GROUP, KT_FIELD),
     "kotlin/rn-android": parse_nested(
