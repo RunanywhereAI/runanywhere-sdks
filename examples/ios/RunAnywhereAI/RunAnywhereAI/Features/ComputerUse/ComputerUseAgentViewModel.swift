@@ -53,9 +53,6 @@ final class ComputerUseAgentViewModel {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "CUA")
 
-    /// Fara's native coordinate space. The SDK rescales the model's output from
-    /// this space into whatever viewport we pass to `parseAction`.
-    private static let modelSpace = (width: 1000, height: 1000)
     private static let maxTokens: Int32 = 256
 
     // MARK: - Model lifecycle
@@ -117,10 +114,10 @@ final class ComputerUseAgentViewModel {
 
         // 1. The agent prompt for this profile — identity + the computer_use tool
         //    schema — comes from commons, not from this app.
-        guard let systemPrompt = RunAnywhere.CUA.systemPrompt(
-            profile: profile,
-            display: Self.modelSpace
-        ) else {
+        // No `display:` — the SDK already defaults to the profile's own native
+        // coordinate space. Naming it here would duplicate a model-specific
+        // constant in the app and go stale if a profile ever changes upstream.
+        guard let systemPrompt = RunAnywhere.CUA.systemPrompt(profile: profile) else {
             error = "Unknown CUA profile: \(profile)"
             return
         }
