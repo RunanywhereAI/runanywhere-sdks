@@ -64,7 +64,7 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const DEFAULT_LLM = 'qwen2.5-0.5b';
+const DEFAULT_LLM = 'qwen3.5-0.8b';
 // The chat's active LLM. Loading another LLM from the Models tab replaces it (the
 // backend keeps one loaded at a time), so we track it in loadedById/loadedType too
 // to keep the Models badges coherent — exactly one LLM ever shows "loaded".
@@ -79,7 +79,7 @@ const tts = () => acquire('tts');
 // tabs of different modalities never fight. `settings.models` is the user's choice
 // per modality (persisted); `acquire()` is the single place that turns a choice
 // into a loaded handle — download-if-needed, then load, memoized per modality.
-const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'smolvlm-256m', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac' };
+const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'qwen3.5-0.8b-vl', embedder: 'minilm', stt: 'whisper-tiny', tts: 'piper-lessac' };
 const MODALITY_LABEL = { llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text', tts: 'Text-to-speech' };
 const selectedModel = (m) => (settings.models && settings.models[m]) || DEFAULT_MODELS[m];
 
@@ -592,7 +592,7 @@ function showTab(name) {
 // Which modalities each tab lets you choose. Slots are per-modality, so a tab only
 // ever shows the models it actually uses.
 const TAB_MODALITIES = {
-  chat: ['llm'], vision: ['vlm'], embeddings: ['embedder'], voice: ['stt', 'tts'],
+  chat: ['llm'], vision: ['vlm'], embeddings: ['embedder'], voice: ['stt', 'llm', 'tts'],  // the spoken reply uses the LLM too
   rag: ['embedder', 'llm'], structured: ['llm'], tools: ['llm'],
 };
 const CHIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m8 12 3 3 5-6"/></svg>';
