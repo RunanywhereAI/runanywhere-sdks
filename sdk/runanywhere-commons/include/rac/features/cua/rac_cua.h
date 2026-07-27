@@ -85,7 +85,12 @@ typedef struct {
  * (`display_w` x `display_h`; pass the profile's native space, e.g. 1000x1000
  * for Fara). Writes a NUL-terminated string into `out` (truncated to
  * `out_size`). Returns the full length excluding NUL (>= out_size means it was
- * truncated), or -1 if `profile_id` is unknown.
+ * truncated), or -1 if `profile_id` is unknown or the declared space is
+ * unusable. Pass (0, 0) for the profile's native space; any other value must
+ * be non-zero and <= 65536 on BOTH axes. That bound is what rejects a signed
+ * value a caller handed to these unsigned parameters (a JNI `jint` of -1
+ * arrives as 4294967295), which would otherwise render a nonsense resolution
+ * into the prompt.
  */
 int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t display_h,
                           char* out, size_t out_size);
@@ -94,7 +99,11 @@ int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t d
  * Parse a CUA model's raw output into `out_action`, rescaling coordinates from
  * the profile's model space to `viewport_w` x `viewport_h`. Returns 0 on a
  * recognized profile (inspect `out_action->parse_ok` for whether a valid
- * tool_call was found), or -1 if `profile_id` is unknown / args are NULL.
+ * tool_call was found), or -1 if `profile_id` is unknown, args are NULL, or a
+ * viewport dimension is 0 or > 65536. A viewport has no "use the default"
+ * form — every returned coordinate is scaled into it, so an unusable one can
+ * only produce confidently wrong pixels. Coordinates saturate at int32 range,
+ * so a garbled coordinate in the model's own output cannot overflow.
  */
 int rac_cua_parse_action(const char* profile_id, const char* model_output,
                          uint32_t viewport_w, uint32_t viewport_h,
@@ -109,7 +118,8 @@ int rac_cua_parse_action(const char* profile_id, const char* model_output,
  * `CuaAction` type instead of hand-mirroring `rac_cua_action_t`. Returns
  * RAC_SUCCESS on a recognized profile (inspect the decoded `parse_ok` for
  * whether a valid tool_call was found), RAC_ERROR_INVALID_ARGUMENT for an
- * unknown profile, or an error buffer if protobuf is unavailable.
+ * unknown profile or an unusable viewport (see `rac_cua_parse_action`), or an
+ * error buffer if protobuf is unavailable.
  */
 rac_result_t rac_cua_parse_action_proto(const char* profile_id, const char* model_output,
                                         uint32_t viewport_w, uint32_t viewport_h,

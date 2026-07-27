@@ -43,6 +43,52 @@ TestResult run_unknown_profile_rejected() {
     return TEST_PASS();
 }
 
+// A signed dimension handed to these unsigned parameters (a JNI `jint` of -1
+// arrives as 4294967295) must be rejected, not turned into a scale factor.
+TestResult run_unusable_viewport_rejected() {
+    const char* out =
+        "<tool_call>{\"name\": \"computer_use\", \"arguments\": "
+        "{\"action\": \"left_click\", \"coordinate\": [500, 382]}}</tool_call>";
+    rac_cua_action_t a;
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 0, 900, &a), -1, "zero width");
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 0, &a), -1, "zero height");
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 4294967295u, 900, &a), -1,
+              "a -1 jint cast to uint32 must not scale");
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 4294967295u, &a), -1,
+              "same on the height axis");
+    // The valid case still works, so the bound is not simply rejecting everything.
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1440, 900, &a), 0,
+              "1440x900 is fine");
+    return TEST_PASS();
+}
+
+// (0, 0) keeps meaning "the profile's native space"; a half-specified or
+// out-of-range space is a caller bug rather than a request for the default.
+TestResult run_unusable_display_space_rejected() {
+    char buf[8192];
+    ASSERT_TRUE(rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 0, 0, buf, sizeof(buf)) > 0,
+                "(0,0) still means the native space");
+    ASSERT_EQ(rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 1000, 0, buf, sizeof(buf)), -1,
+              "half-specified space rejected");
+    ASSERT_EQ(rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 4294967295u, 1000, buf, sizeof(buf)), -1,
+              "a -1 jint cast to uint32 must not reach the prompt");
+    return TEST_PASS();
+}
+
+// The viewport bound constrains our side; the coordinate comes from the model,
+// so a garbled one must saturate rather than overflow the int32 cast.
+TestResult run_absurd_model_coordinate_saturates() {
+    const char* out =
+        "<tool_call>{\"name\": \"computer_use\", \"arguments\": "
+        "{\"action\": \"left_click\", \"coordinate\": [99999999999, -99999999999]}}</tool_call>";
+    rac_cua_action_t a;
+    ASSERT_EQ(rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 65536, 65536, &a), 0, "still parses");
+    ASSERT_EQ(static_cast<int>(a.has_coordinate), 1, "coordinate present");
+    ASSERT_EQ(a.x, 2147483647, "x saturates at INT32_MAX");
+    ASSERT_EQ(a.y, -2147483648LL, "y saturates at INT32_MIN");
+    return TEST_PASS();
+}
+
 TestResult run_golden_left_click() {
     const char* out =
         "I will click on the search box.\n"
@@ -314,6 +360,9 @@ int main(int argc, char** argv) {
     TestSuite suite("cua");
     suite.add("fara_prompt_has_schema", run_fara_prompt_has_schema);
     suite.add("unknown_profile_rejected", run_unknown_profile_rejected);
+    suite.add("unusable_viewport_rejected", run_unusable_viewport_rejected);
+    suite.add("unusable_display_space_rejected", run_unusable_display_space_rejected);
+    suite.add("absurd_model_coordinate_saturates", run_absurd_model_coordinate_saturates);
     suite.add("golden_left_click", run_golden_left_click);
     suite.add("type_action_text", run_type_action_text);
     suite.add("terminate_answer", run_terminate_answer);

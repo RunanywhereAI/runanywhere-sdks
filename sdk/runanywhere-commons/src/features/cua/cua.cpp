@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <string>
 
 #include "rac/features/cua/rac_cua.h"
@@ -400,12 +401,49 @@ void copy_bounded(char* dst, size_t cap, const std::string& src) {
     dst[n] = '\0';
 }
 
+// Upper bound on a caller-declared coordinate space. Far past any real display,
+// yet small enough that scaling a model coordinate stays well inside int32_t.
+// This is also what catches a signed value a platform SDK handed to a uint32_t
+// parameter: a JNI `jint` of -1 arrives as 4294967295 and is rejected here,
+// rather than becoming a scale factor that mis-places every click.
+constexpr uint32_t kMaxDimension = 1u << 16;
+
+bool dimension_in_range(uint32_t value) {
+    return value != 0 && value <= kMaxDimension;
+}
+
+// Scale one model-space coordinate into the viewport, saturating at int32_t.
+// The bound above constrains the viewport, but `value` comes from the model's
+// own output — a garbled `"coordinate": [999999999, 1]` must not overflow the
+// cast even when the viewport is sane.
+int32_t scale_coordinate(long value, uint32_t viewport, uint32_t model_space) {
+    const double scaled = static_cast<double>(value) *
+                          (static_cast<double>(viewport) / static_cast<double>(model_space));
+    constexpr double kMin = static_cast<double>(std::numeric_limits<int32_t>::min());
+    constexpr double kMax = static_cast<double>(std::numeric_limits<int32_t>::max());
+    // Written as `!(scaled >= kMin)` so a NaN also lands here.
+    if (!(scaled >= kMin)) {
+        return std::numeric_limits<int32_t>::min();
+    }
+    if (scaled > kMax) {
+        return std::numeric_limits<int32_t>::max();
+    }
+    return static_cast<int32_t>(std::lround(scaled));
+}
+
 }  // namespace
 
 extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t display_h,
                                      char* out, size_t out_size) {
     const CuaProfile* p = find_profile(profile_id);
     if (p == nullptr) {
+        return -1;
+    }
+    // (0, 0) means "use the profile's native space". Anything else must be a
+    // usable resolution on both axes — a half-specified space (1000 x 0) is a
+    // caller bug, not a request for the default.
+    if ((display_w != 0 || display_h != 0) &&
+        (!dimension_in_range(display_w) || !dimension_in_range(display_h))) {
         return -1;
     }
     std::string prompt = p->system_prompt;
@@ -433,6 +471,12 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
                                     rac_cua_action_t* out) {
     const CuaProfile* p = find_profile(profile_id);
     if (p == nullptr || model_output == nullptr || out == nullptr) {
+        return -1;
+    }
+    // Unlike the prompt's display space, a viewport has no "use the default"
+    // form — every coordinate this returns is scaled into it, so a zero or
+    // out-of-range viewport can only yield confidently wrong pixels.
+    if (!dimension_in_range(viewport_w) || !dimension_in_range(viewport_h)) {
         return -1;
     }
     std::memset(out, 0, sizeof(*out));
@@ -471,10 +515,8 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
     long my = 0;
     if (json_int_pair(body, "coordinate", &mx, &my)) {
         out->has_coordinate = 1;
-        double sx = static_cast<double>(viewport_w) / static_cast<double>(p->model_space_w);
-        double sy = static_cast<double>(viewport_h) / static_cast<double>(p->model_space_h);
-        out->x = static_cast<int32_t>(std::lround(static_cast<double>(mx) * sx));
-        out->y = static_cast<int32_t>(std::lround(static_cast<double>(my) * sy));
+        out->x = scale_coordinate(mx, viewport_w, p->model_space_w);
+        out->y = scale_coordinate(my, viewport_h, p->model_space_h);
     }
 
     double num = 0.0;
