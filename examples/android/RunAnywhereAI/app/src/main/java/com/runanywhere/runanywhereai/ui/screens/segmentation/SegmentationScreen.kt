@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.ui.screens.segmentation
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,17 +13,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -33,20 +39,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
+import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
+import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
- * Semantic image segmentation (SegFormer) UI. Pure SwiftUI-style Compose:
- * user-supplied model import, image picker, and mask rendering. No inference or
- * model logic lives here — everything routes through [SegmentationViewModel]
- * into the SDK facade.
+ * Semantic image segmentation UI. Model selection uses the shared catalog
+ * [ModelSelectionSheet] (same as iOS / STT / Vision). The file picker here is
+ * only for the input image, never for model weights.
  */
 @Composable
 fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
     val dimens = LocalDimens.current
     val context = LocalContext.current
+    val modelVm: ModelSelectionViewModel =
+        viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.SEGMENTATION))
+    var showSheet by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { viewModel.refreshModelStatus() }
+    val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
+    val modelLoaded = model != null
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
@@ -63,12 +78,6 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
         }
     }
 
-    val modelPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments(),
-    ) { uris ->
-        if (uris.isNotEmpty()) viewModel.importAndLoadModel(uris)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -81,12 +90,21 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.SemiBold,
         )
+        Text(
+            text = "Download SegFormer B0 from the catalog, then pick an image to segment classes on-device.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-        modelCard(viewModel) { modelPicker.launch(arrayOf("*/*")) }
-        imageCard(viewModel) { imagePicker.launch("image/*") }
+        ModelCard(model = model, onClick = { showSheet = true })
+        ImageCard(
+            viewModel = viewModel,
+            modelLoaded = modelLoaded,
+            onPickImage = { imagePicker.launch("image/*") },
+        )
 
         if (viewModel.classSummaries.isNotEmpty()) {
-            resultCard(viewModel)
+            ResultCard(viewModel)
         }
 
         viewModel.error?.let { message ->
@@ -104,45 +122,63 @@ fun SegmentationScreen(viewModel: SegmentationViewModel = viewModel()) {
             )
         }
     }
+
+    if (showSheet) {
+        ModelSelectionSheet(viewModel = modelVm, onDismiss = { showSheet = false })
+    }
 }
 
 @Composable
-private fun modelCard(viewModel: SegmentationViewModel, onPickModel: () -> Unit) {
-    Card {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Model", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Text(
-                if (viewModel.isModelLoaded) "loaded" else "not loaded",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (viewModel.isModelLoaded) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-        }
-        Text(
-            "Segmentation weights are user-supplied and uncataloged. Pick the model files " +
-                "(model.onnx, config.json, preprocessor_config.json); " +
-                "the SDK imports and loads them under the semantic-segmentation category.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Button(
-            onClick = onPickModel,
-            enabled = !viewModel.isImportingModel,
+private fun ModelCard(model: RAModelInfo?, onClick: () -> Unit) {
+    val dimens = LocalDimens.current
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(dimens.radiusLg),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(dimens.spacingLg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
         ) {
-            if (viewModel.isImportingModel) {
-                CircularProgressIndicator(modifier = Modifier.height(18.dp))
-            } else {
-                Text(if (viewModel.isModelLoaded) "Change model files…" else "Choose model files…")
+            Icon(
+                imageVector = RACIcons.Outline.Cpu,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(dimens.iconMd),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(dimens.spacingXs),
+            ) {
+                Text(
+                    "Model",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    model?.name ?: "Select a model",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                model?.let { BackendBadge(framework = it.framework, compact = true) }
             }
+            Icon(
+                imageVector = RACIcons.Outline.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun imageCard(viewModel: SegmentationViewModel, onPickImage: () -> Unit) {
+private fun ImageCard(
+    viewModel: SegmentationViewModel,
+    modelLoaded: Boolean,
+    onPickImage: () -> Unit,
+) {
     val dimens = LocalDimens.current
     Card {
         Text("Image", style = MaterialTheme.typography.titleMedium)
@@ -196,7 +232,7 @@ private fun imageCard(viewModel: SegmentationViewModel, onPickImage: () -> Unit)
             }
             Button(
                 onClick = { viewModel.runSegmentation() },
-                enabled = viewModel.isModelLoaded &&
+                enabled = modelLoaded &&
                     viewModel.sourceBitmap != null &&
                     !viewModel.isSegmenting,
             ) {
@@ -211,7 +247,7 @@ private fun imageCard(viewModel: SegmentationViewModel, onPickImage: () -> Unit)
 }
 
 @Composable
-private fun resultCard(viewModel: SegmentationViewModel) {
+private fun ResultCard(viewModel: SegmentationViewModel) {
     Card {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Classes", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))

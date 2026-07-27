@@ -1,10 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.segmentation
 
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelImportRequest
-import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.SegmentationClassSummary
 import ai.runanywhere.proto.v1.SegmentationImage
 import ai.runanywhere.proto.v1.SegmentationOptions
@@ -12,40 +7,28 @@ import ai.runanywhere.proto.v1.SegmentationPixelFormat
 import ai.runanywhere.proto.v1.SegmentationRequest
 import android.app.Application
 import android.graphics.Bitmap
-import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.importModel
-import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.segment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
-import java.io.File
 import java.nio.ByteBuffer
 
 /**
- * Drives semantic image segmentation (SegFormer) through the canonical
- * `RunAnywhere.segment` facade. Pure platform plumbing: pixel packing, SDK
- * model lifecycle, and the segment call. All inference and model routing live
- * in the SDK / C++ commons.
+ * Drives semantic image segmentation through `RunAnywhere.segment`. Model
+ * download/load is owned by [ModelSelectionSheet] + [RuntimeModelSelection]
+ * (same pattern as STT / Vision / iOS SegmentationView).
  */
 class SegmentationViewModel(application: Application) : AndroidViewModel(application) {
-
-    var isModelLoaded by mutableStateOf(false)
-        private set
-    var loadedModelId by mutableStateOf<String?>(null)
-        private set
-    var isImportingModel by mutableStateOf(false)
-        private set
 
     var sourceBitmap by mutableStateOf<Bitmap?>(null)
         private set
@@ -68,73 +51,6 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
 
     private data class PackedImage(val rgba: ByteArray, val width: Int, val height: Int)
 
-    fun refreshModelStatus() {
-        viewModelScope.launch {
-            isModelLoaded = runCatching {
-                RunAnywhere.currentModel(
-                    CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION),
-                ).found
-            }.getOrDefault(false)
-        }
-    }
-
-    /**
-     * Stage the user-picked SegFormer bundle files into app storage, then import
-     * and load them under the semantic-segmentation category.
-     */
-    fun importAndLoadModel(uris: List<Uri>) {
-        if (uris.isEmpty()) return
-        viewModelScope.launch {
-            isImportingModel = true
-            error = null
-            status = "Importing model…"
-            try {
-                val stagedDir = withContext(Dispatchers.IO) { stageFiles(uris) }
-                val importResult = RunAnywhere.importModel(
-                    ModelImportRequest(
-                        source_path = stagedDir.absolutePath,
-                        copy_into_managed_storage = true,
-                        validate_before_register = false,
-                    ),
-                )
-                if (!importResult.success) {
-                    error = importResult.error_message.ifEmpty { "Model import failed." }
-                    status = ""
-                    return@launch
-                }
-                val modelId = importResult.model?.id
-                if (modelId.isNullOrEmpty()) {
-                    error = "Imported model has no identifier; cannot load."
-                    status = ""
-                    return@launch
-                }
-
-                status = "Loading model…"
-                val loadResult = RunAnywhere.loadModel(
-                    ModelLoadRequest(
-                        model_id = modelId,
-                        category = ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
-                        framework = InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-                    ),
-                )
-                if (!loadResult.success) {
-                    error = loadResult.error_message.ifEmpty { "Model load failed." }
-                    status = ""
-                    return@launch
-                }
-                loadedModelId = modelId
-                isModelLoaded = true
-                status = "Model loaded: $modelId."
-            } catch (e: Exception) {
-                RACLog.e("$TAG: Model import/load failed", e)
-                error = "Model import/load failed: ${e.message}"
-                status = ""
-            } finally {
-                isImportingModel = false
-            }
-        }
-    }
-
     fun onImagePicked(bitmap: Bitmap?) {
         if (bitmap == null) return
         val scaled = downscale(bitmap, MAX_DIMENSION)
@@ -147,9 +63,11 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun runSegmentation() {
-        if (!isModelLoaded) { error = "Load a segmentation model first."; return }
         val pixels = sourcePixels
-        if (pixels == null) { error = "Pick an image first."; return }
+        if (pixels == null) {
+            error = "Pick an image first."
+            return
+        }
 
         viewModelScope.launch {
             isSegmenting = true
@@ -158,6 +76,7 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
             classSummaries = emptyList()
             status = "Running segmentation…"
             try {
+                RuntimeModelSelection.requireCurrent(ModelSelectionContext.SEGMENTATION)
                 val request = SegmentationRequest(
                     image = SegmentationImage(
                         data_ = pixels.rgba.toByteString(),
@@ -186,30 +105,6 @@ class SegmentationViewModel(application: Application) : AndroidViewModel(applica
 
     fun reportError(message: String) {
         error = message
-    }
-
-    // --- Pixel + file helpers -------------------------------------------------
-
-    private fun stageFiles(uris: List<Uri>): File {
-        val resolver = getApplication<Application>().contentResolver
-        val dir = File(getApplication<Application>().filesDir, "segmentation-import").apply {
-            deleteRecursively()
-            mkdirs()
-        }
-        uris.forEachIndexed { index, uri ->
-            val name = displayName(uri) ?: "model-file-$index"
-            resolver.openInputStream(uri)?.use { input ->
-                File(dir, name).outputStream().use { output -> input.copyTo(output) }
-            }
-        }
-        return dir
-    }
-
-    private fun displayName(uri: Uri): String? {
-        val resolver = getApplication<Application>().contentResolver
-        return resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
     }
 
     private fun downscale(bitmap: Bitmap, maxDimension: Int): Bitmap {

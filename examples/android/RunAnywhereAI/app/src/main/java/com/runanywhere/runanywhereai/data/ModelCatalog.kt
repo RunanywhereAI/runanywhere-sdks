@@ -120,7 +120,9 @@ internal object ModelCatalog {
         SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 44_135_896L),
         SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 184_334_815L),
         SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 103_930_338L),
-        SingleFileModel("magpie_tts_357m", "Magpie-TTS Multilingual 357M (HNPU)", "https://huggingface.co/runanywhere/magpie_tts_357m_HNPU/magpie-357m-v81.json", QHEXRT, TTS, 749_093_186L),
+        // Repo-root URL: C++ pin_hf_ref_to_arch inserts v75/v81. Do not hardcode
+        // magpie-357m-v81.json — that filename is missing under the v75/ tree.
+        SingleFileModel("magpie_tts_357m", "Magpie-TTS Multilingual 357M (HNPU)", "https://huggingface.co/runanywhere/magpie_tts_357m_HNPU", QHEXRT, TTS, 749_093_186L),
     )
 
     // The Play build intentionally ships no refusal-removal or safety-bypass adapters.
@@ -641,6 +643,37 @@ internal object ModelCatalog {
             // doubles as download_size_bytes, which feeds the post-download size guard —
             // an over-stated 5 MB tripped the guard on a valid ~2.3 MB download.
             2_327_524
+        ),
+        // Semantic segmentation (SegFormer B0 ADE20K) — mirrors iOS ModelCatalogBootstrap.
+        // Provider expects model.onnx + config.json + preprocessor_config.json at the
+        // model root (engines/onnx/onnx_segmentation_provider.cpp).
+        MultiFileModel(
+            "segformer-b0-ade20k",
+            "SegFormer B0 ADE20K (ONNX)",
+            ONNX,
+            ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
+            memoryBytes = 15_342_776,
+            downloadBytes = 15_342_776,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/onnx/model.onnx",
+                    "model.onnx",
+                    15_335_446,
+                ),
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/config.json",
+                    "config.json",
+                    6_957,
+                ),
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/preprocessor_config.json",
+                    "preprocessor_config.json",
+                    373,
+                ),
+            ),
         ),
         MultiFileModel(
             "all-minilm-l6-v2",

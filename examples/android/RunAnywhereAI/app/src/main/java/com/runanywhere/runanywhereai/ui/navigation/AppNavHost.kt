@@ -19,6 +19,7 @@ import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkScreen
 import com.runanywhere.runanywhereai.ui.screens.cloud.CloudProvidersScreen
 import com.runanywhere.runanywhereai.ui.screens.diarization.DiarizationScreen
 import com.runanywhere.runanywhereai.ui.screens.more.MoreScreen
+import com.runanywhere.runanywhereai.ui.screens.ocr.OcrScreen
 import com.runanywhere.runanywhereai.ui.screens.rag.RagScreen
 import com.runanywhere.runanywhereai.ui.screens.segmentation.SegmentationScreen
 import com.runanywhere.runanywhereai.ui.screens.settings.SettingsScreen
@@ -88,6 +89,7 @@ fun AppNavHost(
             VisionScreen(openLiveCamera = entry.toRoute<Vision>().openLiveCamera)
         }
         composable<Segmentation> { SegmentationScreen() }
+        composable<Ocr> { OcrScreen() }
         composable<Diarization> { DiarizationScreen() }
         composable<Documents> { RagScreen() }
         composable<Solutions> { SolutionsScreen() }

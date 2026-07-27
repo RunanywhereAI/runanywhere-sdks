@@ -401,6 +401,8 @@ endif()
 # therefore only an older-header compatibility check, not a runtime capability
 # check. sherpa_backend.cpp still handles a null pointer as "no quality signal".
 set(SHERPA_HEADER_HAS_YS_LOG_PROBS 0)
+set(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION 0)
+set(SHERPA_HEADER_HAS_GENERATION_CONFIG 0)
 if(SHERPA_ONNX_AVAILABLE AND DEFINED SHERPA_HEADER_PATH)
     include(CheckStructHasMember)
     set(CMAKE_REQUIRED_INCLUDES "${SHERPA_HEADER_PATH}")
@@ -415,9 +417,27 @@ if(SHERPA_ONNX_AVAILABLE AND DEFINED SHERPA_HEADER_PATH)
     if(SHERPA_RESULT_HAS_YS_LOG_PROBS)
         set(SHERPA_HEADER_HAS_YS_LOG_PROBS 1)
     endif()
+    # Pinned Android 1.13.2 headers omit newer stream/TTS helpers that macOS/WASM
+    # local trees may already expose. Header-text probes avoid linking vendor libs
+    # during configure.
+    set(_SHERPA_C_API_H "${SHERPA_HEADER_PATH}/sherpa-onnx/c-api/c-api.h")
+    if(EXISTS "${_SHERPA_C_API_H}")
+        file(READ "${_SHERPA_C_API_H}" _SHERPA_C_API_TEXT)
+        if(_SHERPA_C_API_TEXT MATCHES "SherpaOnnxOnlineStreamSetOption")
+            set(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION 1)
+        endif()
+        if(_SHERPA_C_API_TEXT MATCHES "SherpaOnnxGenerationConfig" AND
+           _SHERPA_C_API_TEXT MATCHES "SherpaOnnxOfflineTtsGenerateWithConfig")
+            set(SHERPA_HEADER_HAS_GENERATION_CONFIG 1)
+        endif()
+        unset(_SHERPA_C_API_TEXT)
+    endif()
+    unset(_SHERPA_C_API_H)
 endif()
 list(APPEND SHERPA_COMPILE_DEFS
-    SHERPA_HEADER_HAS_YS_LOG_PROBS=${SHERPA_HEADER_HAS_YS_LOG_PROBS})
+    SHERPA_HEADER_HAS_YS_LOG_PROBS=${SHERPA_HEADER_HAS_YS_LOG_PROBS}
+    SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION=${SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION}
+    SHERPA_HEADER_HAS_GENERATION_CONFIG=${SHERPA_HEADER_HAS_GENERATION_CONFIG})
 
 rac_add_engine_plugin(sherpa
     TARGET_NAME         rac_backend_sherpa

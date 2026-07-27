@@ -17,9 +17,13 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import ai.runanywhere.proto.v1.ModelUnloadRequest
+import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.downloadModelStream
+import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +101,10 @@ class ModelDownloadService : Service() {
     private suspend fun runDownload(model: RAModelInfo) {
         _state.value = Download(model.id, progressPercent = 0, status = Status.RUNNING)
         try {
+            // Resident STT/LLM weights hold multi-GB of MemAvailable and trip the
+            // download RAM preflight on mid-range phones. Free them first; the
+            // user can re-select after the transfer finishes.
+            freeResidentModelsForDownload()
             RunAnywhere.downloadModelStream(model).collect { p ->
                 val pct = if (p.total_bytes > 0) {
                     (p.bytes_downloaded * 100 / p.total_bytes).toInt()
@@ -118,6 +126,15 @@ class ModelDownloadService : Service() {
         } finally {
             stopSelfSafely()
         }
+    }
+
+    private suspend fun freeResidentModelsForDownload() {
+        runCatching {
+            RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
+        }.onFailure { RACLog.w("pre-download unload skipped: ${it.message}") }
+        RuntimeModelSelection.clearAll()
+        GlobalState.model.set(null)
+        GlobalState.lora.set(null)
     }
 
     private fun startAsForeground(model: RAModelInfo): Boolean {

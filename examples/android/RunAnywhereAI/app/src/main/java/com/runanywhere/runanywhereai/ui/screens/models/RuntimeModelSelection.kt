@@ -67,6 +67,11 @@ object RuntimeModelSelection {
         }
     }
 
+    /** Clear every modality mirror after a process-wide lifecycle unload. */
+    fun clearAll() {
+        ModelSelectionContext.values().forEach { context -> publish(context, null) }
+    }
+
     /**
      * Query the C++ lifecycle for the model that would execute for [context].
      * This is intentionally a suspend query rather than a read from [cached].

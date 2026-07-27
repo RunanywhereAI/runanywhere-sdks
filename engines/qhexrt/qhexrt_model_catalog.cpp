@@ -65,8 +65,11 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"llama3_2_1b", kV79V81, false},
     {"ternary_bonsai_1_7b", kV75V81, false},
     {"bonsai_1_7b_1bit", kV81, false},
-    {"bonsai_4b_1bit", kV75V81, false},
-    {"bonsai_8b_1bit", kV75V81, false},
+    // HF currently ships only v81 context binaries for these 1-bit Bonsai
+    // bundles (no v75/). Keep policy aligned with the published tree so v75
+    // devices filter them before registration instead of failing with -423.
+    {"bonsai_4b_1bit", kV81, false},
+    {"bonsai_8b_1bit", kV81, false},
     {"bonsai_27b_1bit", kV81, false},
     {"phi_tiny_moe", kV79V81, false},
     {"embeddinggemma_300m", kAllSupportedArches, false},

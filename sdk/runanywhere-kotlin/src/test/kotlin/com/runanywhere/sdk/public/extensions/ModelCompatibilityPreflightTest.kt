@@ -30,7 +30,29 @@ class ModelCompatibilityPreflightTest {
                 }
 
             assertEquals(0, networkCalls)
-            assertTrue(error.message.orEmpty().contains("Close other apps"))
+            assertTrue(error.message.orEmpty().contains("Unload the current model"))
+        }
+
+    @Test
+    fun `insufficient memory reclaims resident models then proceeds`() =
+        runBlocking {
+            var probes = 0
+            var reclaimCalls = 0
+            var networkCalls = 0
+            withModelCompatibilityPreflight(
+                operation = ModelCompatibilityOperation.DOWNLOAD,
+                resultProvider = {
+                    probes += 1
+                    compatibilityResult(canRun = probes > 1, canFit = true)
+                },
+                reclaimMemory = { reclaimCalls += 1 },
+            ) {
+                networkCalls += 1
+            }
+
+            assertEquals(2, probes)
+            assertEquals(1, reclaimCalls)
+            assertEquals(1, networkCalls)
         }
 
     @Test
@@ -84,7 +106,7 @@ class ModelCompatibilityPreflightTest {
             assertEquals(request.model_id, result.model_id)
             assertEquals(request.category, result.category)
             assertEquals(request.framework, result.framework)
-            assertTrue(result.error_message.contains("Close other apps"))
+            assertTrue(result.error_message.contains("Unload the current model"))
         }
 
     @Test

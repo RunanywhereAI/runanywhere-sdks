@@ -1,0 +1,14 @@
+## Copy to local.properties (gitignored) for local/production example builds.
+## Prefer environment variables in CI:
+##   RUNANYWHERE_BASE_URL / RUNANYWHERE_API_KEY
+##   KEYSTORE_PATH / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD / UPLOAD_CERT_SHA256
+
+sdk.dir=/path/to/Android/sdk
+
+# Production control-plane (same values as iOS RunAnywhereLocalSecrets.plist)
+runanywhere.baseUrl=https://api.runanywhere.ai
+runanywhere.apiKey=YOUR_API_KEY
+
+# Optional: Hugging Face token for gated runanywhere/*_HNPU downloads.
+# Prefer Settings → HF token at runtime; this key is NOT baked into the APK.
+# hf.token=hf_...
