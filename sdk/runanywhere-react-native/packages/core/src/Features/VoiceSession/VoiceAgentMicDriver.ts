@@ -27,6 +27,7 @@ import { AudioPlaybackManager } from './AudioPlaybackManager';
 import { processVoiceTurn } from '../../Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgentMicDriver');
 
@@ -48,7 +49,7 @@ export interface VoiceAgentMicCallbacks {
   onError?: (error: Error) => void;
 }
 
-const SAMPLE_RATE_HZ = 16000;
+const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;
 const BYTES_PER_SAMPLE = 2;
 
 /** Absolute floor for the adaptive speech threshold (normalized RMS). */
