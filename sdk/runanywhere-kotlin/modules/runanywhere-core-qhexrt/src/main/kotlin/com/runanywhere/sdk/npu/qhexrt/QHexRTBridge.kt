@@ -4,7 +4,7 @@
  *
  * QHexRT Native Bridge
  *
- * Self-contained JNI bridge for the private QHexRT (Qualcomm Hexagon NPU)
+ * Self-contained JNI bridge for the QHexRT (Qualcomm Hexagon NPU)
  * backend module. The native library (librac_backend_qhexrt_jni.so) exposes:
  * - rac_backend_qhexrt_register() / rac_backend_qhexrt_unregister()
  * - rac_qhexrt_probe_proto() (pre-flight Hexagon arch detection)
