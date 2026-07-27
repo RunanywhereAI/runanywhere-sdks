@@ -261,8 +261,9 @@ TestResult run_golden_real_loop_terminate() {
     rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 1000, 666, &a);
     ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_TERMINATE), "terminate");
     ASSERT_EQ(static_cast<int>(a.has_coordinate), 0, "terminate carries no coordinate");
-    ASSERT_TRUE(std::strcmp(a.text, "The final status text shown on the page is: CLICKED: ACCEPTED.") == 0,
-                "answer mapped to text verbatim");
+    ASSERT_TRUE(
+        std::strcmp(a.text, "The final status text shown on the page is: CLICKED: ACCEPTED.") == 0,
+        "answer mapped to text verbatim");
     return TEST_PASS();
 }
 
