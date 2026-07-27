@@ -15,6 +15,7 @@ import 'package:runanywhere/generated/convenience/ra_convenience.dart'
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -325,7 +326,7 @@ class RunAnywhereSTT {
   STTOptions _effectiveOptions(STTOptions options) {
     final opts = options.deepCopy();
     if (!opts.hasSampleRate()) {
-      opts.sampleRate = 16000;
+      opts.sampleRate = RADefaultsAudioCapture.micSampleRateHz;
     }
     if (!opts.hasAudioFormat()) {
       opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_WAV;

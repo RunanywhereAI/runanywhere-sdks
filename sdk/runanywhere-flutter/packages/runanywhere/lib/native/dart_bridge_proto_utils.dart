@@ -11,7 +11,7 @@ import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/errors.pbenum.dart' as pb_enum;
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 
 /// Maximum number of microtask yields the synchronous-FFI streaming wrappers
 /// use to drain queued `NativeCallable.listener` callbacks before deciding
@@ -132,8 +132,8 @@ class DartBridgeProtoUtils {
     int code,
     String symbol,
   ) {
-    if (code == RacResultCode.success &&
-        out.ref.status == RacResultCode.success) {
+    if (code == RacResultCodes.success &&
+        out.ref.status == RacResultCodes.success) {
       return;
     }
     throw SDKException.make(

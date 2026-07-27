@@ -5,6 +5,34 @@ allprojects {
     }
 }
 
+// jni 1.0.1 is unbuildable under AGP 9 on its own terms. Its
+// android/build.gradle skips `apply plugin: 'kotlin-android'` when the AGP
+// major is >= 9 (expecting AGP's built-in Kotlin support to provide the DSL),
+// but a few lines later it still configures the KGP-owned top-level
+// `kotlin { compilerOptions { ... } }` extension. With no Kotlin plugin
+// applied that extension does not exist, so evaluating the project dies with
+// "Could not find method kotlin()".
+//
+// jni arrives transitively via path_provider_android and
+// flutter_secure_storage_android, so it cannot simply be dropped, and 1.0.1 is
+// the newest release — there is no version of it that works here. Rather than
+// pin the graph backwards (0.15.2 evaluates fine but breaks
+// path_provider_android, which needs the jni 1.x Dart API), give the project
+// the plugin it assumed it would have.
+//
+// `beforeProject` rather than `afterEvaluate`: the failure happens *during*
+// evaluation, so the extension has to exist before jni's build.gradle runs.
+// KGP is already on the buildscript classpath from settings.gradle
+// (`apply false`), so this only applies it, it does not resolve anything new.
+//
+// Remove once jni guards its `kotlin { }` block the same way it guards the
+// plugin apply.
+gradle.beforeProject { project ->
+    if (project.name == "jni") {
+        project.pluginManager.apply("org.jetbrains.kotlin.android")
+    }
+}
+
 rootProject.layout.buildDirectory.set(file('../build'))
 subprojects {
     project.layout.buildDirectory.set(rootProject.layout.buildDirectory.dir(project.name))

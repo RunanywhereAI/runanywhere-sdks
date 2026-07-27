@@ -31,6 +31,7 @@
 #define RAC_STT_TYPES_H
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +43,7 @@ extern "C" {
 // =============================================================================
 
 // Audio Format Constants
-#define RAC_STT_DEFAULT_SAMPLE_RATE 16000
+#define RAC_STT_DEFAULT_SAMPLE_RATE RAC_DEFAULT_STT_CONFIGURATION_SAMPLE_RATE
 #define RAC_STT_MAX_SAMPLE_RATE 48000
 #define RAC_STT_MIN_SAMPLE_RATE 8000
 #define RAC_STT_BYTES_PER_SAMPLE 2

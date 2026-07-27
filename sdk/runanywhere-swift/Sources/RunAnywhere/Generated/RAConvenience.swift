@@ -179,6 +179,55 @@ extension RAArchiveStructure {
     }
 }
 
+extension RALLMGenerationOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RALLMGenerationOptions {
+        var r = RALLMGenerationOptions()
+        r.maxTokens = 100
+        r.temperature = 0.8
+        r.topP = 1.0
+        r.topK = 0
+        r.repetitionPenalty = 1.0
+        return r
+    }
+}
+
+extension RALLMGenerationOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if maxTokens < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "LLMGenerationOptions.max_tokens",
+                message: "max_tokens must be >= 0 (got \(maxTokens))"
+            )
+        }
+        if !temperature.isFinite || temperature < 0.0 || temperature > 2.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "LLMGenerationOptions.temperature",
+                message: "temperature must be in 0.0...2.0 (got \(temperature))"
+            )
+        }
+        if !topP.isFinite || topP < 0.0 || topP > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "LLMGenerationOptions.top_p",
+                message: "top_p must be in 0.0...1.0 (got \(topP))"
+            )
+        }
+        if topK < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "LLMGenerationOptions.top_k",
+                message: "top_k must be >= 0 (got \(topK))"
+            )
+        }
+        if !repetitionPenalty.isFinite || repetitionPenalty < 0.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "LLMGenerationOptions.repetition_penalty",
+                message: "repetition_penalty must be >= 0.0 (got \(repetitionPenalty))"
+            )
+        }
+    }
+}
+
 extension RADiarizationOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RADiarizationOptions {
@@ -281,6 +330,7 @@ extension RAVADConfiguration {
         r.sampleRate = 16000
         r.frameLengthMs = 100
         r.threshold = 0.015
+        r.calibrationMultiplier = 2.0
         return r
     }
 }
@@ -304,6 +354,12 @@ extension RAVADConfiguration {
             throw SDKException.validationFailed(
                 fieldPath: "VADConfiguration.threshold",
                 message: "threshold must be in 0.0...1.0 (got \(threshold))"
+            )
+        }
+        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.calibration_multiplier",
+                message: "calibration_multiplier must be in 1.5...4.0 (got \(calibrationMultiplier))"
             )
         }
     }
@@ -541,5 +597,56 @@ extension RATTSOptions {
         r.audioFormat = .pcm
         r.sampleRate = 22050
         return r
+    }
+}
+
+extension RAVLMGenerationOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVLMGenerationOptions {
+        var r = RAVLMGenerationOptions()
+        r.maxTokens = 2048
+        r.temperature = 0.7
+        r.topP = 0.9
+        r.topK = 0
+        r.streamingEnabled = true
+        r.useGpu = true
+        r.repetitionPenalty = 1.1
+        return r
+    }
+}
+
+extension RAVLMGenerationOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if maxTokens < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VLMGenerationOptions.max_tokens",
+                message: "max_tokens must be >= 0 (got \(maxTokens))"
+            )
+        }
+        if !temperature.isFinite || temperature < 0.0 || temperature > 2.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VLMGenerationOptions.temperature",
+                message: "temperature must be in 0.0...2.0 (got \(temperature))"
+            )
+        }
+        if !topP.isFinite || topP < 0.0 || topP > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VLMGenerationOptions.top_p",
+                message: "top_p must be in 0.0...1.0 (got \(topP))"
+            )
+        }
+        if topK < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VLMGenerationOptions.top_k",
+                message: "top_k must be >= 0 (got \(topK))"
+            )
+        }
+        if !repetitionPenalty.isFinite || repetitionPenalty < 0.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VLMGenerationOptions.repetition_penalty",
+                message: "repetition_penalty must be >= 0.0 (got \(repetitionPenalty))"
+            )
+        }
     }
 }

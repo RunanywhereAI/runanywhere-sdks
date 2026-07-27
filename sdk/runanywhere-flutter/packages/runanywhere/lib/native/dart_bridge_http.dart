@@ -9,10 +9,11 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
@@ -66,7 +67,7 @@ class DartBridgeHTTP {
 
       try {
         final result = configureFn(basePtr, keyPtr);
-        if (result != RacResultCode.success) {
+        if (result != RacResultCodes.success) {
           _logger.warning('HTTP configure failed', metadata: {'code': result});
         }
       } finally {
@@ -333,12 +334,10 @@ class DartBridgeHTTP {
 
   String _getDefaultBaseURL(SDKEnvironment environment) {
     switch (environment) {
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        return 'https://dev-api.runanywhere.ai';
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        return 'https://api.runanywhere.ai';
+        return RADefaultsEnvironment.productionBaseUrl;
       default:
-        return 'https://dev-api.runanywhere.ai';
+        return RADefaultsEnvironment.developmentBaseUrl;
     }
   }
 

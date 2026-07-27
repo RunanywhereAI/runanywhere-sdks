@@ -26,6 +26,8 @@ import { AudioCaptureManager } from './AudioCaptureManager';
 import { AudioPlaybackManager } from './AudioPlaybackManager';
 import { processVoiceTurn } from '../../Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgentMicDriver');
 
@@ -47,13 +49,13 @@ export interface VoiceAgentMicCallbacks {
   onError?: (error: Error) => void;
 }
 
-const SAMPLE_RATE_HZ = 16000;
+const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;
 const BYTES_PER_SAMPLE = 2;
 
 /** Absolute floor for the adaptive speech threshold (normalized RMS). */
-const SPEECH_RMS_THRESHOLD = 0.015;
+const SPEECH_RMS_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 /** Speech must exceed this multiple of the tracked ambient noise floor. */
-const SPEECH_FLOOR_MULTIPLIER = 2.2;
+const SPEECH_FLOOR_MULTIPLIER = voiceAgentDefaults.speechFloorMultiplier;
 /** Per-chunk rate at which the ambient floor creeps toward louder ambient. */
 const NOISE_FLOOR_RISE = 0.05;
 /** Trailing silence that closes an utterance. */

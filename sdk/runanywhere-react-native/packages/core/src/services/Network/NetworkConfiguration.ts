@@ -1,3 +1,4 @@
+import { environmentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 /**
  * NetworkConfiguration.ts
  *
@@ -10,7 +11,7 @@
 const SCAFFOLD_VALUE_PATTERN = /^(?:<your[^>]*>|your(?:[-_ ][a-z0-9]+)+|replace[-_ ]?me|placeholder(?:[-_ ][a-z0-9]+)*)$/i;
 
 /** Default base URL when the app does not override it. */
-export const DEFAULT_BASE_URL = 'https://api.runanywhere.ai';
+export const DEFAULT_BASE_URL = environmentDefaults.productionBaseUrl;
 
 function looksLikePlaceholder(value?: string | null): boolean {
   const trimmed = value?.trim();

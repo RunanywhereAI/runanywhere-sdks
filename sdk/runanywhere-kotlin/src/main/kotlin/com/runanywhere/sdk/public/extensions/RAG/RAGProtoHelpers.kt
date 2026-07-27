@@ -13,6 +13,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGStatistics
@@ -38,17 +39,13 @@ fun RARAGConfiguration.resolvingLifecycleArtifacts(
 // MARK: - RAGQueryOptions
 
 /**
- * Build a [RAGQueryOptions] with the same defaults the Swift SDK ships:
- * max_tokens = 512, temperature = 0.7, top_p = 1.0, top_k = 0.
+ * [RAGQueryOptions.defaults] with the question filled in.
+ *
+ * Values come from generated/convenience/RAConvenience.kt, emitted from the
+ * rac_default annotations in idl/rag.proto.
  */
 fun RAGQueryOptions.Companion.defaults(question: String): RAGQueryOptions =
-    RAGQueryOptions(
-        question = question,
-        max_tokens = 512,
-        temperature = 0.7f,
-        top_p = 1.0f,
-        top_k = 0,
-    )
+    defaults().copy(question = question)
 
 // MARK: - RAGResult
 

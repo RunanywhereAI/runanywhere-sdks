@@ -46,6 +46,13 @@ jobs:
       # if any tracked AGENTS.md is missing its committed CLAUDE.md -> AGENTS.md symlink.
       - name: AGENTS.md / CLAUDE.md symlink check
         run: bash scripts/validation/gates/check_agents_claude_sync.sh
+      # Also bash-only. Fails the PR if SDK source re-declares a default that
+      # idl/sdk_defaults.proto (or a rac_default annotation) already declares.
+      # Without it the per-SDK default tables grow back: they had already drifted
+      # to three different VLM max_tokens values and an 8x spread in HTTP stream
+      # chunk size before the pool existed.
+      - name: Central default pool (no re-declared defaults)
+        run: bash scripts/validation/gates/check_no_hardcoded_defaults.sh
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: node

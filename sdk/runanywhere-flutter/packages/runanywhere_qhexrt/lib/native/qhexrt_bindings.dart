@@ -6,6 +6,7 @@ import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -168,9 +169,9 @@ class QhexrtBindings {
 
   bool get isAvailable => _register != null;
 
-  int register() => _register?.call() ?? RacResultCode.errorNotSupported;
+  int register() => _register?.call() ?? RacResultCodes.errorNotSupported;
 
-  int unregister() => _unregister?.call() ?? RacResultCode.errorNotSupported;
+  int unregister() => _unregister?.call() ?? RacResultCodes.errorNotSupported;
 
   /// Configure the app-private directory containing extracted FastRPC skels.
   /// Must be called before backend registration can create a QNN runtime.

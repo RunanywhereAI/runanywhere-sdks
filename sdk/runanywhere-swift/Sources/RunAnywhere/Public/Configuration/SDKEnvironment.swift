@@ -140,7 +140,7 @@ public struct SDKInitParams: Sendable {
     /// Placeholder URL used for development when no URL is provided.
     /// Development mode uses local analytics, so this is just a placeholder.
     private static let developmentPlaceholderURL: URL = {
-        guard let url = URL(string: "https://dev.runanywhere.local") else {
+        guard let url = URL(string: RADefaults.Environment.developmentPlaceholderUrl) else {
             fatalError("Invalid hardcoded development URL")
         }
         return url

@@ -1428,7 +1428,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_enable_auto_calibration(bool value);
 
   public:
-  // float calibration_multiplier = 6;
+  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
   void clear_calibration_multiplier() ;
   [[nodiscard]] float calibration_multiplier() const;
   void set_calibration_multiplier(float value);
@@ -3169,7 +3169,7 @@ inline void VADConfiguration::_internal_set_enable_auto_calibration(bool value) 
   _impl_.enable_auto_calibration_ = value;
 }
 
-// float calibration_multiplier = 6;
+// float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
 inline void VADConfiguration::clear_calibration_multiplier() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.calibration_multiplier_ = 0;

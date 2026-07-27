@@ -34,7 +34,14 @@ public extension RunAnywhere {
     /// Default Silero VAD model id seeded by every example app's catalog.
     /// Exposed so callers do not hard-code the string when invoking
     /// `ensureDefaultVAD(...)`.
-    static var defaultVADModelID: String { "silero-vad" }
+    ///
+    /// Declared once in idl/sdk_defaults.proto
+    /// (VoiceAgentDefaults.default_vad_model_id); four SDKs each carried their own
+    /// copy of this literal before that. commons reads the same declaration
+    /// through `rac_voice_agent_default_vad_model_id()`, which is deliberately
+    /// not called here: Swift links a prebuilt RACommons.xcframework, and a
+    /// generated constant does not require the natives to be rebuilt first.
+    static var defaultVADModelID: String { RADefaults.VoiceAgent.defaultVadModelID }
 
     /// Ensure a VAD model is loaded in the canonical lifecycle before a voice
     /// agent session starts. When no VAD model is currently registered for

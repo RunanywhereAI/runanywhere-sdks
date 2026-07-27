@@ -2,8 +2,8 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Minimal ONNX backend FFI bindings.
 ///
@@ -254,7 +254,7 @@ class OnnxBindings {
   /// if already registered.
   int register() {
     if (_register == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     return _register();
   }
@@ -262,7 +262,7 @@ class OnnxBindings {
   /// Unregister the ONNX backend from C++ registry.
   int unregister() {
     if (_unregister == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     return _unregister();
   }
@@ -282,11 +282,11 @@ class OnnxBindings {
     final entry = _sherpaPluginEntry;
     final register = _pluginRegister;
     if (entry == null || register == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     final vtable = entry();
     if (vtable == nullptr) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     return register(vtable);
   }
@@ -298,7 +298,7 @@ class OnnxBindings {
     }
     final unregister = _pluginUnregister;
     if (unregister == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     final name = 'sherpa'.toNativeUtf8();
     try {

@@ -60,6 +60,7 @@ import {
   LLAMACPP_STREAM_WORKER_WEBGPU_FACTORY_ID,
 } from './streamWorkerFactoryId.js';
 import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('LlamaCPP');
 let _installedBackendWorkerFactory = false;
@@ -407,7 +408,7 @@ async function installLlamaCppBackendWorker(
     ?? (typeof Worker !== 'undefined' && typeof URL !== 'undefined');
   setLlamaBackendWorkerRequired(requireWorker);
   const host = new BackendWorkerHost(factory, {
-    initTimeoutMs: 120_000,
+    initTimeoutMs: workerDefaults.backendInitTimeoutMs,
     backendId: 'llamacpp',
   });
   _backendWorkerHost = host;

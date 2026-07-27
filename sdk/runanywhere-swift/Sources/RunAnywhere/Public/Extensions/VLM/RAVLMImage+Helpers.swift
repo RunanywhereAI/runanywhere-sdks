@@ -22,14 +22,20 @@ extension RAVLMConfiguration {
 // MARK: - RAVLMGenerationOptions
 
 extension RAVLMGenerationOptions {
-    public static func defaults(prompt: String = "") -> RAVLMGenerationOptions {
-        var options = RAVLMGenerationOptions()
+    /// `defaults()` with a prompt filled in.
+    ///
+    /// The sampling values come from the generated `defaults()` in
+    /// RAConvenience.swift, which reads the rac_default annotations in
+    /// idl/vlm_options.proto. The hand-written table this replaced capped
+    /// max_tokens at 128 against the C layer's 2048, and set top_k=40 where the
+    /// C layer disables it — so a Swift caption was truncated far earlier than
+    /// the same call on any other platform.
+    ///
+    /// `prompt` is deliberately not defaulted: a `defaults()` with no arguments
+    /// must resolve unambiguously to the generated overload.
+    public static func defaults(prompt: String) -> RAVLMGenerationOptions {
+        var options = defaults()
         options.prompt = prompt
-        options.maxTokens = 128
-        options.temperature = 0.7
-        options.topP = 0.9
-        options.topK = 40
-        options.repetitionPenalty = 1.1
         return options
     }
 }

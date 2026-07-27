@@ -28,6 +28,7 @@ import 'dart:typed_data';
 import 'package:runanywhere/features/stt/services/audio_capture_manager.dart';
 import 'package:runanywhere/features/tts/services/audio_playback_manager.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_events_pb;
@@ -42,14 +43,16 @@ class VoiceAgentMicDriver {
 
   static final _logger = SDKLogger('VoiceAgentMic');
 
-  static const int _sampleRateHz = 16000;
+  static const int _sampleRateHz = RADefaultsAudioCapture.micSampleRateHz;
   static const int _bytesPerSample = 2;
 
   /// Absolute floor for the adaptive speech threshold (normalized RMS).
-  static const double _speechRmsThreshold = 0.015;
+  static const double _speechRmsThreshold =
+      RADefaultsVoiceAgent.speechRmsThreshold;
 
   /// Speech must exceed this multiple of the tracked ambient noise floor.
-  static const double _speechFloorMultiplier = 2.2;
+  static const double _speechFloorMultiplier =
+      RADefaultsVoiceAgent.speechFloorMultiplier;
 
   /// Per-chunk rate at which the ambient floor creeps up toward louder ambient.
   static const double _noiseFloorRise = 0.05;
@@ -67,7 +70,8 @@ class VoiceAgentMicDriver {
   static const int _preRollChunks = 3;
 
   /// Piper's native rate; used when an audio frame omits sample_rate_hz.
-  static const int _defaultTtsSampleRateHz = 22050;
+  static const int _defaultTtsSampleRateHz =
+      RADefaultsAudioCapture.ttsSampleRateHz;
 
   final AudioCaptureManager _capture = AudioCaptureManager();
   final AudioPlaybackManager _playback = AudioPlaybackManager();

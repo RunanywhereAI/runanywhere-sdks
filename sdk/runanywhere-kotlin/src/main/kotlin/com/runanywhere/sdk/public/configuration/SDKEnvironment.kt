@@ -19,6 +19,7 @@ package com.runanywhere.sdk.public.configuration
 import ai.runanywhere.proto.v1.LogLevel
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEnvironment
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.RADefaults
 
 /**
  * SDK environment mode — determines how data is handled.
@@ -131,7 +132,8 @@ data class SDKInitParams(
          * Development mode uses local analytics, so this is just a placeholder.
          * Mirrors Swift's `developmentPlaceholderURL`.
          */
-        const val DEVELOPMENT_PLACEHOLDER_URL: String = "https://dev.runanywhere.local"
+        const val DEVELOPMENT_PLACEHOLDER_URL: String =
+            RADefaults.Environment.DEVELOPMENT_PLACEHOLDER_URL
 
         /**
          * Create initialization parameters for production (or an explicit

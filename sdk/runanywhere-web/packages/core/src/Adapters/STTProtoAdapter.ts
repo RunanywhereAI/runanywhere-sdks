@@ -29,6 +29,7 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 function requireLiveOnnxWorkerOrMain(operation: string) {
   const host = getActiveBackendWorkerHost('onnx');
@@ -230,7 +231,7 @@ function lifecycleRequest(
       audioData,
       encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
-      sampleRate: options.sampleRate > 0 ? options.sampleRate : 16_000,
+      sampleRate: options.sampleRate > 0 ? options.sampleRate : audioCaptureDefaults.micSampleRateHz,
       channels: 1,
       bitsPerSample: 16,
     },

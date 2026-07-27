@@ -8,6 +8,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -185,24 +186,26 @@ class RunAnywhereVLM {
     VLMGenerationOptions options, {
     bool streaming = false,
   }) {
-    // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
-    // (RAVLMImage+Helpers.swift:25-33): maxTokens=256, temperature=0.7,
-    // topP=0.9, topK=40 — no Flutter-only useGpu default.
+    // Fill unset fields from the generated defaults, which come from the
+    // rac_default annotations in idl/vlm_options.proto. The table this replaced
+    // capped maxTokens at 256 against the C layer's 2048 and set topK=40 where
+    // the C layer disables it.
+    final d = VLMGenerationOptionsConvenience.defaults();
     final opts = options.deepCopy();
     if (!opts.hasPrompt()) {
       opts.prompt = prompt;
     }
     if (!opts.hasMaxTokens()) {
-      opts.maxTokens = 256;
+      opts.maxTokens = d.maxTokens;
     }
     if (!opts.hasTemperature()) {
-      opts.temperature = 0.7;
+      opts.temperature = d.temperature;
     }
     if (!opts.hasTopP()) {
-      opts.topP = 0.9;
+      opts.topP = d.topP;
     }
     if (!opts.hasTopK()) {
-      opts.topK = 40;
+      opts.topK = d.topK;
     }
     opts.streamingEnabled = streaming;
     return opts;

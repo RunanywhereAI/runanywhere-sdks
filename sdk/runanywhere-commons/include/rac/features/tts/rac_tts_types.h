@@ -27,6 +27,7 @@
 #define RAC_TTS_TYPES_H
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 #include "rac/features/stt/rac_stt_types.h"  // For rac_audio_format_enum_t
 
 #ifdef __cplusplus
@@ -39,7 +40,7 @@ extern "C" {
 // =============================================================================
 
 // Audio Format Constants
-#define RAC_TTS_DEFAULT_SAMPLE_RATE 22050
+#define RAC_TTS_DEFAULT_SAMPLE_RATE RAC_DEFAULT_TTS_CONFIGURATION_SAMPLE_RATE
 #define RAC_TTS_HIGH_QUALITY_SAMPLE_RATE 24000
 #define RAC_TTS_CD_QUALITY_SAMPLE_RATE 44100
 #define RAC_TTS_MAX_SAMPLE_RATE 48000
@@ -47,7 +48,7 @@ extern "C" {
 #define RAC_TTS_CHANNELS 1
 
 // Speaking Rate Constants
-#define RAC_TTS_DEFAULT_SPEAKING_RATE 1.0f
+#define RAC_TTS_DEFAULT_SPEAKING_RATE RAC_DEFAULT_TTS_CONFIGURATION_SPEAKING_RATE
 #define RAC_TTS_MIN_SPEAKING_RATE 0.5f
 #define RAC_TTS_MAX_SPEAKING_RATE 2.0f
 

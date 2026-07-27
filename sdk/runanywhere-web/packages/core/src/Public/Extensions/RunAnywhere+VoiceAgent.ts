@@ -58,15 +58,23 @@ import {
 } from '../../runtime/EmscriptenModule.js';
 import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
   'You are a helpful voice assistant. Respond in one or two short, natural, spoken sentences. ' +
   'Be direct, warm, and conversational. Do not use markdown, bullet points, code blocks, or emoji. ' +
   'If you are unsure or lack the information, say so briefly instead of guessing.';
-const VOICE_MAX_TOKENS = 200;
+// Web assembles its own LLM options in TypeScript rather than going through the
+// C++ voice orchestrator, so these have to be read from the pool explicitly.
+// They previously read 200 / 0.7 while the other four platforms inherited 96 /
+// 0.0 from commons, which made Web voice replies roughly twice as long and
+// non-deterministic.
+const VOICE_MAX_TOKENS = voiceAgentDefaults.maxTokens;
+const VOICE_TEMPERATURE = voiceAgentDefaults.temperature;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
-const DEFAULT_VAD_ENERGY_THRESHOLD = 0.005;
+const DEFAULT_VAD_ENERGY_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
 
 export type VoiceAgentAvailabilitySource =
@@ -322,7 +330,7 @@ function requireProvider(feature: string): VoiceAgentProvider {
 }
 
 /** Default Silero VAD model id seeded by every example app's catalog. */
-export const defaultVADModelID = 'silero-vad';
+export const defaultVADModelID = voiceAgentDefaults.defaultVadModelId;
 
 /**
  * Ensure a VAD model is loaded in the canonical lifecycle before a voice-agent
@@ -685,7 +693,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       const llm = await TextGeneration.generate({
         prompt: transcription,
         maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
-        temperature: 0.7,
+        temperature: VOICE_TEMPERATURE,
         systemPrompt: VOICE_SYSTEM_PROMPT,
         history: voiceHistoryMessages(this.conversationHistory),
         conversationId: sessionId,
@@ -811,7 +819,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     return (await TextGeneration.generate({
       prompt,
       maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
-      temperature: 0.7,
+      temperature: VOICE_TEMPERATURE,
       systemPrompt: VOICE_SYSTEM_PROMPT,
       history: voiceHistoryMessages(this.conversationHistory),
       conversationId: this.config.sessionId ?? 'web-voice-agent',
@@ -1134,7 +1142,7 @@ function modelNotLoadedException(message: string): SDKException {
 
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
-    vadSampleRate: 16000,
+    vadSampleRate: audioCaptureDefaults.micSampleRateHz,
     vadFrameLength: 0.1,
     vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
     sessionId: 'web-voice-agent',

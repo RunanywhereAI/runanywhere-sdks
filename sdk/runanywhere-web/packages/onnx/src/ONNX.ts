@@ -32,6 +32,7 @@ import {
 } from '@runanywhere/web/backend';
 import { SherpaONNXBridge } from './Foundation/SherpaONNXBridge.js';
 import { onnxStatus, type ONNXBackendStatus } from './ONNXStatus.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const MODULE_ID = 'onnx';
 const logger = new SDKLogger('ONNX');
@@ -229,7 +230,7 @@ async function installONNXBackendWorker(options: ONNXRegisterOptions): Promise<v
   const requestedThreads = clampThreads(options.threads);
   const host = new BackendWorkerHost(factory, {
     backendId: 'onnx',
-    initTimeoutMs: 120_000,
+    initTimeoutMs: workerDefaults.backendInitTimeoutMs,
   });
   _backendWorkerHost = host;
   try {

@@ -18,7 +18,7 @@ void main() {
       expect(storage, greaterThanOrEqualTo(0));
       expect(init, greaterThan(storage));
       expect(load, greaterThan(init));
-      expect(source, contains('loadResult != RacResultCode.errorFileNotFound'));
+      expect(source, contains('loadResult != RacResultCodes.errorFileNotFound'));
       expect(source, contains('SDKException.throwIfError(loadResult)'));
     });
 

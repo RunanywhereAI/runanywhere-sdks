@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 
 /// Voice-assistant LLM turn defaults (commons). The voice pipeline feeds these
 /// to every LLM turn so replies are short, spoken, and context-aware instead of
@@ -33,11 +34,15 @@ inline constexpr const char* kVoiceAgentSystemPrompt =
 /// Spoken replies should be short. Ninety-six tokens is enough for the one or
 /// two sentences requested above without leaving a long hidden-reasoning
 /// runway on thinking-capable models.
-inline constexpr int32_t kVoiceAgentMaxTokens = 96;
+///
+/// Declared in idl/sdk_defaults.proto (VoiceAgentDefaults) so the Web SDK,
+/// which assembles its own LLM options in TypeScript rather than going through
+/// this path, reads the same number instead of its own.
+inline constexpr int32_t kVoiceAgentMaxTokens = RAC_DEFAULT_VOICE_AGENT_MAX_TOKENS;
 /// Greedy decoding keeps a spoken turn stable and avoids sampling a verbose
 /// continuation. A positive seed is also supplied for backends that still
 /// construct a sampler when temperature is zero.
-inline constexpr float kVoiceAgentTemperature = 0.0f;
+inline constexpr float kVoiceAgentTemperature = RAC_DEFAULT_VOICE_AGENT_TEMPERATURE;
 inline constexpr int32_t kVoiceAgentTopK = 1;
 inline constexpr int64_t kVoiceAgentSeed = 1;
 inline constexpr const char* kVoiceAgentEmptyResponseMessage =

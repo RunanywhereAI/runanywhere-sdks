@@ -283,6 +283,17 @@ RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 // =============================================================================
 
 /**
+ * @brief Catalogued model id the voice agent auto-loads when no VAD model is
+ *        current.
+ *
+ * Exposed because all five platform SDKs had re-declared the literal
+ * "silero-vad" locally. Declared in idl/sdk_defaults.proto
+ * (VoiceAgentDefaults.default_vad_model_id). Returns a static literal; never
+ * NULL, never freed.
+ */
+RAC_API const char* rac_voice_agent_default_vad_model_id(void);
+
+/**
  * @brief Initialize the voice agent with configuration.
  *
  * Mirrors Swift's VoiceAgentCapability.initialize(_:).

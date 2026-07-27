@@ -105,7 +105,11 @@ message VADConfiguration {
 
     // Calibration multiplier (threshold = ambient noise * multiplier).
     // Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
-    float  calibration_multiplier = 6;
+    float  calibration_multiplier = 6 [
+        (runanywhere.v1.rac_default) = "2.0",
+        (runanywhere.v1.rac_min_float) = 1.5,
+        (runanywhere.v1.rac_max_float) = 4.0
+    ];
 
     // Preferred framework for VAD. Absent = auto.
     optional InferenceFramework preferred_framework = 7;

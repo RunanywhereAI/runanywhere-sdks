@@ -37,6 +37,10 @@ from typing import Iterable
 
 from google.protobuf import descriptor_pb2
 
+# Imported rather than restated: a second copy of this list is exactly the drift
+# the annotations exist to prevent.
+from _convenience_common import DECLARATION_ONLY_FILES
+
 # --- rac_options.proto field numbers (mirror idl/rac_options.proto:97-135).
 RAC_DEFAULT_FIELD_NUM       = 50001
 RAC_REQUIRED_FIELD_NUM      = 50002
@@ -289,7 +293,7 @@ def _build_enum_file_map(fds: descriptor_pb2.FileDescriptorSet) -> dict[str, str
     import for a cross-file enum reference in a ``defaults()`` literal."""
     out: dict[str, str] = {}
     for f in fds.file:
-        if f.package != PROTO_PACKAGE:
+        if f.package != PROTO_PACKAGE or f.name in DECLARATION_ONLY_FILES:
             continue
         base = _proto_basename(f)
         for e in f.enum_type:
@@ -695,7 +699,7 @@ def main() -> int:
     validate_count = 0
 
     for file_desc in fds.file:
-        if file_desc.package != PROTO_PACKAGE:
+        if file_desc.package != PROTO_PACKAGE or file_desc.name in DECLARATION_ONLY_FILES:
             continue
 
         base = _proto_basename(file_desc)

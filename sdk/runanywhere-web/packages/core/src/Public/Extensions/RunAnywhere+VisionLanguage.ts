@@ -22,6 +22,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import { SDKException } from '../../Foundation/SDKException.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
+import { vLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/vlm_options_convenience';
 
 export interface VisionLanguageProvider {
   readonly isInitialized: boolean;
@@ -157,14 +158,17 @@ function normalizeVLMGenerationOptions(
   streamingEnabled: boolean,
 ): VLMGenerationOptions {
   // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
-  // (RAVLMImage+Helpers.swift:25-33): maxTokens 256, temperature 0.7,
-  // topP 0.9, topK 40. Normalize only when unset/<=0.
+  // Normalize only when unset/<=0. Defaults come from the rac_default
+  // annotations in idl/vlm_options.proto; the table this replaced capped
+  // maxTokens at 256 against the C layer's 2048 and set topK 40 where the C
+  // layer disables it.
+  const d = vLMGenerationOptionsDefaults();
   return {
     prompt: options.prompt ?? '',
-    maxTokens: options.maxTokens > 0 ? options.maxTokens : 256,
-    temperature: options.temperature > 0 ? options.temperature : 0.7,
-    topP: options.topP > 0 ? options.topP : 0.9,
-    topK: options.topK > 0 ? options.topK : 40,
+    maxTokens: options.maxTokens > 0 ? options.maxTokens : d.maxTokens,
+    temperature: options.temperature > 0 ? options.temperature : d.temperature,
+    topP: options.topP > 0 ? options.topP : d.topP,
+    topK: options.topK > 0 ? options.topK : d.topK,
     stopSequences: options.stopSequences ?? [],
     streamingEnabled,
     systemPrompt: options.systemPrompt,
@@ -175,7 +179,8 @@ function normalizeVLMGenerationOptions(
     customChatTemplate: options.customChatTemplate,
     imageMarkerOverride: options.imageMarkerOverride,
     seed: options.seed ?? 0,
-    repetitionPenalty: options.repetitionPenalty > 0 ? options.repetitionPenalty : 1,
+    repetitionPenalty:
+      options.repetitionPenalty > 0 ? options.repetitionPenalty : d.repetitionPenalty,
     minP: options.minP ?? 0,
     emitImageEmbeddings: options.emitImageEmbeddings ?? false,
   };

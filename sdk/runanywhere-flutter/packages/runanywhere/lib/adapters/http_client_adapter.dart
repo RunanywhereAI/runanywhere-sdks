@@ -25,7 +25,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Minimal response container, platform-agnostic.
@@ -127,7 +128,7 @@ class HTTPClientAdapter {
 
   static final HTTPClientAdapter shared = HTTPClientAdapter._();
 
-  static const int defaultTimeoutMs = 30000;
+  static const int defaultTimeoutMs = RADefaultsNetwork.adapterTimeoutMs;
 
   final SDKLogger _logger = SDKLogger('HTTPClientAdapter');
 
@@ -487,7 +488,7 @@ class HTTPClientAdapter {
     final countOut = calloc<ffi.Size>();
     try {
       final rc = defaultHeadersFn(kvsOut, countOut);
-      if (rc != RacResultCode.success) {
+      if (rc != RacResultCodes.success) {
         throw StateError('rac_http_default_headers failed: $rc');
       }
       final kvs = kvsOut.value;

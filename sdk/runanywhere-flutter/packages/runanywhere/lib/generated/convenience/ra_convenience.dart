@@ -17,12 +17,14 @@ import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/diarization.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart';
 import 'package:runanywhere/generated/logging.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
+import 'package:runanywhere/generated/vlm_options.pb.dart';
 
 extension AudioFormatWireString on AudioFormat {
   String get wireString {
@@ -230,6 +232,53 @@ ArchiveStructure? archiveStructureFromWireString(String value) {
   return null;
 }
 
+extension LLMGenerationOptionsConvenience on LLMGenerationOptions {
+  static LLMGenerationOptions defaults() {
+    final r = LLMGenerationOptions();
+    r.maxTokens = 100;
+    r.temperature = 0.8;
+    r.topP = 1.0;
+    r.topK = 0;
+    r.repetitionPenalty = 1.0;
+    return r;
+  }
+}
+
+extension LLMGenerationOptionsValidate on LLMGenerationOptions {
+  void validate() {
+    if (maxTokens < 0) {
+      throw SDKException.validationFailed(
+        'max_tokens must be >= 0 (got $maxTokens)',
+        fieldPath: 'LLMGenerationOptions.max_tokens',
+      );
+    }
+    if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {
+      throw SDKException.validationFailed(
+        'temperature must be in 0.0...2.0 (got $temperature)',
+        fieldPath: 'LLMGenerationOptions.temperature',
+      );
+    }
+    if (!topP.isFinite || topP < 0.0 || topP > 1.0) {
+      throw SDKException.validationFailed(
+        'top_p must be in 0.0...1.0 (got $topP)',
+        fieldPath: 'LLMGenerationOptions.top_p',
+      );
+    }
+    if (topK < 0) {
+      throw SDKException.validationFailed(
+        'top_k must be >= 0 (got $topK)',
+        fieldPath: 'LLMGenerationOptions.top_k',
+      );
+    }
+    if (!repetitionPenalty.isFinite || repetitionPenalty < 0.0) {
+      throw SDKException.validationFailed(
+        'repetition_penalty must be >= 0.0 (got $repetitionPenalty)',
+        fieldPath: 'LLMGenerationOptions.repetition_penalty',
+      );
+    }
+  }
+}
+
 extension DiarizationOptionsConvenience on DiarizationOptions {
   static DiarizationOptions defaults() {
     final r = DiarizationOptions();
@@ -326,6 +375,7 @@ extension VADConfigurationConvenience on VADConfiguration {
     r.sampleRate = 16000;
     r.frameLengthMs = 100;
     r.threshold = 0.015;
+    r.calibrationMultiplier = 2.0;
     return r;
   }
 }
@@ -348,6 +398,12 @@ extension VADConfigurationValidate on VADConfiguration {
       throw SDKException.validationFailed(
         'threshold must be in 0.0...1.0 (got $threshold)',
         fieldPath: 'VADConfiguration.threshold',
+      );
+    }
+    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
+      throw SDKException.validationFailed(
+        'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
+        fieldPath: 'VADConfiguration.calibration_multiplier',
       );
     }
   }
@@ -610,5 +666,54 @@ extension TTSOptionsConvenience on TTSOptions {
     r.audioFormat = AudioFormat.AUDIO_FORMAT_PCM;
     r.sampleRate = 22050;
     return r;
+  }
+}
+
+extension VLMGenerationOptionsConvenience on VLMGenerationOptions {
+  static VLMGenerationOptions defaults() {
+    final r = VLMGenerationOptions();
+    r.maxTokens = 2048;
+    r.temperature = 0.7;
+    r.topP = 0.9;
+    r.topK = 0;
+    r.streamingEnabled = true;
+    r.useGpu = true;
+    r.repetitionPenalty = 1.1;
+    return r;
+  }
+}
+
+extension VLMGenerationOptionsValidate on VLMGenerationOptions {
+  void validate() {
+    if (maxTokens < 0) {
+      throw SDKException.validationFailed(
+        'max_tokens must be >= 0 (got $maxTokens)',
+        fieldPath: 'VLMGenerationOptions.max_tokens',
+      );
+    }
+    if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {
+      throw SDKException.validationFailed(
+        'temperature must be in 0.0...2.0 (got $temperature)',
+        fieldPath: 'VLMGenerationOptions.temperature',
+      );
+    }
+    if (!topP.isFinite || topP < 0.0 || topP > 1.0) {
+      throw SDKException.validationFailed(
+        'top_p must be in 0.0...1.0 (got $topP)',
+        fieldPath: 'VLMGenerationOptions.top_p',
+      );
+    }
+    if (topK < 0) {
+      throw SDKException.validationFailed(
+        'top_k must be >= 0 (got $topK)',
+        fieldPath: 'VLMGenerationOptions.top_k',
+      );
+    }
+    if (!repetitionPenalty.isFinite || repetitionPenalty < 0.0) {
+      throw SDKException.validationFailed(
+        'repetition_penalty must be >= 0.0 (got $repetitionPenalty)',
+        fieldPath: 'VLMGenerationOptions.repetition_penalty',
+      );
+    }
   }
 }
