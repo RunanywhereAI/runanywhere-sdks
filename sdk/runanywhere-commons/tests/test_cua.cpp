@@ -75,6 +75,20 @@ TestResult run_unusable_display_space_rejected() {
     return TEST_PASS();
 }
 
+// Declaring a space the model was not trained on used to rewrite the prompt
+// while parse_action kept rescaling from the profile's own space — the prompt
+// and the rescale contradicting each other, every click confidently wrong.
+TestResult run_foreign_display_space_rejected() {
+    char buf[8192];
+    ASSERT_EQ(rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 1440, 900, buf, sizeof(buf)), -1,
+              "a space the profile does not use must be refused, not substituted");
+    int n = rac_cua_system_prompt(RAC_CUA_PROFILE_FARA, 1000, 1000, buf, sizeof(buf));
+    ASSERT_TRUE(n > 0, "the profile's own space is accepted");
+    ASSERT_TRUE(std::string(buf).find("1000x1000") != std::string::npos,
+                "and still states the native resolution");
+    return TEST_PASS();
+}
+
 // The viewport bound constrains our side; the coordinate comes from the model,
 // so a garbled one must saturate rather than overflow the int32 cast.
 TestResult run_absurd_model_coordinate_saturates() {
@@ -362,6 +376,7 @@ int main(int argc, char** argv) {
     suite.add("unknown_profile_rejected", run_unknown_profile_rejected);
     suite.add("unusable_viewport_rejected", run_unusable_viewport_rejected);
     suite.add("unusable_display_space_rejected", run_unusable_display_space_rejected);
+    suite.add("foreign_display_space_rejected", run_foreign_display_space_rejected);
     suite.add("absurd_model_coordinate_saturates", run_absurd_model_coordinate_saturates);
     suite.add("golden_left_click", run_golden_left_click);
     suite.add("type_action_text", run_type_action_text);

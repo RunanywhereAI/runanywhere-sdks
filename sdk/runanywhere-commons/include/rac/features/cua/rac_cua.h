@@ -86,11 +86,15 @@ typedef struct {
  * for Fara). Writes a NUL-terminated string into `out` (truncated to
  * `out_size`). Returns the full length excluding NUL (>= out_size means it was
  * truncated), or -1 if `profile_id` is unknown or the declared space is
- * unusable. Pass (0, 0) for the profile's native space; any other value must
- * be non-zero and <= 65536 on BOTH axes. That bound is what rejects a signed
- * value a caller handed to these unsigned parameters (a JNI `jint` of -1
- * arrives as 4294967295), which would otherwise render a nonsense resolution
- * into the prompt.
+ * unusable.
+ *
+ * The coordinate space is a property of the MODEL, not of the caller: pass
+ * (0, 0), or the profile's own space. Declaring a DIFFERENT space is rejected
+ * — Fara emits in a fixed 1000x1000 space because that is what it was trained
+ * on, and `rac_cua_parse_action` always rescales from the profile's space, so
+ * a disagreeing declaration would make the prompt and the rescale contradict
+ * each other and place every click wrongly. The parameter remains for a future
+ * profile whose space is genuinely negotiable.
  */
 int rac_cua_system_prompt(const char* profile_id, uint32_t display_w, uint32_t display_h,
                           char* out, size_t out_size);

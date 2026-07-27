@@ -446,20 +446,17 @@ extern "C" int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
         (!dimension_in_range(display_w) || !dimension_in_range(display_h))) {
         return -1;
     }
-    std::string prompt = p->system_prompt;
-    // Substitute the declared resolution when the caller wants a space other
-    // than the profile's native one.
-    if (display_w != 0 && display_h != 0 &&
-        (display_w != p->model_space_w || display_h != p->model_space_h)) {
-        char from[32];
-        char to[48];
-        std::snprintf(from, sizeof(from), "%ux%u", p->model_space_w, p->model_space_h);
-        std::snprintf(to, sizeof(to), "%ux%u", display_w, display_h);
-        size_t pos = prompt.find(from);
-        if (pos != std::string::npos) {
-            prompt.replace(pos, std::strlen(from), to);
-        }
+    // The coordinate space is a property of the MODEL, not of the caller: Fara
+    // emits in a fixed 1000x1000 space because that is what it was trained on,
+    // and saying otherwise in the prompt does not change what it emits. Worse,
+    // `rac_cua_parse_action` always rescales from the profile's own space, so a
+    // declared space that disagreed produced a prompt and a rescale that
+    // contradicted each other — every click confidently wrong, silently. Refuse
+    // it. The parameter stays for a future profile whose space is negotiable.
+    if (display_w != 0 && (display_w != p->model_space_w || display_h != p->model_space_h)) {
+        return -1;
     }
+    const std::string& prompt = p->system_prompt;
     if (out != nullptr && out_size > 0) {
         copy_bounded(out, out_size, prompt);
     }
