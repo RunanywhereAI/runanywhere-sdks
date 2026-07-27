@@ -282,7 +282,6 @@ private struct MLXSTTOutput {
 }
 
 private struct MLXLLMOptionsSnapshot: Sendable {
-    let hasOptions: Bool
     let maxTokens: Int32
     let temperature: Float
     let topP: Float
@@ -307,7 +306,6 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             // a private table. These fallbacks had drifted to their own values
             // (max_tokens 1024) while every other layer said otherwise.
             let d = RAC_LLM_OPTIONS_DEFAULT
-            hasOptions = false
             maxTokens = d.max_tokens
             temperature = d.temperature
             topP = d.top_p
@@ -322,8 +320,6 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             history = []
             return
         }
-
-        hasOptions = true
         maxTokens = options.max_tokens
         temperature = options.temperature
         topP = options.top_p
@@ -348,7 +344,6 @@ private struct MLXLLMOptionsSnapshot: Sendable {
 }
 
 private struct MLXVLMOptionsSnapshot: Sendable {
-    let hasOptions: Bool
     let maxTokens: Int32
     let temperature: Float
     let topP: Float
@@ -361,7 +356,6 @@ private struct MLXVLMOptionsSnapshot: Sendable {
         guard let options = options?.pointee else {
             // See MLXLLMOptionsSnapshot: commons owns the defaults.
             let d: rac_vlm_options_t = RAC_VLM_OPTIONS_DEFAULT
-            hasOptions = false
             maxTokens = d.max_tokens
             temperature = d.temperature
             topP = d.top_p
@@ -371,8 +365,6 @@ private struct MLXVLMOptionsSnapshot: Sendable {
             seed = d.seed
             return
         }
-
-        hasOptions = true
         maxTokens = options.max_tokens
         temperature = options.temperature
         topP = options.top_p
@@ -1295,11 +1287,10 @@ private final class SyncResultBox<T>: @unchecked Sendable {
 }
 
 private func generateParameters(from options: MLXLLMOptionsSnapshot) -> GenerateParameters {
-    guard options.hasOptions else {
-        // Snapshot already carries the commons defaults when the C layer passed
-        // no options; do not introduce a second number here.
-        return GenerateParameters(maxTokens: Int(options.maxTokens))
-    }
+    // No early return for the no-options case: the snapshot resolves every field
+    // from RAC_LLM_OPTIONS_DEFAULT when the C layer passes no options, so one
+    // path serves both cases. The old early return forwarded maxTokens alone and
+    // let MLX's own constructor defaults win for temperature/topP/topK/penalties.
     return GenerateParameters(
         maxTokens: options.maxTokens > 0 ? Int(options.maxTokens) : nil,
         temperature: options.temperature,
@@ -1344,18 +1335,8 @@ private func llmUserInput(prompt: String, options: MLXLLMOptionsSnapshot) -> Use
 }
 
 private func generateParameters(from options: MLXVLMOptionsSnapshot) -> GenerateParameters {
-    guard options.hasOptions else {
-        // As above: the snapshot's no-options branch already resolved these from
-        // RAC_VLM_OPTIONS_DEFAULT.
-        return GenerateParameters(
-            maxTokens: Int(options.maxTokens),
-            temperature: options.temperature,
-            topP: options.topP,
-            topK: Int(options.topK),
-            repetitionPenalty: options.repetitionPenalty,
-            repetitionContextSize: 32
-        )
-    }
+    // As above: one path, because the snapshot already resolved these from
+    // RAC_VLM_OPTIONS_DEFAULT.
     let repetitionPenalty = options.repetitionPenalty > 0.0
         ? options.repetitionPenalty
         : RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY
